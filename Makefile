@@ -51,7 +51,7 @@ restore:
 	(cd src/servers/restore; make)
 
 floppy:
-	./scripts/rose-floppy-install
+	sh ./scripts/rose-floppy-install
 
 doc:
 	(cd doc; make)
