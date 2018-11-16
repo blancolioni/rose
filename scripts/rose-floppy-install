@@ -1,0 +1,22 @@
+#!/bin/sh
+objdump -d -S -f -h -t build/i686/i686-unknown-rose > ./logs/rose-objdump.txt
+for module in init console mem pci ata restore
+do objdump -d -S -f -h -t build/i686/modules/$module > ./logs/rose-$module-objdump.txt
+   readelf -a build/i686/modules/$module > ./logs/rose-$module-elf.txt
+done
+rm -f images/rose-boot-floppy.img
+gunzip -c images/bootgrub.gz > images/rose-boot-floppy.img
+mount /mnt/rose/rose-fd0/
+cp images/floppy/grub/menu.lst /mnt/rose/rose-fd0/boot/grub
+rm -rf images/tmp
+mkdir -p images/tmp
+cp build/i686/i686-unknown-rose images/tmp/kernel
+cp build/i686/modules/* images/tmp
+#cp bin/drivers/* /mnt/rose/rose-fd0/rose
+strip images/tmp/*
+cp images/tmp/* /mnt/rose/rose-fd0
+df /mnt/rose/rose-fd0
+umount /mnt/rose/rose-fd0
+chown fraser images/rose-boot-floppy.img
+#cp images/rose-boot-floppy.img ~/Dropbox
+echo Build finish at `date`
