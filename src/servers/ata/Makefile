@@ -42,5 +42,5 @@ ata:
 $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g
 
-$(BUILDDIR)/ada_rts.o: ../../library/librose/asm/i686/ada_rts.s
-	$(GCC) -c -m32 ../../library/librose/asm/i686/ada_rts.s -o $(BUILDDIR)/ada_rts.o
+$(BUILDDIR)/ada_rts.o: ../../library/asm/i686/ada_rts.s
+	$(GCC) -c -m32 ../../library/asm/i686/ada_rts.s -o $(BUILDDIR)/ada_rts.o
