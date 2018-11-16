@@ -1,0 +1,44 @@
+--                              -*- Mode: Ada -*-
+--  Filename        : gnat.gpr
+--  Description     : GNAT make project file for the RTS.
+--  Author          : Luke A. Guest
+--  Created On      : Thu Jun 14 12:03:49 2012
+--  Licence         : See LICENCE in the root directory.
+with "common.gpr";
+
+library project RTS is
+  for Source_Dirs  use (Common.Build_Dir & "/adainclude", 
+			"custom/adainclude");
+   for Source_Files use ("ada.ads",
+                         "a-unccon.ads",
+                         "a-uncdea.ads",
+                         "gnat.ads",
+                         "g-souinf.ads",
+                         "interfac.ads",
+			 "system.ads",
+                         "s-atacco.adb", "s-atacco.ads",
+                         "s-maccod.ads",
+                         "s-stoele.adb", "s-stoele.ads",
+			 "s-unstyp.ads",
+                         --  Custom packages go here.
+                         "last_chance_handler.adb", "last_chance_handler.ads",
+                         "memory.adb", "memory.ads",
+                         "s-parame.ads",
+                         "s-secsta.adb", "s-secsta.ads");
+   for Object_Dir   use Common.Build_Dir & "/obj";
+
+   package Builder is
+      Ada_Switches := ("-gnat2012", "-O0", "-g3", "-x", "-gnatg",
+                       "-gnatec=../../../gnat.adc", "-q");--, "-gnatd.n");
+
+      for Default_Switches ("Ada") use Ada_Switches & ("-m32", "-march=i586");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib");
+   end Compiler;
+
+   for Library_Kind use "static";
+   for Library_Name use "gnat";
+   for Library_Dir  use Common.Build_Dir & "/adalib";
+end RTS;

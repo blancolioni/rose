@@ -1,0 +1,26 @@
+project Kernel_X86_64 is
+
+   for Source_Dirs use ("../src", "../src/base", "../src/kernel", "../src/devices", "../src/boot", "../src/asm/x86_64", "../src/arch/x86_64", "../src/kernel/processes", "../src/kernel/modules", "../src/kernel/arch/x86_64", "../src/library/capabilities");
+   for Object_Dir use "../build/x86_64/kernel/obj";
+
+   package Builder is
+      for Global_Configuration_Pragmas use "kernel-pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j1");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-gnat12", "-fno-strict-aliasing", "-m64", "-mcmodel=large");
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("ada") use ("-E", "-n");
+   end Binder;
+
+   package Linker is
+   end Linker;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end Kernel_X86_64;

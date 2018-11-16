@@ -1,0 +1,446 @@
+with System;                            use System;
+
+with Rose.Addresses;
+with Rose.Words;
+
+with Rose.Boot.Console;
+with Rose.Kernel.Heap;
+
+package body Rose.Kernel.Page_Table is
+
+   Log_Page_Table : constant Boolean := False;
+
+   Entries_Per_Page : constant := Physical_Page_Bytes / 4;
+
+   type Page_Entry is
+      record
+         PFA               : Physical_Page_Address := 0;
+         Available_11      : Boolean               := False;
+         Available_10      : Boolean               := False;
+         Available_9       : Boolean               := False;
+         Global            : Boolean               := False;
+         Zero              : Boolean               := False;
+         Dirty             : Boolean               := False;
+         Accessed          : Boolean               := False;
+         Cache_Disable     : Boolean               := False;
+         Transparent_Write : Boolean               := False;
+         User              : Boolean               := False;
+         Writable          : Boolean               := False;
+         Present           : Boolean               := False;
+      end record;
+
+   for Page_Entry use
+      record
+         Present           at 0 range 0 .. 0;
+         Writable          at 0 range 1 .. 1;
+         User              at 0 range 2 .. 2;
+         Transparent_Write at 0 range 3 .. 3;
+         Cache_Disable     at 0 range 4 .. 4;
+         Accessed          at 0 range 5 .. 5;
+         Dirty             at 0 range 6 .. 6;
+         Zero              at 0 range 7 .. 7;
+         Global            at 1 range 0 .. 0;
+         Available_9       at 1 range 1 .. 1;
+         Available_10      at 1 range 2 .. 2;
+         Available_11      at 1 range 3 .. 3;
+         PFA               at 1 range 4 .. 23;
+      end record;
+
+   for Page_Entry'Size use 32;
+
+   type Page_Entry_Index is range 0 .. Entries_Per_Page - 1;
+
+   First_Kernel_Page_Entry_Index : constant :=
+                                     (Entries_Per_Page / 4) * 3;
+
+   subtype Page_Directory_Index is Page_Entry_Index;
+
+   subtype User_Page_Directory_Index is
+     Page_Directory_Index range
+       0 .. First_Kernel_Page_Entry_Index - 1;
+
+   subtype Kernel_Page_Directory_Index is
+     Page_Directory_Index range
+       First_Kernel_Page_Entry_Index .. Entries_Per_Page - 1;
+
+   type Page_Table_Array is
+     array (Page_Entry_Index) of Page_Entry
+     with Pack, Size => Entries_Per_Page * 32;
+
+   Page_Directory    : Page_Table_Array;
+   pragma Import (C, Page_Directory, "boot_page_directory");
+
+   --  Kernel_Page_Table : Page_Table_Array;
+   --  pragma Import (C, Kernel_Page_Table, "KernPageTbl");
+
+--     type Page_Directory_Allocation is array (0 .. 1023) of Boolean;
+--     pragma Pack (Page_Directory_Allocation);
+
+   --  how many pages we allocate in a block
+   Page_Table_Block_Size : constant := 64;
+
+   procedure Init_Page_Entry (P : in out Page_Entry);
+
+   function Page_Table_Block_Start (Dir_Offset : Natural)
+                                    return Natural
+     with Unreferenced;
+
+--     procedure Allocate_Page_Table_Block (Start : Natural);
+
+   procedure Show_Page_Entry (Page : Page_Entry);
+
+   procedure Map_Page
+     (Directory      : in out Page_Table_Array;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
+      Physical_Page  : Rose.Addresses.Physical_Page_Address;
+      Readable       : Boolean;
+      Writable       : Boolean;
+      Executable     : Boolean;
+      User           : Boolean);
+
+   procedure Unmap_Page
+     (Directory      : in out Page_Table_Array;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address);
+
+   -------------------------
+   -- Allocate_Page_Block --
+   -------------------------
+
+--     procedure Allocate_Page_Table_Block (Start : Natural) is
+--        Table_Addr : constant Virtual_Address :=
+--          Rose.Kernel.Heap.Allocate (Page_Table_Block_Size *
+--                                       Physical_Page_Bytes,
+--                                     Physical_Page_Bytes);
+--        Dir_Entry : Page_Entry;
+--     begin
+--        Init_Page_Entry (Dir_Entry);
+--        Dir_Entry.PFA     := Page_Frame_Address (Table_Addr / 4096);
+--        for I in 0 .. Page_Table_Block_Size loop
+--           if not Allocated (Start + I) then
+--              Allocated (Start + I) := True;
+--              Page_Directory (Start + I) := Dir_Entry;
+--           end if;
+--           Dir_Entry.PFA := Dir_Entry.PFA + 1;
+--        end loop;
+--     end Allocate_Page_Table_Block;
+
+   ---------------------
+   -- Init_Page_Entry --
+   ---------------------
+
+   procedure Init_Page_Entry (P : in out Page_Entry) is
+   begin
+      P.PFA               := 0;
+      P.Available_11      := False;
+      P.Available_10      := False;
+      P.Available_9       := False;
+      P.Global            := False;
+      P.Zero              := False;
+      P.Dirty             := False;
+      P.Accessed          := False;
+      P.Cache_Disable     := False;
+      P.Transparent_Write := False;
+      P.User              := True;
+      P.Writable          := False;
+      P.Present           := True;
+   end Init_Page_Entry;
+
+   ---------------------
+   -- Init_Page_Table --
+   ---------------------
+
+   procedure Init_Page_Table is
+   begin
+      Page_Directory (User_Page_Directory_Index) :=
+        (others => <>);
+   end Init_Page_Table;
+
+   ------------------------------
+   -- Init_User_Page_Directory --
+   ------------------------------
+
+   procedure Init_User_Page_Directory
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+   begin
+      Directory := (others => <>);
+      --  top 1G always mapped to Kernel space
+      Directory (Kernel_Page_Directory_Index) :=
+        Page_Directory (Kernel_Page_Directory_Index);
+   end Init_User_Page_Directory;
+
+   ---------------------------
+   -- Kernel_Page_Directory --
+   ---------------------------
+
+   function Kernel_Page_Directory
+     return Rose.Addresses.Physical_Address
+   is (Rose.Addresses.Physical_Address
+         (Rose.Addresses.To_Virtual_Address (Page_Directory'Address)
+          - Kernel_Virtual_Base));
+
+   ---------------------
+   -- Map_Kernel_Page --
+   ---------------------
+
+   procedure Map_Kernel_Page
+     (Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
+      Physical_Page  : Rose.Addresses.Physical_Page_Address;
+      Readable       : Boolean;
+      Writable       : Boolean;
+      Executable     : Boolean;
+      User           : Boolean)
+   is
+   begin
+      Map_Page (Page_Directory, Virtual_Page, Physical_Page,
+                Readable, Writable, Executable, User);
+   end Map_Kernel_Page;
+
+   --------------
+   -- Map_Page --
+   --------------
+
+   procedure Map_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
+      Physical_Page  : Rose.Addresses.Physical_Page_Address;
+      Readable       : Boolean;
+      Writable       : Boolean;
+      Executable     : Boolean;
+      User           : Boolean)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+   begin
+      Map_Page (Directory, Virtual_Page, Physical_Page,
+                Readable, Writable, Executable, User);
+   end Map_Page;
+
+   --------------
+   -- Map_Page --
+   --------------
+
+   procedure Map_Page
+     (Directory      : in out Page_Table_Array;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
+      Physical_Page  : Rose.Addresses.Physical_Page_Address;
+      Readable       : Boolean;
+      Writable       : Boolean;
+      Executable     : Boolean;
+      User           : Boolean)
+   is
+      pragma Unreferenced (Executable, Readable);   --   :-(
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index : constant Page_Entry_Index :=
+                      Page_Entry_Index (Virtual_Page mod 1024);
+   begin
+      if Log_Page_Table then
+         Rose.Boot.Console.Put ("Map_Page: ");
+         Rose.Boot.Console.Put
+           (Physical_Address (Virtual_Page) * 4096);
+         Rose.Boot.Console.Put (" --> ");
+         Rose.Boot.Console.Put (Physical_Address (Physical_Page) * 4096);
+         Rose.Boot.Console.New_Line;
+      end if;
+
+      if Directory (Directory_Index).PFA = 0 then
+         declare
+            Addr       : constant Virtual_Page_Address :=
+                           Rose.Kernel.Heap.Allocate_Page;
+            Table_Page : Page_Table_Array;
+            pragma Import (Ada, Table_Page);
+            for Table_Page'Address use
+              System'To_Address (Virtual_Page_To_Address (Addr));
+         begin
+            if Log_Page_Table then
+               Rose.Boot.Console.Put ("initialising table page");
+            end if;
+
+            Table_Page := (others => <>);
+            Init_Page_Entry (Directory (Directory_Index));
+            Directory (Directory_Index).PFA :=
+              Physical_Page_Address (Addr - Kernel_Virtual_Page_Base);
+            Directory (Directory_Index).User := User;
+            Directory (Directory_Index).Writable := True;
+         end;
+      end if;
+
+      if False and then Log_Page_Table then
+         Show_Page_Entry (Directory (Directory_Index));
+      end if;
+
+      declare
+         Phys_Addr : constant Physical_Address :=
+                       Physical_Address (Directory (Directory_Index).PFA)
+                       * Physical_Page_Bytes;
+         Addr      : constant Virtual_Address :=
+                       Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+         Table_Page : Page_Table_Array;
+         for Table_Page'Address use System'To_Address (Addr);
+         pragma Import (Ada, Table_Page);
+         Table_Entry : Page_Entry renames Table_Page (Table_Index);
+      begin
+         Init_Page_Entry (Table_Entry);
+         Table_Entry.PFA := Physical_Page;
+         Table_Entry.Writable := Writable;
+         Table_Entry.User := User;
+         if Log_Page_Table then
+            Show_Page_Entry (Table_Entry);
+         end if;
+      end;
+
+   end Map_Page;
+
+   --------------------------
+   -- Mapped_Physical_Page --
+   --------------------------
+
+   function Mapped_Physical_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Addresses.Physical_Page_Address
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index     : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page mod 1024);
+   begin
+
+      if Directory (Directory_Index).PFA = 0 then
+         return 0;
+      end if;
+
+      declare
+         Phys_Addr   : constant Physical_Address :=
+                         Physical_Address (Directory (Directory_Index).PFA)
+                         * Physical_Page_Bytes;
+         Addr        : constant Virtual_Address :=
+                         Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+         Table_Page  : Page_Table_Array;
+         for Table_Page'Address use System'To_Address (Addr);
+         pragma Import (Ada, Table_Page);
+         Table_Entry : Page_Entry renames Table_Page (Table_Index);
+      begin
+         return Table_Entry.PFA;
+      end;
+   end Mapped_Physical_Page;
+
+   ----------------------------
+   -- Page_Table_Block_Start --
+   ----------------------------
+
+   function Page_Table_Block_Start (Dir_Offset : Natural)
+                                   return Natural
+   is
+   begin
+      return Dir_Offset - Dir_Offset mod Page_Table_Block_Size;
+   end Page_Table_Block_Start;
+
+   ---------------------
+   -- Show_Page_Entry --
+   ---------------------
+
+   procedure Show_Page_Entry (Page : Page_Entry) is
+      use Rose.Words;
+      Bc : constant array (Boolean) of Character := ('0', '1');
+      W  : Word_32;
+      for W'Address use Page'Address;
+      pragma Import (Ada, W);
+   begin
+      Rose.Boot.Console.Put ("Page Entry: ");
+      Rose.Boot.Console.Put (W);
+      Rose.Boot.Console.Put (" -- ");
+      Rose.Boot.Console.Put (Word_32 (Page.PFA) * 4096);
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Available_11));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Available_10));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Available_9));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Global));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Zero));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Dirty));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Accessed));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Cache_Disable));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Transparent_Write));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.User));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Writable));
+      Rose.Boot.Console.Put (":");
+      Rose.Boot.Console.Put (Bc (Page.Present));
+      Rose.Boot.Console.New_Line;
+   end Show_Page_Entry;
+
+   -----------------------
+   -- Unmap_Kernel_Page --
+   -----------------------
+
+   procedure Unmap_Kernel_Page
+     (Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+   is
+   begin
+      Unmap_Page (Page_Directory, Virtual_Page);
+   end Unmap_Kernel_Page;
+
+   ----------------
+   -- Unmap_Page --
+   ----------------
+
+   procedure Unmap_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+
+   begin
+      Unmap_Page (Directory, Virtual_Page);
+   end Unmap_Page;
+
+   ----------------
+   -- Unmap_Page --
+   ----------------
+
+   procedure Unmap_Page
+     (Directory      : in out Page_Table_Array;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index     : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page mod 1024);
+      Phys_Addr       : constant Physical_Address :=
+                          Physical_Address (Directory (Directory_Index).PFA)
+                          * Physical_Page_Bytes;
+      Addr            : constant Virtual_Address :=
+                          Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+      Table_Page      : Page_Table_Array;
+      for Table_Page'Address use System'To_Address (Addr);
+      pragma Import (Ada, Table_Page);
+      Table_Entry     : Page_Entry renames Table_Page (Table_Index);
+   begin
+      Table_Entry := (others => <>);
+   end Unmap_Page;
+
+end Rose.Kernel.Page_Table;

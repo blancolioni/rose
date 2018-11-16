@@ -1,0 +1,35 @@
+\chapter{Architecture Specifics}
+
+\section{i686}
+
+\subsection{Invocation Record}
+
+The first four words of an invocation are placed in registers.  The remaining words, if any, are pushed onto the stack.
+
+\begin{table}[ht]
+\begin{tabular}{l l}
+\hline\hline
+Register & Parameter \\
+\hline
+{\tt eax}  &  Control word \\
+{\tt edx}  &  Used by {\em sysenter} instruction \\
+{\tt ebx}  &  Invoked capability\\
+{\tt ecx}  &  Used by {\em sysenter} instruction\\
+{\tt esp}  &  \\
+{\tt ebp}  &  \\
+{\tt esi}  &  First argument \\
+{\tt edi}  &  Second argument \\
+\hline
+\end{tabular}
+\caption{i686 invocation record}
+\label{table:i686invocation}
+\end{table}
+
+\subsection{Page Table}
+
+Uses 4K pages.  Per-process virtual memory is 3G.  Page object ids are 31 bits long, allowing up to $2^{43}$ bytes or 8TB of state.
+
+\subsection{Persistence}
+
+
+\section{x64}

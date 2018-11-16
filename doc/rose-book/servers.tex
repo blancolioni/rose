@@ -1,0 +1,47 @@
+\chapter{Servers}
+
+\section{Boot Servers}
+
+When the kernel is ready to schedule its first process, it chooses the first boot module.  This is the {\em init} program.  Its job is to load the rest of the boot modules, and find the most recent consistent checkpoint from which to restore.
+
+Init requires a particular set of launch caps (see Table \ref{table:init-launch-caps}).  Each of these capabilities is invoked in order.  Init runs with a low priority, causing it to block while each boot server initialises.
+
+Init is configured via a Petal script (see Figure \ref{fig:init.petal} for a small example).  This script is compiled to an Ada package spec, which is with'd by the {\tt init} source.
+
+
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Cap & Name & Description \\
+\hline
+1 & meta & Standard meta cap \\
+2 & launch & Cap for launching boot modules \\
+2 & copy & Cap for copying process caps \\
+3 & construct-port & Cap for constructing port caps \\
+\hline
+\end{tabular}
+\caption{Launch caps for {\em init} process}
+\label{table:init-launch-caps}
+\end{table}
+
+\begin{table}[ht]
+\begin{tabular}{l l l l}
+\hline\hline
+Pid & Name & Interface & Description \\
+\hline
+2 & init & none & Installs system image and launches boot servers \\
+3 & console & stream-writer & writes to boot terminal \\
+4 & hd0 & storage & boot hard drive \\
+7 & mem & mem & memory manager \\
+8 & checkpoint & checkpoint & checkpointing process \\
+9 & proc & proc & process manager \\
+\hline
+\end{tabular}
+\caption{Boot Servers}
+\label{table:boot_servers}
+\end{table}
+
+\subsection{Memory Manager}
+
+
+\subsection{Process Manager}

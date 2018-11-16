@@ -1,0 +1,170 @@
+\chapter{Persistence}
+
+The active state of the system is defined by the page object state, which is overridden by the swap state, which is overridden by the memory state.
+
+\section{Checkpoint Objects}
+
+A page object is a single page (where the size of the page is architecture-dependent).  Object identifiers for page objects range from {\tt ff00 0000 0000 0000} to {\tt ffff ffff ffff ffff}.  A checkpoint state contains all page objects from a particular system state.
+
+The swap state is a copy of the page object state, updated by page writes which have occurred since the last checkpoint.  A process addresses its own memory using normal virtual memory conventions; these hardware pages are mapped by the kernel to page object ids, which can index swap and page object state directly.
+
+The memory state is a cache of the swap state.
+
+\section{Checkpoint Operation}
+
+Persistence is implemented by a regular checkpoint operation.
+
+\subsection{Pages}
+
+Memory pages are always allocated read-only.  The first write to a page (if it is allowed) causes a page fault which switches the page to read/write and marks it as dirty.  When a dirty page is swapped out or synchronised, it is written to swap and its page object id is recorded in a list.
+
+\subsection{Process}
+
+When a checkpoint begins, a new, empty, changed page object list is created.  All memory pages are marked as read-only, and all dirty pages are written to swap (via synchronisation).  The former changed page object list is scanned, and the changed pages are copied.  A new checkpoint is created, which references the previous checkpoint, the most recent checkpoint state, and page content copies.
+
+If a page write occurs while the checkpoint process is running, a page fault will result (because all pages are read-only at this point).  If dirty pages are still being written, the faulting process will be blocked until the changed page object list scan starts.
+
+\subsection{Merge}
+
+From time to time, the most recent checkpoint is merged into a full page object state, which will be used for subsequent checkpoint operations.
+
+There exists at least one consistent checkpoint state.  The last operation of a checkpoint merge writes an identifier which certifies the new checkpoint state.  When restoring a checkpoint, if this identifier is missing or malformed, the previous checkpoint state is used instead.
+
+\subsection{Pseudocode}
+
+\subsubsection{Initialising Checkpoint}
+
+\begin{verbatim}
+    checkpoint:
+       lock
+          Checkpoint_State := Write_Dirty_Pages
+          
+          for Page of Writable_Page_List loop
+             if Page.Dirty then
+                Page.Write_To_Swap
+             end if
+             Page.Writable := False
+          end loop
+          Writable_Page_List.Clear
+          old_list := current_list
+          current_list := new Changed_Page_Object_List
+          Checkpoint_State := Copy_Changed_Swap
+       end lock
+\end{verbatim}
+
+\subsubsection{Copying Changed Blocks}
+
+\begin{verbatim}
+    for Page_Id of Changed_Page_Object_List loop
+       Target_Block := Next_Changed_Page_Block
+       Copy_Block (Active_Swap (Page_Id), Target_Block)
+       Append_Checkpoint_Reference (Page_Id, Target_Block)
+    end loop
+    Commit_Checkpoint (Change_Page_Object_list)
+\end{verbatim}
+
+\subsubsection{Merging Checkpoint}
+
+\begin{verbatim}
+    Copy_Current_Page_Object_State
+    for Checkpoint of Incremental_Checkpoint_List
+       for Page_Id of Checkpoint.Page_Id_List
+          Copy_Block (Page_Id.Checkpoint_Block,
+                      New_Page_Object_State.Block (Page_Id))
+       end loop
+    end loop
+    
+    Commit_And_Activate (New_page_Object_State)
+\end{verbatim}
+
+\section{Restore}
+
+To restore from a checkpoint, the most recent consistent checkpoint state is copied to swap.  Then, for each checkpoint based on this state, the previous checkpoint is recursively applied, followed by each changed page object.   Any required pages can be loaded from swap, and the system will proceed normally.
+
+\section{Drive Layout}
+
+\subsection{Partition Example}
+
+This is an example of how to partition a 64G disk.
+
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Partition & Size & Description \\
+\hline
+Boot  & 100MB & Grub, kernel image, boot modules \\
+Swap  & 16G & Active swap partition \\
+State & 16G & Last checkpointed state \\
+Change & 16G & Changes since last full checkpoint \\
+Incremental & 12G & Changes since last incremental checkpoint \\
+\hline
+\end{tabular}
+\caption{Example 100G disk layout}
+\label{table:100gdisklayout}
+\end{table}
+
+\subsection{Boot partition}
+
+This partition contains the boot sector, grub, a kernel image and enough modules to launch a minimal system.  The init module looks for a checkpoint, and if found, restores from it.  Otherwise, the installation process is started.
+
+\subsection{Swap and checkpoint state partition}
+
+These partitions are formatted identically.  Each block in the partition corresponds to exactly one page object; in particular,  the block number or'd with the page object type specifier.
+
+\subsection{Change Partition}
+
+The change partition is divided into a header block, a range of change file blocks, and a range of changed page object blocks.
+
+The change partition is cleared after a checkpoint merge.
+
+\subsubsection{Header Block}
+
+\begin{table}[ht]
+\begin{tabular}{l l}
+\hline\hline
+Offset &  Description \\
+\hline
+{\tt 0000} & Magic number \\
+{\tt 0004} & Reserved \\
+{\tt 0008} & Checkpoint Identity \\
+{\tt 0010} & Checkpoint Start Timestamp \\
+{\tt 0018} & Checkpoint Finish Timestamp \\
+{\tt 0020} & First checkpoint block \\
+{\tt 0028} & Checkpoint block count \\
+{\tt 0030} & Working Checkpoint Identity \\
+{\tt 0038} & Working Checkpoint Start \\
+{\tt 0040} & Working checkpoint first block \\
+{\tt 0048} & Next free checkpoint block \\
+{\tt 0050} & Next free page block \\
+\hline
+\end{tabular}
+\caption{Change Partition Header}
+\label{table:change-partition-header}
+\end{table}
+
+\subsubsection{Checkpoint Block (4K)}
+
+\begin{table}[ht]
+\begin{tabular}{l l}
+\hline\hline
+Offset &  Description \\
+\hline
+{\tt 0000} & Magic number \\
+{\tt 0004} & Reserved \\
+{\tt 0008} & Checkpoint Identity \\
+{\tt 0010} & Next checkpoint block \\
+{\tt 0018} & Reserved \\
+{\tt 0020} & Page Object Id 1 \\
+{\tt 0028} & Page Object Block 1 \\
+{\tt 0030} & Page Object Id 2 \\
+{\tt 0038} & Page Object Block 2 \\
+{\tt ....} & \\
+{\tt 1FE0} & Page Object Id 509 \\
+{\tt 1FE8} & Page Object Block 509 \\
+{\tt 1FF0} & Checkpoint Identity \\
+{\tt 1FF8} & Magic number \\
+\hline
+\end{tabular}
+\caption{Checkpoint block (4K)}
+\label{table:checkpoint-block-4k}
+\end{table}
