@@ -1,0 +1,51 @@
+--                              -*- Mode: Ada -*-
+--  Filename        : common.gpr
+--  Description     : Common GNAT make project file.
+--  Author          : Luke A. Guest
+--  Created On      : Thu Jun 14 16:39:51 2016
+--  Licence         : See LICENCE in the root directory.
+abstract project Common is
+   type Mode_Name  is ("debug", "release");
+   type Arch_Name  is ("i686");
+
+   Mode  : Mode_Name  := "release";
+   Arch  : Arch_Name  := "i686";
+
+   Source_Dir        := "src";
+   Build_Dir         := "build/" & Arch;
+
+   for Source_Dirs use ();
+
+   package Builder is
+      Ada_Switches := ("-gnat2012", "-gnata", "-gnato", "-gnatE",
+                       "-gnaty", "-gnaty-s", "-gnatyO", "-gnaty+M120", "-gnatyx",
+                       "-gnaty+d", "-gnatv"); --, "-v");
+   end Builder;
+
+   package Compiler is
+      Ada_Switches := ("-ffunction-sections", "-fdata-sections") & Builder.Ada_Switches;
+      --                         "-gnat2012", "-gnata", "-gnato", "-gnatE",
+      --                         "-gnatyN", "-gnaty", "-gnaty-s", "-gnatyO", "-gnatyM120", "-gnatyx",
+      --                         "-gnaty+d", "-gnatv");
+      Asm_Switches := ("");
+
+      case Mode is
+         when "debug" =>
+            Ada_Switches := Ada_Switches & ("-O0", "-g"); --  , "-gnatD", "-gnatG");
+            Asm_Switches := Asm_Switches & ("-g");
+
+         when "release" =>
+            Ada_Switches := Ada_Switches & ("-O2");
+            Asm_Switches := Asm_Switches & ("-O", "-g");
+      end case;
+
+      case Arch is
+         when "i686" =>
+            Ada_Switches := Ada_Switches & ("-m32", "-march=" & Arch);
+            Asm_Switches := Asm_Switches & ("--32", "-march=" & Arch);
+      end case;
+
+      for Default_Switches ("Ada") use Ada_Switches;
+      for Default_Switches ("Asm") use Asm_Switches;
+   end Compiler;
+end Common;

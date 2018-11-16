@@ -1,0 +1,45 @@
+\chapter{Petal}
+
+\section{Generating init Scripts}
+
+A subset of Petal can be used to generate an Ada package suitable for use as an init script.  The Petal source is processed by an Aquarius plugin.
+
+\begin{figure}
+\begin{verbatim}
+    $ aquarius -f -i init.petal -a init
+\end{verbatim}
+\caption{Command for generating init script package}
+\end{figure}
+
+\begin{figure}
+\begin{verbatim}
+procedure Init
+  (Meta_Cap    : Capability;
+   Launch_Cap  : Capability;
+   Copy_Cap    : Capability;
+   Create_Cap  : Capability)
+is
+   Console_Ready       : constant String := "init: console ready" & NL;
+   Memory_Buffer       : Page;
+   Page_Object_Cap     : Capability;
+   Console_Process_Cap : Capability;
+   Console_Memory_Cap  : Capability;
+   Console_Write_Cap   : Capability;
+begin
+   Page_Object_Cap :=
+     Meta_Cap.Endpoint (3).Invoke
+       (Memory_Buffer'Address, Memory_Buffer'Storage_Size);
+   Console_Memory_Cap :=
+     Create_Cap (Driver_Page_Capability, 16#000B_8000#);
+   Console_Process_Cap :=
+     Launch_Cap (Meta_Cap, Console_Memory_Cap);
+   Console_Write_Cap := 
+     Copy_Cap (Console_Process_Cap, 1);
+   Memory_Buffer.Write (Console_Ready);
+   Console_Write_Cap (Page_Object_Cap, Console_Ready'Length);
+end Init;
+\end{verbatim}
+\caption{Sample init Petal source}
+\end{figure}
+
+

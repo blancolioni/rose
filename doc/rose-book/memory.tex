@@ -1,0 +1,40 @@
+\chapter{Memory}
+
+Physical memory is managed by the memory manager.  Page objects are managed by the page object manager.  A process belongs to a particular space bank, which represents a range of page objects.  Space banks are hierarchical.  A page object is a direct member of at most one space bank.  At the top of the space bank hierarchy is the root space bank, which encompasses the entire page object id range.
+
+Each process executes in a flat memory space starting at zero.  These are the virtual pages.  Virtual pages are mapped or unmapped.  A mapped virtual page references a corresponding physical page.  A physical page may be mapped by any number of virtual pages.  This mapping is not persisted.
+
+\section{Example}
+
+The command {\tt ls} lists the contents of a directory.  A user shell normally has a launch capability for {\tt ls}.  When this capability is invoked, a new process is created.  A snapshot of part of the memory state might look something like table \ref{table:ls-launch}.
+
+\begin{table}[ht]
+\begin{tabular}{l l l l}
+\hline\hline
+Page Object & Virtual Address & Physical Address & Description \\
+\hline
+$ls + 0$ & {\tt 0000 0000} & {\tt 4020 C000} & 1st page of ls text segment \\
+$ls + 1000$ & {\tt 0000 1000} & {\tt ABCD 2000} & 2nd page of ls text segment \\
+$ls + 2000$ & {\tt 0000 2000} &  & 3rd page (not paged in yet) \\
+$base + 3000$ & {\tt BFFF F000} & {\tt D020 1000} & stack page (in user space map) \\
+\hline
+\end{tabular}
+\caption{Example memory snapshot after launching {\tt ls}}
+\label{table:ls-launch}
+\end{table}
+
+Every physical page is either free, or mapped to a page object.  This mapping is not persisted.  The memory manager keeps track of free memory pages and memory page $\Leftrightarrow$ page object mappings.
+
+\section{Memory Interface}
+
+A memory capability can be used to map a page object id.  This makes the page object available to a running process, although it does not necessarily exist in physical memory yet.  When a process is launched, four page object ranges are mapped: the code segment (read-only, executable), the text segment (read-only), the data segment (read/write) and the stack segment (read/write).
+
+If the memory server already knows about a read-only page object id, the map is not updated.
+
+A stack segment page object id is always new, and is therefore always recorded in the memory manager.
+
+A data segment page object may be initialised or uninitialised.
+
+If an initialised read/write page object id is mapped, and the memory manager already has the page object mapped read-only, the page object is mapped to the read-only version.  If it is later written to, a copy will be made and the page object will be re-mapped.
+
+An uninitialised read/write page object is recorded (same as a stack segment page).

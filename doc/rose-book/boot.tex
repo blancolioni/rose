@@ -1,0 +1,51 @@
+\chapter{Boot Sequence}
+
+\section{Initial Processes}
+
+\subsection{{\tt init}}
+
+The {\tt init} program executes a series of commands created from a Petal script.  These are compiled with the executable, using an Aquarius plugin to generate an array of command records which implement the script.
+
+The script is restricted to a subset of the full Petal language.
+
+The kernel gives the init process a single {\tt create} capability.
+
+\subsection{console}
+
+The console program implements a stream writer interface, and sends anything it receives to its device.  For rose-x86 it writes directly to the console buffer, which is mapped by the kernel at boot time.  Normally this is the first server launched by {\tt init}.
+
+\subsection{mem}
+
+The standard memory manager is launched with a memory capability, which can be queried for the available physical memory layout, and invoked to map and unmap virtual addresses to physical ones.  It implements the {\tt memory manager} interface, which can add and remove processes, and handle page faults.
+
+\subsection{pci}
+
+\subsection{ata}
+
+\section{First Boot}
+
+\section{Restore Boot}
+
+\section{Scripts}
+
+The boot process is controlled by a compiled Petal script.  A sample script is shown in figure {\ref{fig:init.petal}}.
+
+\begin{figure}
+    \centering
+\begin{verbatim}
+    procedure Init
+      (Create    : interface Meta)
+    is
+       Console : constant interface Process :=
+         Launch.Launch_Boot_Module (2);
+       Writer  : constant interface Stream_Writer :=
+         Cap_Copy.Copy_Cap (Console, 1);
+    begin
+       Output_Buffer := Start_Init;
+       Writer.Write (Output_Buffer, Start_Init'Length);
+    end Init;
+\end{verbatim}
+\caption{Sample Petal script for init}
+    \label{fig:init.petal}
+\end{figure}
+
