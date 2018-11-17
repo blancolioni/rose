@@ -379,7 +379,7 @@ package body Rose.Kernel.Processes is
             Addr    => Virtual_Address);
       end if;
 
-      if Log_Page_Faults or else Current_Process_Id = 5 then
+      if Log_Page_Faults or else Current_Process_Id = Log_Process_Activity then
          Rose.Boot.Console.Put ("page-fault: ");
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
@@ -391,7 +391,7 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Write_Attempt then "w" else "-");
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
-         Debug.Report_Process (Current_Process_Id, True);
+         Debug.Report_Process (Current_Process_Id, False);
       end if;
 
       Handle_Page_Fault
