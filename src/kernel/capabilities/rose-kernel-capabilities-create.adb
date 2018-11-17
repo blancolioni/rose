@@ -65,6 +65,7 @@ package body Rose.Kernel.Capabilities.Create is
       Rose.Boot.Console.Put (Rose.Words.Word_8 (New_Cap));
       Rose.Boot.Console.Put (" ");
       Rose.Kernel.Debug.Put_Cap_Type (Cap_Layout.Header.Cap_Type);
+      Rose.Boot.Console.Put (" ");
       Rose.Boot.Console.Put (Rose.Words.Word_16 (Cap_Layout.Header.Endpoint));
       Rose.Boot.Console.Put (" ");
       Rose.Boot.Console.Put (Rose.Words.Word (Cap_Layout.Payload));
