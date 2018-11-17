@@ -19,8 +19,8 @@ package body PCI.Server is
       Current_Endpoint : Rose.Objects.Endpoint_Id :=
                             Rose.Devices.PCI.PCI_Base_Device_Endpoint_Id;
    begin
-      for Bus in Rose.Devices.PCI.Bus_Type range 0 .. 1 loop
-         for Slot in Rose.Devices.PCI.Device_Type range 0 .. 1 loop
+      for Bus in Rose.Devices.PCI.Bus_Type loop
+         for Slot in Rose.Devices.PCI.Device_Type loop
             declare
                use type Rose.Words.Word_16;
                Vendor : constant Rose.Words.Word_16 :=
@@ -98,6 +98,7 @@ package body PCI.Server is
 
          if Params.Endpoint = Rose.Devices.PCI.PCI_Endpoint_Id then
             declare
+               use Rose.Capabilities;
                Vendor  : constant Rose.Words.Word_16 :=
                            Rose.Words.Word_16 (Params.Data (0));
                Device  : constant Rose.Words.Word_16 :=
@@ -106,12 +107,24 @@ package body PCI.Server is
                            PCI.Devices.Find_Device_Cap
                              (Vendor, Device);
             begin
-               Params.Control.Flags :=
-                 (Reply     => True,
-                  Send_Caps => True,
-                  others    => False);
-               Params.Control.Last_Sent_Cap := 0;
-               Params.Caps (0) := Cap;
+               if Cap = Null_Capability then
+                  Rose.Console_IO.Put ("pci: cannot find device ");
+                  Rose.Console_IO.Put (Vendor);
+                  Rose.Console_IO.Put (" ");
+                  Rose.Console_IO.Put (Device);
+                  Rose.Console_IO.New_Line;
+                  Params.Control.Flags :=
+                    (Reply     => True,
+                     Error     => True,
+                     others    => False);
+               else
+                  Params.Control.Flags :=
+                    (Reply     => True,
+                     Send_Caps => True,
+                     others    => False);
+                  Params.Control.Last_Sent_Cap := 0;
+                  Params.Caps (0) := Cap;
+               end if;
                Params.Cap := Params.Reply_Cap;
                Rose.System_Calls.Invoke_Capability (Params);
             end;
@@ -136,7 +149,7 @@ package body PCI.Server is
                     (Reply      => True,
                      Send_Words => True,
                      others     => False);
-                  Params.Control.Last_Sent_Cap := 0;
+                  Params.Control.Last_Sent_Word := 0;
                   Params.Data (0) := Data;
                   Params.Cap := Params.Reply_Cap;
                   Rose.System_Calls.Invoke_Capability (Params);
