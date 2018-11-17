@@ -10,6 +10,21 @@ package Rose.Devices.GPT is
    procedure Initialize_GPT
      (Block_Device : Rose.Devices.Block.Client.Block_Device_Type);
 
+   function Partition_Count
+     (Block_Device : Rose.Devices.Block.Client.Block_Device_Type)
+      return Natural;
+
+--     procedure Get_Partition_Details
+--       (Block_Device        : Rose.Devices.Block.Client.Block_Device_Type;
+--        Partition_Index     : Positive;
+--        First_Block         : out Rose.Devices.Block.Block_Address_Type;
+--        Last_Block          : out Rose.Devices.Block.Block_Address_Type;
+--        Partition_Type_Low  : out Rose.Words.Word_64;
+--        Partition_Type_High : out Rose.Words.Word_64;
+--        Partition_Flags     : out Rose.Words.Word_64;
+--        Partition_Name      : out String;
+--        Partition_Name_Last : out Natural);
+
    procedure Add_Partition
      (Block_Device        : Rose.Devices.Block.Client.Block_Device_Type;
       First_Block         : Rose.Devices.Block.Block_Address_Type;
@@ -19,7 +34,9 @@ package Rose.Devices.GPT is
       Partition_Flags     : Rose.Words.Word_64;
       Partition_Name      : String);
 
-   procedure Write_Partition_Table
+   procedure Report_Partition_Table
      (Block_Device : Rose.Devices.Block.Client.Block_Device_Type);
+
+   procedure Flush (Device : Rose.Devices.Block.Client.Block_Device_Type);
 
 end Rose.Devices.GPT;
