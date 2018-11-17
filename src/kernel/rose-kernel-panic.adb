@@ -97,6 +97,8 @@ package body Rose.Kernel.Panic is
                     Addr    : Virtual_Address)
    is
    begin
+      Rose.Boot.Console.Enable_Display;
+      Rose.Boot.Console.Put_Line ("*** kernel panic ***");
       Rose.Boot.Console.Put (Message);
       Rose.Boot.Console.Put (Physical_Address (Addr));
       Rose.Boot.Console.Put (" (virtual)");
