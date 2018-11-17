@@ -1,5 +1,9 @@
+with System.Storage_Elements;
+
 with Rose.Capabilities;
 with Rose.Words;
+
+with Rose.Devices.Block;
 
 package ATA.Commands is
 
@@ -7,10 +11,20 @@ package ATA.Commands is
 
    type ATA_Command is private;
 
-   procedure Identify
+   procedure Set_Identify_Command
      (Command : out ATA_Command;
       Master  : Boolean;
       LBA     : Boolean);
+
+   procedure Set_Read_Sector_Command
+     (Command : out ATA_Command;
+      Master  : Boolean;
+      LBA     : Rose.Devices.Block.Block_Address_Type);
+
+   procedure Set_Write_Sector_Command
+     (Command : out ATA_Command;
+      Master  : Boolean;
+      LBA     : Rose.Devices.Block.Block_Address_Type);
 
    function Send_Command
      (Command      : ATA_Command;
@@ -24,6 +38,20 @@ package ATA.Commands is
       Mask      : Rose.Words.Word_8;
       Value     : Rose.Words.Word_8)
       return Boolean;
+
+   procedure Read_Sector
+     (Data_Port    : Rose.Capabilities.Capability;
+      Sector       : out System.Storage_Elements.Storage_Array);
+
+   procedure Write_Sector
+     (Data_Port    : Rose.Capabilities.Capability;
+      Sector       : System.Storage_Elements.Storage_Array);
+
+   procedure Flush
+     (Command_Port : Rose.Capabilities.Capability;
+      Control_Port : Rose.Capabilities.Capability;
+      Data_Port    : Rose.Capabilities.Capability;
+      Master       : Boolean);
 
 private
 

@@ -17,30 +17,34 @@ package body ATA.Drives is
    ----------------------
 
    procedure Initialize_Drive
-     (Index        : ATA_Drive_Index;
-      Command_Cap  : Rose.Capabilities.Capability;
-      Control_Cap  : Rose.Capabilities.Capability;
-      Data_Cap_8   : Rose.Capabilities.Capability;
-      Data_Cap_16  : Rose.Capabilities.Capability;
-      Base_DMA     : Rose.Words.Word_32;
-      Is_Native    : Boolean)
+     (Index             : ATA_Drive_Index;
+      Command_Cap       : Rose.Capabilities.Capability;
+      Control_Cap       : Rose.Capabilities.Capability;
+      Data_Cap_8        : Rose.Capabilities.Capability;
+      Data_Read_Cap_16  : Rose.Capabilities.Capability;
+      Data_Write_Cap_16 : Rose.Capabilities.Capability;
+      Base_DMA          : Rose.Words.Word_32;
+      Is_Native         : Boolean)
    is
       Identify : ATA.Commands.ATA_Command;
 
    begin
       Drive_Table (Index) :=
         ATA_Drive_Record'
-          (Initialized => True,
-           Listening   => False,
-           Dead        => False,
-           Native      => Is_Native,
-           Command_Cap => Command_Cap,
-           Control_Cap => Control_Cap,
-           Base_DMA    => Base_DMA,
-           Block_Size  => 512,
-           Block_Count => 0);
+          (Initialized       => True,
+           Listening         => False,
+           Dead              => False,
+           Native            => Is_Native,
+           Command_Cap       => Command_Cap,
+           Control_Cap       => Control_Cap,
+           Data_8_Cap        => Data_Cap_8,
+           Data_16_Read_Cap  => Data_Read_Cap_16,
+           Data_16_Write_Cap => Data_Write_Cap_16,
+           Base_DMA          => Base_DMA,
+           Block_Size        => 512,
+           Block_Count       => 0);
 
-      ATA.Commands.Identify
+      ATA.Commands.Set_Identify_Command
         (Command => Identify,
          Master  => Index in 0 | 2,
          LBA     => False);
@@ -81,7 +85,7 @@ package body ATA.Drives is
             for I in 1 .. 256 loop
                declare
                   D : constant Rose.Words.Word_16 :=
-                        Rose.Devices.Port_IO.Port_In_16 (Data_Cap_16);
+                        Rose.Devices.Port_IO.Port_In_16 (Data_Read_Cap_16);
                begin
                   Id_Buffer (I) := D;
                end;
@@ -189,5 +193,106 @@ package body ATA.Drives is
    begin
       return Drive.Listening;
    end Is_Listening;
+
+   ----------------
+   -- Read_Block --
+   ----------------
+
+   procedure Read_Block
+     (Index   : ATA_Drive_Index;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Buffer  : out System.Storage_Elements.Storage_Array)
+   is
+      Command : ATA.Commands.ATA_Command;
+      Drive   : ATA_Drive_Record renames Drive_Table (Index);
+   begin
+
+      if Drive.Dead then
+         Rose.Console_IO.Put ("ata: drive ");
+         Rose.Console_IO.Put (Natural (Index));
+         Rose.Console_IO.Put (" is dead");
+         return;
+      end if;
+
+      ATA.Commands.Set_Read_Sector_Command
+        (Command => Command,
+         Master  => Index in 0 | 2,
+         LBA     => Address);
+
+      if ATA.Commands.Send_Command
+        (Command      => Command,
+         Command_Port => Drive.Command_Cap,
+         Control_Port => Drive.Control_Cap,
+         Data_Port    => Drive.Data_8_Cap)
+      then
+         if not ATA.Commands.Wait_For_Status
+           (Drive.Data_8_Cap, ATA.Commands.Status_Busy, 0)
+         then
+            Drive_Table (Index).Dead := True;
+            return;
+         end if;
+
+         ATA.Commands.Read_Sector
+           (Data_Port    => Drive.Data_16_Read_Cap,
+            Sector       => Buffer);
+      else
+         Rose.Console_IO.Put ("ata: sending to drive ");
+         Rose.Console_IO.Put (Natural (Index));
+         Rose.Console_IO.Put (" failed");
+      end if;
+   end Read_Block;
+
+   -----------------
+   -- Write_Block --
+   -----------------
+
+   procedure Write_Block
+     (Index   : ATA_Drive_Index;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Buffer  : System.Storage_Elements.Storage_Array)
+   is
+      Command : ATA.Commands.ATA_Command;
+      Drive   : ATA_Drive_Record renames Drive_Table (Index);
+   begin
+
+      if Drive.Dead then
+         Rose.Console_IO.Put ("ata: drive ");
+         Rose.Console_IO.Put (Natural (Index));
+         Rose.Console_IO.Put (" is dead");
+         return;
+      end if;
+
+      ATA.Commands.Set_Write_Sector_Command
+        (Command => Command,
+         Master  => Index in 0 | 2,
+         LBA     => Address);
+
+      if ATA.Commands.Send_Command
+        (Command      => Command,
+         Command_Port => Drive.Command_Cap,
+         Control_Port => Drive.Control_Cap,
+         Data_Port    => Drive.Data_8_Cap)
+      then
+         if not ATA.Commands.Wait_For_Status
+           (Drive.Data_8_Cap, ATA.Commands.Status_Busy, 0)
+         then
+            Drive_Table (Index).Dead := True;
+            return;
+         end if;
+
+         ATA.Commands.Write_Sector
+           (Data_Port    => Drive.Data_16_Write_Cap,
+            Sector       => Buffer);
+         ATA.Commands.Flush
+           (Command_Port => Drive.Command_Cap,
+            Control_Port => Drive.Control_Cap,
+            Data_Port    => Drive.Data_8_Cap,
+            Master       => Index in 0 | 2);
+      else
+         Rose.Console_IO.Put ("ata: sending to drive ");
+         Rose.Console_IO.Put (Natural (Index));
+         Rose.Console_IO.Put (" failed");
+      end if;
+   end Write_Block;
 
 end ATA.Drives;

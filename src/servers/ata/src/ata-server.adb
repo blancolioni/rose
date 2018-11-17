@@ -89,13 +89,14 @@ package body ATA.Server is
                Rose.Console_IO.Put_Line
                  ("found compatability IDE on channel 0");
                ATA.Drives.Initialize_Drive
-                 (Index       => 0,
-                  Command_Cap => Command_0_Cap,
-                  Control_Cap => Control_0_Cap,
-                  Data_Cap_8  => Data_0_Cap_8,
-                  Data_Cap_16 => Data_0_Cap_16,
-                  Base_DMA    => Base_DMA,
-                  Is_Native   => False);
+                 (Index             => 0,
+                  Command_Cap       => Command_0_Cap,
+                  Control_Cap       => Control_0_Cap,
+                  Data_Cap_8        => Data_0_Cap_8,
+                  Data_Read_Cap_16  => Data_0_Cap_Read_16,
+                  Data_Write_Cap_16 => Data_0_Cap_Write_16,
+                  Base_DMA          => Base_DMA,
+                  Is_Native         => False);
             end if;
 
             if False then
@@ -106,13 +107,14 @@ package body ATA.Server is
                   Rose.Console_IO.Put_Line
                     ("found compatability IDE on channel 1");
                   ATA.Drives.Initialize_Drive
-                    (Index       => 2,
-                     Command_Cap => Command_1_Cap,
-                     Control_Cap => Control_1_Cap,
-                     Data_Cap_8  => Data_1_Cap_8,
-                     Data_Cap_16 => Data_1_Cap_16,
-                     Base_DMA    => Base_DMA,
-                     Is_Native   => False);
+                    (Index               => 2,
+                     Command_Cap         => Command_1_Cap,
+                     Control_Cap         => Control_1_Cap,
+                     Data_Cap_8          => Data_1_Cap_8,
+                     Data_Read_Cap_16    => Data_1_Cap_Read_16,
+                     Data_Write_Cap_16   => Data_1_Cap_Write_16,
+                     Base_DMA            => Base_DMA,
+                     Is_Native           => False);
                end if;
             end if;
          end;
@@ -133,12 +135,8 @@ package body ATA.Server is
      (Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : out System.Storage_Elements.Storage_Array)
    is
-      pragma Unreferenced (Buffer);
    begin
-      Rose.Console_IO.Put ("ata: read block: ");
-      Rose.Console_IO.Put (Natural (Block_Address));
-      Rose.Console_IO.New_Line;
-      Buffer := (others => 0);
+      ATA.Drives.Read_Block (0, Block_Address, Buffer);
    end Read_Block;
 
    ------------------
@@ -165,11 +163,8 @@ package body ATA.Server is
      (Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : System.Storage_Elements.Storage_Array)
    is
-      pragma Unreferenced (Buffer);
    begin
-      Rose.Console_IO.Put ("ata: write block: ");
-      Rose.Console_IO.Put (Natural (Block_Address));
-      Rose.Console_IO.New_Line;
+      ATA.Drives.Write_Block (0, Block_Address, Buffer);
    end Write_Block;
 
 end ATA.Server;
