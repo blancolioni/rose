@@ -18,6 +18,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-block.o \
 	$(BUILDDIR)/rose-devices-block-client.o \
+	$(BUILDDIR)/rose-devices-block-client-table.o \
 	$(BUILDDIR)/rose-devices-gpt.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
