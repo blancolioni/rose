@@ -344,6 +344,15 @@ package body Rose.Kernel.Processes.Init is
               (Valid => True, Readable => True, Writable => True,
                others => False);
 
+            Launch_Index := Launch_Index + 1;
+            Launch_Params.Data (Launch_Index) := 3;  --  stack is r/w
+            Launch_Index := Launch_Index + 1;
+            Launch_Params.Data (Launch_Index) :=
+              Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Base);
+            Launch_Index := Launch_Index + 1;
+            Launch_Params.Data (Launch_Index) :=
+              Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Bound);
+
             Map_Page
               (Directory_Page => Directory_VP,
                Virtual_Page   =>
