@@ -17,6 +17,17 @@ package body ATA.Server is
 
    Device_Cap  : Rose.Capabilities.Capability;
 
+   type Vendor_Device_Record is
+      record
+         Vendor : Rose.Words.Word_32;
+         Device : Rose.Words.Word_32;
+      end record;
+
+   Known_Devices : constant array (Positive range <>) of
+     Vendor_Device_Record :=
+       (1 => (16#8086#, 16#7111#),
+        2 => (16#8086#, 16#7010#));
+
    procedure Read_Block
      (Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : out System.Storage_Elements.Storage_Array);
@@ -32,11 +43,17 @@ package body ATA.Server is
    procedure Create_Server is
       use type Rose.Capabilities.Capability;
    begin
-      Device_Cap :=
-        Rose.System_Calls.Client.Get_Capability
-          (PCI_Cap, (16#8086#, 16#7111#));
 
-      if Device_Cap = 0 then
+      Device_Cap := Rose.Capabilities.Null_Capability;
+
+      for Rec of Known_Devices loop
+         Device_Cap :=
+           Rose.System_Calls.Client.Get_Capability
+             (PCI_Cap, (Rec.Vendor, Rec.Device));
+         exit when Device_Cap /= Rose.Capabilities.Null_Capability;
+      end loop;
+
+      if Device_Cap = Rose.Capabilities.Null_Capability then
          Rose.Console_IO.Put_Line
            ("ata: no devices");
       else
