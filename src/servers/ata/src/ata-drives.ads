@@ -1,3 +1,4 @@
+with System.Storage_Elements;
 with Rose.Devices.Block;
 with Rose.Words;
 
@@ -22,27 +23,41 @@ package ATA.Drives is
       return Rose.Devices.Block.Block_Address_Type;
 
    procedure Initialize_Drive
-     (Index        : ATA_Drive_Index;
-      Command_Cap  : Rose.Capabilities.Capability;
-      Control_Cap  : Rose.Capabilities.Capability;
-      Data_Cap_8   : Rose.Capabilities.Capability;
-      Data_Cap_16  : Rose.Capabilities.Capability;
-      Base_DMA     : Rose.Words.Word_32;
-      Is_Native    : Boolean);
+     (Index             : ATA_Drive_Index;
+      Command_Cap       : Rose.Capabilities.Capability;
+      Control_Cap       : Rose.Capabilities.Capability;
+      Data_Cap_8        : Rose.Capabilities.Capability;
+      Data_Read_Cap_16  : Rose.Capabilities.Capability;
+      Data_Write_Cap_16 : Rose.Capabilities.Capability;
+      Base_DMA          : Rose.Words.Word_32;
+      Is_Native         : Boolean);
+
+   procedure Read_Block
+     (Index   : ATA_Drive_Index;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Buffer  : out System.Storage_Elements.Storage_Array);
+
+   procedure Write_Block
+     (Index   : ATA_Drive_Index;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Buffer  : System.Storage_Elements.Storage_Array);
 
 private
 
    type ATA_Drive_Record is
       record
-         Initialized  : Boolean := False;
-         Listening    : Boolean := False;
-         Dead         : Boolean := False;
-         Native       : Boolean := False;
-         Command_Cap  : Rose.Capabilities.Capability;
-         Control_Cap  : Rose.Capabilities.Capability;
-         Base_DMA     : Rose.Words.Word_32;
-         Block_Size   : Rose.Devices.Block.Block_Size_Type;
-         Block_Count  : Rose.Devices.Block.Block_Address_Type;
+         Initialized        : Boolean := False;
+         Listening          : Boolean := False;
+         Dead               : Boolean := False;
+         Native             : Boolean := False;
+         Command_Cap        : Rose.Capabilities.Capability;
+         Control_Cap        : Rose.Capabilities.Capability;
+         Data_8_Cap         : Rose.Capabilities.Capability;
+         Data_16_Read_Cap   : Rose.Capabilities.Capability;
+         Data_16_Write_Cap  : Rose.Capabilities.Capability;
+         Base_DMA           : Rose.Words.Word_32;
+         Block_Size         : Rose.Devices.Block.Block_Size_Type;
+         Block_Count        : Rose.Devices.Block.Block_Address_Type;
       end record;
 
    type ATA_Drive is access all ATA_Drive_Record;
