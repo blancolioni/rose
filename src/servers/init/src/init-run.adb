@@ -170,10 +170,14 @@ package body Init.Run is
                            Init.Calls.Call
                              (Create_Cap,
                               (16#0000_000E#, 2, 16#01F0#, 16#01F7#));
-         Data_0_Cap_16 : constant Rose.Capabilities.Capability :=
-                           Init.Calls.Call
-                             (Create_Cap,
-                              (16#0000_001E#, 2, 16#01F0#, 16#01F7#));
+         Data_0_Cap_Read_16 : constant Rose.Capabilities.Capability :=
+                                Init.Calls.Call
+                                  (Create_Cap,
+                                   (16#0000_001E#, 2, 16#01F0#, 16#01F7#));
+         Data_0_Cap_Write_16   : constant Rose.Capabilities.Capability :=
+                                   Init.Calls.Call
+                                     (Create_Cap,
+                                      (16#0000_001E#, 1, 16#01F0#, 16#01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                     Init.Calls.Call (Boot_Cap, 5,
                                      (Create_Endpoint_Cap,
@@ -181,7 +185,9 @@ package body Init.Run is
                                       PCI_Cap,
                                       Command_0_Cap,
                                       Control_0_Cap,
-                                      Data_0_Cap_8, Data_0_Cap_16));
+                                      Data_0_Cap_8,
+                                      Data_0_Cap_Read_16,
+                                      Data_0_Cap_Write_16));
          Copy_Ata_Cap         : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
