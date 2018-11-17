@@ -122,12 +122,13 @@ package body Rose.Devices.Block.Client is
       end if;
 
       Params.Control.Flags :=
-        (Rose.Invocation.Send            => True,
-         Rose.Invocation.Block           => True,
-         Rose.Invocation.Send_Buffer     => True,
-         Rose.Invocation.Writable_Buffer => False,
-         Rose.Invocation.Send_Words      => True,
-         others                          => False);
+        (Rose.Invocation.Send             => True,
+         Rose.Invocation.Block            => True,
+         Rose.Invocation.Send_Buffer      => True,
+         Rose.Invocation.Writable_Buffer  => False,
+         Rose.Invocation.Send_Words       => True,
+         Rose.Invocation.Create_Reply_Cap => True,
+         others                           => False);
       Params.Control.Last_Sent_Word := 0;
       Params.Cap := Device.Write;
       Params.Data (0) := Rose.Words.Word (Block_Address);
