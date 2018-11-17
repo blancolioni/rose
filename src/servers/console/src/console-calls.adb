@@ -6,7 +6,7 @@ with Rose.System_Calls;
 
 package body Console.Calls is
 
-   Cursor_Enabled : constant Boolean := False;
+   Cursor_Enabled : constant Boolean := True;
 
    -----------------------
    -- Invoke_Memory_Cap --
