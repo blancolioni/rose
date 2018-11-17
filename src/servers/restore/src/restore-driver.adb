@@ -40,48 +40,77 @@ begin
          Rose.Console_IO.Put_Line ("Intitialising device");
 
          Rose.Devices.GPT.Initialize_GPT (Device);
+      end if;
 
-         if Rose.Devices.GPT.Has_GPT (Device) then
-            declare
-               use Rose.Devices.Block;
-               use Rose.Devices.Partitions;
-               Available_Blocks : constant Block_Address_Type :=
-                                    Block_Count - 4;
-               Partition_Size   : constant Block_Address_Type :=
-                                    Available_Blocks / 4;
-               Current_Start    : Block_Address_Type := 3;
-               Name             : String  := "rose-swap-#";
-            begin
+      if not Rose.Devices.GPT.Has_GPT (Device) then
+         Rose.Console_IO.Put_Line ("Device initialization failed");
+         return;
+      end if;
 
-               Rose.Console_IO.Put_Line ("creating partitions");
+      if Rose.Devices.GPT.Partition_Count (Device) > 0 then
+         Rose.Console_IO.Put_Line ("Scanning partitions");
+         Rose.Devices.GPT.Report_Partition_Table (Device);
+--
+--           for I in 1 .. Rose.Devices.GPT.Partition_Count (Device) loop
+--              declare
+--                 First_Block         : Rose.Devices.Block.Block_Address_Type;
+--                 Last_Block          : Rose.Devices.Block.Block_Address_Type;
+--                 Partition_Type_Low  : Rose.Words.Word_64;
+--                 Partition_Type_High : Rose.Words.Word_64;
+--                 Partition_Flags     : Rose.Words.Word_64;
+--                 Partition_Name      : String (1 .. 40);
+--                 Partition_Name_Last : Natural;
+--              begin
+--                 Rose.Devices.GPT.Get_Partition_Details
+--                   (Device, I,
+--                    First_Block, Last_Block,
+--                    Partition_Type_Low, Partition_Type_High,
+--                    Partition_Flags,
+--                    Partition_Name, Partition_Name_Last);
+--
+--
+--           end loop;
 
-               for I in 1 .. 4 loop
-                  Name (Name'Last) :=
-                    Character'Val (48 + I);
+      else
+         declare
+            use Rose.Devices.Block;
+            use Rose.Devices.Partitions;
+            Available_Blocks : constant Block_Address_Type :=
+                                 Block_Count - 4;
+            Partition_Size   : constant Block_Address_Type :=
+                                 Available_Blocks / 4;
+            Current_Start    : Block_Address_Type := 3;
+            Name             : String  := "rose-swap-#";
+         begin
 
-                  Rose.Console_IO.Put ("partition: ");
-                  Rose.Console_IO.Put (Name);
-                  Rose.Console_IO.New_Line;
+            Rose.Console_IO.Put_Line ("creating partitions");
 
-                  Rose.Devices.GPT.Add_Partition
-                    (Block_Device        => Device,
-                     First_Block         => Current_Start,
-                     Last_Block          => Current_Start + Partition_Size - 1,
-                     Partition_Type_Low  => Swap_Id_Low,
-                     Partition_Type_High => Swap_Id_High,
-                     Partition_Flags     => 0,
-                     Partition_Name      => Name);
+            for I in 1 .. 4 loop
+               Name (Name'Last) :=
+                 Character'Val (48 + I);
 
-                  Current_Start := Current_Start + Partition_Size;
+               Rose.Devices.GPT.Add_Partition
+                 (Block_Device        => Device,
+                  First_Block         => Current_Start,
+                  Last_Block          => Current_Start + Partition_Size - 1,
+                  Partition_Type_Low  => Swap_Id_Low,
+                  Partition_Type_High => Swap_Id_High,
+                  Partition_Flags     => 0,
+                  Partition_Name      => Name);
 
-               end loop;
-            end;
+               Current_Start := Current_Start + Partition_Size;
 
-            Rose.Devices.GPT.Write_Partition_Table (Device);
-         else
-            Rose.Console_IO.Put_Line ("Device initialization failed");
-         end if;
+            end loop;
+         end;
+
+         Rose.Devices.GPT.Report_Partition_Table (Device);
       end if;
    end;
+
+   Rose.Console_IO.Put_Line ("restore: done");
+
+   loop
+      null;
+   end loop;
 
 end Restore.Driver;
