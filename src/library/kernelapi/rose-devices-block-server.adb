@@ -129,6 +129,7 @@ package body Rose.Devices.Block.Server is
                      Rose.Console_IO.New_Line;
                   else
                      Read_Handler (Block_Address, Buffer);
+                     Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
                   end if;
                end;
 
@@ -169,6 +170,7 @@ package body Rose.Devices.Block.Server is
                      Rose.Console_IO.New_Line;
                   else
                      Write_Handler (Block_Address, Buffer);
+                     Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
                   end if;
                end;
 
