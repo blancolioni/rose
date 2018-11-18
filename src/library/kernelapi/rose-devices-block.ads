@@ -2,7 +2,9 @@ with Rose.Objects;
 
 package Rose.Devices.Block is
 
-   type Block_Size_Type is range 0 .. 65536;
+   Max_Block_Size : constant := 4096;
+
+   type Block_Size_Type is range 0 .. Max_Block_Size;
    type Block_Address_Type is mod 2 ** 48;
    type Device_Size_Type is mod 2 ** 64;
 

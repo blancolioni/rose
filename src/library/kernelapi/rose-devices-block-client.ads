@@ -1,4 +1,4 @@
-with System;
+with System.Storage_Elements;
 
 with Rose.Capabilities;
 
@@ -23,12 +23,12 @@ package Rose.Devices.Block.Client is
    procedure Read_Block
      (Device        : Block_Device_Type;
       Block_Address : Block_Address_Type;
-      Buffer        : System.Address);
+      Block_Storage : out System.Storage_Elements.Storage_Array);
 
    procedure Write_Block
      (Device        : Block_Device_Type;
       Block_Address : Block_Address_Type;
-      Buffer        : System.Address);
+      Block_Storage : System.Storage_Elements.Storage_Array);
 
 private
 
