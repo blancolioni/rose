@@ -1,4 +1,4 @@
 #!/bin/sh
-if [ ! -f ./images/rose.img ]; then
-  qemu-img create -f raw ./images/rose.img 16M
+if [ ! -f ./images/rose-hd0.img ]; then
+  qemu-img create -f raw ./images/rose-hd0.img 16M
 fi

@@ -1,1 +1,1 @@
-"C:\Program Files\qemu\qemu-system-i386.exe" -fda rose-boot-floppy.img -m 8 -serial file:../logs/qemu-port-1.txt -hda rose.img
+"C:\Program Files\qemu\qemu-system-i386.exe" -fda rose-boot-floppy.img -m 8 -serial file:../logs/qemu-port-1.txt -hda rose-hd0.img
