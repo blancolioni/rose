@@ -31,3 +31,5 @@ rose-init-objdump.txt
 src/kernel/old
 rts/gnat-src
 logs/*
+images/rose.img
+images/rose-boot-floppy.img
