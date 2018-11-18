@@ -7,8 +7,6 @@ with Rose.Console_IO;
 
 package body Rose.Devices.GPT is
 
-   Buffer : System.Storage_Elements.Storage_Array (1 .. 4096);
-
    GPT_Magic : constant Rose.Words.Word_64 := 16#5452_4150_2049_4645#;
 
    type GPT_Header is
@@ -155,13 +153,17 @@ package body Rose.Devices.GPT is
          Entry_Count       : constant Word_32 :=
                                Partition_Entries_Per_Block (Block_Size);
          Partition_Entries : GPT_Partition_Entry_Array (0 .. Entry_Count - 1);
+         Partition_Buffer  : System.Storage_Elements.Storage_Array
+           (1 .. System.Storage_Elements.Storage_Count (Block_Size));
+         pragma Import (Ada, Partition_Buffer);
+         for Partition_Buffer'Address use Partition_Entries'Address;
       begin
          GPT_Data.Block_Size := Block_Size;
          Read_Header (Device, GPT_Data.Header);
          if GPT_Data.Header.Magic = GPT_Magic then
             if GPT_Data.Header.Partition_Entry_Count > 0 then
                Client.Read_Block
-                 (Device, 2, Partition_Entries'Address);
+                 (Device, 2, Partition_Buffer);
                for I in 0 .. GPT_Data.Header.Partition_Entry_Count - 1 loop
                   GPT_Data.Parts (I) := Partition_Entries (I);
                end loop;
@@ -256,9 +258,6 @@ package body Rose.Devices.GPT is
                      Rose.Devices.Block.Client.Get_Block_Size
                        (Block_Device);
    begin
-      Buffer := (others => 0);
-      Rose.Devices.Block.Client.Read_Block
-        (Block_Device, 1, Buffer'Address);
       declare
          use System.Storage_Elements;
          Header_Storage : Storage_Array (1 .. Storage_Count (Block_Size));
@@ -266,7 +265,8 @@ package body Rose.Devices.GPT is
          pragma Import (Ada, Header_Record);
          for Header_Record'Address use Header_Storage'Address;
       begin
-         Header_Storage := Buffer (Header_Storage'Range);
+         Rose.Devices.Block.Client.Read_Block
+           (Block_Device, 1, Header_Storage);
          Header := Header_Record;
       end;
    end Read_Header;
@@ -358,26 +358,21 @@ package body Rose.Devices.GPT is
      (Block_Device : Rose.Devices.Block.Client.Block_Device_Type;
       Header       : GPT_Header)
    is
+      use System.Storage_Elements;
       use Rose.Devices.Block;
       Block_Size : constant Block_Size_Type :=
                      Client.Get_Block_Size (Block_Device);
       Block_Count : constant Block_Address_Type :=
                      Client.Get_Block_Count (Block_Device);
+      Header_Storage : Storage_Array (1 .. Storage_Count (Block_Size));
+      Header_Record  : GPT_Header;
+      pragma Import (Ada, Header_Record);
+      for Header_Record'Address use Header_Storage'Address;
    begin
-      declare
-         use System.Storage_Elements;
-         Header_Storage : Storage_Array (1 .. Storage_Count (Block_Size));
-         Header_Record  : GPT_Header;
-         pragma Import (Ada, Header_Record);
-         for Header_Record'Address use Header_Storage'Address;
-      begin
-         Buffer := (others => 0);
-         Header_Record := Header;
-         Buffer (Header_Storage'Range) := Header_Storage;
-         Client.Write_Block (Block_Device, 1, Buffer'Address);
-         Client.Write_Block
-           (Block_Device, Block_Count - 1, Buffer'Address);
-      end;
+      Header_Record := Header;
+      Client.Write_Block (Block_Device, 1, Header_Storage);
+      Client.Write_Block
+        (Block_Device, Block_Count - 1, Header_Storage);
    end Write_Header;
 
    -----------------------------
@@ -396,10 +391,15 @@ package body Rose.Devices.GPT is
       Entry_Count       : constant Word_32 :=
                             Partition_Entries_Per_Block (Block_Size);
       Partition_Entries : GPT_Partition_Entry_Array (0 .. Entry_Count - 1);
+      Block_Storage     : System.Storage_Elements.Storage_Array
+        (1 .. System.Storage_Elements.Storage_Count (Block_Size));
+      pragma Import (Ada, Block_Storage);
+      for Block_Storage'Address use Partition_Entries'Address;
    begin
+      Block_Storage := (others => 0);
       Partition_Entries (Entries'Range) := Entries;
       Rose.Devices.Block.Client.Write_Block
-        (Block_Device, 2, Partition_Entries'Address);
+        (Block_Device, 2, Block_Storage);
    end Write_Partition_Entries;
 
 end Rose.Devices.GPT;
