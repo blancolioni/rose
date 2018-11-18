@@ -97,14 +97,9 @@ package body Rose.Devices.GPT is
       Partition_Name      : String)
    is
       use Rose.Words;
-      use Rose.Devices.Block;
-      Block_Size        : constant Block_Size_Type :=
-                            Rose.Devices.Block.Client.Get_Block_Size
-                              (Block_Device);
-      Entry_Count       : constant Word_32 :=
-                            Partition_Entries_Per_Block (Block_Size);
-      Partition_Entries : GPT_Partition_Entry_Array (0 .. Entry_Count - 1);
       Header            : GPT_Header renames GPT_Data.Header;
+      Part              : GPT_Partition_Entry renames
+                            GPT_Data.Parts (Header.Partition_Entry_Count);
    begin
 
       Check_Cached (Block_Device);
@@ -114,7 +109,7 @@ package body Rose.Devices.GPT is
          return;
       end if;
 
-      GPT_Data.Parts (Header.Partition_Entry_Count) :=
+      Part :=
         GPT_Partition_Entry'
           (Partition_Type_Low  => Partition_Type_Low,
            Partition_Type_High => Partition_Type_High,
@@ -124,9 +119,16 @@ package body Rose.Devices.GPT is
            Last_LBA            => Last_Block,
            Flags               => Partition_Flags,
            Name                => <>);
-      Partition_Entries (Header.Partition_Entry_Count).Name
-        (1 .. Partition_Name'Length)
-        := Partition_Name;
+
+      declare
+         Index : Natural := 0;
+      begin
+         for Ch of Partition_Name loop
+            Index := Index + 1;
+            Part.Name (Index) := Ch;
+         end loop;
+      end;
+
       Header.Partition_Entry_Count := Header.Partition_Entry_Count + 1;
       Save_Changes (Block_Device);
    end Add_Partition;
