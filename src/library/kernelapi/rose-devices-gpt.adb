@@ -174,15 +174,16 @@ package body Rose.Devices.GPT is
    -----------
 
    procedure Flush (Device : Rose.Devices.Block.Client.Block_Device_Type) is
+      use type Rose.Words.Word_32;
    begin
-      if Cached_Table.Contains (Device) then
-         Cached_Table.Get_Element (Device, GPT_Data);
-         if GPT_Data.Dirty then
-            Write_Header (Device, GPT_Data.Header);
-            Write_Partition_Entries (Device, GPT_Data.Parts);
-            GPT_Data.Dirty := False;
-            Save_Changes (Device);
-         end if;
+      Check_Cached (Device);
+      if GPT_Data.Dirty then
+         Write_Header (Device, GPT_Data.Header);
+         Write_Partition_Entries
+           (Device,
+            GPT_Data.Parts (0 .. GPT_Data.Header.Partition_Entry_Count - 1));
+         GPT_Data.Dirty := False;
+         Save_Changes (Device);
       end if;
    end Flush;
 
