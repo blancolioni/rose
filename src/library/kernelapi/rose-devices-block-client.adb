@@ -7,6 +7,10 @@ with Rose.Console_IO;
 
 package body Rose.Devices.Block.Client is
 
+   Local_Client_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. Max_Block_Size)
+     with Alignment => Max_Block_Size;
+
    ---------------------
    -- Get_Block_Count --
    ---------------------
@@ -77,14 +81,27 @@ package body Rose.Devices.Block.Client is
    procedure Read_Block
      (Device        : Block_Device_Type;
       Block_Address : Block_Address_Type;
-      Buffer        : System.Address)
+      Block_Storage : out System.Storage_Elements.Storage_Array)
    is
+      use System.Storage_Elements;
       Params  : aliased Rose.Invocation.Invocation_Record;
    begin
 
       if Block_Address >= Device.Block_Count then
+         Rose.Console_IO.Put ("read-block: invalid block address: ");
+         Rose.Console_IO.Put (Natural (Block_Address));
+         Rose.Console_IO.New_Line;
          return;
       end if;
+
+      if Block_Storage'Length /= Storage_Count (Device.Block_Size) then
+         Rose.Console_IO.Put ("read-block: invalid block size: ");
+         Rose.Console_IO.Put (Natural (Block_Storage'Length));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      Local_Client_Buffer := (others => 0);
 
       Params.Control.Flags :=
         (Rose.Invocation.Send             => True,
@@ -97,11 +114,21 @@ package body Rose.Devices.Block.Client is
       Params.Control.Last_Sent_Word := 0;
       Params.Cap := Device.Read;
       Params.Data (0) := Rose.Words.Word (Block_Address);
+
       Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Buffer);
+        Rose.Addresses.To_Virtual_Address (Local_Client_Buffer'Address);
       Params.Buffer_Length := Rose.Words.Word (Device.Block_Size);
 
       Rose.System_Calls.Invoke_Capability (Params);
+
+      declare
+         Count : Storage_Count := 0;
+      begin
+         for Unit of Block_Storage loop
+            Count := Count + 1;
+            Unit := Local_Client_Buffer (Count);
+         end loop;
+      end;
 
    end Read_Block;
 
@@ -112,14 +139,36 @@ package body Rose.Devices.Block.Client is
    procedure Write_Block
      (Device        : Block_Device_Type;
       Block_Address : Block_Address_Type;
-      Buffer        : System.Address)
+      Block_Storage : System.Storage_Elements.Storage_Array)
    is
+      use System.Storage_Elements;
       Params  : aliased Rose.Invocation.Invocation_Record;
    begin
 
       if Block_Address >= Device.Block_Count then
+         Rose.Console_IO.Put ("write-block: invalid block address: ");
+         Rose.Console_IO.Put (Natural (Block_Address));
+         Rose.Console_IO.New_Line;
          return;
       end if;
+
+      if Block_Storage'Length /= Storage_Count (Device.Block_Size) then
+         Rose.Console_IO.Put ("write-block: invalid block size: ");
+         Rose.Console_IO.Put (Natural (Block_Storage'Length));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      Local_Client_Buffer := (others => 0);
+
+      declare
+         Count : Storage_Count := 0;
+      begin
+         for Unit of Block_Storage loop
+            Count := Count + 1;
+            Local_Client_Buffer (Count) := Unit;
+         end loop;
+      end;
 
       Params.Control.Flags :=
         (Rose.Invocation.Send             => True,
@@ -132,8 +181,9 @@ package body Rose.Devices.Block.Client is
       Params.Control.Last_Sent_Word := 0;
       Params.Cap := Device.Write;
       Params.Data (0) := Rose.Words.Word (Block_Address);
+
       Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Buffer);
+        Rose.Addresses.To_Virtual_Address (Local_Client_Buffer'Address);
       Params.Buffer_Length := Rose.Words.Word (Device.Block_Size);
 
       Rose.System_Calls.Invoke_Capability (Params);
