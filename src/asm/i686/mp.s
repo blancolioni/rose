@@ -252,7 +252,6 @@ cpu_exception:
 
 cpu_exception_code:
     # cpu exception with error code
-    movl exception_code, %eax
     popl exception_number
     popl exception_code
     
