@@ -33,3 +33,4 @@ rts/gnat-src
 logs/*
 images/rose.img
 images/rose-boot-floppy.img
+images/rose-hd0.img
