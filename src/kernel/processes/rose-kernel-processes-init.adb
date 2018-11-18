@@ -32,7 +32,7 @@ package body Rose.Kernel.Processes.Init is
      new System.Address_To_Access_Conversions (Kernel_Process_Table);
 
    Launch_Params : aliased Rose.Invocation.Invocation_Record;
-   Enable_Paging : constant Boolean := False;
+   Enable_Paging : constant Boolean := True;
 
    ------------------------
    -- Init_Process_Table --
