@@ -101,6 +101,9 @@ begin
                Current_Start := Current_Start + Partition_Size;
 
             end loop;
+
+            Rose.Devices.GPT.Flush (Device);
+
          end;
 
          Rose.Devices.GPT.Report_Partition_Table (Device);
