@@ -15,7 +15,7 @@ BOOT_MODULES=init console mem pci ata restore
 #BOOT_MODULES=init console mem pci ram_disk ata restore
 
 #all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
-all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) floppy
+all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) hdd floppy
 
 rts:
 	(cd rts; make)
@@ -50,6 +50,9 @@ ata:
 restore:
 	(cd src/servers/restore; make)
 
+hdd:
+	sh ./scripts/rose-hdd-install
+	
 floppy:
 	sh ./scripts/rose-floppy-install
 
