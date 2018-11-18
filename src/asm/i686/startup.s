@@ -169,12 +169,12 @@ relocated_start:        # we are now running paged, in 0xC010_0000
         wrmsr
         
         # set clock interrupt rate ~ 100/s
-#        mov $0x36, %al
-#       outb %al, $0x43
-#        mov $0x9C, %al
-#        outb %al, $0x40
-#        mov $0x2E, %al
-#        outb %al, $0x40
+        mov $0x36, %al
+       outb %al, $0x43
+        mov $0x9C, %al
+        outb %al, $0x40
+        mov $0x2E, %al
+        outb %al, $0x40
         
        mov $0xFF, %al
        out %al, $0x21
