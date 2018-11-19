@@ -462,8 +462,6 @@ package body Rose.Kernel.Processes.Init is
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);
       end;
 
-      --  Rose.Kernel.Processes.Queue.Choose_Process;
-
       return Pid;
 
    end Load_Boot_Module;
