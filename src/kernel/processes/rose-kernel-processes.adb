@@ -1102,13 +1102,8 @@ package body Rose.Kernel.Processes is
    function Use_Tick return Boolean is
       use Rose.Words;
    begin
-      if Current_Process.Remaining_Ticks > 0 then
-         Current_Process.Remaining_Ticks :=
-           Current_Process.Remaining_Ticks - 1;
-      end if;
-      if Current_Process.Remaining_Ticks = 0 then
-         Current_Process.Remaining_Ticks := Current_Process.Quantum_Ticks;
-         return True;
+      if Current_Process = null then
+         return False;
       else
          if Current_Process.Remaining_Ticks > 0 then
             Current_Process.Remaining_Ticks :=
