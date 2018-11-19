@@ -285,6 +285,8 @@ package body Rose.Kernel.Processes.Init is
 
          Proc.Priority := Priority;
          Proc.State := Ready;
+         Proc.Quantum_Ticks := 10;
+         Proc.Remaining_Ticks := 10;
 
          case Pid is
             when 2 =>
