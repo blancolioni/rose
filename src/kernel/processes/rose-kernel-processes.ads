@@ -216,6 +216,9 @@ package Rose.Kernel.Processes is
       Write_Attempt     : Boolean;
       Execution_Attempt : Boolean);
 
+   function Page_Fault_Count
+     return Natural;
+
    function Current_ESP
      (Process : Rose.Objects.Process_Id)
       return Rose.Words.Word_32;

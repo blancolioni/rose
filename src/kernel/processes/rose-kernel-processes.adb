@@ -20,7 +20,8 @@ package body Rose.Kernel.Processes is
      (Addr : Rose.Words.Word);
    pragma Export (C, Show_Address, "debug_show_address");
 
-   Page_Fault_Params : aliased Rose.Invocation.Invocation_Record;
+   Current_Page_Fault_Count  : Natural := 0;
+   Page_Fault_Params         : aliased Rose.Invocation.Invocation_Record;
 
    Page_Fault_Address : Rose.Words.Word_32;
    pragma Import (C, Page_Fault_Address, "page_fault_address");
@@ -394,6 +395,8 @@ package body Rose.Kernel.Processes is
          Debug.Report_Process (Current_Process_Id, False);
       end if;
 
+      Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
+
       Handle_Page_Fault
         (Virtual_Page      => Virtual_Page,
          Is_Mapped         => not Protection_Violation,
@@ -634,6 +637,17 @@ package body Rose.Kernel.Processes is
       end if;
       return 0;
    end Next_Blocked_Sender;
+
+   ----------------------
+   -- Page_Fault_Count --
+   ----------------------
+
+   function Page_Fault_Count
+     return Natural
+   is
+   begin
+      return Current_Page_Fault_Count;
+   end Page_Fault_Count;
 
    -------------
    -- Receive --

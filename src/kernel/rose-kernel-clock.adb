@@ -3,7 +3,6 @@ with Rose.Words;                       use Rose.Words;
 
 with Rose.Boot.Console;
 
-with Rose.Kernel.Invocation;
 with Rose.Kernel.Processes.Queue;
 
 package body Rose.Kernel.Clock is
@@ -23,15 +22,14 @@ package body Rose.Kernel.Clock is
          Rose.Boot.Console.Status_Line
            (Current_Pid   => Rose.Kernel.Processes.Current_Process_Id,
             Current_Ticks => Ticks,
-            Page_Faults   => Rose.Kernel.Invocation.Page_Fault_Count);
+            Page_Faults   => Rose.Kernel.Processes.Page_Fault_Count);
       end if;
 
       if Rose.Kernel.Processes.Use_Tick then
          Rose.Kernel.Processes.Queue.Choose_Process;
       end if;
 
-      if False and then Ticks mod 10 = 0 then
-         Rose.Boot.Console.Put_Line ("clock: invoking cap");
+--      if Ticks mod 10 = 0 then
 --           declare
 --              use System.Machine_Code;
 --              use Rose.Invocation;
@@ -53,8 +51,7 @@ package body Rose.Kernel.Clock is
 --                   Volatile => True);
 --              Asm ("int $0x30", Volatile => True);
 --           end;
-         Rose.Boot.Console.Put_Line ("clock: returning");
-      end if;
+--      end if;
       return Rose.Kernel.Interrupts.Finished;
    end Handle_Clock_Tick;
 
