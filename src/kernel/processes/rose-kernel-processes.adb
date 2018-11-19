@@ -3,7 +3,7 @@ with Rose.Boot.Console;
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
-with Rose.Kernel.Processes.Queue;
+with Rose.Kernel.Processes;
 
 --  with Rose.Invocation.Trace;
 
@@ -350,7 +350,7 @@ package body Rose.Kernel.Processes is
       Debug.Report_Process (Current_Process_Id, True);
       Rose.Boot.Console.Put_Line ("Faulted");
       Set_Current_State (Current_Process_Id, Killed);
-      return Rose.Kernel.Interrupts.Finished;
+      return Rose.Kernel.Interrupts.Not_Finished;
    end Handle_General_Protection_Fault;
 
    -----------------------
@@ -462,8 +462,6 @@ package body Rose.Kernel.Processes is
          Sender_Cap   => 0,
          Receiver_Cap => Mem_Page_Fault_Cap,
          Params       => Params);
-
-      Rose.Kernel.Processes.Queue.Choose_Process;
 
    end Handle_Page_Fault;
 
@@ -1112,7 +1110,21 @@ package body Rose.Kernel.Processes is
          Current_Process.Remaining_Ticks := Current_Process.Quantum_Ticks;
          return True;
       else
-         return False;
+         if Current_Process.Remaining_Ticks > 0 then
+            Current_Process.Remaining_Ticks :=
+              Current_Process.Remaining_Ticks - 1;
+         end if;
+         if Current_Process.Remaining_Ticks = 0 then
+            if False then
+               Current_Process.Remaining_Ticks :=
+                 Current_Process.Quantum_Ticks;
+               return True;
+            else
+               return False;
+            end if;
+         else
+            return False;
+         end if;
       end if;
    end Use_Tick;
 

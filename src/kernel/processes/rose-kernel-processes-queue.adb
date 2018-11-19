@@ -59,63 +59,7 @@ package body Rose.Kernel.Processes.Queue is
          end if;
       end;
 
-      declare
-         Log         : constant Boolean :=
-                         Log_Reply
-                             or else Log_Process_Activity
-                               = Next_Process.Pid;
-         Log_Details : constant Boolean :=
-                         Log and then
-                             Log_Detailed_Invocation
-                               = Next_Process.Pid;
-      begin
-         Invocation_Reply := (if Current_Process.Flags (Invoke_Reply)
-                              then 1 else 0);
-         Interrupted_Resume := (if Current_Process.Flags (Interrupt_Resume)
-                                then 1 else 0);
-
-         if not Current_Process.Flags (Invoke_Reply)
-           and then not Current_Process.Flags (Interrupt_Resume)
-         then
-            if Log then
-               Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
-               Rose.Boot.Console.Put (": resuming with no reply");
-               Rose.Boot.Console.New_Line;
-            end if;
-         end if;
-
-         if Current_Process.Flags (Invoke_Reply) then
-            if Log then
-               Rose.Kernel.Debug.Put_Call
-                 ("reply", Current_Process.Pid,
-                  Current_Process.Cap_Cache
-                    (Current_Process.Current_Params.Cap),
-                  Current_Process.Current_Params);
-
-               if Log_Details then
-                  Debug.Report_Process (Current_Process.Pid, False);
-               end if;
-            end if;
-
-            Process_Invocation_Record := Current_Process.Current_Params;
-            Current_Process.Flags (Invoke_Reply) := False;
-         end if;
-
-         if Current_Process.Flags (Interrupt_Resume) then
-            if Log then
-               Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
-               Rose.Boot.Console.Put (": resuming from interrupt");
-               Rose.Boot.Console.New_Line;
-               Debug.Report_Process (Current_Process_Id, False);
-            end if;
-            Current_Process.Flags (Interrupt_Resume) := False;
-         end if;
-      end;
-
-      if False then
-         Rose.Kernel.Processes.Debug.Report_Process
-           (Current_Process.Pid);
-      end if;
+      Resume_Current_Process;
 
    end Choose_Process;
 
@@ -194,5 +138,65 @@ package body Rose.Kernel.Processes.Queue is
 --           Rose.Boot.Console.New_Line;
 --        end if;
    end Queue_Process;
+
+   ----------------------------
+   -- Resume_Current_Process --
+   ----------------------------
+
+   procedure Resume_Current_Process is
+      use type Rose.Objects.Process_Id;
+      Log         : constant Boolean :=
+                      Log_Reply
+                          or else Log_Process_Activity
+                            = Next_Process.Pid;
+      Log_Details : constant Boolean :=
+                      Log and then
+                          Log_Detailed_Invocation
+                            = Next_Process.Pid;
+   begin
+      Invocation_Reply := (if Current_Process.Flags (Invoke_Reply)
+                           then 1 else 0);
+      Interrupted_Resume := (if Current_Process.Flags (Interrupt_Resume)
+                             then 1 else 0);
+
+      if not Current_Process.Flags (Invoke_Reply)
+        and then not Current_Process.Flags (Interrupt_Resume)
+      then
+         if Log then
+            Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
+            Rose.Boot.Console.Put (": resuming with no reply");
+            Rose.Boot.Console.New_Line;
+         end if;
+      end if;
+
+      if Current_Process.Flags (Invoke_Reply) then
+         if Log then
+            Rose.Kernel.Debug.Put_Call
+              ("reply", Current_Process.Pid,
+               Current_Process.Cap_Cache
+                 (Current_Process.Current_Params.Cap),
+               Current_Process.Current_Params);
+
+            if Log_Details then
+               Debug.Report_Process (Current_Process.Pid, False);
+            end if;
+         end if;
+
+         Process_Invocation_Record := Current_Process.Current_Params;
+         Current_Process.Flags (Invoke_Reply) := False;
+      end if;
+
+      if Current_Process.Flags (Interrupt_Resume) then
+         if True or else Log then
+            Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
+            Rose.Boot.Console.Put (": resuming from interrupt");
+            Rose.Boot.Console.New_Line;
+            if Log_Details then
+               Debug.Report_Process (Current_Process_Id, False);
+            end if;
+         end if;
+         Current_Process.Flags (Interrupt_Resume) := False;
+      end if;
+   end Resume_Current_Process;
 
 end Rose.Kernel.Processes.Queue;

@@ -5,7 +5,7 @@ with Rose.Boot.Console;
 
 with Rose.Kernel.Interrupts;
 
-with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Queue;
 
 package body Rose.Arch.Interrupt_Table is
 
@@ -143,7 +143,8 @@ package body Rose.Arch.Interrupt_Table is
       Handler (Invalid_TSS, Invalid_Tss_Exception'Access);
       Handler (Segment_Not_Present, Segment_Not_Present_Exception'Access);
       Handler (Stack_Segment_Fault, Stack_Fault_Exception'Access);
-      Handler (General_Protection_Fault, Protection_Fault_Exception'Access);
+      Handler (General_Protection_Fault,
+               Protection_Fault_Exception'Access);
       Handler (Page_Fault, Page_Fault_Exception'Access);
 
       Handler (Clock_Interrupt, IRQ_00'Access);
@@ -211,10 +212,11 @@ package body Rose.Arch.Interrupt_Table is
             when Finished =>
                IRQ_Active (Vector) := 0;
                Rose.Kernel.Processes.Set_Current_State
-                 (Interrupted_Process_Id,
-                  Rose.Kernel.Processes.Ready);
+                 (Interrupted_Process_Id, Rose.Kernel.Processes.Ready);
+               Rose.Kernel.Processes.Queue.Resume_Current_Process;
             when Not_Finished =>
                IRQ_Active (Vector) := 1;
+               Rose.Kernel.Processes.Queue.Choose_Process;
          end case;
       end;
 
@@ -253,5 +255,17 @@ package body Rose.Arch.Interrupt_Table is
         + IDRT_Entry (Selector) * 2 ** 16
         + IDRT_Entry (H mod 2 ** 16) * 2 ** 0;
    end Set_Handler;
+
+   ------------------------------
+   -- Start_Interrupt_Handling --
+   ------------------------------
+
+   procedure Start_Interrupt_Handling is
+   begin
+      if True then
+         Rose.Arch.Outb (16#21#, 0);
+         Rose.Arch.Outb (16#A1#, 0);
+      end if;
+   end Start_Interrupt_Handling;
 
 end Rose.Arch.Interrupt_Table;
