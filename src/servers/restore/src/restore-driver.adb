@@ -6,6 +6,9 @@ with Rose.Console_IO;
 
 with Rose.Words;
 
+with Rose.Invocation;
+with Rose.System_Calls.Server;
+
 procedure Restore.Driver is
    use Rose.Devices.Block.Client;
    Device : Block_Device_Type;
@@ -112,8 +115,29 @@ begin
 
    Rose.Console_IO.Put_Line ("restore: done");
 
-   loop
-      null;
-   end loop;
+   declare
+      use Rose.Invocation;
+      use Rose.System_Calls;
+      Params : aliased Rose.Invocation.Invocation_Record;
+      Receive_Cap : constant Rose.Capabilities.Capability :=
+                      Rose.System_Calls.Server.Create_Receive_Cap
+                        (Create_Cap   => Create_Endpoint_Cap);
+   begin
+      Params :=
+        Invocation_Record'
+          (Control       =>
+             Control_Word'
+               (Flags          =>
+                  (Receive     => True,
+                   Block       => True,
+                   Recv_Words  => True,
+                   Recv_Caps   => True,
+                   others      => False),
+                others         => <>),
+           Cap           => Receive_Cap,
+           others        => <>);
+
+      Invoke_Capability (Params);
+   end;
 
 end Restore.Driver;

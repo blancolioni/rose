@@ -23,6 +23,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
+	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o
 
