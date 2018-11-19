@@ -333,15 +333,15 @@ package body Rose.Kernel.Processes.Init is
             Map_Page
               (Directory_Page => Directory_VP,
                Virtual_Page   =>
-                 Virtual_Address_To_Page (16#BFFF_FFF0#),
+                 Virtual_Address_To_Page (Process_Stack_Bound - 1),
                Physical_Page  => Proc.Stack_Page,
                Readable       => True,
                Writable       => True,
                Executable     => False,
                User           => True);
             Proc.Page_Ranges (Stack_Range_Index) :=
-              (Virtual_Address_To_Page (16#BFFF_0000#),
-               Virtual_Address_To_Page (16#C000_0000#));
+              (Virtual_Address_To_Page (Process_Stack_Bound - 16#1_0000#),
+               Virtual_Address_To_Page (Process_Stack_Bound));
             Proc.Page_Flags (Stack_Range_Index) :=
               (Valid => True, Readable => True, Writable => True,
                others => False);
@@ -358,7 +358,7 @@ package body Rose.Kernel.Processes.Init is
             Map_Page
               (Directory_Page => Directory_VP,
                Virtual_Page   =>
-                 Virtual_Address_To_Page (16#F000_0000#),
+                 Virtual_Address_To_Page (16#FFFF_0000#),
                Physical_Page  => System_Call_Page,
                Readable       => True,
                Writable       => False,

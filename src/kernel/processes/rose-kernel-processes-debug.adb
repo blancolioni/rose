@@ -34,7 +34,7 @@ package body Rose.Kernel.Processes.Debug is
          return;
       end if;
 
-      while ESP < 16#C000_0000#
+      while ESP < Process_Stack_Bound
         and then Index < Saved_Stack'Last
       loop
          declare
@@ -137,7 +137,7 @@ package body Rose.Kernel.Processes.Debug is
             Start_Line : Boolean := True;
             Line_Count : Natural := 0;
          begin
-            while X < 16#C000_0000# and then Line_Count < 32 loop
+            while X < Process_Stack_Bound and then Line_Count < 32 loop
                if Start_Line then
                   Put (X);
                   Put (": ");
@@ -191,7 +191,7 @@ package body Rose.Kernel.Processes.Debug is
       end if;
       Saved_ESP := Current_Process.Stack.ESP;
 
-      while ESP < 16#C000_0000#
+      while ESP < Process_Stack_Bound
         and then Index < Saved_Stack'Last
       loop
          declare

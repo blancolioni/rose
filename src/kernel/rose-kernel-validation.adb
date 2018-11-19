@@ -106,7 +106,7 @@ package body Rose.Kernel.Validation is
                             Procs (Process).Stack;
             Errors      : Boolean := False;
          begin
-            while Stack_Addr < 16#C000_000#
+            while Stack_Addr < Process_Stack_Bound
               and then Stack_Index <= Saved_Stack'Last
             loop
                if Saved_Stack (Stack_Index) /= Stack (Stack_Index) then

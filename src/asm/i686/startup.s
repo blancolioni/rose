@@ -13,7 +13,7 @@
 
 .set PAGE_ENTRY_FLAGS,   0x63           # Initial page entry flag value
 
-        .set KERNEL_VIRTUAL_BASE, 0xC0000000
+        .set KERNEL_VIRTUAL_BASE, 0xF0000000
         .set KERNEL_PAGE_NUMBER, KERNEL_VIRTUAL_BASE >> 22
 
         .set kernel_page_directory, boot_page_directory - KERNEL_VIRTUAL_BASE
@@ -68,12 +68,12 @@ _boot:
         addl $4,%esi
         loop 1b
 
-        # point 4M starting at 0x0000_0000 and 0xC000_0000 to 0x0000_0000
+        # point 4M starting at 0x0000_0000 and 0xF000_0000 to 0x0000_0000
         movl	$(boot_page_directory - KERNEL_VIRTUAL_BASE), %esi
         movl	$(boot_page_table - KERNEL_VIRTUAL_BASE), %edx
         orl	$PAGE_ENTRY_FLAGS, %edx
         movl	%edx,(%esi)
-        movl	%edx,0xC00(%esi)
+        movl	%edx,0xF00(%esi)
 
         # load boot page directory into master mapping register
         movl    $(boot_page_directory - KERNEL_VIRTUAL_BASE), %edx
@@ -88,7 +88,7 @@ _boot:
         lea    relocated_start, %edx
         jmp *%edx
 
-relocated_start:        # we are now running paged, in 0xC010_0000
+relocated_start:        # we are now running paged, in 0xF010_0000
 
     movl $_ld_start, %eax                # save our start and end locations
     movl %eax, _kmem_base

@@ -12,9 +12,6 @@ package Rose.Kernel.Processes is
    Process_Table_Heap_Size : constant Rose.Addresses.Physical_Bytes;
    Process_Priority_Count  : constant := 16;
 
-   Invocation_Buffer_Range_Base  : constant := 16#A000_0000#;
-   Invocation_Buffer_Range_Bound : constant := 16#B000_0000#;
-
    type Process_State is
      (Available, Ready, Running, Blocked, Interrupted, Killed);
 

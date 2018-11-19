@@ -356,7 +356,7 @@ system_call_entry:
     push %ecx
     push %edx
     mov %esp, %ecx
-    mov $0xf0000010, %edx
+    mov $0xffff0010, %edx
     sysenter
     
 .align 4

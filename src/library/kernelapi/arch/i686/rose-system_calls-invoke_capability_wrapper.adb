@@ -6,5 +6,5 @@ procedure Invoke_Capability_Wrapper
 is
    pragma Unreferenced (Item);
 begin
-   Asm ("jmp 0xf0000000", Volatile => True);
+   Asm ("jmp 0xffff0000", Volatile => True);
 end Invoke_Capability_Wrapper;
