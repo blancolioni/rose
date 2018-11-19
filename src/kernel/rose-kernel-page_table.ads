@@ -41,4 +41,7 @@ package Rose.Kernel.Page_Table is
    function Kernel_Page_Directory
      return Rose.Addresses.Physical_Address;
 
+   procedure Report_Mapped_Pages
+     (Directory_Page : Rose.Addresses.Physical_Address);
+
 end Rose.Kernel.Page_Table;
