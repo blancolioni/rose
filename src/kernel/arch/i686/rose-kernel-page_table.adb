@@ -348,45 +348,101 @@ package body Rose.Kernel.Page_Table is
       return Dir_Offset - Dir_Offset mod Page_Table_Block_Size;
    end Page_Table_Block_Start;
 
+   -------------------------
+   -- Report_Mapped_Pages --
+   -------------------------
+
+   procedure Report_Mapped_Pages
+     (Directory_Page : Rose.Addresses.Physical_Address)
+   is
+      use Rose.Words;
+      Directory_Address : constant Virtual_Address :=
+                            Virtual_Address (Directory_Page
+                                             + Kernel_Virtual_Base);
+      Directory         : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use System'To_Address (Directory_Address);
+   begin
+      for Index in Directory'Range loop
+
+         if Directory (Index).Present then
+
+            declare
+               Base : constant Word_32 :=
+                        Word_32 (Index) * 4096 * 1024;
+            begin
+               Rose.Boot.Console.Put (Base);
+               Rose.Boot.Console.Put ("  ");
+               Show_Page_Entry (Directory (Index));
+
+               if Index < 16#0300# then
+                  declare
+                     Page_Entry_Address : constant Word_32 :=
+                                            Word_32 (Directory (Index).PFA)
+                                            * 4096
+                                              + Word_32 (Kernel_Virtual_Base);
+                     Page_Table         : Page_Table_Array;
+                     pragma Import (Ada, Page_Table);
+                     for Page_Table'Address use
+                       System'To_Address (Page_Entry_Address);
+                  begin
+                     for Index in Page_Table'Range loop
+                        if Page_Table (Index).Present then
+                           Rose.Boot.Console.Put ("   ");
+                           Rose.Boot.Console.Put
+                             (Base + Word_32 (Index) * 4096);
+                           Rose.Boot.Console.Put ("  ");
+                           Show_Page_Entry (Page_Table (Index));
+                        end if;
+                     end loop;
+                  end;
+               end if;
+            end;
+         end if;
+      end loop;
+   end Report_Mapped_Pages;
+
    ---------------------
    -- Show_Page_Entry --
    ---------------------
 
    procedure Show_Page_Entry (Page : Page_Entry) is
       use Rose.Words;
-      Bc : constant array (Boolean) of Character := ('0', '1');
       W  : Word_32;
       for W'Address use Page'Address;
       pragma Import (Ada, W);
+
+      procedure Put_Flag (Value : Boolean;
+                          Name  : String);
+
+      --------------
+      -- Put_Flag --
+      --------------
+
+      procedure Put_Flag (Value : Boolean;
+                          Name  : String)
+      is
+      begin
+         Rose.Boot.Console.Put (if Value then Name else "-");
+      end Put_Flag;
+
    begin
-      Rose.Boot.Console.Put ("Page Entry: ");
       Rose.Boot.Console.Put (W);
-      Rose.Boot.Console.Put (" -- ");
+      Rose.Boot.Console.Put (": ");
       Rose.Boot.Console.Put (Word_32 (Page.PFA) * 4096);
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Available_11));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Available_10));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Available_9));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Global));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Zero));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Dirty));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Accessed));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Cache_Disable));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Transparent_Write));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.User));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Writable));
-      Rose.Boot.Console.Put (":");
-      Rose.Boot.Console.Put (Bc (Page.Present));
+      Rose.Boot.Console.Put (" ");
+      Put_Flag (Page.Available_11, "z");
+      Put_Flag (Page.Available_10, "y");
+      Put_Flag (Page.Available_9, "x");
+      Put_Flag (Page.Global, "g");
+      Put_Flag (Page.Zero, "0");
+      Put_Flag (Page.Dirty, "d");
+      Put_Flag (Page.Accessed, "a");
+      Put_Flag (Page.Cache_Disable, "c");
+      Put_Flag (Page.Transparent_Write, "t");
+      Put_Flag (Page.User, "u");
+      Put_Flag (Page.Writable, "w");
+      Put_Flag (Page.Present, "p");
       Rose.Boot.Console.New_Line;
    end Show_Page_Entry;
 
