@@ -13,16 +13,9 @@ package Rose.Arch.Interrupt_Table is
       EFLags    : Rose.Words.Word_32);
    pragma Export (C, Generic_Hardware_Interrupt, "generic_handle_int");
 
---     procedure Handle_Interrupt
---       (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector);
---     pragma Export (C, Handle_Interrupt, "handle_interrupt");
-
    type Exception_Handler is access procedure;
    pragma Convention (C, Exception_Handler);
 
---     procedure Set_Hardware_Interrupt_Handler
---       (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
---        Handler   : Interrupt_Handler);
---     pragma Export (C, Set_Hardware_Interrupt_Handler, "set_hw_handler");
+   procedure Start_Interrupt_Handling;
 
 end Rose.Arch.Interrupt_Table;
