@@ -11,6 +11,11 @@ package Rose.Kernel is
    Kernel_Object_Id    : constant Rose.Objects.Object_Id :=
                            16#0000_0000_0000_0001#;
 
+   Process_Stack_Base            : constant := 16#D000_0000#;
+   Process_Stack_Bound           : constant := 16#E000_0000#;
+   Invocation_Buffer_Range_Base  : constant := 16#E000_0000#;
+   Invocation_Buffer_Range_Bound : constant := 16#F000_0000#;
+
    type Process_Segment is (Text, Static, Data, Environment);
 
    Environment_Virtual_Page    : constant := 16#000F_F000#;
@@ -29,7 +34,7 @@ private
    pragma Export (C, Kernel_Base, "_kmem_base");
    pragma Export (C, Kernel_Bound, "_kmem_bound");
 
-   Kernel_Virtual_Base : constant := 16#C000_0000#;
+   Kernel_Virtual_Base : constant := 16#F000_0000#;
    Kernel_Virtual_Page_Base : constant :=
                                 Kernel_Virtual_Base
                                   / Rose.Addresses.Physical_Page_Bytes;

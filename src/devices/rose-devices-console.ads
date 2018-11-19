@@ -2,7 +2,7 @@ with Rose.Words;                       use Rose.Words;
 
 package Rose.Devices.Console is
 
-   Console_Start : constant := 16#C00B_8000# + 2 * 80;
+   Console_Start : constant := 16#F00B_8000# + 2 * 80;
 
    Num_Lines   : constant := 24;
    Num_Columns : constant := 80;

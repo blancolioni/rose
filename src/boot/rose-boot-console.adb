@@ -19,7 +19,7 @@ package body Rose.Boot.Console is
    Status_Colours               : array (1 .. 80) of Word_16 :=
                                     (others => 16#0700#);
    Status_Memory                : array (1 .. 80) of Word_16;
-   for Status_Memory'Address use System'To_Address (16#C00B_8000#);
+   for Status_Memory'Address use System'To_Address (16#F00B_8000#);
    pragma Import (Ada, Status_Memory);
 
    Enabled          : Boolean := True;

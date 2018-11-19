@@ -22,7 +22,7 @@ package body Rose.Kernel.Arch is
 
    function Process_Stack_Frame
      (Start_EIP       : Word_32;
-      Start_ESP       : Word_32 := 16#BFFF_FFF0#;
+      Start_ESP       : Word_32 := Process_Stack_Bound;
       Start_PSW       : Word_32 := 16#0000_0200#;
       Code_Segment    : Word_32 := 16#18#;
       Data_Segment    : Word_32 := 16#20#;

@@ -2,7 +2,7 @@ package Rose.Kernel.Page_Table is
 
    procedure Init_Page_Table;
    --  Bring the page table to a known state: nothing mapped except
-   --  the kernel starting at 16#c000_0000#
+   --  the kernel starting at 16#F000_0000#
 
    procedure Init_User_Page_Directory
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);

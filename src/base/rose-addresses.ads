@@ -31,7 +31,7 @@ package Rose.Addresses is
    subtype Virtual_Bytes is Virtual_Address;
 
    type Kernel_Address is
-     new Virtual_Address range 16#C000_0000# .. 16#FFFF_FFFF#;
+     new Virtual_Address range 16#F000_0000# .. 16#FFFF_FFFF#;
 
    type Kernel_Page_Address is
      new Virtual_Page_Address range
