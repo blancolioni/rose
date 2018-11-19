@@ -96,8 +96,6 @@ kernel_stack_top:
 .global hwint\irq
 hwint\irq :
     save_process_context 0
-    xor     %eax, %eax
-    mov     %eax, invoke_reply
     push    $(\irq + 32)
     call    handle_interrupt
     pop     %ecx
@@ -127,8 +125,6 @@ hwint_master 7
 .global hwint\irq
 hwint\irq :
     save_process_context 0
-    xor     %eax, %eax
-    mov     %eax, invoke_reply
     push    $(\irq + 32)
     call    handle_interrupt
     pop     %ecx
@@ -257,10 +253,6 @@ cpu_exception_code:
     
 cpu_exception_common:
     save_process_context 0    
-    xor     %eax, %eax
-    mov     %eax, invoke_reply
-    mov %cr2, %eax
-    push %eax
     mov exception_code, %eax
     push %eax
     mov exception_number, %eax
@@ -270,27 +262,7 @@ cpu_exception_common:
     pop %ecx
     mov $invocation_record, %esi
     jmp continue    
-    
-    
-#.global cpu_page_fault
-#cpu_page_fault:
-#    mov %eax, page_fault_eax
-#    pop %eax
-#    mov %eax, page_fault_code
-#    mov page_fault_eax, %eax
-#    save_process_context 0
-#    xor     %eax, %eax
-#    mov     %eax, invoke_reply
-#    mov %cr2, %eax
-#    push %eax
-#    mov page_fault_code, %eax
-#    push %eax
-#    call page_fault_handler
-#    pop %ecx
-#    pop %ecx
-#    mov $invocation_record, %esi
-#    jmp continue
-    
+        
 .text
 
 system_call:
@@ -309,12 +281,6 @@ system_call:
     mov     %eax, Process_EAX(%ebp)
     mov     %ebx, Process_EBX(%ebp)
     
-#    push %eax
-#    push %ebp
-#    call    validation_save_process
-#    pop %ebp
-#    pop %eax
-    
     movl %eax, %esi
     movl $invocation_record, %ebp
     movl $INVOKE_WORDS,%ecx
@@ -323,9 +289,6 @@ system_call:
     addl $4, %esi
     addl $4, %ebp
     loop 1b
-    
-   # movl    $(kernel_page_directory), %edx
-   # mov	%edx,%cr3
    
     push    $invocation_record
     call    invoke_capability
@@ -341,10 +304,6 @@ continue:
     cmp     $0, %eax                          
     jnz     rti_continue                       # if so, return via rti
 
-#    push %ebp
-#    call    validation_check_process
-#    pop %ebp
-    
     movl    invoke_reply, %eax
     cmp     $0, %eax                           # are we sending a reply to their invocation?
     jz      no_reply_continue                  # if not, skip invocation record copy
