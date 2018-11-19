@@ -196,6 +196,15 @@ package body Rose.Kernel.Page_Table is
       User           : Boolean)
    is
    begin
+      Rose.Boot.Console.Put
+        ("map kernel page: ");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word_32 (Virtual_Page));
+      Rose.Boot.Console.Put (" ");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word_32 (Physical_Page));
+      Rose.Boot.Console.New_Line;
+
       Map_Page (Page_Directory, Virtual_Page, Physical_Page,
                 Readable, Writable, Executable, User);
    end Map_Kernel_Page;
