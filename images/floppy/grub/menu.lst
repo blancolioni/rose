@@ -1,5 +1,5 @@
 default 0
-timeout 5
+timeout 1
 splashimage=/boot/rose-splash.xpm
 
 title Rose boot
@@ -37,7 +37,7 @@ title Rose port debug
 
 title Rose process log
     root (fd0)
-    kernel /kernel log-process=6
+    kernel /kernel log-process=7
     module /init
     module /console
     module /mem
