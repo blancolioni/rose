@@ -347,7 +347,13 @@ package body Rose.Kernel.Processes is
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
    begin
+      Rose.Boot.Console.Put (Current_Process_Id);
+      Rose.Boot.Console.Put_Line (": general protection fault");
       Debug.Report_Process (Current_Process_Id, True);
+      Rose.Boot.Console.Put_Line ("mapped page report");
+      Rose.Kernel.Page_Table.Report_Mapped_Pages
+        (Current_Process.Directory_Page);
+
       Rose.Boot.Console.Put_Line ("Faulted");
       Set_Current_State (Current_Process_Id, Killed);
       return Rose.Kernel.Interrupts.Not_Finished;
