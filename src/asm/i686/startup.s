@@ -124,37 +124,7 @@ relocated_start:        # we are now running paged, in 0xC010_0000
     mov $0x28, %ax
     ltr %ax
     
-        # call    initialise_pic        
-        mov $0x11, %al
-        outb %al, $0x20
-        outb %al, $0xA0
-        
-        mov $0x20, %al
-        outb %al, $0x21
-        mov $0x28, %al
-        outb %al, $0xA1
-        
-        mov $0x04, %al
-        outb %al, $0x21
-        
-        mov $0x02, %al
-        outb %al, $0xA1
-        
-        mov $0x01, %al
-        outb %al, $0x21
-        outb %al, $0xA1
-               
-#        push $hwint0
-#        pushl $0x20
-#        call set_hw_handler
-        
-#        push $hwint1
-#        pushl $0x21
-#        call set_hw_handler
-    
-#        push $system_call
-#        pushl $0x30
-#        call set_hw_handler
+        call    initialise_pic        
 
         # Initialise system call registers
         xor %edx, %edx
@@ -169,17 +139,13 @@ relocated_start:        # we are now running paged, in 0xC010_0000
         wrmsr
         
         # set clock interrupt rate ~ 100/s
+        # this should go into clock module
         mov $0x36, %al
        outb %al, $0x43
         mov $0x9C, %al
         outb %al, $0x40
         mov $0x2E, %al
         outb %al, $0x40
-        
-       mov $0xFF, %al
-       out %al, $0x21
-       mov $0xFF, %al
-       out %al, $0xA1
         
         movl $(stack + STACKSIZE), %esp
         mov %esp, kernel_stack_top
