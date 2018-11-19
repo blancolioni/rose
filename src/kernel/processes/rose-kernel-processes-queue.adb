@@ -187,7 +187,7 @@ package body Rose.Kernel.Processes.Queue is
       end if;
 
       if Current_Process.Flags (Interrupt_Resume) then
-         if True or else Log then
+         if Log then
             Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
             Rose.Boot.Console.Put (": resuming from interrupt");
             Rose.Boot.Console.New_Line;
