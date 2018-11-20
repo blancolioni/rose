@@ -13,7 +13,7 @@ package body Rose.Kernel.Capabilities.Boot is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       pragma Unreferenced (Cap);

@@ -13,7 +13,7 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       use Rose.Invocation;
@@ -82,7 +82,7 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                   Map_Cap : constant Rose.Capabilities.Capability :=
                               Rose.Kernel.Processes.Create_Cap
                                 (Rose.Kernel.Processes.Current_Process_Id);
-                  Layout  : Generic_Capability_Layout;
+                  Layout  : Capability_Layout;
                begin
                   Get_User_Region (Positive (Params.Data (0)), Base, Bound);
 

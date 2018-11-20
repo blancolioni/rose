@@ -12,7 +12,7 @@ package body Rose.Kernel.Capabilities.Arch is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       use Rose.Invocation;

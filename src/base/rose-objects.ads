@@ -12,6 +12,8 @@ package Rose.Objects is
 
    type Endpoint_Index is mod 2 ** 32;
 
+   type Capability_Identifier is mod 2 ** 20;
+
    type Process_Id is new Rose.Words.Word_32;
    Null_Process_Id : constant Process_Id := 0;
 
