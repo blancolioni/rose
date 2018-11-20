@@ -13,6 +13,7 @@ package ATA is
    Data_0_Cap_8        : constant Rose.Capabilities.Capability := 6;
    Data_0_Cap_Read_16  : constant Rose.Capabilities.Capability := 7;
    Data_0_Cap_Write_16 : constant Rose.Capabilities.Capability := 8;
+
    Command_1_Cap       : constant Rose.Capabilities.Capability := 9;
    Control_1_Cap       : constant Rose.Capabilities.Capability := 10;
    Data_1_Cap_8        : constant Rose.Capabilities.Capability := 11;
