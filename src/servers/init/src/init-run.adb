@@ -222,9 +222,22 @@ package body Init.Run is
 --             Copy_Cap_From_Process (Copy_Ata_Cap, 16#D469_B96E#);
       end;
 
+      if False then
+         declare
+            IsoFS_Id : constant Rose.Objects.Object_Id :=
+                         Init.Calls.Call (Boot_Cap, 6,
+                                          (Create_Endpoint_Cap,
+                                           Console_Write_Cap,
+                                           Hd1_Parameters_Cap,
+                                           Hd1_Read_Cap));
+         begin
+            pragma Unreferenced (IsoFS_Id);
+         end;
+      end if;
+
       declare
          Restore_Id : constant Rose.Objects.Object_Id :=
-                        Init.Calls.Call (Boot_Cap, 6,
+                        Init.Calls.Call (Boot_Cap, 7,
                                          (Create_Endpoint_Cap,
                                           Console_Write_Cap,
                                           Hd0_Parameters_Cap,

@@ -10,6 +10,7 @@ title Rose boot
     module /mem
     module /pci
     module /ata
+    module /isofs
     module /restore
     boot
 
