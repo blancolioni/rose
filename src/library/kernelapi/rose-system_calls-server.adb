@@ -24,6 +24,7 @@ package body Rose.System_Calls.Server is
    procedure Create_Endpoint
      (Create_Cap   : Rose.Capabilities.Capability;
       Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0;
       Entry_Cap    : out Rose.Capabilities.Capability;
       Endpoint_Cap : out Rose.Capabilities.Capability)
    is
@@ -40,11 +41,14 @@ package body Rose.System_Calls.Server is
                    Recv_Caps  => True,
                    Send_Words => True,
                    others     => False),
-                Last_Sent_Word => 0,
+                Last_Sent_Word => 1,
                 Last_Recv_Cap  => 1,
                 others         => <>),
            Cap           => Create_Cap,
-           Data          => (0 => Rose.Words.Word (Endpoint_Id), others => 0),
+           Data          =>
+             (Rose.Words.Word (Endpoint_Id),
+              Rose.Words.Word (Identifier),
+              others => 0),
            others        => <>);
 
       Invoke_Capability (Params);
@@ -60,12 +64,15 @@ package body Rose.System_Calls.Server is
 
    function Create_Endpoint
      (Create_Cap   : Rose.Capabilities.Capability;
-      Endpoint_Id  : Rose.Objects.Endpoint_Id)
+      Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
       return Rose.Capabilities.Capability
    is
    begin
       return Rose.System_Calls.Client.Get_Capability
-        (Create_Cap, (1 => Rose.Words.Word (Endpoint_Id)));
+        (Create_Cap,
+         (Rose.Words.Word (Endpoint_Id),
+          Rose.Words.Word (Identifier)));
    end Create_Endpoint;
 
    ------------------------
