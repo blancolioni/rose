@@ -38,4 +38,9 @@ package Init.Calls is
       Sent_Caps : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
+   procedure Get_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Identifier     : Rose.Objects.Capability_Identifier;
+      Interface_Caps : out Array_Of_Capabilities);
+
 end Init.Calls;

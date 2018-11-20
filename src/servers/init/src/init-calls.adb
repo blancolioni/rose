@@ -22,11 +22,12 @@ package body Init.Calls is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Params.Cap := Cap;
-      Params.Control.Flags := (Send       => True,
-                               Send_Words => Data'Length > 0,
-                               Block      => True,
-                               Recv_Caps  => True,
-                               others     => False);
+      Params.Control.Flags := (Send             => True,
+                               Send_Words       => Data'Length > 0,
+                               Block            => True,
+                               Recv_Caps        => True,
+                               Create_Reply_Cap => True,
+                               others           => False);
       Params.Control.Last_Sent_Word := 0;
       for Value of Data loop
          Params.Data (Params.Control.Last_Sent_Word) := Value;
@@ -59,12 +60,13 @@ package body Init.Calls is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Params.Cap := Cap;
-      Params.Control.Flags := (Send       => True,
-                               Send_Words => True,
-                               Recv_Words => True,
-                               Send_Caps  => Sent_Caps'Length > 0,
-                               Block      => True,
-                               others     => False);
+      Params.Control.Flags := (Send             => True,
+                               Send_Words       => True,
+                               Recv_Words       => True,
+                               Send_Caps        => Sent_Caps'Length > 0,
+                               Block            => True,
+                               Create_Reply_Cap => True,
+                               others           => False);
       Params.Control.Last_Sent_Word := 0;
       Params.Control.Last_Sent_Cap := 0;
       Params.Data (0) := Data;
@@ -94,6 +96,50 @@ package body Init.Calls is
       end;
 
    end Call;
+
+   -------------------
+   -- Get_Interface --
+   -------------------
+
+   procedure Get_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Identifier     : Rose.Objects.Capability_Identifier;
+      Interface_Caps : out Array_Of_Capabilities)
+   is
+      use Rose.Invocation;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Params.Cap := Cap;
+      Params.Control.Flags := (Send             => True,
+                               Send_Words       => True,
+                               Block            => True,
+                               Recv_Caps        => True,
+                               Create_Reply_Cap => True,
+                               others           => False);
+      Params.Control.Last_Sent_Word := 0;
+      Params.Control.Last_Recv_Cap :=
+        Capability_Index (Interface_Caps'Length - 1);
+
+      Params.Data (0) := Rose.Words.Word (Identifier);
+
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      Interface_Caps := (others => 0);
+
+      if not (Params.Control.Flags (Error)
+              or else not Params.Control.Flags (Send_Caps))
+      then
+         declare
+            Last : Natural := Interface_Caps'First - 1;
+         begin
+            for Index in 0 .. Params.Control.Last_Sent_Cap loop
+               Last := Last + 1;
+               exit when Last > Interface_Caps'Length;
+               Interface_Caps (Last) := Params.Caps (Index);
+            end loop;
+         end;
+      end if;
+   end Get_Interface;
 
    ----------
    -- Send --
