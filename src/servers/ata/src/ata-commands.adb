@@ -3,11 +3,6 @@ with Rose.Console_IO;
 
 package body ATA.Commands is
 
-   ATA_Read_Sectors  : constant Rose.Words.Word_8 := 16#20#;
-   ATA_Write_Sectors : constant Rose.Words.Word_8 := 16#30#;
-   ATA_Flush         : constant Rose.Words.Word_8 := 16#E7#;
-   ATA_Identify      : constant Rose.Words.Word_8 := 16#EC#;
-
    function To_Select_Drive
      (Master  : Boolean;
       LBA     : Boolean;
@@ -25,9 +20,9 @@ package body ATA.Commands is
       Master       : Boolean)
    is
       Command : constant ATA_Command :=
-                  (Command_Status => ATA_Flush,
-                   Select_Drive   => To_Select_Drive (Master, True),
-                   others         => 0);
+                  (Command => ATA_Flush,
+                   Master  => Master,
+                   others  => <>);
    begin
       if not Send_Command
         (Command      => Command,
@@ -38,6 +33,21 @@ package body ATA.Commands is
          Rose.Console_IO.Put_Line ("cannot flush drive");
       end if;
    end Flush;
+
+   ------------------------
+   -- Initialize_Command --
+   ------------------------
+
+   procedure Initialize_Command
+     (Item    : out ATA_Command;
+      Command : ATA_Command_Type;
+      Master  : Boolean;
+      Use_LBA : Boolean := True)
+   is
+   begin
+      Item := (Command => Command, Master => Master, Use_LBA => Use_LBA,
+               others  => <>);
+   end Initialize_Command;
 
    -----------------
    -- Read_Sector --
@@ -79,9 +89,8 @@ package body ATA.Commands is
    begin
 
       Rose.Devices.Port_IO.Port_Out_8
-        (Command_Port,
-         Command_Register'Pos (Select_Drive),
-         Command (Select_Drive));
+        (Command_Port, R_Select_Drive,
+         To_Select_Drive (Command.Master, Command.Use_LBA, Command.LBA));
 
       if False then
          if not Wait_For_Status (Data_Port, Status_Busy, 0) then
@@ -97,14 +106,27 @@ package body ATA.Commands is
       end if;
 
       declare
+         use Rose.Words;
          Data : Rose.Devices.Port_IO.Word_8_Data_Array (1 .. 6);
       begin
-         Data (1) := (1, Command (Precomp));
-         Data (2) := (2, Command (Sector_Count));
-         Data (3) := (3, Command (Sector_Number));
-         Data (4) := (4, Command (Cylinder_Low));
-         Data (5) := (5, Command (Cylinder_High));
-         Data (6) := (7, Command (Command_Status));
+         Data (1) := (1, 0);
+         Data (2) := (2, Command.Sector_Count);
+
+         if Command.Use_LBA then
+            declare
+               LBA_28 : constant Word_32 := Word_32 (Command.LBA);
+            begin
+               Data (3) := (3, Word_8 (LBA_28 mod 256));
+               Data (4) := (4, Word_8 (LBA_28 / 256 mod 256));
+               Data (5) := (5, Word_8 (LBA_28 / 65536 mod 256));
+            end;
+         else
+            Data (3) := (3, Command.Sector);
+            Data (4) := (4, Word_8 (Command.Cylinder mod 256));
+            Data (5) := (5, Word_8 (Command.Cylinder / 256));
+         end if;
+
+         Data (6) := (7, Rose.Words.Word_8 (Command.Command));
 
          Rose.Devices.Port_IO.Port_Out_8
            (Port => Command_Port,
@@ -124,9 +146,10 @@ package body ATA.Commands is
       LBA     : Boolean)
    is
    begin
-      Command := (Command_Status => ATA_Identify,
-                  Select_Drive   => To_Select_Drive (Master, LBA),
-                  others         => 0);
+      Command := (Command => ATA_Identify,
+                  Master  => Master,
+                  Use_LBA => LBA,
+                  others  => <>);
    end Set_Identify_Command;
 
    -----------------------------
@@ -138,16 +161,13 @@ package body ATA.Commands is
       Master  : Boolean;
       LBA     : Rose.Devices.Block.Block_Address_Type)
    is
-      use Rose.Words;
-      LBA_28 : constant Word_32 := Word_32 (LBA);
    begin
-      Command := (Command_Status => ATA_Read_Sectors,
-                  Sector_Count   => 1,
-                  Sector_Number  => Word_8 (LBA_28 mod 256),
-                  Cylinder_Low   => Word_8 (LBA_28 / 256 mod 256),
-                  Cylinder_High  => Word_8 (LBA_28 / 65536 mod 256),
-                  Select_Drive   => To_Select_Drive (Master, True, LBA),
-                  others         => 0);
+      Command := (Command      => ATA_Read_Sectors,
+                  Master       => Master,
+                  Use_LBA      => True,
+                  Sector_Count => 1,
+                  LBA          => LBA,
+                  others       => <>);
    end Set_Read_Sector_Command;
 
    ------------------------------
@@ -159,16 +179,13 @@ package body ATA.Commands is
       Master  : Boolean;
       LBA     : Rose.Devices.Block.Block_Address_Type)
    is
-      use Rose.Words;
-      LBA_28 : constant Word_32 := Word_32 (LBA);
    begin
-      Command := (Command_Status => ATA_Write_Sectors,
-                  Sector_Count   => 1,
-                  Sector_Number  => Word_8 (LBA_28 mod 256),
-                  Cylinder_Low   => Word_8 (LBA_28 / 256 mod 256),
-                  Cylinder_High  => Word_8 (LBA_28 / 65536 mod 256),
-                  Select_Drive   => To_Select_Drive (Master, True, LBA),
-                  others         => 0);
+      Command := (Command      => ATA_Write_Sectors,
+                  Master       => Master,
+                  Use_LBA      => True,
+                  Sector_Count => 1,
+                  LBA          => LBA,
+                  others       => <>);
    end Set_Write_Sector_Command;
 
    ---------------------
@@ -195,18 +212,17 @@ package body ATA.Commands is
 
    function Wait_For_Status
      (Data_Port : Rose.Capabilities.Capability;
-      Mask      : Rose.Words.Word_8;
-      Value     : Rose.Words.Word_8)
-     return Boolean
+      Mask      : ATA_Status;
+      Value     : ATA_Status)
+      return Boolean
    is
-      use Rose.Words;
-      X : Word_8 := 0;
+      X : ATA_Status := 0;
    begin
       for I in 1 .. 599 loop
          if I mod 100 = 0 then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
-         X := Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7);
+         X := ATA_Status (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
          if (X and Mask) = Value then
             return True;
          end if;
@@ -216,11 +232,11 @@ package body ATA.Commands is
          end if;
       end loop;
       Rose.Console_IO.Put ("wait for status: giving up; last status ");
-      Rose.Console_IO.Put (X);
+      Rose.Console_IO.Put (Rose.Words.Word_8 (X));
       Rose.Console_IO.Put ("; expected ");
-      Rose.Console_IO.Put (Mask);
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Mask));
       Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (Value);
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Value));
       Rose.Console_IO.New_Line;
       return False;
    end Wait_For_Status;
