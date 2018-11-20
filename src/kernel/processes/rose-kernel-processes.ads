@@ -111,6 +111,7 @@ package Rose.Kernel.Processes is
       To_Process      : Rose.Objects.Process_Id;
       Sender_Cap      : Rose.Capabilities.Capability;
       Endpoint        : Rose.Objects.Endpoint_Index;
+      Identifier      : Rose.Objects.Capability_Identifier;
       Params          : Rose.Invocation.Invocation_Record);
 
    procedure Send_Reply

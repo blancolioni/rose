@@ -10,10 +10,11 @@ with Rose.Boot.Console;
 package body Rose.Kernel.Capabilities.Endpoint is
 
    procedure Send_To_Endpoint
-     (Sender   : Rose.Objects.Process_Id;
-      Receiver : Rose.Objects.Process_Id;
-      Endpoint : Rose.Objects.Endpoint_Index;
-      Params   : Rose.Invocation.Invocation_Access);
+     (Sender     : Rose.Objects.Process_Id;
+      Receiver   : Rose.Objects.Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Index;
+      Identifier : Rose.Objects.Capability_Identifier;
+      Params     : Rose.Invocation.Invocation_Access);
 
    ------------
    -- Handle --
@@ -89,10 +90,11 @@ package body Rose.Kernel.Capabilities.Endpoint is
       end if;
 
       Send_To_Endpoint
-        (Sender   => Rose.Kernel.Processes.Current_Process_Id,
-         Receiver => Process_Id,
-         Endpoint => Endpoint_Index,
-         Params   => Params);
+        (Sender     => Rose.Kernel.Processes.Current_Process_Id,
+         Receiver   => Process_Id,
+         Endpoint   => Endpoint_Index,
+         Identifier => Cap.Header.Identifier,
+         Params     => Params);
 
    end Handle;
 
@@ -101,10 +103,11 @@ package body Rose.Kernel.Capabilities.Endpoint is
    ----------------------
 
    procedure Send_To_Endpoint
-     (Sender   : Rose.Objects.Process_Id;
-      Receiver : Rose.Objects.Process_Id;
-      Endpoint : Rose.Objects.Endpoint_Index;
-      Params   : Rose.Invocation.Invocation_Access)
+     (Sender     : Rose.Objects.Process_Id;
+      Receiver   : Rose.Objects.Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Index;
+      Identifier : Rose.Objects.Capability_Identifier;
+      Params     : Rose.Invocation.Invocation_Access)
    is
       Receiver_Blocked : constant Boolean :=
                            Rose.Kernel.Processes.Is_Blocked_On_Endpoint
@@ -117,6 +120,7 @@ package body Rose.Kernel.Capabilities.Endpoint is
             To_Process   => Receiver,
             Sender_Cap   => Params.Cap,
             Endpoint     => Endpoint,
+            Identifier   => Identifier,
             Params       => Params.all);
       else
          if Params.Control.Flags (Rose.Invocation.Block) then
