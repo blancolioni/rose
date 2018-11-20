@@ -11,8 +11,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=
-BOOT_MODULES=init console mem pci ata restore
-#BOOT_MODULES=init console mem pci ram_disk ata restore
+BOOT_MODULES=init console mem pci ata isofs restore
 
 #all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
 all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
@@ -46,6 +45,9 @@ ram_disk:
 
 ata:
 	(cd src/servers/ata; make)
+
+isofs:
+	(cd src/servers/isofs; make)
 
 restore:
 	(cd src/servers/restore; make)
