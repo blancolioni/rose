@@ -1,6 +1,21 @@
 
 package body Rose.Arch.PIC is
 
+   ----------------
+   -- Enable_IRQ --
+   ----------------
+
+   procedure Enable_IRQ (IRQ : Rose.Words.Word_8) is
+      IRQ_Line : constant Word_8 :=
+                   (if IRQ < 8 then IRQ else IRQ - 8);
+      Port     : constant Word_16 :=
+                   (if IRQ < 8 then PIC_1_Data else PIC_2_Data);
+      Value    : constant Word_8 :=
+                   Inb (Port) or not (2 ** Natural (IRQ_Line));
+   begin
+      Outb (Port, Value);
+   end Enable_IRQ;
+
    --------------------
    -- Initialise_PIC --
    --------------------
