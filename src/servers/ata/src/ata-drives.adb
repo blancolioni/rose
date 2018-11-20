@@ -1,5 +1,7 @@
 with Rose.Console_IO;
 with Rose.Devices.Port_IO;
+with Rose.Objects;
+with Rose.System_Calls.Server;
 
 with ATA.Commands;
 
@@ -28,22 +30,26 @@ package body ATA.Drives is
    is
       use Rose.Words;
       Identify : ATA.Commands.ATA_Command;
+      Drive    : ATA_Drive_Record renames Drive_Table (Index);
    begin
-      Drive_Table (Index) :=
+      Drive :=
         ATA_Drive_Record'
-          (Initialized       => True,
-           Listening         => False,
-           Dead              => False,
-           Atapi             => False,
-           Native            => Is_Native,
-           Command_Cap       => Command_Cap,
-           Control_Cap       => Control_Cap,
-           Data_8_Cap        => Data_Cap_8,
-           Data_16_Read_Cap  => Data_Read_Cap_16,
-           Data_16_Write_Cap => Data_Write_Cap_16,
-           Base_DMA          => Base_DMA,
-           Block_Size        => 512,
-           Block_Count       => 0);
+          (Initialized        => True,
+           Listening          => False,
+           Dead               => False,
+           Atapi              => False,
+           Native             => Is_Native,
+           Command_Cap        => Command_Cap,
+           Control_Cap        => Control_Cap,
+           Data_8_Cap         => Data_Cap_8,
+           Data_16_Read_Cap   => Data_Read_Cap_16,
+           Data_16_Write_Cap  => Data_Write_Cap_16,
+           Get_Parameters_Cap => Rose.Capabilities.Null_Capability,
+           Read_Block_Cap     => Rose.Capabilities.Null_Capability,
+           Write_Block_Cap    => Rose.Capabilities.Null_Capability,
+           Base_DMA           => Base_DMA,
+           Block_Size         => 512,
+           Block_Count        => 0);
 
       for Check_Atapi in Boolean loop
          ATA.Commands.Initialize_Command
@@ -137,8 +143,36 @@ package body ATA.Drives is
 
             Rose.Console_IO.New_Line;
 
-            Drive_Table (Index).Listening := True;
-            Drive_Table (Index).Atapi := Check_Atapi;
+            Drive.Listening := True;
+            Drive.Atapi := Check_Atapi;
+
+            Drive.Get_Parameters_Cap :=
+              Rose.System_Calls.Server.Create_Endpoint
+                (Create_Cap  => Create_Endpoint_Cap,
+                 Endpoint_Id =>
+                   Rose.Devices.Block.Get_Device_Parameters_Endpoint,
+                 Identifier  =>
+                   Rose.Objects.Capability_Identifier (Index));
+
+            Drive.Read_Block_Cap :=
+              Rose.System_Calls.Server.Create_Endpoint
+                (Create_Cap  => Create_Endpoint_Cap,
+                 Endpoint_Id =>
+                   Rose.Devices.Block.Read_Block_Endpoint,
+                 Identifier  =>
+                   Rose.Objects.Capability_Identifier (Index));
+
+            if not Drive.Atapi then
+               Drive.Write_Block_Cap :=
+                 Rose.System_Calls.Server.Create_Endpoint
+                   (Create_Cap  => Create_Endpoint_Cap,
+                    Endpoint_Id =>
+                      Rose.Devices.Block.Write_Block_Endpoint,
+                    Identifier  =>
+                      Rose.Objects.Capability_Identifier (Index));
+
+            end if;
+
             return;
          end if;
       end loop;

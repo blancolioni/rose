@@ -14,14 +14,6 @@ package ATA.Drives is
    function Is_Listening (Drive : ATA_Drive) return Boolean;
    function Is_Dead (Drive : ATA_Drive) return Boolean;
 
-   function Block_Size
-     (Drive : ATA_Drive)
-      return Rose.Devices.Block.Block_Size_Type;
-
-   function Block_Count
-     (Drive : ATA_Drive)
-      return Rose.Devices.Block.Block_Address_Type;
-
    procedure Initialize_Drive
      (Index             : ATA_Drive_Index;
       Command_Cap       : Rose.Capabilities.Capability;
@@ -31,6 +23,26 @@ package ATA.Drives is
       Data_Write_Cap_16 : Rose.Capabilities.Capability;
       Base_DMA          : Rose.Words.Word_32;
       Is_Native         : Boolean);
+
+   function Get_Parameters_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Read_Block_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Write_Block_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Block_Size
+     (Drive : ATA_Drive)
+      return Rose.Devices.Block.Block_Size_Type;
+
+   function Block_Count
+     (Drive : ATA_Drive)
+      return Rose.Devices.Block.Block_Address_Type;
 
    procedure Read_Block
      (Index   : ATA_Drive_Index;
@@ -51,14 +63,17 @@ private
          Dead               : Boolean := False;
          Native             : Boolean := False;
          Atapi              : Boolean := False;
-         Command_Cap        : Rose.Capabilities.Capability;
-         Control_Cap        : Rose.Capabilities.Capability;
-         Data_8_Cap         : Rose.Capabilities.Capability;
-         Data_16_Read_Cap   : Rose.Capabilities.Capability;
-         Data_16_Write_Cap  : Rose.Capabilities.Capability;
-         Base_DMA           : Rose.Words.Word_32;
+         Command_Cap        : Rose.Capabilities.Capability := 0;
+         Control_Cap        : Rose.Capabilities.Capability := 0;
+         Data_8_Cap         : Rose.Capabilities.Capability := 0;
+         Data_16_Read_Cap   : Rose.Capabilities.Capability := 0;
+         Data_16_Write_Cap  : Rose.Capabilities.Capability := 0;
+         Base_DMA           : Rose.Words.Word_32           := 0;
          Block_Size         : Rose.Devices.Block.Block_Size_Type;
          Block_Count        : Rose.Devices.Block.Block_Address_Type;
+         Get_Parameters_Cap : Rose.Capabilities.Capability := 0;
+         Read_Block_Cap     : Rose.Capabilities.Capability := 0;
+         Write_Block_Cap    : Rose.Capabilities.Capability := 0;
       end record;
 
    type ATA_Drive is access all ATA_Drive_Record;
@@ -72,5 +87,20 @@ private
      (Drive : ATA_Drive)
       return Rose.Devices.Block.Block_Address_Type
    is (Drive.Block_Count);
+
+   function Get_Parameters_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Get_Parameters_Cap);
+
+   function Read_Block_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Read_Block_Cap);
+
+   function Write_Block_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Write_Block_Cap);
 
 end ATA.Drives;

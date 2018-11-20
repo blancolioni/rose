@@ -1,6 +1,8 @@
 with System.Storage_Elements;
 
 with Rose.System_Calls.Client;
+
+with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
 
 with Rose.Devices.PCI.Client;
@@ -28,13 +30,26 @@ package body ATA.Server is
        (1 => (16#8086#, 16#7111#),
         2 => (16#8086#, 16#7010#));
 
+   procedure Get_Parameters
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Size    : out Rose.Devices.Block.Block_Size_Type;
+      Block_Count   : out Rose.Devices.Block.Block_Address_Type);
+
    procedure Read_Block
-     (Block_Address : Rose.Devices.Block.Block_Address_Type;
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : out System.Storage_Elements.Storage_Array);
 
    procedure Write_Block
-     (Block_Address : Rose.Devices.Block.Block_Address_Type;
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : System.Storage_Elements.Storage_Array);
+
+   procedure Get_Interface
+     (Identifier         : Rose.Objects.Capability_Identifier;
+      Get_Parameters_Cap : out Rose.Capabilities.Capability;
+      Read_Block_Cap     : out Rose.Capabilities.Capability;
+      Write_Block_Cap    : out Rose.Capabilities.Capability);
 
    -------------------
    -- Create_Server --
@@ -135,16 +150,61 @@ package body ATA.Server is
 
    end Create_Server;
 
+   -------------------
+   -- Get_Interface --
+   -------------------
+
+   procedure Get_Interface
+     (Identifier         : Rose.Objects.Capability_Identifier;
+      Get_Parameters_Cap : out Rose.Capabilities.Capability;
+      Read_Block_Cap     : out Rose.Capabilities.Capability;
+      Write_Block_Cap    : out Rose.Capabilities.Capability)
+   is
+      Drive_Index : constant ATA.Drives.ATA_Drive_Index :=
+                      ATA.Drives.ATA_Drive_Index (Identifier);
+      Drive       : constant ATA.Drives.ATA_Drive :=
+                      ATA.Drives.Get (Drive_Index);
+   begin
+      Get_Parameters_Cap :=
+        ATA.Drives.Get_Parameters_Cap (Drive);
+      Read_Block_Cap :=
+        ATA.Drives.Read_Block_Cap (Drive);
+      Write_Block_Cap :=
+        ATA.Drives.Write_Block_Cap (Drive);
+   end Get_Interface;
+
+   --------------------
+   -- Get_Parameters --
+   --------------------
+
+   procedure Get_Parameters
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Size    : out Rose.Devices.Block.Block_Size_Type;
+      Block_Count   : out Rose.Devices.Block.Block_Address_Type)
+   is
+      Drive_Index : constant ATA.Drives.ATA_Drive_Index :=
+                      ATA.Drives.ATA_Drive_Index (Identifier);
+      Drive       : constant ATA.Drives.ATA_Drive :=
+                      ATA.Drives.Get (Drive_Index);
+   begin
+      Block_Size := ATA.Drives.Block_Size (Drive);
+      Block_Count := ATA.Drives.Block_Count (Drive);
+   end Get_Parameters;
+
    ----------------
    -- Read_Block --
    ----------------
 
    procedure Read_Block
-     (Block_Address : Rose.Devices.Block.Block_Address_Type;
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : out System.Storage_Elements.Storage_Array)
    is
    begin
-      ATA.Drives.Read_Block (0, Block_Address, Buffer);
+      ATA.Drives.Read_Block
+        (Index   => ATA.Drives.ATA_Drive_Index (Identifier),
+         Address => Block_Address,
+         Buffer  => Buffer);
    end Read_Block;
 
    ------------------
@@ -152,15 +212,13 @@ package body ATA.Server is
    ------------------
 
    procedure Start_Server is
-      Drive : constant ATA.Drives.ATA_Drive :=
-                ATA.Drives.Get (0);
    begin
       Rose.Devices.Block.Server.Run_Server
-        (Endpoint_Cap  => Create_Endpoint_Cap,
-         Block_Size    => ATA.Drives.Block_Size (Drive),
-         Block_Count   => ATA.Drives.Block_Count (Drive),
-         Read_Handler  => Read_Block'Access,
-         Write_Handler => Write_Block'Access);
+        (Endpoint_Cap   => Create_Endpoint_Cap,
+         Get_Parameters => Get_Parameters'Access,
+         Read_Handler   => Read_Block'Access,
+         Write_Handler  => Write_Block'Access,
+         Get_Interface  => Get_Interface'Access);
    end Start_Server;
 
    -----------------
@@ -168,11 +226,15 @@ package body ATA.Server is
    -----------------
 
    procedure Write_Block
-     (Block_Address : Rose.Devices.Block.Block_Address_Type;
+     (Identifier    : Rose.Objects.Capability_Identifier;
+      Block_Address : Rose.Devices.Block.Block_Address_Type;
       Buffer        : System.Storage_Elements.Storage_Array)
    is
    begin
-      ATA.Drives.Write_Block (0, Block_Address, Buffer);
+      ATA.Drives.Write_Block
+        (Index   => ATA.Drives.ATA_Drive_Index (Identifier),
+         Address => Block_Address,
+         Buffer  => Buffer);
    end Write_Block;
 
 end ATA.Server;
