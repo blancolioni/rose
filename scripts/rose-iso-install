@@ -1,4 +1,4 @@
 #!/bin/sh
 rm -f ./images/rose.iso
 cp images/tmp/* ./images/iso/boot
-grub2-mkrescue -o ./images/rose.iso ./images/iso
+grub2-mkrescue -o ./images/rose.iso ./images/iso > ./logs/rose-iso.log 2>&1
