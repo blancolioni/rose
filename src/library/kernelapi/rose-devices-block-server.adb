@@ -12,11 +12,11 @@ package body Rose.Devices.Block.Server is
    ------------------------
 
    procedure Run_Server
-     (Endpoint_Cap  : Rose.Capabilities.Capability;
-      Block_Size    : Block_Size_Type;
-      Block_Count   : Block_Address_Type;
-      Read_Handler  : Read_Block_Handler;
-      Write_Handler : Write_Block_Handler)
+     (Endpoint_Cap   : Rose.Capabilities.Capability;
+      Get_Parameters : Get_Parameters_Handler;
+      Read_Handler   : Read_Block_Handler;
+      Write_Handler  : Write_Block_Handler;
+      Get_Interface  : Get_Interface_Handler)
    is
       use Rose.Invocation;
       use Rose.Words;
@@ -28,17 +28,13 @@ package body Rose.Devices.Block.Server is
       Check_End      : array (Word_8) of Rose.Words.Word_8;
    begin
 
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Endpoint_Cap, Rose.Devices.Get_Interface_Endpoint);
+
       for I in Check_Start'Range loop
          Check_Start (I) := I;
          Check_End (I) := I;
       end loop;
-
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Endpoint_Cap, Get_Device_Parameters_Endpoint);
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Endpoint_Cap, Read_Block_Endpoint);
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Endpoint_Cap, Write_Block_Endpoint);
 
       loop
          Params.Control.Flags :=
@@ -87,10 +83,16 @@ package body Rose.Devices.Block.Server is
 
          case Params.Endpoint is
             when Get_Device_Parameters_Endpoint =>
-               Rose.System_Calls.Server.Send_Reply
-                 (Params.Reply_Cap,
-                  (Rose.Words.Word (Block_Size),
-                   Rose.Words.Word (Block_Count)));
+               declare
+                  Block_Size : Block_Size_Type;
+                  Block_Count : Block_Address_Type;
+               begin
+                  Get_Parameters (Params.Identifier, Block_Size, Block_Count);
+                  Rose.System_Calls.Server.Send_Reply
+                    (Params.Reply_Cap,
+                     (Rose.Words.Word (Block_Size),
+                      Rose.Words.Word (Block_Count)));
+               end;
 
             when Read_Block_Endpoint =>
                declare
@@ -107,30 +109,30 @@ package body Rose.Devices.Block.Server is
                   pragma Import (Ada, Buffer);
                   for Buffer'Address use Address;
                begin
-                  if Count /= Storage_Count (Block_Size) then
-                     Rose.Console_IO.Put
-                       ("read-block: received buffer size ");
-                     Rose.Console_IO.Put
-                       (Natural (Count));
-                     Rose.Console_IO.Put
-                       (" but block size is ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Size));
-                     Rose.Console_IO.New_Line;
-                  elsif Block_Address >= Block_Count then
-                     Rose.Console_IO.Put
-                       ("read-block: received request for block ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Address));
-                     Rose.Console_IO.Put
-                       (" but block count is ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Count));
-                     Rose.Console_IO.New_Line;
-                  else
-                     Read_Handler (Block_Address, Buffer);
-                     Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
-                  end if;
+--                    if Count /= Storage_Count (Block_Size) then
+--                       Rose.Console_IO.Put
+--                         ("read-block: received buffer size ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Count));
+--                       Rose.Console_IO.Put
+--                         (" but block size is ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Size));
+--                       Rose.Console_IO.New_Line;
+--                    elsif Block_Address >= Block_Count then
+--                       Rose.Console_IO.Put
+--                         ("read-block: received request for block ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Address));
+--                       Rose.Console_IO.Put
+--                         (" but block count is ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Count));
+--                       Rose.Console_IO.New_Line;
+--                    else
+                  Read_Handler (Params.Identifier, Block_Address, Buffer);
+                  Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
+--                    end if;
                end;
 
             when Write_Block_Endpoint =>
@@ -148,30 +150,42 @@ package body Rose.Devices.Block.Server is
                   pragma Import (Ada, Buffer);
                   for Buffer'Address use Address;
                begin
-                  if Count /= Storage_Count (Block_Size) then
-                     Rose.Console_IO.Put
-                       ("write-block: received buffer size ");
-                     Rose.Console_IO.Put
-                       (Natural (Count));
-                     Rose.Console_IO.Put
-                       (" but block size is ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Size));
-                     Rose.Console_IO.New_Line;
-                  elsif Block_Address >= Block_Count then
-                     Rose.Console_IO.Put
-                       ("write-block: received request for block ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Address));
-                     Rose.Console_IO.Put
-                       (" but block count is ");
-                     Rose.Console_IO.Put
-                       (Natural (Block_Count));
-                     Rose.Console_IO.New_Line;
-                  else
-                     Write_Handler (Block_Address, Buffer);
-                     Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
-                  end if;
+--                    if Count /= Storage_Count (Block_Size) then
+--                       Rose.Console_IO.Put
+--                         ("write-block: received buffer size ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Count));
+--                       Rose.Console_IO.Put
+--                         (" but block size is ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Size));
+--                       Rose.Console_IO.New_Line;
+--                    elsif Block_Address >= Block_Count then
+--                       Rose.Console_IO.Put
+--                         ("write-block: received request for block ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Address));
+--                       Rose.Console_IO.Put
+--                         (" but block count is ");
+--                       Rose.Console_IO.Put
+--                         (Natural (Block_Count));
+--                       Rose.Console_IO.New_Line;
+--                    else
+                  Write_Handler (Params.Identifier, Block_Address, Buffer);
+                  Rose.System_Calls.Server.Send_Reply (Params.Reply_Cap);
+--                    end if;
+               end;
+
+            when Get_Interface_Endpoint =>
+               declare
+                  Get, Read, Write : Rose.Capabilities.Capability;
+               begin
+                  Get_Interface
+                    (Rose.Objects.Capability_Identifier (Params.Data (0)),
+                     Get, Read, Write);
+                  Rose.System_Calls.Server.Send_Reply_Caps
+                    (Params.Reply_Cap,
+                     (Get, Read, Write));
                end;
 
             when others =>
