@@ -26,14 +26,15 @@ package body ATA.Drives is
       Base_DMA          : Rose.Words.Word_32;
       Is_Native         : Boolean)
    is
+      use Rose.Words;
       Identify : ATA.Commands.ATA_Command;
-
    begin
       Drive_Table (Index) :=
         ATA_Drive_Record'
           (Initialized       => True,
            Listening         => False,
            Dead              => False,
+           Atapi             => False,
            Native            => Is_Native,
            Command_Cap       => Command_Cap,
            Control_Cap       => Control_Cap,
@@ -44,47 +45,21 @@ package body ATA.Drives is
            Block_Size        => 512,
            Block_Count       => 0);
 
-      ATA.Commands.Set_Identify_Command
-        (Command => Identify,
-         Master  => Index in 0 | 2,
-         LBA     => False);
+      for Check_Atapi in Boolean loop
+         ATA.Commands.Initialize_Command
+           (Item => Identify,
+            Command => (if Check_Atapi
+                        then ATA.Commands.ATAPI_Identify
+                        else ATA.Commands.ATA_Identify),
+            Master  => Index in 0 | 2,
+            Use_LBA => False);
 
-      if ATA.Commands.Send_Command
-        (Identify, Command_Cap, Control_Cap, Data_Cap_8)
-      then
-
-         if not ATA.Commands.Wait_For_Status
-           (Data_Cap_8, ATA.Commands.Status_Busy, 0)
+         if ATA.Commands.Send_Command
+           (Identify, Command_Cap, Control_Cap, Data_Cap_8)
+           and then
+             ATA.Commands.Wait_For_Status
+               (Data_Cap_8, ATA.Commands.Status_DRQ, ATA.Commands.Status_DRQ)
          then
-            Rose.Console_IO.Put ("Error: hd");
-            Rose.Console_IO.Put (Natural (Index));
-            Rose.Console_IO.Put (" not responding");
-            Drive_Table (Index).Dead := True;
-            return;
-         end if;
-
-         declare
-            use Rose.Words;
-            Id_4   : constant Rose.Words.Word_8 :=
-                       Rose.Devices.Port_IO.Port_In_8
-                         (Data_Cap_8, 4);
-            Id_5   : constant Rose.Words.Word_8 :=
-                       Rose.Devices.Port_IO.Port_In_8
-                         (Data_Cap_8, 5);
-         begin
-            Rose.Console_IO.Put ("identity: ");
-            Rose.Console_IO.Put (Id_4);
-            Rose.Console_IO.Put (" ");
-            Rose.Console_IO.Put (Id_5);
-            if Id_4 = 16#14# and then Id_5 = 16#EB# then
-               Rose.Console_IO.Put (" (atapi)");
-            elsif Id_4 = 16#3C# and then Id_5 = 16#c3# then
-               Rose.Console_IO.Put (" (sata)");
-            else
-               Rose.Console_IO.Put (" (unknown)");
-            end if;
-            Rose.Console_IO.New_Line;
-
             for I in 1 .. 256 loop
                declare
                   D : constant Rose.Words.Word_16 :=
@@ -98,45 +73,49 @@ package body ATA.Drives is
             Rose.Console_IO.Put (Natural (Index));
             Rose.Console_IO.Put (": ");
 
-            Rose.Console_IO.Put (Natural (Id_Buffer (2)));
-            Rose.Console_IO.Put ("/");
-            Rose.Console_IO.Put (Natural (Id_Buffer (4)));
-            Rose.Console_IO.Put ("/");
-            Rose.Console_IO.Put (Natural (Id_Buffer (7)));
+            if Check_Atapi then
+               Rose.Console_IO.Put ("atapi");
+            else
+               Rose.Console_IO.Put (Natural (Id_Buffer (2)));
+               Rose.Console_IO.Put ("/");
+               Rose.Console_IO.Put (Natural (Id_Buffer (4)));
+               Rose.Console_IO.Put ("/");
+               Rose.Console_IO.Put (Natural (Id_Buffer (7)));
 
-            Rose.Console_IO.Put (": ");
-            if (Id_Buffer (84) and 2 ** 10) /= 0 then
-               Rose.Console_IO.Put ("lba48 ");
+               Rose.Console_IO.Put (": ");
+               if (Id_Buffer (84) and 2 ** 10) /= 0 then
+                  Rose.Console_IO.Put ("lba48 ");
+               end if;
+
+               declare
+                  Sector_Count : constant Word_32 :=
+                                   Word_32 (Id_Buffer (61))
+                                   + 65536 * Word_32 (Id_Buffer (62));
+               begin
+                  if Sector_Count > 0 then
+                     Rose.Console_IO.Put ("lba28 ");
+                     Rose.Console_IO.Put (Natural (Sector_Count));
+                     Rose.Console_IO.Put (" ");
+                     Drive_Table (Index).Block_Count :=
+                       Rose.Devices.Block.Block_Address_Type (Sector_Count);
+                  end if;
+               end;
+
+               Rose.Console_IO.Put ("size: ");
+               declare
+                  Size : constant Word_64 :=
+                           Word_64 (Drive_Table (Index).Block_Count)
+                           * Word_64 (Drive_Table (Index).Block_Size);
+               begin
+                  if Size < 2 ** 32 then
+                     Rose.Console_IO.Put (Natural (Size / 2 ** 20));
+                     Rose.Console_IO.Put ("M");
+                  else
+                     Rose.Console_IO.Put (Natural (Size / 2 ** 30));
+                     Rose.Console_IO.Put ("G");
+                  end if;
+               end;
             end if;
-
-            declare
-               Sector_Count : constant Word_32 :=
-                                Word_32 (Id_Buffer (61))
-                                + 65536 * Word_32 (Id_Buffer (62));
-            begin
-               if Sector_Count > 0 then
-                  Rose.Console_IO.Put ("lba28 ");
-                  Rose.Console_IO.Put (Natural (Sector_Count));
-                  Rose.Console_IO.Put (" ");
-                  Drive_Table (Index).Block_Count :=
-                    Rose.Devices.Block.Block_Address_Type (Sector_Count);
-               end if;
-            end;
-
-            Rose.Console_IO.Put ("size: ");
-            declare
-               Size : constant Word_64 :=
-                        Word_64 (Drive_Table (Index).Block_Count)
-                        * Word_64 (Drive_Table (Index).Block_Size);
-            begin
-               if Size < 2 ** 32 then
-                  Rose.Console_IO.Put (Natural (Size / 2 ** 20));
-                  Rose.Console_IO.Put ("M");
-               else
-                  Rose.Console_IO.Put (Natural (Size / 2 ** 30));
-                  Rose.Console_IO.Put ("G");
-               end if;
-            end;
 
             Rose.Console_IO.Put (" ");
 
@@ -158,16 +137,16 @@ package body ATA.Drives is
 
             Rose.Console_IO.New_Line;
 
-         end;
+            Drive_Table (Index).Listening := True;
+            Drive_Table (Index).Atapi := Check_Atapi;
+            return;
+         end if;
+      end loop;
 
-         Drive_Table (Index).Listening := True;
-      else
-         Rose.Console_IO.Put ("unable to initialise hd");
-         Rose.Console_IO.Put (Natural (Index));
-         Rose.Console_IO.New_Line;
-         Drive_Table (Index).Dead := True;
-      end if;
-
+      Rose.Console_IO.Put ("unable to initialise hd");
+      Rose.Console_IO.Put (Natural (Index));
+      Rose.Console_IO.New_Line;
+      Drive_Table (Index).Dead := True;
    end Initialize_Drive;
 
    -------------

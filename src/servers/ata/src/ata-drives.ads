@@ -50,6 +50,7 @@ private
          Listening          : Boolean := False;
          Dead               : Boolean := False;
          Native             : Boolean := False;
+         Atapi              : Boolean := False;
          Command_Cap        : Rose.Capabilities.Capability;
          Control_Cap        : Rose.Capabilities.Capability;
          Data_8_Cap         : Rose.Capabilities.Capability;
