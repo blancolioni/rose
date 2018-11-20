@@ -83,13 +83,15 @@ package Rose.Invocation is
          Control        : Control_Word;
          Cap            : Rose.Capabilities.Capability := 0;
          Reply_Cap      : Rose.Capabilities.Capability := 0;
-         Endpoint       : Rose.Objects.Endpoint_Id;
-         Data           : Parameter_Words;
-         Caps           : Capability_Words;
-         Buffer_Address : Rose.Addresses.Virtual_Address;
-         Buffer_Length  : Rose.Words.Word;
+         Endpoint       : Rose.Objects.Endpoint_Id     := 0;
+         Identifier     : Rose.Objects.Capability_Identifier := 0;
+         Reserved       : Rose.Words.Word_8 := 0;
+         Data           : Parameter_Words := (others => 0);
+         Caps           : Capability_Words := (others => 0);
+         Buffer_Address : Rose.Addresses.Virtual_Address := 0;
+         Buffer_Length  : Rose.Words.Word := 0;
       end record
-     with Pack, Size => 31 * 4 * 8;
+     with Pack, Size => 32 * 4 * 8;
 
    type Invocation_Access is access all Invocation_Record;
 

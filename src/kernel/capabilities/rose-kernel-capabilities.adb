@@ -22,7 +22,7 @@ package body Rose.Kernel.Capabilities is
    use Rose.Capabilities.Layout;
 
 --     type Cap_Handler is access
---     procedure (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+--     procedure (Cap    : Rose.Capabilities.Layout.Capability_Layout;
 --                  Params : Rose.Invocation.Invocation_Access);
 --
 --     Handler : constant array (Capability_Type) of Cap_Handler :=
@@ -42,7 +42,7 @@ package body Rose.Kernel.Capabilities is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       package Handlers renames Rose.Kernel.Capabilities;

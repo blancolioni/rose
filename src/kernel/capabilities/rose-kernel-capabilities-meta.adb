@@ -23,6 +23,7 @@ package body Rose.Kernel.Capabilities.Meta is
                          Rose.Kernel.Processes.Current_Process_Id;
       Endpoint_Id    : Rose.Objects.Endpoint_Id;
       Local_Endpoint : Rose.Objects.Endpoint_Index  := 0;
+      Identifier     : Rose.Objects.Capability_Identifier := 0;
       Receive_Cap    : Rose.Capabilities.Capability := Null_Capability;
       Endpoint_Cap   : Rose.Capabilities.Capability := Null_Capability;
    begin
@@ -35,6 +36,10 @@ package body Rose.Kernel.Capabilities.Meta is
       end if;
 
       Endpoint_Id := Rose.Objects.Endpoint_Id (Params.Data (0));
+
+      if Params.Control.Last_Sent_Word >= 1 then
+         Identifier := Rose.Objects.Capability_Identifier (Params.Data (1));
+      end if;
 
       if Endpoint_Id /= 0 then
          Local_Endpoint :=
@@ -96,7 +101,7 @@ package body Rose.Kernel.Capabilities.Meta is
          Rose.Kernel.Processes.Set_Cap
            (Process_Id, Endpoint_Cap,
             Rose.Capabilities.Layout.Endpoint_Capability
-              (Process_Id, Local_Endpoint));
+              (Process_Id, Local_Endpoint, Identifier));
       end if;
 
       Rose.Kernel.Processes.Set_Endpoint_Caps
@@ -146,7 +151,7 @@ package body Rose.Kernel.Capabilities.Meta is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       Process_Id : constant Rose.Objects.Process_Id :=

@@ -5,15 +5,17 @@ package body Rose.Capabilities.Layout is
    -------------------------
 
    function Endpoint_Capability
-     (Pid      : Rose.Objects.Process_Id;
-      Endpoint : Rose.Objects.Endpoint_Index)
-      return Generic_Capability_Layout
+     (Pid        : Rose.Objects.Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Index;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Capability_Layout
    is
    begin
-      return Generic_Capability_Layout'
-        (Header  => Generic_Capability_Header'
+      return Capability_Layout'
+        (Header  => Capability_Header'
            (Cap_Type    => Endpoint_Cap,
             Endpoint    => Endpoint,
+            Identifier  => Identifier,
             others      => <>),
          Payload => Rose.Objects.To_Object_Id (Pid));
    end Endpoint_Capability;
@@ -25,11 +27,11 @@ package body Rose.Capabilities.Layout is
    function Receive_Capability
      (Pid      : Rose.Objects.Process_Id;
       Endpoint : Rose.Objects.Endpoint_Index)
-      return Generic_Capability_Layout
+      return Capability_Layout
    is
    begin
-      return Generic_Capability_Layout'
-        (Header  => Generic_Capability_Header'
+      return Capability_Layout'
+        (Header  => Capability_Header'
            (Cap_Type    => Receive_Cap,
             Endpoint    => Endpoint,
             others      => <>),

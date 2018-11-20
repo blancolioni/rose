@@ -175,7 +175,7 @@ package body Rose.Kernel.Processes is
 
    function Current_Process_Cap
      (Cap_Index : Rose.Capabilities.Capability;
-      Cap       : out Rose.Capabilities.Layout.Generic_Capability_Layout)
+      Cap       : out Rose.Capabilities.Layout.Capability_Layout)
       return Boolean
    is
       use Rose.Capabilities;
@@ -258,7 +258,7 @@ package body Rose.Kernel.Processes is
 --
 --        for Cap in P.Cap_Cache'Range loop
 --           declare
---              Layout : Generic_Capability_Layout renames
+--              Layout : Capability_Layout renames
 --                         P.Cap_Cache (Cap);
 --           begin
 --              if Layout.Header.Cap_Type = Endpoint_Cap then
@@ -901,7 +901,7 @@ package body Rose.Kernel.Processes is
    procedure Set_Cap
      (Process_Id : Rose.Objects.Process_Id;
       Cap        : Rose.Capabilities.Capability;
-      Layout     : Rose.Capabilities.Layout.Generic_Capability_Layout)
+      Layout     : Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
       Process_Table (Process_Id).Cap_Cache (Cap) := Layout;

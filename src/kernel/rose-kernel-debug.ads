@@ -10,7 +10,7 @@ package Rose.Kernel.Debug is
    procedure Put_Call
      (Name   : String;
       Pid    : Rose.Objects.Process_Id;
-      Layout : Rose.Capabilities.Layout.Generic_Capability_Layout;
+      Layout : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Record);
 
 end Rose.Kernel.Debug;

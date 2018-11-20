@@ -19,7 +19,7 @@ package Rose.Kernel.Processes is
 
    function Current_Process_Cap
      (Cap_Index : Rose.Capabilities.Capability;
-      Cap       : out Rose.Capabilities.Layout.Generic_Capability_Layout)
+      Cap       : out Rose.Capabilities.Layout.Capability_Layout)
       return Boolean;
 
    procedure Set_Current_Invocation
@@ -54,7 +54,7 @@ package Rose.Kernel.Processes is
    procedure Set_Cap
      (Process_Id : Rose.Objects.Process_Id;
       Cap        : Rose.Capabilities.Capability;
-      Layout     : Rose.Capabilities.Layout.Generic_Capability_Layout);
+      Layout     : Rose.Capabilities.Layout.Capability_Layout);
 
    function Current_State
      (Process : Rose.Objects.Process_Id)
@@ -235,7 +235,7 @@ private
 
    type Capability_Cache_Array is
      array (Rose.Capabilities.Capability range 1 .. Cached_Capability_Count)
-     of Rose.Capabilities.Layout.Generic_Capability_Layout;
+     of Rose.Capabilities.Layout.Capability_Layout;
 
    Capabilities_Per_Page : constant :=
                    Rose.Addresses.Physical_Page_Bytes
@@ -243,7 +243,7 @@ private
 
    type Capability_Page is
      array (Rose.Capabilities.Capability range 1 .. Capabilities_Per_Page)
-     of Rose.Capabilities.Layout.Generic_Capability_Layout
+     of Rose.Capabilities.Layout.Capability_Layout
        with Size => Rose.Addresses.Physical_Page_Bits;
 
    Max_Capability_Pages : constant := 16;

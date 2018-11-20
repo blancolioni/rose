@@ -13,7 +13,7 @@ package body Rose.Kernel.Capabilities.Create is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       pragma Unreferenced (Cap);
@@ -22,7 +22,7 @@ package body Rose.Kernel.Capabilities.Create is
       Process_Id   : constant Rose.Objects.Process_Id :=
                        Rose.Kernel.Processes.Current_Process_Id;
       New_Cap      : Rose.Capabilities.Capability;
-      Cap_Layout   : Rose.Capabilities.Layout.Generic_Capability_Layout;
+      Cap_Layout   : Rose.Capabilities.Layout.Capability_Layout;
       Cap_Array    : array (Parameter_Word_Index range 0 .. 3) of Word_32;
       for Cap_Array'Address use Cap_Layout'Address;
       pragma Import (Ada, Cap_Array);

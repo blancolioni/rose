@@ -38,7 +38,7 @@ package body Rose.Kernel.Invocation is
       Log_Details : constant Boolean :=
                       Log and then
                           Log_Detailed_Invocation = Process_Id;
-      Cap : Rose.Capabilities.Layout.Generic_Capability_Layout;
+      Cap : Rose.Capabilities.Layout.Capability_Layout;
       function To_Word_32 is
         new Ada.Unchecked_Conversion (Rose.Invocation.Invocation_Access,
                                       Rose.Words.Word_32);

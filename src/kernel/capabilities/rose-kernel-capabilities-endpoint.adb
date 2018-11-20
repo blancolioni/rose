@@ -20,7 +20,7 @@ package body Rose.Kernel.Capabilities.Endpoint is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       use Rose.Kernel.Processes;
@@ -79,7 +79,7 @@ package body Rose.Kernel.Capabilities.Endpoint is
 
          declare
             use Rose.Capabilities.Layout;
-            Reply_Layout : constant Generic_Capability_Layout :=
+            Reply_Layout : constant Capability_Layout :=
                              Reply_Capability (Current_Process_Id);
          begin
             Set_Cap (Process_Id, Params.Reply_Cap, Reply_Layout);

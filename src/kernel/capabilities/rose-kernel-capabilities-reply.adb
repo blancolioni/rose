@@ -7,7 +7,7 @@ package body Rose.Kernel.Capabilities.Reply is
    ------------
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
       From_Pid : constant Rose.Objects.Process_Id :=

@@ -5,7 +5,7 @@ package Rose.Kernel.Capabilities.Physical_Memory is
    Get_Region            : constant Rose.Objects.Endpoint_Index := 3;
 
    procedure Handle
-     (Cap    : Rose.Capabilities.Layout.Generic_Capability_Layout;
+     (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);
 
 end Rose.Kernel.Capabilities.Physical_Memory;

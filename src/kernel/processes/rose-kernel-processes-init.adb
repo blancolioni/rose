@@ -374,8 +374,8 @@ package body Rose.Kernel.Processes.Init is
                   use Rose.Capabilities.Layout;
                begin
                   Proc.Cap_Cache (1) :=
-                    Generic_Capability_Layout'
-                      (Header => Generic_Capability_Header'
+                    Capability_Layout'
+                      (Header => Capability_Header'
                          (Cap_Type    => Create_Cap,
                           others      => <>),
                        Payload => 0);
@@ -419,7 +419,7 @@ package body Rose.Kernel.Processes.Init is
             begin
                Rose.Kernel.Processes.Set_Cap
                  (Mem_Process, Resume_Cap,
-                  Generic_Capability_Layout'
+                  Capability_Layout'
                     (Header  =>
                          (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
                           Endpoint => 1,
@@ -439,7 +439,7 @@ package body Rose.Kernel.Processes.Init is
             begin
                Rose.Kernel.Processes.Set_Cap
                  (Mem_Process, Faulted_Cap,
-                  Generic_Capability_Layout'
+                  Capability_Layout'
                     (Header  =>
                          (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
                           Endpoint => 2,
