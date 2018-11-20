@@ -14,13 +14,6 @@ package Rose.Arch is
 
    type Privilege_Level is mod 2 ** 2;
 
-   procedure Outb (Port  : Word_16;
-                   Value : Word_8)
-     with Inline_Always;
-
-   function Inb (Port : Word_16)
-                return Word_8;
-
    function Port_In_8
      (Port  : Word_16)
       return Word_8;
@@ -44,6 +37,16 @@ package Rose.Arch is
    procedure Port_Out_32
      (Port  : Word_16;
       Value : Word_32);
+
+   function Inb
+     (Port  : Word_16)
+      return Word_8
+      renames Port_In_8;
+
+   procedure Outb
+     (Port  : Word_16;
+      Value : Word_8)
+      renames Port_Out_8;
 
    procedure IO_Wait is null;   --  because in, out are so lame
 
