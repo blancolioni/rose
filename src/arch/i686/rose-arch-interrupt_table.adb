@@ -1,6 +1,8 @@
 with Rose.Words;                       use Rose.Words;
 with Rose.Objects;
 
+with Rose.Arch.PIC;
+
 with Rose.Boot.Console;
 
 with Rose.Kernel.Interrupts;
@@ -158,6 +160,23 @@ package body Rose.Arch.Interrupt_Table is
 
    end Create_Boot_Interrupt_Table;
 
+   ----------------------
+   -- Enable_Interrupt --
+   ----------------------
+
+   procedure Enable_Interrupt
+     (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector)
+   is
+   begin
+      if Interrupt in 32 .. 47 then
+         Rose.Arch.PIC.Enable_IRQ (Rose.Words.Word_8 (Interrupt) - 32);
+      else
+         Rose.Boot.Console.Put ("enable-interrupt: invalid interrupt: ");
+         Rose.Boot.Console.Put (Rose.Words.Word_8 (Interrupt));
+         Rose.Boot.Console.New_Line;
+      end if;
+   end Enable_Interrupt;
+
    --------------------------------
    -- Generic_Hardware_Interrupt --
    --------------------------------
@@ -260,12 +279,12 @@ package body Rose.Arch.Interrupt_Table is
    -- Start_Interrupt_Handling --
    ------------------------------
 
-   procedure Start_Interrupt_Handling is
-   begin
-      if True then
-         Rose.Arch.Outb (16#21#, 0);
-         Rose.Arch.Outb (16#A1#, 0);
-      end if;
-   end Start_Interrupt_Handling;
+--     procedure Start_Interrupt_Handling is
+--     begin
+--        if True then
+--           Rose.Arch.Outb (16#21#, 16#00#);
+--           Rose.Arch.Outb (16#A1#, 16#FF#);
+--        end if;
+--     end Start_Interrupt_Handling;
 
 end Rose.Arch.Interrupt_Table;

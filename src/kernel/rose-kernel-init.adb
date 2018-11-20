@@ -1,5 +1,6 @@
 with Rose.Boot.Console;
 
+with Rose.Arch.Interrupts;
 with Rose.Arch.Interrupt_Table;
 
 with Rose.Kernel.Clock;
@@ -109,14 +110,13 @@ package body Rose.Kernel.Init is
 
       Rose.Kernel.Processes.Init.Init_Process_Table;
 
-      Rose.Boot.Console.Put_Line ("Attaching clock");
+      Rose.Boot.Console.Put_Line ("Starting clock");
 
       Rose.Kernel.Interrupts.Set_Handler
         (32, Rose.Kernel.Clock.Handle_Clock_Tick'Access);
 
-      Rose.Boot.Console.Put_Line ("Enabling hardware interrupts");
-
-      Rose.Arch.Interrupt_Table.Start_Interrupt_Handling;
+      Rose.Arch.Interrupt_Table.Enable_Interrupt
+        (Rose.Arch.Interrupts.Clock_Interrupt);
 
       if False then
          Physical_Memory.Show_Regions;

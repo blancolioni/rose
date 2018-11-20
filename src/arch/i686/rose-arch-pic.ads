@@ -29,4 +29,6 @@ package Rose.Arch.PIC is
    procedure Initialise_PIC;
    pragma Export (C, Initialise_PIC, "initialise_pic");
 
+   procedure Enable_IRQ (IRQ : Rose.Words.Word_8);
+
 end Rose.Arch.PIC;

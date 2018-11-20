@@ -16,6 +16,7 @@ package Rose.Arch.Interrupt_Table is
    type Exception_Handler is access procedure;
    pragma Convention (C, Exception_Handler);
 
-   procedure Start_Interrupt_Handling;
+   procedure Enable_Interrupt
+     (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector);
 
 end Rose.Arch.Interrupt_Table;
