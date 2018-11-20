@@ -127,11 +127,27 @@ package body Rose.System_Calls.Server is
      (Cap  : Rose.Capabilities.Capability;
       Caps : Sent_Caps_Array := No_Sent_Caps)
    is
-      Sent_Words   : Sent_Words_Array (1 .. 0);
-      Result_Words : Sent_Words_Array (1 .. 0);
-      Result_Caps  : Sent_Caps_Array (1 .. 0);
+      use Rose.Invocation;
+      Params : aliased Rose.Invocation.Invocation_Record;
+      Send   : constant Boolean := Caps'Length > 0;
    begin
-      Invoke_Reply (Cap, Sent_Words, Caps, Result_Words, Result_Caps);
+      Params.Control :=
+        (Flags          => (Reply      => True,
+                            Send_Caps  => Send,
+                            others     => False),
+         Last_Sent_Cap  => 0,
+         others         => <>);
+
+      Params.Cap := Cap;
+      if Send then
+         Params.Control.Last_Sent_Cap :=
+           Capability_Index (Caps'Length - 1);
+         for I in Caps'Range loop
+            Params.Caps (Capability_Index (I - Caps'First)) := Caps (I);
+         end loop;
+      end if;
+
+      Invoke_Capability (Params);
    end Send_Reply_Caps;
 
 
