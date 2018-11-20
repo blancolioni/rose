@@ -49,9 +49,13 @@ package body Init.Run is
                                Init.Calls.Call
                                  (Create_Cap, (7, 1, 0, 0));
       PCI_Cap              : Rose.Capabilities.Capability;
-      Hd_Parameters_Cap    : Rose.Capabilities.Capability;
-      Hd_Read_Cap          : Rose.Capabilities.Capability;
-      Hd_Write_Cap         : Rose.Capabilities.Capability;
+
+      Hd0_Parameters_Cap   : Rose.Capabilities.Capability;
+      Hd0_Read_Cap         : Rose.Capabilities.Capability;
+      Hd0_Write_Cap        : Rose.Capabilities.Capability;
+
+      Hd1_Parameters_Cap   : Rose.Capabilities.Capability;
+      Hd1_Read_Cap         : Rose.Capabilities.Capability;
 
       function Copy_Cap_From_Process
         (Copy_Cap : Rose.Capabilities.Capability;
@@ -194,14 +198,28 @@ package body Init.Run is
                                      (9, 1,
                                       Word (Ata_Id mod 2 ** 32),
                                       Word (Ata_Id / 2 ** 32)));
-
+         Get_Interface_Cap     : constant Rose.Capabilities.Capability :=
+                                   Copy_Cap_From_Process
+                                     (Copy_Ata_Cap, 16#7F4D_5635#);
+         Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
+         Hd1                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin
-         Hd_Parameters_Cap :=
-           Copy_Cap_From_Process (Copy_Ata_Cap, 16#8C1F_B232#);
-         Hd_Read_Cap :=
-           Copy_Cap_From_Process (Copy_Ata_Cap, 16#82AC_0BDA#);
-         Hd_Write_Cap :=
-           Copy_Cap_From_Process (Copy_Ata_Cap, 16#D469_B96E#);
+         Init.Calls.Get_Interface (Get_Interface_Cap, 0, Hd0);
+         Init.Calls.Get_Interface (Get_Interface_Cap, 1, Hd1);
+
+         Hd0_Parameters_Cap := Hd0 (1);
+         Hd0_Read_Cap := Hd0 (2);
+         Hd0_Write_Cap := Hd0 (3);
+
+         Hd1_Parameters_Cap := Hd1 (1);
+         Hd1_Read_Cap := Hd1 (2);
+
+         --           Hd_Parameters_Cap :=
+--             Copy_Cap_From_Process (Copy_Ata_Cap, 16#8C1F_B232#);
+--           Hd_Read_Cap :=
+--             Copy_Cap_From_Process (Copy_Ata_Cap, 16#82AC_0BDA#);
+--           Hd_Write_Cap :=
+--             Copy_Cap_From_Process (Copy_Ata_Cap, 16#D469_B96E#);
       end;
 
       declare
@@ -209,9 +227,11 @@ package body Init.Run is
                         Init.Calls.Call (Boot_Cap, 6,
                                          (Create_Endpoint_Cap,
                                           Console_Write_Cap,
-                                          Hd_Parameters_Cap,
-                                          Hd_Read_Cap,
-                                          Hd_Write_Cap));
+                                          Hd0_Parameters_Cap,
+                                          Hd0_Read_Cap,
+                                          Hd0_Write_Cap,
+                                          Hd1_Parameters_Cap,
+                                          Hd1_Read_Cap));
       begin
          pragma Unreferenced (Restore_Id);
       end;
