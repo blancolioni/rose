@@ -219,7 +219,7 @@ package body ATA.Commands is
       X : ATA_Status := 0;
    begin
       for I in 1 .. 599 loop
-         if I mod 100 = 0 then
+         if False and then I mod 100 = 0 then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
          X := ATA_Status (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
@@ -227,17 +227,18 @@ package body ATA.Commands is
             return True;
          end if;
          if (X and 1) /= 0 then
-            Rose.Console_IO.Put_Line ("error bit set");
             return False;
          end if;
       end loop;
-      Rose.Console_IO.Put ("wait for status: giving up; last status ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (X));
-      Rose.Console_IO.Put ("; expected ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (Mask));
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (Value));
-      Rose.Console_IO.New_Line;
+      if False then
+         Rose.Console_IO.Put ("wait for status: giving up; last status ");
+         Rose.Console_IO.Put (Rose.Words.Word_8 (X));
+         Rose.Console_IO.Put ("; expected ");
+         Rose.Console_IO.Put (Rose.Words.Word_8 (Mask));
+         Rose.Console_IO.Put (" ");
+         Rose.Console_IO.Put (Rose.Words.Word_8 (Value));
+         Rose.Console_IO.New_Line;
+      end if;
       return False;
    end Wait_For_Status;
 
