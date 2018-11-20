@@ -56,6 +56,9 @@ package body ATA.Drives is
          if not ATA.Commands.Wait_For_Status
            (Data_Cap_8, ATA.Commands.Status_Busy, 0)
          then
+            Rose.Console_IO.Put ("Error: hd");
+            Rose.Console_IO.Put (Natural (Index));
+            Rose.Console_IO.Put (" not responding");
             Drive_Table (Index).Dead := True;
             return;
          end if;
