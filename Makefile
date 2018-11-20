@@ -15,7 +15,7 @@ BOOT_MODULES=init console mem pci ata restore
 #BOOT_MODULES=init console mem pci ram_disk ata restore
 
 #all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
-all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) hdd floppy
+all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
 
 rts:
 	(cd rts; make)
@@ -50,11 +50,23 @@ ata:
 restore:
 	(cd src/servers/restore; make)
 
+exports:
+	sh ./scripts/export-elf-trace
+
+stripped:
+	sh ./scripts/prepare-boot-executables
+
 hdd:
 	sh ./scripts/rose-hdd-install
 	
+iso:
+	sh ./scripts/rose-iso-install
+
 floppy:
 	sh ./scripts/rose-floppy-install
+
+finished:
+	@echo Build finished at `date`
 
 doc:
 	(cd doc; make)

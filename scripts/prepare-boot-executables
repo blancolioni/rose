@@ -1,0 +1,6 @@
+#!/bin/sh
+rm -rf images/tmp
+mkdir -p images/tmp
+cp build/i686/i686-unknown-rose images/tmp/kernel
+cp build/i686/modules/* images/tmp
+strip images/tmp/*
