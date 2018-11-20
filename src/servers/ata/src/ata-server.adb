@@ -81,24 +81,6 @@ package body ATA.Server is
                                and PCI_Bar_IO_Mask;
 
          begin
---              Rose.Console_IO.Put ("class:      ");
---              Rose.Console_IO.Put (Class_Id);
---              Rose.Console_IO.New_Line;
---              Rose.Console_IO.Put ("sub-class:  ");
---              Rose.Console_IO.Put (Sub_Class_Id);
---              Rose.Console_IO.New_Line;
---              Rose.Console_IO.Put ("prog-if:    ");
---              Rose.Console_IO.Put (Prog_IF);
---              Rose.Console_IO.New_Line;
---
---              Rose.Console_IO.Put ("base IRQ: ");
---              Rose.Console_IO.Put (IRQ);
---              Rose.Console_IO.New_Line;
---
---              Rose.Console_IO.Put ("base DMA: ");
---              Rose.Console_IO.Put (Base_DMA);
---              Rose.Console_IO.New_Line;
-
             if not Is_IDE or else Has_Native_0 then
                Rose.Console_IO.Put_Line
                  ("found native IDE on channel 0");
@@ -107,6 +89,15 @@ package body ATA.Server is
                  ("found compatability IDE on channel 0");
                ATA.Drives.Initialize_Drive
                  (Index             => 0,
+                  Command_Cap       => Command_0_Cap,
+                  Control_Cap       => Control_0_Cap,
+                  Data_Cap_8        => Data_0_Cap_8,
+                  Data_Read_Cap_16  => Data_0_Cap_Read_16,
+                  Data_Write_Cap_16 => Data_0_Cap_Write_16,
+                  Base_DMA          => Base_DMA,
+                  Is_Native         => False);
+               ATA.Drives.Initialize_Drive
+                 (Index             => 1,
                   Command_Cap       => Command_0_Cap,
                   Control_Cap       => Control_0_Cap,
                   Data_Cap_8        => Data_0_Cap_8,
