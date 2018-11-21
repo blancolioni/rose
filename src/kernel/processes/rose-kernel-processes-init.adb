@@ -288,6 +288,7 @@ package body Rose.Kernel.Processes.Init is
          Proc.Quantum_Ticks := 10;
          Proc.Remaining_Ticks := 10;
 
+         --  FIXME: replace this nonsense with data from the modules
          case Pid is
             when 2 =>
                Proc.Name (1 .. 4) := "init";
@@ -300,6 +301,8 @@ package body Rose.Kernel.Processes.Init is
             when 6 =>
                Proc.Name (1 .. 3) := "ata";
             when 7 =>
+               Proc.Name (1 .. 5) := "isofs";
+            when 8 =>
                Proc.Name (1 .. 7) := "restore";
             when others =>
                Proc.Name (1 .. 5) := "boot ";
