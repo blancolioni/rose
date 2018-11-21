@@ -1,10 +1,15 @@
-with System.Storage_Elements;
+--  with System.Storage_Elements;
 with Rose.Devices.Block;
 with Rose.Words;
 
 package ATA.Drives is
 
    type ATA_Drive_Index is range 0 .. 3;
+
+   type ATA_Status is new Rose.Words.Word_8;
+
+   Status_DRQ        : constant ATA_Status := 16#08#;
+   Status_Busy       : constant ATA_Status := 16#80#;
 
    type ATA_Drive is private;
 
@@ -13,6 +18,31 @@ package ATA.Drives is
    function Is_Initialized (Drive : ATA_Drive) return Boolean;
    function Is_Listening (Drive : ATA_Drive) return Boolean;
    function Is_Dead (Drive : ATA_Drive) return Boolean;
+   function Is_Master (Drive : ATA_Drive) return Boolean;
+   function Is_Slave (Drive : ATA_Drive) return Boolean;
+   function Is_Atapi (Drive : ATA_Drive) return Boolean;
+
+   function Drive_Index (Drive : ATA_Drive) return ATA_Drive_Index;
+
+   function Command_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Control_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Data_8_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Data_16_Read_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
+   function Data_16_Write_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
 
    procedure Initialize_Drive
      (Index             : ATA_Drive_Index;
@@ -23,6 +53,10 @@ package ATA.Drives is
       Data_Write_Cap_16 : Rose.Capabilities.Capability;
       Base_DMA          : Rose.Words.Word_32;
       Is_Native         : Boolean);
+
+   function Get_Status (Drive : ATA_Drive) return ATA_Status;
+   procedure Set_Status (Drive  : ATA_Drive;
+                         Status : ATA_Status);
 
    function Get_Parameters_Cap
      (Drive : ATA_Drive)
@@ -44,15 +78,21 @@ package ATA.Drives is
      (Drive : ATA_Drive)
       return Rose.Devices.Block.Block_Address_Type;
 
-   procedure Read_Block
-     (Index   : ATA_Drive_Index;
-      Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer  : out System.Storage_Elements.Storage_Array);
+   procedure Log
+     (Drive   : ATA_Drive;
+      Message : String);
 
-   procedure Write_Block
-     (Index   : ATA_Drive_Index;
-      Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer  : System.Storage_Elements.Storage_Array);
+   procedure Set_Dead (Drive : ATA_Drive);
+
+--     procedure Read_Block
+--       (Index   : ATA_Drive_Index;
+--        Address : Rose.Devices.Block.Block_Address_Type;
+--        Buffer  : out System.Storage_Elements.Storage_Array);
+--
+--     procedure Write_Block
+--       (Index   : ATA_Drive_Index;
+--        Address : Rose.Devices.Block.Block_Address_Type;
+--        Buffer  : System.Storage_Elements.Storage_Array);
 
 private
 
@@ -63,6 +103,8 @@ private
          Dead               : Boolean := False;
          Native             : Boolean := False;
          Atapi              : Boolean := False;
+         Index              : ATA_Drive_Index;
+         Status             : ATA_Status := 0;
          Command_Cap        : Rose.Capabilities.Capability := 0;
          Control_Cap        : Rose.Capabilities.Capability := 0;
          Data_8_Cap         : Rose.Capabilities.Capability := 0;
@@ -77,6 +119,46 @@ private
       end record;
 
    type ATA_Drive is access all ATA_Drive_Record;
+
+   function Is_Master (Drive : ATA_Drive) return Boolean
+   is (Drive.Index in 0 | 2);
+
+   function Is_Slave (Drive : ATA_Drive) return Boolean
+   is (Drive.Index in 1 | 3);
+
+   function Is_Atapi (Drive : ATA_Drive) return Boolean
+   is (Drive.Atapi);
+
+   function Drive_Index (Drive : ATA_Drive) return ATA_Drive_Index
+   is (Drive.Index);
+
+   function Command_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Command_Cap);
+
+   function Control_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Control_Cap);
+
+   function Data_8_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Data_8_Cap);
+
+   function Data_16_Read_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Data_16_Read_Cap);
+
+   function Data_16_Write_Port
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Data_16_Write_Cap);
+
+   function Get_Status (Drive : ATA_Drive) return ATA_Status
+   is (Drive.Status);
 
    function Block_Size
      (Drive : ATA_Drive)

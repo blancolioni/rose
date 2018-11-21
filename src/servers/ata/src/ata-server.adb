@@ -10,6 +10,7 @@ with Rose.Console_IO;
 
 with Rose.Devices.Block.Server;
 
+with ATA.Commands;
 with ATA.Drives;
 
 package body ATA.Server is
@@ -201,10 +202,10 @@ package body ATA.Server is
       Buffer        : out System.Storage_Elements.Storage_Array)
    is
    begin
-      ATA.Drives.Read_Block
-        (Index   => ATA.Drives.ATA_Drive_Index (Identifier),
+      ATA.Commands.Read_Sector
+        (Drive   => ATA.Drives.Get (ATA.Drives.ATA_Drive_Index (Identifier)),
          Address => Block_Address,
-         Buffer  => Buffer);
+         Sector  => Buffer);
    end Read_Block;
 
    ------------------
@@ -231,10 +232,10 @@ package body ATA.Server is
       Buffer        : System.Storage_Elements.Storage_Array)
    is
    begin
-      ATA.Drives.Write_Block
-        (Index   => ATA.Drives.ATA_Drive_Index (Identifier),
+      ATA.Commands.Write_Sector
+        (Drive   => ATA.Drives.Get (ATA.Drives.ATA_Drive_Index (Identifier)),
          Address => Block_Address,
-         Buffer  => Buffer);
+         Sector  => Buffer);
    end Write_Block;
 
 end ATA.Server;
