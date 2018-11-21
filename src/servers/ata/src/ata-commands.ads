@@ -17,6 +17,7 @@ package ATA.Commands is
 
    ATAPI_Packet       : constant ATA_Command_Type := 16#A0#;
    ATAPI_Identify     : constant ATA_Command_Type := 16#A1#;
+   ATAPI_Read         : constant ATA_Command_Type := 16#A8#;
 
    type ATA_Command is private;
 
@@ -61,15 +62,17 @@ private
 
    type ATA_Command is
       record
-         Command      : ATA_Command_Type;
-         Master       : Boolean;
-         Use_LBA      : Boolean            := True;
-         LBA          : Rose.Devices.Block.Block_Address_Type := 0;
-         Data         : Rose.Words.Word_8  := 0;
-         Error        : Rose.Words.Word_8  := 0;
-         Sector_Count : Rose.Words.Word_8  := 0;
-         Sector       : Rose.Words.Word_8  := 0;
-         Cylinder     : Rose.Words.Word_16 := 0;
+         Command        : ATA_Command_Type;
+         Master         : Boolean;
+         Use_LBA        : Boolean            := True;
+         Atapi          : Boolean            := False;
+         LBA            : Rose.Devices.Block.Block_Address_Type := 0;
+         Data           : Rose.Words.Word_8  := 0;
+         Error          : Rose.Words.Word_8  := 0;
+         Sector_Count   : Rose.Words.Word_8  := 0;
+         Sector         : Rose.Words.Word_8  := 0;
+         Cylinder       : Rose.Words.Word_16 := 0;
+         Max_Byte_Count : Rose.Words.Word_16 := 0;
       end record;
 
    R_Control       : constant Rose.Words.Word_8 := 0;
