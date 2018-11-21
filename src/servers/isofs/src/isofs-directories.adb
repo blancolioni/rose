@@ -12,6 +12,26 @@ package body IsoFS.Directories is
      System.Storage_Elements.Storage_Array
        (1 .. ISO_Sector_Size);
 
+   type Directory_Date_Time is array (1 .. 7) of Word_8;
+
+   type Directory_Entry is
+      record
+         Length                           : Word_8;
+         Extended_Attribute_Record_Length : Word_8;
+         Extent_Location_LSB              : Word_32;
+         Extent_Location_MSB              : Word_32;
+         Extent_Size_LSB                  : Word_32;
+         Extent_Size_MSB                  : Word_32;
+         Recording_Date_Time              : Directory_Date_Time;
+         File_Flags                       : Word_8;
+         Interleaved_File_Unit_Size       : Word_8;
+         Interleaved_Gap_Size             : Word_8;
+         Volume_Sequence_LSB              : Word_16;
+         Volume_Sequence_MSB              : Word_16;
+         File_Identifier_Length           : Word_8;
+      end record
+   with Pack, Size => 33 * 8;
+
    type Primary_Volume_Sector is
       record
          Sector_Type                   : Word_8;
@@ -36,7 +56,8 @@ package body IsoFS.Directories is
          Optional_L_Path_Table_Address : Word_32;
          M_Path_Table_Address          : Word_32;
          Optional_M_Path_Table_Address : Word_32;
-         Root_Directory_Entry          : String (1 .. 34);
+         Root_Directory_Entry          : Directory_Entry;
+         Empty_Root_Directory_Name     : Word_8;
          Volume_Set_Identifier         : String (1 .. 128);
          Publisher_Identifier          : String (1 .. 128);
          Data_Preparer_Identifier      : String (1 .. 128);
@@ -94,6 +115,7 @@ package body IsoFS.Directories is
       end if;
 
       declare
+         use Rose.Console_IO;
          Volume : Primary_Volume_Sector;
          pragma Import (Ada, Volume);
          for Volume'Address use Buffer'Address;
@@ -103,6 +125,24 @@ package body IsoFS.Directories is
          Rose.Console_IO.Put
            (Volume.Volume_Identifier);
          Rose.Console_IO.New_Line;
+         Put ("root directory timestamp: ");
+         declare
+            D : Directory_Date_Time renames
+                  Volume.Root_Directory_Entry.Recording_Date_Time;
+         begin
+            Put (Natural (D (1)) + 1900);
+            Put ("-");
+            Put (Natural (D (2)));
+            Put ("-");
+            Put (Natural (D (3)));
+            Put (" ");
+            Put (Natural (D (4)));
+            Put (":");
+            Put (Natural (D (5)));
+            Put (":");
+            Put (Natural (D (6)));
+            New_Line;
+         end;
       end;
 
    end Read_Root_Directory;
