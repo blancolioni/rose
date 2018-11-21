@@ -62,7 +62,7 @@ package body Rose.Devices.Block.Client is
 
       Rose.System_Calls.Invoke_Capability (Params);
 
-      Rose.Console_IO.Put ("restore: block size ");
+      Rose.Console_IO.Put ("block-device: block size ");
       Rose.Console_IO.Put (Natural (Params.Data (0)));
       Rose.Console_IO.Put ("; block count ");
       Rose.Console_IO.Put (Natural (Params.Data (1)));
