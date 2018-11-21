@@ -75,6 +75,7 @@ package body IsoFS.Directories is
       while Volume_Index < Sector_Count
         and then not Found
       loop
+
          Read_Block (Device, Volume_Index, Buffer);
 
          if Buffer (Descriptor_Type_Offset + 1)
@@ -101,6 +102,7 @@ package body IsoFS.Directories is
            ("found volume: ");
          Rose.Console_IO.Put
            (Volume.Volume_Identifier);
+         Rose.Console_IO.New_Line;
       end;
 
    end Read_Root_Directory;
