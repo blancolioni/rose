@@ -9,27 +9,25 @@ package body ATA.Commands is
       Address : Rose.Devices.Block.Block_Address_Type := 0)
       return Rose.Words.Word_8;
 
+   procedure Sector_Command
+     (Drive   : ATA.Drives.ATA_Drive;
+      Write   : Boolean;
+      LBA     : Rose.Devices.Block.Block_Address_Type;
+      Command : out ATA_Command);
+
    -----------
    -- Flush --
    -----------
 
    procedure Flush
-     (Command_Port : Rose.Capabilities.Capability;
-      Control_Port : Rose.Capabilities.Capability;
-      Data_Port    : Rose.Capabilities.Capability;
-      Master       : Boolean)
+     (Drive : ATA.Drives.ATA_Drive)
    is
       Command : constant ATA_Command :=
                   (Command => ATA_Flush,
-                   Master  => Master,
+                   Master  => ATA.Drives.Is_Master (Drive),
                    others  => <>);
    begin
-      if not Send_Command
-        (Command      => Command,
-         Command_Port => Command_Port,
-         Control_Port => Control_Port,
-         Data_Port    => Data_Port)
-      then
+      if not Send_Command (Drive, Command) then
          Rose.Console_IO.Put_Line ("cannot flush drive");
       end if;
    end Flush;
@@ -54,12 +52,36 @@ package body ATA.Commands is
    -----------------
 
    procedure Read_Sector
-     (Data_Port    : Rose.Capabilities.Capability;
-      Sector       : out System.Storage_Elements.Storage_Array)
+     (Drive   : ATA.Drives.ATA_Drive;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Sector  : out System.Storage_Elements.Storage_Array)
    is
       use System.Storage_Elements;
       Index : Storage_Offset := Sector'First - 1;
+      Command : ATA_Command;
+      Data_Port : constant Rose.Capabilities.Capability :=
+                    ATA.Drives.Data_16_Read_Port (Drive);
    begin
+      if ATA.Drives.Is_Dead (Drive) then
+         ATA.Drives.Log (Drive, "no drive detected");
+         return;
+      end if;
+
+      Sector_Command (Drive, False, Address, Command);
+
+      if not Send_Command (Drive, Command) then
+         ATA.Drives.Log (Drive, "sending read command failed");
+         return;
+      end if;
+
+      if not Wait_For_Status
+        (Drive, ATA.Drives.Status_Busy, 0)
+      then
+         ATA.Drives.Log (Drive, "unresponsive");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
+
       for I in 1 .. 256 loop
          declare
             use Rose.Words;
@@ -75,35 +97,45 @@ package body ATA.Commands is
 
    end Read_Sector;
 
+   --------------------
+   -- Sector_Command --
+   --------------------
+
+   procedure Sector_Command
+     (Drive   : ATA.Drives.ATA_Drive;
+      Write   : Boolean;
+      LBA     : Rose.Devices.Block.Block_Address_Type;
+      Command : out ATA_Command)
+   is
+   begin
+      Command := (Command      =>
+                    (if ATA.Drives.Is_Atapi (Drive)
+                     then ATAPI_Packet
+                     elsif not Write
+                     then ATA_Read_Sectors
+                     else ATA_Write_Sectors),
+                  Master       => ATA.Drives.Is_Master (Drive),
+                  Use_LBA      => True,
+                  Sector_Count => 1,
+                  LBA          => LBA,
+                  others       => <>);
+   end Sector_Command;
+
    ------------------
    -- Send_Command --
    ------------------
 
    function Send_Command
-     (Command      : ATA_Command;
-      Command_Port : Rose.Capabilities.Capability;
-      Control_Port : Rose.Capabilities.Capability;
-      Data_Port    : Rose.Capabilities.Capability)
+     (Drive        : ATA.Drives.ATA_Drive;
+      Command      : ATA_Command)
       return Boolean
    is
+      Command_Port : constant Rose.Capabilities.Capability :=
+                       ATA.Drives.Command_Port (Drive);
    begin
-
       Rose.Devices.Port_IO.Port_Out_8
         (Command_Port, R_Select_Drive,
          To_Select_Drive (Command.Master, Command.Use_LBA, Command.LBA));
-
-      if False then
-         if not Wait_For_Status (Data_Port, Status_Busy, 0) then
-            return False;
-         end if;
-      end if;
-
-      if False then
-         Rose.Devices.Port_IO.Port_Out_8
-           (Port   => Control_Port,
-            Offset => 0,
-            Value  => 16#08#);
-      end if;
 
       declare
          use Rose.Words;
@@ -136,58 +168,6 @@ package body ATA.Commands is
       return True;
    end Send_Command;
 
-   --------------------------
-   -- Set_Identify_Command --
-   --------------------------
-
-   procedure Set_Identify_Command
-     (Command : out ATA_Command;
-      Master  : Boolean;
-      LBA     : Boolean)
-   is
-   begin
-      Command := (Command => ATA_Identify,
-                  Master  => Master,
-                  Use_LBA => LBA,
-                  others  => <>);
-   end Set_Identify_Command;
-
-   -----------------------------
-   -- Set_Read_Sector_Command --
-   -----------------------------
-
-   procedure Set_Read_Sector_Command
-     (Command : out ATA_Command;
-      Master  : Boolean;
-      LBA     : Rose.Devices.Block.Block_Address_Type)
-   is
-   begin
-      Command := (Command      => ATA_Read_Sectors,
-                  Master       => Master,
-                  Use_LBA      => True,
-                  Sector_Count => 1,
-                  LBA          => LBA,
-                  others       => <>);
-   end Set_Read_Sector_Command;
-
-   ------------------------------
-   -- Set_Write_Sector_Command --
-   ------------------------------
-
-   procedure Set_Write_Sector_Command
-     (Command : out ATA_Command;
-      Master  : Boolean;
-      LBA     : Rose.Devices.Block.Block_Address_Type)
-   is
-   begin
-      Command := (Command      => ATA_Write_Sectors,
-                  Master       => Master,
-                  Use_LBA      => True,
-                  Sector_Count => 1,
-                  LBA          => LBA,
-                  others       => <>);
-   end Set_Write_Sector_Command;
-
    ---------------------
    -- To_Select_Drive --
    ---------------------
@@ -211,18 +191,22 @@ package body ATA.Commands is
    ---------------------
 
    function Wait_For_Status
-     (Data_Port : Rose.Capabilities.Capability;
-      Mask      : ATA_Status;
-      Value     : ATA_Status)
+     (Drive     : ATA.Drives.ATA_Drive;
+      Mask      : ATA.Drives.ATA_Status;
+      Value     : ATA.Drives.ATA_Status)
       return Boolean
    is
-      X : ATA_Status := 0;
+      use type ATA.Drives.ATA_Status;
+      X : ATA.Drives.ATA_Status := 0;
+      Data_Port : constant Rose.Capabilities.Capability :=
+                    ATA.Drives.Data_8_Port (Drive);
    begin
-      for I in 1 .. 599 loop
-         if False and then I mod 100 = 0 then
+      for I in 1 .. 10 loop
+         if False then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
-         X := ATA_Status (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
+         X := ATA.Drives.ATA_Status
+           (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
          if (X and Mask) = Value then
             return True;
          end if;
@@ -247,12 +231,35 @@ package body ATA.Commands is
    ------------------
 
    procedure Write_Sector
-     (Data_Port : Rose.Capabilities.Capability;
-      Sector    : System.Storage_Elements.Storage_Array)
+     (Drive   : ATA.Drives.ATA_Drive;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Sector  : System.Storage_Elements.Storage_Array)
    is
       use System.Storage_Elements;
-      Index : Storage_Offset := Sector'First;
+      Index   : Storage_Offset := Sector'First;
+      Data_Port : constant Rose.Capabilities.Capability :=
+                    ATA.Drives.Data_16_Write_Port (Drive);
+      Command : ATA_Command;
    begin
+      if ATA.Drives.Is_Dead (Drive) then
+         ATA.Drives.Log (Drive, "no drive detected");
+         return;
+      end if;
+
+      Sector_Command (Drive, True, Address, Command);
+      if not Send_Command (Drive, Command) then
+         ATA.Drives.Log (Drive, "sending write command failed");
+         return;
+      end if;
+
+      if not Wait_For_Status
+        (Drive, ATA.Drives.Status_Busy, 0)
+      then
+         ATA.Drives.Log (Drive, "unresponsive");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
+
       for I in 1 .. 256 loop
          declare
             use Rose.Words;
@@ -264,6 +271,9 @@ package body ATA.Commands is
             Index := Index + 2;
          end;
       end loop;
+
+      Flush (Drive);
+
    end Write_Sector;
 
 end ATA.Commands;
