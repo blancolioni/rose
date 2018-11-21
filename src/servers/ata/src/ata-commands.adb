@@ -15,6 +15,11 @@ package body ATA.Commands is
       LBA     : Rose.Devices.Block.Block_Address_Type;
       Command : out ATA_Command);
 
+   procedure Read_Sector_ATAPI
+     (Drive   : ATA.Drives.ATA_Drive;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Sector  : out System.Storage_Elements.Storage_Array);
+
    -----------
    -- Flush --
    -----------
@@ -56,6 +61,7 @@ package body ATA.Commands is
       Address : Rose.Devices.Block.Block_Address_Type;
       Sector  : out System.Storage_Elements.Storage_Array)
    is
+      use ATA.Drives;
       use System.Storage_Elements;
       Index : Storage_Offset := Sector'First - 1;
       Command : ATA_Command;
@@ -63,7 +69,11 @@ package body ATA.Commands is
                     ATA.Drives.Data_16_Read_Port (Drive);
    begin
       if ATA.Drives.Is_Dead (Drive) then
-         ATA.Drives.Log (Drive, "no drive detected");
+         ATA.Drives.Log (Drive, "drive is dead");
+      end if;
+
+      if ATA.Drives.Is_Atapi (Drive) then
+         Read_Sector_ATAPI (Drive, Address, Sector);
          return;
       end if;
 
@@ -75,7 +85,7 @@ package body ATA.Commands is
       end if;
 
       if not Wait_For_Status
-        (Drive, ATA.Drives.Status_Busy, 0)
+        (Drive, Status_Busy or Status_DRQ, Status_DRQ)
       then
          ATA.Drives.Log (Drive, "unresponsive");
          ATA.Drives.Set_Dead (Drive);
@@ -97,6 +107,111 @@ package body ATA.Commands is
 
    end Read_Sector;
 
+   -----------------------
+   -- Read_Sector_ATAPI --
+   -----------------------
+
+   procedure Read_Sector_ATAPI
+     (Drive   : ATA.Drives.ATA_Drive;
+      Address : Rose.Devices.Block.Block_Address_Type;
+      Sector  : out System.Storage_Elements.Storage_Array)
+   is
+      use Rose.Devices.Block;
+      use Rose.Words;
+      use ATA.Drives;
+      use System.Storage_Elements;
+      Index         : Storage_Offset := Sector'First - 1;
+      Atapi_Command : array (1 .. 6) of Word_16 :=
+                        (1 => Word_16 (ATAPI_Read), others => 0);
+      Data          : Rose.Devices.Port_IO.Word_8_Data_Array (1 .. 6);
+      Command_Port  : constant Rose.Capabilities.Capability :=
+                        ATA.Drives.Command_Port (Drive);
+      Status_Port   : constant Rose.Capabilities.Capability :=
+                        ATA.Drives.Data_8_Port (Drive);
+      Block_Size    : constant Word_16 :=
+                        Word_16 (ATA.Drives.Block_Size (Drive));
+      Data_Out      : constant Rose.Capabilities.Capability :=
+                        Data_16_Write_Port (Drive);
+      Data_In      : constant Rose.Capabilities.Capability :=
+                        Data_16_Read_Port (Drive);
+   begin
+      Rose.Devices.Port_IO.Port_Out_8
+        (Command_Port, R_Select_Drive,
+         To_Select_Drive (ATA.Drives.Is_Master (Drive), False, 0));
+
+      Data (1) := (1, 0);
+      Data (2) := (4, Word_8 (Block_Size mod 256));
+      Data (3) := (5, Word_8 (Block_Size / 256));
+      Data (4) := (7, Word_8 (ATAPI_Packet));
+
+      Rose.Devices.Port_IO.Port_Out_8
+        (Port => Command_Port,
+         Data => Data (1 .. 4));
+
+      if not Wait_For_Status
+        (Drive, Status_Busy or Status_DRQ, Status_DRQ)
+      then
+         ATA.Drives.Log (Drive, "unresponsive after sending ATA command");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
+
+      Atapi_Command (5) := 1 * 256;  --  1 sector
+      Atapi_Command (2) := Word_16 (Address / 2 ** 24)
+        + Word_16 (Address / 2 ** 16) * 2 ** 8;
+      Atapi_Command (3) :=
+        Word_16 (Address / 256)
+        + 256 * Word_16 (Address mod 256);
+
+      for W of Atapi_Command loop
+         Rose.Devices.Port_IO.Port_Out_16
+           (Port  => Data_Out,
+            Value => W);
+      end loop;
+
+      if not Wait_For_Status
+        (Drive, Status_Busy, 0)
+      then
+         ATA.Drives.Log (Drive, "unresponsive after sending ATAPI command");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
+
+      declare
+         Size_Lo : constant Word_8 :=
+                     Rose.Devices.Port_IO.Port_In_8
+                       (Status_Port, 4);
+         Size_Hi : constant Word_8 :=
+                     Rose.Devices.Port_IO.Port_In_8
+                       (Status_Port, 5);
+         Available_Size : constant Word_16 :=
+                            Word_16 (Size_Lo)
+                            + 256 * Word_16 (Size_Hi);
+      begin
+         if Available_Size /= Block_Size then
+            Rose.Console_IO.Put ("ata: expected ");
+            Rose.Console_IO.Put (Block_Size);
+            Rose.Console_IO.Put (" bytes, but drive reported ");
+            Rose.Console_IO.Put (Available_Size);
+            Rose.Console_IO.New_Line;
+            return;
+         end if;
+      end;
+
+      for I in 1 .. Block_Size / 2 loop
+         declare
+            D : constant Rose.Words.Word_16 :=
+                  Rose.Devices.Port_IO.Port_In_16 (Data_In);
+         begin
+            Index := Index + 1;
+            Sector (Index) := Storage_Element (D mod 256);
+            Index := Index + 1;
+            Sector (Index) := Storage_Element (D / 256);
+         end;
+      end loop;
+
+   end Read_Sector_ATAPI;
+
    --------------------
    -- Sector_Command --
    --------------------
@@ -108,17 +223,25 @@ package body ATA.Commands is
       Command : out ATA_Command)
    is
    begin
-      Command := (Command      =>
-                    (if ATA.Drives.Is_Atapi (Drive)
-                     then ATAPI_Packet
-                     elsif not Write
-                     then ATA_Read_Sectors
-                     else ATA_Write_Sectors),
-                  Master       => ATA.Drives.Is_Master (Drive),
-                  Use_LBA      => True,
-                  Sector_Count => 1,
-                  LBA          => LBA,
-                  others       => <>);
+      if ATA.Drives.Is_Atapi (Drive) then
+         Command := (Command        => ATAPI_Packet,
+                     Master         => ATA.Drives.Is_Master (Drive),
+                     Atapi          => True,
+                     Max_Byte_Count => 2048,
+                     LBA            => LBA,
+                     Sector_Count   => 1,
+                     others         => <>);
+      else
+         Command := (Command      =>
+                       (if not Write
+                        then ATA_Read_Sectors
+                        else ATA_Write_Sectors),
+                     Master       => ATA.Drives.Is_Master (Drive),
+                     Use_LBA      => True,
+                     Sector_Count => 1,
+                     LBA          => LBA,
+                     others       => <>);
+      end if;
    end Sector_Command;
 
    ------------------
@@ -201,7 +324,7 @@ package body ATA.Commands is
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_8_Port (Drive);
    begin
-      for I in 1 .. 10 loop
+      for I in 1 .. 20 loop
          if False then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
@@ -242,7 +365,7 @@ package body ATA.Commands is
       Command : ATA_Command;
    begin
       if ATA.Drives.Is_Dead (Drive) then
-         ATA.Drives.Log (Drive, "no drive detected");
+         ATA.Drives.Log (Drive, "drive is dead");
          return;
       end if;
 
