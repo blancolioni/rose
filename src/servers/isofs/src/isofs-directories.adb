@@ -132,15 +132,15 @@ package body IsoFS.Directories is
          begin
             Put (Natural (D (1)) + 1900);
             Put ("-");
-            Put (Natural (D (2)));
+            Put (Natural (D (2)), 2, '0');
             Put ("-");
-            Put (Natural (D (3)));
+            Put (Natural (D (3)), 2, '0');
             Put (" ");
-            Put (Natural (D (4)));
+            Put (Natural (D (4)), 2, '0');
             Put (":");
-            Put (Natural (D (5)));
+            Put (Natural (D (5)), 2, '0');
             Put (":");
-            Put (Natural (D (6)));
+            Put (Natural (D (6)), 2, '0');
             New_Line;
          end;
       end;
