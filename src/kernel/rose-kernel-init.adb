@@ -113,7 +113,8 @@ package body Rose.Kernel.Init is
       Rose.Boot.Console.Put_Line ("Starting clock");
 
       Rose.Kernel.Interrupts.Set_Handler
-        (32, Rose.Kernel.Clock.Handle_Clock_Tick'Access);
+        (Rose.Arch.Interrupts.Clock_Interrupt,
+         Rose.Kernel.Clock.Handle_Clock_Tick'Access);
 
       Rose.Arch.Interrupt_Table.Enable_Interrupt
         (Rose.Arch.Interrupts.Clock_Interrupt);
