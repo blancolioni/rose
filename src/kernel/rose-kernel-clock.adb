@@ -3,7 +3,7 @@ with Rose.Words;                       use Rose.Words;
 
 with Rose.Boot.Console;
 
-with Rose.Kernel.Processes.Queue;
+with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Clock is
 
@@ -18,6 +18,7 @@ package body Rose.Kernel.Clock is
    is
    begin
       Ticks := Ticks + 1;
+
       if Ticks mod 100 = 0 then
          Rose.Boot.Console.Status_Line
            (Current_Pid   => Rose.Kernel.Processes.Current_Process_Id,
@@ -26,7 +27,10 @@ package body Rose.Kernel.Clock is
       end if;
 
       if Rose.Kernel.Processes.Use_Tick then
-         Rose.Kernel.Processes.Queue.Choose_Process;
+         Rose.Kernel.Processes.Set_Current_State
+           (Rose.Kernel.Processes.Current_Process_Id,
+            Rose.Kernel.Processes.Ready);
+         return Rose.Kernel.Interrupts.Not_Finished;
       end if;
 
 --      if Ticks mod 10 = 0 then
