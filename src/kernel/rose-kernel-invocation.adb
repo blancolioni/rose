@@ -73,7 +73,7 @@ package body Rose.Kernel.Invocation is
               ("invoke", Process_Id, Cap, Params.all);
             if Log_Details then
                Rose.Kernel.Processes.Debug.Report_Process
-                 (Process_Id, True);
+                 (Process_Id, False);
             end if;
          end if;
 
