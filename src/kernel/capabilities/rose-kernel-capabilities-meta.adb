@@ -61,13 +61,17 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         Rose.Boot.Console.Put
-           (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
-         Rose.Boot.Console.Put
-           (": new receive cap: ");
-         Rose.Boot.Console.Put
-           (Rose.Words.Word_8 (Receive_Cap));
-         Rose.Boot.Console.New_Line;
+         if Log_Invocation
+           or else Process_Id = Log_Process_Activity
+         then
+            Rose.Boot.Console.Put
+              (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
+            Rose.Boot.Console.Put
+              (": new receive cap: ");
+            Rose.Boot.Console.Put
+              (Rose.Words.Word_8 (Receive_Cap));
+            Rose.Boot.Console.New_Line;
+         end if;
 
          Rose.Kernel.Processes.Set_Cap
            (Process_Id, Receive_Cap,
@@ -86,17 +90,21 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         Rose.Boot.Console.Put
-           (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
-         Rose.Boot.Console.Put
-           (": new endpoint cap: ");
-         Rose.Boot.Console.Put
-           (Rose.Words.Word_8 (Endpoint_Cap));
-         Rose.Boot.Console.Put (" for endpoint ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (Local_Endpoint));
-         Rose.Boot.Console.Put (" ");
-         Rose.Boot.Console.Put (Rose.Words.Word (Endpoint_Id));
-         Rose.Boot.Console.New_Line;
+         if Log_Invocation
+           or else Process_Id = Log_Process_Activity
+         then
+            Rose.Boot.Console.Put
+              (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
+            Rose.Boot.Console.Put
+              (": new endpoint cap: ");
+            Rose.Boot.Console.Put
+              (Rose.Words.Word_8 (Endpoint_Cap));
+            Rose.Boot.Console.Put (" for endpoint ");
+            Rose.Boot.Console.Put (Rose.Words.Word_8 (Local_Endpoint));
+            Rose.Boot.Console.Put (" ");
+            Rose.Boot.Console.Put (Rose.Words.Word (Endpoint_Id));
+            Rose.Boot.Console.New_Line;
+         end if;
 
          Rose.Kernel.Processes.Set_Cap
            (Process_Id, Endpoint_Cap,
