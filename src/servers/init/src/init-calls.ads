@@ -32,10 +32,11 @@ package Init.Calls is
      (Cap     : Rose.Capabilities.Capability;
       Message : String);
 
-   function Call
-     (Cap       : Rose.Capabilities.Capability;
-      Data      : Rose.Words.Word;
-      Sent_Caps : Array_Of_Capabilities)
+   function Launch_Boot_Module
+     (Cap          : Rose.Capabilities.Capability;
+      Module_Index : Rose.Words.Word;
+      Priority     : Rose.Words.Word;
+      Launch_Caps  : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
    procedure Get_Interface

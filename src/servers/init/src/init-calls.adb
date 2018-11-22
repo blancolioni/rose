@@ -46,57 +46,6 @@ package body Init.Calls is
       end if;
    end Call;
 
-   ----------
-   -- Call --
-   ----------
-
-   function Call
-     (Cap       : Rose.Capabilities.Capability;
-      Data      : Rose.Words.Word;
-      Sent_Caps : Array_Of_Capabilities)
-      return Rose.Objects.Object_Id
-   is
-      use Rose.Invocation;
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      Params.Cap := Cap;
-      Params.Control.Flags := (Send             => True,
-                               Send_Words       => True,
-                               Recv_Words       => True,
-                               Send_Caps        => Sent_Caps'Length > 0,
-                               Block            => True,
-                               Create_Reply_Cap => True,
-                               others           => False);
-      Params.Control.Last_Sent_Word := 0;
-      Params.Control.Last_Sent_Cap := 0;
-      Params.Data (0) := Data;
-      for Sent_Cap of Sent_Caps loop
-         Params.Caps (Params.Control.Last_Sent_Cap) := Sent_Cap;
-         Params.Control.Last_Sent_Cap :=
-           Params.Control.Last_Sent_Cap + 1;
-      end loop;
-      Params.Control.Last_Sent_Cap :=
-        Params.Control.Last_Sent_Cap - 1;
-
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      declare
-         use Rose.Objects;
-         Result : Object_Id := 0;
-      begin
-         if Params.Control.Flags (Send_Words) then
-            Result := Object_Id (Params.Data (0));
-            if Params.Control.Last_Sent_Word > 0 then
-               Result := Result
-                 + Object_Id (Params.Data (1)) * 2 ** 32;
-            end if;
-         end if;
-
-         return Result;
-      end;
-
-   end Call;
-
    -------------------
    -- Get_Interface --
    -------------------
@@ -140,6 +89,60 @@ package body Init.Calls is
          end;
       end if;
    end Get_Interface;
+
+   ------------------------
+   -- Launch_Boot_Module --
+   ------------------------
+
+   function Launch_Boot_Module
+     (Cap          : Rose.Capabilities.Capability;
+      Module_Index : Rose.Words.Word;
+      Priority     : Rose.Words.Word;
+      Launch_Caps  : Array_Of_Capabilities)
+      return Rose.Objects.Object_Id
+   is
+      use Rose.Invocation;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Params.Cap := Cap;
+      Params.Control.Flags := (Send             => True,
+                               Send_Words       => True,
+                               Recv_Words       => True,
+                               Send_Caps        => Launch_Caps'Length > 0,
+                               Block            => True,
+                               Create_Reply_Cap => True,
+                               others           => False);
+      Params.Control.Last_Sent_Word := 1;
+      Params.Control.Last_Sent_Cap := 0;
+      Params.Data (0) := Module_Index;
+      Params.Data (1) := Priority;
+
+      for Launch_Cap of Launch_Caps loop
+         Params.Caps (Params.Control.Last_Sent_Cap) := Launch_Cap;
+         Params.Control.Last_Sent_Cap :=
+           Params.Control.Last_Sent_Cap + 1;
+      end loop;
+      Params.Control.Last_Sent_Cap :=
+        Params.Control.Last_Sent_Cap - 1;
+
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      declare
+         use Rose.Objects;
+         Result : Object_Id := 0;
+      begin
+         if Params.Control.Flags (Send_Words) then
+            Result := Object_Id (Params.Data (0));
+            if Params.Control.Last_Sent_Word > 0 then
+               Result := Result
+                 + Object_Id (Params.Data (1)) * 2 ** 32;
+            end if;
+         end if;
+
+         return Result;
+      end;
+
+   end Launch_Boot_Module;
 
    ----------
    -- Send --
