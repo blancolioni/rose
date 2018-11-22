@@ -3,7 +3,7 @@ with Rose.Words;                       use Rose.Words;
 
 with Rose.Boot.Console;
 
-with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Queue;
 
 package body Rose.Kernel.Clock is
 
@@ -16,20 +16,22 @@ package body Rose.Kernel.Clock is
    function Handle_Clock_Tick
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
+      Current_Pid : constant Rose.Objects.Process_Id :=
+                      Rose.Kernel.Processes.Current_Process_Id;
    begin
       Ticks := Ticks + 1;
 
       if Ticks mod 100 = 0 then
          Rose.Boot.Console.Status_Line
-           (Current_Pid   => Rose.Kernel.Processes.Current_Process_Id,
+           (Current_Pid   => Current_Pid,
             Current_Ticks => Ticks,
             Page_Faults   => Rose.Kernel.Processes.Page_Fault_Count);
       end if;
 
       if Rose.Kernel.Processes.Use_Tick then
          Rose.Kernel.Processes.Set_Current_State
-           (Rose.Kernel.Processes.Current_Process_Id,
-            Rose.Kernel.Processes.Ready);
+           (Current_Pid, Rose.Kernel.Processes.Ready);
+         Rose.Kernel.Processes.Queue.Quantum_Finished (Current_Pid);
          return Rose.Kernel.Interrupts.Not_Finished;
       end if;
 

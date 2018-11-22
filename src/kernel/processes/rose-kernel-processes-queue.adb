@@ -77,6 +77,9 @@ package body Rose.Kernel.Processes.Queue is
    begin
       if Q.First = P then
          Q.First := P.Queue_Next;
+         if Q.First = null then
+            Q.Last := null;
+         end if;
       else
          declare
             It : Kernel_Process_Access := Q.First;
@@ -100,8 +103,17 @@ package body Rose.Kernel.Processes.Queue is
       end if;
 
       P.Queue_Next := null;
---        Rose.Boot.Console.Put_Line ("Dequeue: " & P.Name);
    end Dequeue_Process;
+
+   ----------------------
+   -- Quantum_Finished --
+   ----------------------
+
+   procedure Quantum_Finished (Process : Rose.Objects.Process_Id) is
+   begin
+      Dequeue_Process (Process);
+      Queue_Process (Process);
+   end Quantum_Finished;
 
    -------------------
    -- Queue_Process --
@@ -123,20 +135,6 @@ package body Rose.Kernel.Processes.Queue is
          Q.Last.Queue_Next := P;
          Q.Last := P;
       end if;
-
---        if True then
---           Rose.Boot.Console.Put ("Queue: ");
---           Rose.Boot.Console.Put (P.Name);
---           Rose.Boot.Console.Put (" ");
---           Rose.Boot.Console.Put (Words.Word_8 (P.Priority));
---           Rose.Boot.Console.Put (" ");
---          Rose.Boot.Console.Put (Words.Word_8'(Process_State'Pos (P.State)));
---           Rose.Boot.Console.Put (" ");
---           Rose.Boot.Console.Put (P.Stack.EIP);
---           Rose.Boot.Console.Put (" ");
---           Rose.Boot.Console.Put (P.Stack.ESP);
---           Rose.Boot.Console.New_Line;
---        end if;
    end Queue_Process;
 
    ----------------------------
