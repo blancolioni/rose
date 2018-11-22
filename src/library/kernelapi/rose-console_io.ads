@@ -10,7 +10,8 @@ package Rose.Console_IO is
    procedure Put (Text : String);
    procedure Put (Num : Integer);
    procedure Put (X     : Natural;
-                  Width : Positive);
+                  Width : Positive;
+                  Pad   : Character := ' ');
    procedure Put (Item : Rose.Words.Word_4);
    procedure Put (Item : Rose.Words.Word_8);
    procedure Put (Item : Rose.Words.Word_16);

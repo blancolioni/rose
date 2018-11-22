@@ -91,7 +91,8 @@ package body Rose.Console_IO is
 
    procedure Put
      (X     : Natural;
-      Width : Positive)
+      Width : Positive;
+      Pad   : Character := ' ')
    is
       Buffer : String (1 .. 16);
       Index  : Natural := 0;
@@ -114,10 +115,10 @@ package body Rose.Console_IO is
 
       if Index < Width then
          declare
-            Spaces : constant String (1 .. Width - Index) :=
-                       (others => ' ');
+            Padding : constant String (1 .. Width - Index) :=
+                        (others => Pad);
          begin
-            Put (Spaces);
+            Put (Padding);
          end;
       end if;
 
