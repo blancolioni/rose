@@ -1118,13 +1118,9 @@ package body Rose.Kernel.Processes is
               Current_Process.Remaining_Ticks - 1;
          end if;
          if Current_Process.Remaining_Ticks = 0 then
-            if False then
-               Current_Process.Remaining_Ticks :=
-                 Current_Process.Quantum_Ticks;
-               return True;
-            else
-               return False;
-            end if;
+            Current_Process.Remaining_Ticks :=
+              Current_Process.Quantum_Ticks;
+            return True;
          else
             return False;
          end if;
