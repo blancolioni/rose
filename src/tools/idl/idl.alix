@@ -1,0 +1,10 @@
+project_name = IDL
+source_dir = src
+depend = { project = WLib version = any }
+depend = { project = GCS version = any }
+depend = { project = syn version = any }
+depend = { project = tropos version = any }
+main_unit = idl-main
+exec_name = idl
+config_dir = config
+path_unit = { unit = IDL.Paths path = src/idl-paths.ads }

@@ -1,0 +1,3 @@
+interface File : Stream, Seekable is
+
+end File;
