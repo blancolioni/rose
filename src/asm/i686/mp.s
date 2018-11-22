@@ -266,14 +266,14 @@ cpu_exception_common:
 .text
 
 system_call:
-    mov %eax, saved_process_address
     push    %ebp                            # save %ebp for later
     mov     current_process_ptr, %ebp       # currently running process
     mov     %ecx, Process_ESP(%ebp)         # %esp is passed to us via %ecx
     mov     %edx, Process_EIP(%ebp)         # %eip is passed to us via %edx
     pushf                                   # get current eflags
-    pop     %edx                            # and save it
-    mov     %edx, Process_PSW(%ebp)         # to the process record
+    pop     %edx                            
+    or      $0x0200, %edx                   # make sure interrupts will be enabled when we return
+    mov     %edx, Process_PSW(%ebp)         # save it to the process record
     mov     %esi, Process_ESI(%ebp)
     mov     %edi, Process_EDI(%ebp)
     pop     %esi
