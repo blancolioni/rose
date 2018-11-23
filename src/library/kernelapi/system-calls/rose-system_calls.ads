@@ -1,5 +1,7 @@
 with System;
 
+with System.Storage_Elements;
+
 with Rose.Capabilities;
 with Rose.Invocation;
 with Rose.Words;
@@ -41,6 +43,52 @@ package Rose.System_Calls is
       Out_Words : out Sent_Words_Array;
       Out_Caps  : out Sent_Caps_Array);
 
+   procedure Send_Text
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String);
+
+   procedure Send_Storage_Array
+     (Params   : in out Rose.Invocation.Invocation_Record;
+      Storage  : System.Storage_Elements.Storage_Array;
+      Writable : Boolean);
+
+   procedure Send_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Integer);
+
+    procedure Send_Cap
+      (Params : in out Rose.Invocation.Invocation_Record;
+       Cap    : Rose.Capabilities.Capability);
+
+   procedure Send_Buffer
+      (Params   : in out Rose.Invocation.Invocation_Record;
+       Bytes    : System.Storage_Elements.Storage_Count;
+       Buffer   : System.Address;
+       Writable : Boolean);
+
+--     procedure Receive_Buffer
+--       (Params   : in out Rose.Invocation.Invocation_Record;
+--        Buffer   : System.Address;
+--        Writable : Boolean);
+
+   procedure Receive_Buffer
+     (Params   : in out Rose.Invocation.Invocation_Record);
+
+   procedure Copy_Buffer
+     (Params    : Rose.Invocation.Invocation_Record;
+      Max_Bytes : System.Storage_Elements.Storage_Count;
+      To        : System.Address);
+
+   procedure Copy_Storage_Array
+     (Params    : Rose.Invocation.Invocation_Record;
+      To        : out System.Storage_Elements.Storage_Array;
+      Last      : out System.Storage_Elements.Storage_Count);
+
+    procedure Copy_Text
+      (Params   : Rose.Invocation.Invocation_Record;
+       To       : out String;
+       Last     : out Natural);
+
    procedure Initialize_Send
      (Params : in out Rose.Invocation.Invocation_Record;
       Cap    : Rose.Capabilities.Capability);
@@ -49,10 +97,6 @@ package Rose.System_Calls is
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
 
-   procedure Send_Cap
-     (Params : in out Rose.Invocation.Invocation_Record;
-      Cap    : Rose.Capabilities.Capability);
-
    procedure Receive_Words
      (Params : in out Rose.Invocation.Invocation_Record;
       Count  : Natural);
@@ -60,19 +104,5 @@ package Rose.System_Calls is
    procedure Receive_Caps
      (Params : in out Rose.Invocation.Invocation_Record;
       Count  : Natural);
-
-   procedure Send_Buffer
-     (Params   : in out Rose.Invocation.Invocation_Record;
-      Bytes    : Natural;
-      Buffer   : System.Address;
-      Writable : Boolean);
-
-   procedure Receive_Buffer
-     (Params   : in out Rose.Invocation.Invocation_Record);
-
-   procedure Copy_Text
-     (Params   : Rose.Invocation.Invocation_Record;
-      To       : out String;
-      Last     : out Natural);
 
 end Rose.System_Calls;
