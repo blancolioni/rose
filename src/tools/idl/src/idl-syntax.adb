@@ -249,7 +249,7 @@ package body IDL.Syntax is
    begin
       To.Num_Inherited := To.Num_Inherited + 1;
       To.Inherited (To.Num_Inherited) := Parent;
-      Add_Context (To, "Rose.Interfaces." & Get_Name (Parent));
+--        Add_Context (To, "Rose.Interfaces." & Get_Name (Parent));
 --        for I in 1 .. Get_Num_Contexts (Parent) loop
 --           Add_Context (To, Get_Context (Parent, I));
 --        end loop;
