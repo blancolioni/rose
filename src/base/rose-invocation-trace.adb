@@ -1,3 +1,4 @@
+with Rose.Addresses;
 with Rose.Boot.Console;
 
 package body Rose.Invocation.Trace is
@@ -64,12 +65,18 @@ package body Rose.Invocation.Trace is
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Buffer) then
-         Rose.Boot.Console.Put (" buf=(");
-         Rose.Boot.Console.Put (Word (Invocation.Buffer_Address));
-         Rose.Boot.Console.Put (",");
-         Rose.Boot.Console.Put
-           (Word (Invocation.Buffer_Address) + Invocation.Buffer_Length);
-         Rose.Boot.Console.Put (")");
+         declare
+            Addr : constant Word :=
+                     Word (Rose.Addresses.To_Virtual_Address
+                           (Invocation.Buffer_Address));
+         begin
+            Rose.Boot.Console.Put (" buf=(");
+            Rose.Boot.Console.Put (Addr);
+            Rose.Boot.Console.Put (",");
+            Rose.Boot.Console.Put
+              (Addr + Word (Invocation.Buffer_Length));
+            Rose.Boot.Console.Put (")");
+         end;
       end if;
 
       Rose.Boot.Console.New_Line;

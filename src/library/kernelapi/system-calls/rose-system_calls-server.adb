@@ -29,6 +29,7 @@ package body Rose.System_Calls.Server is
       Endpoint_Cap : out Rose.Capabilities.Capability)
    is
       use Rose.Invocation;
+      use type Rose.Objects.Endpoint_Id;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Params :=
@@ -41,12 +42,13 @@ package body Rose.System_Calls.Server is
                    Recv_Caps  => True,
                    Send_Words => True,
                    others     => False),
-                Last_Sent_Word => 1,
+                Last_Sent_Word => 2,
                 Last_Recv_Cap  => 1,
                 others         => <>),
            Cap           => Create_Cap,
            Data          =>
-             (Rose.Words.Word (Endpoint_Id),
+             (Rose.Words.Word (Endpoint_Id mod 2 ** 32),
+              Rose.Words.Word (Endpoint_Id / 2 ** 32),
               Rose.Words.Word (Identifier),
               others => 0),
            others        => <>);
@@ -68,10 +70,12 @@ package body Rose.System_Calls.Server is
       Identifier   : Rose.Objects.Capability_Identifier := 0)
       return Rose.Capabilities.Capability
    is
+      use type Rose.Objects.Endpoint_Id;
    begin
       return Rose.System_Calls.Client.Get_Capability
         (Create_Cap,
-         (Rose.Words.Word (Endpoint_Id),
+         (Rose.Words.Word (Endpoint_Id mod 2 ** 32),
+          Rose.Words.Word (Endpoint_Id / 2 ** 32),
           Rose.Words.Word (Identifier)));
    end Create_Endpoint;
 

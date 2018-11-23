@@ -1,4 +1,5 @@
-with Rose.Addresses;
+with System.Storage_Elements;
+
 with Rose.Capabilities;
 with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
@@ -88,8 +89,8 @@ package Rose.Invocation is
          Reserved       : Rose.Words.Word_8 := 0;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
-         Buffer_Address : Rose.Addresses.Virtual_Address := 0;
-         Buffer_Length  : Rose.Words.Word := 0;
+         Buffer_Address : System.Address := System.Null_Address;
+         Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
      with Pack, Size => 32 * 4 * 8;
 

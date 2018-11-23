@@ -7,6 +7,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
+TOOLS=idl
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
@@ -83,11 +84,16 @@ kernel:
 boot:
 	(cd src/asm/$(ARCH); make)
 
+idl:
+	(cd src/tools/idl; make)
+	(cd src/library/kernelapi/generated; make)
+
 config:
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(MODULEDIR)
 
 clean:
+	(cd src/library/kernelapi/generated; make clean)
 	rm -rf build/*
 	rm -f `find src -name "*.o" -print`
 	rm -f images/rose-boot-floppy.img
