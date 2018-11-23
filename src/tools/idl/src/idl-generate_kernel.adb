@@ -893,13 +893,12 @@ package body IDL.Generate_Kernel is
                            ("Rose.Interfaces." & Package_Name);
       Subprs         : constant IDL_Subprogram_Array :=
                          Get_Subprograms (Item);
+      First          : Boolean := True;
    begin
 
 --        for I in 1 .. Get_Num_Contexts (Item) loop
 --           IF_Pkg.With_Package (Get_Context (Item, I));
 --        end loop;
-
-      IF_Pkg.With_Package ("Rose.Objects");
 
       for I in 1 .. Get_Num_Objects (Item) loop
 
@@ -979,6 +978,12 @@ package body IDL.Generate_Kernel is
       end loop;
 
       for Subpr of Subprs loop
+
+         if First then
+            IF_Pkg.With_Package ("Rose.Objects");
+            First := False;
+         end if;
+
          IF_Pkg.Append
            (Syn.Declarations.New_Constant_Declaration
               (Name        => Get_Name (Subpr) & "_Endpoint",
