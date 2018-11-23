@@ -1,0 +1,5 @@
+interface Seekable is
+   
+   procedure Seek (Offset_From_Start : Word);
+   
+end Seekable;

@@ -1,4 +1,3 @@
-with Rose.Addresses;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
@@ -115,9 +114,9 @@ package body Rose.Devices.Block.Client is
       Params.Cap := Device.Read;
       Params.Data (0) := Rose.Words.Word (Block_Address);
 
-      Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Local_Client_Buffer'Address);
-      Params.Buffer_Length := Rose.Words.Word (Device.Block_Size);
+      Params.Buffer_Address := Local_Client_Buffer'Address;
+      Params.Buffer_Length :=
+        System.Storage_Elements.Storage_Count (Device.Block_Size);
 
       Rose.System_Calls.Invoke_Capability (Params);
 
@@ -182,9 +181,9 @@ package body Rose.Devices.Block.Client is
       Params.Cap := Device.Write;
       Params.Data (0) := Rose.Words.Word (Block_Address);
 
-      Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Local_Client_Buffer'Address);
-      Params.Buffer_Length := Rose.Words.Word (Device.Block_Size);
+      Params.Buffer_Address := Local_Client_Buffer'Address;
+      Params.Buffer_Length :=
+        System.Storage_Elements.Storage_Count (Device.Block_Size);
 
       Rose.System_Calls.Invoke_Capability (Params);
 

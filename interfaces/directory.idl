@@ -1,0 +1,16 @@
+interface Directory is
+
+   type File_Kind is (Directory, Ordinary_File, Special_File);
+   
+   function Directory_Entry_Count return Natural;
+   function Directory_Entry_Name (Index : Positive) return String;
+   function Directory_Entry_Kind (Index : Positive) return File_Kind;
+   function Get_Ordinary_File (Index : Positive) return interface File;
+   function Get_Directory (Index : Positive) return interface Directory;
+   
+   function Read_File (Index : Positive) return interface Stream_Reader;
+
+   function Create_Directory (Name : String) return interface Directory;
+   function Create_File (Name : String) return interface File;
+   
+end Directory;

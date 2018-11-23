@@ -1,0 +1,5 @@
+interface Rose_Interface is
+
+   procedure Destroy;
+   
+end Rose_Interface;

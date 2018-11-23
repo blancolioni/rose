@@ -1,6 +1,8 @@
 with Rose.Objects;
 with Rose.Words;
 
+with Rose.Interfaces.File_System;
+
 with Init.Calls;
 
 package body Init.Run is
@@ -61,9 +63,11 @@ package body Init.Run is
       Hd1_Parameters_Cap   : Rose.Capabilities.Capability;
       Hd1_Read_Cap         : Rose.Capabilities.Capability;
 
+      Install_FS           : Rose.Capabilities.Capability;
+
       function Copy_Cap_From_Process
         (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Words.Word)
+         Endpoint : Rose.Objects.Endpoint_Id)
          return Rose.Capabilities.Capability;
 
       ---------------------------
@@ -72,22 +76,25 @@ package body Init.Run is
 
       function Copy_Cap_From_Process
         (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Words.Word)
+         Endpoint : Rose.Objects.Endpoint_Id)
          return Rose.Capabilities.Capability
       is
-         Cap : Capability :=
-                 Init.Calls.Call
-                   (Copy_Cap, Endpoint);
+
+         Data : constant Init.Calls.Array_Of_Words :=
+                  (Word_32 (Word_64 (Endpoint) mod 2 ** 32),
+                   Word_32 (Word_64 (Endpoint) / 2 ** 32));
+         Cap  : Capability :=
+                  Init.Calls.Call (Copy_Cap, Data);
          Hex_Digits : constant String := "0123456789ABCDEF";
          Retry_Message : String :=
                            "init: failed to copy endpoint; retrying "
-                           & "        " & NL;
+                           & "            " & NL;
          Fail_Message  : constant String :=
                            "init: failed to copy endpoint; giving up"
                            & NL;
-         It            : Word := Endpoint;
+         It            : Word_64 := Rose.Words.Word_64 (Endpoint);
       begin
-         for I in 1 .. 8 loop
+         for I in 1 .. 12 loop
             Retry_Message (Retry_Message'Last - I) :=
               Hex_Digits (Natural (It mod 16) + 1);
             It := It / 16;
@@ -97,8 +104,7 @@ package body Init.Run is
             exit when Cap /= Null_Capability;
             Init.Calls.Send_String
               (Console_Write_Cap, Retry_Message);
-            Cap :=
-              Init.Calls.Call (Copy_Cap, Endpoint);
+            Cap := Init.Calls.Call (Copy_Cap, Data);
          end loop;
 
          if Cap = 0 then
@@ -238,8 +244,17 @@ package body Init.Run is
                           Console_Write_Cap,
                           Hd1_Parameters_Cap,
                           Hd1_Read_Cap));
+         Copy_IsoFS_Cap : constant Rose.Capabilities.Capability :=
+                            Init.Calls.Call
+                              (Create_Cap,
+                               (9, 1,
+                                Word (IsoFS_Id mod 2 ** 32),
+                                Word (IsoFS_Id / 2 ** 32)));
       begin
-         pragma Unreferenced (IsoFS_Id);
+         Install_FS :=
+           Copy_Cap_From_Process
+             (Copy_IsoFS_Cap,
+              Rose.Interfaces.File_System.Root_Directory_Endpoint);
       end;
 
       declare
@@ -251,12 +266,13 @@ package body Init.Run is
                             Hd0_Parameters_Cap,
                             Hd0_Read_Cap,
                             Hd0_Write_Cap,
-                            Hd1_Parameters_Cap,
-                            Hd1_Read_Cap));
+                            Install_FS));
       begin
          pragma Unreferenced (Restore_Id);
       end;
 
+      Init.Calls.Send_String
+        (Console_Write_Cap, "init: exiting" & NL);
       Init.Calls.Send (Exit_Cap);
 
    end Run_Init;

@@ -1,4 +1,3 @@
-with Rose.Addresses;
 with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Words;
@@ -97,11 +96,9 @@ package body Rose.Devices.Block.Server is
             when Read_Block_Endpoint =>
                declare
                   use System.Storage_Elements;
-                  Count   : constant Storage_Count :=
-                              Storage_Count (Params.Buffer_Length);
+                  Count   : constant Storage_Count := Params.Buffer_Length;
                   Address : constant System.Address :=
-                              Rose.Addresses.To_System_Address
-                                (Params.Buffer_Address);
+                              Params.Buffer_Address;
                   Buffer  : Storage_Array (1 .. Count);
                   Block_Address : constant Block_Address_Type :=
                                     Block_Address_Type
@@ -139,10 +136,9 @@ package body Rose.Devices.Block.Server is
                declare
                   use System.Storage_Elements;
                   Count         : constant Storage_Count :=
-                                    Storage_Count (Params.Buffer_Length);
+                                    Params.Buffer_Length;
                   Address       : constant System.Address :=
-                                    Rose.Addresses.To_System_Address
-                                      (Params.Buffer_Address);
+                                    Params.Buffer_Address;
                   Buffer        : Storage_Array (1 .. Count);
                   Block_Address : constant Block_Address_Type :=
                                     Block_Address_Type

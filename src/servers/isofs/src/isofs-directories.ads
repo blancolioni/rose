@@ -1,4 +1,6 @@
 with Rose.Devices.Block.Client;
+with Rose.Objects;
+with Rose.Invocation;
 
 package IsoFS.Directories is
 
@@ -9,7 +11,31 @@ package IsoFS.Directories is
    Boot_Record_Descriptor  : constant := 0;
    Primary_Volume_Descriptor : constant := 1;
 
-   procedure Read_Root_Directory
-     (Device : Rose.Devices.Block.Client.Block_Device_Type);
+   type Directory_Type is private;
+
+   No_Directory : constant Directory_Type;
+
+   function Get_Root_Directory
+     (Device : Rose.Devices.Block.Client.Block_Device_Type)
+      return Directory_Type;
+
+   function Get_Child_Directory
+     (Parent     : Directory_Type;
+      Child_Name : String)
+      return Directory_Type;
+
+   function Get_Identified_Directory
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Directory_Type;
+
+   procedure Send_Directory_Caps
+     (Directory             : Directory_Type;
+      Params                : in out Rose.Invocation.Invocation_Record);
+
+private
+
+   type Directory_Type is new Natural;
+   No_Directory : constant Directory_Type := 0;
+   Root_Directory : constant Directory_Type := 1;
 
 end IsoFS.Directories;

@@ -1,0 +1,3 @@
+interface Stream_Reader is
+   procedure Read (Buffer : out Stream_Element_Array);
+end Stream_Reader;

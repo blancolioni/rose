@@ -1,0 +1,3 @@
+interface Stream : Stream_Reader, Stream_Writer is
+
+end Stream;

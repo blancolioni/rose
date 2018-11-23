@@ -1,6 +1,5 @@
 with System;
 
-with Rose.Addresses;
 with Rose.Invocation;
 with Rose.System_Calls;
 
@@ -64,9 +63,7 @@ package body Console.Calls is
          when Endpoint_Id =>
             declare
                Count : constant Natural := Natural (Params.Buffer_Length);
-               Address : constant System.Address :=
-                           Rose.Addresses.To_System_Address
-                             (Params.Buffer_Address);
+               Address : constant System.Address := Params.Buffer_Address;
                Buffer : String (1 .. Count);
                pragma Import (Ada, Buffer);
                for Buffer'Address use Address;
