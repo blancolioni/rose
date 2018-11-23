@@ -14,19 +14,26 @@ package body Rose.Kernel.Capabilities.Copy is
       Params : Rose.Invocation.Invocation_Access)
    is
       use Rose.Capabilities;
+      use type Rose.Objects.Endpoint_Id;
       To_Process_Id   : constant Rose.Objects.Process_Id :=
                             Rose.Kernel.Processes.Current_Process_Id;
       From_Process_Id : constant Rose.Objects.Process_Id :=
                           Rose.Objects.To_Process_Id (Cap.Payload);
+      Endpoint_Id     : constant Rose.Objects.Endpoint_Id :=
+                          Rose.Objects.Endpoint_Id (Params.Data (0))
+                          + 2 ** 32
+                            * Rose.Objects.Endpoint_Id (Params.Data (1));
+
       Endpoint_Cap : constant Rose.Capabilities.Capability :=
                        Rose.Kernel.Processes.Find_Endpoint_Cap
-                         (From_Process_Id,
-                          Rose.Objects.Endpoint_Id (Params.Data (0)));
+                         (From_Process_Id, Endpoint_Id);
       Local_Cap       : Rose.Capabilities.Capability :=
                           Rose.Capabilities.Null_Capability;
    begin
 
       Rose.Boot.Console.Put ("copy-cap: endpoint = ");
+      Rose.Boot.Console.Put (Params.Data (1));
+      Rose.Boot.Console.Put (" ");
       Rose.Boot.Console.Put (Params.Data (0));
       Rose.Boot.Console.Put ("; pid = ");
       Rose.Boot.Console.Put (Rose.Words.Word_8 (From_Process_Id));
@@ -38,6 +45,8 @@ package body Rose.Kernel.Capabilities.Copy is
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (From_Process_Id));
          Rose.Boot.Console.Put (": no such endpoint: ");
+         Rose.Boot.Console.Put (Params.Data (1));
+         Rose.Boot.Console.Put (" ");
          Rose.Boot.Console.Put (Params.Data (0));
          Rose.Boot.Console.New_Line;
 
