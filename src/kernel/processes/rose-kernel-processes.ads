@@ -373,6 +373,9 @@ private
    Saved_Process_Address : Rose.Words.Word_32;
    pragma Export (C, Saved_Process_Address, "saved_process_address");
 
+   Idle_State : Rose.Words.Word_32;
+   pragma Export (C, Idle_State, "idle_state");
+
    function Current_Process_Id return Rose.Objects.Process_Id
    is (if Current_Process = null then 0 else Current_Process.Pid);
 
