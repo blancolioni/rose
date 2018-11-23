@@ -1,9 +1,54 @@
-with Rose.Addresses;
-
 package body Rose.System_Calls is
+
+   Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
+     with Alignment => 4096;
 
    procedure Invoke_Capability_Wrapper
      (Item : aliased in out Rose.Invocation.Invocation_Record);
+
+   -----------------
+   -- Copy_Buffer --
+   -----------------
+
+   procedure Copy_Buffer
+     (Params    : Rose.Invocation.Invocation_Record;
+      Max_Bytes : System.Storage_Elements.Storage_Count;
+      To        : System.Address)
+   is
+      use System.Storage_Elements;
+      Last   : constant Storage_Count :=
+                 Storage_Count'Min (Max_Bytes, Params.Buffer_Length);
+      Source : System.Storage_Elements.Storage_Array (1 .. Last);
+      pragma Import (Ada, Source);
+      for Source'Address use Params.Buffer_Address;
+      Dest   : System.Storage_Elements.Storage_Array (1 .. Last);
+      pragma Import (Ada, Dest);
+      for Dest'Address use To;
+   begin
+      Dest := Source;
+   end Copy_Buffer;
+
+   ------------------------
+   -- Copy_Storage_Array --
+   ------------------------
+
+   procedure Copy_Storage_Array
+     (Params    : Rose.Invocation.Invocation_Record;
+      To        : out System.Storage_Elements.Storage_Array;
+      Last      : out System.Storage_Elements.Storage_Count)
+   is
+      use System.Storage_Elements;
+   begin
+      Last := Storage_Count'Min (To'Length, Params.Buffer_Length);
+
+      declare
+         Source : Storage_Array (1 .. Last);
+         pragma Import (Ada, Source);
+         for Source'Address use Params.Buffer_Address;
+      begin
+         To := Source;
+      end;
+   end Copy_Storage_Array;
 
    ---------------
    -- Copy_Text --
@@ -23,7 +68,7 @@ package body Rose.System_Calls is
       declare
          Text : String (1 .. Natural (Params.Buffer_Length));
          pragma Import (Ada, Text);
-         for Text'Address use System'To_Address (Params.Buffer_Address);
+         for Text'Address use Params.Buffer_Address;
       begin
          Last := 0;
          for Ch of Text loop
@@ -253,16 +298,15 @@ package body Rose.System_Calls is
 
    procedure Send_Buffer
      (Params   : in out Rose.Invocation.Invocation_Record;
-      Bytes    : Natural;
+      Bytes    : System.Storage_Elements.Storage_Count;
       Buffer   : System.Address;
       Writable : Boolean)
    is
    begin
       Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
       Params.Control.Flags (Rose.Invocation.Writable_Buffer) := Writable;
-      Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Buffer);
-      Params.Buffer_Length := Rose.Words.Word (Bytes);
+      Params.Buffer_Address := Buffer;
+      Params.Buffer_Length := Bytes;
    end Send_Buffer;
 
    --------------
@@ -279,6 +323,60 @@ package body Rose.System_Calls is
         Params.Control.Last_Sent_Cap + 1;
       Params.Caps (Params.Control.Last_Sent_Cap) := Cap;
    end Send_Cap;
+
+   ------------------------
+   -- Send_Storage_Array --
+   ------------------------
+
+   procedure Send_Storage_Array
+     (Params   : in out Rose.Invocation.Invocation_Record;
+      Storage  : System.Storage_Elements.Storage_Array;
+      Writable : Boolean)
+   is
+   begin
+      Local_Buffer := (others => 0);
+      Local_Buffer (1 .. Storage'Length) := Storage;
+      Send_Buffer (Params, Storage'Length, Local_Buffer'Address, Writable);
+   end Send_Storage_Array;
+
+   ---------------
+   -- Send_Text --
+   ---------------
+
+   procedure Send_Text
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String)
+   is
+   begin
+      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+      Params.Buffer_Address := Local_Buffer'Address;
+      Params.Buffer_Length :=
+        System.Storage_Elements.Storage_Count (Text'Length);
+
+      Local_Buffer := (others => 0);
+
+      declare
+         use System.Storage_Elements;
+         Last : Storage_Count := Local_Buffer'First - 1;
+      begin
+         for Ch of Text loop
+            Last := Last + 1;
+            Local_Buffer (Last) := Character'Pos (Ch);
+         end loop;
+      end;
+   end Send_Text;
+
+   ---------------
+   -- Send_Word --
+   ---------------
+
+   procedure Send_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Integer)
+   is
+   begin
+      Send_Word (Params, Rose.Words.Word (Value));
+   end Send_Word;
 
    ---------------
    -- Send_Word --

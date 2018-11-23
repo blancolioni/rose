@@ -1,6 +1,5 @@
 with System.Storage_Elements;
 
-with Rose.Addresses;
 with Rose.Invocation;
 
 package body Rose.System_Calls.Client is
@@ -185,9 +184,9 @@ package body Rose.System_Calls.Client is
            Character'Pos (Message (I));
       end loop;
 
-      Params.Buffer_Address :=
-        Rose.Addresses.To_Virtual_Address (Local_Buffer'Address);
-      Params.Buffer_Length := Rose.Words.Word (Message'Length);
+      Params.Buffer_Address := Local_Buffer'Address;
+      Params.Buffer_Length :=
+        System.Storage_Elements.Storage_Count (Message'Length);
 
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_String;

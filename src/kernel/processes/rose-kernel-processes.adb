@@ -776,24 +776,29 @@ package body Rose.Kernel.Processes is
       if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
          declare
             use Rose.Words;
-            Address   : Virtual_Page_Address :=
-                          Virtual_Address_To_Page (Params.Buffer_Address);
-            Remaining : Rose.Words.Word := Params.Buffer_Length;
+            Virtual   : constant Virtual_Address :=
+                          To_Virtual_Address (Params.Buffer_Address);
+            Page      : Rose.Addresses.Virtual_Page_Address :=
+                          Rose.Addresses.Virtual_Address_To_Page
+                            (Virtual);
+            Remaining : Rose.Words.Word :=
+                          Rose.Words.Word (Params.Buffer_Length);
             Writable  : constant Boolean :=
                           Params.Control.Flags
                             (Rose.Invocation.Writable_Buffer);
          begin
             while Remaining > 0 loop
-               Share_Page (From_Process, To_Process, Address, Writable);
-               Address := Address + 1;
+               Share_Page (From_Process, To_Process, Page, Writable);
+               Page := Page + 1;
                Remaining := Remaining
                  - Word'Min (Remaining, Virtual_Page_Bytes);
             end loop;
          end;
 
          To.Current_Params.Buffer_Address :=
-           Virtual_Page_To_Address
-             (To.Page_Ranges (Invocation_Range_Index).Base);
+           To_System_Address
+             (Virtual_Page_To_Address
+              (To.Page_Ranges (Invocation_Range_Index).Base));
 
       end if;
 

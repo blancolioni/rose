@@ -79,11 +79,18 @@ package body Rose.Kernel.Debug is
       end if;
 
       if Params.Control.Flags (Send_Buffer) then
-         Put (" (");
-         Put (Word (Params.Buffer_Address));
-         Put (" ");
-         Put (Word (Params.Buffer_Address) + Params.Buffer_Length);
-         Put (")");
+         declare
+            Addr : constant Word :=
+                     Word (Rose.Addresses.To_Virtual_Address
+                           (Params.Buffer_Address));
+         begin
+            Rose.Boot.Console.Put (" buf=(");
+            Rose.Boot.Console.Put (Addr);
+            Rose.Boot.Console.Put (",");
+            Rose.Boot.Console.Put
+              (Addr + Word (Params.Buffer_Length));
+            Rose.Boot.Console.Put (")");
+         end;
       end if;
 
       if Params.Control.Flags (Recv_Words) then
