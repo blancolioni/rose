@@ -2,12 +2,17 @@ with Rose.Devices.Block.Client;
 with Rose.Devices.GPT;
 with Rose.Devices.Partitions;
 
+with Rose.Interfaces.File_System.Client;
+with Rose.Interfaces.Directory.Client;
+
 with Rose.Console_IO;
 
 with Rose.Words;
 
 with Rose.Invocation;
 with Rose.System_Calls.Server;
+
+with Restore.Installer;
 
 procedure Restore.Driver is
    use Rose.Devices.Block.Client;
@@ -111,6 +116,17 @@ begin
 
          Rose.Devices.GPT.Report_Partition_Table (Device);
       end if;
+   end;
+
+   declare
+      use Rose.Interfaces.File_System.Client;
+      use Rose.Interfaces.Directory.Client;
+      File_System : File_System_Client;
+      Root        : Directory_Client;
+   begin
+      Open (File_System, Install_File_System);
+      Root := Root_Directory (File_System);
+      Restore.Installer.Install (Root);
    end;
 
    Rose.Console_IO.Put_Line ("restore: done");
