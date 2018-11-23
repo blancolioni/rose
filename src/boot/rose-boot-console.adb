@@ -309,6 +309,15 @@ package body Rose.Boot.Console is
    -- Put --
    ---------
 
+   procedure Put (Endpoint : Rose.Objects.Endpoint_Id) is
+   begin
+      Put (Rose.Objects.Object_Id (Endpoint));
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
    procedure Put (Addr : System.Address) is
       function To_Word is
          new Ada.Unchecked_Conversion (System.Address, Word);
