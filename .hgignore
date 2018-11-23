@@ -35,3 +35,4 @@ images/rose.img
 images/rose-boot-floppy.img
 images/rose-hd0.img
 src/library/kernelapi/generated/*.ad[bs]
+src/tools/idl/idl.gpr

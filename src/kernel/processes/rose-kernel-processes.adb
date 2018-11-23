@@ -255,39 +255,6 @@ package body Rose.Kernel.Processes is
          end if;
       end loop;
       return Rose.Capabilities.Null_Capability;
---
---        for Cap in P.Cap_Cache'Range loop
---           declare
---              Layout : Capability_Layout renames
---                         P.Cap_Cache (Cap);
---           begin
---              if Layout.Header.Cap_Type = Endpoint_Cap then
---                 declare
---                    Index : constant Rose.Objects.Endpoint_Index :=
---                              Layout.Header.Endpoint;
---                    EP    : constant Rose.Objects.Endpoint_Id :=
---                              P.Endpoints (Index).Endpoint;
---                 begin
---                    Rose.Boot.Console.Put ("find-endpoint-cap: endpoint = ");
---                    Rose.Boot.Console.Put (Rose.Words.Word (Endpoint));
---                    Rose.Boot.Console.Put ("; pid = ");
---                    Rose.Boot.Console.Put (Rose.Words.Word_8 (Process_Id));
---                    Rose.Boot.Console.Put ("; cap = ");
---                    Rose.Boot.Console.Put (Rose.Words.Word_8 (Cap));
---                    Rose.Boot.Console.Put ("; index = ");
---                    Rose.Boot.Console.Put
---                      (Rose.Words.Word_8 (Index));
---                    Rose.Boot.Console.Put ("; found ep = ");
---                    Rose.Boot.Console.Put (Rose.Words.Word (EP));
---                    Rose.Boot.Console.New_Line;
---                    if EP = Endpoint then
---                       return Cap;
---                    end if;
---                 end;
---              end if;
---           end;
---        end loop;
---        return Rose.Capabilities.Null_Capability;
    end Find_Endpoint_Cap;
 
    ------------------------
