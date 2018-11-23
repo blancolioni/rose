@@ -133,7 +133,8 @@ package body Rose.Kernel.Processes.Queue is
       Log         : constant Boolean :=
                       Log_Reply
                           or else Log_Process_Activity
-                            = Next_Process.Pid;
+                            = Next_Process.Pid
+                          or else Next_Process.Pid = 1;
       Log_Details : constant Boolean :=
                       Log and then
                           Log_Detailed_Invocation
@@ -182,6 +183,9 @@ package body Rose.Kernel.Processes.Queue is
          end if;
          Current_Process.Flags (Interrupt_Resume) := False;
       end if;
+
+      Idle_State := (if Current_Process_Id = 1 then 1 else 0);
+
    end Resume_Current_Process;
 
 end Rose.Kernel.Processes.Queue;

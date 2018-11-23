@@ -296,6 +296,9 @@ system_call:
                                                # will need to be available in %esi if it's used
 
 continue:
+    mov     idle_state, %ebp
+    cmp     $0, %ebp
+    jnz     idle                               # zero indicates idle state
     mov     current_process_ptr, %ebp          # may or may not be the same process
     mov Process_Directory_Page(%ebp), %eax     # copy scheduled process page directory
     mov %eax, %cr3                             # to global page directory register
