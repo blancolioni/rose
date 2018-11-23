@@ -26,7 +26,6 @@ OBJECTS= \
 	$(BUILDDIR)/restore-installer.o \
 	$(BUILDDIR)/restore.o \
 	$(BUILDDIR)/rose.o \
-	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-devices.o \

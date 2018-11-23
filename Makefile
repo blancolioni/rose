@@ -20,6 +20,8 @@ all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso f
 rts:
 	(cd rts; make)
 
+tools: $(TOOLS)
+	
 $(PROJECT):
 	sed s/ARCH/$(ARCH)/g projects/kernel-template.gpr > $(PROJECT)
 
