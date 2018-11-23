@@ -5,8 +5,6 @@ with Rose.Kernel.Panic;
 with Rose.Kernel.Processes.Debug;
 with Rose.Boot.Console;
 
-with Rose.Arch;
-
 package body Rose.Kernel.Processes.Queue is
 
    type Process_Queue_Type is
@@ -22,7 +20,6 @@ package body Rose.Kernel.Processes.Queue is
    --------------------
 
    procedure Choose_Process is
-      use type Rose.Objects.Process_Id;
    begin
       Next_Process := null;
       for I in Process_Queue'Range loop
@@ -45,19 +42,9 @@ package body Rose.Kernel.Processes.Queue is
 
       Current_Process := Next_Process;
 
-      declare
-         use Rose.Objects;
-      begin
-         if Next_Process = null
-           or else Next_Process.Pid = 1
-         then
-            loop
-               Rose.Arch.Enable_Interrupts;
-               Rose.Arch.Halt;
-               Rose.Arch.Disable_Interrupts;
-            end loop;
-         end if;
-      end;
+      if Current_Process = null then
+         Rose.Kernel.Panic.Panic ("no processes");
+      end if;
 
       Resume_Current_Process;
 
