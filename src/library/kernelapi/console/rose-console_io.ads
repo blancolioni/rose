@@ -16,6 +16,7 @@ package Rose.Console_IO is
    procedure Put (Item : Rose.Words.Word_8);
    procedure Put (Item : Rose.Words.Word_16);
    procedure Put (Item : Rose.Words.Word_32);
+   procedure Put (Item : Rose.Words.Word_64);
    procedure Put_Line (Text : String);
    procedure New_Line;
 

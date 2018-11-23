@@ -189,6 +189,18 @@ package body Rose.Console_IO is
       Put (Buffer);
    end Put;
 
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : Rose.Words.Word_64) is
+      use type Rose.Words.Word_64;
+   begin
+      Put (Rose.Words.Word_32 (Item / 2 ** 32));
+      Put ("_");
+      Put (Rose.Words.Word_32 (Item mod 2 ** 32));
+   end Put;
+
    --------------
    -- Put_Line --
    --------------
