@@ -93,21 +93,16 @@ package body IDL.Generate_Kernel is
          Count_Name : String;
          Base_Type  : IDL_Type)
       is
-         pragma Unreferenced (Base_Type);
+         pragma Unreferenced (Base_Type, Count_Name);
          Call : Syn.Statements.Procedure_Call_Statement'Class :=
                   Syn.Statements.New_Procedure_Call_Statement
-                    ("Copy_From_Memory_Cap");
+                    ("Rose.System_Calls.Copy_Buffer");
       begin
+         Call.Add_Actual_Argument ("Params");
          Call.Add_Actual_Argument
-           ("Item." & Get_Ada_Name (Subpr) & "_" & Base_Name & "_Cap");
-         if Count_Name /= "" then
-            Call.Add_Actual_Argument
-              (Syn.Constrained_Array
-                 (Base_Name, Syn.Literal (1), Syn.Object (Count_Name)));
-         else
-            Call.Add_Actual_Argument
-              (Syn.Object (Base_Name));
-         end if;
+           (Syn.Object (Base_Name & "'Length"));
+         Call.Add_Actual_Argument
+           (Syn.Object (Base_Name & "'Address"));
 
          Copy_Block.Append (Call);
       end Copy_Array_Type;
@@ -157,7 +152,7 @@ package body IDL.Generate_Kernel is
                Cap_Index : Natural := 0;
                Open_Proc : Syn.Statements.Procedure_Call_Statement'Class :=
                              Syn.Statements.New_Procedure_Call_Statement
-                               (Get_Qualified_Name (Result) & ".Open",
+                               (Get_Package_Name (Result) & ".Client.Open",
                                 Syn.Object (Base_Name));
 
                procedure Copy_Cap (Result_Subprogram : IDL_Subprogram);
@@ -675,8 +670,6 @@ package body IDL.Generate_Kernel is
    begin
 
       Block.Add_Declaration
-        (Syn.Declarations.Use_Package ("Rose.Invocation"));
-      Block.Add_Declaration
         (Syn.Declarations.New_Object_Declaration
            (Identifiers => Syn.Declarations.Identifier ("Params"),
             Is_Aliased  => True,
@@ -684,13 +677,13 @@ package body IDL.Generate_Kernel is
             Is_Deferred => False,
             Object_Type =>
               Syn.Named_Subtype
-                ("Rose.System_Calls.Invocation_Record")));
+                ("Rose.Invocation.Invocation_Record")));
 
       Initialise_Invocation (Block, Subpr);
 
       Block.Add_Statement
         (Syn.Statements.New_Procedure_Call_Statement
-           ("Invoke_Capability",
+           ("Rose.System_Calls.Invoke_Capability",
             Syn.Object ("Params")));
 
       Copy_Invocation_Result (Block, Subpr);
@@ -761,15 +754,14 @@ package body IDL.Generate_Kernel is
                            ("Rose.Interfaces." & Package_Name);
    begin
 
-      --        Add_Context (Item, "Rose.Capabilities");
+      Add_Context (Item, "Rose.Capabilities");
 
       for I in 1 .. Get_Num_Contexts (Item) loop
          Client.With_Package (Get_Context (Item, I));
       end loop;
 
       Client.With_Package ("Rose.Invocation", Body_With => True);
-      Client.With_Package ("Rose.System_Calls", Body_With => True,
-                           Use_Package  => True);
+      Client.With_Package ("Rose.System_Calls", Body_With => True);
 
       With_Packages (Item, Client, False);
 
@@ -907,6 +899,8 @@ package body IDL.Generate_Kernel is
 --           IF_Pkg.With_Package (Get_Context (Item, I));
 --        end loop;
 
+      IF_Pkg.With_Package ("Rose.Objects");
+
       for I in 1 .. Get_Num_Objects (Item) loop
 
          if Get_Object_Is_Constant (Item, I) then
@@ -988,7 +982,7 @@ package body IDL.Generate_Kernel is
          IF_Pkg.Append
            (Syn.Declarations.New_Constant_Declaration
               (Name        => Get_Name (Subpr) & "_Endpoint",
-               Object_Type => "Rose.Endpoint_Id",
+               Object_Type => "Rose.Objects.Endpoint_Id",
                Value       =>
                  Syn.Object
                    (IDL.Endpoints.Endpoint_Id
@@ -1135,7 +1129,7 @@ package body IDL.Generate_Kernel is
                   Is_Aliased     => True,
                   Arg_Mode       => Syn.Declarations.Inout_Argument,
                   Arg_Type       =>
-                    "Rose.System_Calls.Invocation_Record");
+                    "Rose.Invocation.Invocation_Record");
                Server_Pkg.Append_To_Body (Proc);
             end;
          end Generate_Subpr;
@@ -1326,7 +1320,7 @@ package body IDL.Generate_Kernel is
 
       Block.Add_Statement
         (Syn.Statements.New_Procedure_Call_Statement
-           ("Rose.System_Calls.Initialise_Send",
+           ("Rose.System_Calls.Initialize_Send",
             Syn.Object ("Params"),
             Syn.Object ("Item." & Get_Ada_Name (Subpr))));
 
@@ -1335,6 +1329,24 @@ package body IDL.Generate_Kernel is
             Mode     : constant IDL_Argument_Mode := Get_Mode (Args (I));
             Arg_Type : constant IDL_Type := Get_Type (Args (I));
          begin
+
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("--  " & Get_Ada_Name (Args (I))
+                  & " "
+                  & (case Mode is
+                       when In_Argument    => "in",
+                       when Inout_Argument => "in out",
+                       when Out_Argument   => "out")
+                  & " "
+                  & (if Is_Scalar (Arg_Type)
+                    then "scalar" else "composite")));
+
+            if Mode = Out_Argument
+              and then not Is_Scalar (Arg_Type)
+            then
+               Recv_Buffer := True;
+            end if;
 
             if Mode = In_Argument
               or else Mode = Inout_Argument
@@ -1367,25 +1379,25 @@ package body IDL.Generate_Kernel is
                      else
                         Block.Append
                           (Syn.Statements.New_Procedure_Call_Statement
-                             ("Rose.System_Calls.Send_Text",
+                             ("Rose.System_Calls.Send_Storage_Array",
                               Syn.Object ("Params"),
-                              Syn.Object (Get_Ada_Name (Args (I)))));
+                              Syn.Object (Get_Ada_Name (Args (I))),
+                              Syn.Literal (Mode = Inout_Argument)));
                      end if;
                   end if;
+
                else
                   Block.Append
                     (Syn.Statements.New_Procedure_Call_Statement
                        ("Rose.System_Calls.Send_Word",
                         Syn.Object ("Params"),
-                        Syn.Expressions.New_Function_Call_Expression
-                          ("Rose.Words.Word",
-                           Get_Ada_Name (Args (I)))));
+                        Syn.Object (Get_Ada_Name (Args (I)))));
+               end if;
+               if Mode = Out_Argument or else Mode = Inout_Argument then
+                  Recv_Words := Recv_Words + 1;
                end if;
             end if;
 
-            if Mode = Out_Argument or else Mode = Inout_Argument then
-               Recv_Words := Recv_Words + 1;
-            end if;
          end;
       end loop;
 
@@ -1471,9 +1483,6 @@ package body IDL.Generate_Kernel is
          pragma Unreferenced (Is_Return);
       begin
          if IDL.Types.Is_Interface (Ref) then
---              if Server then
---                 Pkg.With_Package ("Rose.Invocation", Body_With => True);
---              end if;
             declare
                Pkg_Name : constant String :=
                             IDL.Types.Get_Ada_Package (Ref);
@@ -1481,8 +1490,7 @@ package body IDL.Generate_Kernel is
                if Server then
                   Pkg.With_Package (Pkg_Name, Body_With => True);
                else
-                  Pkg.With_Package (Pkg_Name, Private_With => True);
-                  Pkg.With_Package (Pkg_Name & ".Client", Body_With => True);
+                  Pkg.With_Package (Pkg_Name, Body_With => True);
                end if;
             end;
          else
@@ -1493,7 +1501,6 @@ package body IDL.Generate_Kernel is
                if Pkg_Name /= ""  then
                   Pkg.With_Package
                     (Pkg_Name,
-                     Private_With => not Server,
                      Body_With    => Server);
                end if;
             end;
@@ -1503,29 +1510,10 @@ package body IDL.Generate_Kernel is
                Pkg.With_Package ("System.Storage_Elements",
                                  Body_With => True);
             end if;
-
-            if IDL.Types.Is_String (Ref) then
-               Pkg.With_Package ("Rose.System_Calls.Marshalling",
-                                 Body_With => True);
-            end if;
-
-            if IDL.Types.Is_Stream (Ref) then
-               Pkg.With_Package ("Rose.System_Calls.Streams",
-                                 Body_With => True, Use_Package => True);
-            end if;
-
          end if;
       end Check_Type;
 
    begin
-      --        for I in 1 .. Get_Num_Inherited (Top_Interface) loop
-      --           Pkg.With_Package
-      --             ("Rose.Interfaces."
-      --              & Get_Ada_Name (Get_Inherited (Top_Interface, I))
-      --              & ".Server",
-      --              Body_With => True);
-      --        end loop;
-
       Scan_Subprograms (Top_Interface, True, Add_Dependent_Withs'Access);
    end With_Packages;
 
