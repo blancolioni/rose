@@ -38,7 +38,12 @@ package body Rose.Kernel.Capabilities.Meta is
       Endpoint_Id := Rose.Objects.Endpoint_Id (Params.Data (0));
 
       if Params.Control.Last_Sent_Word >= 1 then
-         Identifier := Rose.Objects.Capability_Identifier (Params.Data (1));
+         Endpoint_Id := Endpoint_Id
+           + 2 ** 32 * Rose.Objects.Endpoint_Id (Params.Data (1));
+      end if;
+
+      if Params.Control.Last_Sent_Word >= 2 then
+         Identifier := Rose.Objects.Capability_Identifier (Params.Data (2));
       end if;
 
       if Endpoint_Id /= 0 then
@@ -90,7 +95,8 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         if Log_Invocation
+         if True
+           or else Log_Invocation
            or else Process_Id = Log_Process_Activity
          then
             Rose.Boot.Console.Put
@@ -102,7 +108,7 @@ package body Rose.Kernel.Capabilities.Meta is
             Rose.Boot.Console.Put (" for endpoint ");
             Rose.Boot.Console.Put (Rose.Words.Word_8 (Local_Endpoint));
             Rose.Boot.Console.Put (" ");
-            Rose.Boot.Console.Put (Rose.Words.Word (Endpoint_Id));
+            Rose.Boot.Console.Put (Endpoint_Id);
             Rose.Boot.Console.New_Line;
          end if;
 

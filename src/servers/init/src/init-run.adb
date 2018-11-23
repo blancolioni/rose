@@ -63,7 +63,7 @@ package body Init.Run is
 
       function Copy_Cap_From_Process
         (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Words.Word)
+         Endpoint : Rose.Objects.Endpoint_Id)
          return Rose.Capabilities.Capability;
 
       ---------------------------
@@ -72,22 +72,25 @@ package body Init.Run is
 
       function Copy_Cap_From_Process
         (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Words.Word)
+         Endpoint : Rose.Objects.Endpoint_Id)
          return Rose.Capabilities.Capability
       is
-         Cap : Capability :=
-                 Init.Calls.Call
-                   (Copy_Cap, Endpoint);
+
+         Data : constant Init.Calls.Array_Of_Words :=
+                  (Word_32 (Word_64 (Endpoint) mod 2 ** 32),
+                   Word_32 (Word_64 (Endpoint) / 2 ** 32));
+         Cap  : Capability :=
+                  Init.Calls.Call (Copy_Cap, Data);
          Hex_Digits : constant String := "0123456789ABCDEF";
          Retry_Message : String :=
                            "init: failed to copy endpoint; retrying "
-                           & "        " & NL;
+                           & "            " & NL;
          Fail_Message  : constant String :=
                            "init: failed to copy endpoint; giving up"
                            & NL;
-         It            : Word := Endpoint;
+         It            : Word_64 := Rose.Words.Word_64 (Endpoint);
       begin
-         for I in 1 .. 8 loop
+         for I in 1 .. 12 loop
             Retry_Message (Retry_Message'Last - I) :=
               Hex_Digits (Natural (It mod 16) + 1);
             It := It / 16;
@@ -97,8 +100,7 @@ package body Init.Run is
             exit when Cap /= Null_Capability;
             Init.Calls.Send_String
               (Console_Write_Cap, Retry_Message);
-            Cap :=
-              Init.Calls.Call (Copy_Cap, Endpoint);
+            Cap := Init.Calls.Call (Copy_Cap, Data);
          end loop;
 
          if Cap = 0 then
