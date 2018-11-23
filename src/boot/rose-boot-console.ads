@@ -22,6 +22,7 @@ package Rose.Boot.Console is
    procedure Put (Addr : Virtual_Address);
    procedure Put (Addr : System.Address);
    procedure Put (Object : Rose.Objects.Object_Id);
+   procedure Put (Endpoint : Rose.Objects.Endpoint_Id);
    procedure Put (Pid : Rose.Objects.Process_Id);
    procedure Put (Cap : Rose.Capabilities.Capability);
    procedure Put (X : Word_8);
