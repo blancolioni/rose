@@ -1,4 +1,4 @@
-IDL=file_system directory file stream_reader stream_writer stream seekable
+IDL=file_system directory file file_system stream_reader stream_writer stream seekable
 
 all: $(IDL)
 
