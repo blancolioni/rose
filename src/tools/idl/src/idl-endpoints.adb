@@ -1,6 +1,7 @@
 with Ada.Directories;
 
 with WL.String_Maps;
+with WL.String_Sets;
 with WL.Random;
 
 with Tropos.Reader;
@@ -13,8 +14,10 @@ package body IDL.Endpoints is
    package Endpoint_Table is
      new WL.String_Maps (String);
 
-   Table : Endpoint_Table.Map;
-   Loaded : Boolean := False;
+   Table      : Endpoint_Table.Map;
+   Numbers    : WL.String_Sets.Set;
+   Loaded     : Boolean := False;
+   Randomised : Boolean := False;
 
    procedure Check_Loaded (Key : String);
    procedure Save_Table;
@@ -34,6 +37,7 @@ package body IDL.Endpoints is
             begin
                for Item of Config loop
                   Table.Insert (Item.Config_Name, Item.Value);
+                  Numbers.Insert (Item.Value);
                end loop;
             end;
          end if;
@@ -41,19 +45,35 @@ package body IDL.Endpoints is
       end if;
 
       if not Table.Contains (Key) then
-         declare
-            S : String (1 .. 12);
-            Ds : constant String := "0123456789ABCDEF";
-         begin
-            for Ch of S loop
-               Ch := Ds (WL.Random.Random_Number (1, 16));
-            end loop;
-            Table.Insert
-              (Key, "16#" & S (1 .. 4)
-               & "_" & S (5 .. 8)
-               & "_" & S (9 .. 12)
-               & "#");
-         end;
+
+         if not Randomised then
+            WL.Random.Randomise;
+            Randomised := True;
+         end if;
+
+         loop
+            declare
+               S : String (1 .. 12);
+               Ds : constant String := "0123456789ABCDEF";
+            begin
+               for Ch of S loop
+                  Ch := Ds (WL.Random.Random_Number (1, 16));
+               end loop;
+
+               declare
+                  Value : constant String :=
+                            "16#" & S (1 .. 4)
+                          & "_" & S (5 .. 8)
+                            & "_" & S (9 .. 12)
+                          & "#";
+               begin
+                  if not Numbers.Contains (Value) then
+                     Table.Insert (Key, Value);
+                     exit;
+                  end if;
+               end;
+            end;
+         end loop;
          Save_Table;
       end if;
    end Check_Loaded;
