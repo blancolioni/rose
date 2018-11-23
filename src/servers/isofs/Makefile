@@ -14,7 +14,6 @@ OBJECTS= \
 	$(BUILDDIR)/isofs.o \
 	$(BUILDDIR)/isofs-server.o \
 	$(BUILDDIR)/rose.o \
-	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-devices.o \

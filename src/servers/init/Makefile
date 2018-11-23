@@ -14,7 +14,6 @@ OBJECTS= \
 	$(BUILDDIR)/init-run.o \
 	$(BUILDDIR)/init.o \
 	$(BUILDDIR)/rose.o \
-	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
