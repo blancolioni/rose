@@ -93,8 +93,6 @@ package body Rose.System_Calls is
       Params.Control.Flags (Send) := True;
       Params.Control.Flags (Block) := True;
       Params.Control.Flags (Create_Reply_Cap) := True;
-      Params.Control.Last_Sent_Word := Parameter_Word_Index'Last;
-      Params.Control.Last_Sent_Cap := Capability_Index'Last;
       Params.Cap := Cap;
    end Initialize_Send;
 
@@ -319,8 +317,13 @@ package body Rose.System_Calls is
    is
       use type Rose.Invocation.Capability_Index;
    begin
-      Params.Control.Last_Sent_Cap :=
-        Params.Control.Last_Sent_Cap + 1;
+      if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
+         Params.Control.Flags (Rose.Invocation.Send_Caps) := True;
+         Params.Control.Last_Sent_Cap := 0;
+      else
+         Params.Control.Last_Sent_Cap :=
+           Params.Control.Last_Sent_Cap + 1;
+      end if;
       Params.Caps (Params.Control.Last_Sent_Cap) := Cap;
    end Send_Cap;
 
@@ -388,9 +391,14 @@ package body Rose.System_Calls is
    is
       use type Rose.Invocation.Parameter_Word_Index;
    begin
-      Params.Control.Flags (Rose.Invocation.Send_Words) := True;
-      Params.Control.Last_Sent_Word :=
-        Params.Control.Last_Sent_Word + 1;
+      if not Params.Control.Flags (Rose.Invocation.Send_Words) then
+         Params.Control.Flags (Rose.Invocation.Send_Words) := True;
+         Params.Control.Last_Sent_Word := 0;
+      else
+         Params.Control.Last_Sent_Word :=
+           Params.Control.Last_Sent_Word + 1;
+      end if;
+
       Params.Data (Params.Control.Last_Sent_Word) := Value;
    end Send_Word;
 
