@@ -15,7 +15,7 @@ DRIVERS=
 BOOT_MODULES=init console mem pci ata isofs restore
 
 #all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
-all: config $(TOOLS) $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
+all: config $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
 
 rts:
 	(cd rts; make)
