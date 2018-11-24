@@ -1,6 +1,7 @@
 with Rose.Devices.Block.Client;
 with Rose.Objects;
 with Rose.Invocation;
+with Rose.Interfaces.Directory;
 
 package IsoFS.Directories is
 
@@ -23,6 +24,21 @@ package IsoFS.Directories is
      (Parent     : Directory_Type;
       Child_Name : String)
       return Directory_Type;
+
+   function Get_Entry_Count
+     (Directory : Directory_Type)
+      return Natural;
+
+   function Get_Entry_Kind
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Rose.Interfaces.Directory.File_Kind;
+
+   procedure Get_Entry_Name
+     (Directory : Directory_Type;
+      Index     : Positive;
+      Name      : out String;
+      Last      : out Natural);
 
    function Get_Identified_Directory
      (Identifier : Rose.Objects.Capability_Identifier)
