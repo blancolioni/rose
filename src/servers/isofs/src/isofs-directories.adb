@@ -4,7 +4,6 @@ with Rose.Words;
 
 with Rose.Console_IO;
 
-with Rose.Interfaces.Directory;
 with Rose.System_Calls.Server;
 
 package body IsoFS.Directories is
@@ -12,6 +11,8 @@ package body IsoFS.Directories is
    use Rose.Words;
 
    Max_Directories : constant := 100;
+
+   Block_Device : Rose.Devices.Block.Client.Block_Device_Type;
 
    subtype ISO_Sector is
      System.Storage_Elements.Storage_Array
@@ -84,6 +85,7 @@ package body IsoFS.Directories is
    type Directory_Caps_Record is
       record
          Valid : Boolean := False;
+         Sector_Address        : Rose.Devices.Block.Block_Address_Type;
          Entry_Record          : Directory_Entry;
          Directory_Entry_Count : Rose.Capabilities.Capability := 0;
          Directory_Entry_Name  : Rose.Capabilities.Capability := 0;
@@ -112,7 +114,18 @@ package body IsoFS.Directories is
 
    procedure Create_Cap_Record
      (Directory : Directory_Type;
+      Sector    : Rose.Devices.Block.Block_Address_Type;
       Dir_Entry : Directory_Entry);
+
+   procedure Scan_Directory_Entries
+     (Directory : Directory_Type;
+      Process   : not null access
+        procedure (Rec : Directory_Entry;
+                   Name : String));
+
+--     function Get_Directory_From_Address
+--       (Address : Rose.Devices.Block.Block_Address_Type)
+--        return Directory_Type;
 
    -----------------------
    -- Create_Cap_Record --
@@ -120,6 +133,7 @@ package body IsoFS.Directories is
 
    procedure Create_Cap_Record
      (Directory : Directory_Type;
+      Sector    : Rose.Devices.Block.Block_Address_Type;
       Dir_Entry : Directory_Entry)
    is
       use Rose.Interfaces.Directory;
@@ -133,6 +147,7 @@ package body IsoFS.Directories is
       Directory_Caps (Directory) :=
         Directory_Caps_Record'
           (Valid                 => True,
+           Sector_Address        => Sector,
            Entry_Record          => Dir_Entry,
            Directory_Entry_Count =>
               New_Cap (Directory_Entry_Count_Endpoint),
@@ -161,6 +176,134 @@ package body IsoFS.Directories is
    begin
       return No_Directory;
    end Get_Child_Directory;
+
+   ---------------------
+   -- Get_Entry_Count --
+   ---------------------
+
+   function Get_Entry_Count
+     (Directory : Directory_Type)
+      return Natural
+   is
+      Count : Natural := 0;
+
+      procedure Process
+        (Rec  : Directory_Entry;
+         Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec  : Directory_Entry;
+         Name : String)
+      is
+         pragma Unreferenced (Rec, Name);
+      begin
+         Count := Count + 1;
+      end Process;
+
+   begin
+      Scan_Directory_Entries (Directory, Process'Access);
+      return Count;
+   end Get_Entry_Count;
+
+   function Get_Entry_Kind
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Rose.Interfaces.Directory.File_Kind
+   is
+      Count : Natural := 0;
+      Kind  : Rose.Interfaces.Directory.File_Kind :=
+                Rose.Interfaces.Directory.Ordinary_File;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Entry_Name);
+      begin
+         Count := Count + 1;
+         if Count = Index then
+            if (Rec.File_Flags and 2) = 2 then
+               Kind := Rose.Interfaces.Directory.Directory;
+            else
+               Kind := Rose.Interfaces.Directory.Ordinary_File;
+            end if;
+         end if;
+      end Process;
+
+   begin
+      Scan_Directory_Entries (Directory, Process'Access);
+      return Kind;
+   end Get_Entry_Kind;
+
+   --------------------
+   -- Get_Entry_Name --
+   --------------------
+
+   procedure Get_Entry_Name
+     (Directory : Directory_Type;
+      Index     : Positive;
+      Name      : out String;
+      Last      : out Natural)
+   is
+      Count : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Rec);
+      begin
+         Count := Count + 1;
+         if Count = Index then
+            if Index <= 2 then
+               if Name'Length > 0 then
+                  Name (Name'First) := '.';
+                  Last := Name'First;
+               end if;
+               if Index = 2 and then Name'Length > 1 then
+                  Name (Name'First + 1) := '.';
+                  Last := Name'First + 1;
+               end if;
+            else
+               declare
+                  Length : constant Natural :=
+                             Natural'Min (Entry_Name'Length,
+                                          Name'Length);
+               begin
+                  for I in 1 .. Length loop
+                     Name (I - Name'First + 1) :=
+                       Entry_Name (I - Entry_Name'First + 1);
+                  end loop;
+                  Last := Name'First + Length - 1;
+               end;
+            end if;
+         end if;
+      end Process;
+
+   begin
+      Last := 0;
+      Scan_Directory_Entries (Directory, Process'Access);
+   end Get_Entry_Name;
 
    ------------------------------
    -- Get_Identified_Directory --
@@ -217,6 +360,9 @@ package body IsoFS.Directories is
       Found        : Boolean := False;
       Buffer       : ISO_Sector;
    begin
+
+      Block_Device := Device;
+
       while Volume_Index < Sector_Count
         and then not Found
       loop
@@ -268,11 +414,75 @@ package body IsoFS.Directories is
             New_Line;
          end;
 
-         Create_Cap_Record (Root_Directory, Volume.Root_Directory_Entry);
+         Create_Cap_Record
+           (Root_Directory, Volume_Index, Volume.Root_Directory_Entry);
 
       end;
 
    end Read_Root_Directory;
+
+   ----------------------------
+   -- Scan_Directory_Entries --
+   ----------------------------
+
+   procedure Scan_Directory_Entries
+     (Directory : Directory_Type;
+      Process   : not null access
+        procedure (Rec : Directory_Entry;
+                   Name : String))
+   is
+      use System.Storage_Elements;
+      subtype Block_Address_Type is Rose.Devices.Block.Block_Address_Type;
+      Rec          : Directory_Caps_Record renames Directory_Caps (Directory);
+      Dir          : Directory_Entry renames Rec.Entry_Record;
+      Location     : Word_32 := Dir.Extent_Location_LSB;
+      Length       : constant Word_32 := Dir.Extent_Size_LSB;
+      Sector       : ISO_Sector;
+      Have_Sector  : Boolean := False;
+      Position     : Storage_Offset := 1;
+      Sector_Start : Storage_Offset;
+   begin
+      while Position < Storage_Count (Length) loop
+         if not Have_Sector then
+            Rose.Devices.Block.Client.Read_Block
+              (Block_Device, Block_Address_Type (Location), Sector);
+            Have_Sector := True;
+            Sector_Start := Position - 1;
+         end if;
+
+         exit when Sector (Position - Sector_Start) = 0;
+
+         declare
+            Start         : constant Storage_Offset := Position - Sector_Start;
+            Record_Length : constant Storage_Count :=
+                              Storage_Count (Sector (Start));
+            Rec           : Directory_Entry;
+            pragma Import (Ada, Rec);
+            for Rec'Address use Sector (Start)'Address;
+
+            Name : String (1 .. Natural (Rec.File_Identifier_Length));
+         begin
+
+            for I in Name'Range loop
+               declare
+                  Index : constant Storage_Offset :=
+                            Start + 32 + Storage_Count (I);
+               begin
+                  Name (I) := Character'Val (Sector (Index));
+               end;
+            end loop;
+
+            Process (Rec, Name);
+
+            Position := Position + Record_Length;
+            if Position - Sector_Start >= Sector'Last then
+               Location := Location + 1;
+               Have_Sector := False;
+            end if;
+         end;
+
+      end loop;
+   end Scan_Directory_Entries;
 
    -------------------------
    -- Send_Directory_Caps --
