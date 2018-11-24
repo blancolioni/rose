@@ -2,6 +2,7 @@ with Rose.Objects;
 with Rose.Words;
 
 with Rose.Interfaces.File_System;
+with Rose.Interfaces.Storage;
 
 with Init.Calls;
 
@@ -12,6 +13,15 @@ package body Init.Run is
    Device_Driver_Priority : constant := 4;
    File_System_Priority   : constant := 10;
    Low_Priority           : constant := 12;
+
+   Console_Module : constant := 2;
+   Mem_Module     : constant := 3;
+   PCI_Module     : constant := 4;
+   ATA_Module     : constant := 5;
+   Store_Module   : constant := 6;
+   ISOFS_Module   : constant := 7;
+   Restore_Module : constant := 8;
+   Scan_Module    : constant := 9;
 
    --------------
    -- Run_Init --
@@ -62,6 +72,8 @@ package body Init.Run is
 
       Hd1_Parameters_Cap   : Rose.Capabilities.Capability;
       Hd1_Read_Cap         : Rose.Capabilities.Capability;
+
+      Add_Storage_Cap      : Rose.Capabilities.Capability;
 
       Install_FS           : Rose.Capabilities.Capability;
 
@@ -122,7 +134,7 @@ package body Init.Run is
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Console_Id :=
         Init.Calls.Launch_Boot_Module
-          (Boot_Cap, 2, Low_Priority,
+          (Boot_Cap, Console_Module, Low_Priority,
            (Create_Endpoint_Cap,
             Console_Mem_Cap,
             Console_Cursor_Cap));
@@ -133,13 +145,6 @@ package body Init.Run is
 
       Console_Write_Cap :=
         Copy_Cap_From_Process (Copy_Console_Cap, 16#C025_0130#);
-
-      Mem_Id :=
-        Init.Calls.Launch_Boot_Module
-          (Boot_Cap, 3, Device_Driver_Priority,
-           (Create_Endpoint_Cap, Console_Write_Cap,
-            Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-            Page_On_Cap));
 
       declare
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
@@ -156,7 +161,7 @@ package body Init.Run is
                                      (16#0000_002E#, 2, 16#0CFC#, 0));
          PCI_Id               : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
-                                    (Boot_Cap, 4, Low_Priority,
+                                    (Boot_Cap, PCI_Module, Low_Priority,
                                      (Create_Endpoint_Cap,
                                       Console_Write_Cap,
                                       Command_Port_Out_Cap,
@@ -197,7 +202,8 @@ package body Init.Run is
                                       (16#0000_001E#, 1, 16#01F0#, 16#01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
-                                     (Boot_Cap, 5, Device_Driver_Priority,
+                                     (Boot_Cap, ATA_Module,
+                                      Device_Driver_Priority,
                                       (Create_Endpoint_Cap,
                                        Console_Write_Cap,
                                        PCI_Cap,
@@ -228,18 +234,55 @@ package body Init.Run is
          Hd1_Parameters_Cap := Hd1 (1);
          Hd1_Read_Cap := Hd1 (2);
 
-         --           Hd_Parameters_Cap :=
---             Copy_Cap_From_Process (Copy_Ata_Cap, 16#8C1F_B232#);
---           Hd_Read_Cap :=
---             Copy_Cap_From_Process (Copy_Ata_Cap, 16#82AC_0BDA#);
---           Hd_Write_Cap :=
---             Copy_Cap_From_Process (Copy_Ata_Cap, 16#D469_B96E#);
       end;
+
+      declare
+         Store_Id : constant Rose.Objects.Object_Id :=
+                      Init.Calls.Launch_Boot_Module
+                        (Boot_Cap, Store_Module, Device_Driver_Priority,
+                         (Create_Endpoint_Cap,
+                          Console_Write_Cap,
+                          Hd0_Parameters_Cap,
+                          Hd0_Read_Cap,
+                          Hd0_Write_Cap));
+         Copy_Store_Cap : constant Rose.Capabilities.Capability :=
+                            Init.Calls.Call
+                              (Create_Cap,
+                               (9, 1,
+                                Word (Store_Id mod 2 ** 32),
+                                Word (Store_Id / 2 ** 32)));
+      begin
+         Add_Storage_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage.Add_Backing_Store_Endpoint);
+      end;
+
+      declare
+         Scan_Id : constant Rose.Objects.Object_Id :=
+                     Init.Calls.Launch_Boot_Module
+                       (Boot_Cap, Scan_Module, File_System_Priority,
+                        (Create_Endpoint_Cap,
+                         Console_Write_Cap,
+                         Hd0_Parameters_Cap,
+                         Hd0_Read_Cap,
+                         Hd0_Write_Cap,
+                         Add_Storage_Cap));
+      begin
+         pragma Unreferenced (Scan_Id);
+      end;
+
+      Mem_Id :=
+        Init.Calls.Launch_Boot_Module
+          (Boot_Cap, Mem_Module, Device_Driver_Priority,
+           (Create_Endpoint_Cap, Console_Write_Cap,
+            Mem_Region_Count_Cap, Mem_Get_Region_Cap,
+            Page_On_Cap));
 
       declare
          IsoFS_Id : constant Rose.Objects.Object_Id :=
                       Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, 6, File_System_Priority,
+                        (Boot_Cap, ISOFS_Module, File_System_Priority,
                          (Create_Endpoint_Cap,
                           Console_Write_Cap,
                           Hd1_Parameters_Cap,
@@ -260,12 +303,13 @@ package body Init.Run is
       declare
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
-                          (Boot_Cap, 7, File_System_Priority,
+                          (Boot_Cap, Restore_Module, File_System_Priority,
                            (Create_Endpoint_Cap,
                             Console_Write_Cap,
                             Hd0_Parameters_Cap,
                             Hd0_Read_Cap,
                             Hd0_Write_Cap,
+                            Add_Storage_Cap,
                             Install_FS));
       begin
          pragma Unreferenced (Restore_Id);
