@@ -171,6 +171,7 @@ package body IDL.Types is
       Add_Type ("word_32", "Rose.Words", "Word_32");
       Add_Type ("word_64", "Rose.Words", "Word_64");
       Add_Type ("endpoint", "Rose.Objects", "Endpoint_Id");
+      Add_Type ("object_id", "Rose.Objects", "Object_Id");
       Add_Type ("natural", "", "Natural");
       Add_Type ("positive", "", "Positive");
       Add_Type ("integer", "", "Integer");

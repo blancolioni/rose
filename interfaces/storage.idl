@@ -1,0 +1,11 @@
+interface Storage is
+
+   procedure Reserve_Storage
+     (Size   : Word_64;
+      Base   : out Object_Id;
+      Bound  : out Object_Id);
+   
+   procedure Add_Backing_Store
+     (Store  : interface Block_Device);
+     
+end Storage;
