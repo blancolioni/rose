@@ -94,6 +94,14 @@ package Rose.System_Calls is
      (Params : in out Rose.Invocation.Invocation_Record;
       Cap    : Rose.Capabilities.Capability);
 
+   procedure Initialize_Receive
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Cap    : Rose.Capabilities.Capability);
+
+   procedure Initialize_Reply
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Cap    : Rose.Capabilities.Capability);
+
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
