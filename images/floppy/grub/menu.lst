@@ -10,10 +10,25 @@ title Rose boot
     module /mem
     module /pci
     module /ata
+    module /store
     module /isofs
     module /restore
+    module /scan
     boot
 
+title Rose process log
+    root (fd0)
+    kernel /kernel log-process=7
+    module /init
+    module /console
+    module /mem
+    module /pci
+    module /ata
+    module /store
+    module /isofs
+    module /restore
+    module /scan
+    boot
 title Rose invocation debug
     root (fd0)
     kernel /kernel log-invocation log-reply
@@ -22,8 +37,10 @@ title Rose invocation debug
     module /mem
     module /pci
     module /ata
+    module /store
     module /isofs
     module /restore
+    module /scan
     boot
 
 title Rose port debug
@@ -34,18 +51,9 @@ title Rose port debug
     module /mem
     module /pci
     module /ata
+    module /store
     module /isofs
     module /restore
+    module /scan
     boot
 
-title Rose process log
-    root (fd0)
-    kernel /kernel log-process=6
-    module /init
-    module /console
-    module /mem
-    module /pci
-    module /ata
-    module /isofs
-    module /restore
-    boot
