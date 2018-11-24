@@ -56,27 +56,39 @@ package body Rose.System_Calls is
 
    procedure Copy_Text
      (Params   : Rose.Invocation.Invocation_Record;
+      Count    : Natural;
       To       : out String;
       Last     : out Natural)
    is
    begin
-      if not Params.Control.Flags (Rose.Invocation.Send_Buffer) then
-         Last := 0;
-         return;
+      if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+         declare
+            Text : String (1 .. Natural (Params.Buffer_Length));
+            pragma Import (Ada, Text);
+            for Text'Address use Params.Buffer_Address;
+         begin
+            Last := 0;
+            for Ch of Text loop
+               exit when Last >= To'Last;
+               Last := Last + 1;
+               To (Last) := Ch;
+            end loop;
+         end;
+      else
+         declare
+            use System.Storage_Elements;
+            Index : Storage_Offset := 0;
+         begin
+            Last := To'First - 1;
+            for I in 1 .. Count loop
+               exit when Index >= Local_Buffer'Last;
+               exit when Last >= To'Last;
+               Index := Index + 1;
+               Last := Last + 1;
+               To (Last) := Character'Val (Local_Buffer (Index));
+            end loop;
+         end;
       end if;
-
-      declare
-         Text : String (1 .. Natural (Params.Buffer_Length));
-         pragma Import (Ada, Text);
-         for Text'Address use Params.Buffer_Address;
-      begin
-         Last := 0;
-         for Ch of Text loop
-            exit when Last >= To'Last;
-            Last := Last + 1;
-            To (Last) := Ch;
-         end loop;
-      end;
    end Copy_Text;
 
    ---------------------
@@ -255,7 +267,11 @@ package body Rose.System_Calls is
      (Params   : in out Rose.Invocation.Invocation_Record)
    is
    begin
-      Params.Control.Flags (Rose.Invocation.Recv_Buffer) := True;
+      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+      Params.Control.Flags (Rose.Invocation.Writable_Buffer) := True;
+      Params.Buffer_Address := Local_Buffer'Address;
+      Params.Buffer_Length := Local_Buffer'Last;
+      Local_Buffer := (others => 0);
    end Receive_Buffer;
 
    ------------------

@@ -255,6 +255,8 @@ package body IDL.Generate_Kernel is
               (Syn.Statements.New_Procedure_Call_Statement
                  ("Rose.System_Calls.Copy_Text",
                   Syn.Object ("Params"),
+                  Syn.Expressions.New_Function_Call_Expression
+                    ("Natural", Syn.Object ("Params.Data (0)")),
                   Syn.Object ("Result"),
                   Syn.Object ("Last")));
          end if;
