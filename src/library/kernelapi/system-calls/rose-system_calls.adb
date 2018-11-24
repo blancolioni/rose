@@ -91,6 +91,37 @@ package body Rose.System_Calls is
       end if;
    end Copy_Text;
 
+   ------------------------
+   -- Initialize_Receive --
+   ------------------------
+
+   procedure Initialize_Receive
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Cap    : Rose.Capabilities.Capability)
+   is
+      use Rose.Invocation;
+   begin
+      Params := (others => <>);
+      Params.Control.Flags (Receive) := True;
+      Params.Control.Flags (Block) := True;
+      Params.Cap := Cap;
+   end Initialize_Receive;
+
+   ----------------------
+   -- Initialize_Reply --
+   ----------------------
+
+   procedure Initialize_Reply
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Cap    : Rose.Capabilities.Capability)
+   is
+      use Rose.Invocation;
+   begin
+      Params := (others => <>);
+      Params.Control.Flags (Reply) := True;
+      Params.Cap := Cap;
+   end Initialize_Reply;
+
    ---------------------
    -- Initialize_Send --
    ---------------------
