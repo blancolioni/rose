@@ -85,9 +85,10 @@ package Rose.System_Calls is
       Last      : out System.Storage_Elements.Storage_Count);
 
     procedure Copy_Text
-      (Params   : Rose.Invocation.Invocation_Record;
-       To       : out String;
-       Last     : out Natural);
+     (Params   : Rose.Invocation.Invocation_Record;
+      Count    : Natural;
+      To       : out String;
+      Last     : out Natural);
 
    procedure Initialize_Send
      (Params : in out Rose.Invocation.Invocation_Record;
