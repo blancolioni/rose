@@ -3,13 +3,11 @@ with System.Storage_Elements;
 
 package Rose.Kernel.Modules is
 
-   Max_Kernel_Modules : constant := 16;
+   Max_Kernel_Modules : constant := 32;
 
    type Module_Index is range 1 .. Max_Kernel_Modules;
 
    Init_Module              : constant Module_Index := 1;
-   Console_Module           : constant Module_Index := 2;
-   Memory_Management_Module : constant Module_Index := 3;
 
    function Last_Boot_Module return Module_Index;
 
