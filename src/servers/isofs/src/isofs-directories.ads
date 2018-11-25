@@ -1,7 +1,8 @@
-with Rose.Devices.Block.Client;
 with Rose.Objects;
 with Rose.Invocation;
 with Rose.Interfaces.Directory;
+
+with Rose.Interfaces.Block_Device.Client;
 
 package IsoFS.Directories is
 
@@ -17,7 +18,7 @@ package IsoFS.Directories is
    No_Directory : constant Directory_Type;
 
    function Get_Root_Directory
-     (Device : Rose.Devices.Block.Client.Block_Device_Type)
+     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
       return Directory_Type;
 
    function Get_Child_Directory

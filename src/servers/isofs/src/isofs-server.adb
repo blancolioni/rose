@@ -1,10 +1,10 @@
 with System.Storage_Elements;
 
-with Rose.Devices.Block.Client;
 with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Words;
 
+with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File_System;
 with Rose.Console_IO;
@@ -18,14 +18,14 @@ package body IsoFS.Server is
    ------------------
 
    procedure Start_Server is
-      Device : Rose.Devices.Block.Client.Block_Device_Type;
+      Device      : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
       Receive_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Receive_Cap
                         (Create_Endpoint_Cap);
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Devices.Block.Client.Open
+      Rose.Interfaces.Block_Device.Client.Open
         (Device, Device_Parameters_Cap, Device_Read_Cap, 0);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint

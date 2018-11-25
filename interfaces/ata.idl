@@ -1,0 +1,5 @@
+interface ATA is
+
+   function Get_Device return interface Block_Device;
+
+end ATA;
