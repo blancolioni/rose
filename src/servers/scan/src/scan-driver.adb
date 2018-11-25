@@ -84,27 +84,41 @@ begin
             Partition_Size   : constant Block_Address_Type :=
                                  Available_Blocks / 4;
             Current_Start    : Block_Address_Type := 3;
-            Name             : String  := "rose-swap-#";
          begin
+
 
             Rose.Console_IO.Put_Line ("creating partitions");
 
-            for I in 1 .. 4 loop
-               Name (Name'Last) :=
-                 Character'Val (48 + I);
+            Rose.Devices.GPT.Add_Partition
+              (Block_Device        => Device,
+               First_Block         => Current_Start,
+               Last_Block          => Current_Start + Partition_Size - 1,
+               Partition_Type_Low  => Swap_Id_Low,
+               Partition_Type_High => Swap_Id_High,
+               Partition_Flags     => 0,
+               Partition_Name      => "rose-storage-1");
 
-               Rose.Devices.GPT.Add_Partition
-                 (Block_Device        => Device,
-                  First_Block         => Current_Start,
-                  Last_Block          => Current_Start + Partition_Size - 1,
-                  Partition_Type_Low  => Swap_Id_Low,
-                  Partition_Type_High => Swap_Id_High,
-                  Partition_Flags     => 0,
-                  Partition_Name      => Name);
+            Current_Start := Current_Start + Partition_Size;
 
-               Current_Start := Current_Start + Partition_Size;
+            Rose.Devices.GPT.Add_Partition
+              (Block_Device        => Device,
+               First_Block         => Current_Start,
+               Last_Block          => Current_Start + Partition_Size - 1,
+               Partition_Type_Low  => Swap_Id_Low,
+               Partition_Type_High => Swap_Id_High,
+               Partition_Flags     => 0,
+               Partition_Name      => "rose-storage-2");
 
-            end loop;
+            Current_Start := Current_Start + Partition_Size;
+
+            Rose.Devices.GPT.Add_Partition
+              (Block_Device        => Device,
+               First_Block         => Current_Start,
+               Last_Block          => Available_Blocks,
+               Partition_Type_Low  => Log_Id_Low,
+               Partition_Type_High => Log_Id_High,
+               Partition_Flags     => 0,
+               Partition_Name      => "rose-log");
 
             Rose.Devices.GPT.Flush (Device);
 

@@ -328,6 +328,11 @@ package body Rose.Devices.GPT is
                then
                   Rose.Console_IO.Put
                     ("rose-swap ");
+               elsif Part.Partition_Type_Low = Log_Id_Low
+                 and then Part.Partition_Type_High = Log_Id_High
+               then
+                  Rose.Console_IO.Put
+                    ("rose-log ");
                else
                   Rose.Console_IO.Put
                     ("unknown   ");
