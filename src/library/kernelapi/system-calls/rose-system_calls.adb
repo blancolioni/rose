@@ -1,12 +1,19 @@
 package body Rose.System_Calls is
 
+   Default_32_Bit : constant Boolean :=
+                      Rose.Words.Word'Size = 32;
+
    Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
    procedure Invoke_Capability_Wrapper
      (Item : aliased in out Rose.Invocation.Invocation_Record);
 
-   -----------------
+   procedure Send_Native_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Rose.Words.Word);
+
+     -----------------
    -- Copy_Buffer --
    -----------------
 
@@ -90,6 +97,39 @@ package body Rose.System_Calls is
          end;
       end if;
    end Copy_Text;
+
+   -----------------
+   -- Get_Word_32 --
+   -----------------
+
+   function Get_Word_32
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Rose.Words.Word_32
+   is
+   begin
+      return Rose.Words.Word_32 (Params.Data (Index));
+   end Get_Word_32;
+
+   -----------------
+   -- Get_Word_64 --
+   -----------------
+
+   function Get_Word_64
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Rose.Words.Word_64
+   is
+      use Rose.Invocation;
+      use Rose.Words;
+   begin
+      if Default_32_Bit then
+         return Word_64 (Params.Data (Index))
+           + 2 ** 32 * Word_64 (Params.Data (Index + 1));
+      else
+         return Word_64 (Params.Data (Index));
+      end if;
+   end Get_Word_64;
 
    ------------------------
    -- Initialize_Receive --
@@ -374,6 +414,27 @@ package body Rose.System_Calls is
       Params.Caps (Params.Control.Last_Sent_Cap) := Cap;
    end Send_Cap;
 
+   ----------------------
+   -- Send_Native_Word --
+   ----------------------
+
+   procedure Send_Native_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Rose.Words.Word)
+   is
+      use type Rose.Invocation.Parameter_Word_Index;
+   begin
+      if not Params.Control.Flags (Rose.Invocation.Send_Words) then
+         Params.Control.Flags (Rose.Invocation.Send_Words) := True;
+         Params.Control.Last_Sent_Word := 0;
+      else
+         Params.Control.Last_Sent_Word :=
+           Params.Control.Last_Sent_Word + 1;
+      end if;
+
+      Params.Data (Params.Control.Last_Sent_Word) := Value;
+   end Send_Native_Word;
+
    ------------------------
    -- Send_Storage_Array --
    ------------------------
@@ -422,10 +483,10 @@ package body Rose.System_Calls is
 
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
-      Value  : Integer)
+      Value  : Natural)
    is
    begin
-      Send_Word (Params, Rose.Words.Word (Value));
+      Send_Native_Word (Params, Rose.Words.Word (Value));
    end Send_Word;
 
    ---------------
@@ -434,19 +495,41 @@ package body Rose.System_Calls is
 
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
-      Value  : Rose.Words.Word)
+      Value  : Rose.Words.Word_64)
+   is
+      use Rose.Words;
+   begin
+      if Default_32_Bit then
+         Send_Native_Word (Params, Word_32 (Value mod 2 ** 32));
+         Send_Native_Word (Params, Word_32 (Value / 2 ** 32));
+      else
+         Send_Native_Word (Params, Rose.Words.Word (Value));
+      end if;
+   end Send_Word;
+
+   ---------------
+   -- Send_Word --
+   ---------------
+
+   procedure Send_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Rose.Words.Word_32)
    is
       use type Rose.Invocation.Parameter_Word_Index;
    begin
-      if not Params.Control.Flags (Rose.Invocation.Send_Words) then
-         Params.Control.Flags (Rose.Invocation.Send_Words) := True;
-         Params.Control.Last_Sent_Word := 0;
-      else
-         Params.Control.Last_Sent_Word :=
-           Params.Control.Last_Sent_Word + 1;
-      end if;
+      if Default_32_Bit then
+         if not Params.Control.Flags (Rose.Invocation.Send_Words) then
+            Params.Control.Flags (Rose.Invocation.Send_Words) := True;
+            Params.Control.Last_Sent_Word := 0;
+         else
+            Params.Control.Last_Sent_Word :=
+              Params.Control.Last_Sent_Word + 1;
+         end if;
 
-      Params.Data (Params.Control.Last_Sent_Word) := Value;
+         Params.Data (Params.Control.Last_Sent_Word) := Value;
+      else
+         Send_Word (Params, Rose.Words.Word_64 (Value));
+      end if;
    end Send_Word;
 
 end Rose.System_Calls;

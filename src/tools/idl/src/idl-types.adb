@@ -25,16 +25,19 @@ package body IDL.Types is
          Name           : Ada.Strings.Unbounded.Unbounded_String;
          Ada_Package    : Ada.Strings.Unbounded.Unbounded_String;
          Ada_Name       : Ada.Strings.Unbounded.Unbounded_String;
-         Derived_From   : IDL_Type;
          Fields         : Record_Field_Vectors.Vector;
-         Count_Type     : IDL_Type;
-         Is_Enumeration : Boolean;
-         Is_Record      : Boolean;
-         Is_Interface   : Boolean;
-         Is_Capability  : Boolean;
-         Is_Address     : Boolean;
-         Is_Internal    : Boolean;
-         Is_Scalar      : Boolean;
+         Derived_From   : IDL_Type      := null;
+         Count_Type     : IDL_Type      := null;
+         Size           : Natural       := 0;
+         Low, High      : Integer       := 0;
+         Is_Range       : Boolean       := False;
+         Is_Enumeration : Boolean       := False;
+         Is_Record      : Boolean       := False;
+         Is_Interface   : Boolean       := False;
+         Is_Capability  : Boolean       := False;
+         Is_Address     : Boolean       := False;
+         Is_Internal    : Boolean       := False;
+         Is_Scalar      : Boolean       := False;
       end record;
 
    package Type_Tables is
@@ -49,14 +52,22 @@ package body IDL.Types is
      (Name          : String;
       Ada_Package   : String;
       Ada_Name      : String;
+      Size          : Natural  := 0;
       Derived_From  : IDL_Type := null;
       Count_Type    : IDL_Type := null;
+      Low           : Integer := 0;
+      High          : Integer := 0;
       Is_Record     : Boolean := False;
       Is_Interface  : Boolean := False;
       Is_Capability : Boolean := False;
       Is_Address    : Boolean := False;
       Is_Internal   : Boolean := False;
+      Is_Range      : Boolean := False;
       Is_Scalar     : Boolean := True);
+
+   function Default_Size return Natural
+   is (if IDL.Options.Generate_32_Bit
+       then 32 else 64);
 
    ----------------------
    -- Add_Derived_Type --
@@ -69,6 +80,7 @@ package body IDL.Types is
       Internal_Add_Type (Name          => Name,
                          Ada_Package   => "",
                          Ada_Name      => IDL.Identifiers.To_Ada_Name (Name),
+                         Size          => Parent.Size,
                          Derived_From  => Parent,
                          Is_Interface  => Parent.Is_Interface,
                          Is_Capability => Parent.Is_Capability,
@@ -145,7 +157,8 @@ package body IDL.Types is
    begin
       Add_Type (Name        => Name,
                 Ada_Package => "",
-                Ada_Name    => Ada_Name);
+                Ada_Name    => Ada_Name,
+                Size        => Default_Size);
    end Add_Type;
 
    --------------
@@ -155,10 +168,11 @@ package body IDL.Types is
    procedure Add_Type
      (Name        : String;
       Ada_Package : String;
-      Ada_Name    : String)
+      Ada_Name    : String;
+      Size        : Natural := 0)
    is
    begin
-      Internal_Add_Type (Name, Ada_Package, Ada_Name);
+      Internal_Add_Type (Name, Ada_Package, Ada_Name, Size => Size);
    end Add_Type;
 
    ---------------------------
@@ -167,14 +181,14 @@ package body IDL.Types is
 
    procedure Create_Standard_Types is
    begin
-      Add_Type ("word", "Rose.Words", "Word");
-      Add_Type ("word_32", "Rose.Words", "Word_32");
-      Add_Type ("word_64", "Rose.Words", "Word_64");
-      Add_Type ("endpoint", "Rose.Objects", "Endpoint_Id");
-      Add_Type ("object_id", "Rose.Objects", "Object_Id");
-      Add_Type ("natural", "", "Natural");
-      Add_Type ("positive", "", "Positive");
-      Add_Type ("integer", "", "Integer");
+      Add_Type ("word", "Rose.Words", "Word", Default_Size);
+      Add_Type ("word_32", "Rose.Words", "Word_32", 32);
+      Add_Type ("word_64", "Rose.Words", "Word_64", 64);
+      Add_Type ("endpoint", "Rose.Objects", "Endpoint_Id", 64);
+      Add_Type ("object_id", "Rose.Objects", "Object_Id", 64);
+      Add_Type ("natural", "", "Natural", 32);
+      Add_Type ("positive", "", "Positive", 32);
+      Add_Type ("integer", "", "Integer", 32);
       Internal_Add_Type
         ("rose_interface", "Rose.Interfaces", "Rose_Interface",
          Is_Interface => True);
@@ -301,6 +315,15 @@ package body IDL.Types is
       return Item.Fields.Element (Index).Field_Type;
    end Get_Field_Type;
 
+   --------------
+   -- Get_High --
+   --------------
+
+   function Get_High (Item : IDL_Type) return Natural is
+   begin
+      return Item.High;
+   end Get_High;
+
    -----------------------
    -- Get_Literal_Count --
    -----------------------
@@ -319,6 +342,15 @@ package body IDL.Types is
    is (Ada.Strings.Unbounded.To_String
          (Item.Fields.Element (Index).Field_Name));
 
+   -------------
+   -- Get_Low --
+   -------------
+
+   function Get_Low (Item : IDL_Type) return Natural is
+   begin
+      return Item.Low;
+   end Get_Low;
+
    --------------
    -- Get_Name --
    --------------
@@ -327,6 +359,15 @@ package body IDL.Types is
    begin
       return Ada.Strings.Unbounded.To_String (Item.Name);
    end Get_Name;
+
+   --------------
+   -- Get_Size --
+   --------------
+
+   function Get_Size (Item : IDL_Type) return Natural is
+   begin
+      return Item.Size;
+   end Get_Size;
 
    --------------
    -- Get_Type --
@@ -358,13 +399,17 @@ package body IDL.Types is
      (Name          : String;
       Ada_Package   : String;
       Ada_Name      : String;
+      Size          : Natural  := 0;
       Derived_From  : IDL_Type := null;
       Count_Type    : IDL_Type := null;
+      Low           : Integer := 0;
+      High          : Integer := 0;
       Is_Record     : Boolean := False;
       Is_Interface  : Boolean := False;
       Is_Capability : Boolean := False;
       Is_Address    : Boolean := False;
       Is_Internal   : Boolean := False;
+      Is_Range      : Boolean := False;
       Is_Scalar     : Boolean := True)
    is
       use Ada.Strings.Unbounded;
@@ -375,9 +420,14 @@ package body IDL.Types is
                               (To_Unbounded_String (Name),
                                To_Unbounded_String (Ada_Package),
                                To_Unbounded_String (Ada_Name),
-                               Derived_From,
                                Record_Field_Vectors.Empty_Vector,
+                               Derived_From,
+                               Size           =>
+                                 (if Size = 0 then Default_Size else Size),
+                               Low            => Low,
+                               High           => High,
                                Count_Type     => Count_Type,
+                               Is_Range       => Is_Range,
                                Is_Enumeration => False,
                                Is_Record      => Is_Record,
                                Is_Interface   => Is_Interface,
@@ -417,6 +467,15 @@ package body IDL.Types is
    begin
       return Item.Is_Interface;
    end Is_Interface;
+
+   -------------------
+   -- Is_Range_Type --
+   -------------------
+
+   function Is_Range_Type (Item : IDL_Type) return Boolean is
+   begin
+      return Item.Is_Range;
+   end Is_Range_Type;
 
    --------------------
    -- Is_Record_Type --
@@ -477,27 +536,33 @@ package body IDL.Types is
          others => <>);
    end New_Enumerated_Type;
 
+   --------------------
+   -- New_Range_Type --
+   --------------------
+
+   function New_Range_Type
+     (Interface_Name : String;
+      Low, High      : Integer)
+      return IDL_Type
+   is
+      use Ada.Strings.Unbounded;
+   begin
+      return new IDL_Type_Record'
+        (Ada_Package    => +("Rose.Interfaces." & Interface_Name),
+         Is_Range       => True,
+         Is_Scalar      => True,
+         Low            => Low,
+         High           => High,
+         others         => <>);
+   end New_Range_Type;
+
    ---------------------
    -- New_Record_Type --
    ---------------------
 
    function New_Record_Type return IDL_Type is
-      use Ada.Strings.Unbounded;
    begin
-      return new IDL_Type_Record'
-        (Null_Unbounded_String,
-         Null_Unbounded_String,
-         Null_Unbounded_String,
-         null,
-         Record_Field_Vectors.Empty_Vector,
-         Count_Type     => null,
-         Is_Enumeration => False,
-         Is_Record      => True,
-         Is_Interface   => False,
-         Is_Capability  => False,
-         Is_Address     => False,
-         Is_Internal    => False,
-         Is_Scalar      => False);
+      return new IDL_Type_Record'(Is_Record => True, others => <>);
    end New_Record_Type;
 
 end IDL.Types;

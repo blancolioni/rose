@@ -5,7 +5,7 @@ private package IDL.Parser.Tokens is
        Tok_Identifier, Tok_Integer_Constant, Tok_String_Constant,
 
        Tok_Interface, Tok_Record, Tok_Is, Tok_Begin, Tok_End,
-       Tok_Procedure, Tok_Function, Tok_Return,
+       Tok_Procedure, Tok_Function, Tok_Range, Tok_Return,
        Tok_In, Tok_Invoke, Tok_Out, Tok_Type, Tok_Constant, Tok_New,
        Tok_With,
 
