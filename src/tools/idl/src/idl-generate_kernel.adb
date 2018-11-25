@@ -3,6 +3,7 @@ with Ada.Text_IO;
 with IDL.Endpoints;
 with IDL.Identifiers;
 with IDL.Interface_Table;
+with IDL.Options;
 with IDL.Types;
 
 with Syn.Blocks;
@@ -59,6 +60,9 @@ package body IDL.Generate_Kernel is
      (Top_Interface : IDL.Syntax.IDL_Interface;
       Pkg           : in out Syn.Declarations.Package_Type'Class;
       Server        : Boolean);
+
+   function Default_Size return Natural
+   is (if IDL.Options.Generate_32_Bit then 32 else 64);
 
    ----------------------------
    -- Copy_Invocation_Result --
@@ -189,15 +193,29 @@ package body IDL.Generate_Kernel is
                      Syn.Object ("Params"),
                      Syn.Literal (Recv_Count))));
          else
-            Recv_Count := Recv_Count + 1;
-            Copy_Block.Append
-              (Syn.Statements.New_Assignment_Statement
-                 (Base_Name,
-                  Syn.Expressions.New_Function_Call_Expression
-                    (Get_Ada_Name (Base_Type),
+            if Get_Size (Base_Type) > Default_Size then
+               Copy_Block.Append
+                 (Syn.Statements.New_Assignment_Statement
+                    (Base_Name,
                      Syn.Expressions.New_Function_Call_Expression
-                       ("Params.Data",
-                        Syn.Literal (Recv_Count - 1)))));
+                       (Get_Ada_Name (Base_Type),
+                        Syn.Expressions.New_Function_Call_Expression
+                          ("Rose.System_Calls.Get_Word_64",
+                           Syn.Object ("Params"),
+                           Syn.Literal (Recv_Count)))));
+               Recv_Count := Recv_Count + 2;
+            else
+               Copy_Block.Append
+                 (Syn.Statements.New_Assignment_Statement
+                    (Base_Name,
+                     Syn.Expressions.New_Function_Call_Expression
+                       (Get_Ada_Name (Base_Type),
+                        Syn.Expressions.New_Function_Call_Expression
+                          ("Rose.System_Calls.Get_Word_32",
+                           Syn.Object ("Params"),
+                           Syn.Literal (Recv_Count)))));
+               Recv_Count := Recv_Count + 1;
+            end if;
          end if;
       end Copy_Scalar_Type;
 
@@ -758,6 +776,8 @@ package body IDL.Generate_Kernel is
 
       Add_Context (Item, "Rose.Capabilities");
 
+--      Client.With_Package ("Rose.Words", Body_With => True);
+
       for I in 1 .. Get_Num_Contexts (Item) loop
          Client.With_Package (Get_Context (Item, I));
       end loop;
@@ -968,12 +988,23 @@ package body IDL.Generate_Kernel is
                           (Get_Object_Ada_Name (Item, I),
                            Enum));
                   end;
+               elsif Is_Range_Type (New_Type) then
+                  IF_Pkg.Append
+                    (Syn.Declarations.New_Full_Type_Declaration
+                       (Get_Object_Ada_Name (Item, I),
+                        Syn.Types.New_Range_Definition
+                          (Integer'Image (Get_Low (New_Type)),
+                           Integer'Image (Get_High (New_Type)))));
                else
                   IF_Pkg.Append
                     (Syn.Declarations.New_Full_Type_Declaration
                        (Get_Object_Ada_Name (Item, I),
                         Syn.New_Derived_Type
                           (IDL.Types.Get_Ada_Name (New_Type))));
+                  if Is_Word_Type (New_Type) then
+                     IF_Pkg.With_Package ("Rose.Words");
+                  end if;
+
                end if;
             end;
          end if;
@@ -1394,11 +1425,31 @@ package body IDL.Generate_Kernel is
                   end if;
 
                else
-                  Block.Append
-                    (Syn.Statements.New_Procedure_Call_Statement
-                       ("Rose.System_Calls.Send_Word",
-                        Syn.Object ("Params"),
-                        Syn.Object (Get_Ada_Name (Args (I)))));
+                  if Is_Word_Type (Arg_Type)
+                    or else Is_Integer_Type (Arg_Type)
+                  then
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Word",
+                           Syn.Object ("Params"),
+                           Syn.Object (Get_Ada_Name (Args (I)))));
+                  elsif Get_Size (Arg_Type) > Default_Size then
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Word",
+                           Syn.Object ("Params"),
+                           Syn.Expressions.New_Function_Call_Expression
+                             ("Rose.Words.Word_64",
+                              Syn.Object (Get_Ada_Name (Args (I))))));
+                  else
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Word",
+                           Syn.Object ("Params"),
+                           Syn.Expressions.New_Function_Call_Expression
+                             ("Rose.Words.Word",
+                              Syn.Object (Get_Ada_Name (Args (I))))));
+                  end if;
                end if;
                if Mode = Out_Argument or else Mode = Inout_Argument then
                   Recv_Words := Recv_Words + 1;
@@ -1506,9 +1557,7 @@ package body IDL.Generate_Kernel is
                             IDL.Types.Get_Ada_Package (Ref);
             begin
                if Pkg_Name /= ""  then
-                  Pkg.With_Package
-                    (Pkg_Name,
-                     Body_With    => Server);
+                  Pkg.With_Package (Pkg_Name);
                end if;
             end;
             if Server

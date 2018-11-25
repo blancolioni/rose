@@ -2,21 +2,14 @@ interface Block_Device is
 
    Max_Block_Size : constant := 4096;
 
-   type Block_Size_Type is range 0 .. Max_Block_Size;
-   type Block_Address_Type is mod 2 ** 48;
-   type Device_Size_Type is mod 2 ** 64;
+   type Block_Size_Type is range 0 .. 4096;
+   type Block_Address_Type is new Word_64;
+   type Device_Size_Type is new Word_64;
 
-   function Block_Count return Block_Address_Type;
-   function Block_Size return Block_Size_Type;
-   
-   procedure Read_Block
-     (Address : Block_Address_Type;
-      Block   : out Storage_Array);
-
-   procedure Write_Block
-     (Address : Block_Address_Type;
-      Block   : Storage_Array);
-
+   procedure Get_Parameters
+     (Block_Count : out Block_Address_Type;
+      Block_Size  : out Block_Size_Type);
+      
    procedure Read_Blocks
      (Start   : Block_Address_Type;
       Count   : Natural;

@@ -17,7 +17,7 @@ private package IDL.Parser.Lexical is
                  Tok_Float          => Tok_None,
                  First_Keyword      => Tok_Interface,
                  Keywords           => "interface record is begin end " &
-                   "procedure function return " &
+                   "procedure function range return " &
                    "in invoke out type constant new " &
                    "with",
                  First_Symbol       => Tok_Colon,

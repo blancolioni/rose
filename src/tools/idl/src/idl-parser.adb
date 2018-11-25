@@ -985,26 +985,67 @@ package body IDL.Parser is
 
          Scan;
 
-         if Tok = Tok_New then
-            Derived := True;
+         if Tok = Tok_Range then
             Scan;
-         end if;
+            declare
+               Low, High : Integer;
+            begin
+               if Tok = Tok_Integer_Constant then
+                  Low := Integer'Value (Tok_Text);
+                  Scan;
+               else
+                  Error ("expected an integer constant");
+                  raise Parse_Error;
+               end if;
+               if Tok = Tok_Dot_Dot then
+                  Scan;
+               else
+                  Error ("expected '..'");
+                  raise Parse_Error;
+               end if;
+               if Tok = Tok_Integer_Constant then
+                  High := Integer'Value (Tok_Text);
+                  Scan;
+               else
+                  Error ("expected an integer constant");
+                  raise Parse_Error;
+               end if;
 
-         Item_Type := Parse_Type;
+               if Tok /= Tok_Semi then
+                  Error ("missing ';'");
+                  raise Parse_Error;
+               end if;
 
-         if Tok /= Tok_Semi then
-            Error ("missing ';'");
-            raise Parse_Error;
-         end if;
+               Scan;
 
-         Scan;
-
-         if Derived then
-            IDL.Syntax.Add_Derived_Type (For_Interface, Name, Item_Type);
+               Item_Type :=
+                 IDL.Types.New_Range_Type
+                   (IDL.Syntax.Get_Ada_Name (For_Interface),
+                    Low, High);
+               IDL.Syntax.Add_Type (For_Interface, Name, Item_Type);
+            end;
          else
-            IDL.Syntax.Add_Type (For_Interface, Name, Item_Type);
-         end if;
 
+            if Tok = Tok_New then
+               Derived := True;
+               Scan;
+            end if;
+
+            Item_Type := Parse_Type;
+
+            if Tok /= Tok_Semi then
+               Error ("missing ';'");
+               raise Parse_Error;
+            end if;
+
+            Scan;
+
+            if Derived then
+               IDL.Syntax.Add_Derived_Type (For_Interface, Name, Item_Type);
+            else
+               IDL.Syntax.Add_Type (For_Interface, Name, Item_Type);
+            end if;
+         end if;
       end;
    end Parse_Type_Decl;
 

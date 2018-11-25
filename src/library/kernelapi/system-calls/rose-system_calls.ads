@@ -52,10 +52,6 @@ package Rose.System_Calls is
       Storage  : System.Storage_Elements.Storage_Array;
       Writable : Boolean);
 
-   procedure Send_Word
-     (Params : in out Rose.Invocation.Invocation_Record;
-      Value  : Integer);
-
     procedure Send_Cap
       (Params : in out Rose.Invocation.Invocation_Record;
        Cap    : Rose.Capabilities.Capability);
@@ -84,11 +80,21 @@ package Rose.System_Calls is
       To        : out System.Storage_Elements.Storage_Array;
       Last      : out System.Storage_Elements.Storage_Count);
 
-    procedure Copy_Text
+   procedure Copy_Text
      (Params   : Rose.Invocation.Invocation_Record;
       Count    : Natural;
       To       : out String;
       Last     : out Natural);
+
+   function Get_Word_32
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+     return Rose.Words.Word_32;
+
+   function Get_Word_64
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Rose.Words.Word_64;
 
    procedure Initialize_Send
      (Params : in out Rose.Invocation.Invocation_Record;
@@ -104,7 +110,15 @@ package Rose.System_Calls is
 
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
-      Value  : Rose.Words.Word);
+      Value  : Natural);
+
+   procedure Send_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Rose.Words.Word_32);
+
+   procedure Send_Word
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Rose.Words.Word_64);
 
    procedure Receive_Words
      (Params : in out Rose.Invocation.Invocation_Record;
