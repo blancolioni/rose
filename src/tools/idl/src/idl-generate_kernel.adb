@@ -722,7 +722,7 @@ package body IDL.Generate_Kernel is
       begin
          Method.Add_Formal_Argument
            ("Item",
-            (if Is_Function (Subpr) then In_Argument else Inout_Argument),
+            In_Argument,
             Interface_Name & "_Client");
          declare
             use IDL.Types;

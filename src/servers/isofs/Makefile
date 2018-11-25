@@ -16,9 +16,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-devices.o \
-	$(BUILDDIR)/rose-devices-block.o \
-	$(BUILDDIR)/rose-devices-block-client.o \
+	$(BUILDDIR)/rose-interfaces-block_device.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

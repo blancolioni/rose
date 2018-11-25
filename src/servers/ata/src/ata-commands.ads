@@ -38,15 +38,17 @@ package ATA.Commands is
       Value     : ATA.Drives.ATA_Status)
       return Boolean;
 
-   procedure Read_Sector
+   procedure Read_Sectors
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
-      Sector  : out System.Storage_Elements.Storage_Array);
+      Count   : Positive;
+      Sectors : out System.Storage_Elements.Storage_Array);
 
-   procedure Write_Sector
+   procedure Write_Sectors
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
-      Sector  : System.Storage_Elements.Storage_Array);
+      Count   : Positive;
+      Sectors : System.Storage_Elements.Storage_Array);
 
    procedure Flush
      (Drive : ATA.Drives.ATA_Drive);

@@ -1,4 +1,4 @@
-IDL=block_device file_system directory file file_system stream_reader stream_writer stream seekable storage
+IDL=block_device file_system directory file file_system stream_reader stream_writer stream seekable storage ata
 
 all: $(IDL)
 
@@ -25,3 +25,5 @@ stream: rose-interfaces-stream.ads
 seekable: rose-interfaces-seekable.ads
 
 storage: rose-interfaces-storage.ads
+
+ata: rose-interfaces-ata.ads

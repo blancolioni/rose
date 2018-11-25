@@ -1,4 +1,5 @@
 with Rose.Devices.Port_IO;
+with Rose.Interfaces.Block_Device;
 with Rose.Console_IO;
 
 package body ATA.Commands is
@@ -15,9 +16,10 @@ package body ATA.Commands is
       LBA     : Rose.Devices.Block.Block_Address_Type;
       Command : out ATA_Command);
 
-   procedure Read_Sector_ATAPI
+   procedure Read_Sectors_ATAPI
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
+      Count   : Positive;
       Sector  : out System.Storage_Elements.Storage_Array);
 
    -----------
@@ -56,14 +58,15 @@ package body ATA.Commands is
    -- Read_Sector --
    -----------------
 
-   procedure Read_Sector
+   procedure Read_Sectors
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
-      Sector  : out System.Storage_Elements.Storage_Array)
+      Count   : Positive;
+      Sectors : out System.Storage_Elements.Storage_Array)
    is
       use ATA.Drives;
       use System.Storage_Elements;
-      Index : Storage_Offset := Sector'First - 1;
+      Index : Storage_Offset := Sectors'First - 1;
       Command : ATA_Command;
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_16_Read_Port (Drive);
@@ -73,7 +76,7 @@ package body ATA.Commands is
       end if;
 
       if ATA.Drives.Is_Atapi (Drive) then
-         Read_Sector_ATAPI (Drive, Address, Sector);
+         Read_Sectors_ATAPI (Drive, Address, Count, Sectors);
          return;
       end if;
 
@@ -99,24 +102,26 @@ package body ATA.Commands is
                   Rose.Devices.Port_IO.Port_In_16 (Data_Port);
          begin
             Index := Index + 1;
-            Sector (Index) := Storage_Element (D mod 256);
+            Sectors (Index) := Storage_Element (D mod 256);
             Index := Index + 1;
-            Sector (Index) := Storage_Element (D / 256);
+            Sectors (Index) := Storage_Element (D / 256);
          end;
       end loop;
 
-   end Read_Sector;
+   end Read_Sectors;
 
    -----------------------
    -- Read_Sector_ATAPI --
    -----------------------
 
-   procedure Read_Sector_ATAPI
+   procedure Read_Sectors_ATAPI
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
+      Count   : Positive;
       Sector  : out System.Storage_Elements.Storage_Array)
    is
-      use Rose.Devices.Block;
+      pragma Unreferenced (Count);
+      use Rose.Interfaces.Block_Device;
       use Rose.Words;
       use ATA.Drives;
       use System.Storage_Elements;
@@ -210,7 +215,7 @@ package body ATA.Commands is
          end;
       end loop;
 
-   end Read_Sector_ATAPI;
+   end Read_Sectors_ATAPI;
 
    --------------------
    -- Sector_Command --
@@ -353,13 +358,15 @@ package body ATA.Commands is
    -- Write_Sector --
    ------------------
 
-   procedure Write_Sector
+   procedure Write_Sectors
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
-      Sector  : System.Storage_Elements.Storage_Array)
+      Count   : Positive;
+      Sectors : System.Storage_Elements.Storage_Array)
    is
+      pragma Unreferenced (Count);
       use System.Storage_Elements;
-      Index   : Storage_Offset := Sector'First;
+      Index   : Storage_Offset := Sectors'First;
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_16_Write_Port (Drive);
       Command : ATA_Command;
@@ -387,8 +394,8 @@ package body ATA.Commands is
          declare
             use Rose.Words;
             D : constant Word_16 :=
-                  Word_16 (Sector (Index)) +
-                  256 * Word_16 (Sector (Index + 1));
+                  Word_16 (Sectors (Index)) +
+                  256 * Word_16 (Sectors (Index + 1));
          begin
             Rose.Devices.Port_IO.Port_Out_16 (Data_Port, D);
             Index := Index + 2;
@@ -397,6 +404,6 @@ package body ATA.Commands is
 
       Flush (Drive);
 
-   end Write_Sector;
+   end Write_Sectors;
 
 end ATA.Commands;

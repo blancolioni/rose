@@ -1,4 +1,4 @@
-with Rose.Devices.Block.Client;
+with Rose.Interfaces.Block_Device.Client;
 with Rose.Devices.GPT;
 with Rose.Devices.Partitions;
 
@@ -10,26 +10,30 @@ with Rose.Invocation;
 with Rose.System_Calls.Server;
 
 procedure Scan.Driver is
-   use Rose.Devices.Block.Client;
-   Device : Block_Device_Type;
+
+   use Rose.Interfaces.Block_Device;
+   use Rose.Interfaces.Block_Device.Client;
+
+   Device : Block_Device_Client;
+   Block_Size   : Rose.Interfaces.Block_Device.Block_Size_Type;
+   Block_Count  : Rose.Interfaces.Block_Device.Block_Address_Type;
+
 begin
    Rose.Console_IO.Open (Console_Cap);
 
-   Rose.Devices.Block.Client.Open
-     (Device         => Device,
-      Parameters_Cap => Block_Device_Parameters_Cap,
-      Read_Cap       => Block_Device_Read_Cap,
-      Write_Cap      => Block_Device_Write_Cap);
+   Rose.Interfaces.Block_Device.Client.Open
+     (Client         => Device,
+      Get_Parameters => Block_Device_Parameters_Cap,
+      Read_Blocks    => Block_Device_Read_Cap,
+      Write_Blocks   => Block_Device_Write_Cap);
+
+   Get_Parameters (Device, Block_Count, Block_Size);
 
    declare
       use Rose.Words;
-      Block_Size   : constant Rose.Devices.Block.Block_Size_Type :=
-                       Get_Block_Size (Device);
-      Block_Count  : constant Rose.Devices.Block.Block_Address_Type :=
-                       Get_Block_Count (Device);
-      Storage_Size : constant Rose.Devices.Block.Device_Size_Type :=
-                       Rose.Devices.Block.To_Device_Size
-                         (Block_Size, Block_Count);
+      Storage_Size : constant Device_Size_Type :=
+                       Device_Size_Type (Block_Size)
+                       * Device_Size_Type (Block_Count);
    begin
       Rose.Console_IO.Put ("device: size ");
       Rose.Console_IO.Put (Natural (Word_64 (Storage_Size) / 2 ** 20));
@@ -57,8 +61,8 @@ begin
 --
 --           for I in 1 .. Rose.Devices.GPT.Partition_Count (Device) loop
 --              declare
---                 First_Block         : Rose.Devices.Block.Block_Address_Type;
---                 Last_Block          : Rose.Devices.Block.Block_Address_Type;
+--      First_Block         : Rose.Interfaces.Block_Device.Block_Address_Type;
+--      Last_Block          : Rose.Interfaces.Block_Device.Block_Address_Type;
 --                 Partition_Type_Low  : Rose.Words.Word_64;
 --                 Partition_Type_High : Rose.Words.Word_64;
 --                 Partition_Flags     : Rose.Words.Word_64;
@@ -77,7 +81,6 @@ begin
 
       else
          declare
-            use Rose.Devices.Block;
             use Rose.Devices.Partitions;
             Available_Blocks : constant Block_Address_Type :=
                                  Block_Count - 4;

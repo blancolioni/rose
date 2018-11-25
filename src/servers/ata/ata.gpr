@@ -6,6 +6,7 @@ project ATA is
        "../../library/capabilities",
        "../../library/kernelapi/console",
        "../../library/kernelapi/devices",
+       "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
        "../../library/kernelapi/arch/i686");
    for Object_Dir use "./build/obj";

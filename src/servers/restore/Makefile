@@ -18,6 +18,10 @@ FILE_OBJECTS= \
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o
+BLOCK_DEVICE_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-block_device.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client-table.o
 
 OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
@@ -28,10 +32,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-devices.o \
-	$(BUILDDIR)/rose-devices-block.o \
-	$(BUILDDIR)/rose-devices-block-client.o \
-	$(BUILDDIR)/rose-devices-block-client-table.o \
 	$(BUILDDIR)/rose-devices-gpt.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-invocation.o \
@@ -41,6 +41,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o \
 	$(DIRECTORY_OBJECTS) \
+	$(BLOCK_DEVICE_OBJECTS) \
 	$(FILE_OBJECTS) \
 	$(FILE_SYSTEM_OBJECTS) \
 	$(STREAM_READER_OBJECTS)
