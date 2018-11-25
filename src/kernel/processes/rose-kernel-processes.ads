@@ -307,12 +307,14 @@ private
 
    type Kernel_Process_Access is access all Kernel_Process_Entry;
 
+   subtype Process_Name is String (1 .. 16);
+
    type Kernel_Process_Entry is
       record
          Stack             : Rose.Kernel.Arch.Stack_Frame;
          Directory_Page    : Rose.Addresses.Physical_Address;
          Pid               : Rose.Objects.Process_Id;
-         Name              : String (1 .. 16);
+         Name              : Process_Name;
          State             : Process_State;
          Flags             : Process_Flag_Array := (others => False);
          Default_Cap       : Rose.Capabilities.Capability :=

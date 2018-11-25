@@ -15,11 +15,17 @@ package Rose.Kernel.Modules is
    --  Move modules to safe memory
 
    procedure Add_Module
-     (Base, Bound : Physical_Address);
+     (Name        : String;
+      Base, Bound : Physical_Address);
 
    procedure Get_Module_Image
      (Module : Module_Index;
       Base   : out System.Address;
       Length : out System.Storage_Elements.Storage_Count);
+
+   procedure Get_Module_Name
+     (Module  : Module_Index;
+      Name    : out String;
+      Last    : out Natural);
 
 end Rose.Kernel.Modules;

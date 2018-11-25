@@ -23,11 +23,6 @@ with Rose.Arch.Interrupts;
 
 package body Rose.Kernel.Processes.Init is
 
---     Init_Name    : aliased constant String := "init";
---     Console_Name : aliased constant String := "console";
---     MM_Name      : aliased constant String := "mm";
---     Unknown_Name : aliased constant String := "unknown";
-
    package Process_Table_Conversions is
      new System.Address_To_Access_Conversions (Kernel_Process_Table);
 
@@ -108,15 +103,16 @@ package body Rose.Kernel.Processes.Init is
       Base              : System.Address;
       Length            : System.Storage_Elements.Storage_Count;
       Launch_Index      : Parameter_Word_Index := 0;
-
-      --        Name   : access constant String;
-      Pid          : Process_Id := 1;
+      Name              : Process_Name;
+      Name_Length       : Natural;
+      Pid               : Process_Id := 1;
    begin
 
       while Process_Table (Pid).State /= Available loop
          Pid := Pid + 1;
       end loop;
 
+      Rose.Kernel.Modules.Get_Module_Name (Module, Name, Name_Length);
       Rose.Kernel.Modules.Get_Module_Image (Module, Base, Length);
 
       declare
@@ -288,30 +284,13 @@ package body Rose.Kernel.Processes.Init is
          Proc.Quantum_Ticks := 10;
          Proc.Remaining_Ticks := 10;
 
-         --  FIXME: replace this nonsense with data from the modules
-         case Pid is
-            when 2 =>
-               Proc.Name (1 .. 4) := "init";
-            when 3 =>
-               Proc.Name (1 .. 7) := "console";
-            when 4 =>
-               Proc.Name (1 .. 3) := "pci";
-            when 5 =>
-               Proc.Name (1 .. 3) := "ata";
-            when 6 =>
-               Proc.Name (1 .. 5) := "store";
-            when 7 =>
-               Proc.Name (1 .. 4) := "scan";
-            when 8 =>
-               Proc.Name (1 .. 3) := "mem";
-            when 9 =>
-               Proc.Name (1 .. 5) := "isofs";
-            when 10 =>
-               Proc.Name (1 .. 7) := "restore";
-            when others =>
-               Proc.Name (1 .. 5) := "boot ";
-               Proc.Name (6) := Character'Val (Pid + 48);
-         end case;
+         for I in 1 .. Proc.Name'Last loop
+            if I <= Name_Length then
+               Proc.Name (I) := Name (I);
+            else
+               Proc.Name (I) := ' ';
+            end if;
+         end loop;
 
          Proc.Page_Flags := (others => (others => False));
          Proc.Page_Ranges := (others => (others => 0));
@@ -467,6 +446,13 @@ package body Rose.Kernel.Processes.Init is
          end if;
 
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);
+
+         Rose.Boot.Console.Put ("started boot module process ");
+         Rose.Boot.Console.Put (Pid);
+         Rose.Boot.Console.Put (" ");
+         Rose.Boot.Console.Put (Process_Table (Pid).Name);
+         Rose.Boot.Console.New_Line;
+
       end;
 
       return Pid;

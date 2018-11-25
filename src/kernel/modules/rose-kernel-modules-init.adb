@@ -42,7 +42,7 @@ package body Rose.Kernel.Modules.Init is
       Rose.Boot.Console.Put (": ");
       Rose.Boot.Console.Put_Line (Mod_Text);
 
-      Add_Module (Base, Bound);
+      Add_Module (Mod_Text, Base, Bound);
 
       Physical_Memory.Allocate_Region
         (Base, Bound,
