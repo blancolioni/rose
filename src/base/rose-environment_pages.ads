@@ -18,6 +18,10 @@ package Rose.Environment_Pages is
       Name  : String;
       Value : String);
 
+   procedure Delete_Environment_Value
+     (Page  : in out Environment_Page;
+      Name  : String);
+
 private
 
    Max_Values_Per_Page : constant := 256;
@@ -34,9 +38,10 @@ private
 
    type Environment_Page is
       record
-         Value_Count : Rose.Words.Word_32;
-         Indices     : Value_Indices;
-         Text        : String (1 .. 3068);
+         Value_Count : Rose.Words.Word_32 := 0;
+         Text_Length : Rose.Words.Word_32 := 0;
+         Indices     : Value_Indices      := (others => (0, 0));
+         Text        : String (1 .. 3064) := (others => Character'Val (0));
       end record;
 
    for Environment_Page'Size use 8 * 4096;
