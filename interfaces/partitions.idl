@@ -1,0 +1,12 @@
+interface Partitions is
+
+   function Partition_Count return Natural;
+   
+   procedure Get_Partition
+     (Index           : Positive;
+      Partition_Type  : out Word;
+      Partition_Flags : out Word_64;
+      Start_Address   : out Word_64;
+      Length          : out Word_64);
+   
+end Partitions;
