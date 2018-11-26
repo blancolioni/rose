@@ -13,16 +13,10 @@ package Rose.Kernel is
 
    Process_Stack_Base            : constant := 16#D000_0000#;
    Process_Stack_Bound           : constant := 16#E000_0000#;
-   Invocation_Buffer_Range_Base  : constant := 16#E000_0000#;
+   Environment_Base              : constant := 16#E000_0000#;
+   Environment_Bound             : constant := 16#E100_0000#;
+   Invocation_Buffer_Range_Base  : constant := 16#EF00_0000#;
    Invocation_Buffer_Range_Bound : constant := 16#F000_0000#;
-
-   type Process_Segment is (Text, Static, Data, Environment);
-
-   Environment_Virtual_Page    : constant := 16#000F_F000#;
-   Environment_Virtual_Address : constant :=
-     Environment_Virtual_Page * Rose.Addresses.Memory_Page_Size;
-
-   type Message_Priority is mod 4;   --  0 is the highest
 
    function Kernel_Physical_Base return Rose.Addresses.Physical_Address;
    function Kernel_Physical_Bound return Rose.Addresses.Physical_Address;
