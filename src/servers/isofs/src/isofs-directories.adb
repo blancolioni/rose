@@ -8,11 +8,12 @@ with Rose.System_Calls.Server;
 
 package body IsoFS.Directories is
 
+   use Rose.Interfaces.Block_Device;
    use Rose.Words;
 
    Max_Directories : constant := 100;
 
-   Block_Device : Rose.Devices.Block.Client.Block_Device_Type;
+   Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
 
    subtype ISO_Sector is
      System.Storage_Elements.Storage_Array
@@ -85,7 +86,7 @@ package body IsoFS.Directories is
    type Directory_Caps_Record is
       record
          Valid : Boolean := False;
-         Sector_Address        : Rose.Devices.Block.Block_Address_Type;
+         Sector_Address        : Block_Address_Type;
          Entry_Record          : Directory_Entry;
          Directory_Entry_Count : Rose.Capabilities.Capability := 0;
          Directory_Entry_Name  : Rose.Capabilities.Capability := 0;
@@ -102,7 +103,7 @@ package body IsoFS.Directories is
    Directory_Caps : Directory_Caps_Array;
 
    procedure Read_Root_Directory
-     (Device : Rose.Devices.Block.Client.Block_Device_Type);
+     (Device : Client.Block_Device_Client);
 
    function New_Cap
      (Directory : Directory_Type;
@@ -114,7 +115,7 @@ package body IsoFS.Directories is
 
    procedure Create_Cap_Record
      (Directory : Directory_Type;
-      Sector    : Rose.Devices.Block.Block_Address_Type;
+      Sector    : Block_Address_Type;
       Dir_Entry : Directory_Entry);
 
    procedure Scan_Directory_Entries
@@ -133,7 +134,7 @@ package body IsoFS.Directories is
 
    procedure Create_Cap_Record
      (Directory : Directory_Type;
-      Sector    : Rose.Devices.Block.Block_Address_Type;
+      Sector    : Block_Address_Type;
       Dir_Entry : Directory_Entry)
    is
       use Rose.Interfaces.Directory;
@@ -329,7 +330,7 @@ package body IsoFS.Directories is
    ------------------------
 
    function Get_Root_Directory
-     (Device : Rose.Devices.Block.Client.Block_Device_Type)
+     (Device : Client.Block_Device_Client)
       return Directory_Type
    is
    begin
@@ -348,18 +349,19 @@ package body IsoFS.Directories is
    -------------------------
 
    procedure Read_Root_Directory
-     (Device : Rose.Devices.Block.Client.Block_Device_Type)
+     (Device : Client.Block_Device_Client)
    is
       use System.Storage_Elements;
-      use Rose.Devices.Block;
-      use Rose.Devices.Block.Client;
+      use Rose.Interfaces.Block_Device.Client;
 
       Volume_Index : Block_Address_Type := ISO_First_Volume_Sector;
-      Sector_Count : constant Block_Address_Type :=
-                       Get_Block_Count (Device);
+      Sector_Count : Block_Address_Type;
+      Sector_Size  : Block_Size_Type;
       Found        : Boolean := False;
       Buffer       : ISO_Sector;
    begin
+
+      Get_Parameters (Device, Sector_Count, Sector_Size);
 
       Block_Device := Device;
 
@@ -367,7 +369,7 @@ package body IsoFS.Directories is
         and then not Found
       loop
 
-         Read_Block (Device, Volume_Index, Buffer);
+         Read_Blocks (Device, Volume_Index, 1, Buffer);
 
          if Buffer (Descriptor_Type_Offset + 1)
            = Primary_Volume_Descriptor
@@ -432,7 +434,6 @@ package body IsoFS.Directories is
                    Name : String))
    is
       use System.Storage_Elements;
-      subtype Block_Address_Type is Rose.Devices.Block.Block_Address_Type;
       Rec          : Directory_Caps_Record renames Directory_Caps (Directory);
       Dir          : Directory_Entry renames Rec.Entry_Record;
       Location     : Word_32 := Dir.Extent_Location_LSB;
@@ -444,8 +445,8 @@ package body IsoFS.Directories is
    begin
       while Position < Storage_Count (Length) loop
          if not Have_Sector then
-            Rose.Devices.Block.Client.Read_Block
-              (Block_Device, Block_Address_Type (Location), Sector);
+            Rose.Interfaces.Block_Device.Client.Read_Blocks
+              (Block_Device, Block_Address_Type (Location), 1, Sector);
             Have_Sector := True;
             Sector_Start := Position - 1;
          end if;

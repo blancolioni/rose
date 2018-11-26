@@ -18,8 +18,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-devices.o \
-	$(BUILDDIR)/rose-devices-block.o \
-	$(BUILDDIR)/rose-devices-block-server.o \
 	$(BUILDDIR)/rose-devices-pci.o \
 	$(BUILDDIR)/rose-devices-pci-client.o \
 	$(BUILDDIR)/rose-devices-port_io.o \

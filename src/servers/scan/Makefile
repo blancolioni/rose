@@ -18,6 +18,10 @@ FILE_OBJECTS= \
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o
+BLOCK_DEVICE_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-block_device.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client-table.o
 
 OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
@@ -28,16 +32,14 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-devices.o \
-	$(BUILDDIR)/rose-devices-block.o \
-	$(BUILDDIR)/rose-devices-block-client.o \
-	$(BUILDDIR)/rose-devices-block-client-table.o \
 	$(BUILDDIR)/rose-devices-gpt.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-objects.o \
-	$(BUILDDIR)/rose-words.o
+	$(BUILDDIR)/rose-words.o \
+	$(BLOCK_DEVICE_OBJECTS)
 
 all: scan $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/scan $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
