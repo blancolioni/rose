@@ -1,7 +1,7 @@
-package Store.Server is
+package Partition.Server is
 
    procedure Create_Server;
 
    procedure Start_Server;
 
-end Store.Server;
+end Partition.Server;

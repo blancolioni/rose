@@ -1,10 +1,10 @@
 with Rose.Console_IO;
 
-with Store.Server;
+with Partition.Server;
 
-procedure Store.Driver is
+procedure Partition.Driver is
 begin
    Rose.Console_IO.Open (Console_Cap);
-   Store.Server.Create_Server;
-   Store.Server.Start_Server;
-end Store.Driver;
+   Partition.Server.Create_Server;
+   Partition.Server.Start_Server;
+end Partition.Driver;
