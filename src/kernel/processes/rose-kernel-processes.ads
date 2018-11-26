@@ -338,6 +338,7 @@ private
          Code_Page         : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
+         Env_Page          : Rose.Addresses.Physical_Page_Address;
          Invocation_Buffer : Rose.Addresses.Virtual_Page_Address;
          Saved_Stack_Value : Rose.Words.Word_32;
       end record;

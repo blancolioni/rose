@@ -28,6 +28,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-boot.o \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-console.o \
+	$(BUILDDIR)/rose-environment_pages.o \
 	$(BUILDDIR)/rose-formats.o \
 	$(BUILDDIR)/rose-formats-elf.o \
 	$(BUILDDIR)/rose-invocation.o \

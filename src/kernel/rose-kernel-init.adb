@@ -30,16 +30,21 @@ package body Rose.Kernel.Init is
                              Processes.Process_Table_Heap_Size;
       --  for each boot module, four page table pages
       --  page directory, first code and data page, top of stack page
+      --  and an environment page
       Boot_Module_Heap   : constant Physical_Bytes :=
                              Physical_Bytes (Modules.Last_Boot_Module)
-                             * 16#4000#;
+                             * 16#5000#;
 
       --  Module_Size : constant Virtual_Bytes :=
       --    Modules.Module_Heap_Size;
-      Heap_Size       : constant Physical_Bytes := Page_Table_Size
-                             + Process_Table_Size
-                               + Boot_Module_Heap;
+      Heap_Size       : constant Physical_Bytes :=
+                          Page_Table_Size
+                            + Process_Table_Size
+                            + Boot_Module_Heap
+                            + 16#20_0000#;
+
       --    Page_Table_Size + Process_Table_Size + Module_Size;
+
    begin
 
       Rose.Boot.Console.Put ("Kernel init: ");

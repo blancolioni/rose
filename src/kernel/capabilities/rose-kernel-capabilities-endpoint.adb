@@ -124,7 +124,10 @@ package body Rose.Kernel.Capabilities.Endpoint is
             Params       => Params.all);
       else
          if Params.Control.Flags (Rose.Invocation.Block) then
-            Rose.Boot.Console.Put_Line ("waiting for receiver");
+            Rose.Boot.Console.Put (Sender);
+            Rose.Boot.Console.Put (" -> ");
+            Rose.Boot.Console.Put (Receiver);
+            Rose.Boot.Console.Put_Line (": blocked");
             Rose.Kernel.Processes.Wait_For_Receiver
               (Waiting_Process => Sender,
                Params          => Params.all);
