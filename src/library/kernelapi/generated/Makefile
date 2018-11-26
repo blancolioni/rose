@@ -1,4 +1,4 @@
-IDL=block_device file_system directory file file_system stream_reader stream_writer stream seekable storage ata
+IDL=block_device file_system directory file file_system stream_reader stream_writer stream seekable storage ata partitions
 
 all: $(IDL)
 
@@ -9,6 +9,8 @@ rose-interfaces-%.ads: ../../../../interfaces/%.idl
 	idl $<
 
 block_device: rose-interfaces-block_device.ads
+
+partitions: rose-interfaces-partitions.ads
 
 file_system: rose-interfaces-file_system.ads
 

@@ -12,7 +12,7 @@ TOOLS=idl
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=
-BOOT_MODULES=init console store mem pci ata isofs restore scan
+BOOT_MODULES=init console store mem pci ata isofs restore scan partition
 
 #all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
 all: config interfaces $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
@@ -60,6 +60,9 @@ isofs:
 
 scan:
 	(cd src/servers/scan; make)
+
+partition:
+	(cd src/servers/partition; make)
 
 restore:
 	(cd src/servers/restore; make)
