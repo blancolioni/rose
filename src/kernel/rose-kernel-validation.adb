@@ -10,7 +10,7 @@ with Rose.Kernel.Panic;
 
 package body Rose.Kernel.Validation is
 
-   subtype Validated_Process_Id is Rose.Objects.Process_Id range 2 .. 10;
+   subtype Validated_Process_Id is Rose.Objects.Process_Id range 2 .. 16;
    subtype Validated_Capability is Rose.Capabilities.Capability range 1 .. 64;
 
    type Allocated_Cap_Array is

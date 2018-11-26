@@ -75,8 +75,9 @@ package body Rose.Kernel.Processes.Init is
       declare
          Pid : constant Rose.Objects.Process_Id :=
                  Load_Boot_Module
-                   (Priority   => 15,
-                    Module     => Rose.Kernel.Modules.Init_Module);
+                   (Priority    => 15,
+                    Module      => Rose.Kernel.Modules.Init_Module,
+                    Environment => null);
       begin
          pragma Unreferenced (Pid);
       end;
@@ -94,8 +95,9 @@ package body Rose.Kernel.Processes.Init is
    ----------------------
 
    function Load_Boot_Module
-     (Priority   : Process_Priority;
-      Module     : Rose.Kernel.Modules.Module_Index)
+     (Priority    : Process_Priority;
+      Module      : Rose.Kernel.Modules.Module_Index;
+      Environment : access Rose.Environment_Pages.Environment_Page)
       return Rose.Objects.Process_Id
    is
       use Rose.Invocation;
@@ -306,6 +308,7 @@ package body Rose.Kernel.Processes.Init is
            (Image, Load_Program_Header'Access);
 
          Proc.Stack_Page := Rose.Kernel.Heap.Allocate_Page;
+         Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
 
          declare
             use Rose.Kernel.Page_Table;
@@ -331,6 +334,43 @@ package body Rose.Kernel.Processes.Init is
             Proc.Page_Flags (Stack_Range_Index) :=
               (Valid => True, Readable => True, Writable => True,
                others => False);
+
+            Map_Page
+              (Directory_Page => Directory_VP,
+               Virtual_Page   =>
+                 Virtual_Address_To_Page (Environment_Base),
+               Physical_Page  => Proc.Env_Page,
+               Readable       => True,
+               Writable       => True,
+               Executable     => False,
+               User           => True);
+
+            if Environment /= null then
+               Rose.Boot.Console.Put_Line ("attaching environment page");
+               Map_Kernel_Page
+                 (Virtual_Page  =>
+                    Virtual_Page_Address
+                      (Proc.Env_Page + Kernel_Virtual_Page_Base),
+                  Physical_Page => Proc.Env_Page,
+                  Readable      => True,
+                  Writable      => True,
+                  Executable    => False,
+                  User          => False);
+
+               declare
+                  Kernel_Page_Address : constant Virtual_Address :=
+                                          (Virtual_Address (Proc.Env_Page)
+                                           + Kernel_Virtual_Page_Base)
+                                          * 4096;
+                  Kernel_Env_Page   : Rose.Environment_Pages.Environment_Page;
+                  pragma Import (Ada, Kernel_Env_Page);
+                  for Kernel_Env_Page'Address use
+                    System'To_Address (Kernel_Page_Address);
+               begin
+                  Kernel_Env_Page := Environment.all;
+               end;
+               Rose.Boot.Console.Put_Line ("done");
+            end if;
 
             Launch_Index := Launch_Index + 1;
             Launch_Params.Data (Launch_Index) := 3;  --  stack is r/w
