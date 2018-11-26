@@ -243,6 +243,13 @@ package body Init.Run is
       Console_Write_Cap :=
         Copy_Cap_From_Process (Copy_Console_Cap, 16#C025_0130#);
 
+      Mem_Id :=
+        Init.Calls.Launch_Boot_Module
+          (Boot_Cap, Mem_Module, Device_Driver_Priority,
+           (Create_Endpoint_Cap, Console_Write_Cap,
+            Mem_Region_Count_Cap, Mem_Get_Region_Cap,
+            Page_On_Cap));
+
       declare
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
@@ -395,13 +402,6 @@ package body Init.Run is
          end loop;
 
       end;
-
-      Mem_Id :=
-        Init.Calls.Launch_Boot_Module
-          (Boot_Cap, Mem_Module, Device_Driver_Priority,
-           (Create_Endpoint_Cap, Console_Write_Cap,
-            Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-            Page_On_Cap));
 
       declare
          IsoFS_Id : constant Rose.Objects.Object_Id :=
