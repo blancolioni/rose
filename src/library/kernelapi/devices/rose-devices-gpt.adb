@@ -199,6 +199,49 @@ package body Rose.Devices.GPT is
       end if;
    end Flush;
 
+   ---------------------------
+   -- Get_Partition_Details --
+   ---------------------------
+
+   procedure Get_Partition_Details
+     (Block_Device        :
+      Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+      Partition_Index     : Positive;
+      First_Block         : out
+        Rose.Interfaces.Block_Device.Block_Address_Type;
+      Last_Block          : out
+        Rose.Interfaces.Block_Device.Block_Address_Type;
+      Partition_Type_Low  : out Rose.Words.Word_64;
+      Partition_Type_High : out Rose.Words.Word_64;
+      Partition_Flags     : out Rose.Words.Word_64;
+      Partition_Name      : out String;
+      Partition_Name_Last : out Natural)
+   is
+   begin
+      Check_Cached (Block_Device);
+
+      declare
+         use Rose.Words;
+         Index : constant Word_32 := Word_32 (Partition_Index) - 1;
+         Part : GPT_Partition_Entry renames
+                  GPT_Data.Parts (Index);
+      begin
+         First_Block := Part.First_LBA;
+         Last_Block  := Part.Last_LBA;
+         Partition_Type_Low := Part.Partition_Type_Low;
+         Partition_Type_High := Part.Partition_Type_High;
+         Partition_Flags := Part.Flags;
+         Partition_Name :=
+           Part.Name
+             (1 .. Natural'Min (Partition_Name'Length, Part.Name'Length));
+         Partition_Name_Last := 0;
+         for Ch of Partition_Name loop
+            exit when Character'Pos (Ch) = 0;
+            Partition_Name_Last := Partition_Name_Last + 1;
+         end loop;
+      end;
+   end Get_Partition_Details;
+
    -------------
    -- Has_GPT --
    -------------
@@ -341,12 +384,17 @@ package body Rose.Devices.GPT is
                  and then Part.Partition_Type_High = Log_Id_High
                then
                   Rose.Console_IO.Put
-                    ("rose-log ");
+                    ("rose-log  ");
                else
                   Rose.Console_IO.Put
                     ("unknown   ");
                end if;
+
+               if (Part.Flags and Active_Swap_Flag) /= 0 then
+                  Rose.Console_IO.Put ("A");
+               end if;
             end;
+
          end;
          Rose.Console_IO.New_Line;
       end loop;

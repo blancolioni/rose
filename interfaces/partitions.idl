@@ -3,10 +3,11 @@ interface Partitions is
    function Partition_Count return Natural;
    
    procedure Get_Partition
-     (Index           : Positive;
-      Partition_Type  : out Word;
-      Partition_Flags : out Word_64;
-      Start_Address   : out Word_64;
-      Length          : out Word_64);
+     (Index               : Positive;
+      Partition_Type_Low  : out Word_64;
+      Partition_Type_High : out Word_64;      
+      Partition_Flags     : out Word_64;
+      Start_Address       : out Word_64;
+      Length              : out Word_64);
    
 end Partitions;

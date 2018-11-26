@@ -14,17 +14,19 @@ package Rose.Devices.GPT is
      (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
    return Natural;
 
---     procedure Get_Partition_Details
---       (Block_Device        : Rose.Interfaces.Block_Device.Client
-   --  .Block_Device_Client;
---        Partition_Index     : Positive;
---        First_Block         : out Rose.Devices.Block.Block_Address_Type;
---        Last_Block          : out Rose.Devices.Block.Block_Address_Type;
---        Partition_Type_Low  : out Rose.Words.Word_64;
---        Partition_Type_High : out Rose.Words.Word_64;
---        Partition_Flags     : out Rose.Words.Word_64;
---        Partition_Name      : out String;
---        Partition_Name_Last : out Natural);
+   procedure Get_Partition_Details
+     (Block_Device        :
+      Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+      Partition_Index     : Positive;
+      First_Block         : out
+        Rose.Interfaces.Block_Device.Block_Address_Type;
+      Last_Block          : out
+        Rose.Interfaces.Block_Device.Block_Address_Type;
+      Partition_Type_Low  : out Rose.Words.Word_64;
+      Partition_Type_High : out Rose.Words.Word_64;
+      Partition_Flags     : out Rose.Words.Word_64;
+      Partition_Name      : out String;
+      Partition_Name_Last : out Natural);
 
    procedure Add_Partition
      (Block_Device        :
