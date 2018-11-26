@@ -70,9 +70,8 @@ package Rose.System_Calls is
    procedure Receive_Buffer
      (Params   : in out Rose.Invocation.Invocation_Record);
 
-   procedure Copy_Buffer
-     (Params    : Rose.Invocation.Invocation_Record;
-      Max_Bytes : System.Storage_Elements.Storage_Count;
+   procedure Copy_Received_Buffer
+     (Max_Bytes : System.Storage_Elements.Storage_Count;
       To        : System.Address);
 
    procedure Copy_Storage_Array

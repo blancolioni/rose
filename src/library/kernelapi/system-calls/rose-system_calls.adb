@@ -13,27 +13,23 @@ package body Rose.System_Calls is
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
 
-     -----------------
-   -- Copy_Buffer --
-   -----------------
+   --------------------------
+   -- Copy_Received_Buffer --
+   --------------------------
 
-   procedure Copy_Buffer
-     (Params    : Rose.Invocation.Invocation_Record;
-      Max_Bytes : System.Storage_Elements.Storage_Count;
+   procedure Copy_Received_Buffer
+     (Max_Bytes : System.Storage_Elements.Storage_Count;
       To        : System.Address)
    is
       use System.Storage_Elements;
       Last   : constant Storage_Count :=
-                 Storage_Count'Min (Max_Bytes, Params.Buffer_Length);
-      Source : System.Storage_Elements.Storage_Array (1 .. Last);
-      pragma Import (Ada, Source);
-      for Source'Address use Params.Buffer_Address;
+                 Storage_Count'Min (Max_Bytes, Local_Buffer'Length);
       Dest   : System.Storage_Elements.Storage_Array (1 .. Last);
       pragma Import (Ada, Dest);
       for Dest'Address use To;
    begin
-      Dest := Source;
-   end Copy_Buffer;
+      Dest := Local_Buffer (1 .. Last);
+   end Copy_Received_Buffer;
 
    ------------------------
    -- Copy_Storage_Array --
