@@ -14,6 +14,7 @@ title Rose boot
     module /isofs
     module /restore
     module /scan
+    module /partition
     boot
 
 title Rose process log
@@ -28,7 +29,9 @@ title Rose process log
     module /isofs
     module /restore
     module /scan
+    module /partition
     boot
+
 title Rose invocation debug
     root (fd0)
     kernel /kernel log-invocation log-reply
@@ -41,6 +44,7 @@ title Rose invocation debug
     module /isofs
     module /restore
     module /scan
+    module /partition
     boot
 
 title Rose port debug
@@ -55,5 +59,6 @@ title Rose port debug
     module /isofs
     module /restore
     module /scan
+    module /partition
     boot
 
