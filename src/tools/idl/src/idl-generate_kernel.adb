@@ -193,26 +193,37 @@ package body IDL.Generate_Kernel is
                      Syn.Literal (Recv_Count))));
          else
             if Get_Size (Base_Type) > Default_Size then
-               Copy_Block.Append
-                 (Syn.Statements.New_Assignment_Statement
-                    (Base_Name,
-                     Syn.Expressions.New_Function_Call_Expression
-                       (Get_Ada_Name (Base_Type),
-                        Syn.Expressions.New_Function_Call_Expression
-                          ("Rose.System_Calls.Get_Word_64",
-                           Syn.Object ("Params"),
-                           Syn.Literal (Recv_Count)))));
+               declare
+                  Get : constant Syn.Expression'Class :=
+                          Syn.Expressions.New_Function_Call_Expression
+                            ("Rose.System_Calls.Get_Word_64",
+                             Syn.Object ("Params"),
+                             Syn.Literal (Recv_Count));
+               begin
+                  Copy_Block.Append
+                    (Syn.Statements.New_Assignment_Statement
+                       (Base_Name,
+                        (if Is_Word_Type (Base_Type)
+                         then Get
+                         else Syn.Expressions.New_Function_Call_Expression
+                           (Get_Ada_Name (Base_Type), Get))));
+               end;
                Recv_Count := Recv_Count + 2;
             else
-               Copy_Block.Append
-                 (Syn.Statements.New_Assignment_Statement
-                    (Base_Name,
-                     Syn.Expressions.New_Function_Call_Expression
-                       (Get_Ada_Name (Base_Type),
-                        Syn.Expressions.New_Function_Call_Expression
-                          ("Rose.System_Calls.Get_Word_32",
-                           Syn.Object ("Params"),
-                           Syn.Literal (Recv_Count)))));
+               declare
+                  Get : constant Syn.Expression'Class :=
+                          Syn.Expressions.New_Function_Call_Expression
+                            ("Rose.System_Calls.Get_Word_32",
+                             Syn.Object ("Params"),
+                             Syn.Literal (Recv_Count));
+               begin
+                  Copy_Block.Append
+                    (Syn.Statements.New_Assignment_Statement
+                       (Base_Name,
+                        (if Is_Word_Type (Base_Type) then Get
+                         else Syn.Expressions.New_Function_Call_Expression
+                           (Get_Ada_Name (Base_Type), Get))));
+               end;
                Recv_Count := Recv_Count + 1;
             end if;
          end if;
