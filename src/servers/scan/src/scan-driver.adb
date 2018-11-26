@@ -170,7 +170,7 @@ begin
 
          Invoke_Capability (Params);
 
-         Rose.System_Calls.Initialize_Reply (Reply, Params.Cap);
+         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
             when Rose.Interfaces.Partitions.Partition_Count_Endpoint =>
