@@ -24,7 +24,7 @@ package body Rose.Command_Line is
       Argument : out String;
       Last     : out Natural)
    is
-      Name : String := "arg00";
+      Name : String := "@arg00";
    begin
       Name (Name'Last) := Character'Val (Index mod 10 + 48);
       Name (Name'Last - 1) := Character'Val (Index / 10 mod 10 + 48);
