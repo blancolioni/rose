@@ -4,6 +4,8 @@ with Rose.Words;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Storage;
 
+with Rose.Interfaces.Ata;
+
 with Init.Calls;
 
 package body Init.Run is
@@ -220,7 +222,8 @@ package body Init.Run is
                                       Word (Ata_Id / 2 ** 32)));
          Get_Interface_Cap     : constant Rose.Capabilities.Capability :=
                                    Copy_Cap_From_Process
-                                     (Copy_Ata_Cap, 16#7F4D_5635#);
+                                     (Copy_Ata_Cap,
+                                      Rose.Interfaces.Ata.Get_Device_Endpoint);
          Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
          Hd1                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin

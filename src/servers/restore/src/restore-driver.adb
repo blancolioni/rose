@@ -1,4 +1,4 @@
-with Rose.Devices.Block.Client;
+with Rose.Interfaces.Block_Device.Client;
 with Rose.Devices.GPT;
 
 with Rose.Interfaces.File_System.Client;
@@ -12,18 +12,18 @@ with Rose.System_Calls.Server;
 with Restore.Installer;
 
 procedure Restore.Driver is
-   use Rose.Devices.Block.Client;
-   Device : Block_Device_Type;
+   use Rose.Interfaces.Block_Device.Client;
+   Device : Block_Device_Client;
 begin
    Rose.Console_IO.Open (Console_Cap);
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");
 
-   Rose.Devices.Block.Client.Open
-     (Device         => Device,
-      Parameters_Cap => Block_Device_Parameters_Cap,
-      Read_Cap       => Block_Device_Read_Cap,
-      Write_Cap      => Block_Device_Write_Cap);
+   Rose.Interfaces.Block_Device.Client.Open
+     (Client         => Device,
+      Get_Parameters => Block_Device_Parameters_Cap,
+      Read_Blocks    => Block_Device_Read_Cap,
+      Write_Blocks   => Block_Device_Write_Cap);
 
    Rose.Console_IO.Put_Line ("restore: looking for system image");
 

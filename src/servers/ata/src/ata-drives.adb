@@ -146,7 +146,7 @@ package body ATA.Drives is
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Cap  => Create_Endpoint_Cap,
            Endpoint_Id =>
-             Rose.Devices.Block.Read_Block_Endpoint,
+             Rose.Devices.Block.Read_Blocks_Endpoint,
            Identifier  =>
              Rose.Objects.Capability_Identifier (Drive.Index));
 
@@ -155,7 +155,7 @@ package body ATA.Drives is
            Rose.System_Calls.Server.Create_Endpoint
              (Create_Cap  => Create_Endpoint_Cap,
               Endpoint_Id =>
-                Rose.Devices.Block.Write_Block_Endpoint,
+                Rose.Devices.Block.Write_Blocks_Endpoint,
               Identifier  =>
                 Rose.Objects.Capability_Identifier (Drive.Index));
 

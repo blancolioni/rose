@@ -1,14 +1,18 @@
 with System.Storage_Elements;
 
 with Rose.System_Calls.Client;
+with Rose.System_Calls.Server;
 
+with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
 
 with Rose.Devices.PCI.Client;
 with Rose.Console_IO;
 
-with Rose.Devices.Block.Server;
+with Rose.Devices.Block;
+with Rose.Interfaces.Block_Device;
+with Rose.Interfaces.Ata;
 
 with ATA.Commands;
 with ATA.Drives;
@@ -36,18 +40,8 @@ package body ATA.Server is
       Block_Size    : out Rose.Devices.Block.Block_Size_Type;
       Block_Count   : out Rose.Devices.Block.Block_Address_Type);
 
-   procedure Read_Block
-     (Identifier    : Rose.Objects.Capability_Identifier;
-      Block_Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer        : out System.Storage_Elements.Storage_Array);
-
-   procedure Write_Block
-     (Identifier    : Rose.Objects.Capability_Identifier;
-      Block_Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer        : System.Storage_Elements.Storage_Array);
-
    procedure Get_Interface
-     (Identifier         : Rose.Objects.Capability_Identifier;
+     (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
       Write_Block_Cap    : out Rose.Capabilities.Capability);
@@ -156,13 +150,13 @@ package body ATA.Server is
    -------------------
 
    procedure Get_Interface
-     (Identifier         : Rose.Objects.Capability_Identifier;
+     (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
       Write_Block_Cap    : out Rose.Capabilities.Capability)
    is
       Drive_Index : constant ATA.Drives.ATA_Drive_Index :=
-                      ATA.Drives.ATA_Drive_Index (Identifier);
+                      ATA.Drives.ATA_Drive_Index (Interface_Id);
       Drive       : constant ATA.Drives.ATA_Drive :=
                       ATA.Drives.Get (Drive_Index);
    begin
@@ -172,6 +166,17 @@ package body ATA.Server is
         ATA.Drives.Read_Block_Cap (Drive);
       Write_Block_Cap :=
         ATA.Drives.Write_Block_Cap (Drive);
+
+      Rose.Console_IO.Put ("ata: caps for hd");
+      Rose.Console_IO.Put (Natural (Interface_Id));
+      Rose.Console_IO.Put (": ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Get_Parameters_Cap));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Read_Block_Cap));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Write_Block_Cap));
+      Rose.Console_IO.New_Line;
+
    end Get_Interface;
 
    --------------------
@@ -192,50 +197,139 @@ package body ATA.Server is
       Block_Count := ATA.Drives.Block_Count (Drive);
    end Get_Parameters;
 
-   ----------------
-   -- Read_Block --
-   ----------------
-
-   procedure Read_Block
-     (Identifier    : Rose.Objects.Capability_Identifier;
-      Block_Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer        : out System.Storage_Elements.Storage_Array)
-   is
-   begin
-      ATA.Commands.Read_Sector
-        (Drive   => ATA.Drives.Get (ATA.Drives.ATA_Drive_Index (Identifier)),
-         Address => Block_Address,
-         Sector  => Buffer);
-   end Read_Block;
-
    ------------------
    -- Start_Server --
    ------------------
 
    procedure Start_Server is
+      Receive_Cap : constant Rose.Capabilities.Capability :=
+                      Rose.System_Calls.Server.Create_Receive_Cap
+                        (Create_Endpoint_Cap);
+      Params      : aliased Rose.Invocation.Invocation_Record;
+      Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Devices.Block.Server.Run_Server
-        (Endpoint_Cap   => Create_Endpoint_Cap,
-         Get_Parameters => Get_Parameters'Access,
-         Read_Handler   => Read_Block'Access,
-         Write_Handler  => Write_Block'Access,
-         Get_Interface  => Get_Interface'Access);
+
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
+         Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
+
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
+         Rose.Interfaces.Ata.Get_Device_Endpoint);
+
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
+         Rose.Interfaces.Block_Device.Read_Blocks_Endpoint);
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
+         Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
+
+      loop
+         Params := (others => <>);
+         Params.Control.Flags (Rose.Invocation.Receive) := True;
+         Params.Control.Flags (Rose.Invocation.Block) := True;
+         Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
+         Params.Control.Flags (Rose.Invocation.Recv_Buffer) := True;
+         Params.Control.Last_Recv_Word :=
+           Rose.Invocation.Parameter_Word_Index'Last;
+         Params.Cap := Receive_Cap;
+
+         Rose.System_Calls.Invoke_Capability (Params);
+
+         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+
+         case Params.Endpoint is
+            when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
+               declare
+                  Block_Size    : Rose.Devices.Block.Block_Size_Type;
+                  Block_Count   : Rose.Devices.Block.Block_Address_Type;
+               begin
+                  Get_Parameters (Params.Identifier, Block_Size, Block_Count);
+
+                  Rose.System_Calls.Send_Word
+                    (Reply, Rose.Words.Word_64 (Block_Count));
+                  Rose.System_Calls.Send_Word
+                    (Reply, Rose.Words.Word_32 (Block_Size));
+
+               end;
+
+            when Rose.Interfaces.Block_Device.Read_Blocks_Endpoint =>
+               declare
+                  use Rose.Interfaces.Block_Device;
+                  use System.Storage_Elements;
+                  Buffer : Storage_Array (1 .. Params.Buffer_Length);
+                  pragma Import (Ada, Buffer);
+                  for Buffer'Address use Params.Buffer_Address;
+                  Block_Address : constant Block_Address_Type :=
+                                    Block_Address_Type
+                                      (Rose.System_Calls.Get_Word_64
+                                         (Params, 0));
+                  Block_Count   : constant Natural :=
+                                    Natural
+                                      (Rose.System_Calls.Get_Word_64
+                                         (Params, 2));
+               begin
+                  ATA.Commands.Read_Sectors
+                    (Drive         =>
+                       ATA.Drives.Get
+                         (ATA.Drives.ATA_Drive_Index (Params.Identifier)),
+                     Address       => Block_Address,
+                     Count         => Block_Count,
+                     Sectors       => Buffer);
+               end;
+
+            when Rose.Interfaces.Block_Device.Write_Blocks_Endpoint =>
+               declare
+                  use Rose.Interfaces.Block_Device;
+                  use System.Storage_Elements;
+                  Buffer        : Storage_Array (1 .. Params.Buffer_Length);
+                  pragma Import (Ada, Buffer);
+                  for Buffer'Address use Params.Buffer_Address;
+                  Block_Address : constant Block_Address_Type :=
+                                    Block_Address_Type
+                                      (Rose.System_Calls.Get_Word_64
+                                         (Params, 0));
+                  Block_Count   : constant Natural :=
+                                    Natural
+                                      (Rose.System_Calls.Get_Word_64
+                                         (Params, 2));
+               begin
+                  ATA.Commands.Write_Sectors
+                    (Drive         =>
+                       ATA.Drives.Get
+                         (ATA.Drives.ATA_Drive_Index (Params.Identifier)),
+                     Address       => Block_Address,
+                     Count         => Block_Count,
+                     Sectors       => Buffer);
+               end;
+
+            when Rose.Interfaces.Ata.Get_Device_Endpoint =>
+               declare
+                  Get_Parameters_Cap : Rose.Capabilities.Capability;
+                  Read_Block_Cap     : Rose.Capabilities.Capability;
+                  Write_Block_Cap    : Rose.Capabilities.Capability;
+               begin
+                  Get_Interface (Params.Data (0),
+                                 Get_Parameters_Cap,
+                                 Read_Block_Cap,
+                                 Write_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Read_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Write_Block_Cap);
+               end;
+
+            when others =>
+               Rose.Console_IO.Put
+                 ("ata: unknown endpoint: ");
+               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
+               Rose.Console_IO.New_Line;
+               Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+
+         end case;
+
+         Rose.System_Calls.Invoke_Capability (Reply);
+
+      end loop;
    end Start_Server;
-
-   -----------------
-   -- Write_Block --
-   -----------------
-
-   procedure Write_Block
-     (Identifier    : Rose.Objects.Capability_Identifier;
-      Block_Address : Rose.Devices.Block.Block_Address_Type;
-      Buffer        : System.Storage_Elements.Storage_Array)
-   is
-   begin
-      ATA.Commands.Write_Sector
-        (Drive   => ATA.Drives.Get (ATA.Drives.ATA_Drive_Index (Identifier)),
-         Address => Block_Address,
-         Sector  => Buffer);
-   end Write_Block;
 
 end ATA.Server;
