@@ -4,6 +4,7 @@ project Init is
       ("src",
        "../../base",
        "../../library/capabilities",
+       "../../library/kernelapi/devices",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
        "../../library/kernelapi/arch/i686");

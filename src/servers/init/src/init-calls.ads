@@ -39,6 +39,14 @@ package Init.Calls is
       Launch_Caps  : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
+   function Launch_Boot_Module
+     (Cap          : Rose.Capabilities.Capability;
+      Module_Index : Rose.Words.Word;
+      Priority     : Rose.Words.Word;
+      Launch_Caps  : Array_Of_Capabilities;
+      Launch_Words : Array_Of_Words)
+      return Rose.Objects.Object_Id;
+
    procedure Get_Interface
      (Cap            : Rose.Capabilities.Capability;
       Identifier     : Rose.Objects.Capability_Identifier;
