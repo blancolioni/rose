@@ -10,4 +10,6 @@ package Rose.Devices.Partitions is
    Log_Id_High : constant :=
                     16#4091_DD32_8E25_7A2F#;
 
+   Active_Swap_Flag : constant := 2 ** 22;
+
 end Rose.Devices.Partitions;
