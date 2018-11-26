@@ -100,9 +100,8 @@ package body IDL.Generate_Kernel is
          pragma Unreferenced (Base_Type, Count_Name);
          Call : Syn.Statements.Procedure_Call_Statement'Class :=
                   Syn.Statements.New_Procedure_Call_Statement
-                    ("Rose.System_Calls.Copy_Buffer");
+                    ("Rose.System_Calls.Copy_Received_Buffer");
       begin
-         Call.Add_Actual_Argument ("Params");
          Call.Add_Actual_Argument
            (Syn.Object (Base_Name & "'Length"));
          Call.Add_Actual_Argument
