@@ -41,7 +41,7 @@ package body ATA.Server is
       Block_Count   : out Rose.Devices.Block.Block_Address_Type);
 
    procedure Get_Interface
-     (Identifier         : Rose.Objects.Capability_Identifier;
+     (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
       Write_Block_Cap    : out Rose.Capabilities.Capability);
@@ -150,13 +150,13 @@ package body ATA.Server is
    -------------------
 
    procedure Get_Interface
-     (Identifier         : Rose.Objects.Capability_Identifier;
+     (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
       Write_Block_Cap    : out Rose.Capabilities.Capability)
    is
       Drive_Index : constant ATA.Drives.ATA_Drive_Index :=
-                      ATA.Drives.ATA_Drive_Index (Identifier);
+                      ATA.Drives.ATA_Drive_Index (Interface_Id);
       Drive       : constant ATA.Drives.ATA_Drive :=
                       ATA.Drives.Get (Drive_Index);
    begin
@@ -166,6 +166,17 @@ package body ATA.Server is
         ATA.Drives.Read_Block_Cap (Drive);
       Write_Block_Cap :=
         ATA.Drives.Write_Block_Cap (Drive);
+
+      Rose.Console_IO.Put ("ata: caps for hd");
+      Rose.Console_IO.Put (Natural (Interface_Id));
+      Rose.Console_IO.Put (": ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Get_Parameters_Cap));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Read_Block_Cap));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Write_Block_Cap));
+      Rose.Console_IO.New_Line;
+
    end Get_Interface;
 
    --------------------
@@ -298,7 +309,7 @@ package body ATA.Server is
                   Read_Block_Cap     : Rose.Capabilities.Capability;
                   Write_Block_Cap    : Rose.Capabilities.Capability;
                begin
-                  Get_Interface (Params.Identifier,
+                  Get_Interface (Params.Data (0),
                                  Get_Parameters_Cap,
                                  Read_Block_Cap,
                                  Write_Block_Cap);
