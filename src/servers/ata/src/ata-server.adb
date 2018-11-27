@@ -166,17 +166,6 @@ package body ATA.Server is
         ATA.Drives.Read_Block_Cap (Drive);
       Write_Block_Cap :=
         ATA.Drives.Write_Block_Cap (Drive);
-
-      Rose.Console_IO.Put ("ata: caps for hd");
-      Rose.Console_IO.Put (Natural (Interface_Id));
-      Rose.Console_IO.Put (": ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (Get_Parameters_Cap));
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (Read_Block_Cap));
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (Rose.Words.Word_8 (Write_Block_Cap));
-      Rose.Console_IO.New_Line;
-
    end Get_Interface;
 
    --------------------
