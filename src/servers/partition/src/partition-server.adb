@@ -27,6 +27,9 @@ package body Partition.Server is
 
    Device_Client      : Client.Block_Device_Client;
 
+   Get_Parameters_Cap   : Rose.Capabilities.Capability;
+   Read_Cap, Write_Cap  : Rose.Capabilities.Capability;
+
 --     function To_Device_Block_Count
 --       (Count : Block_Address_Type)
 --        return Block_Address_Type
@@ -56,13 +59,22 @@ package body Partition.Server is
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Read_Blocks_Endpoint);
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
+         Rose.Interfaces.Get_Interface_Endpoint);
+
+      Get_Parameters_Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Endpoint_Cap,
+           Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
+
+      Read_Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Endpoint_Cap,
+           Rose.Interfaces.Block_Device.Read_Blocks_Endpoint);
+
+      Write_Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Endpoint_Cap,
+           Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
 
       declare
          Argument : String (1 .. 20);
@@ -150,6 +162,11 @@ package body Partition.Server is
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
+            when Rose.Interfaces.Get_Interface_Endpoint =>
+               Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
+               Rose.System_Calls.Send_Cap (Reply, Read_Cap);
+               Rose.System_Calls.Send_Cap (Reply, Write_Cap);
+
             when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
                Rose.System_Calls.Send_Word
                  (Reply, Rose.Words.Word_32 (Partition_Block_Size));
@@ -198,8 +215,9 @@ package body Partition.Server is
                      Blocks => Storage);
                end;
             when others =>
-               Rose.Console_IO.Put_Line
-                 ("partition: bad endpoint");
+               Rose.Console_IO.Put ("partition: bad endpoint: ");
+               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
+               Rose.Console_IO.New_Line;
          end case;
          Rose.System_Calls.Invoke_Capability (Reply);
       end loop;
