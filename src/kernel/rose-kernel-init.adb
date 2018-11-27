@@ -40,8 +40,7 @@ package body Rose.Kernel.Init is
       Heap_Size       : constant Physical_Bytes :=
                           Page_Table_Size
                             + Process_Table_Size
-                            + Boot_Module_Heap
-                            + 16#20_0000#;
+                            + Boot_Module_Heap;
 
       --    Page_Table_Size + Process_Table_Size + Module_Size;
 
