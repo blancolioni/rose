@@ -48,9 +48,8 @@ package body Partition.Server is
 
    procedure Create_Server is
    begin
-      Client.Open
-        (Device_Client,
-         Device_Parameters_Cap, Device_Read_Cap, Device_Write_Cap);
+      Client.Open_Interface
+        (Device_Client, Block_Device_Cap);
 
       Client.Get_Parameters
         (Device_Client, Device_Total_Block_Count, Device_Block_Size);

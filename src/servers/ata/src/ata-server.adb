@@ -211,6 +211,10 @@ package body ATA.Server is
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
+         Rose.Interfaces.Get_Interface_Endpoint);
+
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
          Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
@@ -239,6 +243,21 @@ package body ATA.Server is
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
+            when Rose.Interfaces.Get_Interface_Endpoint =>
+               declare
+                  Get_Parameters_Cap : Rose.Capabilities.Capability;
+                  Read_Block_Cap     : Rose.Capabilities.Capability;
+                  Write_Block_Cap    : Rose.Capabilities.Capability;
+               begin
+                  Get_Interface (Rose.Words.Word (Params.Identifier),
+                                 Get_Parameters_Cap,
+                                 Read_Block_Cap,
+                                 Write_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Read_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Write_Block_Cap);
+               end;
+
             when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
                declare
                   Block_Size    : Rose.Devices.Block.Block_Size_Type;

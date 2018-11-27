@@ -74,6 +74,7 @@ package body Init.Run is
                                  (Create_Cap, (7, 1, 0, 0));
       PCI_Cap              : Rose.Capabilities.Capability;
 
+      Hd0_Cap              : Rose.Capabilities.Capability;
       Hd0_Parameters_Cap   : Rose.Capabilities.Capability;
       Hd0_Read_Cap         : Rose.Capabilities.Capability;
       Hd0_Write_Cap        : Rose.Capabilities.Capability;
@@ -93,16 +94,15 @@ package body Init.Run is
 --          .Block_Device_Client;
 
       function Copy_Cap_From_Process
-        (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Objects.Endpoint_Id)
+        (Copy_Cap   : Rose.Capabilities.Capability;
+         Endpoint   : Rose.Objects.Endpoint_Id;
+         Identifier : Rose.Objects.Capability_Identifier := 0)
          return Rose.Capabilities.Capability;
 
       procedure Load_Partition
         (Client            : Rose.Interfaces.Partitions
          .Client.Partitions_Client;
-         Device_Parameters : Rose.Capabilities.Capability;
-         Device_Read       : Rose.Capabilities.Capability;
-         Device_Write      : Rose.Capabilities.Capability;
+         Device_Cap        : Rose.Capabilities.Capability;
          Index             : Positive);
 
       ---------------------------
@@ -110,14 +110,16 @@ package body Init.Run is
       ---------------------------
 
       function Copy_Cap_From_Process
-        (Copy_Cap : Rose.Capabilities.Capability;
-         Endpoint : Rose.Objects.Endpoint_Id)
+        (Copy_Cap   : Rose.Capabilities.Capability;
+         Endpoint   : Rose.Objects.Endpoint_Id;
+         Identifier : Rose.Objects.Capability_Identifier := 0)
          return Rose.Capabilities.Capability
       is
 
          Data : constant Init.Calls.Array_Of_Words :=
                   (Word_32 (Word_64 (Endpoint) mod 2 ** 32),
-                   Word_32 (Word_64 (Endpoint) / 2 ** 32));
+                   Word_32 (Word_64 (Endpoint) / 2 ** 32),
+                   Word_32 (Identifier));
          Cap  : Capability :=
                   Init.Calls.Call (Copy_Cap, Data);
          Hex_Digits : constant String := "0123456789ABCDEF";
@@ -160,9 +162,7 @@ package body Init.Run is
       procedure Load_Partition
         (Client            : Rose.Interfaces.Partitions
          .Client.Partitions_Client;
-         Device_Parameters : Rose.Capabilities.Capability;
-         Device_Read       : Rose.Capabilities.Capability;
-         Device_Write      : Rose.Capabilities.Capability;
+         Device_Cap        : Rose.Capabilities.Capability;
          Index             : Positive)
       is
          Partition_Type_Low  : Rose.Words.Word_64;
@@ -184,7 +184,7 @@ package body Init.Run is
                 (Boot_Cap, Partition_Module, Device_Driver_Priority,
                  (Create_Endpoint_Cap,
                   Console_Write_Cap,
-                  Device_Parameters, Device_Read, Device_Write),
+                  Device_Cap),
                   (Rose.Words.Word (Start_Address),
                    Rose.Words.Word (Start_Address + Length),
                   4096));
@@ -333,6 +333,13 @@ package body Init.Run is
          Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
          Hd1                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin
+
+         Hd0_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Ata_Cap,
+              Rose.Interfaces.Get_Interface_Endpoint,
+              0);
+
          Init.Calls.Get_Interface (Get_Interface_Cap, 0, Hd0);
          Init.Calls.Get_Interface (Get_Interface_Cap, 1, Hd1);
 
@@ -396,11 +403,9 @@ package body Init.Run is
 
          for I in 1 .. Client.Partition_Count (Parts) loop
             Load_Partition
-              (Client            => Parts,
-               Device_Parameters => Hd0_Parameters_Cap,
-               Device_Read       => Hd0_Read_Cap,
-               Device_Write      => Hd0_Write_Cap,
-               Index             => I);
+              (Client     => Parts,
+               Device_Cap => Hd0_Cap,
+               Index      => I);
          end loop;
 
       end;
