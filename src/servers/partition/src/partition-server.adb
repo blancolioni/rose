@@ -13,7 +13,7 @@ package body Partition.Server is
 
    use Rose.Interfaces.Block_Device;
 
---   Partition_Base_Address : Block_Address_Type;
+--     Partition_Base_Address : Block_Address_Type;
    Partition_Block_Count  : Block_Address_Type;
    Partition_Block_Size   : Block_Size_Type;
 
@@ -75,7 +75,8 @@ package body Partition.Server is
 
          Rose.Command_Line.Get_Argument (2, Argument, Last);
          Device_Block_Count :=
-           Block_Address_Type (To_Word_32 (Argument (1 .. Last)));
+           Block_Address_Type (To_Word_32 (Argument (1 .. Last)))
+           - Device_Base_Address + 1;
 
          Rose.Command_Line.Get_Argument (3, Argument, Last);
          Partition_Block_Size :=
@@ -87,6 +88,7 @@ package body Partition.Server is
 
 --        Partition_Base_Address :=
 --          (Device_Base_Address + Block_Size_Ratio - 1) / Block_Size_Ratio;
+
       declare
          use Rose.Words;
       begin
@@ -94,6 +96,40 @@ package body Partition.Server is
            Block_Address_Type
              (Word (Device_Block_Count) / Word (Block_Size_Ratio));
       end;
+
+      Rose.Console_IO.Put
+        ("partition: start ");
+      Rose.Console_IO.Put
+        ((Natural (Device_Base_Address)
+         + Natural (Block_Size_Ratio) - 1)
+         / Natural (Block_Size_Ratio));
+
+      Rose.Console_IO.Put ("/");
+      Rose.Console_IO.Put
+        (Natural (Device_Base_Address));
+      Rose.Console_IO.Put
+        (" blocks ");
+      Rose.Console_IO.Put
+        (Natural (Partition_Block_Count));
+      Rose.Console_IO.Put ("/");
+      Rose.Console_IO.Put
+        (Natural (Device_Block_Count));
+      Rose.Console_IO.Put
+        (" block size ");
+      Rose.Console_IO.Put
+        (Natural (Partition_Block_Size));
+      Rose.Console_IO.Put ("/");
+      Rose.Console_IO.Put
+        (Natural (Device_Block_Size));
+
+      Rose.Console_IO.Put
+        (" total ");
+      Rose.Console_IO.Put
+        (Natural (Partition_Block_Count)
+         * Natural (Partition_Block_Size)
+         / 1024 / 1024);
+      Rose.Console_IO.Put ("M");
+      Rose.Console_IO.New_Line;
 
    end Create_Server;
 
@@ -108,7 +144,6 @@ package body Partition.Server is
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Console_IO.Put_Line ("partition: starting server");
       loop
          Rose.System_Calls.Initialize_Receive (Params, Receive_Cap);
          Rose.System_Calls.Receive_Words (Params, 1);
