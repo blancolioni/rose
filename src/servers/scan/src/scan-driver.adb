@@ -23,11 +23,9 @@ procedure Scan.Driver is
 begin
    Rose.Console_IO.Open (Console_Cap);
 
-   Rose.Interfaces.Block_Device.Client.Open
+   Rose.Interfaces.Block_Device.Client.Open_Interface
      (Client         => Device,
-      Get_Parameters => Block_Device_Parameters_Cap,
-      Read_Blocks    => Block_Device_Read_Cap,
-      Write_Blocks   => Block_Device_Write_Cap);
+      Interface_Cap  => Block_Device_Cap);
 
    Get_Parameters (Device, Block_Count, Block_Size);
 

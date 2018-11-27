@@ -381,10 +381,7 @@ package body Init.Run is
                        (Boot_Cap, Scan_Module, File_System_Priority,
                         (Create_Endpoint_Cap,
                          Console_Write_Cap,
-                         Hd0_Parameters_Cap,
-                         Hd0_Read_Cap,
-                         Hd0_Write_Cap,
-                         Add_Storage_Cap));
+                         Hd0_Cap));
          Copy_Scan_Cap : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
