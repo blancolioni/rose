@@ -422,7 +422,7 @@ package body Rose.Kernel.Processes.Init is
                if Use_Serial_Port then
                   Rose.Boot.Console.Put_Line
                     ("Switching to serial port");
-                  Rose.Boot.Console.Enable_Serial_Port;
+                  Rose.Boot.Console.Disable_Display;
                end if;
 
             end if;

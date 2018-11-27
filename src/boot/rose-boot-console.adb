@@ -22,8 +22,9 @@ package body Rose.Boot.Console is
    for Status_Memory'Address use System'To_Address (16#F00B_8000#);
    pragma Import (Ada, Status_Memory);
 
-   Enabled          : Boolean := True;
-   Serial_Port_Mode : Boolean := False;
+   Enabled             : Boolean := True;
+   Serial_Port_Enabled : constant Boolean := True;
+   Display_Enabled     : Boolean := True;
 
    --  use the known boot virtual address that points to the console
    Console_Memory : Console_Memory_Array;
@@ -50,6 +51,8 @@ package body Rose.Boot.Console is
 
    procedure Put_String (Text   : String;
                          Update : Boolean);
+
+   procedure Enable_Serial_Port;
 
    -----------
    -- Clear --
@@ -91,13 +94,22 @@ package body Rose.Boot.Console is
       null;    --  Enabled := False;
    end Disable_Console;
 
+   ---------------------
+   -- Disable_Display --
+   ---------------------
+
+   procedure Disable_Display is
+   begin
+      Display_Enabled := False;
+   end Disable_Display;
+
    --------------------
    -- Enable_Display --
    --------------------
 
    procedure Enable_Display is
    begin
-      Serial_Port_Mode := False;
+      Display_Enabled := True;
    end Enable_Display;
 
    ------------------------
@@ -113,7 +125,6 @@ package body Rose.Boot.Console is
       Rose.Arch.Outb (Serial_Port + 3, 16#03#);
       Rose.Arch.Outb (Serial_Port + 2, 16#C7#);
       Rose.Arch.Outb (Serial_Port + 1, 16#00#);
-      Serial_Port_Mode := True;
    end Enable_Serial_Port;
 
    ---------------------
@@ -163,6 +174,8 @@ package body Rose.Boot.Console is
 
       Status_Line (0, 0, 0);
 
+      Enable_Serial_Port;
+
    end Init_Boot_Console;
 
    -------------
@@ -183,9 +196,10 @@ package body Rose.Boot.Console is
    procedure New_Line is
    begin
       if Enabled then
-         if Serial_Port_Mode then
+         if Serial_Port_Enabled then
             Put_Serial_Port (Character'Val (10));
-         else
+         end if;
+         if Display_Enabled then
             Terminal_Line := Terminal_Line + 1;
             Terminal_Column := 0;
             Scroll;
@@ -210,7 +224,7 @@ package body Rose.Boot.Console is
       Offset : constant Natural := Current_Offset;
    begin
       if Enabled then
-         if Serial_Port_Mode then
+         if Serial_Port_Enabled then
             if Character'Pos (Ch) in 32 .. 127 then
                Put_Serial_Port (Ch);
             else
@@ -221,7 +235,8 @@ package body Rose.Boot.Console is
                  (Hex_Digit (Character'Pos (Ch) mod 256));
                Put_Serial_Port (']');
             end if;
-         else
+         end if;
+         if Display_Enabled then
             Console_Memory (Offset) := Current_Colour + Character'Pos (Ch);
             Update_Cursor_Position (Offset + 1);
          end if;
@@ -414,11 +429,12 @@ package body Rose.Boot.Console is
       Offset : Natural := Current_Offset;
    begin
       if Enabled then
-         if Serial_Port_Mode then
+         if Serial_Port_Enabled then
             for Ch of Text loop
-               Put (Ch);
+               Put_Serial_Port (Ch);
             end loop;
-         else
+         end if;
+         if Display_Enabled then
             for I in Text'Range loop
                Console_Memory (Offset) :=
                  Current_Colour + Character'Pos (Text (I));
@@ -437,7 +453,7 @@ package body Rose.Boot.Console is
 
    procedure Scroll is
    begin
-      if Enabled and then not Serial_Port_Mode then
+      if Enabled and then Display_Enabled then
          while Terminal_Line >= Num_Lines loop
             Console_Memory (0 .. (Num_Lines - 1) * Num_Columns - 1) :=
               Console_Memory (Num_Columns .. Num_Lines * Num_Columns - 1);
