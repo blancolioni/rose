@@ -203,10 +203,6 @@ begin
                            Partition_Flags     => Partition_Flags,
                            Partition_Name      => Partition_Name,
                            Partition_Name_Last => Partition_Name_Last);
-                        Rose.Console_IO.Put ("scan: sending partition: ");
-                        Rose.Console_IO.Put
-                          (Partition_Name (1 .. Partition_Name_Last));
-                        Rose.Console_IO.New_Line;
 
                         Rose.System_Calls.Send_Word
                           (Reply, Partition_Type_Low);
