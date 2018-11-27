@@ -195,7 +195,7 @@ package body Rose.Kernel.Command_Line is
          Rec    : Text_Range renames Command_Line.Values (Index);
          Result : Integer := 0;
       begin
-         for Value_Index in reverse Rec.First .. Rec.Last loop
+         for Value_Index in Rec.First .. Rec.Last loop
             declare
                Ch : constant Character := Command_Line.Text (Value_Index);
             begin
