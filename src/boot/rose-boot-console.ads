@@ -8,7 +8,7 @@ with Rose.Words;                       use Rose.Words;
 package Rose.Boot.Console is
 
    procedure Init_Boot_Console;
-   procedure Enable_Serial_Port;
+   procedure Disable_Display;
    procedure Enable_Display;
    procedure Detach;
 
