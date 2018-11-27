@@ -12,14 +12,18 @@ package body Rose.Kernel.Capabilities.Boot is
 
    Page : aliased Rose.Environment_Pages.Environment_Page;
 
-   procedure Create_Environment (Params : Rose.Invocation.Invocation_Access);
+   function Check_Environment
+     (Params : Rose.Invocation.Invocation_Access)
+      return Boolean;
+   --  Return True if environment was created
 
    ------------------------
    -- Create_Environment --
    ------------------------
 
-   procedure Create_Environment
+   function Check_Environment
      (Params : Rose.Invocation.Invocation_Access)
+      return Boolean
    is
       use Rose.Invocation;
       use Rose.Words;
@@ -65,6 +69,10 @@ package body Rose.Kernel.Capabilities.Boot is
                          Word (Params.Control.Last_Sent_Word) - 1;
       Argument_Index : Parameter_Word_Index := Start;
    begin
+      if Argument_Count = 0 then
+         return False;
+      end if;
+
       Set_Value (Argument_Count);
       Set_Environment_Value (Page, "@arg-count", Value (1 .. Length));
       Rose.Boot.Console.Put ("@arg-count = ");
@@ -86,7 +94,8 @@ package body Rose.Kernel.Capabilities.Boot is
             Argument_Index := Argument_Index + 1;
          end;
       end loop;
-   end Create_Environment;
+      return True;
+   end Check_Environment;
 
    ------------
    -- Handle --
@@ -99,10 +108,10 @@ package body Rose.Kernel.Capabilities.Boot is
       pragma Unreferenced (Cap);
       use Rose.Invocation;
       Process_Id : Rose.Objects.Process_Id;
+      Have_Environment : constant Boolean :=
+                           Check_Environment (Params);
 
    begin
-
-      Create_Environment (Params);
 
       Process_Id :=
         Rose.Kernel.Processes.Init.Load_Boot_Module
@@ -111,7 +120,9 @@ package body Rose.Kernel.Capabilities.Boot is
            Module   =>
              Rose.Kernel.Modules.Module_Index
                (Params.Data (0)),
-           Environment => Page'Access);
+           Environment => (if Have_Environment
+                           then Page'Access
+                             else null));
 
       Rose.Boot.Console.Put ("boot module ");
       Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Data (0)));

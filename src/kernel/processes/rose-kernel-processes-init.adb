@@ -29,6 +29,8 @@ package body Rose.Kernel.Processes.Init is
    Launch_Params : aliased Rose.Invocation.Invocation_Record;
    Enable_Paging : constant Boolean := True;
 
+   Empty_Environment : aliased Rose.Environment_Pages.Environment_Page;
+
    ------------------------
    -- Init_Process_Table --
    ------------------------
@@ -308,7 +310,16 @@ package body Rose.Kernel.Processes.Init is
            (Image, Load_Program_Header'Access);
 
          Proc.Stack_Page := Rose.Kernel.Heap.Allocate_Page;
-         Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
+
+         if Environment = null then
+            Proc.Env_Page :=
+              Physical_Address_To_Page
+                (To_Kernel_Physical_Address
+                   (To_Virtual_Address
+                      (Empty_Environment'Address)));
+         else
+            Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
+         end if;
 
          declare
             use Rose.Kernel.Page_Table;
@@ -341,7 +352,7 @@ package body Rose.Kernel.Processes.Init is
                  Virtual_Address_To_Page (Environment_Base),
                Physical_Page  => Proc.Env_Page,
                Readable       => True,
-               Writable       => True,
+               Writable       => Environment /= null,
                Executable     => False,
                User           => True);
 
