@@ -708,6 +708,7 @@ package body Rose.Kernel.Processes is
         and then From_Process /= 1
       then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+            if Params.Caps (Cap_Index) /= Null_Capability then
             declare
                From_Cap : constant Capability := Params.Caps (Cap_Index);
                New_Cap  : constant Capability := Create_Cap (To_Process);
@@ -735,8 +736,10 @@ package body Rose.Kernel.Processes is
                To.Cap_Cache (New_Cap) := From.Cap_Cache (From_Cap);
                To.Current_Params.Caps (Cap_Index) := New_Cap;
                Rose.Kernel.Validation.Create_Cap
-                 (To_Process, New_Cap, To.Cap_Cache (New_Cap).Header.Cap_Type);
+                    (To_Process, New_Cap,
+                     To.Cap_Cache (New_Cap).Header.Cap_Type);
             end;
+            end if;
          end loop;
       end if;
 
@@ -810,6 +813,7 @@ package body Rose.Kernel.Processes is
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+            if Params.Caps (Cap_Index) /= Null_Capability then
             declare
                From_Cap : constant Capability := Params.Caps (Cap_Index);
                New_Cap  : constant Capability := Create_Cap (To_Process);
@@ -840,6 +844,7 @@ package body Rose.Kernel.Processes is
                  (To_Process, New_Cap,
                   To.Cap_Cache (New_Cap).Header.Cap_Type);
             end;
+            end if;
          end loop;
       end if;
 
