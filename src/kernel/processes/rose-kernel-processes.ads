@@ -177,6 +177,11 @@ package Rose.Kernel.Processes is
       To_Process   : Rose.Objects.Process_Id;
       To_Cap       : Rose.Capabilities.Capability);
 
+   procedure Set_Cap_Id
+     (Process      : Rose.Objects.Process_Id;
+      Cap          : Rose.Capabilities.Capability;
+      Id           : Rose.Objects.Capability_Identifier);
+
    procedure Map_Page
      (Process       : Rose.Objects.Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;

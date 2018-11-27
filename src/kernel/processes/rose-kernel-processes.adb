@@ -881,6 +881,19 @@ package body Rose.Kernel.Processes is
       Process_Table (Process_Id).Cap_Cache (Cap) := Layout;
    end Set_Cap;
 
+   ----------------
+   -- Set_Cap_Id --
+   ----------------
+
+   procedure Set_Cap_Id
+     (Process      : Rose.Objects.Process_Id;
+      Cap          : Rose.Capabilities.Capability;
+      Id           : Rose.Objects.Capability_Identifier)
+   is
+   begin
+      Process_Table (Process).Cap_Cache (Cap).Header.Identifier := Id;
+   end Set_Cap_Id;
+
    ----------------------------
    -- Set_Current_Invocation --
    ----------------------------
