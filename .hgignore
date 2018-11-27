@@ -37,3 +37,14 @@ images/rose-hd0.img
 src/library/kernelapi/generated/*.ad[bs]
 src/tools/idl/idl.gpr
 images/rose.iso
+images/iso/boot/store
+images/iso/boot/console
+images/iso/boot/init
+images/iso/boot/isofs
+images/iso/boot/kernel
+images/iso/boot/mem
+images/iso/boot/partition
+images/iso/boot/pci
+images/iso/boot/restore
+images/iso/boot/scan
+images/iso/boot/ata
