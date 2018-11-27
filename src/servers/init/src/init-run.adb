@@ -79,8 +79,7 @@ package body Init.Run is
       Hd0_Read_Cap         : Rose.Capabilities.Capability;
       Hd0_Write_Cap        : Rose.Capabilities.Capability;
 
-      Hd1_Parameters_Cap   : Rose.Capabilities.Capability;
-      Hd1_Read_Cap         : Rose.Capabilities.Capability;
+      Hd1_Cap              : Rose.Capabilities.Capability;
 
       Add_Storage_Cap      : Rose.Capabilities.Capability;
 
@@ -331,7 +330,6 @@ package body Init.Run is
                                      (Copy_Ata_Cap,
                                       Rose.Interfaces.Ata.Get_Device_Endpoint);
          Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
-         Hd1                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin
 
          Hd0_Cap :=
@@ -340,15 +338,17 @@ package body Init.Run is
               Rose.Interfaces.Get_Interface_Endpoint,
               0);
 
+         Hd1_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Ata_Cap,
+              Rose.Interfaces.Get_Interface_Endpoint,
+              1);
+
          Init.Calls.Get_Interface (Get_Interface_Cap, 0, Hd0);
-         Init.Calls.Get_Interface (Get_Interface_Cap, 1, Hd1);
 
          Hd0_Parameters_Cap := Hd0 (1);
          Hd0_Read_Cap := Hd0 (2);
          Hd0_Write_Cap := Hd0 (3);
-
-         Hd1_Parameters_Cap := Hd1 (1);
-         Hd1_Read_Cap := Hd1 (2);
 
       end;
 
@@ -416,8 +416,7 @@ package body Init.Run is
                         (Boot_Cap, ISOFS_Module, File_System_Priority,
                          (Create_Endpoint_Cap,
                           Console_Write_Cap,
-                          Hd1_Parameters_Cap,
-                          Hd1_Read_Cap));
+                          Hd1_Cap));
          Copy_IsoFS_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
