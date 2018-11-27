@@ -28,7 +28,7 @@ package body Rose.Kernel.Init is
         + 64 * Physical_Page_Bytes;   --  initial page tables
       Process_Table_Size : constant Physical_Bytes :=
                              Processes.Process_Table_Heap_Size;
-      --  for each boot module, four page table pages
+      --  for each boot module, five page table pages
       --  page directory, first code and data page, top of stack page
       --  and an environment page
       Boot_Module_Heap   : constant Physical_Bytes :=
@@ -40,8 +40,8 @@ package body Rose.Kernel.Init is
       Heap_Size       : constant Physical_Bytes :=
                           Page_Table_Size
                             + Process_Table_Size
-                            + Boot_Module_Heap;
-
+                            + Boot_Module_Heap
+                            + 16#8000#;
       --    Page_Table_Size + Process_Table_Size + Module_Size;
 
    begin

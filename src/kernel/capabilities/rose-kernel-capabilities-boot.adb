@@ -75,9 +75,6 @@ package body Rose.Kernel.Capabilities.Boot is
 
       Set_Value (Argument_Count);
       Set_Environment_Value (Page, "@arg-count", Value (1 .. Length));
-      Rose.Boot.Console.Put ("@arg-count = ");
-      Rose.Boot.Console.Put (Value (1 .. Length));
-      Rose.Boot.Console.New_Line;
 
       for I in 1 .. Argument_Count loop
          declare
@@ -87,10 +84,6 @@ package body Rose.Kernel.Capabilities.Boot is
             Name (Name'Last - 1) := Character'Val (I / 10 mod 10 + 48);
             Set_Value (Params.Data (Argument_Index));
             Set_Environment_Value (Page, Name, Value (1 .. Length));
-            Rose.Boot.Console.Put (Name);
-            Rose.Boot.Console.Put (" = ");
-            Rose.Boot.Console.Put (Value (1 .. Length));
-            Rose.Boot.Console.New_Line;
             Argument_Index := Argument_Index + 1;
          end;
       end loop;

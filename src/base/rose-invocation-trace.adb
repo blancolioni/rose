@@ -13,7 +13,7 @@ package body Rose.Invocation.Trace is
    is
    begin
       Rose.Boot.Console.Put ("cap=");
-      Rose.Boot.Console.Put (Rose.Words.Word_32 (Invocation.Cap));
+      Rose.Boot.Console.Put (Rose.Words.Word_8 (Invocation.Cap));
       if Invocation.Control.Flags (Rose.Invocation.Send) then
          Rose.Boot.Console.Put (" S");
       end if;
@@ -62,6 +62,11 @@ package body Rose.Invocation.Trace is
          Rose.Boot.Console.Put (" lrw=");
          Rose.Boot.Console.Put
            (Rose.Words.Word_8 (Invocation.Control.Last_Recv_Word));
+      end if;
+
+      if Rose.Objects."/=" (Invocation.Endpoint, 0) then
+         Rose.Boot.Console.Put (" ep=");
+         Rose.Boot.Console.Put (Rose.Words.Word_32 (Invocation.Endpoint));
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Buffer) then

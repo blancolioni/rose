@@ -5,10 +5,10 @@ with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes;
 
---  with Rose.Invocation.Trace;
-
 with Rose.Kernel.Panic;
 with Rose.Kernel.Validation;
+
+with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Processes is
 
@@ -769,6 +769,16 @@ package body Rose.Kernel.Processes is
 
       end if;
 
+      if To_Process = Log_Process_Activity
+        or else From_Process = Log_Process_Activity
+      then
+         Rose.Boot.Console.Put ("send-cap: ");
+         Rose.Boot.Console.Put (To_Process);
+         Rose.Boot.Console.Put (" ");
+         Rose.Invocation.Trace.Put
+           (To.Current_Params, False);
+      end if;
+
       Set_Current_State (To_Process, Ready);
 
    end Send_Cap;
@@ -1043,6 +1053,35 @@ package body Rose.Kernel.Processes is
       Rose.Boot.Console.New_Line;
    end Show_Address;
 
+   ----------------------
+   -- Unblock_And_Send --
+   ----------------------
+
+   procedure Unblock_And_Send
+     (From_Process    : Rose.Objects.Process_Id;
+      To_Process      : Rose.Objects.Process_Id;
+      Receiver_Params : Rose.Invocation.Invocation_Access)
+   is
+      P : constant Kernel_Process_Access :=
+            Process_Table (From_Process)'Access;
+   begin
+      Rose.Boot.Console.Put (To_Process);
+      Rose.Boot.Console.Put (": processing next sender: ");
+      Rose.Boot.Console.Put (From_Process);
+      Rose.Boot.Console.New_Line;
+      Rose.Invocation.Trace.Put
+        (P.Current_Params, True);
+
+      Send_To_Endpoint
+        (From_Process => From_Process,
+         To_Process   => To_Process,
+         Sender_Cap   => P.Current_Params.Cap,
+         Endpoint     => P.Waiting_Endpoint,
+         Identifier   => P.Waiting_Cap_Id,
+         Params       => P.Current_Params);
+      Receiver_Params.all := Process_Table (To_Process).Current_Params;
+   end Unblock_And_Send;
+
    -----------------------------
    -- Unmap_Invocation_Buffer --
    -----------------------------
@@ -1117,13 +1156,34 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    procedure Wait_For_Receiver
-     (Waiting_Process : Rose.Objects.Process_Id;
-      Params          : Rose.Invocation.Invocation_Record)
+     (Waiting_Process   : Rose.Objects.Process_Id;
+      Receiving_Process : Rose.Objects.Process_Id;
+      Endpoint          : Rose.Objects.Endpoint_Index;
+      Identifier        : Rose.Objects.Capability_Identifier;
+      Params            : Rose.Invocation.Invocation_Record)
    is
-      P : Kernel_Process_Entry renames Process_Table (Waiting_Process);
+      P : constant Kernel_Process_Access :=
+            Process_Table (Waiting_Process)'Access;
+      Q : constant Kernel_Process_Access :=
+            Process_Table (Receiving_Process)'Access;
    begin
       P.State := Blocked;
       P.Current_Params := Params;
+      P.Waiting_Endpoint := Endpoint;
+      P.Waiting_Cap_Id := Identifier;
+      P.Waiting_Next := null;
+      if Q.Waiting_First = null then
+         Q.Waiting_First := P;
+      else
+         declare
+            R : Kernel_Process_Access := Q.Waiting_First;
+         begin
+            while R.Waiting_Next /= null loop
+               R := R.Waiting_Next;
+            end loop;
+            R.Waiting_Next := P;
+         end;
+      end if;
    end Wait_For_Receiver;
 
 end Rose.Kernel.Processes;
