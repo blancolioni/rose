@@ -36,7 +36,7 @@ begin
          File_System : File_System_Client;
          Root        : Directory_Client;
       begin
-         Open_Interface (File_System, Install_Media_Cap);
+         Open (File_System, Install_Media_Cap);
          Root := Root_Directory (File_System);
          Restore.Installer.Install (Root);
       end;
