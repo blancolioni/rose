@@ -27,6 +27,10 @@ package body IDL.Generate_Kernel is
    procedure Generate_Client_Package (Item : IDL.Syntax.IDL_Interface);
    procedure Generate_Server_Package (Item : IDL.Syntax.IDL_Interface);
 
+   procedure Generate_Open_Interface
+     (Pkg     : in out Syn.Declarations.Package_Type'Class;
+      Item    : IDL.Syntax.IDL_Interface);
+
    procedure Generate_Inherited_Overrides
      (Pkg     : in out Syn.Declarations.Package_Type'Class;
       Item    : IDL.Syntax.IDL_Interface;
@@ -868,6 +872,9 @@ package body IDL.Generate_Kernel is
             Scan_Subprograms (Item, True, Add_Argument'Access);
             Client.Append (Open_Procedure);
          end;
+
+         Generate_Open_Interface (Client, Item);
+
       end;
 
       for I in 1 .. Get_Num_Inherited (Item) loop
@@ -1104,6 +1111,87 @@ package body IDL.Generate_Kernel is
       Generate_Client_Package (Item);
       Generate_Server_Package (Item);
    end Generate_Kernel_Interface;
+
+   -----------------------------
+   -- Generate_Open_Interface --
+   -----------------------------
+
+   procedure Generate_Open_Interface
+     (Pkg     : in out Syn.Declarations.Package_Type'Class;
+      Item    : IDL.Syntax.IDL_Interface)
+   is
+      use IDL.Syntax;
+      Block : Syn.Blocks.Block_Type;
+      Interface_Name : constant String :=
+                         IDL.Syntax.Get_Ada_Name (Item);
+      Subprs         : constant IDL_Subprogram_Array :=
+                         Get_Subprograms (Item);
+   begin
+
+      Block.Add_Declaration
+        (Syn.Declarations.New_Object_Declaration
+           (Identifiers => Syn.Declarations.Identifier ("Params"),
+            Is_Aliased  => True,
+            Is_Constant => False,
+            Is_Deferred => False,
+            Object_Type =>
+              Syn.Named_Subtype
+                ("Rose.Invocation.Invocation_Record")));
+
+      Block.Add_Statement
+        (Syn.Statements.New_Assignment_Statement
+           ("Client.Is_Open", Syn.Literal (False)));
+
+      Block.Add_Statement
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Initialize_Send",
+            Syn.Object ("Params"),
+            Syn.Object ("Interface_Cap")));
+
+      Block.Add_Statement
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Receive_Caps",
+            Syn.Object ("Params"),
+            Syn.Literal (Subprs'Length)));
+
+      Block.Add_Statement
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Invoke_Capability",
+            Syn.Object ("Params")));
+
+      for I in Subprs'Range loop
+         Block.Add_Statement
+           (Syn.Statements.New_Assignment_Statement
+              ("Client." & Get_Ada_Name (Subprs (I)),
+               Syn.Expressions.New_Function_Call_Expression
+                 ("Params.Caps", Syn.Literal (I - 1))));
+      end loop;
+
+      Block.Add_Statement
+        (Syn.Statements.New_Assignment_Statement
+           ("Client.Is_Open", Syn.Literal (True)));
+
+      declare
+         Open_Procedure : constant
+           Syn.Declarations.Subprogram_Declaration'Class :=
+             Syn.Declarations.New_Procedure
+               ("Open_Interface",
+                Syn.Declarations.New_Formal_Argument
+                  ("Client",
+                   Syn.Declarations.Out_Argument,
+                   Syn.Named_Subtype
+                     (Interface_Name & "_Client")),
+                Syn.Declarations.New_Formal_Argument
+                  ("Interface_Cap",
+                   Syn.Named_Subtype
+                     ("Rose.Capabilities.Capability")),
+                Block);
+
+      begin
+         Pkg.Append (Open_Procedure);
+      end;
+
+   end Generate_Open_Interface;
 
    -----------------------------
    -- Generate_Server_Package --
