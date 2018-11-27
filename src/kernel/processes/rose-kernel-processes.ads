@@ -120,8 +120,11 @@ package Rose.Kernel.Processes is
       Params       : Rose.Invocation.Invocation_Record);
 
    procedure Wait_For_Receiver
-     (Waiting_Process : Rose.Objects.Process_Id;
-      Params          : Rose.Invocation.Invocation_Record);
+     (Waiting_Process   : Rose.Objects.Process_Id;
+      Receiving_Process : Rose.Objects.Process_Id;
+      Endpoint          : Rose.Objects.Endpoint_Index;
+      Identifier        : Rose.Objects.Capability_Identifier;
+      Params            : Rose.Invocation.Invocation_Record);
 
    procedure Receive
      (Receiver : Rose.Objects.Process_Id;
@@ -134,6 +137,11 @@ package Rose.Kernel.Processes is
    function Next_Blocked_Sender
      (Receiver : Rose.Objects.Process_Id)
       return Rose.Objects.Process_Id;
+
+   procedure Unblock_And_Send
+     (From_Process    : Rose.Objects.Process_Id;
+      To_Process      : Rose.Objects.Process_Id;
+      Receiver_Params : Rose.Invocation.Invocation_Access);
 
    procedure Return_Error
      (Params : Rose.Invocation.Invocation_Access;
@@ -339,6 +347,8 @@ private
          Queue_Next        : Kernel_Process_Access;
          Waiting_Next      : Kernel_Process_Access;
          Waiting_First     : Kernel_Process_Access;
+         Waiting_Endpoint  : Rose.Objects.Endpoint_Index;
+         Waiting_Cap_Id    : Rose.Objects.Capability_Identifier;
          Current_Params    : Rose.Invocation.Invocation_Record;
          Code_Page         : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;

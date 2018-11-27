@@ -52,9 +52,10 @@ package body Rose.Kernel.Debug is
       Put_Flag ("B", Block);
       Put_Flag ("D", Send_Buffer);
 
-      Put (" (");
-      Put (Rose.Words.Word_8 (Params.Endpoint));
-      Put (")");
+      Put (" ");
+      Put (Word_32 (Word_64 (Params.Endpoint) / 2 ** 32));
+      Put ("_");
+      Put (Word_32 (Params.Endpoint));
 
       if Params.Control.Flags (Send_Words) then
          Put (" [");

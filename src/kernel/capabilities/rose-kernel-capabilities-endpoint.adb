@@ -6,6 +6,7 @@ with Rose.Kernel.Validation;
 with Rose.Kernel.Debug;
 
 with Rose.Boot.Console;
+with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Capabilities.Endpoint is
 
@@ -127,10 +128,17 @@ package body Rose.Kernel.Capabilities.Endpoint is
             Rose.Boot.Console.Put (Sender);
             Rose.Boot.Console.Put (" -> ");
             Rose.Boot.Console.Put (Receiver);
-            Rose.Boot.Console.Put_Line (": blocked");
+            Rose.Boot.Console.Put (": blocked on endpoint ");
+            Rose.Boot.Console.Put (Rose.Words.Word_8 (Endpoint));
+            Rose.Boot.Console.New_Line;
+            Rose.Invocation.Trace.Put
+              (Params.all, True);
             Rose.Kernel.Processes.Wait_For_Receiver
-              (Waiting_Process => Sender,
-               Params          => Params.all);
+              (Waiting_Process   => Sender,
+               Receiving_Process => Receiver,
+               Endpoint          => Endpoint,
+               Identifier        => Identifier,
+               Params            => Params.all);
          else
             Rose.Kernel.Processes.Return_Error
               (Params, Rose.Invocation.Request_Would_Block);

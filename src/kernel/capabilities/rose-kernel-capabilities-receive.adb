@@ -26,12 +26,10 @@ package body Rose.Kernel.Capabilities.Receive is
               (Params, Rose.Invocation.Request_Would_Block);
          end if;
       else
-         Rose.Kernel.Processes.Send_Cap
-           (From_Process => Next_Sender,
-            To_Process   => Receiver_Id,
-            Sender_Cap   => 0,
-            Receiver_Cap => Params.Cap,
-            Params       => Params.all);
+         Rose.Kernel.Processes.Unblock_And_Send
+           (From_Process    => Next_Sender,
+            To_Process      => Receiver_Id,
+            Receiver_Params => Params);
       end if;
    end Handle;
 
