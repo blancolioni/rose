@@ -1,5 +1,4 @@
 with Rose.Interfaces.Block_Device.Client;
-with Rose.Devices.GPT;
 
 with Rose.Interfaces.File_System.Client;
 with Rose.Interfaces.Directory.Client;
@@ -9,6 +8,7 @@ with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.System_Calls.Server;
 
+with Rose.Devices.Checkpoints;
 with Restore.Installer;
 
 procedure Restore.Driver is
@@ -19,36 +19,28 @@ begin
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");
 
-   Rose.Interfaces.Block_Device.Client.Open
+   Rose.Interfaces.Block_Device.Client.Open_Interface
      (Client         => Device,
-      Get_Parameters => Block_Device_Parameters_Cap,
-      Read_Blocks    => Block_Device_Read_Cap,
-      Write_Blocks   => Block_Device_Write_Cap);
+      Interface_Cap  => Active_Swap_Cap);
 
    Rose.Console_IO.Put_Line ("restore: looking for system image");
 
-   if not Rose.Devices.GPT.Has_GPT (Device) then
-      Rose.Console_IO.Put_Line ("restore: GPT partition header not found");
-      return;
+   if Rose.Devices.Checkpoints.Has_Checkpoint (Device) then
+      Rose.Console_IO.Put_Line ("restore: restoring from checkpoint");
+   else
+      Rose.Console_IO.Put_Line ("restore: creating system image");
+
+      declare
+         use Rose.Interfaces.File_System.Client;
+         use Rose.Interfaces.Directory.Client;
+         File_System : File_System_Client;
+         Root        : Directory_Client;
+      begin
+         Open_Interface (File_System, Install_Media_Cap);
+         Root := Root_Directory (File_System);
+         Restore.Installer.Install (Root);
+      end;
    end if;
-
-   if Rose.Devices.GPT.Partition_Count (Device) = 0 then
-      Rose.Console_IO.Put_Line ("restore: no partitions found on device");
-      return;
-   end if;
-
-   Rose.Console_IO.Put_Line ("Scanning partitions");
-
-   declare
-      use Rose.Interfaces.File_System.Client;
-      use Rose.Interfaces.Directory.Client;
-      File_System : File_System_Client;
-      Root        : Directory_Client;
-   begin
-      Open (File_System, Install_File_System);
-      Root := Root_Directory (File_System);
-      Restore.Installer.Install (Root);
-   end;
 
    Rose.Console_IO.Put_Line ("restore: done");
 

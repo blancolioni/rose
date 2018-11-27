@@ -6,7 +6,6 @@ with Rose.Devices.Partitions;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Storage;
 
-with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Partitions.Client;
 
 with Rose.Interfaces.Ata;
@@ -85,12 +84,9 @@ package body Init.Run is
 
       Install_FS           : Rose.Capabilities.Capability;
 
-      Active_Swap_Partition   : Rose.Interfaces.Block_Device.Client
-        .Block_Device_Client;
-      Inactive_Swap_Partition : Rose.Interfaces.Block_Device.Client
-        .Block_Device_Client;
---        Log_Partition           : Rose.Interfaces.Block_Device.Client
---          .Block_Device_Client;
+      Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
+      Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
+      Log_Cap           : Rose.Capabilities.Capability := 0;
 
       function Copy_Cap_From_Process
         (Copy_Cap   : Rose.Capabilities.Capability;
@@ -103,6 +99,14 @@ package body Init.Run is
          .Client.Partitions_Client;
          Device_Cap        : Rose.Capabilities.Capability;
          Index             : Positive);
+
+      function Is_Swap_Partition (Low, High : Word_64) return Boolean
+      is (Low = Rose.Devices.Partitions.Swap_Id_Low
+          and then High = Rose.Devices.Partitions.Swap_Id_High);
+
+      function Is_Log_Partition (Low, High : Word_64) return Boolean
+      is (Low = Rose.Devices.Partitions.Log_Id_Low
+          and then High = Rose.Devices.Partitions.Log_Id_High);
 
       ---------------------------
       -- Copy_Cap_From_Process --
@@ -169,64 +173,73 @@ package body Init.Run is
          Partition_Flags     : Rose.Words.Word_64;
          Start_Address       : Rose.Words.Word_64;
          Length              : Rose.Words.Word_64;
-         Id : Rose.Objects.Object_Id;
+         Id                  : Rose.Objects.Object_Id;
+         Is_Active_Swap      : Boolean := False;
+         Is_Inactive_Swap    : Boolean := False;
+         Is_Log              : Boolean := False;
+         Block_Size          : Rose.Words.Word;
+         Active_Swap_Flag    : constant Word_64 :=
+                                 Rose.Devices.Partitions.Active_Swap_Flag;
       begin
          Rose.Interfaces.Partitions.Client.Get_Partition
            (Client, Index, Partition_Type_Low,
             Partition_Type_High, Partition_Flags,
             Start_Address, Length);
-         if Partition_Type_Low = Rose.Devices.Partitions.Swap_Id_Low
-           and then Partition_Type_High = Rose.Devices.Partitions.Swap_Id_High
-         then
-            Id :=
-              Init.Calls.Launch_Boot_Module
-                (Boot_Cap, Partition_Module, Device_Driver_Priority,
-                 (Create_Endpoint_Cap,
-                  Console_Write_Cap,
-                  Device_Cap),
-                  (Rose.Words.Word (Start_Address),
-                   Rose.Words.Word (Start_Address + Length),
-                  4096));
 
-            declare
-               use Rose.Devices.Partitions;
-               Copy_Id_Cap : constant Rose.Capabilities.Capability :=
-                               Init.Calls.Call
-                                 (Create_Cap,
-                                  (9, 1,
-                                   Word (Id mod 2 ** 32),
-                                   Word (Id / 2 ** 32)));
-               Parameters  : constant Rose.Capabilities.Capability :=
-                               Copy_Cap_From_Process
-                                 (Copy_Id_Cap,
-                                  Rose.Interfaces.Block_Device
-                                  .Get_Parameters_Endpoint);
-               Read        : constant Rose.Capabilities.Capability :=
-                               Copy_Cap_From_Process
-                                 (Copy_Id_Cap,
-                                  Rose.Interfaces.Block_Device
-                                  .Read_Blocks_Endpoint);
-               Write       : constant Rose.Capabilities.Capability :=
-                               Copy_Cap_From_Process
-                                 (Copy_Id_Cap,
-                                  Rose.Interfaces.Block_Device
-                                  .Write_Blocks_Endpoint);
-            begin
-               if (Partition_Flags and Active_Swap_Flag) /= 0 then
-                  Rose.Interfaces.Block_Device.Client.Open
-                    (Active_Swap_Partition,
-                     Parameters, Read, Write);
-               else
-                  Rose.Interfaces.Block_Device.Client.Open
-                    (Inactive_Swap_Partition,
-                     Parameters, Read, Write);
+         if Is_Swap_Partition (Partition_Type_Low, Partition_Type_High) then
+            Block_Size := 4096;
+            if (Partition_Flags and Active_Swap_Flag) /= 0 then
+               Is_Active_Swap := True;
+               if Active_Swap_Cap /= 0 then
+                  return;
                end if;
-            end;
-         elsif Partition_Type_Low = Rose.Devices.Partitions.Log_Id_Low
-           and then Partition_Type_High = Rose.Devices.Partitions.Log_Id_High
-         then
-            null;
+            else
+               Is_Inactive_Swap := True;
+               if Inactive_Swap_Cap /= 0 then
+                  return;
+               end if;
+            end if;
+         elsif Is_Log_Partition (Partition_Type_Low, Partition_Type_High) then
+            Block_Size := 512;
+            Is_Log := True;
+            if Log_Cap /= 0 then
+               return;
+            end if;
+
+         else
+            return;
          end if;
+
+         Id :=
+           Init.Calls.Launch_Boot_Module
+             (Boot_Cap, Partition_Module, Device_Driver_Priority,
+              (Create_Endpoint_Cap,
+               Console_Write_Cap,
+               Device_Cap),
+              (Rose.Words.Word (Start_Address),
+               Rose.Words.Word (Start_Address + Length),
+               Block_Size));
+
+         declare
+            Copy_Id_Cap   : constant Rose.Capabilities.Capability :=
+                              Init.Calls.Call
+                                (Create_Cap,
+                                 (9, 1,
+                                  Word (Id mod 2 ** 32),
+                                  Word (Id / 2 ** 32)));
+            Interface_Cap : constant Rose.Capabilities.Capability :=
+                              Copy_Cap_From_Process
+                                (Copy_Id_Cap,
+                                 Rose.Interfaces.Get_Interface_Endpoint);
+         begin
+            if Is_Active_Swap then
+               Active_Swap_Cap := Interface_Cap;
+            elsif Is_Inactive_Swap then
+               Inactive_Swap_Cap := Interface_Cap;
+            elsif Is_Log then
+               Log_Cap := Interface_Cap;
+            end if;
+         end;
 
       end Load_Partition;
 
@@ -433,9 +446,9 @@ package body Init.Run is
                           (Boot_Cap, Restore_Module, File_System_Priority,
                            (Create_Endpoint_Cap,
                             Console_Write_Cap,
-                            Hd0_Parameters_Cap,
-                            Hd0_Read_Cap,
-                            Hd0_Write_Cap,
+                            Active_Swap_Cap,
+                            Inactive_Swap_Cap,
+                            Log_Cap,
                             Add_Storage_Cap,
                             Install_FS));
       begin
