@@ -87,8 +87,8 @@ package body Init.Run is
 
       Active_Swap_Partition   : Rose.Interfaces.Block_Device.Client
         .Block_Device_Client;
---        Inactive_Swap_Partition : Rose.Interfaces.Block_Device.Client
---          .Block_Device_Client;
+      Inactive_Swap_Partition : Rose.Interfaces.Block_Device.Client
+        .Block_Device_Client;
 --        Log_Partition           : Rose.Interfaces.Block_Device.Client
 --          .Block_Device_Client;
 
@@ -188,37 +188,41 @@ package body Init.Run is
                   (Rose.Words.Word (Start_Address),
                    Rose.Words.Word (Start_Address + Length),
                   4096));
-            if (Partition_Flags and Rose.Devices.Partitions.Active_Swap_Flag)
-              /= 0
-            then
-               declare
-                  Copy_Id_Cap : constant Rose.Capabilities.Capability :=
-                                  Init.Calls.Call
-                                    (Create_Cap,
-                                     (9, 1,
-                                      Word (Id mod 2 ** 32),
-                                      Word (Id / 2 ** 32)));
-                  Parameters : constant Rose.Capabilities.Capability :=
-                                  Copy_Cap_From_Process
-                                    (Copy_Id_Cap,
-                                     Rose.Interfaces.Block_Device
-                                     .Get_Parameters_Endpoint);
-                  Read        : constant Rose.Capabilities.Capability :=
-                                  Copy_Cap_From_Process
-                                    (Copy_Id_Cap,
-                                     Rose.Interfaces.Block_Device
-                                     .Read_Blocks_Endpoint);
-                  Write       : constant Rose.Capabilities.Capability :=
-                                  Copy_Cap_From_Process
-                                    (Copy_Id_Cap,
-                                     Rose.Interfaces.Block_Device
-                                     .Write_Blocks_Endpoint);
-               begin
+
+            declare
+               use Rose.Devices.Partitions;
+               Copy_Id_Cap : constant Rose.Capabilities.Capability :=
+                               Init.Calls.Call
+                                 (Create_Cap,
+                                  (9, 1,
+                                   Word (Id mod 2 ** 32),
+                                   Word (Id / 2 ** 32)));
+               Parameters  : constant Rose.Capabilities.Capability :=
+                               Copy_Cap_From_Process
+                                 (Copy_Id_Cap,
+                                  Rose.Interfaces.Block_Device
+                                  .Get_Parameters_Endpoint);
+               Read        : constant Rose.Capabilities.Capability :=
+                               Copy_Cap_From_Process
+                                 (Copy_Id_Cap,
+                                  Rose.Interfaces.Block_Device
+                                  .Read_Blocks_Endpoint);
+               Write       : constant Rose.Capabilities.Capability :=
+                               Copy_Cap_From_Process
+                                 (Copy_Id_Cap,
+                                  Rose.Interfaces.Block_Device
+                                  .Write_Blocks_Endpoint);
+            begin
+               if (Partition_Flags and Active_Swap_Flag) /= 0 then
                   Rose.Interfaces.Block_Device.Client.Open
                     (Active_Swap_Partition,
                      Parameters, Read, Write);
-               end;
-            end if;
+               else
+                  Rose.Interfaces.Block_Device.Client.Open
+                    (Inactive_Swap_Partition,
+                     Parameters, Read, Write);
+               end if;
+            end;
          elsif Partition_Type_Low = Rose.Devices.Partitions.Log_Id_Low
            and then Partition_Type_High = Rose.Devices.Partitions.Log_Id_High
          then
@@ -391,8 +395,6 @@ package body Init.Run is
          Client.Open (Parts, Count_Cap, Part_Cap);
 
          for I in 1 .. Client.Partition_Count (Parts) loop
-            Init.Calls.Send_String
-              (Console_Write_Cap, "init: loading partition" & NL);
             Load_Partition
               (Client            => Parts,
                Device_Parameters => Hd0_Parameters_Cap,
