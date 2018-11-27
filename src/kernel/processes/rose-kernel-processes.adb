@@ -1172,7 +1172,7 @@ package body Rose.Kernel.Processes is
       Q : constant Kernel_Process_Access :=
             Process_Table (Receiving_Process)'Access;
    begin
-      P.State := Blocked;
+      Set_Current_State (Waiting_Process, Blocked);
       P.Current_Params := Params;
       P.Waiting_Endpoint := Endpoint;
       P.Waiting_Cap_Id := Identifier;
