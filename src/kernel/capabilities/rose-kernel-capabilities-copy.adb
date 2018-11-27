@@ -15,6 +15,7 @@ package body Rose.Kernel.Capabilities.Copy is
    is
       use Rose.Capabilities;
       use type Rose.Objects.Endpoint_Id;
+      use type Rose.Invocation.Parameter_Word_Index;
       To_Process_Id   : constant Rose.Objects.Process_Id :=
                             Rose.Kernel.Processes.Current_Process_Id;
       From_Process_Id : constant Rose.Objects.Process_Id :=
@@ -23,6 +24,11 @@ package body Rose.Kernel.Capabilities.Copy is
                           Rose.Objects.Endpoint_Id (Params.Data (0))
                           + 2 ** 32
                             * Rose.Objects.Endpoint_Id (Params.Data (1));
+      Update_Id : constant Boolean := Params.Control.Last_Sent_Word >= 2;
+      Cap_Id : constant Rose.Objects.Capability_Identifier :=
+                 (if Update_Id
+                  then Rose.Objects.Capability_Identifier (Params.Data (2))
+                  else 0);
 
       Endpoint_Cap : constant Rose.Capabilities.Capability :=
                        Rose.Kernel.Processes.Find_Endpoint_Cap
@@ -69,6 +75,11 @@ package body Rose.Kernel.Capabilities.Copy is
          From_Cap     => Endpoint_Cap,
          To_Process   => To_Process_Id,
          To_Cap       => Local_Cap);
+
+      if Update_Id then
+         Rose.Kernel.Processes.Set_Cap_Id
+           (To_Process_Id, Local_Cap, Cap_Id);
+      end if;
 
       Rose.Kernel.Validation.Create_Cap
         (To_Process_Id, Local_Cap,
