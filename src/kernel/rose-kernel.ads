@@ -49,6 +49,13 @@ private
      return Physical_Address
    is (Physical_Address (Virtual_Addr - Kernel_Virtual_Base));
 
+   Checkpoint_Active    : Boolean := False;
+   Image_Write_Active   : Boolean := False;
+   Current_Image_Object : Rose.Objects.Object_Id :=
+                            Rose.Objects.Null_Object_Id;
+   Image_Writer         : Rose.Objects.Object_Id :=
+                            Rose.Objects.Null_Object_Id;
+
    System_Call_Entry        : Physical_Address;
    pragma Import (C, System_Call_Entry, "system_call_entry");
    Log_Invocation           : Boolean := False;

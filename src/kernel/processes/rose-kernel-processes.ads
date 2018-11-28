@@ -164,6 +164,7 @@ package Rose.Kernel.Processes is
       Error  : Rose.Invocation.Invocation_Error);
 
    function Current_Process_Id return Process_Id;
+   function Current_Object_Id return Rose.Objects.Object_Id;
 
    function Use_Tick return Boolean;
    --  current process uses up a tick.  Return True if it has
@@ -434,6 +435,9 @@ private
      (Pid : Process_Id)
       return Rose.Objects.Object_Id
    is (Process_Table (Pid).Oid);
+
+   function Current_Object_Id return Rose.Objects.Object_Id
+   is (Current_Process.Oid);
 
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;

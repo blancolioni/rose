@@ -21,26 +21,31 @@ package body Rose.Kernel.Processes.Queue is
 
    procedure Choose_Process is
    begin
-      Next_Process := null;
-      for I in Process_Queue'Range loop
-         if Process_Queue (I).First /= null then
-            declare
-               It : Kernel_Process_Access := Process_Queue (I).First;
-            begin
-               while It /= null loop
-                  exit when It.State = Ready;
-                  It := It.Queue_Next;
-               end loop;
 
-               if It /= null then
-                  Next_Process := It;
-                  exit;
-               end if;
-            end;
-         end if;
-      end loop;
+      if not Image_Write_Active then
 
-      Current_Process := Next_Process;
+         Next_Process := null;
+         for I in Process_Queue'Range loop
+            if Process_Queue (I).First /= null then
+               declare
+                  It : Kernel_Process_Access := Process_Queue (I).First;
+               begin
+                  while It /= null loop
+                     exit when It.State = Ready;
+                     It := It.Queue_Next;
+                  end loop;
+
+                  if It /= null then
+                     Next_Process := It;
+                     exit;
+                  end if;
+               end;
+            end if;
+         end loop;
+
+         Current_Process := Next_Process;
+
+      end if;
 
       if Current_Process = null then
          Rose.Kernel.Panic.Panic ("no processes");
