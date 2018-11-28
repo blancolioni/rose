@@ -8,9 +8,9 @@ package body Console.IO is
    Current_Line, Current_Column : Natural := 0;
    Current_Colour               : constant Word_16 := 16#700#;
 
-   Console_Start : constant := 16#000B_8000#;
+   Console_Start : constant := 16#000B_80A0#;
 
-   Num_Lines   : constant := 25;
+   Num_Lines   : constant := 24;
    Num_Columns : constant := 80;
 
    type Console_Memory_Array is
@@ -138,7 +138,7 @@ package body Console.IO is
 
    procedure Update_Cursor is
       Position    : constant Natural :=
-        Current_Line * Num_Columns + Current_Column;
+        (Current_Line + 1) * Num_Columns + Current_Column;
    begin
       Console.Calls.Send_Cursor_Position
         (Rose.Words.Word_16 (Position));
