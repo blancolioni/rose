@@ -4,79 +4,21 @@ with Rose.Addresses;
 
 package body Rose.Kernel.Processes.Debug is
 
-   Saved_ESP   : Rose.Words.Word_32;
-   Saved_Stack : array (1 .. 256) of Rose.Words.Word_32;
+   ---------
+   -- Put --
+   ---------
 
-   procedure Save_Current_Stack;
-   pragma Export (C, Save_Current_Stack, "debug_save_current_stack");
-
-   procedure Check_Current_Stack;
-   pragma Export (C, Check_Current_Stack, "debug_check_current_stack");
-
-   -------------------------
-   -- Check_Current_Stack --
-   -------------------------
-
-   procedure Check_Current_Stack is
-      use Rose.Objects;
-      use Rose.Words;
-      ESP   : Virtual_Address :=
-                Virtual_Address (Current_Process.Stack.ESP);
-      Index : Positive := 1;
+   procedure Put (Pid : Process_Id) is
    begin
-      if Current_Process_Id /= Log_Process_Stack then
-         return;
-      end if;
-
-      if Current_Process.Stack.ESP /= Saved_ESP then
-         Saved_Process_Address := Saved_ESP;
-         Report_Process (Current_Process_Id, True);
-         return;
-      end if;
-
-      while ESP < Process_Stack_Bound
-        and then Index < Saved_Stack'Last
-      loop
-         declare
-            A : constant System.Address :=
-                  To_System_Address (ESP);
-            X : Word_32;
-            pragma Import (Ada, X);
-            for X'Address use A;
-         begin
-            if X /= Saved_Stack (Index) then
-               Rose.Boot.Console.Put (Word_32 (ESP));
-               Rose.Boot.Console.Put (" ");
-               Rose.Boot.Console.Put (Saved_Stack (Index));
-               Rose.Boot.Console.Put (" ");
-               Rose.Boot.Console.Put (X);
-               Rose.Boot.Console.New_Line;
-            end if;
-
-            Index := Index + 1;
-            ESP := ESP + 4;
-         end;
-      end loop;
-   end Check_Current_Stack;
-
-   ----------------------------
-   -- Report_Current_Process --
-   ----------------------------
-
-   procedure Report_Current_Process is
-      use Rose.Objects;
-   begin
-      if Current_Process_Id = Log_Process_Stack then
-         Report_Process (Current_Process_Id, True);
-      end if;
-   end Report_Current_Process;
+      Rose.Boot.Console.Put (Natural (Pid));
+   end Put;
 
    --------------------
    -- Report_Process --
    --------------------
 
    procedure Report_Process
-     (Pid : Rose.Objects.Process_Id;
+     (Pid : Rose.Kernel.Processes.Process_Id;
       Show_Stack : Boolean := False)
    is
       use Rose.Boot.Console;
@@ -87,7 +29,7 @@ package body Rose.Kernel.Processes.Debug is
       Put ("Name:   ");
       Put (Proc.Name);
       Put ("     pid ");
-      Put (Word_8 (Pid));
+      Put (Natural (Pid));
       New_Line;
       Put ("  gs:");
       Put (Word_8 (Proc.Stack.GS));
@@ -174,38 +116,5 @@ package body Rose.Kernel.Processes.Debug is
          end;
       end if;
    end Report_Process;
-
-   ------------------------
-   -- Save_Current_Stack --
-   ------------------------
-
-   procedure Save_Current_Stack is
-      use Rose.Objects;
-      use Rose.Words;
-      ESP : Virtual_Address :=
-              Virtual_Address (Current_Process.Stack.ESP);
-      Index : Positive := 1;
-   begin
-      if Current_Process_Id /= Log_Process_Stack then
-         return;
-      end if;
-      Saved_ESP := Current_Process.Stack.ESP;
-
-      while ESP < Process_Stack_Bound
-        and then Index < Saved_Stack'Last
-      loop
-         declare
-            A : constant System.Address :=
-                  To_System_Address (ESP);
-            X : Word_32;
-            pragma Import (Ada, X);
-            for X'Address use A;
-         begin
-            Saved_Stack (Index) := X;
-            Index := Index + 1;
-            ESP := ESP + 4;
-         end;
-      end loop;
-   end Save_Current_Stack;
 
 end Rose.Kernel.Processes.Debug;

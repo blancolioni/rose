@@ -11,14 +11,14 @@ package body Rose.Kernel.Capabilities.Receive is
       Params : Rose.Invocation.Invocation_Access)
    is
       pragma Unreferenced (Cap);
-      use type Rose.Objects.Process_Id;
-      Receiver_Id : constant Rose.Objects.Process_Id :=
+      use type Rose.Kernel.Processes.Process_Id;
+      Receiver_Id : constant Rose.Kernel.Processes.Process_Id :=
                               Rose.Kernel.Processes.Current_Process_Id;
-      Next_Sender : constant Rose.Objects.Process_Id :=
+      Next_Sender : constant Rose.Kernel.Processes.Process_Id :=
                       Rose.Kernel.Processes.Next_Blocked_Sender
                         (Receiver_Id);
    begin
-      if Next_Sender = 0 then
+      if Next_Sender = Rose.Kernel.Processes.Null_Process_Id then
          if Params.Control.Flags (Rose.Invocation.Block) then
             Rose.Kernel.Processes.Receive (Receiver_Id, Params.all);
          else
@@ -27,8 +27,8 @@ package body Rose.Kernel.Capabilities.Receive is
          end if;
       else
          Rose.Kernel.Processes.Unblock_And_Send
-           (From_Process    => Next_Sender,
-            To_Process      => Receiver_Id,
+           (From_Process_Id => Next_Sender,
+            To_Process_Id   => Receiver_Id,
             Receiver_Params => Params);
       end if;
    end Handle;

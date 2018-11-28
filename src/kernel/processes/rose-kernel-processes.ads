@@ -13,9 +13,20 @@ package Rose.Kernel.Processes is
    Process_Priority_Count  : constant := 16;
 
    type Process_State is
-     (Available, Ready, Running, Blocked, Interrupted, Killed);
+     (Available, Ready, Running, Blocked, Interrupted, Faulted, Killed);
 
    type Process_Priority is range 1 .. Process_Priority_Count;
+
+   type Process_Id is private;
+   Null_Process_Id : constant Process_Id;
+
+   function To_Process_Id
+     (Oid : Rose.Objects.Object_Id)
+      return Process_Id;
+
+   function To_Object_Id
+     (Pid : Process_Id)
+      return Rose.Objects.Object_Id;
 
    function Current_Process_Cap
      (Cap_Index : Rose.Capabilities.Capability;
@@ -25,173 +36,164 @@ package Rose.Kernel.Processes is
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
 
+   procedure Get_Process_Name
+     (Pid  : Process_Id;
+      Name : out String;
+      Last : out Natural);
+
    function Create_Cap
-     (Process_Id : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Rose.Capabilities.Capability;
 
    function Create_Caps
-     (Process_Id : Rose.Objects.Process_Id;
-      Count      : Natural)
+     (Pid   : Process_Id;
+      Count : Natural)
       return Rose.Capabilities.Capability;
    --  Create Count caps and return the first.  They
    --  are guaranteed to be sequential, or the return
    --  value is Null_Capability
 
    function Has_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability)
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
       return Boolean;
 
    function Cap_Type
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability)
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Type;
 
    procedure Delete_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability);
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability);
 
    procedure Set_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability;
-      Layout     : Rose.Capabilities.Layout.Capability_Layout);
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Layout : Rose.Capabilities.Layout.Capability_Layout);
 
    function Current_State
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Process_State;
 
    function Blocked
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Boolean;
 
    function Is_Valid_Endpoint_Index
-     (Process        : Rose.Objects.Process_Id;
+     (Pid            : Process_Id;
       Endpoint_Index : Rose.Objects.Endpoint_Index)
       return Boolean;
 
    function Is_Blocked_On_Endpoint
-     (Process        : Rose.Objects.Process_Id;
+     (Pid            : Process_Id;
       Endpoint_Index : Rose.Objects.Endpoint_Index)
       return Boolean;
 
    function Create_Endpoint
-     (Process_Id : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Objects.Endpoint_Index;
    --  returns the new endpoint index, or 0 if it can't be created
 
    procedure Set_Endpoint_Caps
-     (Process_Id  : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index;
       Receive_Cap : Rose.Capabilities.Capability;
       Send_Cap    : Rose.Capabilities.Capability);
 
    function Find_Endpoint_Cap
-     (Process_Id : Rose.Objects.Process_Id;
+     (Pid        : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Capabilities.Capability;
 
    function Current_Receive_Cap
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
      return Rose.Capabilities.Capability;
 
    procedure Set_Current_State
-     (Process : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       State   : Process_State);
 
    procedure Send_Cap
-     (From_Process    : Rose.Objects.Process_Id;
-      To_Process      : Rose.Objects.Process_Id;
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
       Sender_Cap      : Rose.Capabilities.Capability;
       Receiver_Cap    : Rose.Capabilities.Capability;
       Params          : Rose.Invocation.Invocation_Record);
 
    procedure Send_To_Endpoint
-     (From_Process    : Rose.Objects.Process_Id;
-      To_Process      : Rose.Objects.Process_Id;
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
       Sender_Cap      : Rose.Capabilities.Capability;
       Endpoint        : Rose.Objects.Endpoint_Index;
       Identifier      : Rose.Objects.Capability_Identifier;
       Params          : Rose.Invocation.Invocation_Record);
 
    procedure Send_Reply
-     (From_Process : Rose.Objects.Process_Id;
-      To_Process   : Rose.Objects.Process_Id;
-      Params       : Rose.Invocation.Invocation_Record);
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
+      Params          : Rose.Invocation.Invocation_Record);
 
    procedure Wait_For_Receiver
-     (Waiting_Process   : Rose.Objects.Process_Id;
-      Receiving_Process : Rose.Objects.Process_Id;
-      Endpoint          : Rose.Objects.Endpoint_Index;
-      Identifier        : Rose.Objects.Capability_Identifier;
-      Params            : Rose.Invocation.Invocation_Record);
+     (Waiting_Process_Id   : Process_Id;
+      Receiving_Process_Id : Process_Id;
+      Endpoint             : Rose.Objects.Endpoint_Index;
+      Identifier           : Rose.Objects.Capability_Identifier;
+      Params               : Rose.Invocation.Invocation_Record);
 
    procedure Receive
-     (Receiver : Rose.Objects.Process_Id;
-      Params   : Rose.Invocation.Invocation_Record);
+     (Receiver_Id : Process_Id;
+      Params      : Rose.Invocation.Invocation_Record);
 
    procedure Receive_Any
-     (Receiver : Rose.Objects.Process_Id;
-      Params   : Rose.Invocation.Invocation_Record);
+     (Receiver_Id : Process_Id;
+      Params      : Rose.Invocation.Invocation_Record);
 
    function Next_Blocked_Sender
-     (Receiver : Rose.Objects.Process_Id)
-      return Rose.Objects.Process_Id;
+     (Receiver_Id : Process_Id)
+      return Process_Id;
 
    procedure Unblock_And_Send
-     (From_Process    : Rose.Objects.Process_Id;
-      To_Process      : Rose.Objects.Process_Id;
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
       Receiver_Params : Rose.Invocation.Invocation_Access);
 
    procedure Return_Error
      (Params : Rose.Invocation.Invocation_Access;
       Error  : Rose.Invocation.Invocation_Error);
 
-   function Current_Process_Id return Rose.Objects.Process_Id;
+   function Current_Process_Id return Process_Id;
 
    function Use_Tick return Boolean;
    --  current process uses up a tick.  Return True if it has
    --  no ticks left
 
-   function Get_Page_Object_Id
-     (Process : Rose.Objects.Process_Id;
-      Address : Rose.Words.Word)
-      return Rose.Objects.Page_Object_Id;
-   --  convert to (Process, Address) pair to a page object id
-
-   function Get_Page_Object_Process
-     (Page_Object : Rose.Objects.Page_Object_Id)
-      return Rose.Objects.Process_Id;
-
-   function Get_Page_Object_Page
-     (Page_Object : Rose.Objects.Page_Object_Id)
-      return Rose.Addresses.Virtual_Page_Address;
-
    function Is_Valid_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Process_Id)
       return Boolean;
 
    function Is_Active_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Process_Id)
       return Boolean;
 
    function Is_Available_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Process_Id)
       return Boolean;
 
    procedure Copy_Cap_Layout
-     (From_Process : Rose.Objects.Process_Id;
-      From_Cap     : Rose.Capabilities.Capability;
-      To_Process   : Rose.Objects.Process_Id;
-      To_Cap       : Rose.Capabilities.Capability);
+     (From_Process_Id : Process_Id;
+      From_Cap        : Rose.Capabilities.Capability;
+      To_Process_Id   : Process_Id;
+      To_Cap          : Rose.Capabilities.Capability);
 
    procedure Set_Cap_Id
-     (Process      : Rose.Objects.Process_Id;
-      Cap          : Rose.Capabilities.Capability;
-      Id           : Rose.Objects.Capability_Identifier);
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Cap_Id : Rose.Objects.Capability_Identifier);
 
    procedure Map_Page
-     (Process       : Rose.Objects.Process_Id;
+     (Pid           : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Readable      : Boolean;
@@ -200,15 +202,15 @@ package Rose.Kernel.Processes is
       User          : Boolean);
 
    procedure Unmap_Page
-     (Process       : Rose.Objects.Process_Id;
+     (Pid           : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address);
 
    procedure Unmap_Invocation_Buffer
-     (Process       : Rose.Objects.Process_Id);
+     (Pid : Process_Id);
 
    function Mapped_Physical_Page
-     (Process       : Rose.Objects.Process_Id;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address)
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
 
    procedure Report_Current_Process;
@@ -230,20 +232,15 @@ package Rose.Kernel.Processes is
    function Page_Fault_Count
      return Natural;
 
-   function Current_ESP
-     (Process : Rose.Objects.Process_Id)
-      return Rose.Words.Word_32;
-
-   function Current_EIP
-     (Process : Rose.Objects.Process_Id)
-      return Rose.Words.Word_32;
-
 private
 
    type Process_Flag is
      (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply, Interrupt_Resume);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
+
+   type Process_Id is new Rose.Words.Word;
+   Null_Process_Id : constant Process_Id := 0;
 
    Cached_Capability_Count : constant := 64;
 
@@ -326,7 +323,8 @@ private
       record
          Stack             : Rose.Kernel.Arch.Stack_Frame;
          Directory_Page    : Rose.Addresses.Physical_Address;
-         Pid               : Rose.Objects.Process_Id;
+         Pid               : Process_Id;
+         Oid               : Rose.Objects.Object_Id;
          Name              : Process_Name;
          State             : Process_State;
          Flags             : Process_Flag_Array := (others => False);
@@ -359,7 +357,7 @@ private
       end record;
 
    type Kernel_Process_Table is
-     array (Rose.Objects.Process_Id
+     array (Process_Id
             range 1 .. Rose.Kernel.Limits.Max_Processes)
      of aliased Kernel_Process_Entry;
 
@@ -394,48 +392,53 @@ private
    Idle_State : Rose.Words.Word_32;
    pragma Export (C, Idle_State, "idle_state");
 
-   function Current_Process_Id return Rose.Objects.Process_Id
+   function Current_Process_Id return Rose.Kernel.Processes.Process_Id
    is (if Current_Process = null then 0 else Current_Process.Pid);
 
    function Is_Valid_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Rose.Kernel.Processes.Process_Id)
       return Boolean
    is (Id in Process_Table'Range);
 
    function Is_Active_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Rose.Kernel.Processes.Process_Id)
       return Boolean
    is (Id in Process_Table'Range
        and then Process_Table (Id).State /= Available);
 
    function Is_Available_Process_Id
-     (Id : Rose.Objects.Process_Id)
+     (Id : Rose.Kernel.Processes.Process_Id)
       return Boolean
    is (Id in Process_Table'Range
        and then Process_Table (Id).State = Available);
 
    function Current_State
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Process_State
-   is (Process_Table (Process).State);
+   is (Process_Table (Pid).State);
 
    function Blocked
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Boolean
-   is (Current_State (Process) = Blocked);
+   is (Current_State (Pid) = Blocked);
 
    function Current_Receive_Cap
-     (Process : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Rose.Capabilities.Capability
-   is (Process_Table (Process).Receive_Cap);
+   is (Process_Table (Pid).Receive_Cap);
 
    function Create_Cap return Rose.Capabilities.Capability
    is (Create_Cap (Current_Process_Id));
 
+   function To_Object_Id
+     (Pid : Process_Id)
+      return Rose.Objects.Object_Id
+   is (Process_Table (Pid).Oid);
+
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
 
-   Mem_Process        : Rose.Objects.Process_Id := 0;
+   Mem_Process        : Rose.Kernel.Processes.Process_Id := 0;
    Mem_Launch_Cap     : Rose.Capabilities.Capability := 0;
    Mem_Kill_Cap       : Rose.Capabilities.Capability := 0;
    Mem_Page_Fault_Cap : Rose.Capabilities.Capability := 0;

@@ -92,12 +92,6 @@ package body Rose.Kernel.Init is
       Log_Port_IO :=
         Rose.Kernel.Command_Line.Have_Argument ("log-port-io");
 
-      if Rose.Kernel.Command_Line.Have_Argument ("log-process") then
-         Log_Process_Activity :=
-           Rose.Objects.Process_Id
-             (Rose.Kernel.Command_Line.Integer_Argument ("log-process"));
-      end if;
-
       Rose.Boot.Console.Put_Line ("Loading boot modules");
 
       Rose.Kernel.Modules.Init.Load_Modules;

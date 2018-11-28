@@ -13,7 +13,6 @@ with Rose.Kernel.Debug;
 with Rose.Kernel.Panic;
 
 with Rose.Kernel.Capabilities;
-with Rose.Kernel.Validation;
 
 with Rose.Invocation.Trace;
 
@@ -30,27 +29,20 @@ package body Rose.Kernel.Invocation is
       use Rose.Capabilities.Layout;
       use Rose.Invocation;
       use Rose.Kernel.Processes;
-      use type Rose.Objects.Process_Id;
-      Process_Id : constant Rose.Objects.Process_Id := Current_Process_Id;
-      Log : constant Boolean :=
-              Log_Invocation
-                  or else Log_Process_Activity = Process_Id;
-      Log_Details : constant Boolean :=
-                      Log and then
-                          Log_Detailed_Invocation = Process_Id;
-      Cap : Rose.Capabilities.Layout.Capability_Layout;
+      Pid : constant Process_Id := Current_Process_Id;
+      Log         : constant Boolean := Log_Invocation;
+      Log_Details : constant Boolean := False;
+      Cap         : Rose.Capabilities.Layout.Capability_Layout;
       function To_Word_32 is
         new Ada.Unchecked_Conversion (Rose.Invocation.Invocation_Access,
                                       Rose.Words.Word_32);
       pragma Unreferenced (To_Word_32);
    begin
 
-      Rose.Kernel.Validation.Validate;
-
       if Params.Control.Flags (Block)
         or else Params.Control.Flags (Send_Buffer)
       then
-         Set_Current_State (Process_Id, Blocked);
+         Set_Current_State (Pid, Blocked);
       end if;
 
       Params.Reply_Cap := Params.Cap;
@@ -58,9 +50,6 @@ package body Rose.Kernel.Invocation is
       if not Current_Process_Cap (Params.Cap, Cap) then
          Rose.Boot.Console.Put ("invoke: bad cap ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Cap));
-         Rose.Boot.Console.Put (" for pid ");
-         Rose.Boot.Console.Put
-           (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (Params.all, True);
          Rose.Kernel.Processes.Debug.Report_Process
@@ -70,10 +59,10 @@ package body Rose.Kernel.Invocation is
       else
          if Log then
             Rose.Kernel.Debug.Put_Call
-              ("invoke", Process_Id, Cap, Params.all);
+              ("invoke", Cap, Params.all);
             if Log_Details then
                Rose.Kernel.Processes.Debug.Report_Process
-                 (Process_Id, False);
+                 (Pid, False);
             end if;
          end if;
 
@@ -89,7 +78,6 @@ package body Rose.Kernel.Invocation is
 
       Rose.Kernel.Processes.Set_Current_Invocation (Params.all);
       Rose.Kernel.Processes.Queue.Choose_Process;
-      Rose.Kernel.Validation.Validate;
 
    end Invoke_Capability;
 

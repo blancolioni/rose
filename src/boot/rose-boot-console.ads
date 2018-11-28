@@ -23,9 +23,9 @@ package Rose.Boot.Console is
    procedure Put (Addr : System.Address);
    procedure Put (Object : Rose.Objects.Object_Id);
    procedure Put (Endpoint : Rose.Objects.Endpoint_Id);
-   procedure Put (Pid : Rose.Objects.Process_Id);
    procedure Put (Cap : Rose.Capabilities.Capability);
    procedure Put (X : Word_8);
+   procedure Put (X : Natural);
 
    procedure Show_Stack (EIP, CS, PSW, ESP, SS : Word_32);
    pragma Export (C, Show_Stack, "debug_show_stack");
@@ -48,11 +48,11 @@ package Rose.Boot.Console is
    procedure Disable_Console;
 
    procedure Status_Line
-     (Current_Pid   : Rose.Objects.Process_Id;
-      Current_Ticks : Rose.Words.Word;
-      Page_Faults   : Natural;
-      Heap_Allocated : Rose.Addresses.Physical_Bytes;
-      Heap_Available : Rose.Addresses.Physical_Bytes);
+     (Current_Process : String;
+      Current_Ticks   : Rose.Words.Word;
+      Page_Faults     : Natural;
+      Heap_Allocated  : Rose.Addresses.Physical_Bytes;
+      Heap_Available  : Rose.Addresses.Physical_Bytes);
 
 private
 

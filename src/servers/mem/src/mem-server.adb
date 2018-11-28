@@ -13,21 +13,21 @@ with Mem.Virtual_Map;
 package body Mem.Server is
 
    procedure On_Launch
-     (Process     : Rose.Objects.Process_Id;
+     (Process     : Rose.Objects.Object_Id;
       Resume_Cap  : Rose.Capabilities.Capability;
       Faulted_Cap : Rose.Capabilities.Capability;
       Segments    : Mem.Processes.Segment_Record_Array);
 
-   procedure On_Kill (Process : Rose.Objects.Process_Id);
+   procedure On_Kill (Process : Rose.Objects.Object_Id);
 
    procedure On_Page_Fault
-     (Process       : Rose.Objects.Process_Id;
+     (Process       : Rose.Objects.Object_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Action        : Action_Type);
 
    procedure Protection_Fault
-     (Process : Rose.Objects.Process_Id;
+     (Process : Rose.Objects.Object_Id;
       Address : Rose.Addresses.Virtual_Page_Address;
       Message : String);
 
@@ -44,7 +44,7 @@ package body Mem.Server is
    -- On_Kill --
    -------------
 
-   procedure On_Kill (Process : Rose.Objects.Process_Id) is
+   procedure On_Kill (Process : Rose.Objects.Object_Id) is
    begin
       Rose.Console_IO.Put ("mem: killing process: ");
       Rose.Console_IO.Put (Natural (Process));
@@ -58,13 +58,17 @@ package body Mem.Server is
    ---------------
 
    procedure On_Launch
-     (Process     : Rose.Objects.Process_Id;
+     (Process     : Rose.Objects.Object_Id;
       Resume_Cap  : Rose.Capabilities.Capability;
       Faulted_Cap : Rose.Capabilities.Capability;
       Segments    : Mem.Processes.Segment_Record_Array)
    is
    begin
       if False then
+         Rose.Console_IO.Put ("mem: launching process: ");
+         Rose.Console_IO.Put (Natural (Process));
+         Rose.Console_IO.New_Line;
+
          for I in Segments'Range loop
             declare
                use Rose.Words;
@@ -103,7 +107,7 @@ package body Mem.Server is
    -------------------
 
    procedure On_Page_Fault
-     (Process       : Rose.Objects.Process_Id;
+     (Process       : Rose.Objects.Object_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Action        : Action_Type)
@@ -157,6 +161,7 @@ package body Mem.Server is
             end if;
 
             if not Have_Page then
+               Rose.Console_IO.Put_Line ("no page");
                Mem.Calls.Set_Error (Process);
             else
                Mem.Virtual_Map.Map
@@ -197,7 +202,7 @@ package body Mem.Server is
    ----------------------
 
    procedure Protection_Fault
-     (Process : Rose.Objects.Process_Id;
+     (Process : Rose.Objects.Object_Id;
       Address : Rose.Addresses.Virtual_Page_Address;
       Message : String)
    is

@@ -17,7 +17,6 @@ package body Rose.Kernel.Capabilities.Arch is
    is
       use Rose.Invocation;
       use type Rose.Objects.Object_Id;
-      use type Rose.Objects.Process_Id;
       use Rose.Words;
       First_Port : constant Word_16 :=
                      Word_16 (Cap.Payload mod 65536);
@@ -27,10 +26,7 @@ package body Rose.Kernel.Capabilities.Arch is
                      Port_IO_Size'Val
                        (Boolean'Pos (Cap.Header.Flags (1))
                         + 2 * Boolean'Pos (Cap.Header.Flags (2)));
-      Log_Calls : constant Boolean :=
-                   Log_Port_IO
-                       or else Log_Process_Activity =
-                         Rose.Kernel.Processes.Current_Process_Id;
+      Log_Calls : constant Boolean := Log_Port_IO;
 
       procedure Send_To_Encoded_Port (Value : Word);
       procedure Send_To_First_Port (Value : Word);

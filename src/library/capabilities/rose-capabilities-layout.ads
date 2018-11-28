@@ -49,18 +49,18 @@ package Rose.Capabilities.Layout is
    Empty_Capability : constant Capability_Layout := (others => <>);
 
    function Reply_Capability
-     (Pid : Rose.Objects.Process_Id)
+     (Object_Id : Rose.Objects.Object_Id)
       return Capability_Layout
    is ((Reply_Cap, Alloc_Count => 1, others => <>),
-       Rose.Objects.To_Object_Id (Pid));
+       Object_Id);
 
    function Receive_Capability
-     (Pid      : Rose.Objects.Process_Id;
+     (Oid      : Rose.Objects.Object_Id;
       Endpoint : Rose.Objects.Endpoint_Index)
       return Capability_Layout;
 
    function Endpoint_Capability
-     (Pid        : Rose.Objects.Process_Id;
+     (Oid        : Rose.Objects.Object_Id;
       Endpoint   : Rose.Objects.Endpoint_Index;
       Identifier : Rose.Objects.Capability_Identifier)
       return Capability_Layout;

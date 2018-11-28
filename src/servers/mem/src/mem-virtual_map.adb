@@ -7,7 +7,7 @@ package body Mem.Virtual_Map is
    ---------
 
    function Get
-     (Process : Rose.Objects.Process_Id;
+     (Process : Rose.Objects.Object_Id;
       Page    : Rose.Addresses.Virtual_Page_Address)
       return Virtual_Page_Mapping
    is (Virtual_Page_Mapping'
@@ -30,7 +30,7 @@ package body Mem.Virtual_Map is
    -- Map --
    ---------
 
-   procedure Map (Process       : Rose.Objects.Process_Id;
+   procedure Map (Process       : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;
                   Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
                   Readable      : Boolean;
@@ -67,7 +67,7 @@ package body Mem.Virtual_Map is
    ----------------
 
    procedure Remove_All
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
    is null;
 
 end Mem.Virtual_Map;

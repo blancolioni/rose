@@ -14,9 +14,6 @@ package Rose.Objects is
 
    type Capability_Identifier is mod 2 ** 20;
 
-   type Process_Id is new Rose.Words.Word_32;
-   Null_Process_Id : constant Process_Id := 0;
-
    type Page_Id is new Rose.Words.Word_64;
    Null_Page_Id : constant Page_Id := 0;
 
@@ -29,6 +26,9 @@ package Rose.Objects is
    subtype Process_Object_Id is Object_Id range
      16#0000_0000_0000_0001# .. 16#0000_0000_FFFF_FFFF#;
 
+   subtype Persistent_Process_Object_Id is Object_Id range
+     16#0000_0000_0000_100# .. 16#0000_0000_FFFF_FFFF#;
+
    function Is_Page_Object_Id (Id : Object_Id) return Boolean
    is (Id in Page_Object_Id);
 
@@ -37,12 +37,6 @@ package Rose.Objects is
 
    function Is_Process_Object_Id (Id : Object_Id) return Boolean
    is (Id in Process_Object_Id);
-
-   function To_Process_Id (Id : Object_Id) return Process_Id
-   is (Process_Id (Id));
-
-   function To_Object_Id (Id : Process_Id) return Object_Id
-   is (Object_Id (Id));
 
    type Rose_Ticks is new Rose.Words.Word_64;
 

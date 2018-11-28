@@ -2,7 +2,6 @@ with Rose.Words;
 
 with Rose.Kernel.Modules;
 with Rose.Kernel.Processes.Init;
-with Rose.Kernel.Validation;
 
 with Rose.Boot.Console;
 
@@ -100,13 +99,15 @@ package body Rose.Kernel.Capabilities.Boot is
    is
       pragma Unreferenced (Cap);
       use Rose.Invocation;
-      Process_Id : Rose.Objects.Process_Id;
+      Current_Pid      : constant Rose.Kernel.Processes.Process_Id :=
+                           Rose.Kernel.Processes.Current_Process_Id;
+      New_Pid          : Rose.Kernel.Processes.Process_Id;
       Have_Environment : constant Boolean :=
                            Check_Environment (Params);
 
    begin
 
-      Process_Id :=
+      New_Pid :=
         Rose.Kernel.Processes.Init.Load_Boot_Module
           (Priority => Rose.Kernel.Processes.Process_Priority
              (Params.Data (0)),
@@ -125,36 +126,31 @@ package body Rose.Kernel.Capabilities.Boot is
             declare
                To_Cap : constant Rose.Capabilities.Capability :=
                           Rose.Kernel.Processes.Create_Cap
-                            (Process_Id);
+                            (New_Pid);
             begin
                Rose.Boot.Console.Put (" ");
                Rose.Boot.Console.Put
-                 (Rose.Words.Word_8 (Params.Caps (Cap_Index)));
+                 (Rose.Words.Word_8 (To_Cap));
                Rose.Boot.Console.Put ("/");
                Rose.Boot.Console.Put
-                 (Rose.Words.Word_8 (To_Cap));
+                 (Rose.Words.Word_8 (Params.Caps (Cap_Index)));
 
                Rose.Kernel.Processes.Copy_Cap_Layout
-                 (From_Process => Rose.Kernel.Processes.Current_Process_Id,
-                  From_Cap     => Params.Caps (Cap_Index),
-                  To_Process   => Process_Id,
-                  To_Cap       => To_Cap);
-               Rose.Kernel.Validation.Create_Cap
-                 (Process_Id, To_Cap,
-                  Rose.Kernel.Processes.Cap_Type
-                    (Process_Id, To_Cap));
+                 (From_Process_Id => Current_Pid,
+                  From_Cap        => Params.Caps (Cap_Index),
+                  To_Process_Id   => New_Pid,
+                  To_Cap          => To_Cap);
             end;
          end loop;
       end if;
 
       Rose.Boot.Console.New_Line;
 
-      Params.Control.Flags := (Reply  => True, Send_Words => True,
-                               others => False);
-      Params.Control.Last_Sent_Word := 0;
-      Params.Data (0) := Rose.Words.Word (Process_Id);
+      Params.Control.Flags := (Reply  => True, others => False);
+      Rose.Invocation.Send_Object_Id
+        (Params.all, Rose.Kernel.Processes.To_Object_Id (New_Pid));
       Rose.Kernel.Processes.Set_Current_State
-        (Rose.Kernel.Processes.Current_Process_Id,
+        (Current_Pid,
          Rose.Kernel.Processes.Ready);
 
    end Handle;

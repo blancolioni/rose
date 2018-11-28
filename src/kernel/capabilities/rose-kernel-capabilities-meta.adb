@@ -3,7 +3,7 @@ with Rose.Boot.Console;
 with Rose.Words;
 
 with Rose.Kernel.Processes;
-with Rose.Kernel.Validation;
+with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Meta is
 
@@ -19,7 +19,7 @@ package body Rose.Kernel.Capabilities.Meta is
    is
       use Rose.Capabilities;
       use Rose.Invocation;
-      Process_Id     : constant Rose.Objects.Process_Id :=
+      Process_Id     : constant Rose.Kernel.Processes.Process_Id :=
                          Rose.Kernel.Processes.Current_Process_Id;
       Endpoint_Id    : Rose.Objects.Endpoint_Id;
       Local_Endpoint : Rose.Objects.Endpoint_Index  := 0;
@@ -66,11 +66,8 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         if Log_Invocation
-           or else Process_Id = Log_Process_Activity
-         then
-            Rose.Boot.Console.Put
-              (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
+         if Log_Invocation then
+            Rose.Kernel.Processes.Debug.Put (Process_Id);
             Rose.Boot.Console.Put
               (": new receive cap: ");
             Rose.Boot.Console.Put
@@ -81,7 +78,8 @@ package body Rose.Kernel.Capabilities.Meta is
          Rose.Kernel.Processes.Set_Cap
            (Process_Id, Receive_Cap,
             Rose.Capabilities.Layout.Receive_Capability
-              (Process_Id, Local_Endpoint));
+              (Rose.Kernel.Processes.To_Object_Id (Process_Id),
+               Local_Endpoint));
       end if;
 
       if Endpoint_Id /= 0 then
@@ -97,10 +95,8 @@ package body Rose.Kernel.Capabilities.Meta is
 
          if True
            or else Log_Invocation
-           or else Process_Id = Log_Process_Activity
          then
-            Rose.Boot.Console.Put
-              (Rose.Words.Word_8 (Rose.Kernel.Processes.Current_Process_Id));
+            Rose.Kernel.Processes.Debug.Put (Process_Id);
             Rose.Boot.Console.Put
               (": new endpoint cap: ");
             Rose.Boot.Console.Put
@@ -115,28 +111,12 @@ package body Rose.Kernel.Capabilities.Meta is
          Rose.Kernel.Processes.Set_Cap
            (Process_Id, Endpoint_Cap,
             Rose.Capabilities.Layout.Endpoint_Capability
-              (Process_Id, Local_Endpoint, Identifier));
+              (Rose.Kernel.Processes.To_Object_Id (Process_Id),
+               Local_Endpoint, Identifier));
       end if;
 
       Rose.Kernel.Processes.Set_Endpoint_Caps
         (Process_Id, Local_Endpoint, Receive_Cap, Endpoint_Cap);
-
-      if Receive_Cap /= Null_Capability then
-         Rose.Kernel.Validation.Create_Cap
-           (Process_Id, Receive_Cap, Rose.Capabilities.Layout.Receive_Cap);
-      end if;
-
-      if Endpoint_Cap /= Null_Capability then
-         Rose.Kernel.Validation.Create_Cap
-           (Process_Id, Endpoint_Cap, Rose.Capabilities.Layout.Endpoint_Cap);
-      end if;
-
---        Rose.Boot.Console.Put (Rose.Words.Word_8 (Process_Id));
---        Rose.Boot.Console.Put (": new endpoint ");
---        Rose.Boot.Console.Put (Rose.Words.Word (Endpoint));
---        Rose.Boot.Console.Put (" at ");
---        Rose.Boot.Console.Put (Rose.Words.Word_8 (Index));
---        Rose.Boot.Console.New_Line;
 
       Params.Control.Last_Sent_Cap := 0;
 
@@ -168,7 +148,7 @@ package body Rose.Kernel.Capabilities.Meta is
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
-      Process_Id : constant Rose.Objects.Process_Id :=
+      Process_Id : constant Rose.Kernel.Processes.Process_Id :=
                      Rose.Kernel.Processes.Current_Process_Id;
    begin
       case Cap.Header.Endpoint is

@@ -1,5 +1,4 @@
 with Rose.Words;                       use Rose.Words;
-with Rose.Objects;
 
 with Rose.Arch.PIC;
 
@@ -214,7 +213,7 @@ package body Rose.Arch.Interrupt_Table is
      (Vector : Rose.Arch.Interrupts.Interrupt_Vector;
       Code   : Rose.Words.Word_32)
    is
-      Interrupted_Process_Id : constant Rose.Objects.Process_Id :=
+      Interrupted_Process_Id : constant Rose.Kernel.Processes.Process_Id :=
                                  Rose.Kernel.Processes.Current_Process_Id;
    begin
       Rose.Kernel.Processes.Set_Current_State

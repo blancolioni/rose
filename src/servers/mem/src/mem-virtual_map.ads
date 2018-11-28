@@ -5,7 +5,7 @@ package Mem.Virtual_Map is
 
    type Virtual_Page_Mapping is private;
 
-   function Get (Process : Rose.Objects.Process_Id;
+   function Get (Process : Rose.Objects.Object_Id;
                  Page    : Rose.Addresses.Virtual_Page_Address)
                  return Virtual_Page_Mapping;
 
@@ -16,7 +16,7 @@ package Mem.Virtual_Map is
      (Physical_Page : out Rose.Addresses.Physical_Page_Address;
       Success       : out Boolean);
 
-   procedure Map (Process       : Rose.Objects.Process_Id;
+   procedure Map (Process       : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;
                   Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
                   Readable      : Boolean;
@@ -34,7 +34,7 @@ package Mem.Virtual_Map is
    procedure Set_Executable (Mapping : Virtual_Page_Mapping);
 
    procedure Remove_All
-     (Process : Rose.Objects.Process_Id);
+     (Process : Rose.Objects.Object_Id);
 
 private
 

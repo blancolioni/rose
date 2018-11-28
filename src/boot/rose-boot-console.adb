@@ -172,7 +172,7 @@ package body Rose.Boot.Console is
          12 => 16#0400# + Status_Background,
          others => Status_Foreground + Status_Background);
 
-      Status_Line (0, 0, 0, 0, 0);
+      Status_Line ("starting ...", 0, 0, 0, 0);
 
       Enable_Serial_Port;
 
@@ -247,6 +247,28 @@ package body Rose.Boot.Console is
    -- Put --
    ---------
 
+   procedure Put (X : Natural) is
+      Buffer : String (1 .. 16);
+      Start  : Natural := Buffer'Last + 1;
+      It     : Natural := X;
+   begin
+      if It = 0 then
+         Put ('0');
+      else
+         while It > 0 loop
+            exit when Start = 1;
+            Start := Start - 1;
+            Buffer (Start) := Character'Val (It mod 10 + 48);
+            It := It / 10;
+         end loop;
+         Put (Buffer (Start .. Buffer'Last));
+      end if;
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
    procedure Put (X : Word_8) is
    begin
       Put (Hex_Digit (Word_32 (X / 16)));
@@ -286,16 +308,6 @@ package body Rose.Boot.Console is
          end if;
       end loop;
       Put (Buffer);
-   end Put;
-
-   ---------
-   -- Put --
-   ---------
-
-   procedure Put (Pid : Rose.Objects.Process_Id) is
-   begin
-      Put ("pid-");
-      Put (Rose.Words.Word_8 (Pid));
    end Put;
 
    ---------
@@ -511,15 +523,14 @@ package body Rose.Boot.Console is
    -----------------
 
    procedure Status_Line
-     (Current_Pid    : Rose.Objects.Process_Id;
-      Current_Ticks  : Rose.Words.Word;
-      Page_Faults    : Natural;
-      Heap_Allocated : Rose.Addresses.Physical_Bytes;
-      Heap_Available : Rose.Addresses.Physical_Bytes)
+     (Current_Process : String;
+      Current_Ticks   : Rose.Words.Word;
+      Page_Faults     : Natural;
+      Heap_Allocated  : Rose.Addresses.Physical_Bytes;
+      Heap_Available  : Rose.Addresses.Physical_Bytes)
    is
       Time_Image  : String (1 .. 8);
       Acc         : Word_32 := Current_Ticks / 100;
-      Pid_Acc     : Natural := Natural (Current_Pid);
       Fault_Acc   : Natural := Page_Faults;
       Heap        : String (1 .. 20) := (others => ' ');
       Heap_Count  : Natural := 0;
@@ -576,19 +587,24 @@ package body Rose.Boot.Console is
       Acc := Acc / 10;
       Time_Image (1) := Character'Val (Acc mod 10 + 48);
 
-      Status_Chars (70 .. 77) := Time_Image;
+      Status_Chars (72 .. 79) := Time_Image;
 
-      for Pid_Index in reverse 62 .. 66 loop
-         if Pid_Acc = 0 and then Pid_Index < 66 then
-            Status_Chars (Pid_Index) := ' ';
-         else
-            Status_Chars (Pid_Index) := Character'Val (48 + Pid_Acc mod 10);
-            Pid_Acc := Pid_Acc / 10;
-         end if;
-      end loop;
+      declare
+         Name_Index : Positive := 48;
+      begin
+         for Ch of Current_Process loop
+            Name_Index := Name_Index + 1;
+            exit when Name_Index > 62;
+            Status_Chars (Name_Index) := Ch;
+         end loop;
+         while Name_Index < 62 loop
+            Name_Index := Name_Index + 1;
+            Status_Chars (Name_Index) := ' ';
+         end loop;
+      end;
 
-      for Index in reverse 56 .. 60 loop
-         if Fault_Acc = 0 and then Index < 60 then
+      for Index in reverse 64 .. 70 loop
+         if Fault_Acc = 0 and then Index < 70 then
             Status_Chars (Index) := ' ';
          else
             Status_Chars (Index) := Character'Val (48 + Fault_Acc mod 10);
@@ -603,7 +619,7 @@ package body Rose.Boot.Console is
       Heap_Add (Natural (Heap_Allocated + Heap_Available) / 1024);
       Heap_Add ("K");
 
-      Status_Chars (31 .. 30 + Heap'Length) := Heap;
+      Status_Chars (27 .. 26 + Heap'Length) := Heap;
 
       for I in Status_Chars'Range loop
          Status_Memory (I) :=

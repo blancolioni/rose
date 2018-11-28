@@ -31,16 +31,14 @@ package body Mem.Calls is
          Params.Cap := Region_Range_Cap;
          Params.Control.Flags := (Send       => True,
                                   Block      => True,
-                                  Send_Words => True,
                                   Recv_Words => True,
                                   Recv_Caps  => True,
                                   others     => False);
 
-         Params.Control.Last_Sent_Word := 0;
          Params.Control.Last_Recv_Word := 1;
          Params.Control.Last_Recv_Cap  := 1;
 
-         Params.Data (0) := Word (I);
+         Send_Word (Params, Word (I));
 
          Rose.System_Calls.Invoke_Capability (Params);
 
@@ -85,7 +83,7 @@ package body Mem.Calls is
    ---------
 
    procedure Map
-     (Process    : Rose.Objects.Process_Id;
+     (Process    : Rose.Objects.Object_Id;
       Physical   : Rose.Addresses.Physical_Page_Address;
       Virtual    : Rose.Addresses.Virtual_Page_Address;
       Readable   : Boolean;
@@ -108,17 +106,15 @@ package body Mem.Calls is
       else
          Params.Control.Flags := (Send      => True,
                                   Block     => True,
-                                  Send_Words => True,
                                   others    => False);
          Params.Cap := Cap;
-         Params.Control.Last_Sent_Word := 3;
-         Params.Data (0) := Word (Process);
-         Params.Data (1) := Word (Physical);
-         Params.Data (2) := Word (Virtual);
-         Params.Data (3) :=
-           Boolean'Pos (Readable)
-           + 2 * Boolean'Pos (Writeable)
-           + 4 * Boolean'Pos (Executable);
+         Send_Object_Id (Params, Process);
+         Send_Word (Params, Word (Physical));
+         Send_Word (Params, Word (Virtual));
+         Send_Word (Params,
+                    Boolean'Pos (Readable)
+                    + 2 * Boolean'Pos (Writeable)
+                    + 4 * Boolean'Pos (Executable));
 
          Rose.System_Calls.Invoke_Capability (Params);
 
@@ -157,13 +153,11 @@ package body Mem.Calls is
    begin
       Params.Control.Flags := (Send => True,
                                Block => True,
-                               Send_Caps => True,
                                others    => False);
       Params.Cap := Start_Paging_Cap;
-      Params.Control.Last_Sent_Cap := 2;
-      Params.Caps (0) := Launch_Cap;
-      Params.Caps (1) := Kill_Cap;
-      Params.Caps (2) := Page_Fault_Cap;
+      Send_Cap (Params, Launch_Cap);
+      Send_Cap (Params, Kill_Cap);
+      Send_Cap (Params, Page_Fault_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
       loop
@@ -179,9 +173,8 @@ package body Mem.Calls is
          case Params.Endpoint is
             when Process_Launched_Endpoint =>
                declare
-                  Process_Id    : constant Rose.Objects.Process_Id :=
-                                    Rose.Objects.Process_Id
-                                      (Params.Data (0));
+                  Process_Id    : constant Rose.Objects.Object_Id :=
+                                    Get_Object_Id (Params, 0);
                   Resume_Cap    : constant Rose.Capabilities.Capability :=
                                     Params.Caps (0);
                   Faulted_Cap   : constant Rose.Capabilities.Capability :=
@@ -192,7 +185,7 @@ package body Mem.Calls is
 
                   if Log_Calls then
                      Rose.Console_IO.Put ("mem: process launched: ");
-                     Rose.Console_IO.Put (Rose.Words.Word_8 (Process_Id));
+                     Rose.Console_IO.Put (Rose.Words.Word_16 (Process_Id));
                      Rose.Console_IO.Put (" ");
                      Rose.Console_IO.Put ("<");
                      Rose.Console_IO.Put (Rose.Words.Word_8 (Resume_Cap));
@@ -208,7 +201,10 @@ package body Mem.Calls is
                         use Rose.Words;
                         use Mem.Processes;
                         Index : constant Parameter_Word_Index :=
-                                  Parameter_Word_Index (I * 3 - 2);
+                                  Parameter_Word_Index
+                                    (I * 3 - 2 +
+                                       (if Object_Fits_In_Word
+                                        then 0 else 1));
                         Flags : constant Word := Params.Data (Index);
                         Base  : constant Word := Params.Data (Index + 1);
                         Bound : constant Word := Params.Data (Index + 2);
@@ -236,26 +232,38 @@ package body Mem.Calls is
                   Rose.Console_IO.New_Line;
                end if;
 
-               On_Kill
-                 (Rose.Objects.Process_Id (Params.Data (0)));
+               On_Kill (Get_Object_Id (Params, 0));
 
             when Page_Fault_Endpoint =>
                if Log_Calls then
                   Rose.Console_IO.Put ("mem: page fault: ");
-                  Rose.Console_IO.Put (Rose.Words.Word_8 (Params.Data (0)));
+                  Rose.Console_IO.Put (Rose.Words.Word_16 (Params.Data (0)));
                   Rose.Console_IO.Put (" ");
                   Rose.Console_IO.Put (Params.Data (1) * 4096);
                   Rose.Console_IO.Put (" ");
                   Rose.Console_IO.Put (Rose.Words.Word_8 (Params.Data (2)));
                   Rose.Console_IO.New_Line;
                end if;
-               On_Page_Fault
-                 (Rose.Objects.Process_Id (Params.Data (0)),
-                  Rose.Addresses.Virtual_Page_Address
-                    (Params.Data (1)),
-                  Rose.Addresses.Physical_Page_Address
-                    (Params.Data (2)),
-                  Action_Type'Val (Params.Data (3)));
+
+               declare
+                  Oid_Index : constant Parameter_Word_Index := 0;
+                  Virtual_Page_Index : constant Parameter_Word_Index :=
+                                         (if Object_Fits_In_Word
+                                          then 1 else 2);
+                  Physical_Page_Index : constant Parameter_Word_Index :=
+                                          Virtual_Page_Index + 1;
+                  Action_Index        : constant Parameter_Word_Index :=
+                                          Physical_Page_Index + 1;
+               begin
+                  On_Page_Fault
+                    (Get_Object_Id (Params, Oid_Index),
+                     Rose.Addresses.Virtual_Page_Address
+                       (Params.Data (Virtual_Page_Index)),
+                     Rose.Addresses.Physical_Page_Address
+                       (Params.Data (Physical_Page_Index)),
+                     Action_Type'Val
+                       (Params.Data (Action_Index)));
+               end;
 
             when others =>
                Rose.Console_IO.Put
@@ -273,7 +281,7 @@ package body Mem.Calls is
    -----------------
 
    procedure Set_Faulted
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
    is
    begin
       Rose.System_Calls.Client.Send
@@ -285,7 +293,7 @@ package body Mem.Calls is
    ---------------
 
    procedure Set_Ready
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
    is
       use Rose.Invocation;
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -302,7 +310,7 @@ package body Mem.Calls is
    -----------
 
    procedure Unmap
-     (Process    : Rose.Objects.Process_Id;
+     (Process    : Rose.Objects.Object_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address)
    is
       use Rose.Words;

@@ -1,7 +1,6 @@
 with Rose.Words;
 
 with Rose.Kernel.Processes;
-with Rose.Kernel.Validation;
 
 with Rose.Kernel.Debug;
 with Rose.Boot.Console;
@@ -19,7 +18,7 @@ package body Rose.Kernel.Capabilities.Create is
       pragma Unreferenced (Cap);
       use Rose.Invocation, Rose.Words;
       use type Rose.Capabilities.Capability;
-      Process_Id   : constant Rose.Objects.Process_Id :=
+      Process_Id   : constant Rose.Kernel.Processes.Process_Id :=
                        Rose.Kernel.Processes.Current_Process_Id;
       New_Cap      : Rose.Capabilities.Capability;
       Cap_Layout   : Rose.Capabilities.Layout.Capability_Layout;
@@ -49,12 +48,9 @@ package body Rose.Kernel.Capabilities.Create is
       end if;
 
       Rose.Kernel.Processes.Set_Cap
-        (Process_Id => Process_Id,
-         Cap        => New_Cap,
-         Layout     => Cap_Layout);
-
-      Rose.Kernel.Validation.Create_Cap
-        (Process_Id, New_Cap, Cap_Layout.Header.Cap_Type);
+        (Pid    => Process_Id,
+         Cap    => New_Cap,
+         Layout => Cap_Layout);
 
       Params.Control.Flags :=
         (Reply => True, Send_Caps => True, others => False);
