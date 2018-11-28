@@ -50,7 +50,9 @@ package Rose.Boot.Console is
    procedure Status_Line
      (Current_Pid   : Rose.Objects.Process_Id;
       Current_Ticks : Rose.Words.Word;
-      Page_Faults   : Natural);
+      Page_Faults   : Natural;
+      Heap_Allocated : Rose.Addresses.Physical_Bytes;
+      Heap_Available : Rose.Addresses.Physical_Bytes);
 
 private
 

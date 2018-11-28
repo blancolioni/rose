@@ -172,7 +172,7 @@ package body Rose.Boot.Console is
          12 => 16#0400# + Status_Background,
          others => Status_Foreground + Status_Background);
 
-      Status_Line (0, 0, 0);
+      Status_Line (0, 0, 0, 0, 0);
 
       Enable_Serial_Port;
 
@@ -511,14 +511,56 @@ package body Rose.Boot.Console is
    -----------------
 
    procedure Status_Line
-     (Current_Pid   : Rose.Objects.Process_Id;
-      Current_Ticks : Rose.Words.Word;
-      Page_Faults   : Natural)
+     (Current_Pid    : Rose.Objects.Process_Id;
+      Current_Ticks  : Rose.Words.Word;
+      Page_Faults    : Natural;
+      Heap_Allocated : Rose.Addresses.Physical_Bytes;
+      Heap_Available : Rose.Addresses.Physical_Bytes)
    is
       Time_Image  : String (1 .. 8);
       Acc         : Word_32 := Current_Ticks / 100;
       Pid_Acc     : Natural := Natural (Current_Pid);
       Fault_Acc   : Natural := Page_Faults;
+      Heap        : String (1 .. 20) := (others => ' ');
+      Heap_Count  : Natural := 0;
+
+      procedure Heap_Add (Text : String);
+      procedure Heap_Add (Num  : Natural);
+
+      --------------
+      -- Heap_Add --
+      --------------
+
+      procedure Heap_Add (Text : String) is
+      begin
+         for Ch of Text loop
+            Heap_Count := Heap_Count + 1;
+            exit when Heap_Count > Heap'Last;
+            Heap (Heap_Count) := Ch;
+         end loop;
+      end Heap_Add;
+
+      --------------
+      -- Heap_Add --
+      --------------
+
+      procedure Heap_Add (Num  : Natural) is
+         Image : String (1 .. 10);
+         Start : Natural := Image'Last + 1;
+         It    : Natural := Num;
+      begin
+         if Num = 0 then
+            Heap_Add ("0");
+         else
+            while It /= 0 loop
+               Start := Start - 1;
+               Image (Start) := Character'Val (It mod 10 + 48);
+               It := It / 10;
+            end loop;
+            Heap_Add (Image (Start .. Image'Last));
+         end if;
+      end Heap_Add;
+
    begin
       Time_Image (8) := Character'Val (Acc mod 10 + 48);
       Acc := Acc / 10;
@@ -553,6 +595,15 @@ package body Rose.Boot.Console is
             Fault_Acc := Fault_Acc / 10;
          end if;
       end loop;
+
+      Heap_Add ("heap: ");
+      Heap_Add (Natural (Heap_Allocated) / 1024);
+      Heap_Add ("K");
+      Heap_Add ("/");
+      Heap_Add (Natural (Heap_Allocated + Heap_Available) / 1024);
+      Heap_Add ("K");
+
+      Status_Chars (31 .. 30 + Heap'Length) := Heap;
 
       for I in Status_Chars'Range loop
          Status_Memory (I) :=

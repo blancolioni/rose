@@ -96,6 +96,19 @@ package body Rose.Kernel.Heap is
       null;    --  UMMMMMAAAAAAAAAAAAA
    end Free;
 
+   ----------------
+   -- Get_Status --
+   ----------------
+
+   procedure Get_Status
+     (Allocated : out Physical_Bytes;
+      Available : out Physical_Bytes)
+   is
+   begin
+      Allocated := Physical_Bytes (Heap_End - Heap_Start);
+      Available := Physical_Bytes (Heap_Bound - Heap_End);
+   end Get_Status;
+
    ---------------------
    -- Initialise_Heap --
    ---------------------
