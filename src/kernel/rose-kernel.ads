@@ -21,6 +21,12 @@ package Rose.Kernel is
    function Kernel_Physical_Base return Rose.Addresses.Physical_Address;
    function Kernel_Physical_Bound return Rose.Addresses.Physical_Address;
 
+   System_Image_Start_Magic : constant :=
+                                16#e668_f3c2_10fd_3de7#;
+
+   System_Image_End_Magic : constant :=
+                                16#5557_b148_c5b3_f35b#;
+
 private
 
    Kernel_Base, Kernel_Bound : Rose.Addresses.Virtual_Address;

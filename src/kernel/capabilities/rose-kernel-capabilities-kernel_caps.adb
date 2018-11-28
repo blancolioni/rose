@@ -2,6 +2,8 @@ with System.Storage_Elements;
 
 with Rose.Words;
 
+with Rose.Devices;
+
 with Rose.Kernel.Processes;
 with Rose.Kernel.Panic;
 
@@ -87,5 +89,26 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
       end case;
    end Handle;
+
+   -----------------
+   -- Write_Image --
+   -----------------
+
+   procedure Write_Image
+     (Current  : in out Rose.Objects.Object_Id;
+      Storage  : out System.Storage_Elements.Storage_Array;
+      Last     : out System.Storage_Elements.Storage_Offset;
+      Complete : out Boolean)
+   is
+      pragma Unreferenced (Current);
+      use System.Storage_Elements;
+   begin
+      Last := Storage'First - 1;
+      Rose.Devices.To_Storage
+        (Storage, Last, Rose.Words.Word_64'(System_Image_Start_Magic));
+      Rose.Devices.To_Storage
+        (Storage, Last, Rose.Words.Word_64'(System_Image_End_Magic));
+      Complete := True;
+   end Write_Image;
 
 end Rose.Kernel.Capabilities.Kernel_Caps;
