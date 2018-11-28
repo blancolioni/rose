@@ -2,7 +2,6 @@ with Rose.Words;
 
 with Rose.Kernel.Physical_Memory;
 with Rose.Kernel.Processes;
-with Rose.Kernel.Validation;
 
 with Rose.Boot.Console;
 
@@ -18,7 +17,7 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
    is
       use Rose.Invocation;
       use Rose.Words;
-      Process_Id : constant Rose.Objects.Process_Id :=
+      Process_Id : constant Rose.Kernel.Processes.Process_Id :=
                      Rose.Kernel.Processes.Current_Process_Id;
 
       function Get_User_Region_Count return Natural
@@ -97,8 +96,6 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
 
                   Rose.Kernel.Processes.Set_Cap
                     (Process_Id, Map_Cap, Layout);
-                  Rose.Kernel.Validation.Create_Cap
-                    (Process_Id, Map_Cap, Layout.Header.Cap_Type);
 
                   Params.Control.Flags :=
                     (Rose.Invocation.Reply      => True,

@@ -16,26 +16,11 @@ with Rose.Words;
 with Rose.Boot.Console;
 
 with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities is
 
    use Rose.Capabilities.Layout;
-
---     type Cap_Handler is access
---     procedure (Cap    : Rose.Capabilities.Layout.Capability_Layout;
---                  Params : Rose.Invocation.Invocation_Access);
---
---     Handler : constant array (Capability_Type) of Cap_Handler :=
---              (Rose.Capabilities.Layout.Arch_Cap => Arch_Cap.Handle'Access,
---                  Rose.Capabilities.Layout.Create_Cap =>
---                    Rose.Kernel.Capabilities.Create_Cap.Handle'Access,
---                  Rose.Capabilities.Layout.Endpoint_Cap =>
---                    Rose.Kernel.Capabilities.Endpoint_Cap.Handle'Access,
---                  Rose.Capabilities.Layout.Entry_Cap    =>
---                    Rose.Kernel.Capabilities.Entry_Cap.Handle'Access,
---                  Rose.Capabilities.Layout.Meta_Cap     =>
---                    Meta_Cap.Handle'Access,
---                  others                                => null);
 
    ------------
    -- Handle --
@@ -77,9 +62,8 @@ package body Rose.Kernel.Capabilities is
          when others =>
             Rose.Boot.Console.Put
               ("kernel: pid ");
-            Rose.Boot.Console.Put
-              (Rose.Words.Word_8
-                 (Rose.Kernel.Processes.Current_Process_Id));
+            Rose.Kernel.Processes.Debug.Put
+              (Rose.Kernel.Processes.Current_Process_Id);
             Rose.Boot.Console.Put (": no handler for cap type: ");
             Rose.Boot.Console.Put
               (Rose.Words.Word_8

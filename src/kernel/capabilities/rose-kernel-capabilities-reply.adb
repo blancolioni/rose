@@ -10,10 +10,10 @@ package body Rose.Kernel.Capabilities.Reply is
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
-      From_Pid : constant Rose.Objects.Process_Id :=
+      From_Pid : constant Rose.Kernel.Processes.Process_Id :=
                    Rose.Kernel.Processes.Current_Process_Id;
-      To_Pid   : constant Rose.Objects.Process_Id :=
-                   Rose.Objects.To_Process_Id
+      To_Pid   : constant Rose.Kernel.Processes.Process_Id :=
+                   Rose.Kernel.Processes.To_Process_Id
                      (Cap.Payload);
    begin
       Rose.Kernel.Processes.Unmap_Invocation_Buffer (From_Pid);

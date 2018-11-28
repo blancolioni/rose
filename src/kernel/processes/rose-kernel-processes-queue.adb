@@ -55,7 +55,7 @@ package body Rose.Kernel.Processes.Queue is
    ---------------------
 
    procedure Dequeue_Process
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Kernel.Processes.Process_Id)
    is
       P : constant Kernel_Process_Access :=
             Process_Table (Process)'Access;
@@ -96,7 +96,7 @@ package body Rose.Kernel.Processes.Queue is
    -- Quantum_Finished --
    ----------------------
 
-   procedure Quantum_Finished (Process : Rose.Objects.Process_Id) is
+   procedure Quantum_Finished (Process : Rose.Kernel.Processes.Process_Id) is
    begin
       Dequeue_Process (Process);
       Queue_Process (Process);
@@ -107,7 +107,7 @@ package body Rose.Kernel.Processes.Queue is
    -------------------
 
    procedure Queue_Process
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Kernel.Processes.Process_Id)
    is
       P : constant Kernel_Process_Access :=
             Process_Table (Process)'Access;
@@ -129,16 +129,8 @@ package body Rose.Kernel.Processes.Queue is
    ----------------------------
 
    procedure Resume_Current_Process is
-      use type Rose.Objects.Process_Id;
-      Log         : constant Boolean :=
-                      Log_Reply
-                          or else Log_Process_Activity
-                            = Next_Process.Pid
-                          or else Next_Process.Pid = 1;
-      Log_Details : constant Boolean :=
-                      Log and then
-                          Log_Detailed_Invocation
-                            = Next_Process.Pid;
+      Log         : constant Boolean := Log_Reply;
+      Log_Details : constant Boolean := False;
    begin
       Invocation_Reply := (if Current_Process.Flags (Invoke_Reply)
                            then 1 else 0);
@@ -158,7 +150,7 @@ package body Rose.Kernel.Processes.Queue is
       if Current_Process.Flags (Invoke_Reply) then
          if Log then
             Rose.Kernel.Debug.Put_Call
-              ("reply", Current_Process.Pid,
+              ("reply",
                Current_Process.Cap_Cache
                  (Current_Process.Current_Params.Cap),
                Current_Process.Current_Params);

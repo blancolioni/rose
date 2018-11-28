@@ -53,10 +53,7 @@ private
    pragma Import (C, System_Call_Entry, "system_call_entry");
    Log_Invocation           : Boolean := False;
    Log_Reply                : Boolean := False;
-   Log_Port_IO              : Boolean := True;
-   Log_Process_Activity     : Rose.Objects.Process_Id := 0;
-   Log_Detailed_Invocation  : Rose.Objects.Process_Id := 0;
-   Log_Process_Stack        : Rose.Objects.Process_Id := 0;
+   Log_Port_IO              : Boolean := False;
    Use_Serial_Port          : Boolean := True;
 
 end Rose.Kernel;

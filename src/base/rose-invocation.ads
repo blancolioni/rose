@@ -100,6 +100,26 @@ package Rose.Invocation is
    is (Invocation.Control.Flags (Block)
        or else Invocation.Control.Flags (Receive));
 
+   Object_Fits_In_Word : constant Boolean :=
+                           Rose.Objects.Object_Id'Size <= Word'Size;
+
+   procedure Send_Object_Id
+     (Params : in out Invocation_Record;
+      Oid    : Rose.Objects.Object_Id);
+
+   procedure Send_Word
+     (Params : in out Invocation_Record;
+      Value  : Rose.Words.Word);
+
+   procedure Send_Cap
+     (Params : in out Invocation_Record;
+      Cap    : Rose.Capabilities.Capability);
+
+   function Get_Object_Id
+     (Params : Invocation_Record;
+      Index  : Parameter_Word_Index)
+      return Rose.Objects.Object_Id;
+
    procedure Set_Error
      (Params  : in out Invocation_Record;
       Error   : Invocation_Error;

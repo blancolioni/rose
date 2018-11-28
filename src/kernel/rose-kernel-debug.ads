@@ -1,6 +1,5 @@
 with Rose.Capabilities.Layout;
 with Rose.Invocation;
-with Rose.Objects;
 
 package Rose.Kernel.Debug is
 
@@ -9,7 +8,6 @@ package Rose.Kernel.Debug is
 
    procedure Put_Call
      (Name   : String;
-      Pid    : Rose.Objects.Process_Id;
       Layout : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Record);
 

@@ -16,18 +16,23 @@ package body Rose.Kernel.Clock is
    function Handle_Clock_Tick
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
-      Current_Pid : constant Rose.Objects.Process_Id :=
+      Current_Pid : constant Rose.Kernel.Processes.Process_Id :=
                       Rose.Kernel.Processes.Current_Process_Id;
    begin
       Ticks := Ticks + 1;
 
       if Ticks mod 20 = 0 then
          declare
-            Allocated, Available : Physical_Bytes;
+            Allocated   : Physical_Bytes;
+            Available   : Physical_Bytes;
+            Name        : String (1 .. 20);
+            Name_Last   : Natural;
          begin
             Rose.Kernel.Heap.Get_Status (Allocated, Available);
+            Rose.Kernel.Processes.Get_Process_Name
+              (Current_Pid, Name, Name_Last);
             Rose.Boot.Console.Status_Line
-              (Current_Pid    => Current_Pid,
+              (Current_Process => Name (1 .. Name_Last),
                Current_Ticks  => Ticks,
                Page_Faults    => Rose.Kernel.Processes.Page_Fault_Count,
                Heap_Allocated => Allocated,

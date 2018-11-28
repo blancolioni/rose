@@ -9,7 +9,6 @@ package body Rose.Kernel.Debug is
 
    procedure Put_Call
      (Name   : String;
-      Pid    : Rose.Objects.Process_Id;
       Layout : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Record)
    is
@@ -34,9 +33,7 @@ package body Rose.Kernel.Debug is
       end Put_Flag;
 
    begin
-      Put (Name & " ");
-      Put (Word_8 (Pid));
-      Put (": ");
+      Put (Name & ":");
       Put (Word_8 (Params.Cap));
       Put (" ");
       Put_Cap_Type (Layout.Header.Cap_Type);

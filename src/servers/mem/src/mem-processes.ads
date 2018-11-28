@@ -24,27 +24,27 @@ package Mem.Processes is
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
 
    procedure New_Process
-     (Process     : Rose.Objects.Process_Id;
+     (Process     : Rose.Objects.Object_Id;
       Resume_Cap  : Rose.Capabilities.Capability;
       Faulted_Cap : Rose.Capabilities.Capability;
       Segments    : Segment_Record_Array);
 
-   procedure Kill_Process (Process : Rose.Objects.Process_Id);
+   procedure Kill_Process (Process : Rose.Objects.Object_Id);
 
    function Resume_Capability
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
       return Rose.Capabilities.Capability;
 
    function Faulted_Capability
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
       return Rose.Capabilities.Capability;
 
    function Is_Valid_Process_Id
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
       return Boolean;
 
    procedure Get_Process_Segment
-     (Process         : Rose.Objects.Process_Id;
+     (Process         : Rose.Objects.Object_Id;
       Virtual_Address : Rose.Addresses.Virtual_Page_Address;
       Valid           : out Boolean;
       Readable        : out Boolean;
@@ -55,32 +55,32 @@ private
 
    type Memory_Process_Record is
       record
+         Oid         : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
          State       : Process_State := Available;
          Resume_Cap  : Rose.Capabilities.Capability := 0;
          Faulted_Cap : Rose.Capabilities.Capability := 0;
          Segments    : Segment_Record_Array;
       end record;
 
+   type Process_Id is range 0 .. Rose.Limits.Max_Processes;
+   subtype Real_Process_Id is Process_Id range 1 .. Process_Id'Last;
+
    type Memory_Process_Table is
-     array (Rose.Objects.Process_Id range 1 .. Rose.Limits.Max_Processes)
-     of aliased Memory_Process_Record;
+     array (Real_Process_Id) of aliased Memory_Process_Record;
 
    Process_Table : Memory_Process_Table;
+   Next_Pid      : Real_Process_Id := 1;
+
+   function To_Process_Id (Object : Rose.Objects.Object_Id) return Process_Id;
 
    function Resume_Capability
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
       return Rose.Capabilities.Capability
-   is (Process_Table (Process).Resume_Cap);
+   is (Process_Table (To_Process_Id (Process)).Resume_Cap);
 
    function Faulted_Capability
-     (Process : Rose.Objects.Process_Id)
+     (Process : Rose.Objects.Object_Id)
       return Rose.Capabilities.Capability
-   is (Process_Table (Process).Faulted_Cap);
-
-   function Is_Valid_Process_Id
-     (Process : Rose.Objects.Process_Id)
-      return Boolean
-   is (Process in Process_Table'Range
-       and then Process_Table (Process).State = Active);
+   is (Process_Table (To_Process_Id (Process)).Faulted_Cap);
 
 end Mem.Processes;

@@ -10,7 +10,7 @@ package body Rose.Kernel.Capabilities.Pages is
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
-      Process_Id : constant Rose.Objects.Process_Id :=
+      Pid : constant Rose.Kernel.Processes.Process_Id :=
                      Rose.Kernel.Processes.Current_Process_Id;
    begin
       case Cap.Header.Endpoint is
@@ -23,7 +23,7 @@ package body Rose.Kernel.Capabilities.Pages is
                                  Virtual_Page_Address (Physical_Page);
             begin
                Rose.Kernel.Processes.Map_Page
-                 (Process       => Process_Id,
+                 (Pid       => Pid,
                   Virtual_Page  => Virtual_Page,
                   Physical_Page => Physical_Page,
                   Readable      => True,
@@ -36,7 +36,7 @@ package body Rose.Kernel.Capabilities.Pages is
               (Rose.Invocation.Reply => True, others => False);
 
             Rose.Kernel.Processes.Set_Current_State
-              (Process_Id, Rose.Kernel.Processes.Ready);
+              (Pid, Rose.Kernel.Processes.Ready);
 
          when others =>
             null;

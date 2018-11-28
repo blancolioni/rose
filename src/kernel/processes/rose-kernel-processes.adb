@@ -6,15 +6,14 @@ with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes;
 
 with Rose.Kernel.Panic;
-with Rose.Kernel.Validation;
-
-with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Processes is
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
    Log_Page_Faults    : constant Boolean := False;
+
+   First_Persistent_Pid : constant Process_Id := 0;
 
    procedure Show_Address
      (Addr : Rose.Words.Word);
@@ -31,8 +30,8 @@ package body Rose.Kernel.Processes is
       return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
 
    procedure Share_Page
-     (From_Process : Rose.Objects.Process_Id;
-      To_Process   : Rose.Objects.Process_Id;
+     (From_Process : Rose.Kernel.Processes.Process_Id;
+      To_Process   : Rose.Kernel.Processes.Process_Id;
       Address      : Rose.Addresses.Virtual_Page_Address;
       Writable     : Boolean);
 
@@ -41,15 +40,15 @@ package body Rose.Kernel.Processes is
    --------------
 
    function Cap_Type
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability)
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Type
    is
    begin
-      if Is_Valid_Process_Id (Process_Id)
-        and then Has_Cap (Process_Id, Cap)
+      if Is_Valid_Process_Id (Pid)
+        and then Has_Cap (Pid, Cap)
       then
-         return Process_Table (Process_Id).Cap_Cache (Cap).Header.Cap_Type;
+         return Process_Table (Pid).Cap_Cache (Cap).Header.Cap_Type;
       else
          return Rose.Capabilities.Layout.Null_Cap;
       end if;
@@ -60,14 +59,14 @@ package body Rose.Kernel.Processes is
    ---------------------
 
    procedure Copy_Cap_Layout
-     (From_Process : Rose.Objects.Process_Id;
-      From_Cap     : Rose.Capabilities.Capability;
-      To_Process   : Rose.Objects.Process_Id;
-      To_Cap       : Rose.Capabilities.Capability)
+     (From_Process_Id : Process_Id;
+      From_Cap        : Rose.Capabilities.Capability;
+      To_Process_Id   : Process_Id;
+      To_Cap          : Rose.Capabilities.Capability)
    is
    begin
-      Process_Table (To_Process).Cap_Cache (To_Cap) :=
-        Process_Table (From_Process).Cap_Cache (From_Cap);
+      Process_Table (To_Process_Id).Cap_Cache (To_Cap) :=
+        Process_Table (From_Process_Id).Cap_Cache (From_Cap);
    end Copy_Cap_Layout;
 
    ----------------
@@ -75,11 +74,11 @@ package body Rose.Kernel.Processes is
    ----------------
 
    function Create_Cap
-     (Process_Id : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
       return Rose.Capabilities.Capability
    is
       use Rose.Capabilities, Rose.Capabilities.Layout;
-      P : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       for I in P.Cap_Cache'Range loop
          if P.Cap_Cache (I).Header.Cap_Type = Null_Cap then
@@ -96,12 +95,12 @@ package body Rose.Kernel.Processes is
    -----------------
 
    function Create_Caps
-     (Process_Id : Rose.Objects.Process_Id;
-      Count      : Natural)
+     (Pid   : Process_Id;
+      Count : Natural)
       return Rose.Capabilities.Capability
    is
       use Rose.Capabilities, Rose.Capabilities.Layout;
-      P           : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P           : Kernel_Process_Entry renames Process_Table (Pid);
       Found_Count : Natural := 0;
       Start_Cap   : Capability := Null_Capability;
    begin
@@ -129,12 +128,12 @@ package body Rose.Kernel.Processes is
    ---------------------
 
    function Create_Endpoint
-     (Process_Id : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Objects.Endpoint_Index
    is
       use type Rose.Objects.Endpoint_Id;
-      P : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       for I in P.Endpoints'Range loop
          if P.Endpoints (I).Endpoint = Rose.Objects.Null_Endpoint_Id then
@@ -144,30 +143,6 @@ package body Rose.Kernel.Processes is
       end loop;
       return 0;
    end Create_Endpoint;
-
-   -----------------
-   -- Current_EIP --
-   -----------------
-
-   function Current_EIP
-     (Process : Rose.Objects.Process_Id)
-      return Rose.Words.Word_32
-   is
-   begin
-      return Process_Table (Process).Stack.EIP;
-   end Current_EIP;
-
-   -----------------
-   -- Current_ESP --
-   -----------------
-
-   function Current_ESP
-     (Process : Rose.Objects.Process_Id)
-      return Rose.Words.Word_32
-   is
-   begin
-      return Process_Table (Process).Stack.ESP;
-   end Current_ESP;
 
    -------------------------
    -- Current_Process_Cap --
@@ -213,8 +188,6 @@ package body Rose.Kernel.Processes is
             if Cap.Header.Alloc_Count = 0 then
                Current_Process.Cap_Cache (Cap_Index) :=
                  Rose.Capabilities.Layout.Empty_Capability;
-               Rose.Kernel.Validation.Delete_Cap
-                 (Current_Process_Id, Cap_Index);
             else
                Current_Process.Cap_Cache (Cap_Index) := Cap;
             end if;
@@ -229,10 +202,10 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Delete_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability)
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
    is
-      P : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       P.Cap_Cache (Cap) := (others => <>);
    end Delete_Cap;
@@ -242,12 +215,12 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    function Find_Endpoint_Cap
-     (Process_Id : Rose.Objects.Process_Id;
+     (Pid        : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Capabilities.Capability
    is
       use type Rose.Objects.Endpoint_Id;
-      P : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       for Rec of P.Endpoints loop
          if Rec.Endpoint = Endpoint then
@@ -257,54 +230,23 @@ package body Rose.Kernel.Processes is
       return Rose.Capabilities.Null_Capability;
    end Find_Endpoint_Cap;
 
-   ------------------------
-   -- Get_Page_Object_Id --
-   ------------------------
+   ----------------------
+   -- Get_Process_Name --
+   ----------------------
 
-   function Get_Page_Object_Id
-     (Process : Rose.Objects.Process_Id;
-      Address : Rose.Words.Word)
-      return Rose.Objects.Page_Object_Id
+   procedure Get_Process_Name
+     (Pid  : Process_Id;
+      Name : out String;
+      Last : out Natural)
    is
-      use Rose.Objects;
-      use Rose.Words;
-      Result : Page_Object_Id := Page_Object_Id'First;
    begin
-      Result := Result +
-        Page_Object_Id (Object_Id (Process)) * 2 ** 32;
-      Result := Result +
-        Page_Object_Id
-          (Object_Id (Address / Rose.Addresses.Physical_Page_Bytes));
-      return Result;
-   end Get_Page_Object_Id;
-
-   --------------------------
-   -- Get_Page_Object_Page --
-   --------------------------
-
-   function Get_Page_Object_Page
-     (Page_Object : Rose.Objects.Page_Object_Id)
-      return Rose.Addresses.Virtual_Page_Address
-   is
-      use Rose.Words;
-   begin
-      return Rose.Addresses.Virtual_Page_Address
-        (Word_64 (Page_Object) mod 2 ** 32);
-   end Get_Page_Object_Page;
-
-   -----------------------------
-   -- Get_Page_Object_Process --
-   -----------------------------
-
-   function Get_Page_Object_Process
-     (Page_Object : Rose.Objects.Page_Object_Id)
-      return Rose.Objects.Process_Id
-   is
-      use Rose.Words;
-   begin
-      return Rose.Objects.Process_Id
-        (Word_64 (Page_Object) / 2 ** 32 mod 2 ** 24);
-   end Get_Page_Object_Process;
+      Last := Name'First - 1;
+      for Ch of Process_Table (Pid).Name loop
+         exit when Ch = ' ' or else Last >= Name'Last;
+         Last := Last + 1;
+         Name (Last) := Ch;
+      end loop;
+   end Get_Process_Name;
 
    -------------------------------------
    -- Handle_General_Protection_Fault --
@@ -314,7 +256,7 @@ package body Rose.Kernel.Processes is
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
    begin
-      Rose.Boot.Console.Put (Current_Process_Id);
+      Debug.Put (Current_Process_Id);
       Rose.Boot.Console.Put_Line (": general protection fault");
       Debug.Report_Process (Current_Process_Id, True);
       Rose.Boot.Console.Put_Line ("mapped page report");
@@ -335,7 +277,6 @@ package body Rose.Kernel.Processes is
       return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
       use type Rose.Words.Word;
-      use type Rose.Objects.Process_Id;
       Virtual_Address : constant Rose.Addresses.Virtual_Address :=
                           Rose.Addresses.Virtual_Address (Page_Fault_Address);
       Virtual_Page    : constant Rose.Addresses.Virtual_Page_Address :=
@@ -353,7 +294,7 @@ package body Rose.Kernel.Processes is
             Addr    => Virtual_Address);
       end if;
 
-      if Log_Page_Faults or else Current_Process_Id = Log_Process_Activity then
+      if Log_Page_Faults then
          Rose.Boot.Console.Put ("page-fault: ");
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
@@ -391,7 +332,6 @@ package body Rose.Kernel.Processes is
       Write_Attempt     : Boolean;
       Execution_Attempt : Boolean)
    is
-      use type Rose.Objects.Process_Id;
       pragma Unreferenced (Read_Attempt);
       use Rose.Invocation;
       Params : Invocation_Record renames Page_Fault_Params;
@@ -407,34 +347,38 @@ package body Rose.Kernel.Processes is
          end loop;
       end if;
 
-      Params.Control.Flags := (Send => True, Send_Words => True,
+      Params.Control.Flags := (Send => True,
                                others => False);
 
-      Params.Control.Last_Sent_Word := 3;
       Params.Cap := Mem_Page_Fault_Cap;
       Params.Endpoint := 102;
-      Params.Data (0) := Rose.Words.Word_32 (Current_Process_Id);
-      Params.Data (1) := Rose.Words.Word (Virtual_Page);
+
+      Send_Object_Id (Params, Current_Process.Oid);
+      Send_Word (Params, Rose.Words.Word (Virtual_Page));
+
       if Is_Mapped then
-         Params.Data (2) :=
-           Rose.Words.Word
-             (Mapped_Physical_Page (Current_Process_Id, Virtual_Page));
+         Send_Word (Params,
+                    Rose.Words.Word
+                      (Mapped_Physical_Page
+                         (Current_Process_Id, Virtual_Page)));
       else
-         Params.Data (2) := 0;
+         Send_Word (Params, 0);
       end if;
 
       if Write_Attempt then
-         Params.Data (3) := 1;
+         Send_Word (Params, 1);
       elsif Execution_Attempt then
-         Params.Data (3) := 2;
+         Send_Word (Params, 2);
+      else
+         Send_Word (Params, 0);
       end if;
 
       Send_Cap
-        (From_Process => Current_Process_Id,
-         To_Process   => Mem_Process,
-         Sender_Cap   => 0,
-         Receiver_Cap => Mem_Page_Fault_Cap,
-         Params       => Params);
+        (From_Process_Id => Current_Process_Id,
+         To_Process_Id   => Mem_Process,
+         Sender_Cap      => 0,
+         Receiver_Cap    => Mem_Page_Fault_Cap,
+         Params          => Params);
 
    end Handle_Page_Fault;
 
@@ -443,12 +387,12 @@ package body Rose.Kernel.Processes is
    -------------
 
    function Has_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability)
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
       return Boolean
    is
       use Rose.Capabilities.Layout;
-      P : Kernel_Process_Entry renames Process_Table (Process_Id);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       return Cap in 1 .. Cached_Capability_Count
         and then P.Cap_Cache (Cap).Header.Cap_Type /= Null_Cap;
@@ -459,7 +403,6 @@ package body Rose.Kernel.Processes is
    ---------------------------
 
    function Have_Process_Handlers return Boolean is
-      use type Rose.Objects.Process_Id;
    begin
       return Mem_Process /= 0;
    end Have_Process_Handlers;
@@ -469,11 +412,11 @@ package body Rose.Kernel.Processes is
    ----------------------------
 
    function Is_Blocked_On_Endpoint
-     (Process        : Rose.Objects.Process_Id;
+     (Pid            : Process_Id;
       Endpoint_Index : Rose.Objects.Endpoint_Index)
       return Boolean
    is
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       if P.State /= Blocked then
          return False;
@@ -530,12 +473,12 @@ package body Rose.Kernel.Processes is
    -----------------------------
 
    function Is_Valid_Endpoint_Index
-     (Process        : Rose.Objects.Process_Id;
+     (Pid            : Process_Id;
       Endpoint_Index : Rose.Objects.Endpoint_Index)
       return Boolean
    is
       use type Rose.Objects.Endpoint_Id;
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       return Endpoint_Index in P.Endpoints'Range
         and then P.Endpoints (Endpoint_Index).Endpoint
@@ -547,7 +490,7 @@ package body Rose.Kernel.Processes is
    --------------
 
    procedure Map_Page
-     (Process       : Rose.Objects.Process_Id;
+     (Pid           : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Readable      : Boolean;
@@ -555,7 +498,7 @@ package body Rose.Kernel.Processes is
       Executable    : Boolean;
       User          : Boolean)
    is
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       Rose.Kernel.Page_Table.Map_Page
         (Virtual_Page_Address
@@ -575,11 +518,11 @@ package body Rose.Kernel.Processes is
    --------------------------
 
    function Mapped_Physical_Page
-     (Process       : Rose.Objects.Process_Id;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address)
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address
    is
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       return Rose.Kernel.Page_Table.Mapped_Physical_Page
         (Directory_Page =>
@@ -595,14 +538,14 @@ package body Rose.Kernel.Processes is
    -------------------------
 
    function Next_Blocked_Sender
-     (Receiver   : Rose.Objects.Process_Id)
-      return Rose.Objects.Process_Id
+     (Receiver_Id : Process_Id)
+      return Process_Id
    is
       It   : constant Kernel_Process_Access :=
-               Process_Table (Receiver).Waiting_First;
+               Process_Table (Receiver_Id).Waiting_First;
    begin
       if It /= null then
-         Process_Table (Receiver).Waiting_First := It.Waiting_Next;
+         Process_Table (Receiver_Id).Waiting_First := It.Waiting_Next;
          It.Waiting_Next := null;
          return It.Pid;
       end if;
@@ -625,17 +568,17 @@ package body Rose.Kernel.Processes is
    -------------
 
    procedure Receive
-     (Receiver : Rose.Objects.Process_Id;
-      Params   : Rose.Invocation.Invocation_Record)
+     (Receiver_Id : Process_Id;
+      Params      : Rose.Invocation.Invocation_Record)
    is
-      P : Kernel_Process_Entry renames Process_Table (Receiver);
+      P : Kernel_Process_Entry renames Process_Table (Receiver_Id);
    begin
       P.Flags (Receive_Any) := False;
       P.Flags (Receive_Caps) := False;
       P.Current_Params := Params;
       P.Receive_Cap := Params.Cap;
 
-      Set_Current_State (Receiver, Blocked);
+      Set_Current_State (Receiver_Id, Blocked);
 
    end Receive;
 
@@ -644,12 +587,12 @@ package body Rose.Kernel.Processes is
    -----------------
 
    procedure Receive_Any
-     (Receiver : Rose.Objects.Process_Id;
-      Params   : Rose.Invocation.Invocation_Record)
+     (Receiver_Id : Process_Id;
+      Params      : Rose.Invocation.Invocation_Record)
    is
    begin
-      Receive (Receiver, Params);
-      Process_Table (Receiver).Flags (Receive_Any) := True;
+      Receive (Receiver_Id, Params);
+      Process_Table (Receiver_Id).Flags (Receive_Any) := True;
    end Receive_Any;
 
    ----------------------------
@@ -687,43 +630,42 @@ package body Rose.Kernel.Processes is
    --------------
 
    procedure Send_Cap
-     (From_Process : Rose.Objects.Process_Id;
-      To_Process   : Rose.Objects.Process_Id;
-      Sender_Cap   : Rose.Capabilities.Capability;
-      Receiver_Cap : Rose.Capabilities.Capability;
-      Params       : Rose.Invocation.Invocation_Record)
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
+      Sender_Cap      : Rose.Capabilities.Capability;
+      Receiver_Cap    : Rose.Capabilities.Capability;
+      Params          : Rose.Invocation.Invocation_Record)
    is
       pragma Unreferenced (Sender_Cap);
       use Rose.Capabilities;
       use Rose.Invocation;
-      use type Rose.Objects.Process_Id;
-      From : Kernel_Process_Entry renames Process_Table (From_Process);
-      To   : Kernel_Process_Entry renames Process_Table (To_Process);
+      From : Kernel_Process_Entry renames Process_Table (From_Process_Id);
+      To   : Kernel_Process_Entry renames Process_Table (To_Process_Id);
    begin
 
       To.Current_Params := Params;
       To.Current_Params.Cap := Receiver_Cap;
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps)
-        and then From_Process /= 1
+        and then From_Process_Id /= 1
       then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
             if Params.Caps (Cap_Index) /= Null_Capability then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
-                  New_Cap  : constant Capability := Create_Cap (To_Process);
+                  New_Cap  : constant Capability := Create_Cap (To_Process_Id);
                begin
                   if New_Cap = Null_Capability then
                      if Cap_Index > 0 then
                         for Deleted_Cap_Index in 0 .. Cap_Index - 1 loop
                            Delete_Cap
-                             (To_Process,
+                             (To_Process_Id,
                               To.Current_Params.Caps (Deleted_Cap_Index));
                         end loop;
                      end if;
 
                      Rose.Boot.Console.Put ("warning: process ");
-                     Rose.Boot.Console.Put (Rose.Words.Word_8 (To_Process));
+                     Rose.Boot.Console.Put (Rose.Words.Word_8 (To_Process_Id));
                      Rose.Boot.Console.Put (": out of capabilities");
                      Rose.Boot.Console.New_Line;
 
@@ -735,9 +677,6 @@ package body Rose.Kernel.Processes is
 
                   To.Cap_Cache (New_Cap) := From.Cap_Cache (From_Cap);
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
-                  Rose.Kernel.Validation.Create_Cap
-                    (To_Process, New_Cap,
-                     To.Cap_Cache (New_Cap).Header.Cap_Type);
                end;
             end if;
          end loop;
@@ -758,7 +697,7 @@ package body Rose.Kernel.Processes is
                             (Rose.Invocation.Writable_Buffer);
          begin
             while Remaining > 0 loop
-               Share_Page (From_Process, To_Process, Page, Writable);
+               Share_Page (From_Process_Id, To_Process_Id, Page, Writable);
                Page := Page + 1;
                Remaining := Remaining
                  - Word'Min (Remaining, Virtual_Page_Bytes);
@@ -772,17 +711,7 @@ package body Rose.Kernel.Processes is
 
       end if;
 
-      if To_Process = Log_Process_Activity
-        or else From_Process = Log_Process_Activity
-      then
-         Rose.Boot.Console.Put ("send-cap: ");
-         Rose.Boot.Console.Put (To_Process);
-         Rose.Boot.Console.Put (" ");
-         Rose.Invocation.Trace.Put
-           (To.Current_Params, False);
-      end if;
-
-      Set_Current_State (To_Process, Ready);
+      Set_Current_State (To_Process_Id, Ready);
 
    end Send_Cap;
 
@@ -791,17 +720,16 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Send_Reply
-     (From_Process : Rose.Objects.Process_Id;
-      To_Process   : Rose.Objects.Process_Id;
-      Params       : Rose.Invocation.Invocation_Record)
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
+      Params          : Rose.Invocation.Invocation_Record)
    is
       use Rose.Capabilities;
       use Rose.Invocation;
-      use Rose.Objects;
-      From : Kernel_Process_Entry renames Process_Table (From_Process);
-      To   : Kernel_Process_Entry renames Process_Table (To_Process);
+      From : Kernel_Process_Entry renames Process_Table (From_Process_Id);
+      To   : Kernel_Process_Entry renames Process_Table (To_Process_Id);
    begin
-      if To_Process = 0 then
+      if To_Process_Id = 0 then
          return;
       end if;
 
@@ -816,19 +744,19 @@ package body Rose.Kernel.Processes is
             if Params.Caps (Cap_Index) /= Null_Capability then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
-                  New_Cap  : constant Capability := Create_Cap (To_Process);
+                  New_Cap  : constant Capability := Create_Cap (To_Process_Id);
                begin
                   if New_Cap = Null_Capability then
                      if Cap_Index > 0 then
                         for Deleted_Cap_Index in 0 .. Cap_Index - 1 loop
                            Delete_Cap
-                             (To_Process,
+                             (To_Process_Id,
                               To.Current_Params.Caps (Deleted_Cap_Index));
                         end loop;
                      end if;
 
                      Rose.Boot.Console.Put ("warning: process ");
-                     Rose.Boot.Console.Put (Rose.Words.Word_8 (To_Process));
+                     Debug.Put (To_Process_Id);
                      Rose.Boot.Console.Put (": out of capabilities");
                      Rose.Boot.Console.New_Line;
 
@@ -840,15 +768,12 @@ package body Rose.Kernel.Processes is
 
                   To.Cap_Cache (New_Cap) := From.Cap_Cache (From_Cap);
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
-                  Rose.Kernel.Validation.Create_Cap
-                    (To_Process, New_Cap,
-                  To.Cap_Cache (New_Cap).Header.Cap_Type);
                end;
             end if;
          end loop;
       end if;
 
-      Set_Current_State (To_Process, Ready);
+      Set_Current_State (To_Process_Id, Ready);
 
    end Send_Reply;
 
@@ -857,20 +782,20 @@ package body Rose.Kernel.Processes is
    ----------------------
 
    procedure Send_To_Endpoint
-     (From_Process    : Rose.Objects.Process_Id;
-      To_Process      : Rose.Objects.Process_Id;
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
       Sender_Cap      : Rose.Capabilities.Capability;
       Endpoint        : Rose.Objects.Endpoint_Index;
       Identifier      : Rose.Objects.Capability_Identifier;
       Params          : Rose.Invocation.Invocation_Record)
    is
       use type Rose.Objects.Endpoint_Id;
-      To   : Kernel_Process_Entry renames Process_Table (To_Process);
+      To   : Kernel_Process_Entry renames Process_Table (To_Process_Id);
    begin
       if Endpoint in To.Endpoints'Range
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
-         Send_Cap (From_Process, To_Process,
+         Send_Cap (From_Process_Id, To_Process_Id,
                    Sender_Cap, Sender_Cap,
                    (Params with delta
                       Endpoint => To.Endpoints (Endpoint).Endpoint,
@@ -888,12 +813,12 @@ package body Rose.Kernel.Processes is
    -------------
 
    procedure Set_Cap
-     (Process_Id : Rose.Objects.Process_Id;
-      Cap        : Rose.Capabilities.Capability;
-      Layout     : Rose.Capabilities.Layout.Capability_Layout)
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
-      Process_Table (Process_Id).Cap_Cache (Cap) := Layout;
+      Process_Table (Pid).Cap_Cache (Cap) := Layout;
    end Set_Cap;
 
    ----------------
@@ -901,12 +826,12 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Set_Cap_Id
-     (Process      : Rose.Objects.Process_Id;
-      Cap          : Rose.Capabilities.Capability;
-      Id           : Rose.Objects.Capability_Identifier)
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Cap_Id : Rose.Objects.Capability_Identifier)
    is
    begin
-      Process_Table (Process).Cap_Cache (Cap).Header.Identifier := Id;
+      Process_Table (Pid).Cap_Cache (Cap).Header.Identifier := Cap_Id;
    end Set_Cap_Id;
 
    ----------------------------
@@ -925,13 +850,13 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    procedure Set_Current_State
-     (Process : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       State   : Process_State)
    is
-      Current_Process : Kernel_Process_Entry renames Process_Table (Process);
+      Current_Process : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       if Log_State_Changes then
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (Process));
+         Debug.Put (Pid);
          Rose.Boot.Console.Put (": state <- ");
          Rose.Boot.Console.Put
            (case State is
@@ -940,14 +865,13 @@ package body Rose.Kernel.Processes is
                when Interrupted => "interrupted",
                when Available   => "available",
                when Running     => "running",
+               when Faulted     => "faulted",
                when Killed      => "killed");
          Rose.Boot.Console.New_Line;
       end if;
 
       if Current_Process.State = Killed then
          null;
---           Rose.Boot.Console.Put_Line
---             ("set state canceled; process has been killed");
       else
          Current_Process.Flags (Invoke_Reply) :=
            Current_Process.State = Blocked and then State = Ready;
@@ -964,13 +888,13 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    procedure Set_Endpoint_Caps
-     (Process_Id  : Rose.Objects.Process_Id;
+     (Pid : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index;
       Receive_Cap : Rose.Capabilities.Capability;
       Send_Cap    : Rose.Capabilities.Capability)
    is
       Current_Process : Kernel_Process_Entry renames
-                          Process_Table (Process_Id);
+                          Process_Table (Pid);
       Rec             : Registered_Endpoint_Record renames
                           Current_Process.Endpoints (Endpoint);
    begin
@@ -1002,16 +926,16 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Share_Page
-     (From_Process : Rose.Objects.Process_Id;
-      To_Process   : Rose.Objects.Process_Id;
+     (From_Process : Rose.Kernel.Processes.Process_Id;
+      To_Process   : Rose.Kernel.Processes.Process_Id;
       Address      : Rose.Addresses.Virtual_Page_Address;
       Writable     : Boolean)
    is
       use Rose.Words;
       Physical_Page      : constant Physical_Page_Address :=
                                 Mapped_Physical_Page
-                                  (Process      => From_Process,
-                                   Virtual_Page => Address);
+                               (Pid          => From_Process,
+                                Virtual_Page => Address);
       P                  : constant Kernel_Process_Access :=
                              Process_Table (To_Process)'Access;
       Virtual_Page       : constant Virtual_Page_Address :=
@@ -1022,7 +946,7 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (From_Process));
          Rose.Boot.Console.Put (": share page with ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (To_Process));
+         Debug.Put (To_Process);
          Rose.Boot.Console.New_Line;
 
          Rose.Boot.Console.Put (" from ");
@@ -1035,7 +959,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       Map_Page
-        (Process       => To_Process,
+        (Pid           => To_Process,
          Virtual_Page  => Virtual_Page,
          Physical_Page => Physical_Page,
          Readable      => True,
@@ -1058,33 +982,44 @@ package body Rose.Kernel.Processes is
       Rose.Boot.Console.New_Line;
    end Show_Address;
 
+   -------------------
+   -- To_Process_Id --
+   -------------------
+
+   function To_Process_Id
+     (Oid : Rose.Objects.Object_Id)
+      return Process_Id
+   is
+      use Rose.Objects;
+   begin
+      if Oid in Persistent_Process_Object_Id then
+         return Process_Id (Oid - Persistent_Process_Object_Id'First)
+           + First_Persistent_Pid;
+      else
+         return Process_Id (Oid);
+      end if;
+   end To_Process_Id;
+
    ----------------------
    -- Unblock_And_Send --
    ----------------------
 
    procedure Unblock_And_Send
-     (From_Process    : Rose.Objects.Process_Id;
-      To_Process      : Rose.Objects.Process_Id;
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
       Receiver_Params : Rose.Invocation.Invocation_Access)
    is
       P : constant Kernel_Process_Access :=
-            Process_Table (From_Process)'Access;
+            Process_Table (From_Process_Id)'Access;
    begin
-      Rose.Boot.Console.Put (To_Process);
-      Rose.Boot.Console.Put (": processing next sender: ");
-      Rose.Boot.Console.Put (From_Process);
-      Rose.Boot.Console.New_Line;
-      Rose.Invocation.Trace.Put
-        (P.Current_Params, True);
-
       Send_To_Endpoint
-        (From_Process => From_Process,
-         To_Process   => To_Process,
-         Sender_Cap   => P.Current_Params.Cap,
-         Endpoint     => P.Waiting_Endpoint,
-         Identifier   => P.Waiting_Cap_Id,
-         Params       => P.Current_Params);
-      Receiver_Params.all := Process_Table (To_Process).Current_Params;
+        (From_Process_Id => From_Process_Id,
+         To_Process_Id   => To_Process_Id,
+         Sender_Cap      => P.Current_Params.Cap,
+         Endpoint        => P.Waiting_Endpoint,
+         Identifier      => P.Waiting_Cap_Id,
+         Params          => P.Current_Params);
+      Receiver_Params.all := Process_Table (To_Process_Id).Current_Params;
    end Unblock_And_Send;
 
    -----------------------------
@@ -1092,25 +1027,24 @@ package body Rose.Kernel.Processes is
    -----------------------------
 
    procedure Unmap_Invocation_Buffer
-     (Process       : Rose.Objects.Process_Id)
+     (Pid : Process_Id)
    is
       use Rose.Words;
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
       Base : constant Virtual_Page_Address :=
                P.Page_Ranges (Invocation_Range_Index).Base;
    begin
       while P.Invocation_Buffer > Base loop
          P.Invocation_Buffer := P.Invocation_Buffer - 1;
          if Log_Shared_Buffers then
-            Rose.Boot.Console.Put ("pid ");
-            Rose.Boot.Console.Put (Rose.Words.Word_8 (Process));
+            Debug.Put (Pid);
             Rose.Boot.Console.Put (": unmap buffer page ");
             Rose.Boot.Console.Put
               (Rose.Words.Word (P.Invocation_Buffer) * 4096);
             Rose.Boot.Console.New_Line;
          end if;
 
-         Unmap_Page (Process, P.Invocation_Buffer);
+         Unmap_Page (Pid, P.Invocation_Buffer);
       end loop;
    end Unmap_Invocation_Buffer;
 
@@ -1119,10 +1053,10 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Unmap_Page
-     (Process       : Rose.Objects.Process_Id;
+     (Pid           : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address)
    is
-      P : Kernel_Process_Entry renames Process_Table (Process);
+      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       Rose.Kernel.Page_Table.Unmap_Page
         (Directory_Page =>
@@ -1161,18 +1095,18 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    procedure Wait_For_Receiver
-     (Waiting_Process   : Rose.Objects.Process_Id;
-      Receiving_Process : Rose.Objects.Process_Id;
-      Endpoint          : Rose.Objects.Endpoint_Index;
-      Identifier        : Rose.Objects.Capability_Identifier;
-      Params            : Rose.Invocation.Invocation_Record)
+     (Waiting_Process_Id   : Process_Id;
+      Receiving_Process_Id : Process_Id;
+      Endpoint             : Rose.Objects.Endpoint_Index;
+      Identifier           : Rose.Objects.Capability_Identifier;
+      Params               : Rose.Invocation.Invocation_Record)
    is
       P : constant Kernel_Process_Access :=
-            Process_Table (Waiting_Process)'Access;
+            Process_Table (Waiting_Process_Id)'Access;
       Q : constant Kernel_Process_Access :=
-            Process_Table (Receiving_Process)'Access;
+            Process_Table (Receiving_Process_Id)'Access;
    begin
-      Set_Current_State (Waiting_Process, Blocked);
+      Set_Current_State (Waiting_Process_Id, Blocked);
       P.Current_Params := Params;
       P.Waiting_Endpoint := Endpoint;
       P.Waiting_Cap_Id := Identifier;

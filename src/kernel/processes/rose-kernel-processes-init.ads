@@ -9,6 +9,6 @@ package Rose.Kernel.Processes.Init is
      (Priority    : Process_Priority;
       Module      : Rose.Kernel.Modules.Module_Index;
       Environment : access Rose.Environment_Pages.Environment_Page)
-      return Rose.Objects.Process_Id;
+      return Rose.Kernel.Processes.Process_Id;
 
 end Rose.Kernel.Processes.Init;
