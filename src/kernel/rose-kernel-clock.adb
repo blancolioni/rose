@@ -2,7 +2,7 @@
 with Rose.Words;                       use Rose.Words;
 
 with Rose.Boot.Console;
-
+with Rose.Kernel.Heap;
 with Rose.Kernel.Processes.Queue;
 
 package body Rose.Kernel.Clock is
@@ -21,11 +21,18 @@ package body Rose.Kernel.Clock is
    begin
       Ticks := Ticks + 1;
 
-      if Ticks mod 100 = 0 then
-         Rose.Boot.Console.Status_Line
-           (Current_Pid   => Current_Pid,
-            Current_Ticks => Ticks,
-            Page_Faults   => Rose.Kernel.Processes.Page_Fault_Count);
+      if Ticks mod 20 = 0 then
+         declare
+            Allocated, Available : Physical_Bytes;
+         begin
+            Rose.Kernel.Heap.Get_Status (Allocated, Available);
+            Rose.Boot.Console.Status_Line
+              (Current_Pid    => Current_Pid,
+               Current_Ticks  => Ticks,
+               Page_Faults    => Rose.Kernel.Processes.Page_Fault_Count,
+               Heap_Allocated => Allocated,
+               Heap_Available => Available);
+         end;
       end if;
 
       if Rose.Kernel.Processes.Use_Tick then

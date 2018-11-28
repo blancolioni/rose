@@ -21,4 +21,8 @@ package Rose.Kernel.Heap is
    function Push_IPC_Page return Rose.Addresses.Virtual_Page_Address;
    procedure Pop_IPC_Page;
 
+   procedure Get_Status
+     (Allocated : out Physical_Bytes;
+      Available : out Physical_Bytes);
+
 end Rose.Kernel.Heap;
