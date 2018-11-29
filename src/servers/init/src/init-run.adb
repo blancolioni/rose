@@ -409,7 +409,7 @@ package body Init.Run is
                              (Copy_Scan_Cap, Get_Partition_Endpoint);
          Parts         : Client.Partitions_Client;
       begin
-         Client.Open (Parts, Count_Cap, Part_Cap);
+         Client.Open_Cap_Set (Parts, Count_Cap, Part_Cap);
 
          for I in 1 .. Client.Partition_Count (Parts) loop
             Load_Partition
