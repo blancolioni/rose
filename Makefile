@@ -8,7 +8,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
-TOOLS=idl
+TOOLS=idl configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
@@ -68,6 +68,9 @@ boot:
 idl:
 	(cd src/tools/idl; make)
 	(cd src/library/kernelapi/generated; make)
+
+configure-driver:
+	(cd src/tools/configure-driver; make)
 
 config:
 	mkdir -p $(BUILDDIR)
