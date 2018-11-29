@@ -15,6 +15,7 @@ OBJECTS= \
 	$(BUILDDIR)/keyboard-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
+	$(BUILDDIR)/rose-devices-port_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-invocation.o \
