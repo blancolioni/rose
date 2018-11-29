@@ -1,0 +1,6 @@
+interface Interrupt_Handler is
+
+   procedure Handle_Interrupt
+     (Code  : Word);
+   
+end Interrupt_Handler;
