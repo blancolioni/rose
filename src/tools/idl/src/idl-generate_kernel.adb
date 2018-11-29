@@ -159,7 +159,8 @@ package body IDL.Generate_Kernel is
                Cap_Index : Natural := 0;
                Open_Proc : Syn.Statements.Procedure_Call_Statement'Class :=
                              Syn.Statements.New_Procedure_Call_Statement
-                               (Get_Package_Name (Result) & ".Client.Open",
+                               (Get_Package_Name (Result)
+                                & ".Client.Open_Cap_Set",
                                 Syn.Object (Base_Name));
 
                procedure Copy_Cap (Result_Subprogram : IDL_Subprogram);
@@ -843,7 +844,7 @@ package body IDL.Generate_Kernel is
          declare
             Open_Procedure : Syn.Declarations.Subprogram_Declaration'Class :=
                                Syn.Declarations.New_Procedure
-                                 ("Open",
+                                 ("Open_Cap_Set",
                                   Syn.Declarations.New_Formal_Argument
                                     ("Client",
                                      Syn.Declarations.Out_Argument,
@@ -1175,7 +1176,7 @@ package body IDL.Generate_Kernel is
          Open_Procedure : constant
            Syn.Declarations.Subprogram_Declaration'Class :=
              Syn.Declarations.New_Procedure
-               ("Open_Interface",
+               ("Open",
                 Syn.Declarations.New_Formal_Argument
                   ("Client",
                    Syn.Declarations.Out_Argument,

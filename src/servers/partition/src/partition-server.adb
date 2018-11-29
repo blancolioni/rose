@@ -51,7 +51,7 @@ package body Partition.Server is
 
    procedure Create_Server is
    begin
-      Client.Open_Interface
+      Client.Open
         (Device_Client, Block_Device_Cap);
 
       Client.Get_Parameters

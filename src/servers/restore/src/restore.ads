@@ -12,5 +12,6 @@ package Restore is
    Add_Storage_Cap     : constant Rose.Capabilities.Capability := 6;
    Write_System_Image  : constant Rose.Capabilities.Capability := 7;
    Install_Media_Cap   : constant Rose.Capabilities.Capability := 8;
+   Install_Exec_Cap    : constant Rose.Capabilities.Capability := 9;
 
 end Restore;
