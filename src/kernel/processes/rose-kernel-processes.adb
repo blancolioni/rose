@@ -620,8 +620,7 @@ package body Rose.Kernel.Processes is
       Control.Flags (Rose.Invocation.Send) := True;
       Control.Flags (Rose.Invocation.Receive) := False;
       Control.Flags (Rose.Invocation.Block) := False;
-      Current_Process.Current_Params.Data (1) :=
-        Rose.Invocation.Invocation_Error'Pos (Error);
+      Current_Process.Current_Params.Error := Error;
       Current_Process.Flags (Invoke_Reply) := True;
    end Return_Error;
 
