@@ -410,6 +410,32 @@ package body Rose.System_Calls is
       Params.Caps (Params.Control.Last_Sent_Cap) := Cap;
    end Send_Cap;
 
+   -------------------
+   -- Send_Endpoint --
+   -------------------
+
+   procedure Send_Endpoint
+     (Params   : in out Rose.Invocation.Invocation_Record;
+      Endpoint : Rose.Objects.Endpoint_Id)
+   is
+   begin
+      Rose.Invocation.Send_Object_Id
+        (Params, Rose.Objects.Object_Id (Endpoint));
+   end Send_Endpoint;
+
+   ----------------
+   -- Send_Error --
+   ----------------
+
+   procedure Send_Error
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Error  : Rose.Invocation.Invocation_Error)
+   is
+   begin
+      Params.Control.Flags (Rose.Invocation.Error) := True;
+      Params.Error := Rose.Invocation.Invocation_Error'Pos (Error);
+   end Send_Error;
+
    ----------------------
    -- Send_Native_Word --
    ----------------------
@@ -430,6 +456,18 @@ package body Rose.System_Calls is
 
       Params.Data (Params.Control.Last_Sent_Word) := Value;
    end Send_Native_Word;
+
+   --------------------
+   -- Send_Object_Id --
+   --------------------
+
+   procedure Send_Object_Id
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Oid    : Rose.Objects.Object_Id)
+   is
+   begin
+      Rose.Invocation.Send_Object_Id (Params, Oid);
+   end Send_Object_Id;
 
    ------------------------
    -- Send_Storage_Array --
