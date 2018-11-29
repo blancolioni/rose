@@ -433,7 +433,7 @@ package body Rose.System_Calls is
    is
    begin
       Params.Control.Flags (Rose.Invocation.Error) := True;
-      Params.Error := Rose.Invocation.Invocation_Error'Pos (Error);
+      Params.Error := Error;
    end Send_Error;
 
    ----------------------
