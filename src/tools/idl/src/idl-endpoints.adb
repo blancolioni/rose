@@ -1,4 +1,6 @@
+with Ada.Containers.Doubly_Linked_Lists;
 with Ada.Directories;
+with Ada.Strings.Unbounded;
 
 with WL.String_Maps;
 with WL.String_Sets;
@@ -10,6 +12,22 @@ with Tropos.Writer;
 package body IDL.Endpoints is
 
    Endpoint_File_Name : constant String := "interfaces.txt";
+
+   type Endpoint_Value_Record is
+      record
+         Endpoint : Ada.Strings.Unbounded.Unbounded_String;
+         Value    : Ada.Strings.Unbounded.Unbounded_String;
+      end record;
+
+   package Endpoint_Value_Lists is
+     new Ada.Containers.Doubly_Linked_Lists (Endpoint_Value_Record);
+
+   function Less (Left, Right : Endpoint_Value_Record) return Boolean
+   is (Ada.Strings.Unbounded."<"
+       (Left.Endpoint, Right.Endpoint));
+
+   package Endpoint_Sort is
+     new Endpoint_Value_Lists.Generic_Sorting (Less);
 
    package Endpoint_Table is
      new WL.String_Maps (String);
@@ -99,11 +117,22 @@ package body IDL.Endpoints is
    ----------------
 
    procedure Save_Table is
+      use Ada.Strings.Unbounded;
+      function "+" (S : String) return Unbounded_String
+                    renames Ada.Strings.Unbounded.To_Unbounded_String;
+      function "-" (S : Unbounded_String) return String
+                    renames Ada.Strings.Unbounded.To_String;
+
       Config : Tropos.Configuration;
+      List   : Endpoint_Value_Lists.List;
    begin
       for Position in Table.Iterate loop
-         Config.Add (Endpoint_Table.Key (Position),
-                     Endpoint_Table.Element (Position));
+         List.Append ((+(Endpoint_Table.Key (Position)),
+                      +(Endpoint_Table.Element (Position))));
+      end loop;
+      Endpoint_Sort.Sort (List);
+      for Item of List loop
+         Config.Add (-Item.Endpoint, -Item.Value);
       end loop;
       Tropos.Writer.Write_Config (Config, Endpoint_File_Name);
    end Save_Table;
