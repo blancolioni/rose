@@ -50,3 +50,4 @@ images/iso/boot/scan
 images/iso/boot/ata
 images/drivers/*
 images/iso/drivers/*
+*.caps
