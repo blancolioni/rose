@@ -86,7 +86,7 @@ package Rose.Invocation is
          Reply_Cap      : Rose.Capabilities.Capability := 0;
          Endpoint       : Rose.Objects.Endpoint_Id     := 0;
          Identifier     : Rose.Objects.Capability_Identifier := 0;
-         Reserved       : Rose.Words.Word_8 := 0;
+         Error          : Rose.Words.Word_8 := 0;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
          Buffer_Address : System.Address := System.Null_Address;
