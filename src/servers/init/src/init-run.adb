@@ -441,6 +441,10 @@ package body Init.Run is
       end;
 
       declare
+         Write_System_Image_Cap : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap,
+                                       (7, 2, 0, 0));
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
                           (Boot_Cap, Restore_Module, File_System_Priority,
@@ -450,6 +454,7 @@ package body Init.Run is
                             Inactive_Swap_Cap,
                             Log_Cap,
                             Add_Storage_Cap,
+                            Write_System_Image_Cap,
                             Install_FS));
       begin
          pragma Unreferenced (Restore_Id);
