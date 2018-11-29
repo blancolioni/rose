@@ -4,8 +4,10 @@ with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Words;
 
-with Rose.Interfaces.Keyboard_Handler;
+with Rose.Interfaces.Interrupt_Handler;
 with Rose.Interfaces.Stream_Reader;
+
+with Rose.Devices.Port_IO;
 
 with Keyboard.Codes;
 
@@ -80,7 +82,7 @@ package body Keyboard.Server is
       Key_Cap :=
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,
-           Rose.Interfaces.Keyboard_Handler.Handle_Key_Endpoint);
+           Rose.Interfaces.Interrupt_Handler.Handle_Interrupt_Endpoint);
       Rose.System_Calls.Initialize_Send (Params, Register_IRQ_Cap);
       Rose.System_Calls.Send_Cap (Params, Key_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -121,9 +123,35 @@ package body Keyboard.Server is
    ------------------
 
    procedure Start_Server is
+      use Rose.Words;
+
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
       Send_Reply  : Boolean;
+
+      function Key_Code_Available return Boolean;
+      function Read_Key_Code return Rose.Words.Word_8;
+
+      ------------------------
+      -- Key_Code_Available --
+      ------------------------
+
+      function Key_Code_Available return Boolean is
+         Status : constant Word_8 :=
+                    Rose.Devices.Port_IO.Port_In_8 (Read_Status_Cap);
+      begin
+         return (Status and 16#20#) /= 0;
+      end Key_Code_Available;
+
+      -------------------
+      -- Read_Key_Code --
+      -------------------
+
+      function Read_Key_Code return Rose.Words.Word_8 is
+      begin
+         return Rose.Devices.Port_IO.Port_In_8 (Read_Key_Cap);
+      end Read_Key_Code;
+
    begin
       loop
          Send_Reply := True;
@@ -156,34 +184,33 @@ package body Keyboard.Server is
                   end if;
                end;
 
-            when Rose.Interfaces.Keyboard_Handler.Handle_Key_Endpoint =>
-               declare
-                  use System.Storage_Elements;
-                  use type Rose.Words.Word;
-                  Code  : constant Rose.Words.Word :=
-                            Params.Data (0);
-                  State : constant Rose.Words.Word :=
-                            Params.Data (1);
-                  Result : Storage_Array (1 .. 10);
-                  Last   : Storage_Count;
-               begin
-                  Keyboard.Codes.Handle_Key
-                    (Code    => Code,
-                     Pressed => State /= 0,
-                     Result  => Result,
-                     Last    => Last);
+            when Rose.Interfaces.Interrupt_Handler.Handle_Interrupt_Endpoint =>
+               while Key_Code_Available loop
+                  declare
+                     use System.Storage_Elements;
+                     Code  : constant Rose.Words.Word_8 :=
+                               Read_Key_Code;
+                     Result : Storage_Array (1 .. 10);
+                     Last   : Storage_Count;
+                  begin
+                     Keyboard.Codes.Handle_Key
+                       (Code    => Word (Code and 16#7F#),
+                        Pressed => Code < 16#80#,
+                        Result  => Result,
+                        Last    => Last);
 
-                  Add_To_Buffer (Result (1 .. Last));
+                     Add_To_Buffer (Result (1 .. Last));
 
-                  if Have_Blocked_Request then
-                     Rose.System_Calls.Initialize_Reply
-                       (Reply, Blocked_Request.Reply_Cap);
-                     Send_Buffer
-                       (Blocked_Request.Buffer_Address,
-                        Blocked_Request.Buffer_Length,
-                        Reply);
-                  end if;
-               end;
+                     if Have_Blocked_Request then
+                        Rose.System_Calls.Initialize_Reply
+                          (Reply, Blocked_Request.Reply_Cap);
+                        Send_Buffer
+                          (Blocked_Request.Buffer_Address,
+                           Blocked_Request.Buffer_Length,
+                           Reply);
+                     end if;
+                  end;
+               end loop;
 
             when others =>
                Rose.System_Calls.Send_Error
