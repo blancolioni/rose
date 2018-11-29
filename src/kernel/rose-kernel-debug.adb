@@ -116,7 +116,7 @@ package body Rose.Kernel.Debug is
             when Process_Cap         => "process",
             when Endpoint_Cap        => "endpoint",
             when Receive_Cap         => "receive",
-            when Cap_Set             => "cap-set",
+            when Interrupt_Cap       => "interrupt",
             when Kernel_Cap          => "kernel",
             when Boot_Cap            => "boot",
             when Copy_Cap            => "copy",

@@ -270,15 +270,15 @@ package body Init.Run is
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_002E#, 1, 16#0CF8#, 0));
+                                     (16#0000_200E#, 1, 16#0CF8#, 0));
          Data_Port_Out_Cap    : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_002E#, 1, 16#0CFC#, 0));
+                                     (16#0000_200E#, 1, 16#0CFC#, 0));
          Data_Port_In_Cap     : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_002E#, 2, 16#0CFC#, 0));
+                                     (16#0000_200E#, 2, 16#0CFC#, 0));
          PCI_Id               : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
                                     (Boot_Cap, PCI_Module, Low_Priority,
@@ -315,11 +315,11 @@ package body Init.Run is
          Data_0_Cap_Read_16 : constant Rose.Capabilities.Capability :=
                                 Init.Calls.Call
                                   (Create_Cap,
-                                   (16#0000_001E#, 2, 16#01F0#, 16#01F7#));
+                                   (16#0000_100E#, 2, 16#01F0#, 16#01F7#));
          Data_0_Cap_Write_16   : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
-                                      (16#0000_001E#, 1, 16#01F0#, 16#01F7#));
+                                      (16#0000_100E#, 1, 16#01F0#, 16#01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,

@@ -24,8 +24,7 @@ package body Rose.Kernel.Capabilities.Arch is
                      Word_16 (Cap.Payload / 2 ** 32 mod 65536);
       Size       : constant Port_IO_Size :=
                      Port_IO_Size'Val
-                       (Boolean'Pos (Cap.Header.Flags (1))
-                        + 2 * Boolean'Pos (Cap.Header.Flags (2)));
+                       (Natural (Cap.Header.Identifier) mod 4);
       Log_Calls : constant Boolean := Log_Port_IO;
 
       procedure Send_To_Encoded_Port (Value : Word);
