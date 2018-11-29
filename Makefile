@@ -3,6 +3,7 @@ TARGET=$(ARCH)-unknown-rose
 ROSE=./build/$(TARGET)/rose
 BUILDDIR=./build/$(ARCH)/kernel/obj
 MODULEDIR=./build/$(ARCH)/modules
+DRIVERDIR=./build/$(ARCH)/drivers
 RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
@@ -11,11 +12,10 @@ TOOLS=idl
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=
+DRIVERS=keyboard
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition
 
-#all: $(PROJECT) $(ROSE) $(PROJDRIVERS) $(DRIVERS)
-all: config interfaces $(ROSE) $(DRIVERS) $(BOOT_MODULES) exports stripped hdd floppy iso finished
+all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd floppy iso finished
 
 rts:
 	(cd rts; make)
@@ -28,44 +28,11 @@ interfaces:
 $(PROJECT):
 	sed s/ARCH/$(ARCH)/g projects/kernel-template.gpr > $(PROJECT)
 
-$(PROJDRIVERS):
-	sed s/ARCH/$(ARCH)/g projects/drivers-template.gpr > $(PROJDRIVERS)
+$(BOOT_MODULES): %:
+	(cd src/servers/$@; make)
 
-$(NULLSTREAM): $(PROJDRIVERS)
-	gnatmake -P$(PROJDRIVERS)
-
-init:
-	(cd src/servers/init; make)
-
-store:
-	(cd src/servers/store; make)
-
-mem:
-	(cd src/servers/mem; make)
-
-console:
-	(cd src/servers/console; make)
-
-pci:
-	(cd src/servers/pci; make)
-
-ram_disk:
-	(cd src/servers/ram_disk; make)
-
-ata:
-	(cd src/servers/ata; make)
-
-isofs:
-	(cd src/servers/isofs; make)
-
-scan:
-	(cd src/servers/scan; make)
-
-partition:
-	(cd src/servers/partition; make)
-
-restore:
-	(cd src/servers/restore; make)
+$(DRIVERS): %:
+	(cd src/drivers/$@; make)
 
 exports:
 	sh ./scripts/export-elf-trace
@@ -105,6 +72,7 @@ idl:
 config:
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(MODULEDIR)
+	mkdir -p $(DRIVERDIR)
 
 clean:
 	(cd src/library/kernelapi/generated; make clean)
