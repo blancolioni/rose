@@ -68,6 +68,31 @@ package body IDL.Generate_Kernel is
    function Default_Size return Natural
    is (if IDL.Options.Generate_32_Bit then 32 else 64);
 
+   procedure Check_Error
+     (Block : in out Syn.Blocks.Block_Type'Class);
+
+   -----------------
+   -- Check_Error --
+   -----------------
+
+   procedure Check_Error
+     (Block : in out Syn.Blocks.Block_Type'Class)
+   is
+   begin
+      Block.Append
+        (Syn.Statements.New_Assignment_Statement
+           (Target => "Last_Error",
+            Value  => Syn.Object ("Rose.Invocation.OK")));
+      Block.Append
+        (Syn.Statements.If_Statement
+           (Syn.Expressions.New_Function_Call_Expression
+                ("Params.Control.Flags",
+                 Syn.Object ("Rose.Invocation.Error")),
+            Syn.Statements.New_Assignment_Statement
+              ("Last_Error",
+               Syn.Object ("Params.Error"))));
+   end Check_Error;
+
    ----------------------------
    -- Copy_Invocation_Result --
    ----------------------------
@@ -721,6 +746,8 @@ package body IDL.Generate_Kernel is
            ("Rose.System_Calls.Invoke_Capability",
             Syn.Object ("Params")));
 
+      Check_Error (Block);
+
       Copy_Invocation_Result (Block, Subpr);
 
       declare
@@ -797,7 +824,7 @@ package body IDL.Generate_Kernel is
          Client.With_Package (Get_Context (Item, I));
       end loop;
 
-      Client.With_Package ("Rose.Invocation", Body_With => True);
+      Client.With_Package ("Rose.Invocation");
       Client.With_Package ("Rose.System_Calls", Body_With => True);
 
       With_Packages (Item, Client, False);
@@ -806,6 +833,12 @@ package body IDL.Generate_Kernel is
         (Pkg    => Client,
          Item   => Item,
          Client => True);
+
+      Client.Append_To_Body
+        (Syn.Declarations.New_Object_Declaration
+           ("Last_Error",
+            Syn.Named_Subtype ("Rose.Invocation.Invocation_Error"),
+            Syn.Object ("Rose.Invocation.OK")));
 
       declare
          Block : Syn.Blocks.Block_Type;
@@ -871,6 +904,7 @@ package body IDL.Generate_Kernel is
 
          begin
             Scan_Subprograms (Item, True, Add_Argument'Access);
+            Client.Add_Separator;
             Client.Append (Open_Procedure);
          end;
 
@@ -886,6 +920,34 @@ package body IDL.Generate_Kernel is
       for I in Subprs'Range loop
          Generate_Client_Override (Client, Item, Subprs (I), Null_Interface);
       end loop;
+
+      declare
+         Block : Syn.Blocks.Block_Type;
+      begin
+         Block.Add_Declaration
+           (Syn.Declarations.Use_Package ("Rose.Invocation"));
+         Block.Append
+           (Syn.Statements.New_Return_Statement
+              (Syn.Expressions.Operator
+                   ("/=", Syn.Object ("Last_Error"), Syn.Object ("OK"))));
+         Client.Append
+           (Syn.Declarations.New_Function
+              ("Has_Error", Syn.Named_Subtype ("Boolean"),
+               Block));
+      end;
+
+      declare
+         Block : Syn.Blocks.Block_Type;
+      begin
+         Block.Append
+           (Syn.Statements.New_Return_Statement
+              (Syn.Object ("Last_Error")));
+         Client.Append
+           (Syn.Declarations.New_Function
+              ("Get_Last_Error",
+               Syn.Named_Subtype ("Rose.Invocation.Invocation_Error"),
+               Block));
+      end;
 
       declare
          Writer : Syn.File_Writer.File_Writer;
@@ -1189,6 +1251,7 @@ package body IDL.Generate_Kernel is
                 Block);
 
       begin
+         Pkg.Add_Separator;
          Pkg.Append (Open_Procedure);
       end;
 
