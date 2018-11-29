@@ -12,7 +12,7 @@ package Rose.Capabilities.Layout is
       Process_Cap,
       Endpoint_Cap,
       Receive_Cap,
-      Cap_Set,
+      Interrupt_Cap,
       Kernel_Cap,
       Boot_Cap,
       Copy_Cap,
@@ -24,15 +24,10 @@ package Rose.Capabilities.Layout is
       Other_Cap)
      with Size => 4;
 
-   type Capability_Flag is range 1 .. 4;
-
-   type Capability_Flags is
-     array (Capability_Flag) of Boolean with Pack;
-
    type Capability_Header is
       record
          Cap_Type    : Capability_Type                    := Null_Cap;
-         Flags       : Capability_Flags                   := (others => False);
+         R, W, X, D  : Boolean                            := False;
          Alloc_Count : Rose.Objects.Allocation_Count      := 0;
          Identifier  : Rose.Objects.Capability_Identifier := 0;
          Endpoint    : Rose.Objects.Endpoint_Index        := 0;
