@@ -23,7 +23,7 @@ procedure Scan.Driver is
 begin
    Rose.Console_IO.Open (Console_Cap);
 
-   Rose.Interfaces.Block_Device.Client.Open_Interface
+   Rose.Interfaces.Block_Device.Client.Open
      (Client         => Device,
       Interface_Cap  => Block_Device_Cap);
 

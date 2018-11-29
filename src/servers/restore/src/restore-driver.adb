@@ -19,7 +19,7 @@ begin
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");
 
-   Rose.Interfaces.Block_Device.Client.Open_Interface
+   Rose.Interfaces.Block_Device.Client.Open
      (Client         => Device,
       Interface_Cap  => Active_Swap_Cap);
 
@@ -36,7 +36,7 @@ begin
          File_System : File_System_Client;
          Root        : Directory_Client;
       begin
-         Open (File_System, Install_Media_Cap);
+         Open_Cap_Set (File_System, Install_Media_Cap);
          Root := Root_Directory (File_System);
          Restore.Installer.Install (Root, Device);
       end;

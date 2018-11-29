@@ -25,7 +25,7 @@ package body IsoFS.Server is
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Interfaces.Block_Device.Client.Open_Interface
+      Rose.Interfaces.Block_Device.Client.Open
         (Device, Device_Cap);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
