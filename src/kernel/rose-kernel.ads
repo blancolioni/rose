@@ -21,6 +21,12 @@ package Rose.Kernel is
    function Kernel_Physical_Base return Rose.Addresses.Physical_Address;
    function Kernel_Physical_Bound return Rose.Addresses.Physical_Address;
 
+   System_Image_Start_Magic : constant :=
+                                16#e668_f3c2_10fd_3de7#;
+
+   System_Image_End_Magic : constant :=
+                                16#5557_b148_c5b3_f35b#;
+
 private
 
    Kernel_Base, Kernel_Bound : Rose.Addresses.Virtual_Address;
@@ -48,6 +54,13 @@ private
      (Virtual_Addr : Virtual_Address)
      return Physical_Address
    is (Physical_Address (Virtual_Addr - Kernel_Virtual_Base));
+
+   Checkpoint_Active    : Boolean := False;
+   Image_Write_Active   : Boolean := False;
+   Current_Image_Object : Rose.Objects.Object_Id :=
+                            Rose.Objects.Null_Object_Id;
+   Image_Writer         : Rose.Objects.Object_Id :=
+                            Rose.Objects.Null_Object_Id;
 
    System_Call_Entry        : Physical_Address;
    pragma Import (C, System_Call_Entry, "system_call_entry");

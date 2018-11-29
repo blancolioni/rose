@@ -38,7 +38,7 @@ begin
       begin
          Open (File_System, Install_Media_Cap);
          Root := Root_Directory (File_System);
-         Restore.Installer.Install (Root);
+         Restore.Installer.Install (Root, Device);
       end;
    end if;
 

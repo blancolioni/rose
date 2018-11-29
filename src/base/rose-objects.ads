@@ -26,8 +26,11 @@ package Rose.Objects is
    subtype Process_Object_Id is Object_Id range
      16#0000_0000_0000_0001# .. 16#0000_0000_FFFF_FFFF#;
 
+   subtype Ephemeral_Process_Object_Id is Object_Id range
+     16#0000_0000_0000_0001# .. 16#0000_0000_0000_00FF#;
+
    subtype Persistent_Process_Object_Id is Object_Id range
-     16#0000_0000_0000_100# .. 16#0000_0000_FFFF_FFFF#;
+     16#0000_0000_0000_0100# .. 16#0000_0000_FFFF_FFFF#;
 
    function Is_Page_Object_Id (Id : Object_Id) return Boolean
    is (Id in Page_Object_Id);

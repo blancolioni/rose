@@ -4,6 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 with Rose.Invocation;
+with Rose.Objects;
 with Rose.Words;
 
 package Rose.System_Calls is
@@ -118,6 +119,18 @@ package Rose.System_Calls is
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word_64);
+
+   procedure Send_Endpoint
+     (Params   : in out Rose.Invocation.Invocation_Record;
+      Endpoint : Rose.Objects.Endpoint_Id);
+
+   procedure Send_Object_Id
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Oid    : Rose.Objects.Object_Id);
+
+   procedure Send_Error
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Error  : Rose.Invocation.Invocation_Error);
 
    procedure Receive_Words
      (Params : in out Rose.Invocation.Invocation_Record;

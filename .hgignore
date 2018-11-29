@@ -48,3 +48,5 @@ images/iso/boot/pci
 images/iso/boot/restore
 images/iso/boot/scan
 images/iso/boot/ata
+images/drivers/*
+images/iso/drivers/*
