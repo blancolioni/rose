@@ -1,0 +1,6 @@
+interface Keyboard_Handler is
+   procedure Handle_Key
+     (Code  : Word;
+      State : Word);
+   
+end Keyboard_Handler;
