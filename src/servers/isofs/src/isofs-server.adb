@@ -47,10 +47,6 @@ package body IsoFS.Server is
          Rose.System_Calls.Invoke_Capability (Params);
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
-         Rose.Console_IO.Put ("isofs: received endpoint: ");
-         Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
-         Rose.Console_IO.New_Line;
-
          case Params.Endpoint is
             when Rose.Interfaces.File_System.Root_Directory_Endpoint =>
                declare
@@ -204,15 +200,10 @@ package body IsoFS.Server is
                      Rose.System_Calls.Send_Error
                        (Reply, Rose.Invocation.Invalid_Operation);
                   else
-                     Rose.Console_IO.Put ("find-directory: ");
-                     Rose.Console_IO.Put_Line (Name);
                      declare
                         Index : constant Natural :=
                                   Get_Index_By_Name (Directory, Name);
                      begin
-                        Rose.Console_IO.Put ("returning: ");
-                        Rose.Console_IO.Put (Index);
-                        Rose.Console_IO.New_Line;
                         Rose.System_Calls.Send_Word
                           (Reply, Rose.Words.Word (Index));
                      end;

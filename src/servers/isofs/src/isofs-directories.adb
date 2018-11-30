@@ -2,9 +2,9 @@ with System.Storage_Elements;
 
 with Rose.Words;
 
-with Rose.Console_IO;
-
 with Rose.System_Calls.Server;
+
+with Rose.Console_IO;
 
 package body IsoFS.Directories is
 
@@ -379,9 +379,9 @@ package body IsoFS.Directories is
          if Count > 2
            and then Result = 0
          then
-         if Result = 0
+            if Result = 0
               and then Entry_Name'Length = Name'Length
-         then
+            then
                declare
                   Match : Boolean := True;
                begin
@@ -392,8 +392,8 @@ package body IsoFS.Directories is
                      end if;
                   end loop;
                   if Match then
-            Result := Count;
-         end if;
+                     Result := Count;
+                  end if;
                end;
             end if;
          end if;
@@ -405,10 +405,6 @@ package body IsoFS.Directories is
       elsif Name = ".." then
          return 2;
       end if;
-
-      Rose.Console_IO.Put ("isofs: get-index-by-name: ");
-      Rose.Console_IO.Put (Name);
-      Rose.Console_IO.New_Line;
 
       Scan_Directory_Entries (Directory, Process'Access);
       return Result;
@@ -476,38 +472,12 @@ package body IsoFS.Directories is
       end if;
 
       declare
-         use Rose.Console_IO;
          Volume : Primary_Volume_Sector;
          pragma Import (Ada, Volume);
          for Volume'Address use Buffer'Address;
       begin
-         Rose.Console_IO.Put
-           ("found volume: ");
-         Rose.Console_IO.Put
-           (Volume.Volume_Identifier);
-         Rose.Console_IO.New_Line;
-         Put ("root directory timestamp: ");
-         declare
-            D : Directory_Date_Time renames
-                  Volume.Root_Directory_Entry.Recording_Date_Time;
-         begin
-            Put (Natural (D (1)) + 1900);
-            Put ("-");
-            Put (Natural (D (2)), 2, '0');
-            Put ("-");
-            Put (Natural (D (3)), 2, '0');
-            Put (" ");
-            Put (Natural (D (4)), 2, '0');
-            Put (":");
-            Put (Natural (D (5)), 2, '0');
-            Put (":");
-            Put (Natural (D (6)), 2, '0');
-            New_Line;
-         end;
-
          Create_Cap_Record
            (Root_Directory, Volume_Index, Volume.Root_Directory_Entry);
-
       end;
 
    end Read_Root_Directory;
