@@ -51,3 +51,5 @@ images/iso/boot/ata
 images/drivers/*
 images/iso/drivers/*
 *.caps
+src/tools/configure-driver/configure.gpr
+images/iso/rose/install/drivers/keyboard

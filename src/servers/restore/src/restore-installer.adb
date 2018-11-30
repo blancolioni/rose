@@ -27,12 +27,12 @@ package body Restore.Installer is
      (To   : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
    is
       use type Rose.Directories.File_Kind;
-      Install_Directory : constant String := "/rose-install";
+      Install_Directory : constant String := "/rose/install";
 
    begin
       if not Rose.Directories.Exists (Install_Directory) then
          Rose.Console_IO.Put_Line
-           ("install: cannot find directory /rose-install");
+           ("install: cannot find directory /rose/install");
          return;
       end if;
 
@@ -40,7 +40,7 @@ package body Restore.Installer is
         /= Rose.Directories.Directory
       then
          Rose.Console_IO.Put_Line
-           ("install: /rose-install is not a directory");
+           ("install: /rose/install is not a directory");
       end if;
 
       Rose.Directories.Search
