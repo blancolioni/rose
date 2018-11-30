@@ -5,6 +5,10 @@ interface Directory is
    function Directory_Entry_Count return Natural;
    function Directory_Entry_Name (Index : Positive) return String;
    function Directory_Entry_Kind (Index : Positive) return File_Kind;
+   function Directory_Entry_Size (Index : Positive) return Storage_Count;
+   
+   function Find_Entry (Name : String) return Natural;
+   
    function Get_Ordinary_File (Index : Positive) return interface File;
    function Get_Directory (Index : Positive) return interface Directory;
    
