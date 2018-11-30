@@ -178,6 +178,20 @@ package body IsoFS.Directories is
       return No_Directory;
    end Get_Child_Directory;
 
+   -------------------------
+   -- Get_Child_Directory --
+   -------------------------
+
+   function Get_Child_Directory
+     (Parent : Directory_Type;
+      Index  : Positive)
+      return Directory_Type
+   is
+      pragma Unreferenced (Parent, Index);
+   begin
+      return No_Directory;
+   end Get_Child_Directory;
+
    ---------------------
    -- Get_Entry_Count --
    ---------------------
@@ -209,6 +223,10 @@ package body IsoFS.Directories is
       Scan_Directory_Entries (Directory, Process'Access);
       return Count;
    end Get_Entry_Count;
+
+   --------------------
+   -- Get_Entry_Kind --
+   --------------------
 
    function Get_Entry_Kind
      (Directory : Directory_Type;
@@ -324,6 +342,55 @@ package body IsoFS.Directories is
          return No_Directory;
       end if;
    end Get_Identified_Directory;
+
+   -----------------------
+   -- Get_Index_By_Name --
+   -----------------------
+
+   function Get_Index_By_Name
+     (Directory : Directory_Type;
+      Name      : String)
+     return Natural
+   is
+      Count  : Natural := 0;
+      Result : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Rec);
+      begin
+         Count := Count + 1;
+         if Result = 0
+           and then Entry_Name = Name
+         then
+            Result := Count;
+         end if;
+      end Process;
+
+   begin
+      if Name = "." then
+         return 1;
+      elsif Name = ".." then
+         return 2;
+      end if;
+
+      Rose.Console_IO.Put ("isofs: get-index-by-name: ");
+      Rose.Console_IO.Put (Name);
+      Rose.Console_IO.New_Line;
+
+      Scan_Directory_Entries (Directory, Process'Access);
+      return Result;
+   end Get_Index_By_Name;
 
    ------------------------
    -- Get_Root_Directory --
