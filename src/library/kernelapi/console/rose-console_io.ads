@@ -20,4 +20,6 @@ package Rose.Console_IO is
    procedure Put_Line (Text : String);
    procedure New_Line;
 
+   procedure Flush;
+
 end Rose.Console_IO;

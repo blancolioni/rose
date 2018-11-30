@@ -10,6 +10,15 @@ package body Rose.Console_IO is
 
    procedure Send_Buffer;
 
+   -----------
+   -- Flush --
+   -----------
+
+   procedure Flush is
+   begin
+      Send_Buffer;
+   end Flush;
+
    --------------
    -- New_Line --
    --------------
