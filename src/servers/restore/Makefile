@@ -31,6 +31,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
+	$(BUILDDIR)/rose-directories.o \
 	$(BUILDDIR)/rose-devices-checkpoints.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-invocation.o \

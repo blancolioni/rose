@@ -4,6 +4,7 @@ project Restore is
       ("src",
        "../../base",
        "../../library/capabilities",
+       "../../library/rose",
        "../../library/kernelapi/console",
        "../../library/kernelapi/devices",
        "../../library/kernelapi/generated",
