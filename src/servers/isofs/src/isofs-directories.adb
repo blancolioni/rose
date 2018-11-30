@@ -376,10 +376,26 @@ package body IsoFS.Directories is
          pragma Unreferenced (Rec);
       begin
          Count := Count + 1;
-         if Result = 0
-           and then Entry_Name = Name
+         if Count > 2
+           and then Result = 0
          then
+         if Result = 0
+              and then Entry_Name'Length = Name'Length
+         then
+               declare
+                  Match : Boolean := True;
+               begin
+                  for I in Entry_Name'Range loop
+                     if Entry_Name (I) /= Name (I - Name'First + 1) then
+                        Match := False;
+                        exit;
+                     end if;
+                  end loop;
+                  if Match then
             Result := Count;
+         end if;
+               end;
+            end if;
          end if;
       end Process;
 
