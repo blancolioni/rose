@@ -156,6 +156,7 @@ package body IsoFS.Server is
                                   (Params.Identifier);
                   Index     : constant Natural := Natural (Params.Data (0));
                begin
+
                   if Directory = No_Directory then
                      Rose.Console_IO.Put_Line
                        ("cap does not resolve to a directory");
@@ -172,7 +173,7 @@ package body IsoFS.Server is
                        (Reply, Rose.Invocation.Invalid_Operation);
                   else
                      IsoFS.Directories.Send_Directory_Caps
-                       (Directory, Reply);
+                       (Get_Child_Directory (Directory, Index), Reply);
                   end if;
                end;
 

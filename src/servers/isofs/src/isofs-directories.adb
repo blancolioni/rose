@@ -85,7 +85,11 @@ package body IsoFS.Directories is
 
    type Directory_Caps_Record is
       record
-         Valid : Boolean := False;
+         Valid, Filled         : Boolean := False;
+         First_Child           : Directory_Type := No_Directory;
+         Parent                : Directory_Type := No_Directory;
+         Parent_Index          : Natural := 0;
+         Child_Count           : Natural := 0;
          Sector_Address        : Block_Address_Type;
          Entry_Record          : Directory_Entry;
          Directory_Entry_Count : Rose.Capabilities.Capability := 0;
@@ -103,6 +107,7 @@ package body IsoFS.Directories is
      of Directory_Caps_Record;
 
    Directory_Caps : Directory_Caps_Array;
+   Directory_Count : Directory_Type := 0;
 
    procedure Read_Root_Directory
      (Device : Client.Block_Device_Client);
@@ -120,15 +125,44 @@ package body IsoFS.Directories is
       Sector    : Block_Address_Type;
       Dir_Entry : Directory_Entry);
 
+   procedure Check_Cap_Record
+     (Directory : Directory_Type);
+
    procedure Scan_Directory_Entries
      (Directory : Directory_Type;
       Process   : not null access
         procedure (Rec : Directory_Entry;
                    Name : String));
 
+   procedure Get_Child_Entry
+     (Parent      : Directory_Type;
+      Child_Index : Positive;
+      Child_Entry : out Directory_Entry);
+
 --     function Get_Directory_From_Address
 --       (Address : Rose.Devices.Block.Block_Address_Type)
 --        return Directory_Type;
+
+   ----------------------
+   -- Check_Cap_Record --
+   ----------------------
+
+   procedure Check_Cap_Record
+     (Directory : Directory_Type)
+   is
+      Caps : Directory_Caps_Record renames Directory_Caps (Directory);
+   begin
+      if not Caps.Filled then
+         declare
+            Child_Entry : Directory_Entry;
+         begin
+            Get_Child_Entry (Caps.Parent, Caps.Parent_Index, Child_Entry);
+            Create_Cap_Record
+              (Directory, Caps.Sector_Address, Child_Entry);
+         end;
+
+      end if;
+   end Check_Cap_Record;
 
    -----------------------
    -- Create_Cap_Record --
@@ -141,17 +175,52 @@ package body IsoFS.Directories is
    is
       use Rose.Interfaces.Directory;
 
+      Caps : Directory_Caps_Record renames
+               Directory_Caps (Directory);
+
       function New_Cap
         (EP : Rose.Objects.Endpoint_Id)
                return Rose.Capabilities.Capability
       is (New_Cap (Directory, EP));
 
+      procedure Add_Child_Entry
+        (Rec  : Directory_Entry;
+         Name : String);
+
+      ---------------------
+      -- Add_Child_Entry --
+      ---------------------
+
+      procedure Add_Child_Entry
+        (Rec  : Directory_Entry;
+         Name : String)
+      is
+         pragma Unreferenced (Name);
+         New_D    : constant Directory_Type :=
+                      Directory_Count + 1;
+         New_Caps : Directory_Caps_Record renames Directory_Caps (New_D);
+      begin
+         if Caps.First_Child = No_Directory then
+            Caps.First_Child := New_D;
+         end if;
+         New_Caps.Valid := True;
+         New_Caps.Sector_Address :=
+           Block_Address_Type (Rec.Extent_Location_LSB);
+         New_Caps.Parent := Directory;
+
+         Directory_Count := Directory_Count + 1;
+         Caps.Child_Count := Caps.Child_Count + 1;
+         New_Caps.Parent_Index := Caps.Child_Count;
+      end Add_Child_Entry;
+
    begin
-      Directory_Caps (Directory) :=
-        Directory_Caps_Record'
-          (Valid                 => True,
-           Sector_Address        => Sector,
+      Caps :=
+        (Caps with delta
+           Filled                => True,
            Entry_Record          => Dir_Entry,
+           First_Child           => No_Directory,
+           Child_Count           => 0,
+           SectOr_Address        => Sector,
            Directory_Entry_Count =>
               New_Cap (Directory_Entry_Count_Endpoint),
            Directory_Entry_Name  =>
@@ -167,7 +236,10 @@ package body IsoFS.Directories is
            Get_Directory         =>
               New_Cap (Get_Directory_Endpoint),
            Read_File             =>
-              New_Cap (Read_File_Endpoint));
+             New_Cap (Read_File_Endpoint));
+
+      Scan_Directory_Entries (Directory, Add_Child_Entry'Access);
+
    end Create_Cap_Record;
 
    -------------------------
@@ -193,10 +265,55 @@ package body IsoFS.Directories is
       Index  : Positive)
       return Directory_Type
    is
-      pragma Unreferenced (Parent, Index);
    begin
-      return No_Directory;
+      if Index <= Directory_Caps (Parent).Child_Count then
+         declare
+            Child : constant Directory_Type :=
+                      Directory_Caps (Parent).First_Child
+                      + Directory_Type (Index) - 1;
+         begin
+            Check_Cap_Record (Child);
+            return Child;
+         end;
+      else
+         return No_Directory;
+      end if;
    end Get_Child_Directory;
+
+   ---------------------
+   -- Get_Child_Entry --
+   ---------------------
+
+   procedure Get_Child_Entry
+     (Parent      : Directory_Type;
+      Child_Index : Positive;
+      Child_Entry : out Directory_Entry)
+   is
+      Count : Natural := 0;
+
+      procedure Copy_Entry
+        (Rec  : Directory_Entry;
+         Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Copy_Entry
+        (Rec  : Directory_Entry;
+         Name : String)
+      is
+         pragma Unreferenced (Name);
+      begin
+         Count := Count + 1;
+         if Count = Child_Index then
+            Child_Entry := Rec;
+         end if;
+      end Copy_Entry;
+
+   begin
+      Scan_Directory_Entries (Parent, Copy_Entry'Access);
+   end Get_Child_Entry;
 
    ---------------------
    -- Get_Entry_Count --
