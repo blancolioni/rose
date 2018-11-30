@@ -45,6 +45,11 @@ package body IsoFS.Server is
          Params.Cap := Receive_Cap;
 
          Rose.System_Calls.Invoke_Capability (Params);
+         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+
+         Rose.Console_IO.Put ("isofs: received endpoint: ");
+         Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
+         Rose.Console_IO.New_Line;
 
          case Params.Endpoint is
             when Rose.Interfaces.File_System.Root_Directory_Endpoint =>
@@ -53,11 +58,7 @@ package body IsoFS.Server is
                            IsoFS.Directories.Get_Root_Directory
                              (Device);
                begin
-                  Reply := (others => <>);
-                  Reply.Control.Flags (Rose.Invocation.Reply) := True;
-                  Reply.Cap := Params.Reply_Cap;
                   IsoFS.Directories.Send_Directory_Caps (Root, Reply);
-                  Rose.System_Calls.Invoke_Capability (Reply);
                end;
 
             when Rose.Interfaces.Directory.Directory_Entry_Count_Endpoint =>
@@ -70,15 +71,11 @@ package body IsoFS.Server is
                   if Directory = No_Directory then
                      Rose.Console_IO.Put_Line
                        ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
                   else
-                     Reply := (others => <>);
-                     Reply.Control.Flags (Rose.Invocation.Reply) := True;
-                     Reply.Control.Flags (Rose.Invocation.Send_Words) := True;
-                     Reply.Control.Last_Sent_Word := 0;
-                     Reply.Cap := Params.Reply_Cap;
-                     Reply.Data (0) :=
-                       Rose.Words.Word (Get_Entry_Count (Directory));
-                     Rose.System_Calls.Invoke_Capability (Reply);
+                     Rose.System_Calls.Send_Word
+                       (Reply, Rose.Words.Word (Get_Entry_Count (Directory)));
                   end if;
                end;
 
@@ -100,14 +97,17 @@ package body IsoFS.Server is
                   if Directory = No_Directory then
                      Rose.Console_IO.Put_Line
                        ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
                   elsif Index = 0 then
                      Rose.Console_IO.Put_Line
                        ("invalid directory index");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
                   else
                      Get_Entry_Name (Directory, Index, Name, Last);
 
                      declare
-                        use Rose.Invocation;
                         Index  : Storage_Offset := 0;
                      begin
                         for Ch of Name (1 .. Last) loop
@@ -116,13 +116,8 @@ package body IsoFS.Server is
                            Buffer (Index) := Character'Pos (Ch);
                         end loop;
 
-                        Reply := (others => <>);
-                        Reply.Control.Flags (Rose.Invocation.Reply) := True;
-                        Reply.Control.Flags (Send_Words) := True;
-                        Reply.Control.Last_Sent_Word := 0;
-                        Reply.Cap := Params.Reply_Cap;
-                        Reply.Data (0) := Rose.Words.Word (Index);
-                        Rose.System_Calls.Invoke_Capability (Reply);
+                        Rose.System_Calls.Send_Word
+                          (Reply, Rose.Words.Word (Index));
                      end;
                   end if;
                end;
@@ -138,33 +133,105 @@ package body IsoFS.Server is
                   if Directory = No_Directory then
                      Rose.Console_IO.Put_Line
                        ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
                   elsif Index not in 1 .. Get_Entry_Count (Directory) then
                      Rose.Console_IO.Put_Line
                        ("invalid directory index");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
                   else
                      declare
                         use Rose.Interfaces.Directory;
                         Kind : constant File_Kind :=
                                  Get_Entry_Kind (Directory, Index);
                      begin
-                        Reply := (others => <>);
-                        Reply.Control.Flags (Rose.Invocation.Reply) := True;
-                        Reply.Control.Flags (Rose.Invocation.Send_Words) :=
-                          True;
-                        Reply.Control.Last_Sent_Word := 0;
-                        Reply.Cap := Params.Reply_Cap;
-                        Reply.Data (0) := File_Kind'Pos (Kind);
-                        Rose.System_Calls.Invoke_Capability (Reply);
+                        Rose.System_Calls.Send_Word
+                          (Reply, Rose.Words.Word'(File_Kind'Pos (Kind)));
                      end;
                   end if;
                end;
 
+            when Rose.Interfaces.Directory.Get_Directory_Endpoint =>
+               declare
+                  use IsoFS.Directories;
+                  Directory : constant Directory_Type :=
+                                Get_Identified_Directory
+                                  (Params.Identifier);
+                  Index     : constant Natural := Natural (Params.Data (0));
+               begin
+                  if Directory = No_Directory then
+                     Rose.Console_IO.Put_Line
+                       ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
+                     Rose.Console_IO.Put
+                       ("invalid directory index: ");
+                     Rose.Console_IO.Put (Natural (Params.Identifier));
+                     Rose.Console_IO.Put ("/");
+                     Rose.Console_IO.Put (Index);
+                     Rose.Console_IO.New_Line;
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  else
+                     IsoFS.Directories.Send_Directory_Caps
+                       (Directory, Reply);
+                  end if;
+               end;
+
+            when Rose.Interfaces.Directory.Find_Entry_Endpoint =>
+               declare
+                  use IsoFS.Directories;
+                  Directory : constant Directory_Type :=
+                                Get_Identified_Directory
+                                  (Params.Identifier);
+                  Name      : String (1 .. Natural (Params.Buffer_Length));
+                  pragma Import (Ada, Name);
+                  for Name'Address use Params.Buffer_Address;
+               begin
+
+                  if Directory = No_Directory then
+                     Rose.Console_IO.Put_Line
+                       ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  elsif not Params.Control.Flags
+                    (Rose.Invocation.Send_Buffer)
+                  then
+                     Rose.Console_IO.Put_Line
+                       ("expected a name in call to find_entry");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  else
+                     Rose.Console_IO.Put ("find-directory: ");
+                     Rose.Console_IO.Put_Line (Name);
+                     declare
+                        Index : constant Natural :=
+                                  Get_Index_By_Name (Directory, Name);
+                     begin
+                        Rose.Console_IO.Put ("returning: ");
+                        Rose.Console_IO.Put (Index);
+                        Rose.Console_IO.New_Line;
+                        Rose.System_Calls.Send_Word
+                          (Reply, Rose.Words.Word (Index));
+                     end;
+                  end if;
+               end;
+
+
             when others =>
                Rose.Console_IO.Put
                  ("unknown endpoint: ");
-               Rose.Console_IO.Put (Rose.Words.Word_32 (Params.Endpoint));
+               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
                Rose.Console_IO.New_Line;
+               Rose.System_Calls.Send_Error
+                 (Reply, Rose.Invocation.Invalid_Endpoint);
+
          end case;
+
+         Rose.System_Calls.Invoke_Capability (Reply);
+
       end loop;
    end Start_Server;
 

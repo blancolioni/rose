@@ -26,8 +26,18 @@ package IsoFS.Directories is
       Child_Name : String)
       return Directory_Type;
 
+   function Get_Child_Directory
+     (Parent : Directory_Type;
+      Index  : Positive)
+      return Directory_Type;
+
    function Get_Entry_Count
      (Directory : Directory_Type)
+      return Natural;
+
+   function Get_Index_By_Name
+     (Directory : Directory_Type;
+      Name      : String)
       return Natural;
 
    function Get_Entry_Kind
