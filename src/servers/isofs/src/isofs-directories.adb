@@ -91,6 +91,8 @@ package body IsoFS.Directories is
          Directory_Entry_Count : Rose.Capabilities.Capability := 0;
          Directory_Entry_Name  : Rose.Capabilities.Capability := 0;
          Directory_Entry_Kind  : Rose.Capabilities.Capability := 0;
+         Directory_Entry_Size  : Rose.Capabilities.Capability := 0;
+         Find_Entry            : Rose.Capabilities.Capability := 0;
          Get_Ordinary_File     : Rose.Capabilities.Capability := 0;
          Get_Directory         : Rose.Capabilities.Capability := 0;
          Read_File             : Rose.Capabilities.Capability := 0;
@@ -156,6 +158,10 @@ package body IsoFS.Directories is
               New_Cap (Directory_Entry_Name_Endpoint),
            Directory_Entry_Kind  =>
               New_Cap (Directory_Entry_Kind_Endpoint),
+           Directory_Entry_Size  =>
+             New_Cap (Directory_Entry_Size_Endpoint),
+           Find_Entry            =>
+             New_Cap (Find_Entry_Endpoint),
            Get_Ordinary_File     =>
               New_Cap (Get_Ordinary_File_Endpoint),
            Get_Directory         =>
@@ -566,6 +572,8 @@ package body IsoFS.Directories is
       Send_Cap (Params, Caps.Directory_Entry_Count);
       Send_Cap (Params, Caps.Directory_Entry_Name);
       Send_Cap (Params, Caps.Directory_Entry_Kind);
+      Send_Cap (Params, Caps.Directory_Entry_Size);
+      Send_Cap (Params, Caps.Find_Entry);
       Send_Cap (Params, Caps.Get_Ordinary_File);
       Send_Cap (Params, Caps.Get_Directory);
       Send_Cap (Params, Caps.Read_File);
