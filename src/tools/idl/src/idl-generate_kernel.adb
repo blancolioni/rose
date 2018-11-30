@@ -42,6 +42,12 @@ package body IDL.Generate_Kernel is
       Subpr   : IDL.Syntax.IDL_Subprogram;
       Parent  : IDL.Syntax.IDL_Interface);
 
+   procedure Generate_Cap_Query
+     (Pkg     : in out Syn.Declarations.Package_Type'Class;
+      Item    : IDL.Syntax.IDL_Interface;
+      Subpr   : IDL.Syntax.IDL_Subprogram;
+      Parent  : IDL.Syntax.IDL_Interface);
+
    procedure Generate_Interface_Record
      (Pkg     : in out Syn.Declarations.Package_Type'Class;
       Item    : IDL.Syntax.IDL_Interface;
@@ -712,6 +718,33 @@ package body IDL.Generate_Kernel is
             Syn.Object ("Parameters")));
    end Copy_Server_Invocation;
 
+   ------------------------
+   -- Generate_Cap_Query --
+   ------------------------
+
+   procedure Generate_Cap_Query
+     (Pkg     : in out Syn.Declarations.Package_Type'Class;
+      Item    : IDL.Syntax.IDL_Interface;
+      Subpr   : IDL.Syntax.IDL_Subprogram;
+      Parent  : IDL.Syntax.IDL_Interface)
+   is
+      pragma Unreferenced (Parent);
+      use IDL.Syntax, IDL.Identifiers;
+      Name           : constant String := To_Ada_Name (Get_Name (Subpr));
+      Interface_Name : constant String := Get_Ada_Name (Item);
+      Get_Cap        : Syn.Declarations.Subprogram_Declaration'Class :=
+                         Syn.Declarations.New_Function
+                           ("Get_" & Name & "_Cap",
+                            "Rose.Capabilities.Capability",
+                            Syn.Object ("Item." & Name));
+   begin
+      Get_Cap.Add_Formal_Argument
+        (Arg_Name => "Item",
+         Arg_Type => Interface_Name & "_Client");
+      Pkg.Add_Separator;
+      Pkg.Append (Get_Cap);
+   end Generate_Cap_Query;
+
    ------------------------------
    -- Generate_Client_Override --
    ------------------------------
@@ -796,7 +829,9 @@ package body IDL.Generate_Kernel is
 
          Pkg.Add_Separator;
          Pkg.Append (Method);
+
       end;
+
    end Generate_Client_Override;
 
    -----------------------------
@@ -919,6 +954,10 @@ package body IDL.Generate_Kernel is
 
       for I in Subprs'Range loop
          Generate_Client_Override (Client, Item, Subprs (I), Null_Interface);
+      end loop;
+
+      for I in Subprs'Range loop
+         Generate_Cap_Query (Client, Item, Subprs (I), Null_Interface);
       end loop;
 
       declare
