@@ -311,15 +311,15 @@ package body Init.Run is
          Data_0_Cap_8  : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
-                              (16#0000_000E#, 4, 16#01F0#, 16#01F7#));
+                              (16#0000_000E#, 2, 16#01F0#, 16#01F7#));
          Data_0_Cap_Read_16 : constant Rose.Capabilities.Capability :=
                                 Init.Calls.Call
                                   (Create_Cap,
-                                   (16#0000_100E#, 4, 16#01F0#, 16#01F7#));
+                                   (16#0000_100E#, 2, 16#01F0#, 16#01F7#));
          Data_0_Cap_Write_16   : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
-                                      (16#0000_100E#, 3, 16#01F0#, 16#01F7#));
+                                      (16#0000_100E#, 1, 16#01F0#, 16#01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,
