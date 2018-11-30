@@ -51,7 +51,7 @@ package Rose.Invocation is
       Operation_Not_Implemented);
 
    Max_Parameter_Words : constant := 16;
-   Max_Capabilities    : constant := 8;
+   Max_Capabilities    : constant := 16;
 
    type Parameter_Word_Index is mod Max_Parameter_Words;
    type Capability_Index is mod Max_Capabilities;
@@ -66,7 +66,7 @@ package Rose.Invocation is
 
    type Control_Word_Header is new Word_8;
 
-   type Word_5 is mod 2 ** 5;
+   type Word_3 is mod 2 ** 3;
 
    type Control_Word is
       record
@@ -75,7 +75,7 @@ package Rose.Invocation is
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
          Last_Recv_Cap  : Capability_Index     := 0;
-         Reserved       : Word_5               := 0;
+         Reserved       : Word_3               := 0;
       end record
      with Pack, Size => 32;
 
@@ -86,14 +86,14 @@ package Rose.Invocation is
          Reply_Cap      : Rose.Capabilities.Capability := 0;
          Endpoint       : Rose.Objects.Endpoint_Id     := 0;
          Identifier     : Rose.Objects.Capability_Identifier := 0;
-         Error          : Invocation_Error := OK;
          Reserved       : Word_8 := 0;
+         Error          : Invocation_Error := OK;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
          Buffer_Address : System.Address := System.Null_Address;
          Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
-     with Pack, Size => 32 * 4 * 8;
+     with Pack, Size => 40 * 4 * 8;
 
    type Invocation_Access is access all Invocation_Record;
 
