@@ -1,9 +1,9 @@
 with Rose.Interfaces.Block_Device.Client;
 
 with Rose.Interfaces.File_System.Client;
-with Rose.Interfaces.Directory.Client;
 
 with Rose.Console_IO;
+with Rose.Directories;
 
 with Rose.Invocation;
 with Rose.System_Calls.Server;
@@ -32,13 +32,11 @@ begin
 
       declare
          use Rose.Interfaces.File_System.Client;
-         use Rose.Interfaces.Directory.Client;
          File_System : File_System_Client;
-         Root        : Directory_Client;
       begin
          Open_Cap_Set (File_System, Install_Media_Cap);
-         Root := Root_Directory (File_System);
-         Restore.Installer.Install (Root, Device);
+         Rose.Directories.Open_Root_File_System (File_System);
+         Restore.Installer.Install (Device);
       end;
    end if;
 
