@@ -161,7 +161,8 @@ package Rose.Kernel.Processes is
 
    procedure Return_Error
      (Params : Rose.Invocation.Invocation_Access;
-      Error  : Rose.Invocation.Invocation_Error);
+      Error  : Rose.Invocation.Invocation_Error;
+      Data   : Rose.Words.Word := 0);
 
    function Current_Process_Id return Process_Id;
    function Current_Object_Id return Rose.Objects.Object_Id;
