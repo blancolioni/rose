@@ -1,3 +1,5 @@
+with Rose.Console_IO;
+
 package body Rose.Directories is
 
    Root    : Directory_Entry_Type;
@@ -14,6 +16,26 @@ package body Rose.Directories is
      (Name    : String;
       Pattern : String)
       return Boolean;
+
+   procedure Append
+     (To_String : in out String;
+      Last      : in out Natural;
+      Component : String);
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (To_String : in out String;
+      Last      : in out Natural;
+      Component : String)
+   is
+   begin
+      To_String (Last + 1) := '/';
+      To_String (Last + 2 .. Last + 1 + Component'Length) := Component;
+      Last := Last + 1 + Component'Length;
+   end Append;
 
    ----------------
    -- End_Search --
@@ -48,12 +70,21 @@ package body Rose.Directories is
       Last := 0;
 
       if not Directory_Entry.Valid then
+         Last := 0;
+         return;
+      end if;
+
+      if Directory_Entry.Directory_Name_Last = 0
+        and then Directory_Entry.Entry_Index = 0
+      then
+         Last := Name'First;
+         Name (Name'First) := '/';
          return;
       end if;
 
       for Ch of
-        Directory_Entry.Entry_Name
-          (1 .. Directory_Entry.Entry_Name_Last)
+        Directory_Entry.Directory_Name
+          (1 .. Directory_Entry.Directory_Name_Last)
       loop
          exit when Last >= Name'Last;
          Last := Last + 1;
@@ -66,14 +97,7 @@ package body Rose.Directories is
             Name (Last) := '/';
          end if;
 
-         if Last < Name'Last then
-            Last := Last + 1;
-            Directory_Entry_Name
-              (Item   => Directory_Entry.Containing_Directory,
-               Index  => Directory_Entry.Entry_Index,
-               Result => Name (Last .. Name'Last),
-               Last   => Last);
-         end if;
+         Simple_Name (Directory_Entry, Name (Last + 1 .. Name'Last), Last);
       end if;
 
    end Full_Name;
@@ -88,6 +112,7 @@ package body Rose.Directories is
    is
    begin
       Directory_Entry := Search.Directory;
+      Search_Next (Search);
    end Get_Next_Entry;
 
    ----------
@@ -162,21 +187,43 @@ package body Rose.Directories is
      (Name            : String;
       Directory_Entry : out Directory_Entry_Type)
    is
-      Start   : Positive := Name'First;
-      At_File : Boolean := False;
+      Start    : Positive := Name'First;
+      To_Index : Natural := 0;
+      At_File  : Boolean := False;
+
+      procedure Append (Component : String);
+
+      ------------
+      -- Append --
+      ------------
+
+      procedure Append (Component : String) is
+      begin
+         Append
+           (To_String => Directory_Entry.Directory_Name,
+            Last      => Directory_Entry.Directory_Name_Last,
+            Component => Component);
+      end Append;
+
    begin
       if Name (Start) = '/' then
          Directory_Entry := Root;
          Start := Start + 1;
+         Directory_Entry.Directory_Name_Last := 0;
       else
          Directory_Entry := Current;
+         Directory_Entry.Directory_Name := Current.Directory_Name;
+         Directory_Entry.Directory_Name_Last := Current.Directory_Name_Last;
       end if;
 
       for I in Start .. Name'Last + 1 loop
+         To_Index := To_Index + 1;
          if I > Name'Last or else Name (I) = '/' then
             if I > Start + 1 then
 
                if At_File then
+                  Rose.Console_IO.Put_Line
+                    ("declining to treat file as directory");
                   Directory_Entry.Valid := False;
                   return;
                end if;
@@ -188,6 +235,10 @@ package body Rose.Directories is
                                     Name (Start .. I - 1));
                begin
                   if Next_Index = 0 then
+                     Rose.Console_IO.Put (Name (Start .. I - 1));
+                     Rose.Console_IO.Put
+                       (": no such file or directory");
+                     Rose.Console_IO.New_Line;
                      Directory_Entry.Valid := False;
                      return;
                   end if;
@@ -197,17 +248,18 @@ package body Rose.Directories is
                   is
                      when Rose.Interfaces.Directory.Ordinary_File =>
                         Directory_Entry.Entry_Index := Next_Index;
-                        Directory_Entry.Entry_Name
-                          (1 .. I - Start) := Name (Start .. I - 1);
-                        Directory_Entry.Entry_Name_Last := I - Start;
                         Directory_Entry.Valid := True;
                         Directory_Entry.Kind := Ordinary_File;
+                        Directory_Entry.Simple_Name (1 .. I - Start) :=
+                          Name (Start .. I - 1);
+                        Directory_Entry.Simple_Name_Last := I - Start;
                         At_File := True;
                      when Rose.Interfaces.Directory.Directory =>
                         Directory_Entry.Containing_Directory :=
                           Get_Directory
                             (Directory_Entry.Containing_Directory,
                              Next_Index);
+                        Append (Name (Start .. I - 1));
                         Directory_Entry.Entry_Index := 0;
                         Directory_Entry.Kind := Directory;
                         Directory_Entry.Valid := True;
@@ -222,7 +274,6 @@ package body Rose.Directories is
          end if;
 
       end loop;
-
 
    end Name_To_Directory_Entry;
 
@@ -264,7 +315,11 @@ package body Rose.Directories is
       Top : constant Directory_Client :=
               Rose.Interfaces.File_System.Client.Root_Directory (Client);
    begin
-      Root := (Top, (others => ' '), 0, 0, True, Directory);
+      Root := Directory_Entry_Type'
+        (Containing_Directory => Top,
+         Valid                => True,
+         Kind                 => Directory,
+         others               => <>);
       Current := Root;
    end Open_Root_File_System;
 
@@ -291,6 +346,10 @@ package body Rose.Directories is
          end;
       end loop;
    end Search;
+
+   -----------------
+   -- Search_Next --
+   -----------------
 
    procedure Search_Next
      (Search : in out Search_Type)
@@ -323,6 +382,10 @@ package body Rose.Directories is
                      if Match (Entry_Name (1 .. Name_Last),
                                Search.Pattern (1 .. Search.Pattern_Length))
                      then
+                        Search.Directory.Entry_Index := Index;
+                        Search.Directory.Simple_Name (1 .. Name_Last) :=
+                          Entry_Name (1 .. Name_Last);
+                        Search.Directory.Simple_Name_Last := Name_Last;
                         Search.Finished := False;
                         return;
                      end if;
@@ -354,18 +417,35 @@ package body Rose.Directories is
       Name            : out String;
       Last            : out Natural)
    is
-      Start : Natural := Directory_Entry.Entry_Name_Last;
+      Start : Natural := Directory_Entry.Directory_Name_Last;
    begin
-      while Start > 0 loop
-         exit when Directory_Entry.Entry_Name (Start) = '/';
-         Start := Start - 1;
-      end loop;
       Last := Name'First - 1;
-      for I in Start + 1 .. Directory_Entry.Entry_Name_Last loop
-         exit when Last >= Name'Last;
-         Last := Last + 1;
-         Name (Last) := Directory_Entry.Entry_Name (I);
-      end loop;
+      if Directory_Entry.Entry_Index > 0 then
+         for Ch of
+           Directory_Entry.Simple_Name
+             (1 .. Directory_Entry.Simple_Name_Last)
+         loop
+            exit when Last >= Name'Last;
+            Last := Last + 1;
+            Name (Last) := Ch;
+         end loop;
+      elsif Directory_Entry.Directory_Name_Last = 0 then
+         if Last < Name'Last then
+            Last := Last + 1;
+            Name (Last) := '/';
+         end if;
+      else
+         while Start > 0 loop
+            exit when Directory_Entry.Directory_Name (Start) = '/';
+            Start := Start - 1;
+         end loop;
+
+         for I in Start + 1 .. Directory_Entry.Directory_Name_Last loop
+            exit when Last >= Name'Last;
+            Last := Last + 1;
+            Name (Last) := Directory_Entry.Directory_Name (I);
+         end loop;
+      end if;
    end Simple_Name;
 
    ----------
