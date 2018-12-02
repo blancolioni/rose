@@ -664,7 +664,7 @@ package body Rose.Kernel.Processes is
                      end if;
 
                      Rose.Boot.Console.Put ("warning: process ");
-                     Rose.Boot.Console.Put (Rose.Words.Word_8 (To_Process_Id));
+                     Debug.Put (To_Process_Id);
                      Rose.Boot.Console.Put (": out of capabilities");
                      Rose.Boot.Console.New_Line;
 
