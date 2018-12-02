@@ -66,6 +66,21 @@ package body Restore.Installer is
       Rose.Directories.Full_Name
         (Directory_Entry, Full_Name, Full_Name_Last);
 
+      if Full_Name_Last = 0
+        or else (Full_Name_Last = 1
+                 and then Full_Name (1) = '.')
+        or else (Full_Name_Last = 2
+                 and then Full_Name (1) = '.'
+                 and then Full_Name (2) = '.')
+      then
+         Rose.Console_IO.Put ("install: skipping ");
+         Rose.Console_IO.Put_Line (Full_Name (1 .. Full_Name_Last));
+         return;
+      end if;
+
+      Rose.Console_IO.Put ("install: entering directory ");
+      Rose.Console_IO.Put_Line (Full_Name (1 .. Full_Name_Last));
+
       Rose.Directories.Search
         (Directory => Full_Name (1 .. Full_Name_Last),
          Pattern   => "*.caps",
