@@ -243,7 +243,7 @@ private
    type Process_Id is new Rose.Words.Word;
    Null_Process_Id : constant Process_Id := 0;
 
-   Cached_Capability_Count : constant := 64;
+   Cached_Capability_Count : constant := 256;
 
    type Capability_Cache_Array is
      array (Rose.Capabilities.Capability range 1 .. Cached_Capability_Count)

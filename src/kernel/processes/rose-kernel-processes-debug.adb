@@ -9,8 +9,18 @@ package body Rose.Kernel.Processes.Debug is
    ---------
 
    procedure Put (Pid : Process_Id) is
+      Name : String renames Process_Table (Pid).Name;
    begin
       Rose.Boot.Console.Put (Natural (Pid));
+      if Name (Name'First) /= '/' then
+         Rose.Boot.Console.Put ("/");
+      end if;
+      for Ch of Name loop
+         if Ch = ' ' then  --  exit when triggers an infinite loop warning
+            exit;          --  on gcc 8.2.1
+         end if;
+         Rose.Boot.Console.Put (Ch);
+      end loop;
    end Put;
 
    --------------------
