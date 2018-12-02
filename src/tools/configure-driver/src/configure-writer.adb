@@ -13,7 +13,7 @@ package body Configure.Writer is
    is
       File : File_Type;
    begin
-      Create (File, Out_File, Config.Config_Name & ".caps");
+      Create (File, Out_File, Config.Config_Name & ".cap");
       for Caps_Config of Config.Child ("caps") loop
          declare
             Name         : constant String := Caps_Config.Config_Name;

@@ -87,7 +87,7 @@ package body Restore.Installer is
 
       Rose.Directories.Search
         (Directory => Full_Name (1 .. Full_Name_Last),
-         Pattern   => "*.caps",
+         Pattern   => "*.cap",
          Filter    =>
            (Rose.Directories.Ordinary_File => True, others => False),
          Process   => Install_With_Caps'Access);
@@ -110,7 +110,7 @@ package body Restore.Installer is
    begin
       Rose.Directories.Full_Name
         (Cap_File_Entry, Caps_File_Name, Caps_File_Name_Last);
-      Binary_File_Name_Last := Caps_File_Name_Last - 5;  --  "*.caps"
+      Binary_File_Name_Last := Caps_File_Name_Last - 4;  --  "*.cap"
 
       Binary_File_Name (1 .. Binary_File_Name_Last) :=
         Caps_File_Name (1 .. Binary_File_Name_Last);
