@@ -78,16 +78,18 @@ private
 
    use Rose.Interfaces.Directory.Client;
 
-   subtype Entry_Name_Type is String (1 .. 200);
+   subtype Entry_Name_Type is String (1 .. 400);
 
    type Directory_Entry_Type is
       record
          Containing_Directory : Directory_Client;
-         Entry_Name           : Entry_Name_Type;
-         Entry_Name_Last      : Natural;
-         Entry_Index          : Natural;
-         Valid                : Boolean;
-         Kind                 : File_Kind;
+         Directory_Name       : Entry_Name_Type   := (others => ' ');
+         Directory_Name_Last  : Natural           := 0;
+         Simple_Name          : Entry_Name_Type   := (others => ' ');
+         Simple_Name_Last     : Natural           := 0;
+         Entry_Index          : Natural           := 0;
+         Valid                : Boolean           := False;
+         Kind                 : File_Kind         := Special_File;
       end record;
 
    type Search_Type is limited
