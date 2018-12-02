@@ -46,9 +46,10 @@ package Rose.Invocation is
       Closed,
       Invalid_Endpoint,
       Invalid_Operation,
-      No_Such_Device,
-      No_Such_Process,
-      Operation_Not_Implemented);
+      Invalid_Object,
+      Operation_Not_Implemented,
+      Missing_Data,
+      Unknown_Error);
 
    Max_Parameter_Words : constant := 16;
    Max_Capabilities    : constant := 16;
