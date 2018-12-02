@@ -50,7 +50,6 @@ package body Restore.Installer is
          Process   => Install_From_Directory'Access);
 
       Write_Initial_System_Image (To);
-      end if;
 
    end Install;
 
