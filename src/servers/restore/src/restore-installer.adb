@@ -50,6 +50,7 @@ package body Restore.Installer is
          Process   => Install_From_Directory'Access);
 
       Write_Initial_System_Image (To);
+      end if;
 
    end Install;
 
@@ -122,6 +123,7 @@ package body Restore.Installer is
          Rose.Console_IO.Put
            (Binary_File_Name (1 .. Binary_File_Name_Last));
          Rose.Console_IO.Put (": no such file");
+         Rose.Console_IO.New_Line;
          return;
       end if;
 
