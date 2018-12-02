@@ -62,19 +62,23 @@ package body Restore.Installer is
    is
       Full_Name      : String (1 .. 100);
       Full_Name_Last : Natural;
+      Simple_Name      : String (1 .. 100);
+      Simple_Name_Last : Natural;
    begin
       Rose.Directories.Full_Name
         (Directory_Entry, Full_Name, Full_Name_Last);
+      Rose.Directories.Simple_Name
+        (Directory_Entry, Simple_Name, Simple_Name_Last);
 
-      if Full_Name_Last = 0
-        or else (Full_Name_Last = 1
-                 and then Full_Name (1) = '.')
-        or else (Full_Name_Last = 2
-                 and then Full_Name (1) = '.'
-                 and then Full_Name (2) = '.')
+      if Full_Name_Last = 0 then
+         Rose.Console_IO.Put_Line ("directory entry: no name");
+         return;
+      elsif  (Simple_Name_Last = 1
+              and then Simple_Name (1) = '.')
+        or else (Simple_Name_Last = 2
+                 and then Simple_Name (1) = '.'
+                 and then Simple_Name (2) = '.')
       then
-         Rose.Console_IO.Put ("install: skipping ");
-         Rose.Console_IO.Put_Line (Full_Name (1 .. Full_Name_Last));
          return;
       end if;
 
