@@ -638,6 +638,7 @@ package body IsoFS.Directories is
             for Rec'Address use Sector (Start)'Address;
 
             Name : String (1 .. Natural (Rec.File_Identifier_Length));
+            Last : Natural := Name'Last;
          begin
 
             for I in Name'Range loop
@@ -646,10 +647,18 @@ package body IsoFS.Directories is
                             Start + 32 + Storage_Count (I);
                begin
                   Name (I) := Character'Val (Sector (Index));
+                  if Name (I) = ';' then
+                     Last := I - 1;
+                     exit;
+                  end if;
                end;
             end loop;
 
-            Process (Rec, Name);
+            if Name (Last) = '.' then
+               Last := Last - 1;
+            end if;
+
+            Process (Rec, Name (1 .. Last));
 
             Position := Position + Record_Length;
             if Position - Sector_Start >= Sector'Last then
