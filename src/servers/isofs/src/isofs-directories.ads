@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Objects;
 with Rose.Invocation;
 with Rose.Interfaces.Directory;
@@ -44,6 +46,16 @@ package IsoFS.Directories is
      (Directory : Directory_Type;
       Index     : Positive)
       return Rose.Interfaces.Directory.File_Kind;
+
+   function Read_File
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Rose.Capabilities.Capability;
+
+   procedure Read
+     (File   : Positive;
+      Buffer : out System.Storage_Elements.Storage_Array;
+      Count  : out System.Storage_Elements.Storage_Count);
 
    procedure Get_Entry_Name
      (Directory : Directory_Type;
