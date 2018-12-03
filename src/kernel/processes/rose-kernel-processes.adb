@@ -145,6 +145,30 @@ package body Rose.Kernel.Processes is
    end Create_Endpoint;
 
    -------------------------
+   -- Create_Endpoint_Cap --
+   -------------------------
+
+   function Create_Endpoint_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Capabilities, Rose.Objects;
+      Eix : constant Rose.Objects.Endpoint_Index :=
+              Find_Endpoint (Pid, Endpoint);
+   begin
+      if Eix = 0 then
+         return Null_Capability;
+      end if;
+
+      return Cap : constant Capability := Create_Cap (Pid) do
+         if Cap /= Null_Capability then
+            Process_Table (Pid).Endpoints (Eix).Send_Cap := Cap;
+         end if;
+      end return;
+   end Create_Endpoint_Cap;
+
+   -------------------------
    -- Current_Process_Cap --
    -------------------------
 
@@ -210,6 +234,26 @@ package body Rose.Kernel.Processes is
       P.Cap_Cache (Cap) := (others => <>);
    end Delete_Cap;
 
+   -------------------
+   -- Find_Endpoint --
+   -------------------
+
+   function Find_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Id in P.Endpoints'Range loop
+         if P.Endpoints (Id).Endpoint = Endpoint then
+            return Id;
+         end if;
+      end loop;
+      return 0;
+   end Find_Endpoint;
+
    -----------------------
    -- Find_Endpoint_Cap --
    -----------------------
@@ -229,6 +273,26 @@ package body Rose.Kernel.Processes is
       end loop;
       return Rose.Capabilities.Null_Capability;
    end Find_Endpoint_Cap;
+
+   ----------------------
+   -- Find_Receive_Cap --
+   ----------------------
+
+   function Find_Receive_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Rec of P.Endpoints loop
+         if Rec.Endpoint = Endpoint then
+            return Rec.Receive_Cap;
+         end if;
+      end loop;
+      return Rose.Capabilities.Null_Capability;
+   end Find_Receive_Cap;
 
    ----------------------
    -- Get_Process_Name --
@@ -605,6 +669,26 @@ package body Rose.Kernel.Processes is
         (Current_Process.Pid);
    end Report_Current_Process;
 
+   ----------------------
+   -- Require_Endpoint --
+   ----------------------
+
+   function Require_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Id in P.Endpoints'Range loop
+         if P.Endpoints (Id).Endpoint = Endpoint then
+            return Id;
+         end if;
+      end loop;
+      return Create_Endpoint (Pid, Endpoint);
+   end Require_Endpoint;
+
    ------------------
    -- Return_Error --
    ------------------
@@ -885,25 +969,6 @@ package body Rose.Kernel.Processes is
 
    end Set_Current_State;
 
-   -----------------------
-   -- Set_Endpoint_Caps --
-   -----------------------
-
-   procedure Set_Endpoint_Caps
-     (Pid : Process_Id;
-      Endpoint    : Rose.Objects.Endpoint_Index;
-      Receive_Cap : Rose.Capabilities.Capability;
-      Send_Cap    : Rose.Capabilities.Capability)
-   is
-      Current_Process : Kernel_Process_Entry renames
-                          Process_Table (Pid);
-      Rec             : Registered_Endpoint_Record renames
-                          Current_Process.Endpoints (Endpoint);
-   begin
-      Rec.Receive_Cap := Receive_Cap;
-      Rec.Send_Cap    := Send_Cap;
-   end Set_Endpoint_Caps;
-
    --------------------------
    -- Set_Process_Handlers --
    --------------------------
@@ -922,6 +987,23 @@ package body Rose.Kernel.Processes is
         (Interrupt => Rose.Arch.Interrupts.Page_Fault,
          Handler   => Handle_Page_Fault'Access);
    end Set_Process_Handlers;
+
+   ---------------------
+   -- Set_Receive_Cap --
+   ---------------------
+
+   procedure Set_Receive_Cap
+     (Pid         : Process_Id;
+      Endpoint    : Rose.Objects.Endpoint_Index;
+      Receive_Cap : Rose.Capabilities.Capability)
+   is
+      Current_Process : Kernel_Process_Entry renames
+                          Process_Table (Pid);
+      Rec             : Registered_Endpoint_Record renames
+                          Current_Process.Endpoints (Endpoint);
+   begin
+      Rec.Receive_Cap := Receive_Cap;
+   end Set_Receive_Cap;
 
    ----------------
    -- Share_Page --
