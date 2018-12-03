@@ -1,10 +1,10 @@
-with System.Storage_Elements;
-
 with Rose.Words;
 
 with Rose.System_Calls.Server;
 
 with Rose.Console_IO;
+
+with Rose.Interfaces.Stream_Reader;
 
 package body IsoFS.Directories is
 
@@ -12,6 +12,7 @@ package body IsoFS.Directories is
    use Rose.Words;
 
    Max_Directories : constant := 100;
+   Max_Open_Files  : constant := 20;
 
    Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
 
@@ -108,6 +109,19 @@ package body IsoFS.Directories is
 
    Directory_Caps : Directory_Caps_Array;
    Directory_Count : Directory_Type := 0;
+
+   type Open_File_Record is
+      record
+         Open          : Boolean := False;
+         Start_Address : Rose.Words.Word := 0;
+         Length        : Rose.Words.Word := 0;
+         Current       : Rose.Words.Word := 0;
+      end record;
+
+   type Open_File_Array is array (1 .. Max_Open_Files) of Open_File_Record;
+
+   Open_Files      : Open_File_Array;
+   Open_File_Count : Natural := 0;
 
    procedure Read_Root_Directory
      (Device : Client.Block_Device_Client);
@@ -545,6 +559,75 @@ package body IsoFS.Directories is
          return No_Directory;
       end if;
    end Get_Root_Directory;
+
+   ----------
+   -- Read --
+   ----------
+
+   procedure Read
+     (File   : Positive;
+      Buffer : out System.Storage_Elements.Storage_Array;
+      Count  : out System.Storage_Elements.Storage_Count)
+   is
+   begin
+      if Open_Files (File).Open then
+         Buffer (Buffer'First) := 0;
+         Count := 0;
+      else
+         Count := 0;
+      end if;
+   end Read;
+
+   ---------------
+   -- Read_File --
+   ---------------
+
+   function Read_File
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Rose.Capabilities.Capability
+   is
+      Count : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Entry_Name);
+      begin
+         Count := Count + 1;
+         if Count = Index then
+            Open_File_Count := Open_File_Count + 1;
+            Open_Files (Open_File_Count) :=
+              Open_File_Record'
+                (Open          => True,
+                 Start_Address => Rec.Extent_Location_LSB,
+                 Length        => Rec.Extent_Size_LSB,
+                 Current       => 0);
+         end if;
+      end Process;
+
+   begin
+      if Open_File_Count >= Max_Open_Files then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Scan_Directory_Entries (Directory, Process'Access);
+
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Cap  => Create_Endpoint_Cap,
+         Endpoint_Id => Rose.Interfaces.Stream_Reader.Read_Endpoint,
+         Identifier  => Rose.Objects.Capability_Identifier (Open_File_Count));
+
+   end Read_File;
 
    -------------------------
    -- Read_Root_Directory --
