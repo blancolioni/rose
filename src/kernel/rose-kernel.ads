@@ -68,5 +68,9 @@ private
    Log_Reply                : Boolean := False;
    Log_Port_IO              : Boolean := False;
    Use_Serial_Port          : Boolean := True;
+   Log_Cap_Copy             : Boolean := False;
+   Log_Endpoint_Cap_Create  : Boolean := False;
+
+   Log_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
 end Rose.Kernel;
