@@ -1,0 +1,7 @@
+interface Installer is
+
+   procedure Install
+     (Caps_File   : interface Stream_Reader;
+      Binary_File : interface Stream_Reader);
+   
+end Installer;
