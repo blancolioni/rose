@@ -48,9 +48,11 @@ package body Rose.Kernel.Capabilities.Meta is
 
       if Endpoint_Id /= 0 then
          Local_Endpoint :=
-           Rose.Kernel.Processes.Create_Endpoint
+           Rose.Kernel.Processes.Require_Endpoint
              (Process_Id, Endpoint_Id);
          if Local_Endpoint = 0 then
+            Rose.Kernel.Processes.Debug.Put (Process_Id);
+            Rose.Boot.Console.Put_Line (": out of endpoints");
             Rose.Kernel.Processes.Return_Error
               (Params, Rose.Invocation.Out_Of_Endpoints);
             return;
@@ -83,7 +85,10 @@ package body Rose.Kernel.Capabilities.Meta is
       end if;
 
       if Endpoint_Id /= 0 then
-         Endpoint_Cap := Rose.Kernel.Processes.Create_Cap (Process_Id);
+         Endpoint_Cap :=
+           Rose.Kernel.Processes.Create_Endpoint_Cap
+             (Process_Id, Endpoint_Id);
+
          if Endpoint_Cap = Null_Capability then
             if Receive_Cap /= Null_Capability then
                Rose.Kernel.Processes.Delete_Cap (Process_Id, Receive_Cap);
@@ -115,8 +120,10 @@ package body Rose.Kernel.Capabilities.Meta is
                Local_Endpoint, Identifier));
       end if;
 
-      Rose.Kernel.Processes.Set_Endpoint_Caps
-        (Process_Id, Local_Endpoint, Receive_Cap, Endpoint_Cap);
+      if Receive_Cap /= Null_Capability then
+         Rose.Kernel.Processes.Set_Receive_Cap
+           (Process_Id, Local_Endpoint, Receive_Cap);
+      end if;
 
       Params.Control.Last_Sent_Cap := 0;
 
