@@ -861,6 +861,7 @@ package body IDL.Generate_Kernel is
 
       Client.With_Package ("Rose.Invocation");
       Client.With_Package ("Rose.System_Calls", Body_With => True);
+      Client.With_Package ("Rose.Environment", Body_With => True);
 
       With_Packages (Item, Client, False);
 
@@ -945,6 +946,69 @@ package body IDL.Generate_Kernel is
 
          Generate_Open_Interface (Client, Item);
 
+      end;
+
+      declare
+         Block : Syn.Blocks.Block_Type;
+
+         procedure Add_Deleted_Cap
+           (Interface_Subprogram : IDL.Syntax.IDL_Subprogram);
+
+         ---------------------
+         -- Add_Deleted_Cap --
+         ---------------------
+
+         procedure Add_Deleted_Cap
+           (Interface_Subprogram : IDL.Syntax.IDL_Subprogram)
+         is
+         begin
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Send_Cap",
+                  Syn.Object ("Params"),
+                  Syn.Object
+                    ("Client." & Get_Ada_Name (Interface_Subprogram))));
+         end Add_Deleted_Cap;
+
+      begin
+
+         Block.Add_Declaration
+           (Syn.Declarations.New_Object_Declaration
+              (Identifiers => Syn.Declarations.Identifier ("Params"),
+               Is_Aliased  => True,
+               Is_Constant => False,
+               Is_Deferred => False,
+               Object_Type =>
+                 Syn.Named_Subtype
+                   ("Rose.Invocation.Invocation_Record")));
+
+         Block.Append
+           (Syn.Statements.New_Assignment_Statement
+              (Target => "Client.Is_Open",
+               Value  => Syn.Literal (False)));
+
+         Block.Append
+           (Syn.Statements.New_Procedure_Call_Statement
+              ("Rose.System_Calls.Initialize_Send",
+               Syn.Object ("Params"),
+               Syn.Object ("Rose.Environment.Standard_Delete_Cap")));
+
+         Scan_Subprograms (Item, True, Add_Deleted_Cap'Access);
+
+         Block.Append
+           (Syn.Statements.New_Procedure_Call_Statement
+              ("Rose.System_Calls.Invoke_Capability",
+               Syn.Object ("Params")));
+
+         Client.Add_Separator;
+         Client.Append (Syn.Declarations.New_Procedure
+                        ("Close",
+                           Syn.Declarations.New_Formal_Argument
+                             ("Client",
+                              Syn.Declarations.Inout_Argument,
+                              Syn.Named_Subtype
+                                (Interface_Name & "_Client")),
+                           Block));
       end;
 
       for I in 1 .. Get_Num_Inherited (Item) loop

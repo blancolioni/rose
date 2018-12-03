@@ -53,6 +53,9 @@ package body Init.Run is
       Create_Endpoint_Cap  : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 1, 0, 0));
+      Delete_Cap           : constant Rose.Capabilities.Capability :=
+                               Init.Calls.Call
+                                 (Create_Cap, (2, 30, 0, 0));
       Exit_Cap             : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 31, 0, 0));
@@ -449,6 +452,7 @@ package body Init.Run is
                         Init.Calls.Launch_Boot_Module
                           (Boot_Cap, Restore_Module, File_System_Priority,
                            (Create_Endpoint_Cap,
+                            Delete_Cap,
                             Console_Write_Cap,
                             Active_Swap_Cap,
                             Inactive_Swap_Cap,
