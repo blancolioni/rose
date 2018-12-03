@@ -1,5 +1,6 @@
 with Rose.Words;
 with Rose.Boot.Console;
+with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Debug is
 
@@ -28,11 +29,15 @@ package body Rose.Kernel.Debug is
       is
       begin
          if Params.Control.Flags (Flag) then
+            Put (" ");
             Put (Name);
          end if;
       end Put_Flag;
 
    begin
+      Rose.Kernel.Processes.Debug.Put
+        (Rose.Kernel.Processes.Current_Process_Id);
+      Put (": ");
       Put (Name & ":");
       Put (Word_8 (Params.Cap));
       Put (" ");
@@ -41,13 +46,18 @@ package body Rose.Kernel.Debug is
       Put (Rose.Words.Word_16 (Layout.Header.Endpoint));
       Put (":");
       Put (Rose.Words.Word_32 (Layout.Payload));
-      Put (" ");
       Put_Flag ("E", Error);
       Put_Flag ("S", Send);
       Put_Flag ("R", Receive);
       Put_Flag ("Y", Reply);
       Put_Flag ("B", Block);
       Put_Flag ("D", Send_Buffer);
+      Put_Flag ("SW", Send_Words);
+      Put_Flag ("RW", Recv_Words);
+      Put_Flag ("SC", Send_Caps);
+      Put_Flag ("RC", Recv_Caps);
+      Put_Flag ("SB", Send_Buffer);
+      Put_Flag ("WB", Writable_Buffer);
 
       Put (" ");
       Put (Word_32 (Word_64 (Params.Endpoint) / 2 ** 32));

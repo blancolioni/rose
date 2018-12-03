@@ -98,7 +98,7 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         if True
+         if Log_Endpoint_Cap_Create
            or else Log_Invocation
          then
             Rose.Kernel.Processes.Debug.Put (Process_Id);

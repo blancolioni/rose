@@ -83,8 +83,11 @@ config:
 clean:
 	(cd src/library/kernelapi/generated; make clean)
 	rm -rf build/*
+	rm -rf `find src -name build -print`
 	rm -f `find src -name "*.o" -print`
 	rm -f images/rose-boot-floppy.img
 	rm -f $(ROSE)
 	rm -f `find . -name "*~" -print`
 	rm -f `find . -name "b~*" -print`
+	rm -f src/tools/idl/idl.gpr
+	rm -f src/tools/configure-driver/configure.gpr
