@@ -786,10 +786,6 @@ package body IDL.Generate_Kernel is
          end;
       end if;
 
-      Block.Append
-        (Syn.Statements.New_Procedure_Call_Statement
-           ("Rose.System_Calls.Invoke_Capability",
-            Syn.Object ("Parameters")));
    end Copy_Server_Invocation;
 
    ------------------------
@@ -1435,16 +1431,20 @@ package body IDL.Generate_Kernel is
 
       Server_Pkg.With_Package ("Rose.Capabilities");
       Server_Pkg.With_Package ("Rose.Server");
-      Server_Pkg.With_Package ("Rose.System_Calls.Server");
+      Server_Pkg.With_Package ("Rose.System_Calls.Server",
+                               Body_With => True);
+
       Server_Pkg.With_Package ("Rose.Invocation",
                                Body_With => True, Use_Package => True);
       Server_Pkg.With_Package ("Rose.System_Calls",
                                Body_With => True, Use_Package => True);
 
-      for I in 1 .. Get_Num_Contexts (Item) loop
-         Server_Pkg.With_Package
-           (Get_Context (Item, I), Body_With => True);
-      end loop;
+      if False then
+         for I in 1 .. Get_Num_Contexts (Item) loop
+            Server_Pkg.With_Package
+              (Get_Context (Item, I), Body_With => True);
+         end loop;
+      end if;
 
       With_Packages (Item, Server_Pkg, True);
 
@@ -1468,7 +1468,22 @@ package body IDL.Generate_Kernel is
       declare
          Block       : Syn.Blocks.Block_Type;
 
+         procedure Create_Endpoint (Subpr : IDL_Subprogram);
          procedure Register_Endpoint (Subpr : IDL_Subprogram);
+         procedure Save_Handler (Subpr : IDL_Subprogram);
+
+         ---------------------
+         -- Create_Endpoint --
+         ---------------------
+
+         procedure Create_Endpoint (Subpr : IDL_Subprogram) is
+         begin
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Server.Create_Anonymous_Endpoint",
+                  Syn.Literal (1),
+                  Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint")));
+         end Create_Endpoint;
 
          -----------------------
          -- Register_Endpoint --
@@ -1485,8 +1500,22 @@ package body IDL.Generate_Kernel is
                     ("Handle_" & Get_Ada_Name (Subpr) & "'Access")));
          end Register_Endpoint;
 
+         ------------------
+         -- Save_Handler --
+         ------------------
+
+         procedure Save_Handler (Subpr : IDL_Subprogram) is
+         begin
+            Block.Append
+              (Syn.Statements.New_Assignment_Statement
+                 (Target => "Local_" & Get_Ada_Name (Subpr),
+                  Value  => Syn.Object (Get_Ada_Name (Subpr))));
+         end Save_Handler;
+
       begin
 
+         Scan_Subprograms (Item, True, Save_Handler'Access);
+         Scan_Subprograms (Item, True, Create_Endpoint'Access);
          Scan_Subprograms (Item, True, Register_Endpoint'Access);
 
          declare

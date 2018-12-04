@@ -4,17 +4,15 @@ with Rose.Objects;
 
 package Rose.Server is
 
-   type Endpoint_Handler is access
-     procedure (Endpoint   : Rose.Objects.Endpoint_Id;
-                Identifier : Rose.Objects.Capability_Identifier;
-                Invocation : in out Rose.Invocation.Invocation_Record);
+   type Invocation_Handler is access
+     procedure (Invocation : in out Rose.Invocation.Invocation_Record);
 
    type Server_Context is limited private;
 
    procedure Register_Handler
      (Context  : in out Server_Context;
       Endpoint : Rose.Objects.Endpoint_Id;
-      Handler  : Endpoint_Handler);
+      Handler  : Invocation_Handler);
 
    procedure Receive_Message
      (Context : in out Server_Context);
@@ -31,7 +29,7 @@ private
    type Endpoint_Record is
       record
          Endpoint : Rose.Objects.Endpoint_Id;
-         Handler  : Endpoint_Handler;
+         Handler  : Invocation_Handler;
       end record;
 
    type Endpoint_Array is
