@@ -29,8 +29,10 @@ package body Rose.Kernel.Invocation is
       use Rose.Capabilities.Layout;
       use Rose.Invocation;
       use Rose.Kernel.Processes;
+      use type Rose.Objects.Object_Id;
       Pid : constant Process_Id := Current_Process_Id;
-      Log         : constant Boolean := Log_Invocation;
+      Log         : constant Boolean := Log_Invocation
+        or else Current_Object_Id = Log_Object_Id;
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
       function To_Word_32 is

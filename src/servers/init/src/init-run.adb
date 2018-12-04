@@ -9,6 +9,10 @@ with Rose.Interfaces.Storage;
 with Rose.Interfaces.Partitions.Client;
 
 with Rose.Interfaces.Ata;
+with Rose.Interfaces.Installer;
+
+with Rose.Invocation;
+with Rose.System_Calls;
 
 with Init.Calls;
 
@@ -53,6 +57,9 @@ package body Init.Run is
       Create_Endpoint_Cap  : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 1, 0, 0));
+      Delete_Cap           : constant Rose.Capabilities.Capability :=
+                               Init.Calls.Call
+                                 (Create_Cap, (2, 30, 0, 0));
       Exit_Cap             : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 31, 0, 0));
@@ -82,7 +89,9 @@ package body Init.Run is
 
       Add_Storage_Cap      : Rose.Capabilities.Capability;
 
-      Install_FS           : Rose.Capabilities.Capability;
+      Install_Media_FS     : Rose.Capabilities.Capability;
+      Install_Receiver     : Rose.Capabilities.Capability;
+      Install_Endpoint     : Rose.Capabilities.Capability;
 
       Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
@@ -421,6 +430,22 @@ package body Init.Run is
       end;
 
       declare
+         Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
+      begin
+         Init.Calls.Call
+           (Create_Endpoint_Cap,
+            (Rose.Words.Word
+                 (Rose.Interfaces.Installer.Install_Endpoint mod 2 ** 32),
+             Rose.Words.Word
+               (Rose.Interfaces.Installer.Install_Endpoint / 2 ** 32)),
+            Install_Caps);
+         Install_Receiver := Install_Caps (1);
+         Install_Endpoint := Install_Caps (2);
+      end;
+
+
+
+      declare
          IsoFS_Id : constant Rose.Objects.Object_Id :=
                       Init.Calls.Launch_Boot_Module
                         (Boot_Cap, ISOFS_Module, File_System_Priority,
@@ -434,7 +459,7 @@ package body Init.Run is
                                 Word (IsoFS_Id mod 2 ** 32),
                                 Word (IsoFS_Id / 2 ** 32)));
       begin
-         Install_FS :=
+         Install_Media_FS :=
            Copy_Cap_From_Process
              (Copy_IsoFS_Cap,
               Rose.Interfaces.File_System.Root_Directory_Endpoint);
@@ -445,19 +470,32 @@ package body Init.Run is
                                     Init.Calls.Call
                                       (Create_Cap,
                                        (7, 2, 0, 0));
+
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
                           (Boot_Cap, Restore_Module, File_System_Priority,
-                           (Create_Endpoint_Cap,
+                           (Create_Endpoint_Cap, Delete_Cap,
                             Console_Write_Cap,
                             Active_Swap_Cap,
                             Inactive_Swap_Cap,
                             Log_Cap,
                             Add_Storage_Cap,
                             Write_System_Image_Cap,
-                            Install_FS));
-      begin
+                            Install_Media_FS,
+                            Install_Endpoint));
+
          pragma Unreferenced (Restore_Id);
+         Params : aliased Rose.Invocation.Invocation_Record;
+         Reply  : aliased Rose.Invocation.Invocation_Record;
+      begin
+         loop
+            Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
+            Rose.System_Calls.Receive_Caps (Params, 2);
+            Rose.System_Calls.Invoke_Capability (Params);
+            exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
+            Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+            Rose.System_Calls.Invoke_Capability (Reply);
+         end loop;
       end;
 
       Init.Calls.Send_String
