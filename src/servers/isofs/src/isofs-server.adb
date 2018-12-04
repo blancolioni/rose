@@ -7,6 +7,7 @@ with Rose.Words;
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File_System;
+with Rose.Interfaces.Stream_Reader;
 with Rose.Console_IO;
 
 with IsoFS.Directories;
@@ -211,6 +212,41 @@ package body IsoFS.Server is
                   end if;
                end;
 
+            when Rose.Interfaces.Directory.Read_File_Endpoint =>
+               declare
+                  use IsoFS.Directories;
+                  Directory : constant Directory_Type :=
+                                Get_Identified_Directory
+                                  (Params.Identifier);
+                  Index     : constant Natural := Natural (Params.Data (0));
+               begin
+
+                  if Directory = No_Directory then
+                     Rose.Console_IO.Put_Line
+                       ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
+                     Rose.Console_IO.Put
+                       ("invalid directory index: ");
+                     Rose.Console_IO.Put (Natural (Params.Identifier));
+                     Rose.Console_IO.Put ("/");
+                     Rose.Console_IO.Put (Index);
+                     Rose.Console_IO.New_Line;
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  else
+                     Rose.System_Calls.Send_Cap
+                       (Reply,
+                        IsoFS.Directories.Read_File (Directory, Index));
+                  end if;
+               end;
+
+            when Rose.Interfaces.Stream_Reader.Read_Endpoint =>
+
+               Rose.Console_IO.Put_Line ("stream-reader.read");
+               Rose.System_Calls.Send_Error
+                 (Reply, Rose.Invocation.Operation_Not_Implemented);
 
             when others =>
                Rose.Console_IO.Put

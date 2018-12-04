@@ -39,15 +39,17 @@ package body Rose.Kernel.Capabilities.Copy is
                           Rose.Capabilities.Null_Capability;
    begin
 
-      Rose.Boot.Console.Put ("copy-cap: endpoint = ");
-      Rose.Boot.Console.Put (Params.Data (1));
-      Rose.Boot.Console.Put (" ");
-      Rose.Boot.Console.Put (Params.Data (0));
-      Rose.Boot.Console.Put ("; pid = ");
-      Rose.Kernel.Processes.Debug.Put (From_Process_Id);
-      Rose.Boot.Console.Put ("; cap = ");
-      Rose.Boot.Console.Put (Rose.Words.Word_8 (Endpoint_Cap));
-      Rose.Boot.Console.New_Line;
+      if Log_Cap_Copy then
+         Rose.Boot.Console.Put ("copy-cap: endpoint = ");
+         Rose.Boot.Console.Put (Params.Data (1));
+         Rose.Boot.Console.Put (" ");
+         Rose.Boot.Console.Put (Params.Data (0));
+         Rose.Boot.Console.Put ("; pid = ");
+         Rose.Kernel.Processes.Debug.Put (From_Process_Id);
+         Rose.Boot.Console.Put ("; cap = ");
+         Rose.Boot.Console.Put (Rose.Words.Word_8 (Endpoint_Cap));
+         Rose.Boot.Console.New_Line;
+      end if;
 
       if Endpoint_Cap = Null_Capability then
          Rose.Boot.Console.Put ("pid ");

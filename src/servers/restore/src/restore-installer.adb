@@ -49,7 +49,9 @@ package body Restore.Installer is
          Filter    => (Rose.Directories.Directory => True, others => False),
          Process   => Install_From_Directory'Access);
 
-      Write_Initial_System_Image (To);
+      if False then
+         Write_Initial_System_Image (To);
+      end if;
 
    end Install;
 

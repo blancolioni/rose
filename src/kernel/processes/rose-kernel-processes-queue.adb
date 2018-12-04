@@ -134,7 +134,9 @@ package body Rose.Kernel.Processes.Queue is
    ----------------------------
 
    procedure Resume_Current_Process is
-      Log         : constant Boolean := Log_Reply;
+      use type Rose.Objects.Object_Id;
+      Log         : constant Boolean := Log_Reply
+        or else Current_Object_Id = Log_Object_Id;
       Log_Details : constant Boolean := False;
    begin
       Invocation_Reply := (if Current_Process.Flags (Invoke_Reply)
