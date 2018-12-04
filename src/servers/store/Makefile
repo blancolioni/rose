@@ -14,6 +14,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-storage.o \
+	$(BUILDDIR)/rose-interfaces-storage-server.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
