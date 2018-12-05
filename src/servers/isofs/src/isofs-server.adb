@@ -244,9 +244,15 @@ package body IsoFS.Server is
 
             when Rose.Interfaces.Stream_Reader.Read_Endpoint =>
 
-               Rose.Console_IO.Put_Line ("stream-reader.read");
-               Rose.System_Calls.Send_Error
-                 (Reply, Rose.Invocation.Operation_Not_Implemented);
+               declare
+                  use System.Storage_Elements;
+                  Buffer : Storage_Array (1 .. Params.Buffer_Length);
+                  Last   : Storage_Count;
+               begin
+                  IsoFS.Directories.Read
+                    (Positive (Params.Identifier), Buffer, Last);
+                  Rose.System_Calls.Send_Word (Reply, Natural (Last));
+               end;
 
             when others =>
                Rose.Console_IO.Put
