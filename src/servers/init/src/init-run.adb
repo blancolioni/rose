@@ -8,7 +8,6 @@ with Rose.Interfaces.Storage;
 
 with Rose.Interfaces.Partitions.Client;
 
-with Rose.Interfaces.Ata;
 with Rose.Interfaces.Installer;
 
 with Rose.Invocation;
@@ -81,10 +80,6 @@ package body Init.Run is
       PCI_Cap              : Rose.Capabilities.Capability;
 
       Hd0_Cap              : Rose.Capabilities.Capability;
-      Hd0_Parameters_Cap   : Rose.Capabilities.Capability;
-      Hd0_Read_Cap         : Rose.Capabilities.Capability;
-      Hd0_Write_Cap        : Rose.Capabilities.Capability;
-
       Hd1_Cap              : Rose.Capabilities.Capability;
 
       Add_Storage_Cap      : Rose.Capabilities.Capability;
@@ -347,11 +342,6 @@ package body Init.Run is
                                      (9, 1,
                                       Word (Ata_Id mod 2 ** 32),
                                       Word (Ata_Id / 2 ** 32)));
-         Get_Interface_Cap     : constant Rose.Capabilities.Capability :=
-                                   Copy_Cap_From_Process
-                                     (Copy_Ata_Cap,
-                                      Rose.Interfaces.Ata.Get_Device_Endpoint);
-         Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin
 
          Hd0_Cap :=
@@ -366,12 +356,6 @@ package body Init.Run is
               Rose.Interfaces.Get_Interface_Endpoint,
               1);
 
-         Init.Calls.Get_Interface (Get_Interface_Cap, 0, Hd0);
-
-         Hd0_Parameters_Cap := Hd0 (1);
-         Hd0_Read_Cap := Hd0 (2);
-         Hd0_Write_Cap := Hd0 (3);
-
       end;
 
       declare
@@ -379,10 +363,8 @@ package body Init.Run is
                       Init.Calls.Launch_Boot_Module
                         (Boot_Cap, Store_Module, Device_Driver_Priority,
                          (Create_Endpoint_Cap,
-                          Console_Write_Cap,
-                          Hd0_Parameters_Cap,
-                          Hd0_Read_Cap,
-                          Hd0_Write_Cap));
+                          Delete_Cap,
+                          Console_Write_Cap));
          Copy_Store_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -474,7 +456,8 @@ package body Init.Run is
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
                           (Boot_Cap, Restore_Module, File_System_Priority,
-                           (Create_Endpoint_Cap, Delete_Cap,
+                           (Create_Endpoint_Cap,
+                            Delete_Cap,
                             Console_Write_Cap,
                             Active_Swap_Cap,
                             Inactive_Swap_Cap,
