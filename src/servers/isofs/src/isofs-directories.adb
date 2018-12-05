@@ -597,6 +597,9 @@ package body IsoFS.Directories is
          Rose.Console_IO.Put (File);
          Rose.Console_IO.New_Line;
          F.Open := False;
+         if File = Open_File_Count then
+            Open_File_Count := Open_File_Count - 1;
+         end if;
       end if;
 
    end Read;
