@@ -591,6 +591,7 @@ package body IsoFS.Directories is
       Rose.Console_IO.New_Line;
       Buffer (Buffer'First .. Buffer'First + Count - 1) :=
         (others => 0);
+      F.Current := F.Current + Word (Count);
 
       if Count < Buffer'Length then
          Rose.Console_IO.Put ("isofs: closing ");
