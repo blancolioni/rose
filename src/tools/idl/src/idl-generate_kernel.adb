@@ -1631,6 +1631,8 @@ package body IDL.Generate_Kernel is
       Recv_Buffer     : Boolean := False;
       Recv_Words      : Natural := 0;
       Recv_Caps       : Natural := 0;
+      Buffer_Arg      : Natural := 0;
+
 --        function Trim (S : String) return String
 --        is (Ada.Strings.Fixed.Trim (S, Ada.Strings.Both));
 --
@@ -1664,6 +1666,7 @@ package body IDL.Generate_Kernel is
               and then not Is_Scalar (Arg_Type)
             then
                Recv_Buffer := True;
+               Buffer_Arg := I;
             end if;
 
             if Mode = In_Argument
@@ -1750,6 +1753,7 @@ package body IDL.Generate_Kernel is
                Recv_Words := Recv_Words + 1;
             else
                Recv_Buffer := True;
+               Buffer_Arg := 0;
             end if;
          end;
       end if;
@@ -1774,7 +1778,11 @@ package body IDL.Generate_Kernel is
          Block.Append
            (Syn.Statements.New_Procedure_Call_Statement
               ("Rose.System_Calls.Receive_Buffer",
-               Syn.Object ("Params")));
+               Syn.Object ("Params"),
+               Syn.Object
+                 ((if Buffer_Arg = 0 then "Result"
+                  else Get_Ada_Name (Args (Buffer_Arg)))
+                    & "'Length")));
       end if;
 
    end Initialise_Invocation;
