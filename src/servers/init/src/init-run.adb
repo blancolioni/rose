@@ -14,6 +14,7 @@ with Rose.Invocation;
 with Rose.System_Calls;
 
 with Init.Calls;
+with Init.Installer;
 
 package body Init.Run is
 
@@ -476,6 +477,13 @@ package body Init.Run is
             Rose.System_Calls.Receive_Caps (Params, 2);
             Rose.System_Calls.Invoke_Capability (Params);
             exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
+
+            Init.Installer.Launch_With_Caps
+              (Create_Cap    => Create_Cap,
+               Launch_Cap    => 0,
+               Cap_Stream    => Params.Caps (0),
+               Binary_Stream => Params.Caps (1));
+
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
             Rose.System_Calls.Invoke_Capability (Reply);
          end loop;
