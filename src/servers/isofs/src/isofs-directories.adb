@@ -569,13 +569,36 @@ package body IsoFS.Directories is
       Buffer : out System.Storage_Elements.Storage_Array;
       Count  : out System.Storage_Elements.Storage_Count)
    is
+      use System.Storage_Elements;
+      F : Open_File_Record renames Open_Files (File);
    begin
-      if Open_Files (File).Open then
-         Buffer (Buffer'First) := 0;
+      if not F.Open then
          Count := 0;
-      else
-         Count := 0;
+         return;
       end if;
+
+      Rose.Console_IO.Put ("isofs: read ");
+      Rose.Console_IO.Put (F.Start_Address);
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (F.Length);
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (F.Current);
+
+      Count := Storage_Count'Min (Buffer'Length,
+                                  Storage_Count (F.Length - F.Current));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Natural (Count));
+      Rose.Console_IO.New_Line;
+      Buffer (Buffer'First .. Buffer'First + Count - 1) :=
+        (others => 0);
+
+      if Count < Buffer'Length then
+         Rose.Console_IO.Put ("isofs: closing ");
+         Rose.Console_IO.Put (File);
+         Rose.Console_IO.New_Line;
+         F.Open := False;
+      end if;
+
    end Read;
 
    ---------------
@@ -621,6 +644,10 @@ package body IsoFS.Directories is
       end if;
 
       Scan_Directory_Entries (Directory, Process'Access);
+
+      Rose.Console_IO.Put ("isofs: open file: ");
+      Rose.Console_IO.Put (Open_File_Count);
+      Rose.Console_IO.New_Line;
 
       return Rose.System_Calls.Server.Create_Endpoint
         (Create_Cap  => Create_Endpoint_Cap,
