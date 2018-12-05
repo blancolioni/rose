@@ -8,4 +8,12 @@ interface Storage is
    procedure Add_Backing_Store
      (Store  : interface Block_Device);
      
+   procedure Get
+     (Object : Object_Id;
+      Data   : out Storage_Array);
+      
+   procedure Put
+     (Object : Object_Id;
+      Data   : Storage_Array);
+      
 end Storage;
