@@ -355,9 +355,7 @@ package body IDL.Generate_Kernel is
       --  Repl_Caps  : Natural := 0;
 
       procedure Declare_Local
-        (Argument       : IDL_Argument;
-         Index_Argument : IDL_Argument;
-         Base_Name      : String;
+        (Base_Name      : String;
          Base_Type      : IDL_Type;
          Initialize     : Boolean;
          Is_Constant    : Boolean);
@@ -372,9 +370,7 @@ package body IDL.Generate_Kernel is
       -------------------
 
       procedure Declare_Local
-        (Argument       : IDL_Argument;
-         Index_Argument : IDL_Argument;
-         Base_Name      : String;
+        (Base_Name      : String;
          Base_Type      : IDL_Type;
          Initialize     : Boolean;
          Is_Constant    : Boolean)
@@ -468,44 +464,16 @@ package body IDL.Generate_Kernel is
             end if;
 
          else
-            Block.Add_Declaration
-              (Syn.Declarations.New_Constant_Declaration
-                 (Base_Name & "_Cap",
-                  "Rose.Capabilities.Capability",
-                  Syn.Expressions.New_Function_Call_Expression
-                    ("Parameters.Caps",
-                     Syn.Literal (Recv_Caps))));
-            Recv_Caps := Recv_Caps + 1;
-
             if Is_String (Base_Type) then
-               if Get_Mode (Argument) /= Out_Argument then
-                  Recv_Words := Recv_Words + 1;
-                  Block.Add_Declaration
-                    (Syn.Declarations.New_Constant_Declaration
-                       (Get_Ada_Name (Argument) & "_Size",
-                        "System.Storage_Elements.Storage_Count",
-                        Syn.Expressions.New_Function_Call_Expression
-                          ("Get_Data_Word",
-                           Syn.Object ("Parameters"),
-                           Syn.Literal (Recv_Words))));
-               end if;
-            elsif Has_Last_Index_Argument (Argument) then
-               Recv_Words := Recv_Words + 1;
-               Block.Add_Declaration
-                 (Syn.Declarations.New_Object_Declaration
-                    (Get_Ada_Name (Index_Argument),
-                     Get_Ada_Name (Get_Type (Index_Argument)),
-                     Syn.Expressions.New_Function_Call_Expression
-                       ("Get_Data_Word",
-                        Syn.Object ("Parameters"),
-                        Syn.Literal (Recv_Words))));
                Block.Add_Declaration
                  (Syn.Declarations.New_Object_Declaration
                     (Base_Name,
                      Syn.Constrained_Subtype
-                       (Get_Ada_Name (Get_Type (Argument)),
+                       ("String",
                         Syn.Literal (1),
-                        Syn.Object (Get_Ada_Name (Index_Argument)))));
+                        Syn.Expressions.New_Function_Call_Expression
+                          ("Natural",
+                           Syn.Object ("Parameters.Buffer_Length")))));
             else
                Block.Add_Declaration
                  (Syn.Declarations.New_Object_Declaration
@@ -513,21 +481,16 @@ package body IDL.Generate_Kernel is
                      Syn.Constrained_Subtype
                        ("System.Storage_Elements.Storage_Array",
                         Syn.Literal (1),
-                        Syn.Object
-                          (IDL.Syntax.Get_Length_Constraint
-                               (Argument, "Server")))));
+                        Syn.Object ("Parameters.Buffer_Length"))));
             end if;
 
-            if Get_Mode (Argument) /= Out_Argument
-              and then not Is_String (Get_Type (Argument))
-            then
+            Block.Add_Declaration
+              (Syn.Declarations.New_Pragma
+                 ("Import", "Ada, " & Base_Name));
+            Block.Add_Declaration
+              (Syn.Declarations.Address_Representation_Clause
+                 (Base_Name, Syn.Object ("Parameters.Buffer_Address")));
 
-               Block.Add_Statement
-                 (Syn.Statements.New_Procedure_Call_Statement
-                    ("Copy_From_Memory_Cap",
-                     Syn.Object (Base_Name & "_Cap"),
-                     Syn.Object (Base_Name)));
-            end if;
          end if;
       end Declare_Local;
 
@@ -593,11 +556,7 @@ package body IDL.Generate_Kernel is
 --         elsif Has_Last_Index_Argument (Arg) then
 
          elsif not Is_Scalar (Base_Type) then
-            Block.Append
-              (Syn.Statements.New_Procedure_Call_Statement
-                 ("Copy_To_Memory_Cap",
-                  Syn.Object (Base_Name & "_Cap"),
-                  Syn.Object (Base_Name)));
+            null;
          else
             if Get_Size (Base_Type) > Default_Size then
                Block.Append
@@ -639,12 +598,12 @@ package body IDL.Generate_Kernel is
             Skip := Get_Last_Index_Argument (Arg);
             Skipping := True;
             Declare_Local
-              (Arg, Skip, Get_Ada_Name (Arg), Get_Type (Arg),
+              (Get_Ada_Name (Arg), Get_Type (Arg),
                Get_Mode (Arg) in In_Argument | Inout_Argument,
                Get_Mode (Arg) = In_Argument);
          else
             Declare_Local
-              (Arg, Arg, Get_Ada_Name (Arg), Get_Type (Arg),
+              (Get_Ada_Name (Arg), Get_Type (Arg),
                Get_Mode (Arg) in In_Argument | Inout_Argument,
                Get_Mode (Arg) = In_Argument);
          end if;
@@ -669,9 +628,7 @@ package body IDL.Generate_Kernel is
                        ("Local_" & Get_Ada_Name (Subpr));
          begin
             if not Is_Scalar (Ret) then
-               Declare_Local (Get_Return_Argument (Subpr),
-                              Get_Return_Argument (Subpr),
-                              "Result", Ret, True, True);
+               Declare_Local ("Result", Ret, True, True);
             end if;
 
             Expr.Add_Actual_Argument
