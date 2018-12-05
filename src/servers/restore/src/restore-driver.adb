@@ -28,6 +28,16 @@ begin
    if Rose.Devices.Checkpoints.Has_Checkpoint (Device) then
       Rose.Console_IO.Put_Line ("restore: restoring from checkpoint");
    else
+      Rose.Console_IO.Put_Line ("restore: activating storage");
+
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
+         Rose.System_Calls.Send_Cap (Params, Active_Swap_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+
       Rose.Console_IO.Put_Line ("restore: creating system image");
 
       declare
