@@ -6,6 +6,9 @@ with Rose.Console_IO;
 
 with Rose.Interfaces.Stream_Reader;
 
+with Rose.Containers.Bounded_Hashed_Maps;
+with Rose.Containers.Queues;
+
 package body IsoFS.Directories is
 
    use Rose.Interfaces.Block_Device;
@@ -19,6 +22,40 @@ package body IsoFS.Directories is
    subtype ISO_Sector is
      System.Storage_Elements.Storage_Array
        (1 .. ISO_Sector_Size);
+
+   function To_Hash_Type
+     (Sector : Rose.Words.Word_32)
+      return Rose.Containers.Hash_Type
+   is (Rose.Containers.Hash_Type (Sector));
+
+   type Cache_Element is
+      record
+         Tick   : Rose.Words.Word_32;
+         Sector : ISO_Sector;
+      end record;
+
+   package Sector_Cache_Maps is
+     new Rose.Containers.Bounded_Hashed_Maps
+       (Capacity     => 100,
+        Modulus      => 317,
+        Key_Type     => Rose.Words.Word_32,
+        Element_Type => Cache_Element,
+        Hash         => To_Hash_Type);
+
+   package Sector_Cache_Queues is
+     new Rose.Containers.Queues
+       (Rose.Words.Word_32,
+        Sector_Cache_Maps.Cursor,
+        Rose.Words."<",
+        Sector_Cache_Maps."=");
+
+   Sector_Cache : Sector_Cache_Maps.Map;
+   Sector_Queue : Sector_Cache_Queues.Queue (100);
+   Next_Tick    : Word_32 := 0;
+
+   procedure Read_Sector
+     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+      Sector  : out ISO_Sector);
 
    type Directory_Date_Time is array (1 .. 7) of Word_8;
 
@@ -685,7 +722,7 @@ package body IsoFS.Directories is
         and then not Found
       loop
 
-         Read_Blocks (Device, Volume_Index, 1, Buffer);
+         Read_Sector (Volume_Index, Buffer);
 
          if Buffer (Descriptor_Type_Offset + 1)
            = Primary_Volume_Descriptor
@@ -712,6 +749,66 @@ package body IsoFS.Directories is
       end;
 
    end Read_Root_Directory;
+
+   -----------------
+   -- Read_Sector --
+   -----------------
+
+   procedure Read_Sector
+     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+      Sector  : out ISO_Sector)
+   is
+      use Sector_Cache_Maps, Sector_Cache_Queues;
+      Key : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Address);
+      Position : Sector_Cache_Maps.Cursor :=
+                   Sector_Cache_Maps.Find
+                     (Sector_Cache, Key);
+      Item     : Cache_Element;
+
+   begin
+
+      Next_Tick := Next_Tick + 1;
+
+      if not Has_Element (Position) then
+         if Is_Full (Sector_Cache) then
+            declare
+               Oldest : Sector_Cache_Maps.Cursor :=
+                          First_Element (Sector_Queue);
+            begin
+               Delete (Sector_Cache, Oldest);
+               Delete_First (Sector_Queue);
+            end;
+         end if;
+
+         Rose.Interfaces.Block_Device.Client.Read_Blocks
+           (Block_Device, Address, 1, Sector);
+
+         Item := (Next_Tick, Sector);
+
+         declare
+            Inserted : Boolean;
+            pragma Unreferenced (Inserted);
+         begin
+            Insert
+              (Container => Sector_Cache,
+               Key       => Key,
+               New_Item  => Item,
+               Position  => Position,
+               Inserted  => Inserted);
+         end;
+      else
+
+         Item := Element (Position);
+         Delete (Sector_Queue, Item.Tick);
+         Item.Tick := Next_Tick;
+
+         Replace_Element (Sector_Cache, Position, Item);
+
+      end if;
+
+      Insert (Sector_Queue, Next_Tick, Position);
+
+   end Read_Sector;
 
    ----------------------------
    -- Scan_Directory_Entries --
