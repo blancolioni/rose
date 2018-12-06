@@ -1,13 +1,6 @@
 interface Launch is
 
    procedure Launch
-     (Image : interface Stream_Reader;
-      Cap_1 : Capability;
-      Cap_2 : Capability;
-      Cap_3 : Capability;
-      Cap_4 : Capability;
-      Cap_5 : Capability;
-      Cap_6 : Capability;
-      Cap_7 : Capability);
+     (Caps : Capability_Array);
       
 end Launch;

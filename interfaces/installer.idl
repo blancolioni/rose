@@ -1,7 +1,8 @@
 interface Installer is
 
-   procedure Install
+   function Install
      (Caps_File   : interface Stream_Reader;
-      Binary_File : interface Stream_Reader);
+      Binary_File : interface Stream_Reader)
+      return interface Launch;
    
 end Installer;

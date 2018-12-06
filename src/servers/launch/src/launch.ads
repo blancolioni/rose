@@ -9,5 +9,6 @@ package Launch is
    Console_Cap         : constant Rose.Capabilities.Capability := 3;
 
    Create_Process_Cap  : constant Rose.Capabilities.Capability := 4;
+   Storage_Cap         : constant Rose.Capabilities.Capability := 5;
 
 end Launch;

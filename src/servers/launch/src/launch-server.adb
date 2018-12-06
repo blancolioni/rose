@@ -1,24 +1,24 @@
+with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Console_IO;
 
 with Rose.Server;
+with Rose.System_Calls;
+
 with Rose.Interfaces.Launch.Server;
+with Rose.Interfaces.Storage.Client;
 
 package body Launch.Server is
 
    procedure On_Launch
-     (Id    : in     Rose.Objects.Capability_Identifier;
-      Image : in     Rose.Capabilities.Capability;
-      Cap_1 : in     Rose.Capabilities.Capability;
-      Cap_2 : in     Rose.Capabilities.Capability;
-      Cap_3 : in     Rose.Capabilities.Capability;
-      Cap_4 : in     Rose.Capabilities.Capability;
-      Cap_5 : in     Rose.Capabilities.Capability;
-      Cap_6 : in     Rose.Capabilities.Capability;
-      Cap_7 : in     Rose.Capabilities.Capability);
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Caps : Rose.Capabilities.Capability_Array);
 
    Context : Rose.Server.Server_Context;
+   Storage : Rose.Interfaces.Storage.Client.Storage_Client;
+   Base_Object_Id : Rose.Objects.Object_Id;
+   Bound_Object_Id : Rose.Objects.Object_Id;
 
    -------------------
    -- Create_Server --
@@ -29,6 +29,7 @@ package body Launch.Server is
       Rose.Console_IO.Put_Line ("launch: creating server");
       Rose.Interfaces.Launch.Server.Create_Server
         (Context, On_Launch'Access);
+      Rose.Interfaces.Storage.Client.Open (Storage, Storage_Cap);
    end Create_Server;
 
    ---------------
@@ -36,20 +37,14 @@ package body Launch.Server is
    ---------------
 
    procedure On_Launch
-     (Id    : in     Rose.Objects.Capability_Identifier;
-      Image : in     Rose.Capabilities.Capability;
-      Cap_1 : in     Rose.Capabilities.Capability;
-      Cap_2 : in     Rose.Capabilities.Capability;
-      Cap_3 : in     Rose.Capabilities.Capability;
-      Cap_4 : in     Rose.Capabilities.Capability;
-      Cap_5 : in     Rose.Capabilities.Capability;
-      Cap_6 : in     Rose.Capabilities.Capability;
-      Cap_7 : in     Rose.Capabilities.Capability)
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Caps : Rose.Capabilities.Capability_Array)
    is
-      pragma Unreferenced (Id, Image, Cap_1, Cap_2, Cap_3,
-                           Cap_4, Cap_5, Cap_6, Cap_7);
+      use Rose.System_Calls;
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Console_IO.Put_Line ("launching");
+      Initialize_Send (Params, Create_Process_Cap);
+      Invoke_Capability (Params);
    end On_Launch;
 
    ------------------
