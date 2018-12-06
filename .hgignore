@@ -53,3 +53,6 @@ images/iso/drivers/*
 *.caps
 src/tools/configure-driver/configure.gpr
 images/iso/rose/install/drivers/keyboard
+images/iso/boot/launch
+images/iso/rose-install/drivers/*
+images/iso/rose/install/drivers/*.cap
