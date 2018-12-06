@@ -15,6 +15,7 @@ package IDL.Types is
    function Get_Size (Item : IDL_Type) return Natural;
 
    function Is_Capability (Item : IDL_Type) return Boolean;
+   function Is_Capability_Array (Item : IDL_Type) return Boolean;
    function Is_Address (Item : IDL_Type) return Boolean;
    function Is_Scalar (Item : IDL_Type) return Boolean;
    function Is_Interface (Item : IDL_Type) return Boolean;
@@ -111,5 +112,8 @@ private
 
    function Is_Word_Type (Item : IDL_Type) return Boolean
    is (Is_Word_32 (Item) or else Is_Word_64 (Item));
+
+   function Is_Capability_Array (Item : IDL_Type) return Boolean
+   is (Get_Ada_Name (Item) = "Rose.Capabilities.Capability_Array");
 
 end IDL.Types;
