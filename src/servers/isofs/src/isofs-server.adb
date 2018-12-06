@@ -247,6 +247,8 @@ package body IsoFS.Server is
                declare
                   use System.Storage_Elements;
                   Buffer : Storage_Array (1 .. Params.Buffer_Length);
+                  pragma Import (Ada, Buffer);
+                  for Buffer'Address use Params.Buffer_Address;
                   Last   : Storage_Count;
                begin
                   IsoFS.Directories.Read
