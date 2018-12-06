@@ -15,11 +15,12 @@ title Rose boot
     module /restore
     module /scan
     module /partition
+    module /launch
     boot
 
 title Rose process log
     root (fd0)
-    kernel /kernel log-process=7
+    kernel /kernel log-object-id=7
     module /init
     module /console
     module /mem
@@ -30,6 +31,7 @@ title Rose process log
     module /restore
     module /scan
     module /partition
+    module /launch
     boot
 
 title Rose invocation debug
@@ -45,6 +47,7 @@ title Rose invocation debug
     module /restore
     module /scan
     module /partition
+    module /launch
     boot
 
 title Rose port debug
@@ -60,5 +63,6 @@ title Rose port debug
     module /restore
     module /scan
     module /partition
+    module /launch
     boot
 

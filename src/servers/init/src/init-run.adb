@@ -4,6 +4,7 @@ with Rose.Words;
 with Rose.Devices.Partitions;
 
 with Rose.Interfaces.File_System;
+with Rose.Interfaces.Launch;
 with Rose.Interfaces.Storage;
 
 with Rose.Interfaces.Partitions.Client;
@@ -33,6 +34,7 @@ package body Init.Run is
    Restore_Module   : constant := 8;
    Scan_Module      : constant := 9;
    Partition_Module : constant := 10;
+   Launch_Module    : constant := 11;
 
    --------------
    -- Run_Init --
@@ -92,6 +94,8 @@ package body Init.Run is
       Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
+
+      Launch_Cap        : Rose.Capabilities.Capability;
 
       function Copy_Cap_From_Process
         (Copy_Cap   : Rose.Capabilities.Capability;
@@ -413,6 +417,30 @@ package body Init.Run is
       end;
 
       declare
+         Create_Process_Cap : constant Rose.Capabilities.Capability :=
+                                Init.Calls.Call
+                                  (Create_Cap, (7, 4, 0, 0));
+         Launch_Id      : constant Rose.Objects.Object_Id :=
+                            Init.Calls.Launch_Boot_Module
+                              (Boot_Cap, Launch_Module, Low_Priority,
+                               (Create_Endpoint_Cap,
+                                Delete_Cap,
+                                Console_Write_Cap,
+                                Create_Process_Cap));
+         Copy_Launch_Cap : constant Rose.Capabilities.Capability :=
+                            Init.Calls.Call
+                              (Create_Cap,
+                               (9, 1,
+                                Word (Launch_Id mod 2 ** 32),
+                                Word (Launch_Id / 2 ** 32)));
+      begin
+         Launch_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Launch_Cap,
+              Rose.Interfaces.Launch.Launch_Endpoint);
+      end;
+
+      declare
          Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
       begin
          Init.Calls.Call
@@ -480,7 +508,7 @@ package body Init.Run is
 
             Init.Installer.Launch_With_Caps
               (Create_Cap    => Create_Cap,
-               Launch_Cap    => 0,
+               Launch_Cap    => Launch_Cap,
                Cap_Stream    => Params.Caps (0),
                Binary_Stream => Params.Caps (1));
 

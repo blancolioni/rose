@@ -1,0 +1,38 @@
+project Launch is
+
+   for Source_Dirs use
+      ("src",
+       "../../base",
+       "../../library/capabilities",
+       "../../library/kernelapi/console",
+       "../../library/kernelapi/generated",
+       "../../library/kernelapi/system-calls",
+       "../../library/kernelapi/arch/i686",
+       "../../library/rose");
+   for Object_Dir use "./build/obj";
+   for Exec_Dir use "./build/bin";
+   for Main use ("launch-driver.adb");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "launch-pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-O3");
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("ada") use ("-E");
+   end Binder;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-m32", "../../../build/i686/kernel/obj/util.o", "-nostdlib");
+   end Linker;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end Launch;
+
