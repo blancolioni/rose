@@ -34,7 +34,7 @@ package body IsoFS.Directories is
          Sector : ISO_Sector;
       end record;
 
-   package Sector_Cache_Maps is
+   package Sector_Cache is
      new Rose.Containers.Bounded_Hashed_Maps
        (Capacity     => 100,
         Modulus      => 317,
@@ -45,11 +45,10 @@ package body IsoFS.Directories is
    package Sector_Cache_Queues is
      new Rose.Containers.Queues
        (Rose.Words.Word_32,
-        Sector_Cache_Maps.Cursor,
+        Sector_Cache.Cursor,
         Rose.Words."<",
-        Sector_Cache_Maps."=");
+        Sector_Cache."=");
 
-   Sector_Cache : Sector_Cache_Maps.Map;
    Sector_Queue : Sector_Cache_Queues.Queue (100);
    Next_Tick    : Word_32 := 0;
 
@@ -758,24 +757,23 @@ package body IsoFS.Directories is
      (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
       Sector  : out ISO_Sector)
    is
-      use Sector_Cache_Maps, Sector_Cache_Queues;
+      use Sector_Cache_Queues;
       Key : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Address);
-      Position : Sector_Cache_Maps.Cursor :=
-                   Sector_Cache_Maps.Find
-                     (Sector_Cache, Key);
+      Position : Sector_Cache.Cursor :=
+                   Sector_Cache.Find (Key);
       Item     : Cache_Element;
 
    begin
 
       Next_Tick := Next_Tick + 1;
 
-      if not Has_Element (Position) then
-         if Is_Full (Sector_Cache) then
+      if not Sector_Cache.Has_Element (Position) then
+         if Sector_Cache.Is_Full then
             declare
-               Oldest : Sector_Cache_Maps.Cursor :=
+               Oldest : Sector_Cache.Cursor :=
                           First_Element (Sector_Queue);
             begin
-               Delete (Sector_Cache, Oldest);
+               Sector_Cache.Delete (Oldest);
                Delete_First (Sector_Queue);
             end;
          end if;
@@ -789,20 +787,19 @@ package body IsoFS.Directories is
             Inserted : Boolean;
             pragma Unreferenced (Inserted);
          begin
-            Insert
-              (Container => Sector_Cache,
-               Key       => Key,
+            Sector_Cache.Insert
+              (Key       => Key,
                New_Item  => Item,
                Position  => Position,
                Inserted  => Inserted);
          end;
       else
 
-         Item := Element (Position);
+         Item := Sector_Cache.Element (Position);
          Delete (Sector_Queue, Item.Tick);
          Item.Tick := Next_Tick;
-
-         Replace_Element (Sector_Cache, Position, Item);
+         Sector_Cache.Replace_Element (Position, Item);
+         Sector := Item.Sector;
 
       end if;
 
@@ -832,8 +829,7 @@ package body IsoFS.Directories is
    begin
       while Position < Storage_Count (Length) loop
          if not Have_Sector then
-            Rose.Interfaces.Block_Device.Client.Read_Blocks
-              (Block_Device, Block_Address_Type (Location), 1, Sector);
+            Read_Sector (Block_Address_Type (Location), Sector);
             Have_Sector := True;
             Sector_Start := Position - 1;
          end if;
