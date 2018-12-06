@@ -463,6 +463,41 @@ package body IDL.Generate_Kernel is
                Recv_Words := Recv_Words + 1;
             end if;
 
+         elsif Is_Capability_Array (Base_Type) then
+            Block.Add_Declaration
+              (Syn.Declarations.New_Object_Declaration
+                 ("Caps",
+                  Syn.Constrained_Subtype
+                    ("Rose.Capabilities.Capability_Array",
+                     Syn.Literal (1), Syn.Literal (16))));
+            Block.Add_Declaration
+              (Syn.Declarations.New_Object_Declaration
+                 ("Cap_Count", Syn.Named_Subtype ("Natural")));
+            Block.Add_Statement
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Copy_Received_Caps",
+                  Syn.Object ("Parameters"),
+                  Syn.Object ("Caps"),
+                  Syn.Object ("Cap_Count")));
+            declare
+               use Syn, Syn.Expressions;
+               Assign      : constant Syn.Statement'Class :=
+                               Syn.Statements.New_Assignment_Statement
+                                 ("Caps (I)",
+                                  New_Function_Call_Expression
+                                    ("Parameters.Caps",
+                                     New_Function_Call_Expression
+                                       ("Rose.Invocation.Capability_Index",
+                                        Syn.Expressions.Operator
+                                          ("-", Object ("I"), Literal (1)))));
+               Seq         : Syn.Statements.Sequence_Of_Statements;
+            begin
+               Seq.Append (Assign);
+               Block.Append
+                 (Syn.Statements.For_Loop
+                    ("I", Literal (1), Object ("Cap_Count"), False, Seq));
+            end;
+
          else
             if Is_String (Base_Type) then
                Block.Add_Declaration
@@ -585,12 +620,6 @@ package body IDL.Generate_Kernel is
 
    begin
 
-      Block.Append
-        (Syn.Statements.New_Procedure_Call_Statement
-           ("Rose.System_Calls.Initialize_Reply",
-            Syn.Object ("Parameters"),
-            Syn.Object ("Parameters.Reply_Cap")));
-
       for Arg of Args loop
          if Skipping and then Arg = Skip then
             null;
@@ -619,6 +648,12 @@ package body IDL.Generate_Kernel is
                      Syn.Object (Get_Ada_Name (Arg) & "_Size"))));
          end if;
       end loop;
+
+      Block.Append
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Initialize_Reply",
+            Syn.Object ("Parameters"),
+            Syn.Object ("Parameters.Reply_Cap")));
 
       if Is_Function (Subpr) then
          declare
@@ -1648,6 +1683,7 @@ package body IDL.Generate_Kernel is
          declare
             Mode     : constant IDL_Argument_Mode := Get_Mode (Args (I));
             Arg_Type : constant IDL_Type := Get_Type (Args (I));
+            Arg_Name : constant String := Get_Ada_Name (Args (I));
          begin
 
             Block.Append
@@ -1697,12 +1733,29 @@ package body IDL.Generate_Kernel is
                              ("Rose.System_Calls.Send_Text",
                               Syn.Object ("Params"),
                               Syn.Object (Get_Ada_Name (Args (I)))));
+                     elsif Is_Capability_Array (Arg_Type) then
+                        declare
+                           use Syn, Syn.Statements;
+                           Assign : constant Statement'Class :=
+                                      New_Procedure_Call_Statement
+                                        ("Rose.System_Calls.Send_Cap",
+                                         Object ("Params"),
+                                         Object ("Cap"));
+                           Seq    : Sequence_Of_Statements;
+                        begin
+                           Seq.Append (Assign);
+                           Block.Append
+                             (Syn.Statements.Iterate
+                                (Loop_Variable  => "Cap",
+                                 Container_Name => Arg_Name,
+                                 Iterate_Body   => Seq));
+                        end;
                      else
                         Block.Append
                           (Syn.Statements.New_Procedure_Call_Statement
                              ("Rose.System_Calls.Send_Storage_Array",
                               Syn.Object ("Params"),
-                              Syn.Object (Get_Ada_Name (Args (I))),
+                              Syn.Object (Arg_Name),
                               Syn.Literal (Mode = Inout_Argument)));
                      end if;
                   end if;
