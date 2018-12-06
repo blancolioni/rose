@@ -606,33 +606,40 @@ package body IsoFS.Directories is
       Count  : out System.Storage_Elements.Storage_Count)
    is
       use System.Storage_Elements;
-      F : Open_File_Record renames Open_Files (File);
+      F              : Open_File_Record renames Open_Files (File);
+      Start_Sector   : Word;
+      Current_Sector : Word;
+      Current_Offset : Storage_Offset;
+      Sector_Data    : ISO_Sector;
    begin
       if not F.Open then
          Count := 0;
          return;
       end if;
 
-      Rose.Console_IO.Put ("isofs: read ");
-      Rose.Console_IO.Put (F.Start_Address);
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (F.Length);
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (F.Current);
+      Start_Sector := F.Start_Address + F.Current / ISO_Sector_Size;
+      Current_Sector := Start_Sector;
+      Current_Offset := Storage_Offset (F.Current mod ISO_Sector_Size) + 1;
 
       Count := Storage_Count'Min (Buffer'Length,
                                   Storage_Count (F.Length - F.Current));
-      Rose.Console_IO.Put (" ");
-      Rose.Console_IO.Put (Natural (Count));
-      Rose.Console_IO.New_Line;
-      Buffer (Buffer'First .. Buffer'First + Count - 1) :=
-        (others => 0);
+
+      Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
+
+      for I in 1 .. Count loop
+         Buffer (Buffer'First + I - 1) :=
+           Sector_Data (Storage_Count (Current_Offset));
+         Current_Offset := Current_Offset + 1;
+         if Current_Offset > ISO_Sector_Size then
+            Current_Offset := 1;
+            Current_Sector := Current_Sector + 1;
+            Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
+         end if;
+      end loop;
+
       F.Current := F.Current + Word (Count);
 
       if Count < Buffer'Length then
-         Rose.Console_IO.Put ("isofs: closing ");
-         Rose.Console_IO.Put (File);
-         Rose.Console_IO.New_Line;
          F.Open := False;
          if File = Open_File_Count then
             Open_File_Count := Open_File_Count - 1;
@@ -684,10 +691,6 @@ package body IsoFS.Directories is
       end if;
 
       Scan_Directory_Entries (Directory, Process'Access);
-
-      Rose.Console_IO.Put ("isofs: open file: ");
-      Rose.Console_IO.Put (Open_File_Count);
-      Rose.Console_IO.New_Line;
 
       return Rose.System_Calls.Server.Create_Endpoint
         (Create_Cap  => Create_Endpoint_Cap,
