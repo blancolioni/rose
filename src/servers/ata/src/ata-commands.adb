@@ -337,8 +337,8 @@ package body ATA.Commands is
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_8_Port (Drive);
    begin
-      for I in 1 .. 100 loop
-         if I mod 20 = 0 then
+      for I in 1 .. 200 loop
+         if I mod 40 = 0 then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
          X := ATA.Drives.ATA_Status
