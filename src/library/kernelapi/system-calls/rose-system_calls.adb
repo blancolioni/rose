@@ -32,6 +32,28 @@ package body Rose.System_Calls is
    end Copy_Received_Buffer;
 
    ------------------------
+   -- Copy_Received_Caps --
+   ------------------------
+
+   procedure Copy_Received_Caps
+     (Params    : Rose.Invocation.Invocation_Record;
+      To        : out Rose.Capabilities.Capability_Array;
+      Last      : out Natural)
+   is
+   begin
+      Last := To'First - 1;
+      if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
+         return;
+      end if;
+
+      for Index in 0 .. Params.Control.Last_Recv_Cap loop
+         exit when Last >= To'Last;
+         Last := Last + 1;
+         To (Last) := Params.Caps (Index);
+      end loop;
+   end Copy_Received_Caps;
+
+   ------------------------
    -- Copy_Storage_Array --
    ------------------------
 

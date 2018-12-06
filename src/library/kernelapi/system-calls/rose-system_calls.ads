@@ -81,6 +81,11 @@ package Rose.System_Calls is
       To        : out System.Storage_Elements.Storage_Array;
       Last      : out System.Storage_Elements.Storage_Count);
 
+   procedure Copy_Received_Caps
+     (Params    : Rose.Invocation.Invocation_Record;
+      To        : out Rose.Capabilities.Capability_Array;
+      Last      : out Natural);
+
    procedure Copy_Text
      (Params   : Rose.Invocation.Invocation_Record;
       Count    : Natural;
