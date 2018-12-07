@@ -63,6 +63,10 @@ package Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Type;
 
+   procedure Rescind_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability);
+
    procedure Delete_Cap
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability);
@@ -78,6 +82,11 @@ package Rose.Kernel.Processes is
 
    function Blocked
      (Pid : Process_Id)
+      return Boolean;
+
+   function Is_Valid_Entry
+     (Source_Cap          : Rose.Capabilities.Layout.Capability_Layout;
+      Destination_Process : Process_Id)
       return Boolean;
 
    function Is_Valid_Endpoint_Index

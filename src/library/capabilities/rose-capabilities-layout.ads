@@ -26,11 +26,14 @@ package Rose.Capabilities.Layout is
 
    type Capability_Header is
       record
-         Cap_Type    : Capability_Type                    := Null_Cap;
-         R, W, X, D  : Boolean                            := False;
-         Alloc_Count : Rose.Objects.Allocation_Count      := 0;
-         Identifier  : Rose.Objects.Capability_Identifier := 0;
-         Endpoint    : Rose.Objects.Endpoint_Index        := 0;
+         Cap_Type         : Capability_Type                    := Null_Cap;
+         Single_Use       : Boolean                            := False;
+         Read_Access      : Boolean                            := False;
+         Write_Access     : Boolean                            := False;
+         Execution_Access : Boolean                            := False;
+         Rescinded_Count  : Rose.Objects.Rescinded_Count       := 0;
+         Endpoint         : Rose.Objects.Endpoint_Index        := 0;
+         Identifier       : Rose.Objects.Capability_Identifier := 0;
       end record
      with Pack, Size => 64;
 
@@ -46,7 +49,7 @@ package Rose.Capabilities.Layout is
    function Reply_Capability
      (Object_Id : Rose.Objects.Object_Id)
       return Capability_Layout
-   is ((Reply_Cap, Alloc_Count => 1, others => <>),
+   is ((Reply_Cap, Single_Use => True, others => <>),
        Object_Id);
 
    function Receive_Capability
