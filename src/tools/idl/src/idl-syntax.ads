@@ -90,6 +90,12 @@ package IDL.Syntax is
       Process           : not null access
         procedure (Item : IDL_Subprogram));
 
+   procedure Scan_Subprograms
+     (Item              : IDL_Interface;
+      Process           : not null access
+        procedure (Declared_In : IDL_Interface;
+                   Item : IDL_Subprogram));
+
    function Get_Name (Item : IDL_Subprogram) return String;
    function Get_Ada_Name (Item : IDL_Subprogram) return String;
    function Get_Arguments (Item : IDL_Subprogram) return IDL_Argument_Array;
