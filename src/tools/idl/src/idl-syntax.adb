@@ -814,6 +814,43 @@ package body IDL.Syntax is
       Process           : not null access
         procedure (Item : IDL_Subprogram))
    is
+      procedure P (Declared_In : IDL_Interface;
+                   Item        : IDL_Subprogram);
+
+      -------
+      -- P --
+      -------
+
+      procedure P (Declared_In : IDL_Interface;
+                   Item        : IDL_Subprogram)
+      is
+         pragma Unreferenced (Declared_In);
+      begin
+         Process (Item);
+      end P;
+
+   begin
+      if Include_Inherited then
+         Scan_Subprograms (Item, P'Access);
+      else
+         for Subpr of Item.Subprs (1 .. Item.Num_Subprs) loop
+            Process (Subpr);
+         end loop;
+      end if;
+   end Scan_Subprograms;
+
+   ----------------------
+   -- Scan_Subprograms --
+   ----------------------
+
+   procedure Scan_Subprograms
+     (Item              : IDL_Interface;
+      Process           : not null access
+        procedure (Declared_In : IDL_Interface;
+                   Item : IDL_Subprogram))
+   is
+      Visited : WL.String_Sets.Set;
+
       procedure Scan (X : IDL_Interface);
 
       ----------
@@ -821,13 +858,15 @@ package body IDL.Syntax is
       ----------
 
       procedure Scan (X : IDL_Interface) is
+         Name : constant String := Get_Ada_Name (X);
       begin
-         for I in 1 .. X.Num_Subprs loop
-            Process (X.Subprs (I));
-         end loop;
-         if Include_Inherited then
+         if not Visited.Contains (Name) then
+            Visited.Insert (Name);
             for J in 1 .. X.Num_Inherited loop
                Scan (X.Inherited (J));
+            end loop;
+            for I in 1 .. X.Num_Subprs loop
+               Process (X, X.Subprs (I));
             end loop;
          end if;
       end Scan;
