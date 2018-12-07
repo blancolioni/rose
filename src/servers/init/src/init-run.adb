@@ -275,15 +275,24 @@ package body Init.Run is
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 1, 16#0CF8#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0001#,
+                                      16#0000_0CF8#,
+                                      16#0000_0000#));
          Data_Port_Out_Cap    : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 1, 16#0CFC#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0001#,
+                                      16#0000_0CFC#,
+                                      16#0000_0000#));
          Data_Port_In_Cap     : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 2, 16#0CFC#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0002#,
+                                      16#0000_0CFC#,
+                                      16#0000_0000#));
          PCI_Id               : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
                                     (Boot_Cap, PCI_Module, Low_Priority,
@@ -308,23 +317,38 @@ package body Init.Run is
          Command_0_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_000E#, 3, 16#01F0#, 16#01F7#));
+                                     (16#0000_000E#,
+                                      16#0000_0003#,
+                                      16#0000_01F0#,
+                                      16#0000_01F7#));
          Control_0_Cap : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
-                              (16#0000_000E#, 1, 16#03F6#, 16#03F6#));
+                              (16#0000_000E#,
+                               16#0000_0001#,
+                               16#0000_03F6#,
+                               16#0000_03F6#));
          Data_0_Cap_8  : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
-                              (16#0000_000E#, 2, 16#01F0#, 16#01F7#));
+                              (16#0000_000E#,
+                               16#0000_0002#,
+                               16#0000_01F0#,
+                               16#0000_01F7#));
          Data_0_Cap_Read_16 : constant Rose.Capabilities.Capability :=
                                 Init.Calls.Call
                                   (Create_Cap,
-                                   (16#0000_100E#, 2, 16#01F0#, 16#01F7#));
+                                   (16#0000_000E#,
+                                    16#0001_0002#,
+                                    16#0000_01F0#,
+                                    16#0000_01F7#));
          Data_0_Cap_Write_16   : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
-                                      (16#0000_100E#, 1, 16#01F0#, 16#01F7#));
+                                      (16#0000_000E#,
+                                       16#0001_0001#,
+                                       16#0000_01F0#,
+                                       16#0000_01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,

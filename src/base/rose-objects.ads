@@ -10,9 +10,11 @@ package Rose.Objects is
 
    subtype Valid_Endpoint_Id is Endpoint_Id range 1 .. Endpoint_Id'Last;
 
-   type Endpoint_Index is mod 2 ** 32;
+   type Endpoint_Index is mod 2 ** 16;
 
-   type Capability_Identifier is mod 2 ** 20;
+   type Capability_Identifier is mod 2 ** 16;
+
+   type Rescinded_Count is mod 2 ** 24;
 
    type Page_Id is new Rose.Words.Word_64;
    Null_Page_Id : constant Page_Id := 0;
