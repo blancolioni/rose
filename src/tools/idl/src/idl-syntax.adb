@@ -1,6 +1,8 @@
 with Ada.Strings.Fixed.Equal_Case_Insensitive;
 with Ada.Strings.Unbounded;            use Ada.Strings.Unbounded;
 
+with WL.String_Sets;
+
 with IDL.Identifiers;
 
 package body IDL.Syntax is
@@ -743,6 +745,42 @@ package body IDL.Syntax is
            Result_Arg         => null,
            Return_Buffer_Size => <>);
    end New_Subprogram;
+
+   procedure Scan_Ancestors
+     (Item            : IDL_Interface;
+      Include_Current : Boolean;
+      Process         : not null access
+        procedure (Ancestor : IDL_Interface))
+   is
+      Set : WL.String_Sets.Set;
+
+      procedure Scan (Ancestor : IDL_Interface);
+
+      ----------
+      -- Scan --
+      ----------
+
+      procedure Scan (Ancestor : IDL_Interface) is
+      begin
+         Set.Insert (Get_Ada_Name (Ancestor));
+         for I in 1 .. Get_Num_Inherited (Ancestor) loop
+            declare
+               Next : constant IDL_Interface := Get_Inherited (Ancestor, I);
+            begin
+               if not Set.Contains (Get_Ada_Name (Next)) then
+                  Scan (Next);
+                  Process (Next);
+               end if;
+            end;
+         end loop;
+      end Scan;
+
+   begin
+      Scan (Item);
+      if Include_Current then
+         Process (Item);
+      end if;
+   end Scan_Ancestors;
 
    ----------------------
    -- Scan_Constraints --
