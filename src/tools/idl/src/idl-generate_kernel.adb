@@ -1191,6 +1191,33 @@ package body IDL.Generate_Kernel is
          end if;
       end loop;
 
+      declare
+         procedure Declare_Interface_Endpoint
+           (For_Interface : IDL_Interface);
+
+         --------------------------------
+         -- Declare_Interface_Endpoint --
+         --------------------------------
+
+         procedure Declare_Interface_Endpoint
+           (For_Interface : IDL_Interface)
+         is
+         begin
+            IF_Pkg.Append
+              (Syn.Declarations.New_Constant_Declaration
+                 (Name        => Get_Ada_Name (For_Interface) & "_Interface",
+                  Object_Type => "Rose.Objects.Endpoint_Id",
+                  Value       =>
+                    Syn.Object
+                      (IDL.Endpoints.Endpoint_Id
+                           ("interface",
+                            Get_Ada_Name (For_Interface) & "_Interface"))));
+         end Declare_Interface_Endpoint;
+
+      begin
+         Scan_Ancestors (Item, True, Declare_Interface_Endpoint'Access);
+      end;
+
       for Subpr of Subprs loop
 
          if First then
