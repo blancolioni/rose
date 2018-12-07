@@ -1,0 +1,5 @@
+interface Exec : Launch is
+
+   function Install (Executable : interface Stream_Reader) return interface Launch;
+      
+end Exec;

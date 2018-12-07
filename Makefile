@@ -12,7 +12,7 @@ TOOLS=idl configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=keyboard
+DRIVERS=keyboard exec
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition
 
 all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd floppy iso finished
