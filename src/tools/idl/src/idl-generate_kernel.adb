@@ -1191,6 +1191,33 @@ package body IDL.Generate_Kernel is
          end if;
       end loop;
 
+      declare
+         procedure Declare_Interface_Endpoint
+           (For_Interface : IDL_Interface);
+
+         --------------------------------
+         -- Declare_Interface_Endpoint --
+         --------------------------------
+
+         procedure Declare_Interface_Endpoint
+           (For_Interface : IDL_Interface)
+         is
+         begin
+            IF_Pkg.Append
+              (Syn.Declarations.New_Constant_Declaration
+                 (Name        => Get_Ada_Name (For_Interface) & "_Interface",
+                  Object_Type => "Rose.Objects.Endpoint_Id",
+                  Value       =>
+                    Syn.Object
+                      (IDL.Endpoints.Endpoint_Id
+                           ("interface",
+                            Get_Ada_Name (For_Interface) & "_Interface"))));
+         end Declare_Interface_Endpoint;
+
+      begin
+         Scan_Ancestors (Item, True, Declare_Interface_Endpoint'Access);
+      end;
+
       for Subpr of Subprs loop
 
          if First then
@@ -1381,14 +1408,7 @@ package body IDL.Generate_Kernel is
       declare
          use Syn.Declarations;
          Method : Subprogram_Declaration'Class :=
-                    (if not Is_Function (Subpr)
-                     or else not Has_Scalar_Result (Subpr)
-                     then New_Procedure (Name, Block)
-                     else New_Function
-                       (Name,
-                        IDL.Types.Get_Ada_Name
-                          (Get_Return_Type (Subpr)),
-                        Block));
+                    New_Procedure (Name, Block);
       begin
          Method.Add_Formal_Argument
            ("Parameters",
@@ -1445,7 +1465,66 @@ package body IDL.Generate_Kernel is
            (Syn.Declarations.New_Object_Declaration
               ("Local_" & Get_Ada_Name (Subprs (I)),
                Get_Ada_Name (Subprs (I)) & "_Handler"));
+         Server_Pkg.Append_To_Body
+           (Syn.Declarations.New_Object_Declaration
+              (Get_Ada_Name (Subprs (I)) & "_Cap",
+               "Rose.Capabilities.Capability"));
       end loop;
+
+      declare
+         procedure Generate_Interface_Request
+           (For_Interface : IDL_Interface);
+
+         --------------------------------
+         -- Generate_Interface_Request --
+         --------------------------------
+
+         procedure Generate_Interface_Request
+           (For_Interface : IDL_Interface)
+         is
+            Block : Syn.Blocks.Block_Type;
+
+            procedure Send_Subprogram_Cap (Item : IDL_Subprogram);
+
+            -------------------------
+            -- Send_Subprogram_Cap --
+            -------------------------
+
+            procedure Send_Subprogram_Cap (Item : IDL_Subprogram) is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.System_Calls.Send_Cap",
+                     Syn.Object ("Parameters"),
+                     Syn.Object (Get_Ada_Name (Item) & "_Cap")));
+            end Send_Subprogram_Cap;
+
+         begin
+
+            Scan_Subprograms (For_Interface, True, Send_Subprogram_Cap'Access);
+
+            declare
+               use Syn.Declarations;
+               Name : constant String :=
+                        "Handle_Get_"
+                        & Get_Ada_Name (For_Interface);
+               Method : Subprogram_Declaration'Class :=
+                          New_Procedure (Name, Block);
+            begin
+               Method.Add_Formal_Argument
+                 ("Parameters",
+                  Inout_Argument,
+                  "Rose.Invocation.Invocation_Record");
+
+               Server_Pkg.Add_Separator;
+               Server_Pkg.Append_To_Body (Method);
+
+            end;
+         end Generate_Interface_Request;
+
+      begin
+         Scan_Ancestors (Item, True, Generate_Interface_Request'Access);
+      end;
 
       for I in Subprs'Range loop
          Generate_Server_Subprogram_Type
@@ -1464,6 +1543,8 @@ package body IDL.Generate_Kernel is
          procedure Register_Endpoint (Subpr : IDL_Subprogram);
          procedure Save_Handler (Subpr : IDL_Subprogram);
 
+         procedure Register_Interface (Item : IDL_Interface);
+
          ---------------------
          -- Create_Endpoint --
          ---------------------
@@ -1471,10 +1552,12 @@ package body IDL.Generate_Kernel is
          procedure Create_Endpoint (Subpr : IDL_Subprogram) is
          begin
             Block.Append
-              (Syn.Statements.New_Procedure_Call_Statement
-                 ("Rose.System_Calls.Server.Create_Anonymous_Endpoint",
-                  Syn.Literal (1),
-                  Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint")));
+              (Syn.Statements.New_Assignment_Statement
+                 (Get_Ada_Name (Subpr) & "_Cap",
+                  Syn.Expressions.New_Function_Call_Expression
+                    ("Rose.System_Calls.Server.Create_Endpoint",
+                     Syn.Literal (1),
+                     Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"))));
          end Create_Endpoint;
 
          -----------------------
@@ -1492,6 +1575,21 @@ package body IDL.Generate_Kernel is
                     ("Handle_" & Get_Ada_Name (Subpr) & "'Access")));
          end Register_Endpoint;
 
+         ------------------------
+         -- Register_Interface --
+         ------------------------
+
+         procedure Register_Interface (Item : IDL_Interface) is
+         begin
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.Server.Register_Handler",
+                  Syn.Object ("Server_Context"),
+                  Syn.Object (Get_Ada_Name (Item) & "_Interface"),
+                  Syn.Object
+                    ("Handle_Get_" & Get_Ada_Name (Item) & "'Access")));
+         end Register_Interface;
+
          ------------------
          -- Save_Handler --
          ------------------
@@ -1508,6 +1606,9 @@ package body IDL.Generate_Kernel is
 
          Scan_Subprograms (Item, True, Save_Handler'Access);
          Scan_Subprograms (Item, True, Create_Endpoint'Access);
+
+         Scan_Ancestors (Item, True, Register_Interface'Access);
+
          Scan_Subprograms (Item, True, Register_Endpoint'Access);
 
          declare
@@ -1562,7 +1663,6 @@ package body IDL.Generate_Kernel is
       pragma Unreferenced (Parent, Item);
       use IDL.Syntax, IDL.Identifiers;
       Name           : constant String := To_Ada_Name (Get_Name (Subpr));
-      --  Interface_Name : constant String := Get_Ada_Name (Item);
       Handle_Name    : constant String :=
                          "Handle_" & Name with Unreferenced;
       Type_Name      : constant String :=
