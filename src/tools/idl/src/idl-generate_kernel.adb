@@ -1584,111 +1584,116 @@ package body IDL.Generate_Kernel is
          Scan_Subprograms (Item, True, Generate_Override'Access);
       end;
 
-      declare
-         Block       : Syn.Blocks.Block_Type;
-
-         procedure Create_Endpoint (Subpr : IDL_Subprogram);
-         procedure Register_Endpoint (Subpr : IDL_Subprogram);
-         procedure Save_Handler (Subpr : IDL_Subprogram);
-
-         procedure Register_Interface (Item : IDL_Interface);
-
-         ---------------------
-         -- Create_Endpoint --
-         ---------------------
-
-         procedure Create_Endpoint (Subpr : IDL_Subprogram) is
-         begin
-            Block.Append
-              (Syn.Statements.New_Assignment_Statement
-                 (Get_Ada_Name (Subpr) & "_Cap",
-                  Syn.Expressions.New_Function_Call_Expression
-                    ("Rose.System_Calls.Server.Create_Endpoint",
-                     Syn.Literal (1),
-                     Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"))));
-         end Create_Endpoint;
-
-         -----------------------
-         -- Register_Endpoint --
-         -----------------------
-
-         procedure Register_Endpoint (Subpr : IDL_Subprogram) is
-         begin
-            Block.Append
-              (Syn.Statements.New_Procedure_Call_Statement
-                 ("Rose.Server.Register_Handler",
-                  Syn.Object ("Server_Context"),
-                  Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"),
-                  Syn.Object
-                    ("Handle_" & Get_Ada_Name (Subpr) & "'Access")));
-         end Register_Endpoint;
-
-         ------------------------
-         -- Register_Interface --
-         ------------------------
-
-         procedure Register_Interface (Item : IDL_Interface) is
-         begin
-            Block.Append
-              (Syn.Statements.New_Procedure_Call_Statement
-                 ("Rose.Server.Register_Handler",
-                  Syn.Object ("Server_Context"),
-                  Syn.Object (Get_Ada_Name (Item) & "_Interface"),
-                  Syn.Object
-                    ("Handle_Get_" & Get_Ada_Name (Item) & "'Access")));
-         end Register_Interface;
-
-         ------------------
-         -- Save_Handler --
-         ------------------
-
-         procedure Save_Handler (Subpr : IDL_Subprogram) is
-         begin
-            Block.Append
-              (Syn.Statements.New_Assignment_Statement
-                 (Target => "Local_" & Get_Ada_Name (Subpr),
-                  Value  => Syn.Object (Get_Ada_Name (Subpr))));
-         end Save_Handler;
-
-      begin
-
-         Scan_Subprograms (Item, True, Save_Handler'Access);
-         Scan_Subprograms (Item, True, Create_Endpoint'Access);
-
-         Scan_Ancestors (Item, True, Register_Interface'Access);
-
-         Scan_Subprograms (Item, True, Register_Endpoint'Access);
-
+      for Attach_Procedure in Boolean loop
          declare
-            Proc_Name : constant String := "Create_Server";
-            Proc      : Syn.Declarations.Subprogram_Declaration'Class :=
-                          Syn.Declarations.New_Procedure
-                            (Proc_Name, Block);
+            Block       : Syn.Blocks.Block_Type;
 
-            procedure Add_Endpoint_Handler (Subpr : IDL_Subprogram);
+            procedure Create_Endpoint (Subpr : IDL_Subprogram);
+            procedure Register_Endpoint (Subpr : IDL_Subprogram);
+            procedure Save_Handler (Subpr : IDL_Subprogram);
 
-            --------------------------
-            -- Add_Endpoint_Handler --
-            --------------------------
+            procedure Register_Interface (Item : IDL_Interface);
 
-            procedure Add_Endpoint_Handler (Subpr : IDL_Subprogram) is
+            ---------------------
+            -- Create_Endpoint --
+            ---------------------
+
+            procedure Create_Endpoint (Subpr : IDL_Subprogram) is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Assignment_Statement
+                    (Get_Ada_Name (Subpr) & "_Cap",
+                     Syn.Expressions.New_Function_Call_Expression
+                       ("Rose.System_Calls.Server.Create_Endpoint",
+                        Syn.Literal (1),
+                        Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"))));
+            end Create_Endpoint;
+
+            -----------------------
+            -- Register_Endpoint --
+            -----------------------
+
+            procedure Register_Endpoint (Subpr : IDL_Subprogram) is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.Server.Register_Handler",
+                     Syn.Object ("Server_Context"),
+                     Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"),
+                     Syn.Object
+                       ("Handle_" & Get_Ada_Name (Subpr) & "'Access")));
+            end Register_Endpoint;
+
+            ------------------------
+            -- Register_Interface --
+            ------------------------
+
+            procedure Register_Interface (Item : IDL_Interface) is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.Server.Register_Handler",
+                     Syn.Object ("Server_Context"),
+                     Syn.Object (Get_Ada_Name (Item) & "_Interface"),
+                     Syn.Object
+                       ("Handle_Get_" & Get_Ada_Name (Item) & "'Access")));
+            end Register_Interface;
+
+            ------------------
+            -- Save_Handler --
+            ------------------
+
+            procedure Save_Handler (Subpr : IDL_Subprogram) is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Assignment_Statement
+                    (Target => "Local_" & Get_Ada_Name (Subpr),
+                     Value  => Syn.Object (Get_Ada_Name (Subpr))));
+            end Save_Handler;
+
+         begin
+
+            Scan_Subprograms (Item, True, Save_Handler'Access);
+            Scan_Subprograms (Item, True, Create_Endpoint'Access);
+
+            Scan_Ancestors (Item, True, Register_Interface'Access);
+
+            Scan_Subprograms (Item, True, Register_Endpoint'Access);
+
+            declare
+               Proc_Name : constant String :=
+                             (if Attach_Procedure
+                              then "Attach_Interface"
+                              else "Create_Server");
+               Proc      : Syn.Declarations.Subprogram_Declaration'Class :=
+                             Syn.Declarations.New_Procedure
+                               (Proc_Name, Block);
+
+               procedure Add_Endpoint_Handler (Subpr : IDL_Subprogram);
+
+               --------------------------
+               -- Add_Endpoint_Handler --
+               --------------------------
+
+               procedure Add_Endpoint_Handler (Subpr : IDL_Subprogram) is
+               begin
+                  Proc.Add_Formal_Argument
+                    (Arg_Name       => Get_Ada_Name (Subpr),
+                     Arg_Type       => Get_Ada_Name (Subpr) & "_Handler");
+               end Add_Endpoint_Handler;
+
             begin
                Proc.Add_Formal_Argument
-                 (Arg_Name       => Get_Ada_Name (Subpr),
-                  Arg_Type       => Get_Ada_Name (Subpr) & "_Handler");
-            end Add_Endpoint_Handler;
+                 (Arg_Name       => "Server_Context",
+                  Arg_Mode       => Syn.Declarations.Inout_Argument,
+                  Arg_Type       => "Rose.Server.Server_Context");
+               Scan_Subprograms (Item, True, Add_Endpoint_Handler'Access);
 
-         begin
-            Proc.Add_Formal_Argument
-              (Arg_Name       => "Server_Context",
-               Arg_Mode       => Syn.Declarations.Inout_Argument,
-               Arg_Type       => "Rose.Server.Server_Context");
-            Scan_Subprograms (Item, True, Add_Endpoint_Handler'Access);
-
-            Server_Pkg.Add_Separator;
-            Server_Pkg.Append (Proc);
+               Server_Pkg.Add_Separator;
+               Server_Pkg.Append (Proc);
+            end;
          end;
-      end;
+      end loop;
 
       declare
          Writer : Syn.File_Writer.File_Writer;

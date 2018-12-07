@@ -1,0 +1,7 @@
+interface Space_Bank is
+
+   procedure Get_Range
+     (Base_Page : out Object_Id;
+      Bound_Page : out Object_Id);
+
+end Space_Bank;

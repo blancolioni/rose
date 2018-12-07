@@ -1,19 +1,10 @@
 interface Storage is
 
-   procedure Reserve_Storage
-     (Size   : Word_64;
-      Base   : out Object_Id;
-      Bound  : out Object_Id);
+   function Reserve_Storage
+     (Size   : Word_64)
+     return interface Space_Bank;
    
    procedure Add_Backing_Store
      (Store  : interface Block_Device);
      
-   procedure Get
-     (Object : Object_Id;
-      Data   : out Storage_Array);
-      
-   procedure Put
-     (Object : Object_Id;
-      Data   : Storage_Array);
-      
 end Storage;
