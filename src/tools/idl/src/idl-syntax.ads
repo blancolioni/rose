@@ -37,6 +37,12 @@ package IDL.Syntax is
                           Ancestor : IDL_Interface)
                           return Boolean;
 
+   procedure Scan_Ancestors
+     (Item            : IDL_Interface;
+      Include_Current : Boolean;
+      Process         : not null access
+        procedure (Ancestor : IDL_Interface));
+
    function Get_Num_Objects (Item : IDL_Interface)
                              return Natural;
    function Get_Object_Ada_Name (Item    : IDL_Interface;
