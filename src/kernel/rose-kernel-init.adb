@@ -41,7 +41,7 @@ package body Rose.Kernel.Init is
                           Page_Table_Size
                             + Process_Table_Size
                             + Boot_Module_Heap
-                            + 16#8000#;
+                            + 16#1_0000#;
       --    Page_Table_Size + Process_Table_Size + Module_Size;
 
    begin
@@ -91,6 +91,12 @@ package body Rose.Kernel.Init is
 
       Log_Port_IO :=
         Rose.Kernel.Command_Line.Have_Argument ("log-port-io");
+
+      if Rose.Kernel.Command_Line.Have_Argument ("log-object-id") then
+         Log_Object_Id := Rose.Objects.Object_Id
+           (Rose.Kernel.Command_Line.Integer_Argument
+              ("log-object-id"));
+      end if;
 
       Rose.Boot.Console.Put_Line ("Loading boot modules");
 

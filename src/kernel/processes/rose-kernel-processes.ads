@@ -63,6 +63,10 @@ package Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Type;
 
+   procedure Rescind_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability);
+
    procedure Delete_Cap
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability);
@@ -80,6 +84,11 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id)
       return Boolean;
 
+   function Is_Valid_Entry
+     (Source_Cap          : Rose.Capabilities.Layout.Capability_Layout;
+      Destination_Process : Process_Id)
+      return Boolean;
+
    function Is_Valid_Endpoint_Index
      (Pid            : Process_Id;
       Endpoint_Index : Rose.Objects.Endpoint_Index)
@@ -91,18 +100,39 @@ package Rose.Kernel.Processes is
       return Boolean;
 
    function Create_Endpoint
-     (Pid : Process_Id;
+     (Pid        : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Objects.Endpoint_Index;
    --  returns the new endpoint index, or 0 if it can't be created
 
-   procedure Set_Endpoint_Caps
-     (Pid : Process_Id;
-      Endpoint    : Rose.Objects.Endpoint_Index;
-      Receive_Cap : Rose.Capabilities.Capability;
-      Send_Cap    : Rose.Capabilities.Capability);
+   function Find_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index;
+
+   function Require_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index;
+   --  returns endpoint index of given endpoint, creates
+   --  a new one if necessary
+
+   function Create_Endpoint_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability;
 
    function Find_Endpoint_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability;
+
+   procedure Set_Receive_Cap
+     (Pid : Process_Id;
+      Endpoint    : Rose.Objects.Endpoint_Index;
+      Receive_Cap : Rose.Capabilities.Capability);
+
+   function Find_Receive_Cap
      (Pid        : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
       return Rose.Capabilities.Capability;

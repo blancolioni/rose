@@ -16,8 +16,9 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-environment.o \
-	$(BUILDDIR)/rose-environment_pages.o \
+	$(BUILDDIR)/rose-containers.o \
+	$(BUILDDIR)/rose-containers-bounded_hashed_maps.o \
+	$(BUILDDIR)/rose-containers-queues.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-invocation.o \

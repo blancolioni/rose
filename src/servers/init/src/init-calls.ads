@@ -21,6 +21,11 @@ package Init.Calls is
       return Rose.Capabilities.Capability
    is (Call (Cap, (1 => Data)));
 
+   procedure Call
+     (Cap         : Rose.Capabilities.Capability;
+      Data        : Array_Of_Words;
+      Result_Caps : out Array_Of_Capabilities);
+
    procedure Send
      (Cap    : Rose.Capabilities.Capability;
       Data   : Array_Of_Words);

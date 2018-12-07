@@ -145,6 +145,30 @@ package body Rose.Kernel.Processes is
    end Create_Endpoint;
 
    -------------------------
+   -- Create_Endpoint_Cap --
+   -------------------------
+
+   function Create_Endpoint_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Capabilities, Rose.Objects;
+      Eix : constant Rose.Objects.Endpoint_Index :=
+              Find_Endpoint (Pid, Endpoint);
+   begin
+      if Eix = 0 then
+         return Null_Capability;
+      end if;
+
+      return Cap : constant Capability := Create_Cap (Pid) do
+         if Cap /= Null_Capability then
+            Process_Table (Pid).Endpoints (Eix).Send_Cap := Cap;
+         end if;
+      end return;
+   end Create_Endpoint_Cap;
+
+   -------------------------
    -- Current_Process_Cap --
    -------------------------
 
@@ -180,19 +204,10 @@ package body Rose.Kernel.Processes is
          return False;
       end if;
 
-      declare
-         use type Rose.Objects.Allocation_Count;
-      begin
-         if Cap.Header.Alloc_Count > 0 then
-            Cap.Header.Alloc_Count := Cap.Header.Alloc_Count - 1;
-            if Cap.Header.Alloc_Count = 0 then
-               Current_Process.Cap_Cache (Cap_Index) :=
-                 Rose.Capabilities.Layout.Empty_Capability;
-            else
-               Current_Process.Cap_Cache (Cap_Index) := Cap;
-            end if;
-         end if;
-      end;
+      if Cap.Header.Single_Use then
+         Current_Process.Cap_Cache (Cap_Index) :=
+           Rose.Capabilities.Layout.Empty_Capability;
+      end if;
 
       return True;
    end Current_Process_Cap;
@@ -209,6 +224,26 @@ package body Rose.Kernel.Processes is
    begin
       P.Cap_Cache (Cap) := (others => <>);
    end Delete_Cap;
+
+   -------------------
+   -- Find_Endpoint --
+   -------------------
+
+   function Find_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Id in P.Endpoints'Range loop
+         if P.Endpoints (Id).Endpoint = Endpoint then
+            return Id;
+         end if;
+      end loop;
+      return 0;
+   end Find_Endpoint;
 
    -----------------------
    -- Find_Endpoint_Cap --
@@ -229,6 +264,26 @@ package body Rose.Kernel.Processes is
       end loop;
       return Rose.Capabilities.Null_Capability;
    end Find_Endpoint_Cap;
+
+   ----------------------
+   -- Find_Receive_Cap --
+   ----------------------
+
+   function Find_Receive_Cap
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Rec of P.Endpoints loop
+         if Rec.Endpoint = Endpoint then
+            return Rec.Receive_Cap;
+         end if;
+      end loop;
+      return Rose.Capabilities.Null_Capability;
+   end Find_Receive_Cap;
 
    ----------------------
    -- Get_Process_Name --
@@ -485,6 +540,36 @@ package body Rose.Kernel.Processes is
         /= Rose.Objects.Null_Endpoint_Id;
    end Is_Valid_Endpoint_Index;
 
+   --------------------
+   -- Is_Valid_Entry --
+   --------------------
+
+   function Is_Valid_Entry
+     (Source_Cap          : Rose.Capabilities.Layout.Capability_Layout;
+      Destination_Process : Process_Id)
+      return Boolean
+   is
+      use type Rose.Objects.Endpoint_Id;
+      To   : Kernel_Process_Entry renames Process_Table (Destination_Process);
+      Endpoint : constant Rose.Objects.Endpoint_Index :=
+                   Source_Cap.Header.Endpoint;
+   begin
+      if Endpoint in To.Endpoints'Range
+        and then To.Endpoints (Endpoint).Endpoint /= 0
+      then
+         declare
+            use type Rose.Objects.Rescinded_Count;
+            Send_Cap : constant Rose.Capabilities.Capability :=
+                         To.Endpoints (Endpoint).Send_Cap;
+            Rescinded_Count : constant Rose.Objects.Rescinded_Count :=
+                                To.Cap_Cache (Send_Cap).Header.Rescinded_Count;
+         begin
+            return Source_Cap.Header.Rescinded_Count = Rescinded_Count;
+         end;
+      end if;
+      return False;
+   end Is_Valid_Entry;
+
    --------------
    -- Map_Page --
    --------------
@@ -604,6 +689,43 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Processes.Debug.Report_Process
         (Current_Process.Pid);
    end Report_Current_Process;
+
+   ----------------------
+   -- Require_Endpoint --
+   ----------------------
+
+   function Require_Endpoint
+     (Pid        : Process_Id;
+      Endpoint   : Rose.Objects.Endpoint_Id)
+      return Rose.Objects.Endpoint_Index
+   is
+      use type Rose.Objects.Endpoint_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Id in P.Endpoints'Range loop
+         if P.Endpoints (Id).Endpoint = Endpoint then
+            return Id;
+         end if;
+      end loop;
+      return Create_Endpoint (Pid, Endpoint);
+   end Require_Endpoint;
+
+   -----------------
+   -- Rescind_Cap --
+   -----------------
+
+   procedure Rescind_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
+   is
+      use type Rose.Objects.Rescinded_Count;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+      L : Rose.Capabilities.Layout.Capability_Layout renames
+            P.Cap_Cache (Cap);
+   begin
+      L.Header.Rescinded_Count :=
+        L.Header.Rescinded_Count + 1;
+   end Rescind_Cap;
 
    ------------------
    -- Return_Error --
@@ -885,25 +1007,6 @@ package body Rose.Kernel.Processes is
 
    end Set_Current_State;
 
-   -----------------------
-   -- Set_Endpoint_Caps --
-   -----------------------
-
-   procedure Set_Endpoint_Caps
-     (Pid : Process_Id;
-      Endpoint    : Rose.Objects.Endpoint_Index;
-      Receive_Cap : Rose.Capabilities.Capability;
-      Send_Cap    : Rose.Capabilities.Capability)
-   is
-      Current_Process : Kernel_Process_Entry renames
-                          Process_Table (Pid);
-      Rec             : Registered_Endpoint_Record renames
-                          Current_Process.Endpoints (Endpoint);
-   begin
-      Rec.Receive_Cap := Receive_Cap;
-      Rec.Send_Cap    := Send_Cap;
-   end Set_Endpoint_Caps;
-
    --------------------------
    -- Set_Process_Handlers --
    --------------------------
@@ -922,6 +1025,23 @@ package body Rose.Kernel.Processes is
         (Interrupt => Rose.Arch.Interrupts.Page_Fault,
          Handler   => Handle_Page_Fault'Access);
    end Set_Process_Handlers;
+
+   ---------------------
+   -- Set_Receive_Cap --
+   ---------------------
+
+   procedure Set_Receive_Cap
+     (Pid         : Process_Id;
+      Endpoint    : Rose.Objects.Endpoint_Index;
+      Receive_Cap : Rose.Capabilities.Capability)
+   is
+      Current_Process : Kernel_Process_Entry renames
+                          Process_Table (Pid);
+      Rec             : Registered_Endpoint_Record renames
+                          Current_Process.Endpoints (Endpoint);
+   begin
+      Rec.Receive_Cap := Receive_Cap;
+   end Set_Receive_Cap;
 
    ----------------
    -- Share_Page --

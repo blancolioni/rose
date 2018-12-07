@@ -1,10 +1,36 @@
-with Rose.Console_IO;
-with Rose.Invocation;
-with Rose.System_Calls.Server;
+with System.Storage_Elements;
 
-with Rose.Interfaces.Storage;
+with Rose.Objects;
+with Rose.Words;
+
+with Rose.Console_IO;
+
+with Rose.Interfaces.Storage.Server;
+with Rose.Server;
+
+with Store.Devices;
 
 package body Store.Server is
+
+   procedure Reserve_Storage
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Size  : in     Rose.Words.Word_64;
+      Base  :    out Rose.Objects.Object_Id;
+      Bound :    out Rose.Objects.Object_Id);
+
+   procedure Get
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Object : in     Rose.Objects.Object_Id;
+      Data   :    out System.Storage_Elements.Storage_Array)
+   is null;
+
+   procedure Put
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Object : in     Rose.Objects.Object_Id;
+      Data   : in     System.Storage_Elements.Storage_Array)
+   is null;
+
+   Server_Context : Rose.Server.Server_Context;
 
    -------------------
    -- Create_Server --
@@ -12,43 +38,33 @@ package body Store.Server is
 
    procedure Create_Server is
    begin
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.Storage.Add_Backing_Store_Endpoint);
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.Storage.Reserve_Storage_Endpoint);
+      Rose.Interfaces.Storage.Server.Create_Server
+        (Server_Context    => Server_Context,
+         Reserve_Storage   => Reserve_Storage'Access,
+         Add_Backing_Store => Store.Devices.Add_Backing_Store'Access,
+         Get => Get'Access,
+         Put => Put'Access);
    end Create_Server;
+
+   ---------------------
+   -- Reserve_Storage --
+   ---------------------
+
+   procedure Reserve_Storage
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Size  : in     Rose.Words.Word_64;
+      Base  :    out Rose.Objects.Object_Id;
+      Bound :    out Rose.Objects.Object_Id)
+   is null;
 
    ------------------
    -- Start_Server --
    ------------------
 
    procedure Start_Server is
-      Receive_Cap : constant Rose.Capabilities.Capability :=
-                      Rose.System_Calls.Server.Create_Receive_Cap
-                        (Create_Endpoint_Cap);
-      Params      : aliased Rose.Invocation.Invocation_Record;
-      Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.Console_IO.Put_Line ("storage: starting server");
-      loop
-         Rose.System_Calls.Initialize_Receive (Params, Receive_Cap);
-         Rose.System_Calls.Receive_Words (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
-
-         case Params.Endpoint is
-            when Rose.Interfaces.Storage.Add_Backing_Store_Endpoint =>
-               null;
-            when Rose.Interfaces.Storage.Reserve_Storage_Endpoint =>
-               null;
-            when others =>
-               Rose.Console_IO.Put_Line
-                 ("storage: bad endpoint");
-         end case;
-         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
-         Rose.System_Calls.Invoke_Capability (Reply);
-      end loop;
+      Rose.Server.Start_Server (Server_Context);
    end Start_Server;
 
 end Store.Server;

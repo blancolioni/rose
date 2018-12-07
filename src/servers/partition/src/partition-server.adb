@@ -169,9 +169,9 @@ package body Partition.Server is
 
             when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
                Rose.System_Calls.Send_Word
-                 (Reply, Rose.Words.Word_32 (Partition_Block_Size));
-               Rose.System_Calls.Send_Word
                  (Reply, Rose.Words.Word_64 (Partition_Block_Count));
+               Rose.System_Calls.Send_Word
+                 (Reply, Rose.Words.Word_32 (Partition_Block_Size));
             when Rose.Interfaces.Block_Device.Read_Blocks_Endpoint =>
                declare
                   use System.Storage_Elements;

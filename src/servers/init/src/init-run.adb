@@ -8,9 +8,13 @@ with Rose.Interfaces.Storage;
 
 with Rose.Interfaces.Partitions.Client;
 
-with Rose.Interfaces.Ata;
+with Rose.Interfaces.Installer;
+
+with Rose.Invocation;
+with Rose.System_Calls;
 
 with Init.Calls;
+with Init.Installer;
 
 package body Init.Run is
 
@@ -77,15 +81,13 @@ package body Init.Run is
       PCI_Cap              : Rose.Capabilities.Capability;
 
       Hd0_Cap              : Rose.Capabilities.Capability;
-      Hd0_Parameters_Cap   : Rose.Capabilities.Capability;
-      Hd0_Read_Cap         : Rose.Capabilities.Capability;
-      Hd0_Write_Cap        : Rose.Capabilities.Capability;
-
       Hd1_Cap              : Rose.Capabilities.Capability;
 
       Add_Storage_Cap      : Rose.Capabilities.Capability;
 
-      Install_FS           : Rose.Capabilities.Capability;
+      Install_Media_FS     : Rose.Capabilities.Capability;
+      Install_Receiver     : Rose.Capabilities.Capability;
+      Install_Endpoint     : Rose.Capabilities.Capability;
 
       Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
@@ -273,15 +275,24 @@ package body Init.Run is
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 1, 16#0CF8#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0001#,
+                                      16#0000_0CF8#,
+                                      16#0000_0000#));
          Data_Port_Out_Cap    : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 1, 16#0CFC#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0001#,
+                                      16#0000_0CFC#,
+                                      16#0000_0000#));
          Data_Port_In_Cap     : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_200E#, 2, 16#0CFC#, 0));
+                                     (16#0000_000E#,
+                                      16#0002_0002#,
+                                      16#0000_0CFC#,
+                                      16#0000_0000#));
          PCI_Id               : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
                                     (Boot_Cap, PCI_Module, Low_Priority,
@@ -306,23 +317,38 @@ package body Init.Run is
          Command_0_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
-                                     (16#0000_000E#, 3, 16#01F0#, 16#01F7#));
+                                     (16#0000_000E#,
+                                      16#0000_0003#,
+                                      16#0000_01F0#,
+                                      16#0000_01F7#));
          Control_0_Cap : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
-                              (16#0000_000E#, 1, 16#03F6#, 16#03F6#));
+                              (16#0000_000E#,
+                               16#0000_0001#,
+                               16#0000_03F6#,
+                               16#0000_03F6#));
          Data_0_Cap_8  : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
                              (Create_Cap,
-                              (16#0000_000E#, 2, 16#01F0#, 16#01F7#));
+                              (16#0000_000E#,
+                               16#0000_0002#,
+                               16#0000_01F0#,
+                               16#0000_01F7#));
          Data_0_Cap_Read_16 : constant Rose.Capabilities.Capability :=
                                 Init.Calls.Call
                                   (Create_Cap,
-                                   (16#0000_100E#, 2, 16#01F0#, 16#01F7#));
+                                   (16#0000_000E#,
+                                    16#0001_0002#,
+                                    16#0000_01F0#,
+                                    16#0000_01F7#));
          Data_0_Cap_Write_16   : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
-                                      (16#0000_100E#, 1, 16#01F0#, 16#01F7#));
+                                      (16#0000_000E#,
+                                       16#0001_0001#,
+                                       16#0000_01F0#,
+                                       16#0000_01F7#));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,
@@ -341,11 +367,6 @@ package body Init.Run is
                                      (9, 1,
                                       Word (Ata_Id mod 2 ** 32),
                                       Word (Ata_Id / 2 ** 32)));
-         Get_Interface_Cap     : constant Rose.Capabilities.Capability :=
-                                   Copy_Cap_From_Process
-                                     (Copy_Ata_Cap,
-                                      Rose.Interfaces.Ata.Get_Device_Endpoint);
-         Hd0                   : Init.Calls.Array_Of_Capabilities (1 .. 3);
       begin
 
          Hd0_Cap :=
@@ -360,12 +381,6 @@ package body Init.Run is
               Rose.Interfaces.Get_Interface_Endpoint,
               1);
 
-         Init.Calls.Get_Interface (Get_Interface_Cap, 0, Hd0);
-
-         Hd0_Parameters_Cap := Hd0 (1);
-         Hd0_Read_Cap := Hd0 (2);
-         Hd0_Write_Cap := Hd0 (3);
-
       end;
 
       declare
@@ -373,10 +388,8 @@ package body Init.Run is
                       Init.Calls.Launch_Boot_Module
                         (Boot_Cap, Store_Module, Device_Driver_Priority,
                          (Create_Endpoint_Cap,
-                          Console_Write_Cap,
-                          Hd0_Parameters_Cap,
-                          Hd0_Read_Cap,
-                          Hd0_Write_Cap));
+                          Delete_Cap,
+                          Console_Write_Cap));
          Copy_Store_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -424,6 +437,22 @@ package body Init.Run is
       end;
 
       declare
+         Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
+      begin
+         Init.Calls.Call
+           (Create_Endpoint_Cap,
+            (Rose.Words.Word
+                 (Rose.Interfaces.Installer.Install_Endpoint mod 2 ** 32),
+             Rose.Words.Word
+               (Rose.Interfaces.Installer.Install_Endpoint / 2 ** 32)),
+            Install_Caps);
+         Install_Receiver := Install_Caps (1);
+         Install_Endpoint := Install_Caps (2);
+      end;
+
+
+
+      declare
          IsoFS_Id : constant Rose.Objects.Object_Id :=
                       Init.Calls.Launch_Boot_Module
                         (Boot_Cap, ISOFS_Module, File_System_Priority,
@@ -437,7 +466,7 @@ package body Init.Run is
                                 Word (IsoFS_Id mod 2 ** 32),
                                 Word (IsoFS_Id / 2 ** 32)));
       begin
-         Install_FS :=
+         Install_Media_FS :=
            Copy_Cap_From_Process
              (Copy_IsoFS_Cap,
               Rose.Interfaces.File_System.Root_Directory_Endpoint);
@@ -448,6 +477,7 @@ package body Init.Run is
                                     Init.Calls.Call
                                       (Create_Cap,
                                        (7, 2, 0, 0));
+
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
                           (Boot_Cap, Restore_Module, File_System_Priority,
@@ -459,9 +489,28 @@ package body Init.Run is
                             Log_Cap,
                             Add_Storage_Cap,
                             Write_System_Image_Cap,
-                            Install_FS));
-      begin
+                            Install_Media_FS,
+                            Install_Endpoint));
+
          pragma Unreferenced (Restore_Id);
+         Params : aliased Rose.Invocation.Invocation_Record;
+         Reply  : aliased Rose.Invocation.Invocation_Record;
+      begin
+         loop
+            Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
+            Rose.System_Calls.Receive_Caps (Params, 2);
+            Rose.System_Calls.Invoke_Capability (Params);
+            exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
+
+            Init.Installer.Launch_With_Caps
+              (Create_Cap    => Create_Cap,
+               Launch_Cap    => 0,
+               Cap_Stream    => Params.Caps (0),
+               Binary_Stream => Params.Caps (1));
+
+            Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+            Rose.System_Calls.Invoke_Capability (Reply);
+         end loop;
       end;
 
       Init.Calls.Send_String

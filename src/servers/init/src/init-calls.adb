@@ -45,6 +45,38 @@ package body Init.Calls is
       end if;
    end Call;
 
+   ----------
+   -- Call --
+   ----------
+
+   procedure Call
+     (Cap         : Rose.Capabilities.Capability;
+      Data        : Array_Of_Words;
+      Result_Caps : out Array_Of_Capabilities)
+   is
+      use Rose.System_Calls;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Initialize_Send (Params, Cap);
+      for W of Data loop
+         Rose.System_Calls.Send_Word (Params, W);
+      end loop;
+      Params.Control.Flags (Rose.Invocation.Recv_Caps) := True;
+      Params.Control.Last_Recv_Cap :=
+        Rose.Invocation.Capability_Index (Result_Caps'Length - 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         for Cap of Result_Caps loop
+            Cap := 0;
+         end loop;
+      else
+         for I in 0 .. Params.Control.Last_Sent_Cap loop
+            Result_Caps (Natural (I) + Result_Caps'First) :=
+              Params.Caps (I);
+         end loop;
+      end if;
+   end Call;
+
    -------------------
    -- Get_Interface --
    -------------------

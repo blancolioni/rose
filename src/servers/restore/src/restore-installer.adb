@@ -49,7 +49,16 @@ package body Restore.Installer is
          Filter    => (Rose.Directories.Directory => True, others => False),
          Process   => Install_From_Directory'Access);
 
-      Write_Initial_System_Image (To);
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+
+      if False then
+         Write_Initial_System_Image (To);
+      end if;
 
    end Install;
 

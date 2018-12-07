@@ -48,9 +48,11 @@ package body Rose.Kernel.Capabilities.Meta is
 
       if Endpoint_Id /= 0 then
          Local_Endpoint :=
-           Rose.Kernel.Processes.Create_Endpoint
+           Rose.Kernel.Processes.Require_Endpoint
              (Process_Id, Endpoint_Id);
          if Local_Endpoint = 0 then
+            Rose.Kernel.Processes.Debug.Put (Process_Id);
+            Rose.Boot.Console.Put_Line (": out of endpoints");
             Rose.Kernel.Processes.Return_Error
               (Params, Rose.Invocation.Out_Of_Endpoints);
             return;
@@ -83,7 +85,10 @@ package body Rose.Kernel.Capabilities.Meta is
       end if;
 
       if Endpoint_Id /= 0 then
-         Endpoint_Cap := Rose.Kernel.Processes.Create_Cap (Process_Id);
+         Endpoint_Cap :=
+           Rose.Kernel.Processes.Create_Endpoint_Cap
+             (Process_Id, Endpoint_Id);
+
          if Endpoint_Cap = Null_Capability then
             if Receive_Cap /= Null_Capability then
                Rose.Kernel.Processes.Delete_Cap (Process_Id, Receive_Cap);
@@ -93,7 +98,7 @@ package body Rose.Kernel.Capabilities.Meta is
             return;
          end if;
 
-         if True
+         if Log_Endpoint_Cap_Create
            or else Log_Invocation
          then
             Rose.Kernel.Processes.Debug.Put (Process_Id);
@@ -115,8 +120,10 @@ package body Rose.Kernel.Capabilities.Meta is
                Local_Endpoint, Identifier));
       end if;
 
-      Rose.Kernel.Processes.Set_Endpoint_Caps
-        (Process_Id, Local_Endpoint, Receive_Cap, Endpoint_Cap);
+      if Receive_Cap /= Null_Capability then
+         Rose.Kernel.Processes.Set_Receive_Cap
+           (Process_Id, Local_Endpoint, Receive_Cap);
+      end if;
 
       Params.Control.Last_Sent_Cap := 0;
 
@@ -199,6 +206,24 @@ package body Rose.Kernel.Capabilities.Meta is
             Rose.Kernel.Processes.Receive_Any
               (Rose.Kernel.Processes.Current_Process_Id,
                Params.all);
+
+         when Rescind_Cap =>
+            if Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+                  Rose.Kernel.Processes.Rescind_Cap
+                    (Rose.Kernel.Processes.Current_Process_Id,
+                     Params.Caps (Cap_Index));
+               end loop;
+               Params.Control.Flags :=
+                 (Rose.Invocation.Reply     => True,
+                  others                    => False);
+            else
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Invalid_Operation);
+            end if;
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Process_Id, Rose.Kernel.Processes.Ready);
 
          when Delete_Cap =>
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then

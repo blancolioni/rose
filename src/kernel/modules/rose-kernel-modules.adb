@@ -1,5 +1,3 @@
-with Rose.Boot.Console;
-
 package body Rose.Kernel.Modules is
 
    subtype Module_Name is String (1 .. 16);
@@ -76,9 +74,6 @@ package body Rose.Kernel.Modules is
             Name (Last) := Ch;
          end;
       end loop;
-      Rose.Boot.Console.Put ("module name: ");
-      Rose.Boot.Console.Put (Name (Name'First .. Last));
-      Rose.Boot.Console.New_Line;
    end Get_Module_Name;
 
    ----------------------

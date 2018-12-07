@@ -76,6 +76,14 @@ package body Rose.Kernel.Capabilities.Endpoint is
          return;
       end if;
 
+      if not Rose.Kernel.Processes.Is_Valid_Entry
+        (Source_Cap          => Cap,
+         Destination_Process => Pid)
+      then
+         Return_Error (Params, Rose.Invocation.Invalid_Capability);
+         return;
+      end if;
+
       if Params.Control.Flags (Rose.Invocation.Create_Reply_Cap) then
          Params.Reply_Cap := Create_Cap (Pid);
 

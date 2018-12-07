@@ -1,10 +1,13 @@
-with System.Storage_Elements;
-
 with Rose.Words;
 
 with Rose.System_Calls.Server;
 
 with Rose.Console_IO;
+
+with Rose.Interfaces.Stream_Reader;
+
+with Rose.Containers.Bounded_Hashed_Maps;
+with Rose.Containers.Queues;
 
 package body IsoFS.Directories is
 
@@ -12,12 +15,46 @@ package body IsoFS.Directories is
    use Rose.Words;
 
    Max_Directories : constant := 100;
+   Max_Open_Files  : constant := 20;
 
    Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
 
    subtype ISO_Sector is
      System.Storage_Elements.Storage_Array
        (1 .. ISO_Sector_Size);
+
+   function To_Hash_Type
+     (Sector : Rose.Words.Word_32)
+      return Rose.Containers.Hash_Type
+   is (Rose.Containers.Hash_Type (Sector));
+
+   type Cache_Element is
+      record
+         Tick   : Rose.Words.Word_32;
+         Sector : ISO_Sector;
+      end record;
+
+   package Sector_Cache is
+     new Rose.Containers.Bounded_Hashed_Maps
+       (Capacity     => 100,
+        Modulus      => 317,
+        Key_Type     => Rose.Words.Word_32,
+        Element_Type => Cache_Element,
+        Hash         => To_Hash_Type);
+
+   package Sector_Cache_Queues is
+     new Rose.Containers.Queues
+       (Rose.Words.Word_32,
+        Sector_Cache.Cursor,
+        Rose.Words."<",
+        Sector_Cache."=");
+
+   Sector_Queue : Sector_Cache_Queues.Queue (100);
+   Next_Tick    : Word_32 := 0;
+
+   procedure Read_Sector
+     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+      Sector  : out ISO_Sector);
 
    type Directory_Date_Time is array (1 .. 7) of Word_8;
 
@@ -108,6 +145,19 @@ package body IsoFS.Directories is
 
    Directory_Caps : Directory_Caps_Array;
    Directory_Count : Directory_Type := 0;
+
+   type Open_File_Record is
+      record
+         Open          : Boolean := False;
+         Start_Address : Rose.Words.Word := 0;
+         Length        : Rose.Words.Word := 0;
+         Current       : Rose.Words.Word := 0;
+      end record;
+
+   type Open_File_Array is array (1 .. Max_Open_Files) of Open_File_Record;
+
+   Open_Files      : Open_File_Array;
+   Open_File_Count : Natural := 0;
 
    procedure Read_Root_Directory
      (Device : Client.Block_Device_Client);
@@ -546,6 +596,109 @@ package body IsoFS.Directories is
       end if;
    end Get_Root_Directory;
 
+   ----------
+   -- Read --
+   ----------
+
+   procedure Read
+     (File   : Positive;
+      Buffer : out System.Storage_Elements.Storage_Array;
+      Count  : out System.Storage_Elements.Storage_Count)
+   is
+      use System.Storage_Elements;
+      F              : Open_File_Record renames Open_Files (File);
+      Start_Sector   : Word;
+      Current_Sector : Word;
+      Current_Offset : Storage_Offset;
+      Sector_Data    : ISO_Sector;
+   begin
+      if not F.Open then
+         Count := 0;
+         return;
+      end if;
+
+      Start_Sector := F.Start_Address + F.Current / ISO_Sector_Size;
+      Current_Sector := Start_Sector;
+      Current_Offset := Storage_Offset (F.Current mod ISO_Sector_Size) + 1;
+
+      Count := Storage_Count'Min (Buffer'Length,
+                                  Storage_Count (F.Length - F.Current));
+
+      Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
+
+      for I in 1 .. Count loop
+         Buffer (Buffer'First + I - 1) :=
+           Sector_Data (Storage_Count (Current_Offset));
+         Current_Offset := Current_Offset + 1;
+         if Current_Offset > ISO_Sector_Size then
+            Current_Offset := 1;
+            Current_Sector := Current_Sector + 1;
+            Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
+         end if;
+      end loop;
+
+      F.Current := F.Current + Word (Count);
+
+      if Count < Buffer'Length then
+         F.Open := False;
+         if File = Open_File_Count then
+            Open_File_Count := Open_File_Count - 1;
+         end if;
+      end if;
+
+   end Read;
+
+   ---------------
+   -- Read_File --
+   ---------------
+
+   function Read_File
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Rose.Capabilities.Capability
+   is
+      Count : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Entry_Name);
+      begin
+         Count := Count + 1;
+         if Count = Index then
+            Open_File_Count := Open_File_Count + 1;
+            Open_Files (Open_File_Count) :=
+              Open_File_Record'
+                (Open          => True,
+                 Start_Address => Rec.Extent_Location_LSB,
+                 Length        => Rec.Extent_Size_LSB,
+                 Current       => 0);
+         end if;
+      end Process;
+
+   begin
+      if Open_File_Count >= Max_Open_Files then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Scan_Directory_Entries (Directory, Process'Access);
+
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Cap  => Create_Endpoint_Cap,
+         Endpoint_Id => Rose.Interfaces.Stream_Reader.Read_Endpoint,
+         Identifier  => Rose.Objects.Capability_Identifier (Open_File_Count));
+
+   end Read_File;
+
    -------------------------
    -- Read_Root_Directory --
    -------------------------
@@ -571,7 +724,7 @@ package body IsoFS.Directories is
         and then not Found
       loop
 
-         Read_Blocks (Device, Volume_Index, 1, Buffer);
+         Read_Sector (Volume_Index, Buffer);
 
          if Buffer (Descriptor_Type_Offset + 1)
            = Primary_Volume_Descriptor
@@ -599,6 +752,64 @@ package body IsoFS.Directories is
 
    end Read_Root_Directory;
 
+   -----------------
+   -- Read_Sector --
+   -----------------
+
+   procedure Read_Sector
+     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+      Sector  : out ISO_Sector)
+   is
+      use Sector_Cache_Queues;
+      Key : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Address);
+      Position : Sector_Cache.Cursor :=
+                   Sector_Cache.Find (Key);
+      Item     : Cache_Element;
+
+   begin
+
+      Next_Tick := Next_Tick + 1;
+
+      if not Sector_Cache.Has_Element (Position) then
+         if Sector_Cache.Is_Full then
+            declare
+               Oldest : Sector_Cache.Cursor :=
+                          First_Element (Sector_Queue);
+            begin
+               Sector_Cache.Delete (Oldest);
+               Delete_First (Sector_Queue);
+            end;
+         end if;
+
+         Rose.Interfaces.Block_Device.Client.Read_Blocks
+           (Block_Device, Address, 1, Sector);
+
+         Item := (Next_Tick, Sector);
+
+         declare
+            Inserted : Boolean;
+            pragma Unreferenced (Inserted);
+         begin
+            Sector_Cache.Insert
+              (Key       => Key,
+               New_Item  => Item,
+               Position  => Position,
+               Inserted  => Inserted);
+         end;
+      else
+
+         Item := Sector_Cache.Element (Position);
+         Delete (Sector_Queue, Item.Tick);
+         Item.Tick := Next_Tick;
+         Sector_Cache.Replace_Element (Position, Item);
+         Sector := Item.Sector;
+
+      end if;
+
+      Insert (Sector_Queue, Next_Tick, Position);
+
+   end Read_Sector;
+
    ----------------------------
    -- Scan_Directory_Entries --
    ----------------------------
@@ -621,8 +832,7 @@ package body IsoFS.Directories is
    begin
       while Position < Storage_Count (Length) loop
          if not Have_Sector then
-            Rose.Interfaces.Block_Device.Client.Read_Blocks
-              (Block_Device, Block_Address_Type (Location), 1, Sector);
+            Read_Sector (Block_Address_Type (Location), Sector);
             Have_Sector := True;
             Sector_Start := Position - 1;
          end if;

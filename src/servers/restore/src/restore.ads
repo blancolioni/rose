@@ -5,7 +5,7 @@ package Restore is
    pragma Pure (Restore);
 
    Create_Endpoint_Cap : constant Rose.Capabilities.Capability := 1;
-   Delete_Cap          : constant Rose.Capabilities.Capability := 2;
+   Delete_Endpoint_Cap : constant Rose.Capabilities.Capability := 2;
    Console_Cap         : constant Rose.Capabilities.Capability := 3;
    Active_Swap_Cap     : constant Rose.Capabilities.Capability := 4;
    Inactive_Swap_Cap   : constant Rose.Capabilities.Capability := 5;

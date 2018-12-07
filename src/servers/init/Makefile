@@ -11,6 +11,7 @@ OBJECTS= \
 	$(BUILDDIR)/b__init-driver.o \
 	$(BUILDDIR)/init-calls.o \
 	$(BUILDDIR)/init-driver.o \
+	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
 	$(BUILDDIR)/init.o \
 	$(BUILDDIR)/rose.o \
@@ -20,6 +21,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-objects.o \
