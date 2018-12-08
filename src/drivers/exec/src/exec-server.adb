@@ -7,7 +7,7 @@ with Rose.Server;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Exec.Server;
-with Rose.Interfaces.Storage.Client;
+with Rose.Interfaces.Space_Bank.Client;
 with Rose.Interfaces.Stream_Reader.Client;
 
 with Exec.Library;
@@ -24,7 +24,7 @@ package body Exec.Server is
       Caps : Rose.Capabilities.Capability_Array);
 
    Context : Rose.Server.Server_Context;
-   Storage : Rose.Interfaces.Storage.Client.Storage_Client;
+   Space_Bank : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client;
 
    -------------------
    -- Create_Server --
@@ -33,7 +33,7 @@ package body Exec.Server is
    procedure Create_Server is
    begin
       Rose.Console_IO.Put_Line ("exec: creating server");
-      Rose.Interfaces.Storage.Client.Open (Storage, Storage_Cap);
+      Rose.Interfaces.Space_Bank.Client.Open (Space_Bank, Space_Bank_Cap);
 
       Rose.Interfaces.Exec.Server.Create_Server
         (Server_Context => Context,
@@ -50,11 +50,12 @@ package body Exec.Server is
       ELF_Image : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
+      pragma Unreferenced (Id);
       use Rose.Interfaces.Stream_Reader.Client;
       Reader : Stream_Reader_Client;
    begin
       Open (Reader, ELF_Image);
-      return Exec.Library.Install (Storage, Reader);
+      return Exec.Library.Install (Reader);
    end On_Install;
 
    ---------------
@@ -67,8 +68,12 @@ package body Exec.Server is
    is
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
+      Base, Bound : Rose.Objects.Page_Object_Id;
    begin
+      Exec.Library.Get_Image_Pages (Id, Base, Bound);
       Initialize_Send (Params, Create_Process_Cap);
+      Send_Object_Id (Params, Base);
+      Send_Object_Id (Params, Bound);
       for Cap of Caps loop
          Send_Cap (Params, Cap);
       end loop;

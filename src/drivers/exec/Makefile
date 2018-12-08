@@ -11,7 +11,8 @@ ENVIRONMENT_OBJECTS= \
 	$(BUILDDIR)/rose-environment_pages.o \
 	$(BUILDDIR)/rose-command_line.o
 
-LIBROSE_OBJECTS=$(BUILDDIR)/rose-strings.o
+LIBROSE_OBJECTS=
+
 BLOCK_DEVICE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o
@@ -19,6 +20,7 @@ BLOCK_DEVICE_OBJECTS= \
 OBJECTS= \
 	$(BUILDDIR)/exec.o \
 	$(BUILDDIR)/exec-driver.o \
+	$(BUILDDIR)/exec-library.o \
 	$(BUILDDIR)/exec-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
@@ -26,6 +28,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-exec.o \
 	$(BUILDDIR)/rose-interfaces-exec-server.o \
+	$(BUILDDIR)/rose-interfaces-space_bank.o \
+	$(BUILDDIR)/rose-interfaces-space_bank-client.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
@@ -33,12 +39,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o \
-	$(ENVIRONMENT_OBJECTS) \
 	$(LIBROSE_OBJECTS) \
-	$(BLOCK_DEVICE_OBJECTS)
 
 all: exec $(RELOC)
-	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/exec $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/drivers/exec $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 
 exec:
 	mkdir -p build/obj
