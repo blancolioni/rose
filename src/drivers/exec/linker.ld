@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf32-i386)
-STARTUP(./build/obj/b__launch-driver.o)
+STARTUP(./build/obj/b__exec-driver.o)
 ENTRY (main)
 
 SECTIONS
