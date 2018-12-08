@@ -596,9 +596,12 @@ package body IDL.Generate_Kernel is
             if Get_Size (Base_Type) > Default_Size then
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
-                    ("Rose.System_Calls.Send_Word",
+                    ((if Is_Object_Id (Base_Type)
+                     then "Rose.System_Calls.Send_Object_Id"
+                     else "Rose.System_Calls.Send_Word"),
                      Syn.Object ("Parameters"),
                      (if Is_Word_Type (Base_Type)
+                      or else Is_Object_Id (Base_Type)
                       then Syn.Object (Base_Name)
                       else Syn.Expressions.New_Function_Call_Expression
                         ("Rose.Words.Word_64", Base_Name))));
@@ -923,6 +926,7 @@ package body IDL.Generate_Kernel is
          Client.With_Package (Get_Context (Item, I));
       end loop;
 
+      Client.With_Package ("Rose.Capabilities");
       Client.With_Package ("Rose.Invocation");
       Client.With_Package ("Rose.System_Calls", Body_With => True);
 
@@ -1461,7 +1465,6 @@ package body IDL.Generate_Kernel is
         Syn.Declarations.New_Package_Type
           ("Rose.Interfaces." & Package_Name);
 
-      Server_Pkg.With_Package ("Rose.Capabilities");
       Server_Pkg.With_Package ("Rose.Server");
       Server_Pkg.With_Package ("Rose.System_Calls.Server",
                                Body_With => True);
@@ -1927,6 +1930,13 @@ package body IDL.Generate_Kernel is
                           ("Rose.System_Calls.Send_Word",
                            Syn.Object ("Params"),
                            Syn.Object (Get_Ada_Name (Args (I)))));
+                  elsif Is_Object_Id (Arg_Type) then
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Object_Id",
+                           Syn.Object ("Params"),
+                           Syn.Object (Get_Ada_Name (Args (I)))));
+
                   elsif Get_Size (Arg_Type) > Default_Size then
                      Block.Append
                        (Syn.Statements.New_Procedure_Call_Statement
@@ -2009,6 +2019,8 @@ package body IDL.Generate_Kernel is
    is
       use IDL.Syntax;
 
+      Have_Capability_With : Boolean := False;
+
       procedure Add_Dependent_Withs (Subpr : IDL_Subprogram);
 
       procedure Check_Type
@@ -2046,6 +2058,9 @@ package body IDL.Generate_Kernel is
             begin
                if not Server then
                   Pkg.With_Package (Pkg_Name, Body_With => True);
+               else
+                  Pkg.With_Package ("Rose.Capabilities");
+                  Have_Capability_With := True;
                end if;
             end;
          else
@@ -2068,6 +2083,10 @@ package body IDL.Generate_Kernel is
 
    begin
       Scan_Subprograms (Top_Interface, True, Add_Dependent_Withs'Access);
+
+      if Server and then not Have_Capability_With then
+         Pkg.With_Package ("Rose.Capabilities", Body_With => True);
+      end if;
    end With_Packages;
 
 end IDL.Generate_Kernel;
