@@ -4,4 +4,12 @@ interface Space_Bank is
      (Base_Page : out Object_Id;
       Bound_Page : out Object_Id);
 
+   procedure Get
+     (Page : Object_Id;
+      Data : out Storage_Array);
+
+   procedure Put
+     (Page : Object_Id;
+      Data : Storage_Array);
+   
 end Space_Bank;

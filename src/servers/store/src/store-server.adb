@@ -5,7 +5,6 @@ with Rose.Console_IO;
 
 with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Space_Bank.Server;
-with Rose.Server;
 
 with Store.Devices;
 
@@ -28,7 +27,9 @@ package body Store.Server is
          Add_Backing_Store => Store.Devices.Add_Backing_Store'Access);
       Rose.Interfaces.Space_Bank.Server.Attach_Interface
         (Server_Context,
-         Store.Devices.Get_Range'Access);
+         Store.Devices.Get_Range'Access,
+         Store.Devices.Get'Access,
+         Store.Devices.Put'Access);
    end Create_Server;
 
    ---------------------

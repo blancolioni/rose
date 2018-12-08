@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Capabilities;
 with Rose.Objects;
 with Rose.Words;
@@ -16,5 +18,15 @@ package Store.Devices is
      (Id    : Rose.Objects.Capability_Identifier;
       Base  : out Rose.Objects.Object_Id;
       Bound : out Rose.Objects.Object_Id);
+
+   procedure Get
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Page : in     Rose.Objects.Object_Id;
+      Data :    out System.Storage_Elements.Storage_Array);
+
+   procedure Put
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Page : in     Rose.Objects.Object_Id;
+      Data : in     System.Storage_Elements.Storage_Array);
 
 end Store.Devices;
