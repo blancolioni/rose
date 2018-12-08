@@ -12,12 +12,15 @@ OBJECTS= \
 	$(BUILDDIR)/store-server.o \
 	$(BUILDDIR)/store-devices.o \
 	$(BUILDDIR)/rose.o \
+	$(BUILDDIR)/rose-allocators.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-space_bank.o \
+	$(BUILDDIR)/rose-interfaces-space_bank-server.o \
 	$(BUILDDIR)/rose-interfaces-storage.o \
 	$(BUILDDIR)/rose-interfaces-storage-server.o \
 	$(BUILDDIR)/rose-server.o \

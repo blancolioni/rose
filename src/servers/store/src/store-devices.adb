@@ -5,13 +5,16 @@ with Rose.Console_IO;
 with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Block_Device.Client;
+with Rose.Interfaces.Space_Bank;
 
 package body Store.Devices is
 
    Max_Backing_Stores : constant := 16;
    Max_Space_Banks    : constant := 256;
-   Minimum_Bank_Size  : constant := 2 ** 4;
-   Maximum_Store_Size : constant := 2 ** 20;
+   Bank_Size_Bits     : constant := 4;
+   Store_Size_Bits    : constant := 20;
+   Minimum_Bank_Size  : constant := 2 ** Bank_Size_Bits;
+   --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
 
    type Backing_Store_Record is
       record
@@ -44,7 +47,10 @@ package body Store.Devices is
    Space_Banks      : Space_Bank_Array;
    Space_Bank_Count : Natural := 0;
 
-   Allocator : Rose.Allocators.Store (Maximum_Store_Size / Minimum_Bank_Size);
+   package Space_Allocators is
+     new Rose.Allocators (Store_Size_Bits - Bank_Size_Bits);
+
+   Allocator : Space_Allocators.Store;
 
    procedure New_Store
      (Client     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
@@ -99,7 +105,7 @@ package body Store.Devices is
                     Rose.Words.Word (Block_Count),
                     Base, Bound);
 
-         Rose.Allocators.Add_Available_Capacity
+         Space_Allocators.Deallocate
            (Allocator => Allocator,
             Base      =>
               Natural ((Base - Page_Object_Id'First) / Minimum_Bank_Size),
@@ -108,6 +114,42 @@ package body Store.Devices is
       end;
 
    end Add_Backing_Store;
+
+   ---------
+   -- Get --
+   ---------
+
+   procedure Get
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Page : in     Rose.Objects.Object_Id;
+      Data :    out System.Storage_Elements.Storage_Array)
+   is
+      use type Rose.Objects.Object_Id;
+      Space_Bank_Index : constant Natural := Natural (Id);
+   begin
+      if Space_Bank_Index not in 1 .. Space_Bank_Count
+        or else Page < Space_Banks (Space_Bank_Index).Base
+        or else Page >= Space_Banks (Space_Bank_Index).Bound
+      then
+         Data := (others => 0);
+         return;
+      end if;
+
+      declare
+         Space_Bank : Space_Bank_Record renames Space_Banks (Space_Bank_Index);
+         Store      : Backing_Store_Record renames
+                        Backing_Stores (Space_Bank.Backing_Device);
+      begin
+         Rose.Interfaces.Block_Device.Client.Read_Blocks
+           (Item   => Store.Client,
+            Start  =>
+              Rose.Interfaces.Block_Device.Block_Address_Type
+                (Page - Store.Base),
+            Count  => 1,
+            Blocks => Data);
+      end;
+
+   end Get;
 
    ---------------
    -- Get_Range --
@@ -199,8 +241,12 @@ package body Store.Devices is
                                   Backing_Stores (Backing_Store_Count);
             begin
                New_Free_Store.Base := Store.Base + Request_Page_Count;
+               New_Free_Store.Allocator_Base :=
+                 Store.Allocator_Base
+                   + Natural (Request_Page_Count) / Minimum_Bank_Size;
                New_Free_Store.Bound := Store.Bound;
                New_Free_Store.Allocated := False;
+               Store.Allocator_Bound := New_Free_Store.Allocator_Base;
             end;
          end if;
 
@@ -222,6 +268,45 @@ package body Store.Devices is
 
    end New_Store;
 
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Page : in     Rose.Objects.Object_Id;
+      Data : in     System.Storage_Elements.Storage_Array)
+   is
+      use type Rose.Objects.Object_Id;
+      Space_Bank_Index : constant Natural := Natural (Id);
+   begin
+      if Space_Bank_Index not in 1 .. Space_Bank_Count
+        or else Page < Space_Banks (Space_Bank_Index).Base
+        or else Page >= Space_Banks (Space_Bank_Index).Bound
+      then
+         return;
+      end if;
+
+      declare
+         Space_Bank : Space_Bank_Record renames Space_Banks (Space_Bank_Index);
+         Store      : Backing_Store_Record renames
+                        Backing_Stores (Space_Bank.Backing_Device);
+      begin
+         Rose.Interfaces.Block_Device.Client.Write_Blocks
+           (Item   => Store.Client,
+            Start  =>
+              Rose.Interfaces.Block_Device.Block_Address_Type
+                (Page - Store.Base),
+            Count  => 1,
+            Blocks => Data);
+      end;
+
+   end Put;
+
+   ---------------------
+   -- Reserve_Storage --
+   ---------------------
+
    function Reserve_Storage
      (Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability
@@ -241,7 +326,7 @@ package body Store.Devices is
       end if;
 
       Alloc_Index :=
-        Rose.Allocators.Allocate
+        Space_Allocators.Allocate
           (Allocator, Alloc_Size / Minimum_Bank_Size);
 
       if Alloc_Index = 0 then
