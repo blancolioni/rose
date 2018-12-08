@@ -25,6 +25,7 @@ package IDL.Types is
    function Is_Word_Type (Item : IDL_Type) return Boolean;
    function Is_Word_32 (Item : IDL_Type) return Boolean;
    function Is_Word_64 (Item : IDL_Type) return Boolean;
+   function Is_Object_Id (Item : IDL_Type) return Boolean;
 
    function Has_Count_Type (Item : IDL_Type) return Boolean;
    function Get_Count_Type (Item : IDL_Type) return IDL_Type;
@@ -115,5 +116,8 @@ private
 
    function Is_Capability_Array (Item : IDL_Type) return Boolean
    is (Get_Ada_Name (Item) = "Rose.Capabilities.Capability_Array");
+
+   function Is_Object_Id (Item : IDL_Type) return Boolean
+   is (Get_Ada_Name (Item) = "Rose.Objects.Object_Id");
 
 end IDL.Types;
