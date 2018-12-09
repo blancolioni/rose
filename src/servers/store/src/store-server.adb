@@ -29,7 +29,8 @@ package body Store.Server is
         (Server_Context,
          Store.Devices.Get_Range'Access,
          Store.Devices.Get'Access,
-         Store.Devices.Put'Access);
+         Store.Devices.Put'Access,
+         Instanced => True);
    end Create_Server;
 
    ---------------------
