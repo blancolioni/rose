@@ -149,6 +149,34 @@ package body IsoFS.Server is
                   end if;
                end;
 
+            when Rose.Interfaces.Directory.Directory_Entry_Size_Endpoint =>
+               declare
+                  use IsoFS.Directories;
+                  Directory : constant Directory_Type :=
+                                Get_Identified_Directory
+                                  (Params.Identifier);
+                  Index     : constant Natural := Natural (Params.Data (0));
+               begin
+                  if Directory = No_Directory then
+                     Rose.Console_IO.Put_Line
+                       ("cap does not resolve to a directory");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
+                     Rose.Console_IO.Put_Line
+                       ("invalid directory index");
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Invalid_Operation);
+                  else
+                     declare
+                        Size : constant Natural :=
+                                 Get_Entry_Size (Directory, Index);
+                     begin
+                        Rose.System_Calls.Send_Word (Reply, Size);
+                     end;
+                  end if;
+               end;
+
             when Rose.Interfaces.Directory.Get_Directory_Endpoint =>
                declare
                   use IsoFS.Directories;
@@ -258,7 +286,7 @@ package body IsoFS.Server is
 
             when others =>
                Rose.Console_IO.Put
-                 ("unknown endpoint: ");
+                 ("isofs: unknown endpoint: ");
                Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
                Rose.Console_IO.New_Line;
                Rose.System_Calls.Send_Error

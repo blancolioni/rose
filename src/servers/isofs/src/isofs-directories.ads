@@ -47,6 +47,11 @@ package IsoFS.Directories is
       Index     : Positive)
       return Rose.Interfaces.Directory.File_Kind;
 
+   function Get_Entry_Size
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Natural;
+
    function Read_File
      (Directory : Directory_Type;
       Index     : Positive)

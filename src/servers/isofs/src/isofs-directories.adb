@@ -497,6 +497,43 @@ package body IsoFS.Directories is
       Scan_Directory_Entries (Directory, Process'Access);
    end Get_Entry_Name;
 
+   --------------------
+   -- Get_Entry_Size --
+   --------------------
+
+   function Get_Entry_Size
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Natural
+   is
+      Count : Natural := 0;
+      Size  : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Entry_Name);
+      begin
+         Count := Count + 1;
+         if Count = Index then
+            Size := Natural (Rec.Extent_Size_LSB);
+         end if;
+      end Process;
+
+   begin
+      Scan_Directory_Entries (Directory, Process'Access);
+      return Size;
+   end Get_Entry_Size;
+
    ------------------------------
    -- Get_Identified_Directory --
    ------------------------------
