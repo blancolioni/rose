@@ -11,8 +11,9 @@ package Restore is
    Inactive_Swap_Cap   : constant Rose.Capabilities.Capability := 5;
    Log_Cap             : constant Rose.Capabilities.Capability := 6;
    Add_Storage_Cap     : constant Rose.Capabilities.Capability := 7;
-   Write_System_Image  : constant Rose.Capabilities.Capability := 8;
-   Install_Media_Cap   : constant Rose.Capabilities.Capability := 9;
-   Install_Exec_Cap    : constant Rose.Capabilities.Capability := 10;
+   Reserve_Storage_Cap : constant Rose.Capabilities.Capability := 8;
+   Write_System_Image  : constant Rose.Capabilities.Capability := 9;
+   Install_Media_Cap   : constant Rose.Capabilities.Capability := 10;
+   Install_Exec_Cap    : constant Rose.Capabilities.Capability := 11;
 
 end Restore;
