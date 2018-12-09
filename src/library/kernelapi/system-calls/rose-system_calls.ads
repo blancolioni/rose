@@ -9,6 +9,10 @@ with Rose.Words;
 
 package Rose.System_Calls is
 
+   Standard_Create_Endpoint : constant Rose.Capabilities.Capability := 1;
+   Standard_Delete_Cap      : constant Rose.Capabilities.Capability := 2;
+   Standard_Rescind_Cap     : constant Rose.Capabilities.Capability := 3;
+
    type Sent_Words_Array is array (Positive range <>) of Rose.Words.Word;
    No_Sent_Words : Sent_Words_Array (1 .. 0);
 
@@ -133,6 +137,10 @@ package Rose.System_Calls is
    procedure Send_Object_Id
      (Params : in out Rose.Invocation.Invocation_Record;
       Oid    : Rose.Objects.Object_Id);
+
+   procedure Send_Storage_Offset
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Offset : System.Storage_Elements.Storage_Offset);
 
    procedure Send_Error
      (Params : in out Rose.Invocation.Invocation_Record;

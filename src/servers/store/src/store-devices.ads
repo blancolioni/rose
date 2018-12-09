@@ -29,4 +29,13 @@ package Store.Devices is
       Page : in     Rose.Objects.Object_Id;
       Data : in     System.Storage_Elements.Storage_Array);
 
+   function Read_Stream
+     (Id      : in Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
+   procedure Read
+     (Id      : in Rose.Objects.Capability_Identifier;
+      Storage : out System.Storage_Elements.Storage_Array;
+      Last    : out System.Storage_Elements.Storage_Count);
+
 end Store.Devices;

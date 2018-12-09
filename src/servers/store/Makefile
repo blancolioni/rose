@@ -23,6 +23,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-space_bank-server.o \
 	$(BUILDDIR)/rose-interfaces-storage.o \
 	$(BUILDDIR)/rose-interfaces-storage-server.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
