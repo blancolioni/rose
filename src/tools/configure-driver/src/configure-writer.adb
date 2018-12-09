@@ -26,6 +26,10 @@ package body Configure.Writer is
          begin
             if Name = "create-endpoint" then
                Cap := (2, 1, 0, 0);
+            elsif Name = "delete-endpoint" then
+               Cap := (2, 30, 0, 0);
+            elsif Name = "rescind-endpoint" then
+               Cap := (2, 29, 0, 0);
             elsif Name = "register-interrupt" then
                Cap := (6, 1, Field (1), 0);
             elsif Name = "port-out-8" then
