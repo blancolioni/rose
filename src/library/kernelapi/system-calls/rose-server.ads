@@ -22,14 +22,45 @@ package Rose.Server is
      (Context : in out Server_Context);
    --  receive messages until the server is killed
 
+   type Server_Instance is limited private;
+
+   function Has_Instance
+     (Instance   : Server_Instance;
+      Endpoint   : Rose.Objects.Endpoint_Id;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean;
+
+   procedure Set_Instance_Cap
+     (Instance   : in out Server_Instance;
+      Endpoint   : Rose.Objects.Endpoint_Id;
+      Identifier : Rose.Objects.Capability_Identifier;
+      Cap        : Rose.Capabilities.Capability);
+
+   function Get_Instance_Cap
+     (Instance   : Server_Instance;
+      Endpoint   : Rose.Objects.Endpoint_Id;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
 private
 
-   Max_Handled_Endpoints : constant := 20;
+   Max_Handled_Endpoints  : constant := 20;
+   Max_Endpoint_Instances : constant := 40;
+
+   type Instanced_Handler_Record is
+      record
+         Endpoint   : Rose.Objects.Endpoint_Id;
+         Identifier : Rose.Objects.Capability_Identifier;
+         Capability : Rose.Capabilities.Capability;
+      end record;
+
+   type Instanced_Handler_Array is
+     array (1 .. Max_Endpoint_Instances) of Instanced_Handler_Record;
 
    type Endpoint_Record is
       record
-         Endpoint : Rose.Objects.Endpoint_Id;
-         Handler  : Invocation_Handler;
+         Endpoint  : Rose.Objects.Endpoint_Id;
+         Handler   : Invocation_Handler;
       end record;
 
    type Endpoint_Array is
@@ -41,6 +72,12 @@ private
                             Rose.Capabilities.Null_Capability;
          Endpoint_Count : Natural := 0;
          Endpoints      : Endpoint_Array;
+      end record;
+
+   type Server_Instance is limited
+      record
+         Instances      : Instanced_Handler_Array;
+         Instance_Count : Natural := 0;
       end record;
 
 end Rose.Server;
