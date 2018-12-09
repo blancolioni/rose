@@ -1483,6 +1483,10 @@ package body IDL.Generate_Kernel is
 
       With_Packages (Item, Server_Pkg, True);
 
+      Server_Pkg.Append_To_Body
+        (Syn.Declarations.New_Object_Declaration
+           ("Server_Instance", "Rose.Server.Server_Instance"));
+
       declare
          procedure Add_Handler (Subpr : IDL_Subprogram);
 
@@ -1500,7 +1504,8 @@ package body IDL.Generate_Kernel is
             Server_Pkg.Append_To_Body
               (Syn.Declarations.New_Object_Declaration
                  (Name & "_Cap",
-                  "Rose.Capabilities.Capability"));
+                  "Rose.Capabilities.Capability",
+                  Syn.Literal (0)));
          end Add_Handler;
 
       begin
@@ -1527,15 +1532,80 @@ package body IDL.Generate_Kernel is
             -------------------------
 
             procedure Send_Subprogram_Cap (Item : IDL_Subprogram) is
+               use Syn, Syn.Statements, Syn.Expressions;
+               Cap_Name        : constant String :=
+                                   Get_Ada_Name (Item) & "_Cap";
+               Endpoint_Name   : constant String :=
+                                   Get_Ada_Name (Item) & "_Endpoint";
+               Cap_Object      : constant Expression'Class :=
+                                   Object (Cap_Name);
+               Endpoint_Object : constant Expression'Class :=
+                                   Object (Endpoint_Name);
+               Identifier_Object : constant Expression'Class :=
+                                   Object ("Parameters.Identifier");
+               Check_Instance  : Sequence_Of_Statements;
+               Assign_Cap     : Sequence_Of_Statements;
             begin
+
+               Check_Instance.Append
+                 (If_Statement
+                    (Operator
+                         ("not",
+                          (New_Function_Call_Expression
+                             ("Rose.Server.Has_Instance",
+                              Object ("Server_Instance"),
+                              Endpoint_Object,
+                              Identifier_Object))),
+                     New_Procedure_Call_Statement
+                       ("Rose.Server.Set_Instance_Cap",
+                        Object ("Server_Instance"),
+                        Endpoint_Object,
+                        Identifier_Object,
+                        New_Function_Call_Expression
+                          ("Rose.System_Calls.Server.Create_Endpoint",
+                           Literal (1),
+                           Endpoint_Object,
+                           Identifier_Object))));
+               Check_Instance.Append
+                 (New_Assignment_Statement
+                    ("Cap",
+                     New_Function_Call_Expression
+                       ("Rose.Server.Get_Instance_Cap",
+                        Object ("Server_Instance"),
+                        Endpoint_Object,
+                        Identifier_Object)));
+
+               Assign_Cap.Append
+                 (New_Assignment_Statement
+                    ("Cap", Cap_Object));
+
+               Block.Append
+                 (If_Statement
+                    (Operator
+                         ("=", Cap_Object, Object ("Null_Capability")),
+                     Check_Instance,
+                     Assign_Cap));
+
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
                     ("Rose.System_Calls.Send_Cap",
-                     Syn.Object ("Parameters"),
-                     Syn.Object (Get_Ada_Name (Item) & "_Cap")));
+                     Object ("Parameters"),
+                     Object ("Cap")));
             end Send_Subprogram_Cap;
 
          begin
+
+            Block.Add_Declaration
+              (Syn.Declarations.Use_Package ("Rose.Capabilities"));
+            Block.Add_Declaration
+              (Syn.Declarations.New_Object_Declaration
+                 ("Cap", "Capability"));
+
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Initialize_Reply",
+                  Syn.Object ("Parameters"),
+                  Syn.Object ("Parameters.Reply_Cap")));
 
             Scan_Subprograms (For_Interface, True, Send_Subprogram_Cap'Access);
 
@@ -1590,6 +1660,7 @@ package body IDL.Generate_Kernel is
       for Attach_Procedure in Boolean loop
          declare
             Block       : Syn.Blocks.Block_Type;
+            Create_Endpoint_Seq : Syn.Statements.Sequence_Of_Statements;
 
             procedure Create_Endpoint (Subpr : IDL_Subprogram);
             procedure Register_Endpoint (Subpr : IDL_Subprogram);
@@ -1603,7 +1674,7 @@ package body IDL.Generate_Kernel is
 
             procedure Create_Endpoint (Subpr : IDL_Subprogram) is
             begin
-               Block.Append
+               Create_Endpoint_Seq.Append
                  (Syn.Statements.New_Assignment_Statement
                     (Get_Ada_Name (Subpr) & "_Cap",
                      Syn.Expressions.New_Function_Call_Expression
@@ -1658,7 +1729,12 @@ package body IDL.Generate_Kernel is
 
             Scan_Subprograms (Item, True, Save_Handler'Access);
             Scan_Subprograms (Item, True, Create_Endpoint'Access);
-
+            Block.Append
+              (Syn.Statements.If_Statement
+                 (Syn.Expressions.Operator
+                      ("not",
+                       Syn.Object ("Instanced")),
+                  Create_Endpoint_Seq));
             Scan_Ancestors (Item, True, Register_Interface'Access);
 
             Scan_Subprograms (Item, True, Register_Endpoint'Access);
@@ -1691,6 +1767,11 @@ package body IDL.Generate_Kernel is
                   Arg_Mode       => Syn.Declarations.Inout_Argument,
                   Arg_Type       => "Rose.Server.Server_Context");
                Scan_Subprograms (Item, True, Add_Endpoint_Handler'Access);
+
+               Proc.Add_Formal_Argument
+                 (Arg_Name    => "Instanced",
+                  Arg_Type    => "Boolean",
+                  Arg_Default => Syn.Literal (False));
 
                Server_Pkg.Add_Separator;
                Server_Pkg.Append (Proc);
