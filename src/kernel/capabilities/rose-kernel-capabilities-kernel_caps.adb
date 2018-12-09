@@ -83,6 +83,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                   Rose.Kernel.Processes.Ready);
             end;
 
+         when Create_Process_Endpoint =>
+            Rose.Boot.Console.Put_Line ("kernel: create process");
+
+            Params.all :=
+              (Control => (Flags => (Rose.Invocation.Reply => True,
+                                     others                     => False),
+                           others         => <>),
+               others  => <>);
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when others =>
             Rose.Kernel.Panic.Panic
               ("bad kernel cap endpoint");
