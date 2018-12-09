@@ -94,7 +94,6 @@ package body Init.Installer is
 
    procedure Install_Exec_Library
      (Create_Cap    : Rose.Capabilities.Capability;
-      Write_Cap     : Rose.Capabilities.Capability;
       Storage_Cap   : Rose.Capabilities.Capability;
       Launch_Cap    : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
@@ -111,32 +110,18 @@ package body Init.Installer is
       Cap_Reader  : Stream_Reader_Client;
 
       Params      : aliased Rose.Invocation.Invocation_Record;
-      NL          : constant Character := Character'Val (10);
-
    begin
 
       Open_Cap_Set (Exec_Reader, Binary_Stream);
-
-      Init.Calls.Send_String
-        (Write_Cap, "init: copy cap stream" & NL);
-
       Copy_Stream (Exec_Reader, Space_Bank);
 
       Open_Cap_Set (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
-      Init.Calls.Send_String
-        (Write_Cap, "init: sending range cap" & NL);
       Rose.System_Calls.Send_Cap
         (Params, Get_Get_Range_Cap (Space_Bank));
-      Init.Calls.Send_String
-        (Write_Cap, "init: sending get cap" & NL);
       Rose.System_Calls.Send_Cap
         (Params, Get_Get_Cap (Space_Bank));
-      Init.Calls.Send_String
-        (Write_Cap, "init: sending launch caps" & NL);
       Copy_Caps (Cap_Reader, Params, Create_Cap);
-      Init.Calls.Send_String
-        (Write_Cap, "init: invoking launch cap" & NL);
       Rose.System_Calls.Invoke_Capability (Params);
       Install_Cap := Params.Caps (0);
    end Install_Exec_Library;
