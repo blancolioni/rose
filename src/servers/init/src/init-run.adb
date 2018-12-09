@@ -84,6 +84,7 @@ package body Init.Run is
       Hd1_Cap              : Rose.Capabilities.Capability;
 
       Add_Storage_Cap      : Rose.Capabilities.Capability;
+      Reserve_Storage_Cap  : Rose.Capabilities.Capability;
 
       Install_Media_FS     : Rose.Capabilities.Capability;
       Install_Receiver     : Rose.Capabilities.Capability;
@@ -401,6 +402,10 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Store_Cap,
               Rose.Interfaces.Storage.Add_Backing_Store_Endpoint);
+         Reserve_Storage_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage.Reserve_Storage_Endpoint);
       end;
 
       declare
@@ -488,6 +493,7 @@ package body Init.Run is
                             Inactive_Swap_Cap,
                             Log_Cap,
                             Add_Storage_Cap,
+                            Reserve_Storage_Cap,
                             Write_System_Image_Cap,
                             Install_Media_FS,
                             Install_Endpoint));
@@ -495,6 +501,8 @@ package body Init.Run is
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
          Reply  : aliased Rose.Invocation.Invocation_Record;
+         First  : Boolean := True;
+         Launch_Cap : Rose.Capabilities.Capability;
       begin
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
@@ -502,13 +510,36 @@ package body Init.Run is
             Rose.System_Calls.Invoke_Capability (Params);
             exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
 
-            Init.Installer.Launch_With_Caps
-              (Create_Cap    => Create_Cap,
-               Launch_Cap    => 0,
-               Cap_Stream    => Params.Caps (0),
-               Binary_Stream => Params.Caps (1));
-
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+
+            if First then
+               Init.Calls.Send_String
+                 (Console_Write_Cap, "init: installing exec library" & NL);
+               Init.Installer.Install_Exec_Library
+                 (Create_Cap    => Create_Cap,
+                  Write_Cap     => Console_Write_Cap,
+                  Storage_Cap   => Reserve_Storage_Cap,
+                  Launch_Cap    =>
+                    Init.Calls.Call
+                      (Create_Cap,
+                       (7, 4, 0, 0)),
+                  Cap_Stream    => Params.Caps (0),
+                  Binary_Stream => Params.Caps (1),
+                  Binary_Length => Params.Data (0));
+               First := False;
+               Init.Calls.Send_String
+                 (Console_Write_Cap, "init: done" & NL);
+
+            else
+               Launch_Cap :=
+                 Init.Installer.Install_Executable
+                   (Create_Cap    => Create_Cap,
+                    Cap_Stream    => Params.Caps (0),
+                    Binary_Stream => Params.Caps (1),
+                    Binary_Length => Params.Data (0));
+               Rose.System_Calls.Send_Cap (Reply, Launch_Cap);
+            end if;
+
             Rose.System_Calls.Invoke_Capability (Reply);
          end loop;
       end;
