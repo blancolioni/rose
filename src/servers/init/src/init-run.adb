@@ -513,11 +513,8 @@ package body Init.Run is
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
             if First then
-               Init.Calls.Send_String
-                 (Console_Write_Cap, "init: installing exec library" & NL);
                Init.Installer.Install_Exec_Library
                  (Create_Cap    => Create_Cap,
-                  Write_Cap     => Console_Write_Cap,
                   Storage_Cap   => Reserve_Storage_Cap,
                   Launch_Cap    =>
                     Init.Calls.Call
@@ -527,9 +524,6 @@ package body Init.Run is
                   Binary_Stream => Params.Caps (1),
                   Binary_Length => Params.Data (0));
                First := False;
-               Init.Calls.Send_String
-                 (Console_Write_Cap, "init: done" & NL);
-
             else
                Launch_Cap :=
                  Init.Installer.Install_Executable

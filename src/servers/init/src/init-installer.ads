@@ -4,7 +4,6 @@ package Init.Installer is
 
    procedure Install_Exec_Library
      (Create_Cap    : Rose.Capabilities.Capability;
-      Write_Cap     : Rose.Capabilities.Capability;
       Storage_Cap   : Rose.Capabilities.Capability;
       Launch_Cap    : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
