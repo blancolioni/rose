@@ -19,6 +19,10 @@ package body Restore.Installer is
    procedure Install_With_Caps
      (Cap_File_Entry : Rose.Directories.Directory_Entry_Type);
 
+   procedure Install_Executable
+     (Exec_Path : String;
+      Cap_Path  : String);
+
    -------------
    -- Install --
    -------------
@@ -28,8 +32,10 @@ package body Restore.Installer is
    is
       use type Rose.Directories.File_Kind;
       Install_Directory : constant String := "/rose/install";
-
+      Exec_Path : constant String := "/rose/install/exec";
+      Exec_Cap  : constant String := "/rose/install/exec.cap";
    begin
+
       if not Rose.Directories.Exists (Install_Directory) then
          Rose.Console_IO.Put_Line
            ("install: cannot find directory /rose/install");
@@ -42,6 +48,20 @@ package body Restore.Installer is
          Rose.Console_IO.Put_Line
            ("install: /rose/install is not a directory");
       end if;
+
+      if not Rose.Directories.Exists (Exec_Path) then
+         Rose.Console_IO.Put_Line
+           ("install: cannot find exec");
+         return;
+      end if;
+
+      if not Rose.Directories.Exists (Exec_Cap) then
+         Rose.Console_IO.Put_Line
+           ("install: cannot find exec.cap");
+         return;
+      end if;
+
+      Install_Executable (Exec_Path, Exec_Cap);
 
       Rose.Directories.Search
         (Directory => Install_Directory,
@@ -61,6 +81,49 @@ package body Restore.Installer is
       end if;
 
    end Install;
+
+   ------------------------
+   -- Install_Executable --
+   ------------------------
+
+   procedure Install_Executable
+     (Exec_Path : String;
+      Cap_Path  : String)
+   is
+      use Rose.Interfaces.Stream_Reader.Client;
+      Caps_Reader   : Stream_Reader_Client;
+      Binary_Reader : Stream_Reader_Client;
+   begin
+      Rose.Directories.Open (Caps_Reader, Cap_Path);
+      Rose.Directories.Open (Binary_Reader, Exec_Path);
+
+      Rose.Console_IO.Put ("installing: ");
+      Rose.Console_IO.Put (Exec_Path);
+      Rose.Console_IO.Put (": ");
+      Rose.Console_IO.Flush;
+
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Caps_Reader));
+         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Binary_Reader));
+         Rose.System_Calls.Send_Word
+           (Params, Natural (Rose.Directories.Size (Exec_Path)));
+         Rose.System_Calls.Receive_Caps (Params, 1);
+         Rose.System_Calls.Invoke_Capability (Params);
+         if Params.Control.Flags (Rose.Invocation.Error) then
+            Rose.Console_IO.Put_Line ("FAIL");
+         else
+            Rose.Console_IO.Put_Line ("done");
+            if Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               Rose.System_Calls.Initialize_Send (Params, Params.Caps (0));
+               Rose.System_Calls.Invoke_Capability (Params);
+            end if;
+         end if;
+      end;
+
+   end Install_Executable;
 
    ----------------------------
    -- Install_From_Directory --
@@ -109,13 +172,10 @@ package body Restore.Installer is
    procedure Install_With_Caps
      (Cap_File_Entry : Rose.Directories.Directory_Entry_Type)
    is
-      use Rose.Interfaces.Stream_Reader.Client;
       Caps_File_Name        : String (1 .. 100);
       Caps_File_Name_Last   : Natural;
       Binary_File_Name      : String (1 .. 100);
       Binary_File_Name_Last : Natural;
-      Caps_Reader           : Stream_Reader_Client;
-      Binary_Reader         : Stream_Reader_Client;
    begin
       Rose.Directories.Full_Name
         (Cap_File_Entry, Caps_File_Name, Caps_File_Name_Last);
@@ -135,28 +195,6 @@ package body Restore.Installer is
          return;
       end if;
 
-      Rose.Directories.Open (Caps_Reader, Cap_File_Entry);
-      Rose.Directories.Open (Binary_Reader,
-                             Binary_File_Name (1 .. Binary_File_Name_Last));
-
-      Rose.Console_IO.Put ("installing: ");
-      Rose.Console_IO.Put (Binary_File_Name (1 .. Binary_File_Name_Last));
-      Rose.Console_IO.Put (": ");
-      Rose.Console_IO.Flush;
-
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
-         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Caps_Reader));
-         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Binary_Reader));
-         Rose.System_Calls.Invoke_Capability (Params);
-         if Params.Control.Flags (Rose.Invocation.Error) then
-            Rose.Console_IO.Put_Line ("FAIL");
-         else
-            Rose.Console_IO.Put_Line ("done");
-         end if;
-      end;
    end Install_With_Caps;
 
    --------------------------------
