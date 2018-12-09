@@ -172,7 +172,7 @@ package body Rose.Boot.Console is
          12 => 16#0400# + Status_Background,
          others => Status_Foreground + Status_Background);
 
-      Status_Line ("starting ...", 0, 0, 0, 0);
+      Status_Line ("starting ...", 0, 0, 0, 0, 0, 0);
 
       Enable_Serial_Port;
 
@@ -526,13 +526,15 @@ package body Rose.Boot.Console is
      (Current_Process : String;
       Current_Ticks   : Rose.Words.Word;
       Page_Faults     : Natural;
+      Mem_Allocated   : Rose.Addresses.Physical_Bytes;
+      Mem_Available   : Rose.Addresses.Physical_Bytes;
       Heap_Allocated  : Rose.Addresses.Physical_Bytes;
       Heap_Available  : Rose.Addresses.Physical_Bytes)
    is
       Time_Image  : String (1 .. 8);
       Acc         : Word_32 := Current_Ticks / 100;
       Fault_Acc   : Natural := Page_Faults;
-      Heap        : String (1 .. 20) := (others => ' ');
+      Heap        : String (1 .. 30) := (others => ' ');
       Heap_Count  : Natural := 0;
 
       procedure Heap_Add (Text : String);
@@ -612,14 +614,21 @@ package body Rose.Boot.Console is
          end if;
       end loop;
 
-      Heap_Add ("heap: ");
+      Heap_Add ("kmem: ");
       Heap_Add (Natural (Heap_Allocated) / 1024);
       Heap_Add ("K");
       Heap_Add ("/");
       Heap_Add (Natural (Heap_Allocated + Heap_Available) / 1024);
       Heap_Add ("K");
 
-      Status_Chars (27 .. 26 + Heap'Length) := Heap;
+      Heap_Add (" mem: ");
+      Heap_Add (Natural (Mem_Allocated) / 1024);
+      Heap_Add ("K");
+      Heap_Add ("/");
+      Heap_Add (Natural (Mem_Allocated + Mem_Available) / 1024 / 1024);
+      Heap_Add ("M");
+
+      Status_Chars (17 .. 16 + Heap'Length) := Heap;
 
       for I in Status_Chars'Range loop
          Status_Memory (I) :=
