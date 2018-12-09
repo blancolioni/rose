@@ -376,7 +376,7 @@ package body Store.Devices is
             Access_Cap     =>
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
-                 Rose.Interfaces.Space_Bank.Get_Range_Endpoint,
+                 Rose.Interfaces.Space_Bank.Space_Bank_Interface,
                  Capability_Identifier (Space_Bank_Count)));
 
          return New_Bank.Access_Cap;
