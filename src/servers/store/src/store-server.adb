@@ -5,6 +5,7 @@ with Rose.Console_IO;
 
 with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Space_Bank.Server;
+with Rose.Interfaces.Stream_Reader.Server;
 
 with Store.Devices;
 
@@ -30,7 +31,13 @@ package body Store.Server is
          Store.Devices.Get_Range'Access,
          Store.Devices.Get'Access,
          Store.Devices.Put'Access,
+         Store.Devices.Read_Stream'Access,
          Instanced => True);
+
+      Rose.Interfaces.Stream_Reader.Server.Attach_Interface
+        (Server_Context => Server_Context,
+         Read           => Store.Devices.Read'Access,
+         Instanced      => True);
    end Create_Server;
 
    ---------------------

@@ -6,6 +6,7 @@ with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Space_Bank;
+with Rose.Interfaces.Stream_Reader;
 
 package body Store.Devices is
 
@@ -15,6 +16,7 @@ package body Store.Devices is
    Store_Size_Bits    : constant := 20;
    Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
    Minimum_Bank_Size  : constant := Minimum_Bank_Pages * Rose.Limits.Page_Size;
+   Max_Open_Streams   : constant := 10;
 
    --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
 
@@ -48,6 +50,28 @@ package body Store.Devices is
 
    Space_Banks      : Space_Bank_Array;
    Space_Bank_Count : Natural := 0;
+
+   Stream_Buffer_Length : constant := 4096;
+
+   type Space_Bank_Stream_Record is
+      record
+         Open           : Boolean := False;
+         Cap            : Rose.Capabilities.Capability := 0;
+         Space_Bank     : Positive;
+         Current_Page   : Rose.Objects.Page_Object_Id;
+         Current_Offset : System.Storage_Elements.Storage_Offset;
+         Stream_Length  : System.Storage_Elements.Storage_Count;
+         Current_Buffer : System.Storage_Elements.Storage_Array
+           (1 .. Stream_Buffer_Length);
+         Buffer_Length  : System.Storage_Elements.Storage_Count;
+         Buffer_Offset  : System.Storage_Elements.Storage_Offset;
+      end record;
+
+   type Space_Bank_Stream_Array is
+     array (Rose.Objects.Capability_Identifier range 1 .. Max_Open_Streams)
+     of Space_Bank_Stream_Record;
+
+   Space_Bank_Streams : Space_Bank_Stream_Array;
 
    package Space_Allocators is
      new Rose.Allocators (Store_Size_Bits - Bank_Size_Bits);
@@ -305,6 +329,106 @@ package body Store.Devices is
       end;
 
    end Put;
+
+   ----------
+   -- Read --
+   ----------
+
+   procedure Read
+     (Id      : in Rose.Objects.Capability_Identifier;
+      Storage : out System.Storage_Elements.Storage_Array;
+      Last    : out System.Storage_Elements.Storage_Count)
+   is
+      use System.Storage_Elements;
+      use type Rose.Objects.Object_Id;
+      Rec  : Space_Bank_Stream_Record renames
+               Space_Bank_Streams (Id);
+   begin
+      if not Rec.Open
+        or else Rec.Current_Offset >= Rec.Stream_Length
+      then
+         Rose.System_Calls.Server.Rescind_Cap (Rec.Cap);
+         Rec.Open := False;
+         Last := 0;
+         return;
+      end if;
+
+      Last := Storage'First - 1;
+      while Last < Storage'Last
+        and then Rec.Current_Offset <= Rec.Stream_Length
+      loop
+         Last := Last + 1;
+         if Rec.Buffer_Offset > Rec.Buffer_Length then
+            Rec.Current_Page := Rec.Current_Page + 1;
+            Get (Rose.Objects.Capability_Identifier (Rec.Space_Bank),
+                 Rec.Current_Page, Rec.Current_Buffer);
+            Rec.Buffer_Offset := 1;
+         end if;
+
+         Storage (Last) := Rec.Current_Buffer (Rec.Buffer_Offset);
+         Rec.Buffer_Offset := Rec.Buffer_Offset + 1;
+         Rec.Current_Offset := Rec.Current_Offset + 1;
+      end loop;
+
+   end Read;
+
+   -----------------
+   -- Read_Stream --
+   -----------------
+
+   function Read_Stream
+     (Id      : in Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Objects;
+      Stream_Id : Capability_Identifier := 0;
+   begin
+      for I in Space_Bank_Streams'Range loop
+         if not Space_Bank_Streams (I).Open then
+            Stream_Id := I;
+            exit;
+         end if;
+      end loop;
+
+      if Stream_Id = 0 then
+         return 0;
+      end if;
+
+      declare
+         use type System.Storage_Elements.Storage_Offset;
+         use Rose.Capabilities;
+         Current_Cap : constant Capability :=
+                         Space_Bank_Streams (Stream_Id).Cap;
+         Stream_Rec  : Space_Bank_Stream_Record renames
+                         Space_Bank_Streams (Stream_Id);
+         Space_Bank  : Space_Bank_Record renames
+                         Space_Banks (Positive (Id));
+      begin
+         Stream_Rec :=
+           Space_Bank_Stream_Record'
+             (Open           => True,
+              Cap            => Current_Cap,
+              Space_Bank     => Positive (Id),
+              Current_Page   => Space_Bank.Base,
+              Stream_Length  =>
+                System.Storage_Elements.Storage_Count
+                  (Space_Bank.Bound - Space_Bank.Base)
+                    * Rose.Limits.Page_Size,
+              Current_Offset => 0,
+              Buffer_Offset  => 0,
+              Current_Buffer => (others => 0),
+              Buffer_Length  => 0);
+         if Stream_Rec.Cap = 0 then
+            Stream_Rec.Cap :=
+              Rose.System_Calls.Server.Create_Endpoint
+                (1, Rose.Interfaces.Stream_Reader.Stream_Reader_Interface,
+                 Stream_Id);
+         end if;
+
+         return Stream_Rec.Cap;
+      end;
+
+   end Read_Stream;
 
    ---------------------
    -- Reserve_Storage --

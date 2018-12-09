@@ -12,4 +12,6 @@ interface Space_Bank is
      (Page : Object_Id;
       Data : Storage_Array);
    
+   function Read return interface Stream_Reader;
+   
 end Space_Bank;

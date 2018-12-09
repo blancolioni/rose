@@ -509,6 +509,18 @@ package body Rose.System_Calls is
       Send_Buffer (Params, Storage'Length, Local_Buffer'Address, Writable);
    end Send_Storage_Array;
 
+   -------------------------
+   -- Send_Storage_Offset --
+   -------------------------
+
+   procedure Send_Storage_Offset
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Offset : System.Storage_Elements.Storage_Offset)
+   is
+   begin
+      Send_Word (Params, Rose.Words.Word (Offset));
+   end Send_Storage_Offset;
+
    ---------------
    -- Send_Text --
    ---------------

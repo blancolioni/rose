@@ -16,6 +16,12 @@ package Rose.System_Calls.Server is
       Identifier   : Rose.Objects.Capability_Identifier := 0)
       return Rose.Capabilities.Capability;
 
+   procedure Rescind_Cap
+     (Cap : Rose.Capabilities.Capability);
+
+   procedure Delete_Cap
+     (Cap : Rose.Capabilities.Capability);
+
    procedure Create_Anonymous_Endpoint
      (Create_Cap   : Rose.Capabilities.Capability;
       Endpoint_Id  : Rose.Objects.Endpoint_Id);

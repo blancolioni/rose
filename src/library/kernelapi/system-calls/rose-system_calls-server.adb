@@ -93,6 +93,34 @@ package body Rose.System_Calls.Server is
    end Create_Receive_Cap;
 
    ----------------
+   -- Delete_Cap --
+   ----------------
+
+   procedure Delete_Cap
+     (Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Initialize_Send (Params, Standard_Delete_Cap);
+      Send_Cap (Params, Cap);
+      Invoke_Capability (Params);
+   end Delete_Cap;
+
+   -----------------
+   -- Rescind_Cap --
+   -----------------
+
+   procedure Rescind_Cap
+     (Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Initialize_Send (Params, Standard_Rescind_Cap);
+      Send_Cap (Params, Cap);
+      Invoke_Capability (Params);
+   end Rescind_Cap;
+
+   ----------------
    -- Send_Reply --
    ----------------
 
