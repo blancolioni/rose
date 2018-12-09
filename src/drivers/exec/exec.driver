@@ -1,0 +1,5 @@
+caps = {
+   create-endpoint
+   delete-endpoint
+   rescind-endpoint
+}
