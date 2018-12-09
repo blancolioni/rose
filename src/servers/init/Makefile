@@ -19,6 +19,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
+	$(BUILDDIR)/rose-interfaces-space_bank.o \
+	$(BUILDDIR)/rose-interfaces-space_bank-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \

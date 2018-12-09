@@ -1,5 +1,9 @@
 with System.Storage_Elements;
 
+with Rose.Limits;
+with Rose.Objects;
+
+with Rose.Interfaces.Space_Bank.Client;
 with Rose.Interfaces.Stream_Reader.Client;
 
 with Rose.Invocation;
@@ -9,51 +13,197 @@ with Init.Calls;
 
 package body Init.Installer is
 
-   ----------------------
-   -- Launch_With_Caps --
-   ----------------------
+   Install_Cap : Rose.Capabilities.Capability :=
+                   Rose.Capabilities.Null_Capability;
 
-   procedure Launch_With_Caps
-     (Create_Cap    : Rose.Capabilities.Capability;
-      Launch_Cap    : Rose.Capabilities.Capability;
-      Cap_Stream    : Rose.Capabilities.Capability;
-      Binary_Stream : Rose.Capabilities.Capability)
+   Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
+
+   function Reserve_Storage
+     (Storage_Cap : Rose.Capabilities.Capability;
+      Size        : Rose.Words.Word_64)
+      return Rose.Interfaces.Space_Bank.Client.Space_Bank_Client;
+
+   procedure Copy_Stream
+     (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      To   : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client);
+
+   procedure Copy_Caps
+     (From       : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      To         : in out Rose.Invocation.Invocation_Record;
+      Create_Cap : Rose.Capabilities.Capability);
+
+   ---------------
+   -- Copy_Caps --
+   ---------------
+
+   procedure Copy_Caps
+     (From       : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      To         : in out Rose.Invocation.Invocation_Record;
+      Create_Cap : Rose.Capabilities.Capability)
    is
       use Rose.Interfaces.Stream_Reader.Client;
       use System.Storage_Elements;
-      Client      : Stream_Reader_Client;
       Last        : Storage_Count;
       Storage     : Storage_Array (1 .. 16);
       Layout      : Init.Calls.Array_Of_Words (1 .. 4);
       pragma Import (Ada, Layout);
       for Layout'Address use Storage'Address;
-      Launch_Caps : Rose.System_Calls.Sent_Caps_Array (1 .. 10);
-      Cap_Count   : Natural := 0;
    begin
-      Open_Cap_Set (Client, Cap_Stream);
+      loop
+         Read (From, Storage, Last);
+         exit when Has_Error or else Last = 0;
+         Rose.System_Calls.Send_Cap
+           (To,
+            Init.Calls.Call (Create_Cap, Layout));
+      end loop;
+   end Copy_Caps;
+
+   -----------------
+   -- Copy_Stream --
+   -----------------
+
+   procedure Copy_Stream
+     (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      To   : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client)
+   is
+      use System.Storage_Elements;
+      use Rose.Interfaces.Stream_Reader.Client;
+      use Rose.Interfaces.Space_Bank.Client;
+      use type Rose.Objects.Object_Id;
+      Last   : Storage_Count;
+      Page_Base : Rose.Objects.Object_Id;
+      Page_Bound : Rose.Objects.Object_Id;
+      Next_Page : Rose.Objects.Object_Id;
+   begin
+      Get_Range
+        (To, Page_Base, Page_Bound);
+      Next_Page := Page_Base;
 
       loop
-         Read (Client, Storage, Last);
-         exit when Has_Error or else Last = 0;
-         Cap_Count := Cap_Count + 1;
-         Launch_Caps (Cap_Count) :=
-           Init.Calls.Call (Create_Cap, Layout);
+         Read (From, Buffer, Last);
+         exit when Last = 0;
+         Buffer (Last + 1 .. Buffer'Last) := (others => 0);
+         Put (To, Next_Page, Buffer);
+         Next_Page := Next_Page + 1;
       end loop;
+   end Copy_Stream;
 
-      if Has_Error then
-         return;
+   --------------------------
+   -- Install_Exec_Library --
+   --------------------------
+
+   procedure Install_Exec_Library
+     (Create_Cap    : Rose.Capabilities.Capability;
+      Write_Cap     : Rose.Capabilities.Capability;
+      Storage_Cap   : Rose.Capabilities.Capability;
+      Launch_Cap    : Rose.Capabilities.Capability;
+      Cap_Stream    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Binary_Length : Rose.Words.Word)
+   is
+      use Rose.Interfaces.Space_Bank.Client;
+      use Rose.Interfaces.Stream_Reader.Client;
+      Space_Bank : constant Space_Bank_Client :=
+                     Reserve_Storage
+                       (Storage_Cap,
+                        Rose.Words.Word_64 (Binary_Length));
+      Exec_Reader : Stream_Reader_Client;
+      Cap_Reader  : Stream_Reader_Client;
+
+      Params      : aliased Rose.Invocation.Invocation_Record;
+      NL          : constant Character := Character'Val (10);
+
+   begin
+
+      Open_Cap_Set (Exec_Reader, Binary_Stream);
+
+      Init.Calls.Send_String
+        (Write_Cap, "init: copy cap stream" & NL);
+
+      Copy_Stream (Exec_Reader, Space_Bank);
+
+      Open_Cap_Set (Cap_Reader, Cap_Stream);
+      Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
+      Init.Calls.Send_String
+        (Write_Cap, "init: sending range cap" & NL);
+      Rose.System_Calls.Send_Cap
+        (Params, Get_Get_Range_Cap (Space_Bank));
+      Init.Calls.Send_String
+        (Write_Cap, "init: sending get cap" & NL);
+      Rose.System_Calls.Send_Cap
+        (Params, Get_Get_Cap (Space_Bank));
+      Init.Calls.Send_String
+        (Write_Cap, "init: sending launch caps" & NL);
+      Copy_Caps (Cap_Reader, Params, Create_Cap);
+      Init.Calls.Send_String
+        (Write_Cap, "init: invoking launch cap" & NL);
+      Rose.System_Calls.Invoke_Capability (Params);
+      Install_Cap := Params.Caps (0);
+   end Install_Exec_Library;
+
+   ------------------------
+   -- Install_Executable --
+   ------------------------
+
+   function Install_Executable
+     (Create_Cap    : Rose.Capabilities.Capability;
+      Cap_Stream    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Binary_Length : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Binary_Length);
+      use Rose.Interfaces.Stream_Reader.Client;
+      use System.Storage_Elements;
+      Client      : Stream_Reader_Client;
+      Storage     : Storage_Array (1 .. 16);
+      Layout      : Init.Calls.Array_Of_Words (1 .. 4);
+      pragma Import (Ada, Layout);
+      for Layout'Address use Storage'Address;
+      Params      : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Install_Cap);
+      Rose.System_Calls.Send_Cap (Params, Binary_Stream);
+
+      Open_Cap_Set (Client, Cap_Stream);
+      Copy_Caps (Client, Params, Create_Cap);
+
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return 0;
+      else
+         return Params.Caps (0);
       end if;
 
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
-         Rose.System_Calls.Send_Cap (Params, Binary_Stream);
-         for Cap of Launch_Caps (1 .. Cap_Count) loop
-            Rose.System_Calls.Send_Cap (Params, Cap);
-         end loop;
-         Rose.System_Calls.Invoke_Capability (Params);
-      end;
-   end Launch_With_Caps;
+   end Install_Executable;
+
+   ---------------------
+   -- Reserve_Storage --
+   ---------------------
+
+   function Reserve_Storage
+     (Storage_Cap : Rose.Capabilities.Capability;
+      Size        : Rose.Words.Word_64)
+      return Rose.Interfaces.Space_Bank.Client.Space_Bank_Client
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Storage_Cap);
+      Rose.System_Calls.Send_Word (Params, Size);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+
+      return Result : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client do
+         if Params.Control.Flags (Rose.Invocation.Send_Caps) then
+            Rose.Interfaces.Space_Bank.Client.Open
+              (Result, Params.Caps (0));
+         end if;
+      end return;
+
+   end Reserve_Storage;
 
 end Init.Installer;
