@@ -592,6 +592,12 @@ package body IDL.Generate_Kernel is
 
          elsif not Is_Scalar (Base_Type) then
             null;
+         elsif Is_Storage_Offset (Base_Type) then
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Send_Storage_Offset",
+                  Syn.Object ("Parameters"),
+                  Syn.Object (Base_Name)));
          else
             if Get_Size (Base_Type) > Default_Size then
                Block.Append
@@ -2017,7 +2023,12 @@ package body IDL.Generate_Kernel is
                           ("Rose.System_Calls.Send_Object_Id",
                            Syn.Object ("Params"),
                            Syn.Object (Get_Ada_Name (Args (I)))));
-
+                  elsif Is_Storage_Offset (Arg_Type) then
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Storage_Offset",
+                           Syn.Object ("Params"),
+                           Syn.Object (Get_Ada_Name (Args (I)))));
                   elsif Get_Size (Arg_Type) > Default_Size then
                      Block.Append
                        (Syn.Statements.New_Procedure_Call_Statement
