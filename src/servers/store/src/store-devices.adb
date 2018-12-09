@@ -11,9 +11,11 @@ package body Store.Devices is
 
    Max_Backing_Stores : constant := 16;
    Max_Space_Banks    : constant := 256;
-   Bank_Size_Bits     : constant := 4;
+   Bank_Size_Bits     : constant := 2;
    Store_Size_Bits    : constant := 20;
-   Minimum_Bank_Size  : constant := 2 ** Bank_Size_Bits;
+   Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
+   Minimum_Bank_Size  : constant := Minimum_Bank_Pages * Rose.Limits.Page_Size;
+
    --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
 
    type Backing_Store_Record is
@@ -108,9 +110,10 @@ package body Store.Devices is
          Space_Allocators.Deallocate
            (Allocator => Allocator,
             Base      =>
-              Natural ((Base - Page_Object_Id'First) / Minimum_Bank_Size),
+              Natural ((Base - Page_Object_Id'First) / Minimum_Bank_Pages) + 1,
             Bound     =>
-              Natural ((Bound - Page_Object_Id'First) / Minimum_Bank_Size));
+              Natural ((Bound - Page_Object_Id'First) / Minimum_Bank_Pages)
+            + 1);
       end;
 
    end Add_Backing_Store;
@@ -243,7 +246,7 @@ package body Store.Devices is
                New_Free_Store.Base := Store.Base + Request_Page_Count;
                New_Free_Store.Allocator_Base :=
                  Store.Allocator_Base
-                   + Natural (Request_Page_Count) / Minimum_Bank_Size;
+                   + Natural (Request_Page_Count) / Minimum_Bank_Pages;
                New_Free_Store.Bound := Store.Bound;
                New_Free_Store.Allocated := False;
                Store.Allocator_Bound := New_Free_Store.Allocator_Base;
@@ -315,6 +318,7 @@ package body Store.Devices is
       Alloc_Size  : Natural := Natural (Size);
    begin
       if Space_Bank_Count >= Max_Space_Banks then
+         Rose.Console_IO.Put_Line ("store: out of space banks");
          return 0;
       end if;
 
@@ -324,10 +328,22 @@ package body Store.Devices is
          Alloc_Size := (Alloc_Size / Minimum_Bank_Size + 1)
            * Minimum_Bank_Size;
       end if;
+      Rose.Console_IO.New_Line;
+      Rose.Console_IO.Put ("store: size=");
+      Rose.Console_IO.Put (Rose.Words.Word_32 (Size));
+      Rose.Console_IO.Put ("; alloc-size=");
+      Rose.Console_IO.Put (Rose.Words.Word_32 (Alloc_Size));
+      Rose.Console_IO.Put ("; unit-count=");
+      Rose.Console_IO.Put (Natural (Alloc_Size / Minimum_Bank_Size));
+      Rose.Console_IO.New_Line;
 
       Alloc_Index :=
         Space_Allocators.Allocate
           (Allocator, Alloc_Size / Minimum_Bank_Size);
+
+      Rose.Console_IO.Put ("store: alloc index = ");
+      Rose.Console_IO.Put (Alloc_Index);
+      Rose.Console_IO.New_Line;
 
       if Alloc_Index = 0 then
          return 0;
