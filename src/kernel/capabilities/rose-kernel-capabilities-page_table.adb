@@ -1,5 +1,7 @@
+with Rose.Limits;
 with Rose.Words;
 
+with Rose.Kernel.Clock;
 with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Capabilities.Page_Table is
@@ -32,7 +34,11 @@ package body Rose.Kernel.Capabilities.Page_Table is
                                  Virtual_Page_Address
                                    (Params.Data (Page_Index + 1));
                Permissions   : constant Rose.Words.Word :=
-                                 (Params.Data (Page_Index + 2));
+                                 Params.Data (Page_Index + 2);
+               Available_Pages : constant Rose.Words.Word :=
+                                   Params.Data (Page_Index + 3);
+               Allocated_Pages : constant Rose.Words.Word :=
+                                   Params.Data (Page_Index + 4);
                Readable      : constant Boolean :=
                                  (Permissions and 1) /= 0;
                Writable      : constant Boolean :=
@@ -49,6 +55,11 @@ package body Rose.Kernel.Capabilities.Page_Table is
                   Writable      => Writable,
                   Executable    => Executable,
                   User          => True);
+               Rose.Kernel.Clock.Update_Mem
+                 (Allocated =>
+                    Physical_Bytes (Allocated_Pages * Rose.Limits.Page_Size),
+                  Available =>
+                    Physical_Bytes (Available_Pages * Rose.Limits.Page_Size));
             end;
 
             Params.Control :=

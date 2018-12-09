@@ -1,5 +1,6 @@
 with Rose.Addresses;
 with Rose.Capabilities;
+with Rose.Words;
 
 package Mem.Physical_Map is
 
@@ -20,5 +21,8 @@ package Mem.Physical_Map is
 
    function Region_Unmap_Page_Cap
       return Rose.Capabilities.Capability;
+
+   function Available_Pages return Rose.Words.Word;
+   function Allocated_Pages return Rose.Words.Word;
 
 end Mem.Physical_Map;

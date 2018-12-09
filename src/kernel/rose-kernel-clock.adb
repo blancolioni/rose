@@ -9,6 +9,9 @@ package body Rose.Kernel.Clock is
 
    Ticks : Word_32 := 0;
 
+   Current_Allocated_Memory : Physical_Bytes := 0;
+   Current_Available_Memory : Physical_Bytes := 0;
+
    -----------------------
    -- Handle_Clock_Tick --
    -----------------------
@@ -33,10 +36,12 @@ package body Rose.Kernel.Clock is
               (Current_Pid, Name, Name_Last);
             Rose.Boot.Console.Status_Line
               (Current_Process => Name (1 .. Name_Last),
-               Current_Ticks  => Ticks,
-               Page_Faults    => Rose.Kernel.Processes.Page_Fault_Count,
-               Heap_Allocated => Allocated,
-               Heap_Available => Available);
+               Current_Ticks   => Ticks,
+               Page_Faults     => Rose.Kernel.Processes.Page_Fault_Count,
+               Mem_Allocated   => Current_Allocated_Memory,
+               Mem_Available   => Current_Available_Memory,
+               Heap_Allocated  => Allocated,
+               Heap_Available  => Available);
          end;
       end if;
 
@@ -72,5 +77,17 @@ package body Rose.Kernel.Clock is
 --      end if;
       return Rose.Kernel.Interrupts.Finished;
    end Handle_Clock_Tick;
+
+   ----------------
+   -- Update_Mem --
+   ----------------
+
+   procedure Update_Mem
+     (Allocated, Available : Rose.Addresses.Physical_Bytes)
+   is
+   begin
+      Current_Available_Memory := Available;
+      Current_Allocated_Memory := Allocated;
+   end Update_Mem;
 
 end Rose.Kernel.Clock;

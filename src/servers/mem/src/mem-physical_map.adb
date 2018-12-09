@@ -1,5 +1,4 @@
 with Rose.Limits;
-with Rose.Words;
 
 package body Mem.Physical_Map is
 
@@ -16,6 +15,9 @@ package body Mem.Physical_Map is
      of Allocated_Block;
 
    Allocation_Map : Allocated_Block_Array := (others => 0);
+
+   Total_Pages    : Rose.Words.Word := 0;
+   Current_Allocated_Pages : Rose.Words.Word := 0;
 
    type Physical_Region is
       record
@@ -42,6 +44,7 @@ package body Mem.Physical_Map is
       Map_Page_Cap   : Rose.Capabilities.Capability;
       Unmap_Page_Cap : Rose.Capabilities.Capability)
    is
+      use type Rose.Words.Word;
       Map_Start : constant Physical_Page_Address :=
                     (if Number_Of_Regions = 0
                      then 0
@@ -57,6 +60,7 @@ package body Mem.Physical_Map is
            Allocated_Block'Last
              - (2 ** Natural (Bound mod Allocated_Block'Size) - 1);
       end if;
+      Total_Pages := Total_Pages + Rose.Words.Word (Bound - Base);
 
    end Add_Region;
 
@@ -68,8 +72,8 @@ package body Mem.Physical_Map is
      (Page    : out Rose.Addresses.Physical_Page_Address;
       Success : out Boolean)
    is
+      use type Rose.Words.Word;
       Region : Region_Index := Region_Index'First;
-
    begin
       for I in Allocation_Map'Range loop
          if Region_Table (Region).Map_Bound <= I then
@@ -95,6 +99,7 @@ package body Mem.Physical_Map is
                  or 2 ** Offset;
                Page := Page + Physical_Page_Address (Offset);
                Success := True;
+               Current_Allocated_Pages := Current_Allocated_Pages + 1;
                return;
             end;
          end if;
@@ -103,10 +108,30 @@ package body Mem.Physical_Map is
    end Allocate_Page;
 
    ---------------------
+   -- Allocated_Pages --
+   ---------------------
+
+   function Allocated_Pages return Rose.Words.Word is
+   begin
+      return Current_Allocated_Pages;
+   end Allocated_Pages;
+
+   ---------------------
+   -- Available_Pages --
+   ---------------------
+
+   function Available_Pages return Rose.Words.Word is
+      use type Rose.Words.Word;
+   begin
+      return Total_Pages - Current_Allocated_Pages;
+   end Available_Pages;
+
+   ---------------------
    -- Deallocate_Page --
    ---------------------
 
    procedure Deallocate_Page (Page : Rose.Addresses.Physical_Page_Address) is
+      use type Rose.Words.Word;
    begin
       for I in 1 .. Number_Of_Regions loop
          if Page in Region_Table (I).Base .. Region_Table (I).Bound - 1 then
@@ -120,6 +145,7 @@ package body Mem.Physical_Map is
                  (2 ** Natural ((Page - Region_Table (I).Base)
                                 mod Allocated_Block'Size));
             end;
+            Current_Allocated_Pages := Current_Allocated_Pages - 1;
             return;
          end if;
       end loop;

@@ -51,6 +51,8 @@ package Rose.Boot.Console is
      (Current_Process : String;
       Current_Ticks   : Rose.Words.Word;
       Page_Faults     : Natural;
+      Mem_Allocated   : Rose.Addresses.Physical_Bytes;
+      Mem_Available   : Rose.Addresses.Physical_Bytes;
       Heap_Allocated  : Rose.Addresses.Physical_Bytes;
       Heap_Available  : Rose.Addresses.Physical_Bytes);
 

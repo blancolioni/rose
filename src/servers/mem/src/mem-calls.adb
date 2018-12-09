@@ -115,6 +115,8 @@ package body Mem.Calls is
                     Boolean'Pos (Readable)
                     + 2 * Boolean'Pos (Writeable)
                     + 4 * Boolean'Pos (Executable));
+         Send_Word (Params, Mem.Physical_Map.Available_Pages);
+         Send_Word (Params, Mem.Physical_Map.Allocated_Pages);
 
          Rose.System_Calls.Invoke_Capability (Params);
 
