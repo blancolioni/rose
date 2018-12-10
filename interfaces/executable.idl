@@ -2,6 +2,7 @@ interface Executable is
 
    procedure Launch
      (Image : interface Region;
+      Store : interface Storage;
       Caps  : Capability_Array);      
 
 end Executable;
