@@ -5,13 +5,13 @@ with Rose.Console_IO;
 with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Space_Bank;
+with Rose.Interfaces.Region;
 with Rose.Interfaces.Stream_Reader;
 
 package body Store.Devices is
 
    Max_Backing_Stores : constant := 16;
-   Max_Space_Banks    : constant := 256;
+   Max_Regions    : constant := 256;
    Bank_Size_Bits     : constant := 2;
    Store_Size_Bits    : constant := 20;
    Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
@@ -38,26 +38,26 @@ package body Store.Devices is
    Backing_Stores      : Backing_Store_Array;
    Backing_Store_Count : Natural := 0;
 
-   type Space_Bank_Record is
+   type Region_Record is
       record
          Backing_Device : Natural := 0;
          Base, Bound    : Rose.Objects.Object_Id := 0;
          Access_Cap     : Rose.Capabilities.Capability := 0;
       end record;
 
-   type Space_Bank_Array is
-     array (1 .. Max_Space_Banks) of Space_Bank_Record;
+   type Region_Array is
+     array (1 .. Max_Regions) of Region_Record;
 
-   Space_Banks      : Space_Bank_Array;
-   Space_Bank_Count : Natural := 0;
+   Regions      : Region_Array;
+   Region_Count : Natural := 0;
 
    Stream_Buffer_Length : constant := 4096;
 
-   type Space_Bank_Stream_Record is
+   type Region_Stream_Record is
       record
          Open           : Boolean := False;
          Cap            : Rose.Capabilities.Capability := 0;
-         Space_Bank     : Positive;
+         Region     : Positive;
          Current_Page   : Rose.Objects.Page_Object_Id;
          Current_Offset : System.Storage_Elements.Storage_Offset;
          Stream_Length  : System.Storage_Elements.Storage_Count;
@@ -67,11 +67,11 @@ package body Store.Devices is
          Buffer_Offset  : System.Storage_Elements.Storage_Offset;
       end record;
 
-   type Space_Bank_Stream_Array is
+   type Region_Stream_Array is
      array (Rose.Objects.Capability_Identifier range 1 .. Max_Open_Streams)
-     of Space_Bank_Stream_Record;
+     of Region_Stream_Record;
 
-   Space_Bank_Streams : Space_Bank_Stream_Array;
+   Region_Streams : Region_Stream_Array;
 
    package Space_Allocators is
      new Rose.Allocators (Store_Size_Bits - Bank_Size_Bits);
@@ -152,20 +152,20 @@ package body Store.Devices is
       Data :    out System.Storage_Elements.Storage_Array)
    is
       use type Rose.Objects.Object_Id;
-      Space_Bank_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Natural (Id);
    begin
-      if Space_Bank_Index not in 1 .. Space_Bank_Count
-        or else Page < Space_Banks (Space_Bank_Index).Base
-        or else Page >= Space_Banks (Space_Bank_Index).Bound
+      if Region_Index not in 1 .. Region_Count
+        or else Page < Regions (Region_Index).Base
+        or else Page >= Regions (Region_Index).Bound
       then
          Data := (others => 0);
          return;
       end if;
 
       declare
-         Space_Bank : Space_Bank_Record renames Space_Banks (Space_Bank_Index);
+         Region : Region_Record renames Regions (Region_Index);
          Store      : Backing_Store_Record renames
-                        Backing_Stores (Space_Bank.Backing_Device);
+                        Backing_Stores (Region.Backing_Device);
       begin
          Rose.Interfaces.Block_Device.Client.Read_Blocks
            (Item   => Store.Client,
@@ -187,16 +187,16 @@ package body Store.Devices is
       Base  : out Rose.Objects.Object_Id;
       Bound : out Rose.Objects.Object_Id)
    is
-      Space_Bank_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Natural (Id);
    begin
-      if Space_Bank_Index not in 1 .. Space_Bank_Count then
+      if Region_Index not in 1 .. Region_Count then
          Base := 0;
          Bound := 0;
          return;
       end if;
 
-      Base := Space_Banks (Space_Bank_Index).Base;
-      Bound := Space_Banks (Space_Bank_Index).Bound;
+      Base := Regions (Region_Index).Base;
+      Bound := Regions (Region_Index).Bound;
    end Get_Range;
 
    ---------------
@@ -305,19 +305,19 @@ package body Store.Devices is
       Data : in     System.Storage_Elements.Storage_Array)
    is
       use type Rose.Objects.Object_Id;
-      Space_Bank_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Natural (Id);
    begin
-      if Space_Bank_Index not in 1 .. Space_Bank_Count
-        or else Page < Space_Banks (Space_Bank_Index).Base
-        or else Page >= Space_Banks (Space_Bank_Index).Bound
+      if Region_Index not in 1 .. Region_Count
+        or else Page < Regions (Region_Index).Base
+        or else Page >= Regions (Region_Index).Bound
       then
          return;
       end if;
 
       declare
-         Space_Bank : Space_Bank_Record renames Space_Banks (Space_Bank_Index);
+         Region : Region_Record renames Regions (Region_Index);
          Store      : Backing_Store_Record renames
-                        Backing_Stores (Space_Bank.Backing_Device);
+                        Backing_Stores (Region.Backing_Device);
       begin
          Rose.Interfaces.Block_Device.Client.Write_Blocks
            (Item   => Store.Client,
@@ -341,8 +341,8 @@ package body Store.Devices is
    is
       use System.Storage_Elements;
       use type Rose.Objects.Object_Id;
-      Rec  : Space_Bank_Stream_Record renames
-               Space_Bank_Streams (Id);
+      Rec  : Region_Stream_Record renames
+               Region_Streams (Id);
    begin
       if not Rec.Open
         or else Rec.Current_Offset >= Rec.Stream_Length
@@ -360,7 +360,7 @@ package body Store.Devices is
          Last := Last + 1;
          if Rec.Buffer_Offset > Rec.Buffer_Length then
             Rec.Current_Page := Rec.Current_Page + 1;
-            Get (Rose.Objects.Capability_Identifier (Rec.Space_Bank),
+            Get (Rose.Objects.Capability_Identifier (Rec.Region),
                  Rec.Current_Page, Rec.Current_Buffer);
             Rec.Buffer_Offset := 1;
          end if;
@@ -383,8 +383,8 @@ package body Store.Devices is
       use Rose.Objects;
       Stream_Id : Capability_Identifier := 0;
    begin
-      for I in Space_Bank_Streams'Range loop
-         if not Space_Bank_Streams (I).Open then
+      for I in Region_Streams'Range loop
+         if not Region_Streams (I).Open then
             Stream_Id := I;
             exit;
          end if;
@@ -398,21 +398,21 @@ package body Store.Devices is
          use type System.Storage_Elements.Storage_Offset;
          use Rose.Capabilities;
          Current_Cap : constant Capability :=
-                         Space_Bank_Streams (Stream_Id).Cap;
-         Stream_Rec  : Space_Bank_Stream_Record renames
-                         Space_Bank_Streams (Stream_Id);
-         Space_Bank  : Space_Bank_Record renames
-                         Space_Banks (Positive (Id));
+                         Region_Streams (Stream_Id).Cap;
+         Stream_Rec  : Region_Stream_Record renames
+                         Region_Streams (Stream_Id);
+         Region  : Region_Record renames
+                         Regions (Positive (Id));
       begin
          Stream_Rec :=
-           Space_Bank_Stream_Record'
+           Region_Stream_Record'
              (Open           => True,
               Cap            => Current_Cap,
-              Space_Bank     => Positive (Id),
-              Current_Page   => Space_Bank.Base,
+              Region     => Positive (Id),
+              Current_Page   => Region.Base,
               Stream_Length  =>
                 System.Storage_Elements.Storage_Count
-                  (Space_Bank.Bound - Space_Bank.Base)
+                  (Region.Bound - Region.Base)
                     * Rose.Limits.Page_Size,
               Current_Offset => 0,
               Buffer_Offset  => 0,
@@ -441,7 +441,7 @@ package body Store.Devices is
       Alloc_Index : Natural;
       Alloc_Size  : Natural := Natural (Size);
    begin
-      if Space_Bank_Count >= Max_Space_Banks then
+      if Region_Count >= Max_Regions then
          Rose.Console_IO.Put_Line ("store: out of space banks");
          return 0;
       end if;
@@ -473,11 +473,11 @@ package body Store.Devices is
          return 0;
       end if;
 
-      Space_Bank_Count := Space_Bank_Count + 1;
+      Region_Count := Region_Count + 1;
       declare
          use Rose.Objects;
-         New_Bank : Space_Bank_Record renames
-                      Space_Banks (Space_Bank_Count);
+         New_Bank : Region_Record renames
+                      Regions (Region_Count);
          Store    : Positive := 1;
          Base     : Object_Id;
          Bound    : Object_Id;
@@ -493,15 +493,15 @@ package body Store.Devices is
          Bound :=
            Base + Object_Id (Alloc_Size * Minimum_Bank_Size);
 
-         New_Bank := Space_Bank_Record'
+         New_Bank := Region_Record'
            (Backing_Device => Store,
             Base           => Base,
             Bound          => Bound,
             Access_Cap     =>
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
-                 Rose.Interfaces.Space_Bank.Space_Bank_Interface,
-                 Capability_Identifier (Space_Bank_Count)));
+                 Rose.Interfaces.Region.Region_Interface,
+                 Capability_Identifier (Region_Count)));
 
          return New_Bank.Access_Cap;
       end;

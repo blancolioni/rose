@@ -10,6 +10,6 @@ package Exec is
    Console_Cap          : constant Rose.Capabilities.Capability := 4;
 
    Create_Process_Cap   : constant Rose.Capabilities.Capability := 5;
-   Space_Bank_Cap       : constant Rose.Capabilities.Capability := 6;
+   Region_Cap       : constant Rose.Capabilities.Capability := 6;
 
 end Exec;

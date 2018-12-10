@@ -1,4 +1,4 @@
-interface Space_Bank is
+interface Region is
 
    procedure Get_Range
      (Base_Page : out Object_Id;
@@ -14,4 +14,4 @@ interface Space_Bank is
    
    function Read return interface Stream_Reader;
    
-end Space_Bank;
+end Region;

@@ -7,7 +7,7 @@ with Rose.Server;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Exec.Server;
-with Rose.Interfaces.Space_Bank.Client;
+with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Stream_Reader.Client;
 
 with Exec.Library;
@@ -24,7 +24,7 @@ package body Exec.Server is
       Caps : Rose.Capabilities.Capability_Array);
 
    Context : Rose.Server.Server_Context;
-   Space_Bank : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client;
+   Region : Rose.Interfaces.Region.Client.Region_Client;
 
    -------------------
    -- Create_Server --
@@ -33,7 +33,7 @@ package body Exec.Server is
    procedure Create_Server is
    begin
       Rose.Console_IO.Put_Line ("exec: creating server");
-      Rose.Interfaces.Space_Bank.Client.Open (Space_Bank, Space_Bank_Cap);
+      Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
 
       Rose.Interfaces.Exec.Server.Create_Server
         (Server_Context => Context,
