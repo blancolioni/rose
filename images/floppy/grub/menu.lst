@@ -20,7 +20,7 @@ title Rose boot
 
 title Rose process log
     root (fd0)
-    kernel /kernel log-process=7
+    kernel /kernel log-object-id=8
     module /init
     module /console
     module /mem
