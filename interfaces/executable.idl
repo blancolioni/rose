@@ -1,7 +1,7 @@
 interface Executable is
 
    procedure Launch
-     (Image : interface Stream_Reader;
+     (Image : interface Region;
       Caps  : Capability_Array);      
 
 end Executable;
