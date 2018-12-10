@@ -1,0 +1,17 @@
+interface Memory is
+
+   Segment_Readable    : constant := 1;
+   Segment_Writable    : constant := 2;
+   Segment_Executable  : constant := 4;
+   Segment_Initialized : constant := 8;
+   
+   procedure New_Process
+     (Oid           : Object_Id);
+      
+   procedure Add_Segment
+     (Process      : Object_Id;
+      Virtual_Base : Word;
+      Region       : interface Region;
+      Flags        : Word);
+      
+end Memory;

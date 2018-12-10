@@ -32,6 +32,7 @@ package body Store.Server is
          Store.Devices.Get'Access,
          Store.Devices.Put'Access,
          Store.Devices.Read_Stream'Access,
+         Store.Devices.Create_Subregion'Access,
          Instanced => True);
 
       Rose.Interfaces.Stream_Reader.Server.Attach_Interface
