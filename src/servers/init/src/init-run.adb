@@ -8,6 +8,7 @@ with Rose.Interfaces.Storage;
 
 with Rose.Interfaces.Partitions.Client;
 
+with Rose.Interfaces.Executable;
 with Rose.Interfaces.Installer;
 
 with Rose.Invocation;
@@ -33,6 +34,7 @@ package body Init.Run is
    Restore_Module   : constant := 8;
    Scan_Module      : constant := 9;
    Partition_Module : constant := 10;
+   Elf_Module       : constant := 11;
 
    --------------
    -- Run_Init --
@@ -60,6 +62,9 @@ package body Init.Run is
       Delete_Cap           : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 30, 0, 0));
+      Rescind_Cap          : constant Rose.Capabilities.Capability :=
+                               Init.Calls.Call
+                                 (Create_Cap, (2, 29, 0, 0));
       Exit_Cap             : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 31, 0, 0));
@@ -86,6 +91,7 @@ package body Init.Run is
       Add_Storage_Cap      : Rose.Capabilities.Capability;
       Reserve_Storage_Cap  : Rose.Capabilities.Capability;
 
+      Launch_Elf_Cap       : Rose.Capabilities.Capability;
       Install_Media_FS     : Rose.Capabilities.Capability;
       Install_Receiver     : Rose.Capabilities.Capability;
       Install_Endpoint     : Rose.Capabilities.Capability;
@@ -409,6 +415,26 @@ package body Init.Run is
       end;
 
       declare
+         Elf_Id       : constant Rose.Objects.Object_Id :=
+                            Init.Calls.Launch_Boot_Module
+                              (Boot_Cap, Elf_Module, Device_Driver_Priority,
+                               (Create_Endpoint_Cap,
+                                Delete_Cap, Rescind_Cap,
+                                Console_Write_Cap));
+         Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
+                            Init.Calls.Call
+                              (Create_Cap,
+                               (9, 1,
+                                Word (Elf_Id mod 2 ** 32),
+                                Word (Elf_Id / 2 ** 32)));
+      begin
+         Launch_Elf_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Elf_Cap,
+              Rose.Interfaces.Executable.Launch_Endpoint);
+      end;
+
+      declare
          use Rose.Interfaces.Partitions;
          Scan_Id : constant Rose.Objects.Object_Id :=
                      Init.Calls.Launch_Boot_Module
@@ -502,7 +528,6 @@ package body Init.Run is
          Params : aliased Rose.Invocation.Invocation_Record;
          Reply  : aliased Rose.Invocation.Invocation_Record;
          First  : Boolean := True;
-         Launch_Cap : Rose.Capabilities.Capability;
       begin
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
@@ -516,22 +541,22 @@ package body Init.Run is
                Init.Installer.Install_Exec_Library
                  (Create_Cap    => Create_Cap,
                   Storage_Cap   => Reserve_Storage_Cap,
-                  Launch_Cap    =>
-                    Init.Calls.Call
-                      (Create_Cap,
-                       (7, 4, 0, 0)),
+                  Launch_Cap    => Launch_Elf_Cap,
                   Cap_Stream    => Params.Caps (0),
                   Binary_Stream => Params.Caps (1),
                   Binary_Length => Params.Data (0));
                First := False;
             else
-               Launch_Cap :=
-                 Init.Installer.Install_Executable
-                   (Create_Cap    => Create_Cap,
-                    Cap_Stream    => Params.Caps (0),
-                    Binary_Stream => Params.Caps (1),
-                    Binary_Length => Params.Data (0));
-               Rose.System_Calls.Send_Cap (Reply, Launch_Cap);
+               declare
+                  Launch_Cap : constant Rose.Capabilities.Capability :=
+                                 Init.Installer.Install_Executable
+                                   (Create_Cap    => Create_Cap,
+                                    Cap_Stream    => Params.Caps (0),
+                                    Binary_Stream => Params.Caps (1),
+                                    Binary_Length => Params.Data (0));
+               begin
+                  Rose.System_Calls.Send_Cap (Reply, Launch_Cap);
+               end;
             end if;
 
             Rose.System_Calls.Invoke_Capability (Reply);
