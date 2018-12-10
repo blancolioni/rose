@@ -113,7 +113,8 @@ private
    is (Get_Ada_Name (Item) = "Rose.Words.Word_64");
 
    function Is_Word_Type (Item : IDL_Type) return Boolean
-   is (Is_Word_32 (Item) or else Is_Word_64 (Item));
+   is (Is_Word_32 (Item) or else Is_Word_64 (Item)
+       or else Get_Ada_Name (Item) = "Rose.Words.Word");
 
    function Is_Capability_Array (Item : IDL_Type) return Boolean
    is (Get_Ada_Name (Item) = "Rose.Capabilities.Capability_Array");
