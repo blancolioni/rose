@@ -1030,6 +1030,21 @@ package body IDL.Generate_Kernel is
          Generate_Client_Override (Client, Item, Subprs (I), Null_Interface);
       end loop;
 
+      declare
+         Interface_Name : constant String := Get_Ada_Name (Item);
+         Get_Cap        : Syn.Declarations.Subprogram_Declaration'Class :=
+                            Syn.Declarations.New_Function
+                              ("Get_Interface_Cap",
+                               "Rose.Capabilities.Capability",
+                               Syn.Object ("Item.Interface_Cap"));
+      begin
+         Get_Cap.Add_Formal_Argument
+           (Arg_Name => "Item",
+            Arg_Type => Interface_Name & "_Client");
+         Client.Add_Separator;
+         Client.Append (Get_Cap);
+      end;
+
       for I in Subprs'Range loop
          Generate_Cap_Query (Client, Item, Subprs (I), Null_Interface);
       end loop;
@@ -1293,6 +1308,8 @@ package body IDL.Generate_Kernel is
    begin
       Interface_Record.Add_Component
         ("Is_Open", "Boolean", "False");
+      Interface_Record.Add_Component
+        ("Interface_Cap", "Rose.Capabilities.Capability", "0");
 
       declare
          procedure Add_Cap (Subpr : IDL_Subprogram);
@@ -1363,6 +1380,10 @@ package body IDL.Generate_Kernel is
       Block.Add_Statement
         (Syn.Statements.New_Assignment_Statement
            ("Client.Is_Open", Syn.Literal (False)));
+
+      Block.Add_Statement
+        (Syn.Statements.New_Assignment_Statement
+           ("Client.Interface_Cap", Syn.Object ("Interface_Cap")));
 
       Block.Add_Statement
         (Syn.Statements.New_Procedure_Call_Statement
@@ -1962,6 +1983,16 @@ package body IDL.Generate_Kernel is
                        ("Rose.System_Calls.Send_Cap",
                         Syn.Object ("Params"),
                         Syn.Object (Get_Ada_Name (Args (I)))));
+               elsif Is_Interface (Arg_Type) then
+                  Block.Append
+                    (Syn.Statements.New_Procedure_Call_Statement
+                       ("Rose.System_Calls.Send_Cap",
+                        Syn.Object ("Params"),
+                        Syn.Expressions.New_Function_Call_Expression
+                          (Get_Ada_Package (Arg_Type)
+                           & ".Get_Interface_Cap",
+                           Syn.Object (Get_Ada_Name (Args (I))))));
+
                elsif not Is_Scalar (Arg_Type) then
                   if Have_Non_Scalar then
                      Ada.Text_IO.Put_Line
