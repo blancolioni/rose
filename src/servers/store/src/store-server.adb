@@ -4,7 +4,7 @@ with Rose.Words;
 with Rose.Console_IO;
 
 with Rose.Interfaces.Storage.Server;
-with Rose.Interfaces.Space_Bank.Server;
+with Rose.Interfaces.Region.Server;
 with Rose.Interfaces.Stream_Reader.Server;
 
 with Store.Devices;
@@ -26,7 +26,7 @@ package body Store.Server is
         (Server_Context    => Server_Context,
          Reserve_Storage   => Reserve_Storage'Access,
          Add_Backing_Store => Store.Devices.Add_Backing_Store'Access);
-      Rose.Interfaces.Space_Bank.Server.Attach_Interface
+      Rose.Interfaces.Region.Server.Attach_Interface
         (Server_Context,
          Store.Devices.Get_Range'Access,
          Store.Devices.Get'Access,

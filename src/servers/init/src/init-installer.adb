@@ -3,7 +3,7 @@ with System.Storage_Elements;
 with Rose.Limits;
 with Rose.Objects;
 
-with Rose.Interfaces.Space_Bank.Client;
+with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Stream_Reader.Client;
 
 with Rose.Invocation;
@@ -21,11 +21,11 @@ package body Init.Installer is
    function Reserve_Storage
      (Storage_Cap : Rose.Capabilities.Capability;
       Size        : Rose.Words.Word_64)
-      return Rose.Interfaces.Space_Bank.Client.Space_Bank_Client;
+      return Rose.Interfaces.Region.Client.Region_Client;
 
    procedure Copy_Stream
      (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
-      To   : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client);
+      To   : Rose.Interfaces.Region.Client.Region_Client);
 
    procedure Copy_Caps
      (From       : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
@@ -64,11 +64,11 @@ package body Init.Installer is
 
    procedure Copy_Stream
      (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
-      To   : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client)
+      To   : Rose.Interfaces.Region.Client.Region_Client)
    is
       use System.Storage_Elements;
       use Rose.Interfaces.Stream_Reader.Client;
-      use Rose.Interfaces.Space_Bank.Client;
+      use Rose.Interfaces.Region.Client;
       use type Rose.Objects.Object_Id;
       Last   : Storage_Count;
       Page_Base : Rose.Objects.Object_Id;
@@ -100,9 +100,9 @@ package body Init.Installer is
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word)
    is
-      use Rose.Interfaces.Space_Bank.Client;
+      use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
-      Space_Bank : constant Space_Bank_Client :=
+      Region : constant Region_Client :=
                      Reserve_Storage
                        (Storage_Cap,
                         Rose.Words.Word_64 (Binary_Length));
@@ -113,14 +113,14 @@ package body Init.Installer is
    begin
 
       Open_Cap_Set (Exec_Reader, Binary_Stream);
-      Copy_Stream (Exec_Reader, Space_Bank);
+      Copy_Stream (Exec_Reader, Region);
 
       Open_Cap_Set (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
       Rose.System_Calls.Send_Cap
-        (Params, Get_Get_Range_Cap (Space_Bank));
+        (Params, Get_Get_Range_Cap (Region));
       Rose.System_Calls.Send_Cap
-        (Params, Get_Get_Cap (Space_Bank));
+        (Params, Get_Get_Cap (Region));
       Copy_Caps (Cap_Reader, Params, Create_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
       Install_Cap := Params.Caps (0);
@@ -172,7 +172,7 @@ package body Init.Installer is
    function Reserve_Storage
      (Storage_Cap : Rose.Capabilities.Capability;
       Size        : Rose.Words.Word_64)
-      return Rose.Interfaces.Space_Bank.Client.Space_Bank_Client
+      return Rose.Interfaces.Region.Client.Region_Client
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -182,9 +182,9 @@ package body Init.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
 
 
-      return Result : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client do
+      return Result : Rose.Interfaces.Region.Client.Region_Client do
          if Params.Control.Flags (Rose.Invocation.Send_Caps) then
-            Rose.Interfaces.Space_Bank.Client.Open
+            Rose.Interfaces.Region.Client.Open
               (Result, Params.Caps (0));
          end if;
       end return;

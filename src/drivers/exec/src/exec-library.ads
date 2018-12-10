@@ -1,12 +1,12 @@
 with Rose.Objects;
 
-with Rose.Interfaces.Space_Bank.Client;
+with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Stream_Reader.Client;
 
 package Exec.Library is
 
-   procedure Set_Space_Bank
-     (Client : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client);
+   procedure Set_Region
+     (Client : Rose.Interfaces.Region.Client.Region_Client);
 
    function Install
      (ELF_Image  : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client)
