@@ -9,14 +9,23 @@ CFILES=$(UTIL)
 OBJECTS= \
 	$(BUILDDIR)/elf.o \
 	$(BUILDDIR)/elf-driver.o \
+	$(BUILDDIR)/elf-format.o \
+	$(BUILDDIR)/elf-loader.o \
 	$(BUILDDIR)/elf-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-block_device.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-executable.o \
 	$(BUILDDIR)/rose-interfaces-executable-server.o \
+	$(BUILDDIR)/rose-interfaces-memory-client.o \
+	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-client.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
