@@ -17,8 +17,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-executable.o \
 	$(BUILDDIR)/rose-interfaces-executable-server.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \

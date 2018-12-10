@@ -2,7 +2,7 @@ interface Storage is
 
    function Reserve_Storage
      (Size   : Word_64)
-     return interface Space_Bank;
+     return interface Region;
    
    procedure Add_Backing_Store
      (Store  : interface Block_Device);

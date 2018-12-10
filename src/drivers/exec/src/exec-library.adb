@@ -25,7 +25,7 @@ package body Exec.Library is
    Installed_Programs : Installed_Program_Array;
    Installed_Count    : Rose.Objects.Capability_Identifier := 0;
 
-   Space_Bank         : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client;
+   Region         : Rose.Interfaces.Region.Client.Region_Client;
    Page_Base,
    Page_Bound         : Rose.Objects.Object_Id := 0;
    Next_Page          : Rose.Objects.Object_Id := 0;
@@ -66,7 +66,7 @@ package body Exec.Library is
       declare
          use System.Storage_Elements;
          use Rose.Interfaces.Stream_Reader.Client;
-         use Rose.Interfaces.Space_Bank.Client;
+         use Rose.Interfaces.Region.Client;
          use type Rose.Objects.Object_Id;
          Buffer : Storage_Array (1 .. Rose.Limits.Page_Size);
          Last   : Storage_Count;
@@ -80,7 +80,7 @@ package body Exec.Library is
             Read (ELF_Image, Buffer, Last);
             exit when Last = 0;
             Buffer (Last + 1 .. Buffer'Last) := (others => 0);
-            Put (Space_Bank, Next_Page, Buffer);
+            Put (Region, Next_Page, Buffer);
             Next_Page := Next_Page + 1;
          end loop;
          Install.ELF_Bound := Next_Page;
@@ -93,17 +93,17 @@ package body Exec.Library is
    end Install;
 
    --------------------
-   -- Set_Space_Bank --
+   -- Set_Region --
    --------------------
 
-   procedure Set_Space_Bank
-     (Client : Rose.Interfaces.Space_Bank.Client.Space_Bank_Client)
+   procedure Set_Region
+     (Client : Rose.Interfaces.Region.Client.Region_Client)
    is
    begin
-      Space_Bank := Client;
-      Rose.Interfaces.Space_Bank.Client.Get_Range
-        (Space_Bank, Page_Base, Page_Bound);
+      Region := Client;
+      Rose.Interfaces.Region.Client.Get_Range
+        (Region, Page_Base, Page_Bound);
       Next_Page := Page_Base;
-   end Set_Space_Bank;
+   end Set_Region;
 
 end Exec.Library;

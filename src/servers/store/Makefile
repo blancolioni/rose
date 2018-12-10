@@ -19,8 +19,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
-	$(BUILDDIR)/rose-interfaces-space_bank.o \
-	$(BUILDDIR)/rose-interfaces-space_bank-server.o \
+	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-region-server.o \
 	$(BUILDDIR)/rose-interfaces-storage.o \
 	$(BUILDDIR)/rose-interfaces-storage-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
