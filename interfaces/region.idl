@@ -14,4 +14,10 @@ interface Region is
    
    function Read return interface Stream_Reader;
    
+   function Create_Subregion
+     (Subregion_Base  : Object_Id;
+      Subregion_Bound : Object_Id;
+      Flags           : Word)
+     return interface Region;
+     
 end Region;

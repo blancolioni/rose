@@ -33,6 +33,13 @@ package Store.Devices is
      (Id      : in Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
+   function Create_Subregion
+     (Id      : in Rose.Objects.Capability_Identifier;
+      Base    : Rose.Objects.Object_Id;
+      Bound   : Rose.Objects.Object_Id;
+      Flags   : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+
    procedure Read
      (Id      : in Rose.Objects.Capability_Identifier;
       Storage : out System.Storage_Elements.Storage_Array;

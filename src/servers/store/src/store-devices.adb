@@ -11,7 +11,7 @@ with Rose.Interfaces.Stream_Reader;
 package body Store.Devices is
 
    Max_Backing_Stores : constant := 16;
-   Max_Regions    : constant := 256;
+   Max_Regions        : constant := 256;
    Bank_Size_Bits     : constant := 2;
    Store_Size_Bits    : constant := 20;
    Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
@@ -141,6 +141,49 @@ package body Store.Devices is
       end;
 
    end Add_Backing_Store;
+
+   ----------------------
+   -- Create_Subregion --
+   ----------------------
+
+   function Create_Subregion
+     (Id      : in Rose.Objects.Capability_Identifier;
+      Base    : Rose.Objects.Object_Id;
+      Bound   : Rose.Objects.Object_Id;
+      Flags   : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Flags);
+      use Rose.Objects;
+      Parent : Region_Record renames Regions (Positive (Id));
+   begin
+      if Id < 1 or else Natural (Id) > Region_Count
+        or else Region_Count >= Max_Regions
+        or else Base < Parent.Base
+        or else Base >= Parent.Bound
+        or else Bound <= Parent.Base
+        or else Bound > Parent.Bound
+        or else Base > Bound
+      then
+         return 0;
+      end if;
+
+      Region_Count := Region_Count + 1;
+
+      declare
+         Child : Region_Record renames Regions (Region_Count);
+      begin
+         Child := (Parent with delta
+                     Base => Base, Bound => Bound,
+                     Access_Cap =>
+                       Rose.System_Calls.Server.Create_Endpoint
+                       (Create_Endpoint_Cap,
+                        Rose.Interfaces.Region.Region_Interface,
+                        Capability_Identifier (Region_Count)));
+         return Child.Access_Cap;
+      end;
+
+   end Create_Subregion;
 
    ---------
    -- Get --
