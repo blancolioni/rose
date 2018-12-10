@@ -8,7 +8,8 @@ project Scan is
        "../../library/kernelapi/devices",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
-       "../../library/kernelapi/arch/i686");
+       "../../library/kernelapi/arch/i686",
+       "../../library/rose");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("scan-driver.adb");

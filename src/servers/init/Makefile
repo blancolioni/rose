@@ -16,6 +16,8 @@ OBJECTS= \
 	$(BUILDDIR)/init.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
+	$(BUILDDIR)/rose-environment.o \
+	$(BUILDDIR)/rose-environment_pages.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
