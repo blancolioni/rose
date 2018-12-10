@@ -3,6 +3,7 @@ project Elf is
    for Source_Dirs use
       ("src",
        "../../base",
+       "../../formats",
        "../../library/capabilities",
        "../../library/kernelapi/console",
        "../../library/kernelapi/generated",
@@ -35,4 +36,3 @@ project Elf is
    end Pretty_Printer;
 
 end Elf;
-
