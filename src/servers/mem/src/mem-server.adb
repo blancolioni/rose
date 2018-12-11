@@ -1,9 +1,18 @@
 with Rose.Addresses;
 with Rose.Capabilities;
+with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
 
 with Rose.Console_IO;
+
+with Rose.Interfaces.Memory.Server;
+with Rose.Interfaces.Process_Memory.Server;
+
+with Rose.Interfaces.Region.Client;
+
+with Rose.Server;
+with Rose.System_Calls;
 
 with Mem.Calls;
 with Mem.Physical_Map;
@@ -12,24 +21,87 @@ with Mem.Virtual_Map;
 
 package body Mem.Server is
 
-   procedure On_Launch
-     (Process     : Rose.Objects.Object_Id;
-      Resume_Cap  : Rose.Capabilities.Capability;
-      Faulted_Cap : Rose.Capabilities.Capability;
-      Segments    : Mem.Processes.Segment_Record_Array);
+   Server : Rose.Server.Server_Context;
 
-   procedure On_Kill (Process : Rose.Objects.Object_Id);
+   function New_Process
+     (Id         : Rose.Objects.Capability_Identifier;
+      Process    : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
 
-   procedure On_Page_Fault
-     (Process       : Rose.Objects.Object_Id;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
-      Physical_Page : Rose.Addresses.Physical_Page_Address;
-      Action        : Action_Type);
+   procedure Add_Segment
+     (Id           : Rose.Objects.Capability_Identifier;
+      Virtual_Base : Rose.Words.Word;
+      Region       : Rose.Capabilities.Capability;
+      Flags        : Rose.Words.Word);
+
+   procedure Add_Nonpersistent_Segment
+     (Id            : in     Rose.Objects.Capability_Identifier;
+      Virtual_Base  : in     Rose.Words.Word;
+      Virtual_Bound : in     Rose.Words.Word;
+      Flags         : in     Rose.Words.Word);
+
+   procedure Page_Fault
+     (Id       : Rose.Objects.Capability_Identifier;
+      Object   : Rose.Objects.Object_Id;
+      Virtual  : Rose.Words.Word;
+      Physical : Rose.Words.Word;
+      Action   : Rose.Interfaces.Memory.Page_Access_Type);
+
+   procedure Kill (Id : Rose.Objects.Capability_Identifier);
 
    procedure Protection_Fault
      (Process : Rose.Objects.Object_Id;
       Address : Rose.Addresses.Virtual_Page_Address;
       Message : String);
+
+   -------------------------------
+   -- Add_Nonpersistent_Segment --
+   -------------------------------
+
+   procedure Add_Nonpersistent_Segment
+     (Id            : Rose.Objects.Capability_Identifier;
+      Virtual_Base  : Rose.Words.Word;
+      Virtual_Bound : Rose.Words.Word;
+      Flags         : Rose.Words.Word)
+   is
+      use Rose.Interfaces.Process_Memory;
+      use type Rose.Words.Word;
+
+   begin
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process      => Id,
+         Virtual_Base => Rose.Addresses.Virtual_Address (Virtual_Base),
+         Virtual_Bound => Rose.Addresses.Virtual_Address (Virtual_Bound),
+         Readable     => (Flags and Segment_Readable) /= 0,
+         Writable     => (Flags and Segment_Writable) /= 0,
+         Executable   => (Flags and Segment_Executable) /= 0);
+   end Add_Nonpersistent_Segment;
+
+   -----------------
+   -- Add_Segment --
+   -----------------
+
+   procedure Add_Segment
+     (Id           : Rose.Objects.Capability_Identifier;
+      Virtual_Base : Rose.Words.Word;
+      Region       : Rose.Capabilities.Capability;
+      Flags        : Rose.Words.Word)
+   is
+      use Rose.Interfaces.Process_Memory;
+      use Rose.Interfaces.Region.Client;
+      use type Rose.Words.Word;
+
+      Client : Region_Client;
+   begin
+      Open (Client, Region);
+      Mem.Processes.Add_Segment
+        (Process      => Id,
+         Virtual_Base => Rose.Addresses.Virtual_Address (Virtual_Base),
+         Region       => Client,
+         Readable     => (Flags and Segment_Readable) /= 0,
+         Writable     => (Flags and Segment_Writable) /= 0,
+         Executable   => (Flags and Segment_Executable) /= 0);
+   end Add_Segment;
 
    -------------------
    -- Create_Server --
@@ -38,112 +110,101 @@ package body Mem.Server is
    procedure Create_Server is
    begin
       Mem.Calls.Load_Memory_Map;
+
+      Rose.Interfaces.Memory.Server.Create_Server
+        (Server_Context => Server,
+         New_Process    => New_Process'Access,
+         Page_Fault     => Page_Fault'Access);
+
+      Rose.Interfaces.Process_Memory.Server.Attach_Interface
+        (Server_Context => Server,
+         Add_Segment    => Add_Segment'Access,
+         Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
+         Destroy        => Kill'Access,
+         Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
+         Instanced      => True);
+
    end Create_Server;
 
-   -------------
-   -- On_Kill --
-   -------------
+   ----------
+   -- Kill --
+   ----------
 
-   procedure On_Kill (Process : Rose.Objects.Object_Id) is
+   procedure Kill (Id : Rose.Objects.Capability_Identifier) is
    begin
-      Rose.Console_IO.Put ("mem: killing process: ");
-      Rose.Console_IO.Put (Natural (Process));
-      Rose.Console_IO.New_Line;
+      Mem.Processes.Kill_Process (Id);
+   end Kill;
 
-      Mem.Processes.Kill_Process (Process);
-   end On_Kill;
+   -----------------
+   -- New_Process --
+   -----------------
 
-   ---------------
-   -- On_Launch --
-   ---------------
-
-   procedure On_Launch
-     (Process     : Rose.Objects.Object_Id;
-      Resume_Cap  : Rose.Capabilities.Capability;
-      Faulted_Cap : Rose.Capabilities.Capability;
-      Segments    : Mem.Processes.Segment_Record_Array)
+   function New_Process
+     (Id         : Rose.Objects.Capability_Identifier;
+      Process    : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
    is
+      pragma Unreferenced (Id);
    begin
-      if False then
-         Rose.Console_IO.Put ("mem: launching process: ");
-         Rose.Console_IO.Put (Natural (Process));
-         Rose.Console_IO.New_Line;
-
-         for I in Segments'Range loop
-            declare
-               use Rose.Words;
-               Base : constant Word := Word (Segments (I).Base);
-               Bound : constant Word := Word (Segments (I).Bound);
-            begin
-               if Bound > Base then
-                  Rose.Console_IO.Put ("Segment ");
-                  Rose.Console_IO.Put (Natural (I));
-                  Rose.Console_IO.Put (" ");
-                  Rose.Console_IO.Put (Base);
-                  Rose.Console_IO.Put (" ");
-                  Rose.Console_IO.Put (Bound);
-                  Rose.Console_IO.Put (" ");
-                  Rose.Console_IO.Put
-                    (if Segments (I).Flags (Mem.Processes.Read)
-                     then "r" else "-");
-                  Rose.Console_IO.Put
-                    (if Segments (I).Flags (Mem.Processes.Write)
-                     then "w" else "-");
-                  Rose.Console_IO.Put
-                    (if Segments (I).Flags (Mem.Processes.Execute)
-                     then "x" else "-");
-                  Rose.Console_IO.New_Line;
-               end if;
-            end;
-         end loop;
-      end if;
-
-      Mem.Processes.New_Process
-        (Process, Resume_Cap, Faulted_Cap, Segments);
-   end On_Launch;
+      return Mem.Processes.New_Process (Process);
+   end New_Process;
 
    -------------------
    -- On_Page_Fault --
    -------------------
 
-   procedure On_Page_Fault
-     (Process       : Rose.Objects.Object_Id;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
-      Physical_Page : Rose.Addresses.Physical_Page_Address;
-      Action        : Action_Type)
+   procedure Page_Fault
+     (Id       : Rose.Objects.Capability_Identifier;
+      Object   : Rose.Objects.Object_Id;
+      Virtual  : Rose.Words.Word;
+      Physical : Rose.Words.Word;
+      Action   : Rose.Interfaces.Memory.Page_Access_Type)
    is
+      pragma Unreferenced (Id);
       use Rose.Addresses;
-      Valid, Readable, Writable, Executable : Boolean := False;
+      use all type Rose.Interfaces.Memory.Page_Access_Type;
+      Valid,
+      Readable,
+      Writable,
+      Executable : Boolean := False;
+      Virtual_Page : constant Virtual_Page_Address :=
+                       Virtual_Page_Address (Virtual);
+      Physical_Page : constant Physical_Page_Address :=
+                        Physical_Page_Address (Physical);
+      Process_Id    : constant Rose.Objects.Capability_Identifier :=
+                        Mem.Processes.Get_Process_Id (Object);
+      Page_Object : Rose.Objects.Object_Id;
    begin
-      if not Mem.Processes.Is_Valid_Process_Id (Process) then
-         Protection_Fault (Process, Virtual_Page, "invalid process id");
+      if not Mem.Processes.Is_Valid_Process_Id (Process_Id) then
+         Protection_Fault (Object, Virtual_Page, "invalid process id");
          return;
       end if;
 
       Mem.Processes.Get_Process_Segment
-        (Process, Virtual_Page, Valid, Readable, Writable, Executable);
+        (Process_Id, Virtual_Page, Page_Object,
+         Valid, Readable, Writable, Executable);
 
       if not Valid then
-         Protection_Fault (Process, Virtual_Page, "invalid page reference");
+         Protection_Fault (Object, Virtual_Page, "invalid page reference");
          return;
       end if;
 
       case Action is
-         when Mem.Read =>
+         when Read =>
             if not Readable then
-               Protection_Fault (Process, Virtual_Page,
+               Protection_Fault (Object, Virtual_Page,
                                  "attempt to read non-readable page");
                return;
             end if;
-         when Mem.Write =>
+         when Write =>
             if not Writable then
-               Protection_Fault (Process, Virtual_Page,
+               Protection_Fault (Object, Virtual_Page,
                                  "attempt to write non-writable page");
                return;
             end if;
-         when Mem.Execute =>
+         when Execute =>
             if not Executable then
-               Protection_Fault (Process, Virtual_Page,
+               Protection_Fault (Object, Virtual_Page,
                                  "attempt to execute non-executable page");
                return;
             end if;
@@ -162,40 +223,49 @@ package body Mem.Server is
 
             if not Have_Page then
                Rose.Console_IO.Put_Line ("no page");
-               Mem.Calls.Set_Error (Process);
+               Mem.Processes.Fault_Process (Process_Id);
             else
+
+               Mem.Processes.Initialize_Page
+                 (Process       => Process_Id,
+                  Physical_Page => Page,
+                  Virtual_Page  => Virtual_Page);
+
                Mem.Virtual_Map.Map
-                 (Process       => Process,
+                 (Process       => Object,
                   Virtual_Page  => Virtual_Page,
                   Physical_Page => Page,
                   Readable      => True,
                   Writable      => Action = Write,
                   Executable    => Action = Execute);
 
-               Mem.Calls.Set_Ready (Process);
+
+               Mem.Processes.Resume_Process (Process_Id);
+
             end if;
          end;
       else
          declare
             Mapping   : constant Mem.Virtual_Map.Virtual_Page_Mapping :=
-                          Mem.Virtual_Map.Get (Process, Virtual_Page);
+                          Mem.Virtual_Map.Get (Process_Id, Virtual_Page);
          begin
             case Action is
-               when Mem.Read =>
-                  Mem.Calls.Set_Error (Process);
-               when Mem.Execute =>
-                  Mem.Calls.Set_Error (Process);
-               when Mem.Write =>
+               when Read =>
+                  Mem.Processes.Fault_Process (Process_Id);
+               when Execute =>
+                  Mem.Processes.Fault_Process (Process_Id);
+               when Write =>
                   if Mem.Virtual_Map.Writable (Mapping) then
-                     Mem.Calls.Set_Error (Process);
+                     Mem.Processes.Fault_Process (Process_Id);
                   else
                      Mem.Virtual_Map.Set_Read_Write (Mapping);
+                     Mem.Processes.Resume_Process (Process_Id);
                   end if;
             end case;
          end;
       end if;
 
-   end On_Page_Fault;
+   end Page_Fault;
 
    ----------------------
    -- Protection_Fault --
@@ -209,13 +279,13 @@ package body Mem.Server is
       use Rose.Words;
    begin
       Rose.Console_IO.Put ("mem: error pid ");
-      Rose.Console_IO.Put (Natural (Process));
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Process));
       Rose.Console_IO.Put ("; page ");
       Rose.Console_IO.Put (Word (Address) * 4096);
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Put (Message);
       Rose.Console_IO.New_Line;
-      Mem.Calls.Set_Faulted (Process);
+      Mem.Processes.Fault_Process (Mem.Processes.Get_Process_Id (Process));
    end Protection_Fault;
 
    ------------------
@@ -223,10 +293,11 @@ package body Mem.Server is
    ------------------
 
    procedure Start_Server is
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Mem.Calls.Receive
-        (On_Launch'Access, On_Kill'Access,
-         On_Page_Fault'Access);
+      Rose.System_Calls.Initialize_Send (Params, Start_Paging_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+      Rose.Server.Start_Server (Server);
    end Start_Server;
 
 end Mem.Server;

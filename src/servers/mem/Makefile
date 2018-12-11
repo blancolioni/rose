@@ -18,7 +18,19 @@ OBJECTS= \
 	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
+	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-memory.o \
+	$(BUILDDIR)/rose-interfaces-memory-server.o \
+	$(BUILDDIR)/rose-interfaces-process.o \
+	$(BUILDDIR)/rose-interfaces-process-client.o \
+	$(BUILDDIR)/rose-interfaces-process_memory.o \
+	$(BUILDDIR)/rose-interfaces-process_memory-server.o \
+	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-region-client.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

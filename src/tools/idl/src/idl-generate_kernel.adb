@@ -268,6 +268,9 @@ package body IDL.Generate_Kernel is
                     (Syn.Statements.New_Assignment_Statement
                        (Base_Name,
                         (if Is_Word_Type (Base_Type) then Get
+                         elsif Is_Enumerated_Type (Base_Type)
+                         then Syn.Expressions.New_Function_Call_Expression
+                           (Get_Ada_Name (Base_Type) & "'Val", Get)
                          else Syn.Expressions.New_Function_Call_Expression
                            (Get_Ada_Name (Base_Type), Get))));
                end;
@@ -448,6 +451,9 @@ package body IDL.Generate_Kernel is
                           (Base_Name,
                            Get_Ada_Name (Base_Type),
                            (if Is_Word_Type (Base_Type) then Get
+                            elsif Is_Enumerated_Type (Base_Type)
+                            then Syn.Expressions.New_Function_Call_Expression
+                              (Get_Ada_Name (Base_Type) & "'Val", Get)
                             else Syn.Expressions.New_Function_Call_Expression
                               (Get_Ada_Name (Base_Type), Get))));
                   else
@@ -456,6 +462,9 @@ package body IDL.Generate_Kernel is
                           (Base_Name,
                            Get_Ada_Name (Base_Type),
                            (if Is_Word_Type (Base_Type) then Get
+                            elsif Is_Enumerated_Type (Base_Type)
+                            then Syn.Expressions.New_Function_Call_Expression
+                              (Get_Ada_Name (Base_Type) & "'Val", Get)
                             else Syn.Expressions.New_Function_Call_Expression
                               (Get_Ada_Name (Base_Type), Get))));
                   end if;
@@ -2068,6 +2077,16 @@ package body IDL.Generate_Kernel is
                            Syn.Expressions.New_Function_Call_Expression
                              ("Rose.Words.Word_64",
                               Syn.Object (Get_Ada_Name (Args (I))))));
+                  elsif Is_Enumerated_Type (Arg_Type) then
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.System_Calls.Send_Word",
+                           Syn.Object ("Params"),
+                           Syn.Expressions.New_Function_Call_Expression
+                             ("Rose.Words.Word'",
+                              Syn.Expressions.New_Function_Call_Expression
+                                (Get_Ada_Name (Arg_Type) & "'Pos",
+                                 Syn.Object (Get_Ada_Name (Args (I)))))));
                   else
                      Block.Append
                        (Syn.Statements.New_Procedure_Call_Statement

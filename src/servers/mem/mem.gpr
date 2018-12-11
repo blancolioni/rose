@@ -6,7 +6,8 @@ project Mem is
        "../../library/capabilities",
        "../../library/kernelapi/console",
        "../../library/kernelapi/system-calls",
-       "../../library/kernelapi/arch/i686");
+       "../../library/kernelapi/arch/i686",
+       "../../library/kernelapi/generated");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("mem-driver.adb");

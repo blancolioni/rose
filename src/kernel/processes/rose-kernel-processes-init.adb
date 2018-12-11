@@ -439,40 +439,23 @@ package body Rose.Kernel.Processes.Init is
 
          if Have_Process_Handlers then
             Launch_Params.Cap := Mem_Launch_Cap;
-            Launch_Params.Endpoint := 100;
+            Launch_Params.Endpoint := 16#C196_0CA8_7972#;
 
             declare
                use Rose.Capabilities.Layout;
-               Resume_Cap : constant Rose.Capabilities.Capability :=
-                              Rose.Kernel.Processes.Create_Cap
-                                (Mem_Process);
+               Process_Cap : constant Rose.Capabilities.Capability :=
+                               Rose.Kernel.Processes.Create_Cap
+                                 (Mem_Process);
             begin
                Rose.Kernel.Processes.Set_Cap
-                 (Mem_Process, Resume_Cap,
+                 (Mem_Process, Process_Cap,
                   Capability_Layout'
                     (Header  =>
                          (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
                           Endpoint => 1,
                           others   => <>),
                      Payload => To_Object_Id (Pid)));
-               Send_Cap (Launch_Params, Resume_Cap);
-            end;
-
-            declare
-               use Rose.Capabilities.Layout;
-               Faulted_Cap : constant Rose.Capabilities.Capability :=
-                               Rose.Kernel.Processes.Create_Cap
-                                 (Mem_Process);
-            begin
-               Rose.Kernel.Processes.Set_Cap
-                 (Mem_Process, Faulted_Cap,
-                  Capability_Layout'
-                    (Header  =>
-                         (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
-                          Endpoint => 2,
-                          others   => <>),
-                     Payload => To_Object_Id (Pid)));
-               Send_Cap (Launch_Params, Faulted_Cap);
+               Send_Cap (Launch_Params, Process_Cap);
             end;
 
             Send_Cap

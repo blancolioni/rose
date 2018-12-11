@@ -7,6 +7,9 @@ with Rose.Console_IO;
 
 with Rose.Interfaces.Executable.Server;
 
+with Rose.Interfaces.Memory.Client;
+with Rose.Interfaces.Process.Client;
+with Rose.Interfaces.Process_Memory.Client;
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Storage.Client;
 
@@ -15,6 +18,7 @@ with Elf.Loader;
 package body Elf.Server is
 
    Server_Context : Rose.Server.Server_Context;
+   Memory_Client  : Rose.Interfaces.Memory.Client.Memory_Client;
 
    procedure Launch
      (Id    : Rose.Objects.Capability_Identifier;
@@ -24,7 +28,7 @@ package body Elf.Server is
 
    procedure Create_Process
      (Caps      : Rose.Capabilities.Capability_Array;
-      Process   : out Rose.Objects.Object_Id;
+      Process   : out Rose.Capabilities.Capability;
       Start_Cap : out Rose.Capabilities.Capability);
 
    procedure Start_Process
@@ -36,7 +40,7 @@ package body Elf.Server is
 
    procedure Create_Process
      (Caps      : Rose.Capabilities.Capability_Array;
-      Process   : out Rose.Objects.Object_Id;
+      Process   : out Rose.Capabilities.Capability;
       Start_Cap : out Rose.Capabilities.Capability)
    is
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -47,8 +51,8 @@ package body Elf.Server is
       end loop;
       Rose.System_Calls.Invoke_Capability (Params);
       if not Params.Control.Flags (Rose.Invocation.Error) then
-         Process := Rose.Invocation.Get_Object_Id (Params, 0);
-         Start_Cap := Params.Caps (0);
+         Process := Params.Caps (0);
+         Start_Cap := Params.Caps (1);
       else
          Process := 0;
          Start_Cap := 0;
@@ -77,17 +81,27 @@ package body Elf.Server is
       Caps  : Rose.Capabilities.Capability_Array)
    is
       pragma Unreferenced (Id);
-      Process   : Rose.Objects.Object_Id;
+      use Rose.Interfaces.Process_Memory.Client;
+      Process   : Rose.Capabilities.Capability;
       Start_Cap : Rose.Capabilities.Capability;
+      Process_Client : Rose.Interfaces.Process.Client.Process_Client;
+      Process_Memory : Process_Memory_Client;
       Region    : Rose.Interfaces.Region.Client.Region_Client;
       Storage   : Rose.Interfaces.Storage.Client.Storage_Client;
       Success   : Boolean;
    begin
       Rose.Console_IO.Put_Line ("elf: launching image");
       Create_Process (Caps, Process, Start_Cap);
+      Rose.Interfaces.Process.Client.Open (Process_Client, Process);
+
+      Process_Memory :=
+        Rose.Interfaces.Memory.Client.New_Process
+          (Item       => Memory_Client,
+           Process    => Process_Client);
+
       Rose.Interfaces.Region.Client.Open (Region, Image);
       Rose.Interfaces.Storage.Client.Open (Storage, Store);
-      Elf.Loader.Load_Elf_Image (Process, Storage, Region, Success);
+      Elf.Loader.Load_Elf_Image (Process_Memory, Storage, Region, Success);
       pragma Unreferenced (Success);
       Start_Process (Start_Cap);
    end Launch;

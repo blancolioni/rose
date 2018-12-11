@@ -7,7 +7,8 @@ package Mem.Physical_Map is
    procedure Add_Region
      (Base, Bound    : Rose.Addresses.Physical_Page_Address;
       Map_Page_Cap   : Rose.Capabilities.Capability;
-      Unmap_Page_Cap : Rose.Capabilities.Capability);
+      Unmap_Page_Cap : Rose.Capabilities.Capability;
+      Set_Page_Cap   : Rose.Capabilities.Capability);
 
    procedure Allocate_Page
      (Page    : out Rose.Addresses.Physical_Page_Address;
@@ -20,6 +21,10 @@ package Mem.Physical_Map is
       return Rose.Capabilities.Capability;
 
    function Region_Unmap_Page_Cap
+      return Rose.Capabilities.Capability;
+
+   function Region_Set_Page_Cap
+     (Page : Rose.Addresses.Physical_Page_Address)
       return Rose.Capabilities.Capability;
 
    function Available_Pages return Rose.Words.Word;

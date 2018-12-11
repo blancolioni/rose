@@ -1,6 +1,6 @@
 #!/bin/sh
 objdump -d -S -f -h -t build/i686/i686-unknown-rose > ./logs/rose-objdump.txt
-for module in init console mem pci ata restore scan store partition
+for module in init console mem pci ata restore scan store partition elf
 do objdump -d -S -f -h -t build/i686/modules/$module > ./logs/rose-$module-objdump.txt
    readelf -a build/i686/modules/$module > ./logs/rose-$module-elf.txt
 done
