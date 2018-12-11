@@ -1,16 +1,15 @@
 with System.Storage_Elements;
 
 with Rose.Limits;
+with Rose.Objects;
 with Rose.Words;
-
-with Rose.Interfaces.Memory.Client;
 
 with Elf.Format;
 
 package body Elf.Loader is
 
    use Rose.Interfaces.Region.Client;
-   use Rose.Interfaces.Memory.Client;
+   use Rose.Interfaces.Process_Memory.Client;
    use Rose.Interfaces.Storage.Client;
 
    procedure Read
@@ -29,15 +28,13 @@ package body Elf.Loader is
      (Store   : Storage_Client;
       Region  : Region_Client;
       Base    : Rose.Objects.Object_Id;
-      Memory  : Memory_Client;
-      Process : Rose.Objects.Object_Id;
+      Process : Process_Memory_Client;
       Header  : Elf.Format.Elf_Header);
 
    procedure Process_Program_Header
      (Top_Store    : Storage_Client;
       Image_Region : Region_Client;
-      Memory       : Memory_Client;
-      Process      : Rose.Objects.Object_Id;
+      Process      : Process_Memory_Client;
       Base_Object  : Rose.Objects.Object_Id;
       Segment_Type : Elf.Format.Program_Header_Type;
       File_Offset  : Elf.Format.Elf_Address;
@@ -53,13 +50,12 @@ package body Elf.Loader is
    --------------------
 
    procedure Load_Elf_Image
-     (Process : Rose.Objects.Object_Id;
+     (Process : Rose.Interfaces.Process_Memory.Client.Process_Memory_Client;
       Store   : Rose.Interfaces.Storage.Client.Storage_Client;
       Image   : Rose.Interfaces.Region.Client.Region_Client;
       Success : out Boolean)
    is
       Header      : Elf.Format.Elf_Header;
-      Memory      : Memory_Client;
       Base, Bound : Rose.Objects.Object_Id;
    begin
       Get_Range (Image, Base, Bound);
@@ -70,8 +66,7 @@ package body Elf.Loader is
          return;
       end if;
 
-      Open (Memory, Memory_Cap);
-      Scan_Program_Headers (Store, Image, Base, Memory, Process, Header);
+      Scan_Program_Headers (Store, Image, Base, Process, Header);
 
    end Load_Elf_Image;
 
@@ -82,8 +77,7 @@ package body Elf.Loader is
    procedure Process_Program_Header
      (Top_Store    : Storage_Client;
       Image_Region : Region_Client;
-      Memory       : Memory_Client;
-      Process      : Rose.Objects.Object_Id;
+      Process      : Process_Memory_Client;
       Base_Object  : Rose.Objects.Object_Id;
       Segment_Type : Elf.Format.Program_Header_Type;
       File_Offset  : Elf.Format.Elf_Address;
@@ -106,11 +100,12 @@ package body Elf.Loader is
          when PT_LOAD =>
             Flags :=
               (if Readable
-               then Rose.Interfaces.Memory.Segment_Readable else 0)
+               then Rose.Interfaces.Process_Memory.Segment_Readable else 0)
               + (if Writable
-                 then Rose.Interfaces.Memory.Segment_Writable else 0)
+                 then Rose.Interfaces.Process_Memory.Segment_Writable else 0)
               + (if Executable
-                 then Rose.Interfaces.Memory.Segment_Executable else 0);
+                 then Rose.Interfaces.Process_Memory.Segment_Executable
+                 else 0);
 
             if not Writable then
                Segment_Base :=
@@ -145,8 +140,7 @@ package body Elf.Loader is
             end if;
 
             Add_Segment
-              (Item         => Memory,
-               Process      => Process,
+              (Item         => Process,
                Virtual_Base => V_Address,
                Region       => Region,
                Flags        => Flags);
@@ -216,8 +210,7 @@ package body Elf.Loader is
      (Store   : Storage_Client;
       Region  : Region_Client;
       Base    : Rose.Objects.Object_Id;
-      Memory  : Memory_Client;
-      Process : Rose.Objects.Object_Id;
+      Process : Process_Memory_Client;
       Header  : Elf.Format.Elf_Header)
    is
       use System.Storage_Elements;
@@ -236,7 +229,6 @@ package body Elf.Loader is
          Process_Program_Header
            (Top_Store    => Store,
             Image_Region => Region,
-            Memory       => Memory,
             Process      => Process,
             Base_Object  => Base,
             Segment_Type => PH.P_Type,

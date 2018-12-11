@@ -1,8 +1,9 @@
 package Rose.Kernel.Capabilities.Processes is
 
-   Resume_Process_Endpoint : constant Rose.Objects.Endpoint_Index := 1;
-   Faulted_Process_Endpoint : constant Rose.Objects.Endpoint_Index := 2;
-
+   Process_Interface_Endpoint : constant Rose.Objects.Endpoint_Index := 1;
+   Resume_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 2;
+   Faulted_Process_Endpoint   : constant Rose.Objects.Endpoint_Index := 3;
+   Notify_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 4;
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

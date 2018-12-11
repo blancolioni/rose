@@ -340,7 +340,14 @@ package body IDL.Parser is
          end;
       end if;
 
-      Result := Parse_Interface;
+      declare
+         Saved_Interface : constant IDL.Syntax.IDL_Interface :=
+                             Current_Interface;
+      begin
+         Result := Parse_Interface;
+         Current_Interface := Saved_Interface;
+      end;
+
       Close;
       return Result;
    end Parse_Interface_File;

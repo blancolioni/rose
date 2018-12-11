@@ -76,26 +76,37 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                   use Rose.Objects;
                   use Rose.Kernel.Physical_Memory;
                   use Rose.Capabilities.Layout;
+                  use type Rose.Capabilities.Capability;
                   Base    : Rose.Addresses.Physical_Page_Address;
                   Bound   : Rose.Addresses.Physical_Page_Address;
                   Map_Cap : constant Rose.Capabilities.Capability :=
-                              Rose.Kernel.Processes.Create_Cap
-                                (Rose.Kernel.Processes.Current_Process_Id);
-                  Layout  : Capability_Layout;
+                              Rose.Kernel.Processes.Create_Caps
+                                (Rose.Kernel.Processes.Current_Process_Id,
+                                 Count => 3);
+                  Unmap_Cap : constant Rose.Capabilities.Capability :=
+                                Map_Cap + 1;
+                  Set_Cap : constant Rose.Capabilities.Capability :=
+                              Map_Cap + 2;
+
+                  function Layout (Endpoint : Endpoint_Index)
+                                   return Capability_Layout
+                  is (Header  =>
+                        (Cap_Type  => Page_Table_Cap,
+                         Endpoint  => Endpoint,
+                         others    => <>),
+                      Payload =>
+                         Rose.Objects.Object_Id (Base) * 2 ** 32
+                      + Rose.Objects.Object_Id (Bound));
+
                begin
                   Get_User_Region (Positive (Params.Data (0)), Base, Bound);
 
-                  Layout :=
-                    (Header  =>
-                       (Cap_Type  => Page_Table_Cap,
-                        Endpoint  => 1,
-                        others    => <>),
-                     Payload =>
-                       Rose.Objects.Object_Id (Base) * 2 ** 32
-                     + Rose.Objects.Object_Id (Bound));
-
-                  Rose.Kernel.Processes.Set_Cap
-                    (Process_Id, Map_Cap, Layout);
+                  for I in 1 .. 3 loop
+                     Rose.Kernel.Processes.Set_Cap
+                       (Process_Id,
+                        Map_Cap + Rose.Capabilities.Capability (I) - 1,
+                        Layout (Endpoint_Index (I)));
+                  end loop;
 
                   Params.Control.Flags :=
                     (Rose.Invocation.Reply      => True,
@@ -104,12 +115,13 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                      others                     => False);
 
                   Params.Control.Last_Sent_Word := 1;
-                  Params.Control.Last_Sent_Cap := 1;
+                  Params.Control.Last_Sent_Cap := 2;
 
                   Params.Data (0) := Rose.Words.Word (Base);
                   Params.Data (1) := Rose.Words.Word (Bound);
                   Params.Caps (0) := Map_Cap;
-                  Params.Caps (1) := 0;
+                  Params.Caps (1) := Unmap_Cap;
+                  Params.Caps (2) := Set_Cap;
 
                   Rose.Kernel.Processes.Set_Current_State
                     (Rose.Kernel.Processes.Current_Process_Id,

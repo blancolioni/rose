@@ -70,6 +70,7 @@ private
    Use_Serial_Port          : Boolean := True;
    Log_Cap_Copy             : Boolean := False;
    Log_Endpoint_Cap_Create  : Boolean := False;
+   Log_Page_Faults          : Boolean := True;
 
    Log_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
