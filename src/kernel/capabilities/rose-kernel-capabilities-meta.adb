@@ -207,6 +207,15 @@ package body Rose.Kernel.Capabilities.Meta is
               (Rose.Kernel.Processes.Current_Process_Id,
                Params.all);
 
+         when Get_Object_Id_Endpoint =>
+
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply     => True,
+               others                     => False);
+            Rose.Invocation.Send_Object_Id (Params.all, Cap.Payload);
+            Rose.Kernel.Processes.Set_Current_State
+              (Process_Id, Rose.Kernel.Processes.Ready);
+
          when Rescind_Cap =>
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then
                for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
