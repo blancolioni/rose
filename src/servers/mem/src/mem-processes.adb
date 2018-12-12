@@ -63,20 +63,13 @@ package body Mem.Processes is
 
    procedure Add_Nonpersistent_Segment
      (Process        : Rose.Objects.Capability_Identifier;
-      Virtual_Base   : Rose.Addresses.Virtual_Address;
-      Virtual_Bound  : Rose.Addresses.Virtual_Address;
+      Virtual_Base   : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Bound  : Rose.Addresses.Virtual_Page_Address;
       Readable       : Boolean;
       Writable       : Boolean;
       Executable     : Boolean)
    is
-      use Rose.Addresses;
       P : Memory_Process_Record renames Process_Table (Process);
-      Virtual_Page_Base : constant Virtual_Page_Address :=
-                            Virtual_Address_To_Page
-                              (Virtual_Base);
-      Virtual_Page_Bound : constant Virtual_Page_Address :=
-                            Virtual_Address_To_Page
-                               (Virtual_Bound);
    begin
       if P.Num_Segments = Max_Segments then
          return;
@@ -84,8 +77,8 @@ package body Mem.Processes is
 
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
-        (Base         => Virtual_Page_Base,
-         Bound        => Virtual_Page_Bound,
+        (Base         => Virtual_Base,
+         Bound        => Virtual_Bound,
          Region       => <>,
          Region_Base  => 0,
          Region_Bound => 0,
@@ -104,7 +97,7 @@ package body Mem.Processes is
 
    procedure Add_Segment
      (Process       : Rose.Objects.Capability_Identifier;
-      Virtual_Base  : Rose.Addresses.Virtual_Address;
+      Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
       Readable      : Boolean;
       Writable      : Boolean;
@@ -115,9 +108,6 @@ package body Mem.Processes is
       P : Memory_Process_Record renames Process_Table (Process);
       Region_Base : Rose.Objects.Page_Object_Id;
       Region_Bound : Rose.Objects.Page_Object_Id;
-      Virtual_Page_Base : constant Virtual_Page_Address :=
-                            Virtual_Address_To_Page
-                              (Virtual_Base);
    begin
       if P.Num_Segments = Max_Segments then
          return;
@@ -128,8 +118,8 @@ package body Mem.Processes is
 
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
-        (Base         => Virtual_Page_Base,
-         Bound        => Virtual_Page_Base +
+        (Base         => Virtual_Base,
+         Bound        => Virtual_Base +
            Virtual_Page_Address (Region_Bound - Region_Base),
          Region       => Region,
          Region_Base  => Region_Base,
@@ -307,8 +297,25 @@ package body Mem.Processes is
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
+   begin
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Cap   => Create_Endpoint_Cap,
+         Endpoint_Id  =>
+           Rose.Interfaces.Process_Memory.Process_Memory_Interface,
+         Identifier   =>
+           Register_Process (Process_Cap));
+   end New_Process;
+
+   ----------------------
+   -- Register_Process --
+   ----------------------
+
+   function Register_Process
+     (Process_Cap : Rose.Capabilities.Capability)
+      return Rose.Objects.Capability_Identifier
+   is
       use Rose.Objects;
-      Start : constant Capability_Identifier := Next_Pid;
+      Start  : constant Capability_Identifier := Next_Pid;
       Client : Rose.Interfaces.Process.Client.Process_Client;
    begin
       while Process_Table (Next_Pid).State /= Available loop
@@ -319,26 +326,22 @@ package body Mem.Processes is
          end if;
          if Next_Pid = Start then
             Rose.Console_IO.Put_Line ("out of processes");
-            return Rose.Capabilities.Null_Capability;
+            return 0;
          end if;
       end loop;
 
       Rose.Interfaces.Process.Client.Open (Client, Process_Cap);
       Process_Table (Next_Pid) :=
         Memory_Process_Record'
-          (State    => Active,
-           Oid      => Rose.Interfaces.Process.Client.Get_Object_Id (Client),
-           Segments => <>,
+          (State        => Active,
+           Oid          =>
+             Rose.Interfaces.Process.Client.Get_Object_Id (Client),
+           Segments     => <>,
            Num_Segments => 0,
-           Process  => Client);
+           Process      => Client);
 
-      return Rose.System_Calls.Server.Create_Endpoint
-        (Create_Cap   => Create_Endpoint_Cap,
-         Endpoint_Id  =>
-           Rose.Interfaces.Process_Memory.Process_Memory_Interface,
-         Identifier   => Next_Pid);
-
-   end New_Process;
+      return Next_Pid;
+   end Register_Process;
 
    --------------------
    -- Resume_Process --

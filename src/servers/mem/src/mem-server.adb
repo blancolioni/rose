@@ -28,6 +28,18 @@ package body Mem.Server is
       Process    : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
+   procedure Register_Process
+     (Id          : Rose.Objects.Capability_Identifier;
+      Process     : Rose.Capabilities.Capability;
+      Exec_Base   : Rose.Words.Word;
+      Exec_Bound  : Rose.Words.Word;
+      Text_Base   : Rose.Words.Word;
+      Text_Bound  : Rose.Words.Word;
+      Data_Base   : Rose.Words.Word;
+      Data_Bound  : Rose.Words.Word;
+      Stack_Base  : Rose.Words.Word;
+      Stack_Bound : Rose.Words.Word);
+
    procedure Add_Segment
      (Id           : Rose.Objects.Capability_Identifier;
       Virtual_Base : Rose.Words.Word;
@@ -70,8 +82,8 @@ package body Mem.Server is
    begin
       Mem.Processes.Add_Nonpersistent_Segment
         (Process      => Id,
-         Virtual_Base => Rose.Addresses.Virtual_Address (Virtual_Base),
-         Virtual_Bound => Rose.Addresses.Virtual_Address (Virtual_Bound),
+         Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
+         Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Readable     => (Flags and Segment_Readable) /= 0,
          Writable     => (Flags and Segment_Writable) /= 0,
          Executable   => (Flags and Segment_Executable) /= 0);
@@ -96,7 +108,7 @@ package body Mem.Server is
       Open (Client, Region);
       Mem.Processes.Add_Segment
         (Process      => Id,
-         Virtual_Base => Rose.Addresses.Virtual_Address (Virtual_Base),
+         Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Region       => Client,
          Readable     => (Flags and Segment_Readable) /= 0,
          Writable     => (Flags and Segment_Writable) /= 0,
@@ -114,6 +126,7 @@ package body Mem.Server is
       Rose.Interfaces.Memory.Server.Create_Server
         (Server_Context => Server,
          New_Process    => New_Process'Access,
+         Register_Process => Register_Process'Access,
          Page_Fault     => Page_Fault'Access);
 
       Rose.Interfaces.Process_Memory.Server.Attach_Interface
@@ -287,6 +300,61 @@ package body Mem.Server is
       Rose.Console_IO.New_Line;
       Mem.Processes.Fault_Process (Mem.Processes.Get_Process_Id (Process));
    end Protection_Fault;
+
+   ----------------------
+   -- Register_Process --
+   ----------------------
+
+   procedure Register_Process
+     (Id          : Rose.Objects.Capability_Identifier;
+      Process     : Rose.Capabilities.Capability;
+      Exec_Base   : Rose.Words.Word;
+      Exec_Bound  : Rose.Words.Word;
+      Text_Base   : Rose.Words.Word;
+      Text_Bound  : Rose.Words.Word;
+      Data_Base   : Rose.Words.Word;
+      Data_Bound  : Rose.Words.Word;
+      Stack_Base  : Rose.Words.Word;
+      Stack_Bound : Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      Process_Id : constant Rose.Objects.Capability_Identifier :=
+                     Mem.Processes.Register_Process (Process);
+      function A
+        (Value : Rose.Words.Word)
+         return Rose.Addresses.Virtual_Page_Address
+      is (Rose.Addresses.Virtual_Page_Address (Value));
+
+   begin
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process       => Process_Id,
+         Virtual_Base  => A (Exec_Base),
+         Virtual_Bound => A (Exec_Bound),
+         Readable      => True,
+         Writable      => False,
+         Executable    => True);
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process       => Process_Id,
+         Virtual_Base  => A (Text_Base),
+         Virtual_Bound => A (Text_Bound),
+         Readable      => True,
+         Writable      => False,
+         Executable    => False);
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process       => Process_Id,
+         Virtual_Base  => A (Data_Base),
+         Virtual_Bound => A (Data_Bound),
+         Readable      => True,
+         Writable      => True,
+         Executable    => False);
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process       => Process_Id,
+         Virtual_Base  => A (Stack_Base),
+         Virtual_Bound => A (Stack_Bound),
+         Readable      => True,
+         Writable      => True,
+         Executable    => False);
+   end Register_Process;
 
    ------------------
    -- Start_Server --

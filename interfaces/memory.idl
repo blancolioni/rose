@@ -6,6 +6,17 @@ interface Memory is
      (Process    : interface Process)
      return interface Process_Memory;
    
+   procedure Register_Process
+     (Process     : interface Process;
+      Exec_Base   : Word;
+      Exec_Bound  : Word;
+      Text_Base   : Word;
+      Text_Bound  : Word;
+      Data_Base   : Word;
+      Data_Bound  : Word;
+      Stack_Base  : Word;
+      Stack_Bound : Word);
+      
    procedure Page_Fault
      (Faulting_Object : Object_Id;
       Virtual_Page    : Word;
