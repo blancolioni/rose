@@ -1,4 +1,5 @@
 with Rose.Kernel.Processes;
+with Rose.Kernel.Capabilities.Meta;
 
 package body Rose.Kernel.Capabilities.Processes is
 
@@ -21,18 +22,38 @@ package body Rose.Kernel.Capabilities.Processes is
             declare
                use Rose.Capabilities, Rose.Capabilities.Layout;
                use Rose.Invocation;
-               Resume_Cap  : constant Rose.Capabilities.Capability :=
-                              Rose.Kernel.Processes.Create_Caps
-                                (Current_Pid, 3);
-               Fault_Cap  : constant Rose.Capabilities.Capability :=
-                              Resume_Cap + 1;
-               Notify_Cap : constant Rose.Capabilities.Capability :=
-                              Resume_Cap + 2;
+               Destroy_Cap       : constant Rose.Capabilities.Capability :=
+                                     Rose.Kernel.Processes.Create_Caps
+                                       (Current_Pid, 5);
+               Get_Object_Id_Cap : constant Rose.Capabilities.Capability :=
+                                     Destroy_Cap + 1;
+               Resume_Cap        : constant Rose.Capabilities.Capability :=
+                                     Destroy_Cap + 2;
+               Fault_Cap         : constant Rose.Capabilities.Capability :=
+                                     Destroy_Cap + 3;
+               Notify_Cap        : constant Rose.Capabilities.Capability :=
+                                     Destroy_Cap + 4;
             begin
-               if Resume_Cap = Null_Capability then
+               if Destroy_Cap = Null_Capability then
                   Rose.Kernel.Processes.Return_Error
                     (Params, Out_Of_Capabilities);
                else
+                  Rose.Kernel.Processes.Set_Cap
+                    (Current_Pid, Destroy_Cap,
+                     Capability_Layout'
+                       (Header  =>
+                            (Cap_Type => Meta_Cap,
+                             Endpoint => Meta.Delete_Cap,
+                             others   => <>),
+                        Payload => Cap.Payload));
+                  Rose.Kernel.Processes.Set_Cap
+                    (Current_Pid, Get_Object_Id_Cap,
+                     Capability_Layout'
+                       (Header  =>
+                            (Cap_Type => Meta_Cap,
+                             Endpoint => Meta.Get_Object_Id_Endpoint,
+                             others   => <>),
+                        Payload => Cap.Payload));
                   Rose.Kernel.Processes.Set_Cap
                     (Current_Pid, Resume_Cap,
                      Capability_Layout'
@@ -60,6 +81,8 @@ package body Rose.Kernel.Capabilities.Processes is
 
                   Params.Control.Flags :=
                     (Rose.Invocation.Reply => True, others => False);
+                  Send_Cap (Params.all, Destroy_Cap);
+                  Send_Cap (Params.all, Get_Object_Id_Cap);
                   Send_Cap (Params.all, Resume_Cap);
                   Send_Cap (Params.all, Fault_Cap);
                   Send_Cap (Params.all, Notify_Cap);
