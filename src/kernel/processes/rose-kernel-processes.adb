@@ -11,7 +11,6 @@ package body Rose.Kernel.Processes is
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
-   Log_Page_Faults    : constant Boolean := False;
 
    First_Persistent_Pid : constant Process_Id := 0;
 
@@ -406,7 +405,8 @@ package body Rose.Kernel.Processes is
                                others => False);
 
       Params.Cap := Mem_Page_Fault_Cap;
-      Params.Endpoint := 102;
+      Params.Endpoint := 16#C6FF_984F_29F6#;
+      Params.Identifier := 0;
 
       Send_Object_Id (Params, Current_Process.Oid);
       Send_Word (Params, Rose.Words.Word (Virtual_Page));

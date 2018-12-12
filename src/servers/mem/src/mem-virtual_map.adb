@@ -7,7 +7,7 @@ package body Mem.Virtual_Map is
    ---------
 
    function Get
-     (Process : Rose.Objects.Object_Id;
+     (Process : Rose.Objects.Capability_Identifier;
       Page    : Rose.Addresses.Virtual_Page_Address)
       return Virtual_Page_Mapping
    is (Virtual_Page_Mapping'
@@ -67,7 +67,7 @@ package body Mem.Virtual_Map is
    ----------------
 
    procedure Remove_All
-     (Process : Rose.Objects.Object_Id)
+     (Process : Rose.Objects.Capability_Identifier)
    is null;
 
 end Mem.Virtual_Map;

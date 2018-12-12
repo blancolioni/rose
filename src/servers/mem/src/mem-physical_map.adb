@@ -26,6 +26,7 @@ package body Mem.Physical_Map is
          Map_Bound      : Physical_Page_Address;
          Map_Page_Cap   : Rose.Capabilities.Capability;
          Unmap_Page_Cap : Rose.Capabilities.Capability;
+         Set_Page_Cap   : Rose.Capabilities.Capability;
       end record;
 
    Max_Regions : constant := 4;
@@ -42,7 +43,8 @@ package body Mem.Physical_Map is
    procedure Add_Region
      (Base, Bound    : Rose.Addresses.Physical_Page_Address;
       Map_Page_Cap   : Rose.Capabilities.Capability;
-      Unmap_Page_Cap : Rose.Capabilities.Capability)
+      Unmap_Page_Cap : Rose.Capabilities.Capability;
+      Set_Page_Cap   : Rose.Capabilities.Capability)
    is
       use type Rose.Words.Word;
       Map_Start : constant Physical_Page_Address :=
@@ -54,7 +56,7 @@ package body Mem.Physical_Map is
       Region_Table (Number_Of_Regions) :=
         (Base, Bound, Map_Start,
          Map_Start + (Bound - Base) / Allocated_Block'Size,
-         Map_Page_Cap, Unmap_Page_Cap);
+         Map_Page_Cap, Unmap_Page_Cap, Set_Page_Cap);
       if Bound mod Allocated_Block'Size /= 0 then
          Allocation_Map (Region_Table (Number_Of_Regions).Bound - 1) :=
            Allocated_Block'Last
@@ -167,6 +169,23 @@ package body Mem.Physical_Map is
       end loop;
       return 0;
    end Region_Map_Page_Cap;
+
+   -------------------------
+   -- Region_Set_Page_Cap --
+   -------------------------
+
+   function Region_Set_Page_Cap
+     (Page : Rose.Addresses.Physical_Page_Address)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      for Region of Region_Table loop
+         if Page in Region.Base .. Region.Bound - 1 then
+            return Region.Set_Page_Cap;
+         end if;
+      end loop;
+      return 0;
+   end Region_Set_Page_Cap;
 
    ---------------------------
    -- Region_Unmap_Page_Cap --

@@ -1,0 +1,18 @@
+interface Process_Memory : Cap is
+
+   Segment_Readable    : constant := 1;
+   Segment_Writable    : constant := 2;
+   Segment_Executable  : constant := 4;
+   Segment_Initialized : constant := 8;
+   
+   procedure Add_Segment
+     (Virtual_Base : Word;
+      Region       : interface Region;
+      Flags        : Word);
+   
+   procedure Add_Nonpersistent_Segment
+     (Virtual_Base  : Word;
+      Virtual_Bound : Word;
+      Flags         : Word);
+   
+end Process_Memory;
