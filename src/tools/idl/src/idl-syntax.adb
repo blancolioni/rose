@@ -7,7 +7,7 @@ with IDL.Identifiers;
 
 package body IDL.Syntax is
 
-   Max_Arguments : constant := 8;
+   Max_Arguments : constant := 16;
 
    type IDL_Argument_Record is
       record
