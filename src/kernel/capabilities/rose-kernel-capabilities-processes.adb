@@ -13,8 +13,62 @@ package body Rose.Kernel.Capabilities.Processes is
       Pid : constant Rose.Kernel.Processes.Process_Id :=
               Rose.Kernel.Processes.To_Process_Id
                 (Cap.Payload);
+      Current_Pid : constant Rose.Kernel.Processes.Process_Id :=
+                      Rose.Kernel.Processes.Current_Process_Id;
    begin
       case Cap.Header.Endpoint is
+         when Process_Interface_Endpoint =>
+            declare
+               use Rose.Capabilities, Rose.Capabilities.Layout;
+               use Rose.Invocation;
+               Resume_Cap  : constant Rose.Capabilities.Capability :=
+                              Rose.Kernel.Processes.Create_Caps
+                                (Current_Pid, 3);
+               Fault_Cap  : constant Rose.Capabilities.Capability :=
+                              Resume_Cap + 1;
+               Notify_Cap : constant Rose.Capabilities.Capability :=
+                              Resume_Cap + 2;
+            begin
+               if Resume_Cap = Null_Capability then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Out_Of_Capabilities);
+               else
+                  Rose.Kernel.Processes.Set_Cap
+                    (Current_Pid, Resume_Cap,
+                     Capability_Layout'
+                       (Header  =>
+                            (Cap_Type => Process_Cap,
+                             Endpoint => Resume_Process_Endpoint,
+                             others   => <>),
+                        Payload => Cap.Payload));
+                  Rose.Kernel.Processes.Set_Cap
+                    (Current_Pid, Fault_Cap,
+                     Capability_Layout'
+                       (Header  =>
+                            (Cap_Type => Process_Cap,
+                             Endpoint => Faulted_Process_Endpoint,
+                             others   => <>),
+                        Payload => Cap.Payload));
+                  Rose.Kernel.Processes.Set_Cap
+                    (Current_Pid, Notify_Cap,
+                     Capability_Layout'
+                       (Header  =>
+                            (Cap_Type => Process_Cap,
+                             Endpoint => Notify_Process_Endpoint,
+                             others   => <>),
+                        Payload => Cap.Payload));
+
+                  Params.Control.Flags :=
+                    (Rose.Invocation.Reply => True, others => False);
+                  Send_Cap (Params.all, Resume_Cap);
+                  Send_Cap (Params.all, Fault_Cap);
+                  Send_Cap (Params.all, Notify_Cap);
+                  Rose.Kernel.Processes.Set_Current_State
+                    (Current_Pid,
+                     Rose.Kernel.Processes.Ready);
+               end if;
+            end;
+
          when Resume_Process_Endpoint =>
 
             Params.Control.Flags :=

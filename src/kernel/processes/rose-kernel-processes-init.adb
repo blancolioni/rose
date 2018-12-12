@@ -165,6 +165,7 @@ package body Rose.Kernel.Processes.Init is
             Allocated : Rose.Words.Word_32 := 0;
             Prealloc  : Rose.Words.Word_32 := 0;
             Range_Index : Page_Range_Index;
+            Word_Index  : Parameter_Word_Index;
          begin
             case Segment_Type is
                when PT_LOAD =>
@@ -208,22 +209,30 @@ package body Rose.Kernel.Processes.Init is
                   Virt_Page :=
                     Virtual_Address_To_Page (Virt_Addr);
 
-                  Rose.Invocation.Send_Word
-                    (Launch_Params,
-                     Boolean'Pos (Readable)
-                     + 2 * Boolean'Pos (Writable)
-                     + 4 * Boolean'Pos (Executable));
+                  if Executable then
+                     Word_Index := 0;
+                     Rose.Boot.Console.Put ("exec: ");
+                  elsif Writable then
+                     Word_Index := 4;
+                     Rose.Boot.Console.Put ("data: ");
+                  else
+                     Word_Index := 2;
+                     Rose.Boot.Console.Put ("text: ");
+                  end if;
 
-                  Rose.Invocation.Send_Word
-                    (Launch_Params, Rose.Words.Word (Virt_Page));
+                  Launch_Params.Data (Word_Index) :=
+                    Rose.Words.Word (Virt_Page);
+                  Launch_Params.Data (Word_Index + 1) :=
+                    Rose.Words.Word (Virt_Page)
+                    + Rose.Words.Word
+                    (Align_Up_To_Page_Boundary
+                       (Rose.Addresses.Physical_Address (Memory_Size)))
+                      / Virtual_Page_Bytes;
 
-                  Rose.Invocation.Send_Word
-                    (Launch_Params,
-                     Rose.Words.Word (Virt_Page)
-                     + Rose.Words.Word
-                       (Align_Up_To_Page_Boundary
-                            (Rose.Addresses.Physical_Address (Memory_Size))
-                        / Virtual_Page_Bytes));
+                  Rose.Boot.Console.Put (Launch_Params.Data (Word_Index));
+                  Rose.Boot.Console.Put (" ");
+                  Rose.Boot.Console.Put (Launch_Params.Data (Word_Index + 1));
+                  Rose.Boot.Console.New_Line;
 
                   if Executable then
                      Proc.Code_Page := Phys_Page;
@@ -277,9 +286,6 @@ package body Rose.Kernel.Processes.Init is
          end if;
 
          Proc.Oid := Rose.Objects.Object_Id (Pid);
-
-         Rose.Invocation.Send_Object_Id
-           (Launch_Params, Proc.Oid);
 
          Proc.Stack :=
            Rose.Kernel.Arch.Process_Stack_Frame
@@ -385,13 +391,16 @@ package body Rose.Kernel.Processes.Init is
                Rose.Boot.Console.Put_Line ("done");
             end if;
 
-            Rose.Invocation.Send_Word (Launch_Params, 3);
-            Rose.Invocation.Send_Word
-              (Launch_Params,
-               Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Base));
-            Rose.Invocation.Send_Word
-              (Launch_Params,
-               Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Bound));
+            Launch_Params.Data (6) :=
+              Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Base);
+            Launch_Params.Data (7) :=
+              Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Bound);
+
+            Rose.Boot.Console.Put ("stack:");
+            Rose.Boot.Console.Put (Launch_Params.Data (6));
+            Rose.Boot.Console.Put (" ");
+            Rose.Boot.Console.Put (Launch_Params.Data (7));
+            Rose.Boot.Console.New_Line;
 
             Map_Page
               (Directory_Page => Directory_VP,
@@ -439,40 +448,25 @@ package body Rose.Kernel.Processes.Init is
 
          if Have_Process_Handlers then
             Launch_Params.Cap := Mem_Launch_Cap;
-            Launch_Params.Endpoint := 100;
+            Launch_Params.Endpoint := 16#C196_0CA8_7972#;
+            Launch_Params.Control.Last_Sent_Word := 7;
+            Launch_Params.Control.Flags (Rose.Invocation.Send_Words) := True;
 
             declare
                use Rose.Capabilities.Layout;
-               Resume_Cap : constant Rose.Capabilities.Capability :=
-                              Rose.Kernel.Processes.Create_Cap
-                                (Mem_Process);
+               Process_Cap : constant Rose.Capabilities.Capability :=
+                               Rose.Kernel.Processes.Create_Cap
+                                 (Mem_Process);
             begin
                Rose.Kernel.Processes.Set_Cap
-                 (Mem_Process, Resume_Cap,
+                 (Mem_Process, Process_Cap,
                   Capability_Layout'
                     (Header  =>
                          (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
                           Endpoint => 1,
                           others   => <>),
                      Payload => To_Object_Id (Pid)));
-               Send_Cap (Launch_Params, Resume_Cap);
-            end;
-
-            declare
-               use Rose.Capabilities.Layout;
-               Faulted_Cap : constant Rose.Capabilities.Capability :=
-                               Rose.Kernel.Processes.Create_Cap
-                                 (Mem_Process);
-            begin
-               Rose.Kernel.Processes.Set_Cap
-                 (Mem_Process, Faulted_Cap,
-                  Capability_Layout'
-                    (Header  =>
-                         (Cap_Type => Rose.Capabilities.Layout.Process_Cap,
-                          Endpoint => 2,
-                          others   => <>),
-                     Payload => To_Object_Id (Pid)));
-               Send_Cap (Launch_Params, Faulted_Cap);
+               Send_Cap (Launch_Params, Process_Cap);
             end;
 
             Send_Cap

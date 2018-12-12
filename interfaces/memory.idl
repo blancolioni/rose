@@ -1,17 +1,26 @@
 interface Memory is
 
-   Segment_Readable    : constant := 1;
-   Segment_Writable    : constant := 2;
-   Segment_Executable  : constant := 4;
-   Segment_Initialized : constant := 8;
+   type Page_Access_Type is (Read, Write, Execute);
    
-   procedure New_Process
-     (Oid           : Object_Id);
+   function New_Process
+     (Process    : interface Process)
+     return interface Process_Memory;
+   
+   procedure Register_Process
+     (Process     : interface Process;
+      Exec_Base   : Word;
+      Exec_Bound  : Word;
+      Text_Base   : Word;
+      Text_Bound  : Word;
+      Data_Base   : Word;
+      Data_Bound  : Word;
+      Stack_Base  : Word;
+      Stack_Bound : Word);
       
-   procedure Add_Segment
-     (Process      : Object_Id;
-      Virtual_Base : Word;
-      Region       : interface Region;
-      Flags        : Word);
-      
+   procedure Page_Fault
+     (Faulting_Object : Object_Id;
+      Virtual_Page    : Word;
+      Physical_Page   : Word;
+      Action          : Page_Access_Type);
+   
 end Memory;
