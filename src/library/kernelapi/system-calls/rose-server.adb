@@ -100,7 +100,9 @@ package body Rose.Server is
          end loop;
 
          if Handled then
-            if Params.Control.Flags (Rose.Invocation.Reply) then
+            if Params.Control.Flags (Rose.Invocation.Reply)
+              and then Params.Cap /= Rose.Capabilities.Null_Capability
+            then
                Rose.System_Calls.Invoke_Capability (Params);
             end if;
          else
