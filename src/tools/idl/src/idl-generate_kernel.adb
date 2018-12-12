@@ -1402,13 +1402,29 @@ package body IDL.Generate_Kernel is
            ("Rose.System_Calls.Invoke_Capability",
             Syn.Object ("Params")));
 
-      for I in Subprs'Range loop
-         Block.Add_Statement
-           (Syn.Statements.New_Assignment_Statement
-              ("Client." & Get_Ada_Name (Subprs (I)),
-               Syn.Expressions.New_Function_Call_Expression
-                 ("Params.Caps", Syn.Literal (I - 1))));
-      end loop;
+      declare
+
+         Cap_Index : Natural := 0;
+
+         procedure Set_Cap (Subpr : IDL_Subprogram);
+
+         -------------
+         -- Set_Cap --
+         -------------
+
+         procedure Set_Cap (Subpr : IDL_Subprogram) is
+         begin
+            Block.Add_Statement
+              (Syn.Statements.New_Assignment_Statement
+                 ("Client." & Get_Ada_Name (Subpr),
+                  Syn.Expressions.New_Function_Call_Expression
+                    ("Params.Caps", Syn.Literal (Cap_Index))));
+            Cap_Index := Cap_Index + 1;
+         end Set_Cap;
+
+      begin
+         Scan_Subprograms (Item, True, Set_Cap'Access);
+      end;
 
       Block.Add_Statement
         (Syn.Statements.New_Assignment_Statement
