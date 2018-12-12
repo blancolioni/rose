@@ -41,7 +41,7 @@ package body Rose.Kernel.Init is
                           Page_Table_Size
                             + Process_Table_Size
                             + Boot_Module_Heap
-                            + 16#10_0000#;
+                            + 16#2_0000#;
       --    Page_Table_Size + Process_Table_Size + Module_Size;
 
    begin
