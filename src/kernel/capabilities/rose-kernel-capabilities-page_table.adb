@@ -5,6 +5,7 @@ with Rose.Words;
 
 with Rose.Kernel.Clock;
 with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Page_Table is
 
@@ -42,9 +43,21 @@ package body Rose.Kernel.Capabilities.Page_Table is
               ("kernel: unmap page not implemented");
 
          when Set_Page =>
-            Map_Process_Page (Params,
-                              Rose.Kernel.Processes.Current_Process_Id,
-                              0);
+            declare
+               use type Rose.Invocation.Parameter_Word_Index;
+               Pid : constant Rose.Kernel.Processes.Process_Id :=
+                       Rose.Kernel.Processes.Current_Process_Id;
+            begin
+               if Params.Control.Last_Sent_Word = 0 then
+                  Rose.Kernel.Processes.Unmap_Page
+                    (Pid          => Pid,
+                     Virtual_Page =>
+                       Rose.Addresses.Virtual_Page_Address
+                         (Params.Data (0)));
+               else
+                  Map_Process_Page (Params, Pid, 0);
+               end if;
+            end;
 
          when others =>
             Rose.Boot.Console.Put
@@ -54,6 +67,10 @@ package body Rose.Kernel.Capabilities.Page_Table is
       end case;
 
    end Handle;
+
+   ----------------------
+   -- Map_Process_Page --
+   ----------------------
 
    procedure Map_Process_Page
      (Params : Rose.Invocation.Invocation_Access;
@@ -84,6 +101,14 @@ package body Rose.Kernel.Capabilities.Page_Table is
                           (Permissions and 4) /= 0;
 
    begin
+      Rose.Boot.Console.Put ("map-page: ");
+      Rose.Kernel.Processes.Debug.Put (Pid);
+      Rose.Boot.Console.Put (" physical=");
+      Rose.Boot.Console.Put (Rose.Words.Word (Physical_Page) * 4096);
+      Rose.Boot.Console.Put (" virtual=");
+      Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
+      Rose.Boot.Console.New_Line;
+
       Rose.Kernel.Processes.Map_Page
         (Pid           => Pid,
          Virtual_Page  => Virtual_Page,
