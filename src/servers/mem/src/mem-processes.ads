@@ -40,6 +40,10 @@ package Mem.Processes is
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
+   function Register_Process
+     (Process_Cap : Rose.Capabilities.Capability)
+      return Rose.Objects.Capability_Identifier;
+
    procedure Initialize_Page
      (Process       : Rose.Objects.Capability_Identifier;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
@@ -47,7 +51,7 @@ package Mem.Processes is
 
    procedure Add_Segment
      (Process       : Rose.Objects.Capability_Identifier;
-      Virtual_Base  : Rose.Addresses.Virtual_Address;
+      Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
       Readable      : Boolean;
       Writable      : Boolean;
@@ -55,8 +59,8 @@ package Mem.Processes is
 
    procedure Add_Nonpersistent_Segment
      (Process       : Rose.Objects.Capability_Identifier;
-      Virtual_Base  : Rose.Addresses.Virtual_Address;
-      Virtual_Bound : Rose.Addresses.Virtual_Address;
+      Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean);

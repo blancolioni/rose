@@ -141,7 +141,7 @@ package body Elf.Loader is
 
             Add_Segment
               (Item         => Process,
-               Virtual_Base => V_Address,
+               Virtual_Base => V_Address / Rose.Limits.Page_Size,
                Region       => Region,
                Flags        => Flags);
 
