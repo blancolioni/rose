@@ -1372,8 +1372,8 @@ package body IDL.Generate_Kernel is
       Block : Syn.Blocks.Block_Type;
       Interface_Name : constant String :=
                          IDL.Syntax.Get_Ada_Name (Item);
-      Subprs         : constant IDL_Subprogram_Array :=
-                         Get_Subprograms (Item);
+      Receive_Count  : Natural := 0;
+
    begin
 
       Block.Add_Declaration
@@ -1400,11 +1400,27 @@ package body IDL.Generate_Kernel is
             Syn.Object ("Params"),
             Syn.Object ("Interface_Cap")));
 
+      declare
+         procedure Inc (Subpr : IDL_Subprogram);
+
+         ---------
+         -- Inc --
+         ---------
+
+         procedure Inc (Subpr : IDL_Subprogram) is
+            pragma Unreferenced (Subpr);
+         begin
+            Receive_Count := Receive_Count + 1;
+         end Inc;
+
+      begin
+         Scan_Subprograms (Item, True, Inc'Access);
+      end;
+
       Block.Add_Statement
         (Syn.Statements.New_Procedure_Call_Statement
            ("Rose.System_Calls.Receive_Caps",
-            Syn.Object ("Params"),
-            Syn.Literal (Subprs'Length)));
+            Syn.Object ("Params"), Syn.Literal (Receive_Count)));
 
       Block.Add_Statement
         (Syn.Statements.New_Procedure_Call_Statement
