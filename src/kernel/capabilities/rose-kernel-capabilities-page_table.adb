@@ -54,6 +54,9 @@ package body Rose.Kernel.Capabilities.Page_Table is
                      Virtual_Page =>
                        Rose.Addresses.Virtual_Page_Address
                          (Params.Data (0)));
+                  Rose.Kernel.Processes.Set_Current_State
+                    (Pid,
+                     Rose.Kernel.Processes.Ready);
                else
                   Map_Process_Page (Params, Pid, 0);
                end if;
