@@ -5,7 +5,6 @@ with Rose.Words;
 
 with Rose.Kernel.Clock;
 with Rose.Kernel.Processes;
-with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Page_Table is
 
@@ -104,14 +103,6 @@ package body Rose.Kernel.Capabilities.Page_Table is
                           (Permissions and 4) /= 0;
 
    begin
-      Rose.Boot.Console.Put ("map-page: ");
-      Rose.Kernel.Processes.Debug.Put (Pid);
-      Rose.Boot.Console.Put (" physical=");
-      Rose.Boot.Console.Put (Rose.Words.Word (Physical_Page) * 4096);
-      Rose.Boot.Console.Put (" virtual=");
-      Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
-      Rose.Boot.Console.New_Line;
-
       Rose.Kernel.Processes.Map_Page
         (Pid           => Pid,
          Virtual_Page  => Virtual_Page,
