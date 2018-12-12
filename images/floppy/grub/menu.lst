@@ -1,4 +1,4 @@
-default 1
+default 0
 timeout 1
 splashimage=/boot/rose-splash.xpm
 
