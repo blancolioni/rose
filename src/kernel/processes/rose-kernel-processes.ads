@@ -13,7 +13,8 @@ package Rose.Kernel.Processes is
    Process_Priority_Count  : constant := 16;
 
    type Process_State is
-     (Available, Ready, Running, Blocked, Interrupted, Faulted, Killed);
+     (Available, Starting, Ready,
+      Running, Blocked, Interrupted, Faulted, Killed);
 
    type Process_Priority is range 1 .. Process_Priority_Count;
 
@@ -32,6 +33,9 @@ package Rose.Kernel.Processes is
      (Cap_Index : Rose.Capabilities.Capability;
       Cap       : out Rose.Capabilities.Layout.Capability_Layout)
       return Boolean;
+
+   function New_Process
+     return Process_Id;
 
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
@@ -52,6 +56,16 @@ package Rose.Kernel.Processes is
    --  Create Count caps and return the first.  They
    --  are guaranteed to be sequential, or the return
    --  value is Null_Capability
+
+   procedure Copy_Cap
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
+      Cap             : Rose.Capabilities.Capability);
+
+   function New_Cap
+     (For_Process_Id : Process_Id;
+      Layout         : Rose.Capabilities.Layout.Capability_Layout)
+      return Rose.Capabilities.Capability;
 
    function Has_Cap
      (Pid : Process_Id;
