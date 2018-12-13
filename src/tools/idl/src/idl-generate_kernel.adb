@@ -1602,7 +1602,7 @@ package body IDL.Generate_Kernel is
                Endpoint_Object : constant Expression'Class :=
                                    Object (Endpoint_Name);
                Identifier_Object : constant Expression'Class :=
-                                   Object ("Parameters.Identifier");
+                                   Object ("Identifier");
                Check_Instance  : Sequence_Of_Statements;
                Assign_Cap     : Sequence_Of_Statements;
             begin
@@ -1660,6 +1660,10 @@ package body IDL.Generate_Kernel is
             Block.Add_Declaration
               (Syn.Declarations.New_Object_Declaration
                  ("Cap", "Capability"));
+            Block.Add_Declaration
+              (Syn.Declarations.New_Constant_Declaration
+                 ("Identifier", "Rose.Objects.Capability_Identifier",
+                  Syn.Object ("Parameters.Identifier")));
 
             Block.Append
               (Syn.Statements.New_Procedure_Call_Statement
