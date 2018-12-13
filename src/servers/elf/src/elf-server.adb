@@ -68,6 +68,7 @@ package body Elf.Server is
       Rose.Interfaces.Executable.Server.Create_Server
         (Server_Context => Server_Context,
          Launch         => Launch'Access);
+      Rose.Interfaces.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
 
    ------------
