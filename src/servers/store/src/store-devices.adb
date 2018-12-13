@@ -201,9 +201,20 @@ package body Store.Devices is
         or else Page < Regions (Region_Index).Base
         or else Page >= Regions (Region_Index).Bound
       then
+         Rose.Console_IO.Put ("store: get: invalid region/page: ");
+         Rose.Console_IO.Put (Region_Index);
+         Rose.Console_IO.Put ("/");
+         Rose.Console_IO.Put (Page);
+         Rose.Console_IO.New_Line;
          Data := (others => 0);
          return;
       end if;
+
+      Rose.Console_IO.Put ("store: get: ");
+      Rose.Console_IO.Put (Region_Index);
+      Rose.Console_IO.Put ("/");
+      Rose.Console_IO.Put (Page);
+      Rose.Console_IO.New_Line;
 
       declare
          Region : Region_Record renames Regions (Region_Index);
@@ -233,6 +244,9 @@ package body Store.Devices is
       Region_Index : constant Natural := Natural (Id);
    begin
       if Region_Index not in 1 .. Region_Count then
+         Rose.Console_IO.Put ("store: get-range: no such region: ");
+         Rose.Console_IO.Put (Natural (Id));
+         Rose.Console_IO.New_Line;
          Base := 0;
          Bound := 0;
          return;
@@ -240,6 +254,13 @@ package body Store.Devices is
 
       Base := Regions (Region_Index).Base;
       Bound := Regions (Region_Index).Bound;
+
+      Rose.Console_IO.Put ("store: get-range:  base ");
+      Rose.Console_IO.Put (Base);
+      Rose.Console_IO.Put ("bound ");
+      Rose.Console_IO.Put (Bound);
+      Rose.Console_IO.New_Line;
+
    end Get_Range;
 
    ---------------
@@ -485,7 +506,7 @@ package body Store.Devices is
       Alloc_Size  : Natural := Natural (Size);
    begin
       if Region_Count >= Max_Regions then
-         Rose.Console_IO.Put_Line ("store: out of space banks");
+         Rose.Console_IO.Put_Line ("store: out of regions");
          return 0;
       end if;
 
@@ -546,6 +567,11 @@ package body Store.Devices is
                  Rose.Interfaces.Region.Region_Interface,
                  Capability_Identifier (Region_Count)));
 
+         Rose.Console_IO.Put ("store: returning region ");
+         Rose.Console_IO.Put (Natural (New_Bank.Access_Cap));
+         Rose.Console_IO.Put ("/");
+         Rose.Console_IO.Put (Region_Count);
+         Rose.Console_IO.New_Line;
          return New_Bank.Access_Cap;
       end;
    end Reserve_Storage;

@@ -106,10 +106,12 @@ package body Rose.Kernel.Capabilities.Meta is
               (": new endpoint cap: ");
             Rose.Boot.Console.Put
               (Rose.Words.Word_8 (Endpoint_Cap));
-            Rose.Boot.Console.Put (" for endpoint ");
+            Rose.Boot.Console.Put (" ep=");
             Rose.Boot.Console.Put (Rose.Words.Word_8 (Local_Endpoint));
-            Rose.Boot.Console.Put (" ");
+            Rose.Boot.Console.Put ("/");
             Rose.Boot.Console.Put (Endpoint_Id);
+            Rose.Boot.Console.Put (" id=");
+            Rose.Boot.Console.Put (Natural (Identifier));
             Rose.Boot.Console.New_Line;
          end if;
 
