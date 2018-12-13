@@ -6,6 +6,8 @@ with Rose.Words;
 
 with Elf.Format;
 
+with Rose.Console_IO;
+
 package body Elf.Loader is
 
    use Rose.Interfaces.Region.Client;
@@ -62,9 +64,18 @@ package body Elf.Loader is
       Success := True;
       Read_Header (Image, Base, Header);
       if not Elf.Format.Valid (Header) then
+         Rose.Console_IO.Put_Line ("elf: invalid header");
          Success := False;
          return;
       end if;
+
+      Rose.Console_IO.Put ("elf: base  ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Base));
+      Rose.Console_IO.New_Line;
+      Rose.Console_IO.Put ("elf: bound ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Bound));
+      Rose.Console_IO.New_Line;
+
 
       Scan_Program_Headers (Store, Image, Base, Process, Header);
 
@@ -150,6 +161,10 @@ package body Elf.Loader is
       end case;
    end Process_Program_Header;
 
+   ----------
+   -- Read --
+   ----------
+
    procedure Read
      (Region : Region_Client;
       Base   : Rose.Objects.Object_Id;
@@ -169,12 +184,22 @@ package body Elf.Loader is
       Buffer     : Storage_Array (1 .. Rose.Limits.Page_Size);
       Buf_Offset : Storage_Count := Offset mod Rose.Limits.Page_Size;
    begin
+
+      Rose.Console_IO.Put ("elf: read: base ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Base));
+      Rose.Console_IO.Put (" offset=");
+      Rose.Console_IO.Put (Natural (Offset));
+      Rose.Console_IO.Put (" size=");
+      Rose.Console_IO.Put (Natural (Size));
+      Rose.Console_IO.New_Line;
+
       while Last < Size loop
          Get (Region, Page, Buffer);
 
          if Remaining <= Buffer'Last - Buf_Offset then
             Storage (Last + 1 .. Last + Remaining) :=
               Buffer (Buf_Offset .. Remaining);
+            Rose.Console_IO.Put (Storage);
             return;
          end if;
 
@@ -185,6 +210,7 @@ package body Elf.Loader is
          Remaining := Remaining - Buffer'Last;
          Buf_Offset := 0;
       end loop;
+      Rose.Console_IO.Put (Storage);
    end Read;
 
    -----------------
