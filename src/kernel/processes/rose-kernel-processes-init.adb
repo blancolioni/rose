@@ -211,13 +211,10 @@ package body Rose.Kernel.Processes.Init is
 
                   if Executable then
                      Word_Index := 0;
-                     Rose.Boot.Console.Put ("exec: ");
                   elsif Writable then
                      Word_Index := 4;
-                     Rose.Boot.Console.Put ("data: ");
                   else
                      Word_Index := 2;
-                     Rose.Boot.Console.Put ("text: ");
                   end if;
 
                   Launch_Params.Data (Word_Index) :=
@@ -395,12 +392,6 @@ package body Rose.Kernel.Processes.Init is
               Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Base);
             Launch_Params.Data (7) :=
               Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Bound);
-
-            Rose.Boot.Console.Put ("stack:");
-            Rose.Boot.Console.Put (Launch_Params.Data (6));
-            Rose.Boot.Console.Put (" ");
-            Rose.Boot.Console.Put (Launch_Params.Data (7));
-            Rose.Boot.Console.New_Line;
 
             Map_Page
               (Directory_Page => Directory_VP,
