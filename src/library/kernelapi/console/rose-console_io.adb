@@ -210,6 +210,41 @@ package body Rose.Console_IO is
       Put (Rose.Words.Word_32 (Item mod 2 ** 32));
    end Put;
 
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : Rose.Objects.Object_Id) is
+   begin
+      Put (Rose.Words.Word_64 (Item));
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : System.Storage_Elements.Storage_Array) is
+      use Rose.Words;
+      Offset : Word_16 := 0;
+   begin
+      for X of Item loop
+         if Offset mod 16 = 0 then
+            Put (Offset);
+            Put (":");
+         end if;
+         Put (" ");
+         Put (Word_8 (X));
+         Offset := Offset + 1;
+         if Offset mod 16 = 0 then
+            New_Line;
+         end if;
+      end loop;
+
+      if Offset mod 16 /= 0 then
+         New_Line;
+      end if;
+   end Put;
+
    --------------
    -- Put_Line --
    --------------
