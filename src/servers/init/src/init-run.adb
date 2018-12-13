@@ -10,6 +10,7 @@ with Rose.Interfaces.Partitions.Client;
 
 with Rose.Interfaces.Executable;
 with Rose.Interfaces.Installer;
+with Rose.Interfaces.Memory;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -70,8 +71,6 @@ package body Init.Run is
                                  (Create_Cap, (2, 31, 0, 0));
       Copy_Console_Cap     : Rose.Capabilities.Capability;
       Console_Id           : Rose.Objects.Object_Id;
-      Mem_Id               : Rose.Objects.Object_Id;
-      pragma Warnings (Off, Mem_Id);
       Console_Write_Cap    : Rose.Capabilities.Capability :=
                                Null_Capability;
       Mem_Region_Count_Cap : constant Rose.Capabilities.Capability :=
@@ -83,6 +82,7 @@ package body Init.Run is
       Page_On_Cap          : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (7, 1, 0, 0));
+      Mem_Cap              : Rose.Capabilities.Capability;
       PCI_Cap              : Rose.Capabilities.Capability;
 
       Hd0_Cap              : Rose.Capabilities.Capability;
@@ -271,12 +271,24 @@ package body Init.Run is
       Console_Write_Cap :=
         Copy_Cap_From_Process (Copy_Console_Cap, 16#C025_0130#);
 
-      Mem_Id :=
-        Init.Calls.Launch_Boot_Module
-          (Boot_Cap, Mem_Module, Device_Driver_Priority,
-           (Create_Endpoint_Cap, Console_Write_Cap,
-            Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-            Page_On_Cap));
+      declare
+         Mem_Id : constant Rose.Objects.Object_Id :=
+                    Init.Calls.Launch_Boot_Module
+                      (Boot_Cap, Mem_Module, Device_Driver_Priority,
+                       (Create_Endpoint_Cap, Console_Write_Cap,
+                        Mem_Region_Count_Cap, Mem_Get_Region_Cap,
+                        Page_On_Cap));
+         Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
+                          Init.Calls.Call
+                            (Create_Cap,
+                             (9, 1,
+                              Word (Mem_Id mod 2 ** 32),
+                              Word (Mem_Id / 2 ** 32)));
+      begin
+         Mem_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Mem_Cap, Rose.Interfaces.Memory.Memory_Interface);
+      end;
 
       declare
          Command_Port_Out_Cap : constant Rose.Capabilities.Capability :=
@@ -415,12 +427,17 @@ package body Init.Run is
       end;
 
       declare
+         Create_Process_Cap : constant Rose.Capabilities.Capability :=
+                                Init.Calls.Call
+                                  (Create_Cap,
+                                   (7, 4, 0, 0));
          Elf_Id       : constant Rose.Objects.Object_Id :=
                             Init.Calls.Launch_Boot_Module
                               (Boot_Cap, Elf_Module, Device_Driver_Priority,
                                (Create_Endpoint_Cap,
                                 Delete_Cap, Rescind_Cap,
-                                Console_Write_Cap));
+                                Console_Write_Cap,
+                                Mem_Cap, Create_Process_Cap));
          Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
