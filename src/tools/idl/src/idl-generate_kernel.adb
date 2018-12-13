@@ -1764,6 +1764,12 @@ package body IDL.Generate_Kernel is
 
             procedure Register_Interface (Item : IDL_Interface) is
             begin
+               Create_Endpoint_Seq.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.System_Calls.Server.Create_Anonymous_Endpoint",
+                        Syn.Literal (1),
+                        Syn.Object (Get_Ada_Name (Item) & "_Interface")));
+
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
                     ("Rose.Server.Register_Handler",
@@ -1789,13 +1795,13 @@ package body IDL.Generate_Kernel is
 
             Scan_Subprograms (Item, True, Save_Handler'Access);
             Scan_Subprograms (Item, True, Create_Endpoint'Access);
+            Scan_Ancestors (Item, True, Register_Interface'Access);
             Block.Append
               (Syn.Statements.If_Statement
                  (Syn.Expressions.Operator
                       ("not",
                        Syn.Object ("Instanced")),
                   Create_Endpoint_Seq));
-            Scan_Ancestors (Item, True, Register_Interface'Access);
 
             Scan_Subprograms (Item, True, Register_Endpoint'Access);
 
