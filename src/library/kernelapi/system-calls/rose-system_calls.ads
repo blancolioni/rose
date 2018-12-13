@@ -87,6 +87,7 @@ package Rose.System_Calls is
 
    procedure Copy_Received_Caps
      (Params    : Rose.Invocation.Invocation_Record;
+      Start     : Rose.Invocation.Capability_Index;
       To        : out Rose.Capabilities.Capability_Array;
       Last      : out Natural);
 
