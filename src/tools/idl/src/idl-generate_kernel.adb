@@ -486,27 +486,9 @@ package body IDL.Generate_Kernel is
               (Syn.Statements.New_Procedure_Call_Statement
                  ("Rose.System_Calls.Copy_Received_Caps",
                   Syn.Object ("Parameters"),
+                  Syn.Literal (Recv_Caps),
                   Syn.Object ("Caps"),
                   Syn.Object ("Cap_Count")));
-            declare
-               use Syn, Syn.Expressions;
-               Assign      : constant Syn.Statement'Class :=
-                               Syn.Statements.New_Assignment_Statement
-                                 ("Caps (I)",
-                                  New_Function_Call_Expression
-                                    ("Parameters.Caps",
-                                     New_Function_Call_Expression
-                                       ("Rose.Invocation.Capability_Index",
-                                        Syn.Expressions.Operator
-                                          ("-", Object ("I"), Literal (1)))));
-               Seq         : Syn.Statements.Sequence_Of_Statements;
-            begin
-               Seq.Append (Assign);
-               Block.Append
-                 (Syn.Statements.For_Loop
-                    ("I", Literal (1), Object ("Cap_Count"), False, Seq));
-            end;
-
          else
             if Is_String (Base_Type) then
                Block.Add_Declaration
@@ -687,8 +669,13 @@ package body IDL.Generate_Kernel is
             Expr.Add_Actual_Argument
               (Syn.Object ("Parameters.Identifier"));
             for Arg of Args loop
-               Expr.Add_Actual_Argument
-                 (Syn.Object (Get_Ada_Name (Arg)));
+               if Is_Capability_Array (Get_Type (Arg)) then
+                  Expr.Add_Actual_Argument
+                    (Syn.Object (Get_Ada_Name (Arg) & " (1 .. Cap_Count"));
+               else
+                  Expr.Add_Actual_Argument
+                    (Syn.Object (Get_Ada_Name (Arg)));
+               end if;
             end loop;
 
             Block.Add_Declaration
@@ -708,7 +695,12 @@ package body IDL.Generate_Kernel is
             Call.Add_Actual_Argument
               ("Parameters.Identifier");
             for Arg of Args loop
-               Call.Add_Actual_Argument (Get_Ada_Name (Arg));
+               if Is_Capability_Array (Get_Type (Arg)) then
+                  Call.Add_Actual_Argument
+                    (Syn.Object (Get_Ada_Name (Arg) & " (1 .. Cap_Count)"));
+               else
+                  Call.Add_Actual_Argument (Get_Ada_Name (Arg));
+               end if;
             end loop;
             Block.Add_Statement (Call);
          end;
