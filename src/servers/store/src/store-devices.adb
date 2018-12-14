@@ -553,9 +553,10 @@ package body Store.Devices is
          Base :=
            Object_Id
              ((Alloc_Index - Backing_Stores (Store).Allocator_Base)
-              * Minimum_Bank_Size);
+              * Minimum_Bank_Pages)
+           + Page_Object_Id'First;
          Bound :=
-           Base + Object_Id (Alloc_Size * Minimum_Bank_Size);
+           Base + Object_Id (Alloc_Size / Rose.Limits.Page_Size);
 
          New_Bank := Region_Record'
            (Backing_Device => Store,
