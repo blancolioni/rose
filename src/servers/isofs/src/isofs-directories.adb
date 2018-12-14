@@ -727,7 +727,7 @@ package body IsoFS.Directories is
 
       return Rose.System_Calls.Server.Create_Endpoint
         (Create_Cap  => Create_Endpoint_Cap,
-         Endpoint_Id => Rose.Interfaces.Stream_Reader.Read_Endpoint,
+         Endpoint_Id => Rose.Interfaces.Stream_Reader.Stream_Reader_Interface,
          Identifier  => Rose.Objects.Capability_Identifier (Open_File_Count));
 
    end Read_File;
