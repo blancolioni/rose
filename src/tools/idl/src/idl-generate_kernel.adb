@@ -649,12 +649,6 @@ package body IDL.Generate_Kernel is
          end if;
       end loop;
 
-      Block.Append
-        (Syn.Statements.New_Procedure_Call_Statement
-           ("Rose.System_Calls.Initialize_Reply",
-            Syn.Object ("Parameters"),
-            Syn.Object ("Parameters.Reply_Cap")));
-
       if Is_Function (Subpr) then
          declare
             Ret  : constant IDL.Types.IDL_Type := Get_Return_Type (Subpr);
@@ -705,6 +699,12 @@ package body IDL.Generate_Kernel is
             Block.Add_Statement (Call);
          end;
       end if;
+
+      Block.Append
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Initialize_Reply",
+            Syn.Object ("Parameters"),
+            Syn.Object ("Parameters.Reply_Cap")));
 
       for Arg of Args loop
          if Get_Mode (Arg) /= In_Argument then
