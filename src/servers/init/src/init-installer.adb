@@ -113,10 +113,10 @@ package body Init.Installer is
       Params      : aliased Rose.Invocation.Invocation_Record;
    begin
 
-      Open_Cap_Set (Exec_Reader, Binary_Stream);
+      Open (Exec_Reader, Binary_Stream);
       Copy_Stream (Exec_Reader, Region);
 
-      Open_Cap_Set (Cap_Reader, Cap_Stream);
+      Open (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Region));
@@ -151,7 +151,7 @@ package body Init.Installer is
       Rose.System_Calls.Initialize_Send (Params, Install_Cap);
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
 
-      Open_Cap_Set (Client, Cap_Stream);
+      Open (Client, Cap_Stream);
       Copy_Caps (Client, Params, Create_Cap);
 
       Rose.System_Calls.Invoke_Capability (Params);
