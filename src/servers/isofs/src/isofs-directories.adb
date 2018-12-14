@@ -129,14 +129,7 @@ package body IsoFS.Directories is
          Child_Count           : Natural := 0;
          Sector_Address        : Block_Address_Type;
          Entry_Record          : Directory_Entry;
-         Directory_Entry_Count : Rose.Capabilities.Capability := 0;
-         Directory_Entry_Name  : Rose.Capabilities.Capability := 0;
-         Directory_Entry_Kind  : Rose.Capabilities.Capability := 0;
-         Directory_Entry_Size  : Rose.Capabilities.Capability := 0;
-         Find_Entry            : Rose.Capabilities.Capability := 0;
-         Get_Ordinary_File     : Rose.Capabilities.Capability := 0;
-         Get_Directory         : Rose.Capabilities.Capability := 0;
-         Read_File             : Rose.Capabilities.Capability := 0;
+         Directory_Interface   : Rose.Capabilities.Capability := 0;
       end record;
 
    type Directory_Caps_Array is
@@ -264,29 +257,19 @@ package body IsoFS.Directories is
       end Add_Child_Entry;
 
    begin
+      Rose.Console_IO.Put ("isofs: new directory caps: ");
+      Rose.Console_IO.Put (Natural (Directory));
+      Rose.Console_IO.New_Line;
+
       Caps :=
         (Caps with delta
            Filled                => True,
            Entry_Record          => Dir_Entry,
            First_Child           => No_Directory,
            Child_Count           => 0,
-           SectOr_Address        => Sector,
-           Directory_Entry_Count =>
-              New_Cap (Directory_Entry_Count_Endpoint),
-           Directory_Entry_Name  =>
-              New_Cap (Directory_Entry_Name_Endpoint),
-           Directory_Entry_Kind  =>
-              New_Cap (Directory_Entry_Kind_Endpoint),
-           Directory_Entry_Size  =>
-             New_Cap (Directory_Entry_Size_Endpoint),
-           Find_Entry            =>
-             New_Cap (Find_Entry_Endpoint),
-           Get_Ordinary_File     =>
-              New_Cap (Get_Ordinary_File_Endpoint),
-           Get_Directory         =>
-              New_Cap (Get_Directory_Endpoint),
-           Read_File             =>
-             New_Cap (Read_File_Endpoint));
+           Sector_Address        => Sector,
+           Directory_Interface   =>
+              New_Cap (Directory_Interface));
 
       Scan_Directory_Entries (Directory, Add_Child_Entry'Access);
 
@@ -364,6 +347,19 @@ package body IsoFS.Directories is
    begin
       Scan_Directory_Entries (Parent, Copy_Entry'Access);
    end Get_Child_Entry;
+
+   -----------------------------
+   -- Get_Directory_Interface --
+   -----------------------------
+
+   function Get_Directory_Interface
+     (Directory             : Directory_Type)
+      return Rose.Capabilities.Capability
+   is
+      Caps : Directory_Caps_Record renames Directory_Caps (Directory);
+   begin
+      return Caps.Directory_Interface;
+   end Get_Directory_Interface;
 
    ---------------------
    -- Get_Entry_Count --
@@ -504,7 +500,7 @@ package body IsoFS.Directories is
    function Get_Entry_Size
      (Directory : Directory_Type;
       Index     : Positive)
-      return Natural
+      return System.Storage_Elements.Storage_Count
    is
       Count : Natural := 0;
       Size  : Natural := 0;
@@ -531,7 +527,7 @@ package body IsoFS.Directories is
 
    begin
       Scan_Directory_Entries (Directory, Process'Access);
-      return Size;
+      return System.Storage_Elements.Storage_Count (Size);
    end Get_Entry_Size;
 
    ------------------------------
@@ -916,28 +912,5 @@ package body IsoFS.Directories is
 
       end loop;
    end Scan_Directory_Entries;
-
-   -------------------------
-   -- Send_Directory_Caps --
-   -------------------------
-
-   procedure Send_Directory_Caps
-     (Directory             : Directory_Type;
-      Params                : in out Rose.Invocation.Invocation_Record)
-   is
-      use Rose.System_Calls;
-      Caps : Directory_Caps_Record renames Directory_Caps (Directory);
-   begin
-      Send_Cap (Params, Caps.Directory_Entry_Count);
-      Send_Cap (Params, Caps.Directory_Entry_Name);
-      Send_Cap (Params, Caps.Directory_Entry_Kind);
-      Send_Cap (Params, Caps.Directory_Entry_Size);
-      Send_Cap (Params, Caps.Find_Entry);
-      Send_Cap (Params, Caps.Get_Ordinary_File);
-      Send_Cap (Params, Caps.Get_Directory);
-      Send_Cap (Params, Caps.Read_File);
-      Send_Cap (Params, Rose.Capabilities.Null_Capability);
-      Send_Cap (Params, Rose.Capabilities.Null_Capability);
-   end Send_Directory_Caps;
 
 end IsoFS.Directories;

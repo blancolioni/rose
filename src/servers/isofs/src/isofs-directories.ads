@@ -1,7 +1,6 @@
 with System.Storage_Elements;
 
 with Rose.Objects;
-with Rose.Invocation;
 with Rose.Interfaces.Directory;
 
 with Rose.Interfaces.Block_Device.Client;
@@ -50,7 +49,7 @@ package IsoFS.Directories is
    function Get_Entry_Size
      (Directory : Directory_Type;
       Index     : Positive)
-      return Natural;
+      return System.Storage_Elements.Storage_Count;
 
    function Read_File
      (Directory : Directory_Type;
@@ -72,9 +71,9 @@ package IsoFS.Directories is
      (Identifier : Rose.Objects.Capability_Identifier)
       return Directory_Type;
 
-   procedure Send_Directory_Caps
-     (Directory             : Directory_Type;
-      Params                : in out Rose.Invocation.Invocation_Record);
+   function Get_Directory_Interface
+     (Directory             : Directory_Type)
+      return Rose.Capabilities.Capability;
 
 private
 
