@@ -88,6 +88,7 @@ package body Init.Run is
       Hd0_Cap              : Rose.Capabilities.Capability;
       Hd1_Cap              : Rose.Capabilities.Capability;
 
+      Storage_Cap          : Rose.Capabilities.Capability;
       Add_Storage_Cap      : Rose.Capabilities.Capability;
       Reserve_Storage_Cap  : Rose.Capabilities.Capability;
 
@@ -416,6 +417,10 @@ package body Init.Run is
                                 Word (Store_Id mod 2 ** 32),
                                 Word (Store_Id / 2 ** 32)));
       begin
+         Storage_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage.Storage_Interface);
          Add_Storage_Cap :=
            Copy_Cap_From_Process
              (Copy_Store_Cap,
@@ -557,7 +562,8 @@ package body Init.Run is
             if First then
                Init.Installer.Install_Exec_Library
                  (Create_Cap    => Create_Cap,
-                  Storage_Cap   => Reserve_Storage_Cap,
+                  Storage_Cap   => Storage_Cap,
+                  Reserve_Cap   => Reserve_Storage_Cap,
                   Launch_Cap    => Launch_Elf_Cap,
                   Cap_Stream    => Params.Caps (0),
                   Binary_Stream => Params.Caps (1),

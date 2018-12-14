@@ -5,6 +5,8 @@ with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes;
 
+with Rose.Kernel.Heap;
+
 with Rose.Kernel.Panic;
 
 package body Rose.Kernel.Processes is
@@ -34,6 +36,9 @@ package body Rose.Kernel.Processes is
       Address      : Rose.Addresses.Virtual_Page_Address;
       Writable     : Boolean);
 
+   procedure Create_Process_Table_Entry
+     (Pid : Rose.Kernel.Processes.Process_Id);
+
    --------------
    -- Cap_Type --
    --------------
@@ -52,6 +57,22 @@ package body Rose.Kernel.Processes is
          return Rose.Capabilities.Layout.Null_Cap;
       end if;
    end Cap_Type;
+
+   --------------
+   -- Copy_Cap --
+   --------------
+
+   procedure Copy_Cap
+     (From_Process_Id : Process_Id;
+      To_Process_Id   : Process_Id;
+      Cap             : Rose.Capabilities.Capability)
+   is
+      To_Cap : constant Rose.Capabilities.Capability :=
+                 Create_Cap (To_Process_Id);
+   begin
+      Copy_Cap_Layout (From_Process_Id, Cap,
+                       To_Process_Id, To_Cap);
+   end Copy_Cap;
 
    ---------------------
    -- Copy_Cap_Layout --
@@ -166,6 +187,92 @@ package body Rose.Kernel.Processes is
          end if;
       end return;
    end Create_Endpoint_Cap;
+
+   --------------------------------
+   -- Create_Process_Table_Entry --
+   --------------------------------
+
+   procedure Create_Process_Table_Entry
+     (Pid : Rose.Kernel.Processes.Process_Id)
+   is
+      use Rose.Kernel.Page_Table;
+      Proc : Kernel_Process_Entry renames Process_Table (Pid);
+      System_Call_Page : constant Physical_Page_Address :=
+                           Physical_Address_To_Page
+                             (To_Kernel_Physical_Address
+                                (To_Virtual_Address
+                                   (System_Call_Entry'Address)));
+      Directory_VP            : Virtual_Page_Address;
+      Physical_Directory_Page : Physical_Page_Address;
+   begin
+
+      Proc.Oid := Rose.Objects.Object_Id (Pid);
+      Proc.Priority := Process_Priority'Last;
+
+      Proc.State := Starting;
+      Proc.Quantum_Ticks := 10;
+      Proc.Remaining_Ticks := 10;
+
+      Proc.Page_Flags := (others => (others => False));
+      Proc.Page_Ranges := (others => (others => 0));
+
+      Directory_VP := Rose.Kernel.Heap.Allocate_Page;
+      Physical_Directory_Page :=
+        Physical_Page_Address
+          (Directory_VP - Kernel_Virtual_Page_Base);
+      Proc.Directory_Page :=
+        Physical_Page_To_Address (Physical_Directory_Page);
+
+      Rose.Kernel.Page_Table.Init_User_Page_Directory (Directory_VP);
+      Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
+
+      Map_Page
+        (Directory_Page => Directory_VP,
+         Virtual_Page   =>
+           Virtual_Address_To_Page (Process_Stack_Bound - 1),
+         Physical_Page  => Proc.Stack_Page,
+         Readable       => True,
+         Writable       => True,
+         Executable     => False,
+         User           => True);
+      Proc.Page_Ranges (Stack_Range_Index) :=
+        (Virtual_Address_To_Page (Process_Stack_Bound - 16#1_0000#),
+         Virtual_Address_To_Page (Process_Stack_Bound));
+      Proc.Page_Flags (Stack_Range_Index) :=
+        (Valid  => True, Readable => True, Writable => True,
+         others => False);
+
+      Map_Page
+        (Directory_Page => Directory_VP,
+         Virtual_Page   =>
+           Virtual_Address_To_Page (Environment_Base),
+         Physical_Page  => Proc.Env_Page,
+         Readable       => True,
+         Writable       => True,
+         Executable     => False,
+         User           => True);
+
+      Map_Kernel_Page
+        (Virtual_Page  =>
+           Virtual_Page_Address
+             (Proc.Env_Page + Kernel_Virtual_Page_Base),
+         Physical_Page => Proc.Env_Page,
+         Readable      => True,
+         Writable      => True,
+         Executable    => False,
+         User          => False);
+
+      Map_Page
+        (Directory_Page => Directory_VP,
+         Virtual_Page   =>
+           Virtual_Address_To_Page (16#FFFF_0000#),
+         Physical_Page  => System_Call_Page,
+         Readable       => True,
+         Writable       => False,
+         Executable     => True,
+         User           => True);
+
+   end Create_Process_Table_Entry;
 
    -------------------------
    -- Current_Process_Cap --
@@ -618,6 +725,43 @@ package body Rose.Kernel.Processes is
          Virtual_Page   => Virtual_Page);
    end Mapped_Physical_Page;
 
+   -------------
+   -- New_Cap --
+   -------------
+
+   function New_Cap
+     (For_Process_Id : Process_Id;
+      Layout         : Rose.Capabilities.Layout.Capability_Layout)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Cap : constant Rose.Capabilities.Capability :=
+        Create_Cap (For_Process_Id)
+      do
+         Set_Cap (For_Process_Id, Cap, Layout);
+      end return;
+   end New_Cap;
+
+   -----------------
+   -- New_Process --
+   -----------------
+
+   function New_Process
+     return Process_Id
+   is
+      Pid               : Process_Id := 1;
+   begin
+
+      while Process_Table (Pid).State /= Available loop
+         Pid := Pid + 1;
+      end loop;
+
+      Create_Process_Table_Entry (Pid);
+
+      return Pid;
+
+   end New_Process;
+
    -------------------------
    -- Next_Blocked_Sender --
    -------------------------
@@ -985,6 +1129,7 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put
            (case State is
                when Ready       => "ready",
+               when Starting    => "starting",
                when Blocked     => "blocked",
                when Interrupted => "interrupted",
                when Available   => "available",

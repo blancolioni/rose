@@ -99,7 +99,8 @@ package body Rose.Kernel.Capabilities.Endpoint is
             use Rose.Capabilities.Layout;
             Reply_Layout : constant Capability_Layout :=
                              Reply_Capability
-                               (To_Object_Id (Current_Process_Id));
+                               (To_Object_Id (Current_Process_Id),
+                                Cap.Header.Identifier);
          begin
             Set_Cap (Pid, Params.Reply_Cap, Reply_Layout);
          end;
