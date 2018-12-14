@@ -54,8 +54,6 @@ package body Rose.Kernel.Invocation is
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Cap));
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (Params.all, True);
-         Rose.Kernel.Processes.Debug.Report_Process
-           (Rose.Kernel.Processes.Current_Process_Id, True);
          Rose.Kernel.Panic.Panic ("bad cap");
          Return_Error (Params, Rose.Invocation.Invalid_Capability);
       else
