@@ -47,9 +47,11 @@ package Rose.Capabilities.Layout is
    Empty_Capability : constant Capability_Layout := (others => <>);
 
    function Reply_Capability
-     (Object_Id : Rose.Objects.Object_Id)
+     (Object_Id : Rose.Objects.Object_Id;
+      Cap_Id    : Rose.Objects.Capability_Identifier := 0)
       return Capability_Layout
-   is ((Reply_Cap, Single_Use => True, others => <>),
+   is ((Reply_Cap, Single_Use => True, Identifier => Cap_Id,
+        others => <>),
        Object_Id);
 
    function Receive_Capability

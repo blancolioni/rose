@@ -95,6 +95,7 @@ package body Init.Installer is
    procedure Install_Exec_Library
      (Create_Cap    : Rose.Capabilities.Capability;
       Storage_Cap   : Rose.Capabilities.Capability;
+      Reserve_Cap   : Rose.Capabilities.Capability;
       Launch_Cap    : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
@@ -104,7 +105,7 @@ package body Init.Installer is
       use Rose.Interfaces.Stream_Reader.Client;
       Region : constant Region_Client :=
                      Reserve_Storage
-                       (Storage_Cap,
+                       (Reserve_Cap,
                         Rose.Words.Word_64 (Binary_Length));
       Exec_Reader : Stream_Reader_Client;
       Cap_Reader  : Stream_Reader_Client;
@@ -118,9 +119,9 @@ package body Init.Installer is
       Open_Cap_Set (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
       Rose.System_Calls.Send_Cap
-        (Params, Get_Get_Range_Cap (Region));
+        (Params, Get_Interface_Cap (Region));
       Rose.System_Calls.Send_Cap
-        (Params, Get_Get_Cap (Region));
+        (Params, Storage_Cap);
       Copy_Caps (Cap_Reader, Params, Create_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
       Install_Cap := Params.Caps (0);

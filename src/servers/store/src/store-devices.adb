@@ -201,6 +201,11 @@ package body Store.Devices is
         or else Page < Regions (Region_Index).Base
         or else Page >= Regions (Region_Index).Bound
       then
+         Rose.Console_IO.Put ("store: get: invalid region/page: ");
+         Rose.Console_IO.Put (Region_Index);
+         Rose.Console_IO.Put ("/");
+         Rose.Console_IO.Put (Page);
+         Rose.Console_IO.New_Line;
          Data := (others => 0);
          return;
       end if;
@@ -233,6 +238,9 @@ package body Store.Devices is
       Region_Index : constant Natural := Natural (Id);
    begin
       if Region_Index not in 1 .. Region_Count then
+         Rose.Console_IO.Put ("store: get-range: no such region: ");
+         Rose.Console_IO.Put (Natural (Id));
+         Rose.Console_IO.New_Line;
          Base := 0;
          Bound := 0;
          return;
@@ -240,6 +248,7 @@ package body Store.Devices is
 
       Base := Regions (Region_Index).Base;
       Bound := Regions (Region_Index).Bound;
+
    end Get_Range;
 
    ---------------
@@ -485,7 +494,7 @@ package body Store.Devices is
       Alloc_Size  : Natural := Natural (Size);
    begin
       if Region_Count >= Max_Regions then
-         Rose.Console_IO.Put_Line ("store: out of space banks");
+         Rose.Console_IO.Put_Line ("store: out of regions");
          return 0;
       end if;
 
@@ -495,22 +504,10 @@ package body Store.Devices is
          Alloc_Size := (Alloc_Size / Minimum_Bank_Size + 1)
            * Minimum_Bank_Size;
       end if;
-      Rose.Console_IO.New_Line;
-      Rose.Console_IO.Put ("store: size=");
-      Rose.Console_IO.Put (Rose.Words.Word_32 (Size));
-      Rose.Console_IO.Put ("; alloc-size=");
-      Rose.Console_IO.Put (Rose.Words.Word_32 (Alloc_Size));
-      Rose.Console_IO.Put ("; unit-count=");
-      Rose.Console_IO.Put (Natural (Alloc_Size / Minimum_Bank_Size));
-      Rose.Console_IO.New_Line;
 
       Alloc_Index :=
         Space_Allocators.Allocate
           (Allocator, Alloc_Size / Minimum_Bank_Size);
-
-      Rose.Console_IO.Put ("store: alloc index = ");
-      Rose.Console_IO.Put (Alloc_Index);
-      Rose.Console_IO.New_Line;
 
       if Alloc_Index = 0 then
          return 0;
@@ -532,9 +529,10 @@ package body Store.Devices is
          Base :=
            Object_Id
              ((Alloc_Index - Backing_Stores (Store).Allocator_Base)
-              * Minimum_Bank_Size);
+              * Minimum_Bank_Pages)
+           + Page_Object_Id'First;
          Bound :=
-           Base + Object_Id (Alloc_Size * Minimum_Bank_Size);
+           Base + Object_Id (Alloc_Size / Rose.Limits.Page_Size);
 
          New_Bank := Region_Record'
            (Backing_Device => Store,

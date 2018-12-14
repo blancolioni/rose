@@ -42,9 +42,13 @@ package body Rose.Kernel.Debug is
       Put (Word_8 (Params.Cap));
       Put (" ");
       Put_Cap_Type (Layout.Header.Cap_Type);
-      Put (": ");
+      Put (": ep=");
       Put (Rose.Words.Word_16 (Layout.Header.Endpoint));
-      Put (":");
+      Put (" id=");
+      Put (Natural (Layout.Header.Identifier));
+      Put ("/");
+      Put (Natural (Params.Identifier));
+      Put (" payload=");
       Put (Rose.Words.Word_32 (Layout.Payload));
       Put_Flag ("E", Error);
       Put_Flag ("S", Send);
@@ -58,8 +62,9 @@ package body Rose.Kernel.Debug is
       Put_Flag ("RC", Recv_Caps);
       Put_Flag ("SB", Send_Buffer);
       Put_Flag ("WB", Writable_Buffer);
+      Put_Flag ("MR", Create_Reply_Cap);
 
-      Put (" ");
+      Put (" ep=");
       Put (Word_32 (Word_64 (Params.Endpoint) / 2 ** 32));
       Put ("_");
       Put (Word_32 (Params.Endpoint));

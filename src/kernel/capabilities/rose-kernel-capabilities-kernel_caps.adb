@@ -9,7 +9,24 @@ with Rose.Kernel.Panic;
 
 with Rose.Boot.Console;
 
+with Rose.Kernel.Capabilities.Processes;
+
 package body Rose.Kernel.Capabilities.Kernel_Caps is
+
+   function Process_Cap
+     (Pid : Rose.Kernel.Processes.Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Rose.Capabilities.Layout.Capability_Layout;
+
+   function Process_Interface_Cap
+     (Pid : Rose.Kernel.Processes.Process_Id)
+      return Rose.Capabilities.Layout.Capability_Layout
+   is (Process_Cap (Pid, Processes.Process_Interface_Endpoint));
+
+   function Start_Process_Cap
+     (Pid : Rose.Kernel.Processes.Process_Id)
+      return Rose.Capabilities.Layout.Capability_Layout
+   is (Process_Cap (Pid, Processes.Start_Process_Endpoint));
 
    procedure Write_Image
      (Current  : in out Rose.Objects.Object_Id;
@@ -86,11 +103,49 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
          when Create_Process_Endpoint =>
             Rose.Boot.Console.Put_Line ("kernel: create process");
 
-            Params.all :=
-              (Control => (Flags => (Rose.Invocation.Reply => True,
-                                     others                     => False),
-                           others         => <>),
-               others  => <>);
+            declare
+               use Rose.Kernel.Processes;
+               Pid : constant Process_Id := New_Process;
+            begin
+               if Pid = Null_Process_Id then
+                  Rose.Boot.Console.Put_Line ("kernel: out of processes");
+                  Return_Error (Params,
+                                Rose.Invocation.Invalid_Operation,
+                                0);
+                  Rose.Kernel.Processes.Set_Current_State
+                    (Rose.Kernel.Processes.Current_Process_Id,
+                     Rose.Kernel.Processes.Ready);
+                  return;
+               end if;
+
+               for Index in 0 .. Params.Control.Last_Sent_Cap loop
+                  Copy_Cap (Current_Process_Id, Pid,
+                            Params.Caps (Index));
+               end loop;
+
+               Params.all :=
+                 (Control =>
+                    (Flags =>
+                         (Rose.Invocation.Reply => True,
+                          others                => False),
+                     others         => <>),
+                  others  => <>);
+
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap
+                      (Current_Process_Id,
+                       Process_Interface_Cap (Pid)));
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap
+                      (Current_Process_Id,
+                       Start_Process_Cap (Pid)));
+
+            end;
+
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
@@ -101,6 +156,28 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
       end case;
    end Handle;
+
+   -----------------
+   -- Process_Cap --
+   -----------------
+
+   function Process_Cap
+     (Pid      : Rose.Kernel.Processes.Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Rose.Capabilities.Layout.Capability_Layout
+   is
+      use Rose.Capabilities.Layout;
+   begin
+      return Capability_Layout'
+        (Header  =>
+           Capability_Header'
+             (Cap_Type         => Process_Cap,
+              Endpoint         => Endpoint,
+              Identifier       => 0,
+              others           => <>),
+         Payload =>
+           Rose.Kernel.Processes.To_Object_Id (Pid));
+   end Process_Cap;
 
    -----------------
    -- Write_Image --
