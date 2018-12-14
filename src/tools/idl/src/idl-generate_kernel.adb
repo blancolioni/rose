@@ -198,31 +198,15 @@ package body IDL.Generate_Kernel is
             declare
                Result : constant IDL_Interface :=
                           IDL.Interface_Table.Element (Get_Name (Base_Type));
-               Cap_Index : Natural := 0;
                Open_Proc : Syn.Statements.Procedure_Call_Statement'Class :=
                              Syn.Statements.New_Procedure_Call_Statement
                                (Get_Package_Name (Result)
-                                & ".Client.Open_Cap_Set",
+                                & ".Client.Open",
                                 Syn.Object (Base_Name));
-
-               procedure Copy_Cap (Result_Subprogram : IDL_Subprogram);
-
-               --------------
-               -- Copy_Cap --
-               --------------
-
-               procedure Copy_Cap (Result_Subprogram : IDL_Subprogram) is
-               begin
-                  Open_Proc.Add_Actual_Argument
-                    (Get_Ada_Name (Result_Subprogram),
-                     Syn.Expressions.New_Function_Call_Expression
-                       ("Params.Caps", Syn.Literal (Cap_Index)));
-                  Cap_Index := Cap_Index + 1;
-               end Copy_Cap;
-
             begin
-
-               Scan_Subprograms (Result, True, Copy_Cap'Access);
+               Open_Proc.Add_Actual_Argument
+                 (Syn.Expressions.New_Function_Call_Expression
+                    ("Params.Caps", Syn.Literal (0)));
                Copy_Block.Append (Open_Proc);
 
             end;
@@ -516,7 +500,6 @@ package body IDL.Generate_Kernel is
             Block.Add_Declaration
               (Syn.Declarations.Address_Representation_Clause
                  (Base_Name, Syn.Object ("Parameters.Buffer_Address")));
-
          end if;
       end Declare_Local;
 
@@ -552,7 +535,7 @@ package body IDL.Generate_Kernel is
                   Syn.Object ("Parameters"),
                   Syn.Literal (Repl_Words),
                   Syn.Object
-                    ("Rose.Words.Word'(" & Get_Ada_Name (Base_Type)
+                    ("Natural'(" & Get_Ada_Name (Base_Type)
                      & "'Pos (" & Base_Name & "))")));
          elsif Is_Capability (Base_Type) then
             Repl_Words := Repl_Words + 1;
@@ -574,13 +557,9 @@ package body IDL.Generate_Kernel is
             Repl_Words := Repl_Words + 1;
             Block.Append
               (Syn.Statements.New_Procedure_Call_Statement
-                 ("Set_Data_Word",
+                 ("Rose.System_Calls.Send_Word",
                   Syn.Object ("Parameters"),
-                  Syn.Literal (Repl_Words),
-                  Syn.Expressions.New_Function_Call_Expression
-                    ("Rose.Words.Word", "Result'Length")));
---         elsif Has_Last_Index_Argument (Arg) then
-
+                  Syn.Object ("Last")));
          elsif not Is_Scalar (Base_Type) then
             null;
          elsif Is_Storage_Offset (Base_Type) then
@@ -637,25 +616,34 @@ package body IDL.Generate_Kernel is
                Get_Mode (Arg) = In_Argument);
          end if;
 
-         if Is_String (Get_Type (Arg)) then
-            Block.Add_Declaration
-              (Syn.Declarations.New_Constant_Declaration
-                 (Get_Ada_Name (Arg),
-                  "String",
-                  Syn.Expressions.New_Function_Call_Expression
-                    ("Rose.System_Calls.Marshalling.Copy_Memory_To_String",
-                     Syn.Object (Get_Ada_Name (Arg) & "_Cap"),
-                     Syn.Object (Get_Ada_Name (Arg) & "_Size"))));
-         end if;
       end loop;
 
-      Block.Append
-        (Syn.Statements.New_Procedure_Call_Statement
-           ("Rose.System_Calls.Initialize_Reply",
-            Syn.Object ("Parameters"),
-            Syn.Object ("Parameters.Reply_Cap")));
+      if Is_Function (Subpr)
+        and then Is_String (Get_Return_Type (Subpr))
+      then
+         Block.Add_Declaration
+           (Syn.Declarations.New_Object_Declaration
+              ("Last", Syn.Named_Subtype ("Natural"), Syn.Literal (0)));
+         Block.Add_Declaration
+           (Syn.Declarations.New_Object_Declaration
+              ("Result",
+               Syn.Constrained_Subtype
+                 ("String",
+                  Syn.Literal (1),
+                  Syn.Expressions.New_Function_Call_Expression
+                    ("Natural",
+                     Syn.Object ("Parameters.Buffer_Length")))));
+         Block.Add_Declaration
+           (Syn.Declarations.New_Pragma
+              ("Import", "Ada, Result"));
+         Block.Add_Declaration
+           (Syn.Declarations.Address_Representation_Clause
+              ("Result", Syn.Object ("Parameters.Buffer_Address")));
+      end if;
 
-      if Is_Function (Subpr) then
+      if Is_Function (Subpr)
+        and then not Is_String (Get_Return_Type (Subpr))
+      then
          declare
             Ret  : constant IDL.Types.IDL_Type := Get_Return_Type (Subpr);
             Expr : Syn.Expressions.Function_Call_Expression'Class :=
@@ -702,9 +690,21 @@ package body IDL.Generate_Kernel is
                   Call.Add_Actual_Argument (Get_Ada_Name (Arg));
                end if;
             end loop;
+            if Is_Function (Subpr)
+              and then Is_String (Get_Return_Type (Subpr))
+            then
+               Call.Add_Actual_Argument ("Result");
+               Call.Add_Actual_Argument ("Last");
+            end if;
             Block.Add_Statement (Call);
          end;
       end if;
+
+      Block.Append
+        (Syn.Statements.New_Procedure_Call_Statement
+           ("Rose.System_Calls.Initialize_Reply",
+            Syn.Object ("Parameters"),
+            Syn.Object ("Parameters.Reply_Cap")));
 
       for Arg of Args loop
          if Get_Mode (Arg) /= In_Argument then
@@ -738,7 +738,7 @@ package body IDL.Generate_Kernel is
                     ("Rose.System_Calls.Send_Word",
                      Syn.Object ("Parameters"),
                      Syn.Object
-                       ("Rose.Words.Word'(" & Get_Ada_Name (Ret_Type)
+                       ("Natural'(" & Get_Ada_Name (Ret_Type)
                         & "'Pos (Result))")));
             elsif Is_Capability (Ret_Type) then
                Block.Append
@@ -755,17 +755,21 @@ package body IDL.Generate_Kernel is
             elsif Is_String (Ret_Type) then
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
-                    ("Rose.System_Calls.Marshalling.Copy_String_To_Memory",
-                     Syn.Object ("Result_Cap"),
-                     Syn.Object ("Result")));
-               Repl_Words := Repl_Words + 1;
+                    ("Rose.System_Calls.Send_Word",
+                     Syn.Object ("Parameters"),
+                     Syn.Object ("Last")));
+            elsif Get_Ada_Name (Ret_Type) = "Natural" then
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
-                    ("Set_Data_Word",
+                    ("Rose.System_Calls.Send_Word",
                      Syn.Object ("Parameters"),
-                     Syn.Literal (Repl_Words),
-                     Syn.Expressions.New_Function_Call_Expression
-                       ("Rose.Words.Word", "Result'Length")));
+                     Syn.Object ("Result")));
+            elsif Is_Storage_Offset (Ret_Type) then
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.System_Calls.Send_Storage_Offset",
+                     Syn.Object ("Parameters"),
+                     Syn.Object ("Result")));
             else
                if Get_Size (Ret_Type) > Default_Size then
                   Block.Append
@@ -1673,7 +1677,8 @@ package body IDL.Generate_Kernel is
                use Syn.Declarations;
                Name : constant String :=
                         "Handle_Get_"
-                        & Get_Ada_Name (For_Interface);
+                        & Get_Ada_Name (For_Interface)
+                        & "_Interface";
                Method : Subprogram_Declaration'Class :=
                           New_Procedure (Name, Block);
             begin
@@ -1776,7 +1781,8 @@ package body IDL.Generate_Kernel is
                      Syn.Object ("Server_Context"),
                      Syn.Object (Get_Ada_Name (Item) & "_Interface"),
                      Syn.Object
-                       ("Handle_Get_" & Get_Ada_Name (Item) & "'Access")));
+                       ("Handle_Get_" & Get_Ada_Name (Item)
+                        & "_Interface'Access")));
             end Register_Interface;
 
             ------------------
@@ -2113,7 +2119,7 @@ package body IDL.Generate_Kernel is
                           ("Rose.System_Calls.Send_Word",
                            Syn.Object ("Params"),
                            Syn.Expressions.New_Function_Call_Expression
-                             ("Rose.Words.Word'",
+                             ("Natural'",
                               Syn.Expressions.New_Function_Call_Expression
                                 (Get_Ada_Name (Arg_Type) & "'Pos",
                                  Syn.Object (Get_Ada_Name (Args (I)))))));
@@ -2191,7 +2197,7 @@ package body IDL.Generate_Kernel is
    is
       use IDL.Syntax;
 
-      Have_Capability_With : Boolean := False;
+      Have_Capability_With       : Boolean := False;
 
       procedure Add_Dependent_Withs (Subpr : IDL_Subprogram);
 
@@ -2235,6 +2241,8 @@ package body IDL.Generate_Kernel is
                   Have_Capability_With := True;
                end if;
             end;
+         elsif IDL.Types.Is_Storage_Offset (Ref) then
+            Pkg.With_Package ("System.Storage_Elements");
          else
             declare
                Pkg_Name : constant String :=
@@ -2244,12 +2252,6 @@ package body IDL.Generate_Kernel is
                   Pkg.With_Package (Pkg_Name);
                end if;
             end;
-            if Server
-              and then IDL.Types.Is_String (Ref)
-            then
-               Pkg.With_Package ("System.Storage_Elements",
-                                 Body_With => True);
-            end if;
          end if;
       end Check_Type;
 
