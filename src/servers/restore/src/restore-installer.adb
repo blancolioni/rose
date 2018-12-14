@@ -106,8 +106,10 @@ package body Restore.Installer is
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
          Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
-         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Caps_Reader));
-         Rose.System_Calls.Send_Cap (Params, Get_Read_Cap (Binary_Reader));
+         Rose.System_Calls.Send_Cap
+           (Params, Get_Interface_Cap (Caps_Reader));
+         Rose.System_Calls.Send_Cap
+           (Params, Get_Interface_Cap (Binary_Reader));
          Rose.System_Calls.Send_Word
            (Params, Natural (Rose.Directories.Size (Exec_Path)));
          Rose.System_Calls.Receive_Caps (Params, 1);
