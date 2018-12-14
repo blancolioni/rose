@@ -210,12 +210,6 @@ package body Store.Devices is
          return;
       end if;
 
-      Rose.Console_IO.Put ("store: get: ");
-      Rose.Console_IO.Put (Region_Index);
-      Rose.Console_IO.Put ("/");
-      Rose.Console_IO.Put (Page);
-      Rose.Console_IO.New_Line;
-
       declare
          Region : Region_Record renames Regions (Region_Index);
          Store      : Backing_Store_Record renames
@@ -254,12 +248,6 @@ package body Store.Devices is
 
       Base := Regions (Region_Index).Base;
       Bound := Regions (Region_Index).Bound;
-
-      Rose.Console_IO.Put ("store: get-range:  base ");
-      Rose.Console_IO.Put (Base);
-      Rose.Console_IO.Put ("bound ");
-      Rose.Console_IO.Put (Bound);
-      Rose.Console_IO.New_Line;
 
    end Get_Range;
 
@@ -516,22 +504,10 @@ package body Store.Devices is
          Alloc_Size := (Alloc_Size / Minimum_Bank_Size + 1)
            * Minimum_Bank_Size;
       end if;
-      Rose.Console_IO.New_Line;
-      Rose.Console_IO.Put ("store: size=");
-      Rose.Console_IO.Put (Rose.Words.Word_32 (Size));
-      Rose.Console_IO.Put ("; alloc-size=");
-      Rose.Console_IO.Put (Rose.Words.Word_32 (Alloc_Size));
-      Rose.Console_IO.Put ("; unit-count=");
-      Rose.Console_IO.Put (Natural (Alloc_Size / Minimum_Bank_Size));
-      Rose.Console_IO.New_Line;
 
       Alloc_Index :=
         Space_Allocators.Allocate
           (Allocator, Alloc_Size / Minimum_Bank_Size);
-
-      Rose.Console_IO.Put ("store: alloc index = ");
-      Rose.Console_IO.Put (Alloc_Index);
-      Rose.Console_IO.New_Line;
 
       if Alloc_Index = 0 then
          return 0;
@@ -568,11 +544,6 @@ package body Store.Devices is
                  Rose.Interfaces.Region.Region_Interface,
                  Capability_Identifier (Region_Count)));
 
-         Rose.Console_IO.Put ("store: returning region ");
-         Rose.Console_IO.Put (Natural (New_Bank.Access_Cap));
-         Rose.Console_IO.Put ("/");
-         Rose.Console_IO.Put (Region_Count);
-         Rose.Console_IO.New_Line;
          return New_Bank.Access_Cap;
       end;
    end Reserve_Storage;
