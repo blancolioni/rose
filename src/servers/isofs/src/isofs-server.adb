@@ -5,6 +5,7 @@ with Rose.Objects;
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Directory.Server;
 with Rose.Interfaces.File_System.Server;
+with Rose.Interfaces.Stream_Reader.Server;
 
 with Rose.Server;
 
@@ -64,6 +65,11 @@ package body IsoFS.Server is
    function Check_Directory
      (Id : Rose.Objects.Capability_Identifier)
       return IsoFS.Directories.Directory_Type;
+
+   procedure Stream_Reader_Read
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Buffer :    out System.Storage_Elements.Storage_Array;
+      Last   :    out System.Storage_Elements.Storage_Count);
 
    ---------------------
    -- Check_Directory --
@@ -280,10 +286,28 @@ package body IsoFS.Server is
          Create_File           => null,
          Instanced             => True);
 
+      Rose.Interfaces.Stream_Reader.Server.Attach_Interface
+        (Server_Context => Context,
+         Read           => Stream_Reader_Read'Access,
+         Instanced      => True);
+
       Rose.Console_IO.Put_Line ("isofs: starting server");
 
       Rose.Server.Start_Server (Context);
 
    end Start_Server;
+
+   ------------------------
+   -- Stream_Reader_Read --
+   ------------------------
+
+   procedure Stream_Reader_Read
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Buffer :    out System.Storage_Elements.Storage_Array;
+      Last   :    out System.Storage_Elements.Storage_Count)
+   is
+   begin
+      IsoFS.Directories.Read (Positive (Id), Buffer, Last);
+   end Stream_Reader_Read;
 
 end IsoFS.Server;
