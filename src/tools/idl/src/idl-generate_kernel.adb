@@ -202,29 +202,15 @@ package body IDL.Generate_Kernel is
                Open_Proc : Syn.Statements.Procedure_Call_Statement'Class :=
                              Syn.Statements.New_Procedure_Call_Statement
                                (Get_Package_Name (Result)
-                                & ".Client.Open_Cap_Set",
+                                & ".Client.Open",
                                 Syn.Object (Base_Name));
 
-               procedure Copy_Cap (Result_Subprogram : IDL_Subprogram);
-
-               --------------
-               -- Copy_Cap --
-               --------------
-
-               procedure Copy_Cap (Result_Subprogram : IDL_Subprogram) is
-               begin
-                  Open_Proc.Add_Actual_Argument
-                    (Get_Ada_Name (Result_Subprogram),
-                     Syn.Expressions.New_Function_Call_Expression
-                       ("Params.Caps", Syn.Literal (Cap_Index)));
-                  Cap_Index := Cap_Index + 1;
-               end Copy_Cap;
-
             begin
-
-               Scan_Subprograms (Result, True, Copy_Cap'Access);
+               Open_Proc.Add_Actual_Argument
+                 (Syn.Expressions.New_Function_Call_Expression
+                    ("Params.Caps", Syn.Literal (Cap_Index)));
+               Cap_Index := Cap_Index + 1;
                Copy_Block.Append (Open_Proc);
-
             end;
 
          elsif Get_Name (Base_Type) = "stream_element_count"
