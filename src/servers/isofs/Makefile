@@ -21,7 +21,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-containers-queues.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-directory-server.o \
+	$(BUILDDIR)/rose-interfaces-file_system-server.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
