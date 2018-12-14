@@ -1,302 +1,289 @@
 with System.Storage_Elements;
 
-with Rose.Invocation;
-with Rose.System_Calls.Server;
-with Rose.Words;
+with Rose.Objects;
 
 with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Directory;
-with Rose.Interfaces.File_System;
-with Rose.Interfaces.Stream_Reader;
+with Rose.Interfaces.Directory.Server;
+with Rose.Interfaces.File_System.Server;
+
+with Rose.Server;
+
 with Rose.Console_IO;
 
 with IsoFS.Directories;
 
 package body IsoFS.Server is
 
+   Context : Rose.Server.Server_Context;
+   Device  : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+
+   function Root_Directory
+     (Id : Rose.Objects.Capability_Identifier)
+     return Rose.Capabilities.Capability;
+
+   function Directory_Entry_Count
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural;
+
+   procedure Directory_Entry_Name
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Index  : in     Positive;
+      Result :    out String;
+      Last   :    out Natural);
+
+   function Directory_Entry_Kind
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Interfaces.Directory.File_Kind;
+
+   function Directory_Entry_Size
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return System.Storage_Elements.Storage_Count;
+
+   function Find_Entry
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Name : in     String)
+      return Natural;
+
+   function Get_Ordinary_File
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+
+   function Get_Directory
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+
+   function Read_File
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+
+   function Check_Directory
+     (Id : Rose.Objects.Capability_Identifier)
+      return IsoFS.Directories.Directory_Type;
+
+   ---------------------
+   -- Check_Directory --
+   ---------------------
+
+   function Check_Directory
+     (Id : Rose.Objects.Capability_Identifier)
+      return IsoFS.Directories.Directory_Type
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type :=
+                    Get_Identified_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         Rose.Console_IO.Put
+           ("bad directory id: ");
+         Rose.Console_IO.Put (Natural (Id));
+         Rose.Console_IO.New_Line;
+      end if;
+      return Directory;
+   end Check_Directory;
+
+   ---------------------------
+   -- Directory_Entry_Count --
+   ---------------------------
+
+   function Directory_Entry_Count
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         return 0;
+      else
+         return Get_Entry_Count (Directory);
+      end if;
+   end Directory_Entry_Count;
+
+   --------------------------
+   -- Directory_Entry_Kind --
+   --------------------------
+
+   function Directory_Entry_Kind
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Interfaces.Directory.File_Kind
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         return Rose.Interfaces.Directory.Special_File;
+      else
+         return Get_Entry_Kind (Directory, Index);
+      end if;
+   end Directory_Entry_Kind;
+
+   --------------------------
+   -- Directory_Entry_Name --
+   --------------------------
+
+   procedure Directory_Entry_Name
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Index  : in     Positive;
+      Result :    out String;
+      Last   :    out Natural)
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory /= No_Directory then
+         Get_Entry_Name (Directory, Index, Result, Last);
+      end if;
+   end Directory_Entry_Name;
+
+   --------------------------
+   -- Directory_Entry_Size --
+   --------------------------
+
+   function Directory_Entry_Size
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return System.Storage_Elements.Storage_Count
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         return 0;
+      else
+         return Get_Entry_Size (Directory, Index);
+      end if;
+   end Directory_Entry_Size;
+
+   ----------------
+   -- Find_Entry --
+   ----------------
+
+   function Find_Entry
+     (Id   : in     Rose.Objects.Capability_Identifier;
+      Name : in     String)
+      return Natural
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         return 0;
+      else
+         return Get_Index_By_Name (Directory, Name);
+      end if;
+   end Find_Entry;
+
+   -------------------
+   -- Get_Directory --
+   -------------------
+
+   function Get_Directory
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+      Child     : constant Directory_Type :=
+                    (if Directory = No_Directory then No_Directory
+                     else Get_Child_Directory (Directory, Index));
+   begin
+      if Directory = No_Directory
+        or else Child = No_Directory
+      then
+         return 0;
+      else
+         return Get_Directory_Interface (Child);
+      end if;
+   end Get_Directory;
+
+   -----------------------
+   -- Get_Ordinary_File --
+   -----------------------
+
+   function Get_Ordinary_File
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id, Index);
+   begin
+      return 0;
+   end Get_Ordinary_File;
+
+   ---------------
+   -- Read_File --
+   ---------------
+
+   function Read_File
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+   begin
+      if Directory = No_Directory then
+         return 0;
+      else
+         return IsoFS.Directories.Read_File (Directory, Index);
+      end if;
+   end Read_File;
+
+   --------------------
+   -- Root_Directory --
+   --------------------
+
+   function Root_Directory
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+      Root : constant IsoFS.Directories.Directory_Type :=
+               IsoFS.Directories.Get_Root_Directory
+                 (Device);
+   begin
+      return IsoFS.Directories.Get_Directory_Interface (Root);
+   end Root_Directory;
+
    ------------------
    -- Start_Server --
    ------------------
 
    procedure Start_Server is
-      Device      : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
-      Receive_Cap : constant Rose.Capabilities.Capability :=
-                      Rose.System_Calls.Server.Create_Receive_Cap
-                        (Create_Endpoint_Cap);
-      Params      : aliased Rose.Invocation.Invocation_Record;
-      Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
+      Rose.Console_IO.Put_Line ("isofs: creating server");
       Rose.Interfaces.Block_Device.Client.Open
         (Device, Device_Cap);
 
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.File_System.Root_Directory_Endpoint);
+      Rose.Interfaces.File_System.Server.Create_Server
+        (Server_Context => Context,
+         Root_Directory => Root_Directory'Access);
+
+      Rose.Interfaces.Directory.Server.Attach_Interface
+        (Server_Context        => Context,
+         Directory_Entry_Count => Directory_Entry_Count'Access,
+         Directory_Entry_Name  => Directory_Entry_Name'Access,
+         Directory_Entry_Kind  => Directory_Entry_Kind'Access,
+         Directory_Entry_Size  => Directory_Entry_Size'Access,
+         Find_Entry            => Find_Entry'Access,
+         Get_Ordinary_File     => Get_Ordinary_File'Access,
+         Get_Directory         => Get_Directory'Access,
+         Read_File             => Read_File'Access,
+         Create_Directory      => null,
+         Create_File           => null,
+         Instanced             => True);
 
       Rose.Console_IO.Put_Line ("isofs: starting server");
 
-      loop
-         Params := (others => <>);
-         Params.Control.Flags (Rose.Invocation.Receive) := True;
-         Params.Control.Flags (Rose.Invocation.Block) := True;
-         Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
-         Params.Control.Flags (Rose.Invocation.Recv_Buffer) := True;
-         Params.Control.Last_Recv_Word :=
-           Rose.Invocation.Parameter_Word_Index'Last;
-         Params.Cap := Receive_Cap;
+      Rose.Server.Start_Server (Context);
 
-         Rose.System_Calls.Invoke_Capability (Params);
-         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
-
-         case Params.Endpoint is
-            when Rose.Interfaces.File_System.Root_Directory_Endpoint =>
-               declare
-                  Root : constant IsoFS.Directories.Directory_Type :=
-                           IsoFS.Directories.Get_Root_Directory
-                             (Device);
-               begin
-                  IsoFS.Directories.Send_Directory_Caps (Root, Reply);
-               end;
-
-            when Rose.Interfaces.Directory.Directory_Entry_Count_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-               begin
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     Rose.System_Calls.Send_Word
-                       (Reply, Rose.Words.Word (Get_Entry_Count (Directory)));
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Directory_Entry_Name_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  use System.Storage_Elements;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Index     : constant Natural := Natural (Params.Data (0));
-                  Name      : String (1 .. 255);
-                  Last      : Natural;
-                  Addr      : constant System.Address := Params.Buffer_Address;
-                  Buffer    : Storage_Array (1 .. Params.Buffer_Length);
-                  pragma Import (Ada, Buffer);
-                  for Buffer'Address use Addr;
-               begin
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif Index = 0 then
-                     Rose.Console_IO.Put_Line
-                       ("invalid directory index");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     Get_Entry_Name (Directory, Index, Name, Last);
-
-                     declare
-                        Index  : Storage_Offset := 0;
-                     begin
-                        for Ch of Name (1 .. Last) loop
-                           exit when Index >= Params.Buffer_Length;
-                           Index := Index + 1;
-                           Buffer (Index) := Character'Pos (Ch);
-                        end loop;
-
-                        Rose.System_Calls.Send_Word
-                          (Reply, Rose.Words.Word (Index));
-                     end;
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Directory_Entry_Kind_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Index     : constant Natural := Natural (Params.Data (0));
-               begin
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
-                     Rose.Console_IO.Put_Line
-                       ("invalid directory index");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     declare
-                        use Rose.Interfaces.Directory;
-                        Kind : constant File_Kind :=
-                                 Get_Entry_Kind (Directory, Index);
-                     begin
-                        Rose.System_Calls.Send_Word
-                          (Reply, Rose.Words.Word'(File_Kind'Pos (Kind)));
-                     end;
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Directory_Entry_Size_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Index     : constant Natural := Natural (Params.Data (0));
-               begin
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
-                     Rose.Console_IO.Put_Line
-                       ("invalid directory index");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     declare
-                        Size : constant Natural :=
-                                 Get_Entry_Size (Directory, Index);
-                     begin
-                        Rose.System_Calls.Send_Word (Reply, Size);
-                     end;
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Get_Directory_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Index     : constant Natural := Natural (Params.Data (0));
-               begin
-
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
-                     Rose.Console_IO.Put
-                       ("invalid directory index: ");
-                     Rose.Console_IO.Put (Natural (Params.Identifier));
-                     Rose.Console_IO.Put ("/");
-                     Rose.Console_IO.Put (Index);
-                     Rose.Console_IO.New_Line;
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     IsoFS.Directories.Send_Directory_Caps
-                       (Get_Child_Directory (Directory, Index), Reply);
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Find_Entry_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Name      : String (1 .. Natural (Params.Buffer_Length));
-                  pragma Import (Ada, Name);
-                  for Name'Address use Params.Buffer_Address;
-               begin
-
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif not Params.Control.Flags
-                    (Rose.Invocation.Send_Buffer)
-                  then
-                     Rose.Console_IO.Put_Line
-                       ("expected a name in call to find_entry");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     declare
-                        Index : constant Natural :=
-                                  Get_Index_By_Name (Directory, Name);
-                     begin
-                        Rose.System_Calls.Send_Word
-                          (Reply, Rose.Words.Word (Index));
-                     end;
-                  end if;
-               end;
-
-            when Rose.Interfaces.Directory.Read_File_Endpoint =>
-               declare
-                  use IsoFS.Directories;
-                  Directory : constant Directory_Type :=
-                                Get_Identified_Directory
-                                  (Params.Identifier);
-                  Index     : constant Natural := Natural (Params.Data (0));
-               begin
-
-                  if Directory = No_Directory then
-                     Rose.Console_IO.Put_Line
-                       ("cap does not resolve to a directory");
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  elsif Index not in 1 .. Get_Entry_Count (Directory) then
-                     Rose.Console_IO.Put
-                       ("invalid directory index: ");
-                     Rose.Console_IO.Put (Natural (Params.Identifier));
-                     Rose.Console_IO.Put ("/");
-                     Rose.Console_IO.Put (Index);
-                     Rose.Console_IO.New_Line;
-                     Rose.System_Calls.Send_Error
-                       (Reply, Rose.Invocation.Invalid_Operation);
-                  else
-                     Rose.System_Calls.Send_Cap
-                       (Reply,
-                        IsoFS.Directories.Read_File (Directory, Index));
-                  end if;
-               end;
-
-            when Rose.Interfaces.Stream_Reader.Read_Endpoint =>
-
-               declare
-                  use System.Storage_Elements;
-                  Buffer : Storage_Array (1 .. Params.Buffer_Length);
-                  pragma Import (Ada, Buffer);
-                  for Buffer'Address use Params.Buffer_Address;
-                  Last   : Storage_Count;
-               begin
-                  IsoFS.Directories.Read
-                    (Positive (Params.Identifier), Buffer, Last);
-                  Rose.System_Calls.Send_Word (Reply, Natural (Last));
-               end;
-
-            when others =>
-               Rose.Console_IO.Put
-                 ("isofs: unknown endpoint: ");
-               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
-               Rose.Console_IO.New_Line;
-               Rose.System_Calls.Send_Error
-                 (Reply, Rose.Invocation.Invalid_Endpoint);
-
-         end case;
-
-         Rose.System_Calls.Invoke_Capability (Reply);
-
-      end loop;
    end Start_Server;
 
 end IsoFS.Server;
