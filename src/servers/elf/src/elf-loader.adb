@@ -182,7 +182,7 @@ package body Elf.Loader is
       pragma Import (Ada, Storage);
       for Storage'Address use Item;
       Buffer     : Storage_Array (1 .. Rose.Limits.Page_Size);
-      Buf_Offset : Storage_Count := Offset mod Rose.Limits.Page_Size;
+      Buf_Offset : Storage_Count := Offset mod Rose.Limits.Page_Size + 1;
    begin
 
       Rose.Console_IO.Put ("elf: read: base ");
@@ -208,7 +208,7 @@ package body Elf.Loader is
          Page := Page + 1;
          Last := Last + Buffer'Last;
          Remaining := Remaining - Buffer'Last;
-         Buf_Offset := 0;
+         Buf_Offset := 1;
       end loop;
       Rose.Console_IO.Put (Storage);
    end Read;
