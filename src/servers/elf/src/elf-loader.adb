@@ -146,6 +146,7 @@ package body Elf.Loader is
               (Item         => Process,
                Virtual_Base => V_Address / Rose.Limits.Page_Size,
                Region       => Region,
+               Offset       => File_Offset,
                Flags        => Flags);
 
          when others =>

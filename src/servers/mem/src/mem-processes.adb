@@ -34,6 +34,7 @@ package body Mem.Processes is
          Region       : Rose.Interfaces.Region.Client.Region_Client;
          Region_Base  : Rose.Objects.Object_Id := 0;
          Region_Bound : Rose.Objects.Object_Id := 0;
+         Region_Offset : Rose.Objects.Object_Id := 0;
          Flags        : Segment_Flag_Array := (others => False);
       end record;
 
@@ -82,6 +83,7 @@ package body Mem.Processes is
          Region       => <>,
          Region_Base  => 0,
          Region_Bound => 0,
+         Region_Offset => 0,
          Flags        =>
            (Read       => Readable,
             Write      => Writable,
@@ -99,6 +101,7 @@ package body Mem.Processes is
      (Process       : Rose.Objects.Capability_Identifier;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
+      Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean)
@@ -124,6 +127,8 @@ package body Mem.Processes is
          Region       => Region,
          Region_Base  => Region_Base,
          Region_Bound => Region_Bound,
+         Region_Offset =>
+           Rose.Objects.Object_Id (Region_Offset) / Rose.Limits.Page_Size,
          Flags        =>
            (Read => Readable,
             Write => Writable,
@@ -247,7 +252,8 @@ package body Mem.Processes is
                   use Rose.Objects;
                   Page : constant Page_Object_Id :=
                            Segment.Region_Base
-                             + Object_Id (Virtual_Page - Segment.Base);
+                             + Object_Id (Virtual_Page - Segment.Base)
+                             + Segment.Region_Offset;
                begin
                   Rose.Interfaces.Region.Client.Get
                     (Item => Segment.Region,
