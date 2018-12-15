@@ -37,6 +37,10 @@ package Rose.Kernel.Processes is
    function New_Process
      return Process_Id;
 
+   procedure Start_Process
+     (Process : Process_Id;
+      Address : Rose.Words.Word);
+
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
 

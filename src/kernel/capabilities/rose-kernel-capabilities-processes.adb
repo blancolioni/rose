@@ -1,3 +1,5 @@
+with Rose.Boot.Console;
+
 with Rose.Kernel.Processes;
 with Rose.Kernel.Capabilities.Meta;
 
@@ -110,8 +112,27 @@ package body Rose.Kernel.Capabilities.Processes is
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
+
+         when Start_Process_Endpoint =>
+
+            Rose.Boot.Console.Put ("starting process ");
+            Rose.Boot.Console.Put (Natural (Cap.Payload));
+            Rose.Boot.Console.Put (" at ");
+            Rose.Boot.Console.Put (Params.Data (0));
+            Rose.Boot.Console.New_Line;
+
+            Rose.Kernel.Processes.Start_Process
+              (Pid, Params.Data (0));
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when others =>
-            null;
+            Rose.Boot.Console.Put ("invalid endpoint: ");
+            Rose.Boot.Console.Put (Natural (Cap.Header.Endpoint));
+            Rose.Boot.Console.New_Line;
+
       end case;
 
    end Handle;
