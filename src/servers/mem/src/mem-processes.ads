@@ -1,6 +1,7 @@
 with Rose.Addresses;
 with Rose.Capabilities;
 with Rose.Objects;
+with Rose.Words;
 
 with Rose.Interfaces.Region.Client;
 
@@ -53,6 +54,7 @@ package Mem.Processes is
      (Process       : Rose.Objects.Capability_Identifier;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
+      Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean);
