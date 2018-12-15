@@ -3,6 +3,7 @@ with Rose.Boot.Console;
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
+with Rose.Kernel.Processes.Queue;
 with Rose.Kernel.Processes;
 
 with Rose.Kernel.Heap;
@@ -1248,6 +1249,24 @@ package body Rose.Kernel.Processes is
       Rose.Boot.Console.Put (Addr);
       Rose.Boot.Console.New_Line;
    end Show_Address;
+
+   -------------------
+   -- Start_Process --
+   -------------------
+
+   procedure Start_Process
+     (Process : Process_Id;
+      Address : Rose.Words.Word)
+   is
+      Proc : constant Kernel_Process_Access :=
+               Process_Table (Process)'Access;
+   begin
+      Proc.Stack :=
+        Rose.Kernel.Arch.Process_Stack_Frame
+          (Start_EIP => Address);
+      Set_Current_State (Process, Ready);
+      Rose.Kernel.Processes.Queue.Queue_Process (Process);
+   end Start_Process;
 
    -------------------
    -- To_Process_Id --
