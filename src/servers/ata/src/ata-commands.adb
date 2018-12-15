@@ -20,7 +20,8 @@ package body ATA.Commands is
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sector  : out System.Storage_Elements.Storage_Array);
+      Sector  : out System.Storage_Elements.Storage_Array;
+      Success : out Boolean);
 
    -----------
    -- Flush --
@@ -62,7 +63,8 @@ package body ATA.Commands is
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sectors : out System.Storage_Elements.Storage_Array)
+      Sectors : out System.Storage_Elements.Storage_Array;
+      Success : out Boolean)
    is
       use ATA.Drives;
       use System.Storage_Elements;
@@ -71,12 +73,15 @@ package body ATA.Commands is
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_16_Read_Port (Drive);
    begin
+
+      Success := False;
+
       if ATA.Drives.Is_Dead (Drive) then
          ATA.Drives.Log (Drive, "drive is dead");
       end if;
 
       if ATA.Drives.Is_Atapi (Drive) then
-         Read_Sectors_ATAPI (Drive, Address, Count, Sectors);
+         Read_Sectors_ATAPI (Drive, Address, Count, Sectors, Success);
          return;
       end if;
 
@@ -116,6 +121,8 @@ package body ATA.Commands is
          end;
       end loop;
 
+      Success := True;
+
    end Read_Sectors;
 
    -----------------------
@@ -126,7 +133,8 @@ package body ATA.Commands is
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sector  : out System.Storage_Elements.Storage_Array)
+      Sector  : out System.Storage_Elements.Storage_Array;
+      Success : out Boolean)
    is
       pragma Unreferenced (Count);
       use Rose.Interfaces.Block_Device;
@@ -148,6 +156,9 @@ package body ATA.Commands is
       Data_In      : constant Rose.Capabilities.Capability :=
                         Data_16_Read_Port (Drive);
    begin
+
+      Success := False;
+
       Rose.Devices.Port_IO.Port_Out_8
         (Command_Port, R_Select_Drive,
          To_Select_Drive (ATA.Drives.Is_Master (Drive), False, 0));
@@ -223,7 +234,20 @@ package body ATA.Commands is
          end;
       end loop;
 
+      Success := True;
+
    end Read_Sectors_ATAPI;
+
+   -----------
+   -- Reset --
+   -----------
+
+   procedure Reset
+     (Drive : ATA.Drives.ATA_Drive)
+   is
+   begin
+      ATA.Drives.Reset (Drive);
+   end Reset;
 
    --------------------
    -- Sector_Command --
@@ -370,7 +394,8 @@ package body ATA.Commands is
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sectors : System.Storage_Elements.Storage_Array)
+      Sectors : System.Storage_Elements.Storage_Array;
+      Success : out Boolean)
    is
       use System.Storage_Elements;
       Index   : Storage_Offset := Sectors'First;
@@ -378,6 +403,9 @@ package body ATA.Commands is
                     ATA.Drives.Data_16_Write_Port (Drive);
       Command : ATA_Command;
    begin
+
+      Success := False;
+
       if ATA.Drives.Is_Dead (Drive) then
          ATA.Drives.Log (Drive, "drive is dead");
          return;
@@ -420,6 +448,8 @@ package body ATA.Commands is
 
          end;
       end loop;
+
+      Success := True;
 
    end Write_Sectors;
 

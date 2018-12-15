@@ -42,15 +42,20 @@ package ATA.Commands is
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sectors : out System.Storage_Elements.Storage_Array);
+      Sectors : out System.Storage_Elements.Storage_Array;
+      Success : out Boolean);
 
    procedure Write_Sectors
      (Drive   : ATA.Drives.ATA_Drive;
       Address : Rose.Devices.Block.Block_Address_Type;
       Count   : Positive;
-      Sectors : System.Storage_Elements.Storage_Array);
+      Sectors : System.Storage_Elements.Storage_Array;
+      Success : out Boolean);
 
    procedure Flush
+     (Drive : ATA.Drives.ATA_Drive);
+
+   procedure Reset
      (Drive : ATA.Drives.ATA_Drive);
 
 private

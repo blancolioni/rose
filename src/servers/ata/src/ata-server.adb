@@ -276,14 +276,32 @@ package body ATA.Server is
                                     Natural
                                       (Rose.System_Calls.Get_Word_64
                                          (Params, 2));
+                  Drive         : constant ATA.Drives.ATA_Drive :=
+                                    ATA.Drives.Get
+                                      (ATA.Drives.ATA_Drive_Index
+                                         (Params.Identifier));
+                  Success       : Boolean;
                begin
-                  ATA.Commands.Read_Sectors
-                    (Drive         =>
-                       ATA.Drives.Get
-                         (ATA.Drives.ATA_Drive_Index (Params.Identifier)),
-                     Address       => Block_Address,
-                     Count         => Block_Count,
-                     Sectors       => Buffer);
+                  for I in 1 .. 3 loop
+                     ATA.Commands.Read_Sectors
+                       (Drive         => Drive,
+                        Address       => Block_Address,
+                        Count         => Block_Count,
+                        Sectors       => Buffer,
+                        Success       => Success);
+                     exit when Success;
+                     if I = 1 then
+                        Rose.Console_IO.Put_Line
+                          ("ata: read failed: retrying");
+                     elsif I = 2 then
+                        Rose.Console_IO.Put_Line
+                          ("ata: read failed: resetting");
+                        ATA.Commands.Reset (Drive);
+                     else
+                        Rose.Console_IO.Put_Line
+                          ("ata: read failed: giving up");
+                     end if;
+                  end loop;
                end;
 
             when Rose.Interfaces.Block_Device.Write_Blocks_Endpoint =>
@@ -301,14 +319,32 @@ package body ATA.Server is
                                     Natural
                                       (Rose.System_Calls.Get_Word_64
                                          (Params, 2));
+                  Drive         : constant ATA.Drives.ATA_Drive :=
+                                    ATA.Drives.Get
+                                      (ATA.Drives.ATA_Drive_Index
+                                         (Params.Identifier));
+                  Success       : Boolean;
                begin
-                  ATA.Commands.Write_Sectors
-                    (Drive         =>
-                       ATA.Drives.Get
-                         (ATA.Drives.ATA_Drive_Index (Params.Identifier)),
-                     Address       => Block_Address,
-                     Count         => Block_Count,
-                     Sectors       => Buffer);
+                  for I in 1 .. 3 loop
+                     ATA.Commands.Write_Sectors
+                       (Drive         => Drive,
+                        Address       => Block_Address,
+                        Count         => Block_Count,
+                        Sectors       => Buffer,
+                        Success       => Success);
+                     exit when Success;
+                     if I = 1 then
+                        Rose.Console_IO.Put_Line
+                          ("ata: write failed: retrying");
+                     elsif I = 2 then
+                        Rose.Console_IO.Put_Line
+                          ("ata: write failed: resetting");
+                        ATA.Commands.Reset (Drive);
+                     else
+                        Rose.Console_IO.Put_Line
+                          ("ata: write failed: giving up");
+                     end if;
+                  end loop;
                end;
 
             when Rose.Interfaces.Ata.Get_Device_Endpoint =>

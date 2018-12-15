@@ -44,6 +44,9 @@ package ATA.Drives is
      (Drive : ATA_Drive)
       return Rose.Capabilities.Capability;
 
+   procedure Reset
+     (Drive : ATA_Drive);
+
    procedure Initialize_Drive
      (Index             : ATA_Drive_Index;
       Command_Cap       : Rose.Capabilities.Capability;

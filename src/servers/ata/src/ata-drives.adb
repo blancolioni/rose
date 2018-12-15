@@ -261,6 +261,17 @@ package body ATA.Drives is
       Rose.Console_IO.Put (Natural (Drive.Index));
    end Put;
 
+   -----------
+   -- Reset --
+   -----------
+
+   procedure Reset
+     (Drive : ATA_Drive)
+   is
+   begin
+      Drive.Dead := False;
+   end Reset;
+
    --------------
    -- Set_Dead --
    --------------
