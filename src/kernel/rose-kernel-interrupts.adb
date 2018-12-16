@@ -81,7 +81,7 @@ package body Rose.Kernel.Interrupts is
          Rose.Boot.Console.Put (": no handler                       ");
          Rose.Boot.Console.New_Line;
          Rose.Kernel.Processes.Debug.Report_Process
-           (Rose.Kernel.Processes.Current_Process_Id, False);
+           (Rose.Kernel.Processes.Current_Process_Id);
       end if;
 
       while It /= null loop
