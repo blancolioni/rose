@@ -151,6 +151,7 @@ package body Rose.Kernel.Processes.Queue is
             Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
             Rose.Boot.Console.Put (": resuming with no reply");
             Rose.Boot.Console.New_Line;
+            Debug.Report_Process (Current_Process_Id);
          end if;
       end if;
 
@@ -163,7 +164,7 @@ package body Rose.Kernel.Processes.Queue is
                Current_Process.Current_Params);
 
             if Log_Details then
-               Debug.Report_Process (Current_Process.Pid, False);
+               Debug.Report_Process (Current_Process.Pid);
             end if;
          end if;
 
@@ -177,7 +178,7 @@ package body Rose.Kernel.Processes.Queue is
                Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
                Rose.Boot.Console.Put (": resuming from interrupt");
                Rose.Boot.Console.New_Line;
-               Debug.Report_Process (Current_Process_Id, False);
+               Debug.Report_Process (Current_Process_Id);
             end if;
          end if;
          Current_Process.Flags (Interrupt_Resume) := False;

@@ -420,7 +420,7 @@ package body Rose.Kernel.Processes is
    begin
       Debug.Put (Current_Process_Id);
       Rose.Boot.Console.Put_Line (": general protection fault");
-      Debug.Report_Process (Current_Process_Id, True);
+      Debug.Report_Process (Current_Process_Id);
       Rose.Boot.Console.Put_Line ("mapped page report");
       Rose.Kernel.Page_Table.Report_Mapped_Pages
         (Current_Process.Directory_Page);
@@ -439,6 +439,7 @@ package body Rose.Kernel.Processes is
       return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
       use type Rose.Words.Word;
+      use type Rose.Objects.Object_Id;
       Virtual_Address : constant Rose.Addresses.Virtual_Address :=
                           Rose.Addresses.Virtual_Address (Page_Fault_Address);
       Virtual_Page    : constant Rose.Addresses.Virtual_Page_Address :=
@@ -456,7 +457,9 @@ package body Rose.Kernel.Processes is
             Addr    => Virtual_Address);
       end if;
 
-      if Log_Page_Faults then
+      if Log_Page_Faults
+        or else To_Object_Id (Current_Process_Id) = Log_Object_Id
+      then
          Rose.Boot.Console.Put ("page-fault: ");
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
@@ -468,7 +471,7 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Write_Attempt then "w" else "-");
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
-         Debug.Report_Process (Current_Process_Id, False);
+         Debug.Report_Process (Current_Process_Id);
       end if;
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
@@ -495,13 +498,17 @@ package body Rose.Kernel.Processes is
       Execution_Attempt : Boolean)
    is
       pragma Unreferenced (Read_Attempt);
+      use type Rose.Words.Word;
       use Rose.Invocation;
       Params : Invocation_Record renames Page_Fault_Params;
    begin
 
       if Current_Process_Id = Mem_Process then
+         Rose.Boot.Console.Put ("virtual ");
+         Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
+         Rose.Boot.Console.New_Line;
          Rose.Kernel.Processes.Debug.Report_Process
-           (Rose.Kernel.Processes.Current_Process_Id, True);
+           (Rose.Kernel.Processes.Current_Process_Id);
          Rose.Kernel.Panic.Panic
            ("page fault in page fault handler process");
          loop
@@ -691,6 +698,8 @@ package body Rose.Kernel.Processes is
       Executable    : Boolean;
       User          : Boolean)
    is
+      use Rose.Words;
+      use type Rose.Objects.Object_Id;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       Rose.Kernel.Page_Table.Map_Page
