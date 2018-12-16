@@ -257,10 +257,6 @@ package body IsoFS.Directories is
       end Add_Child_Entry;
 
    begin
-      Rose.Console_IO.Put ("isofs: new directory caps: ");
-      Rose.Console_IO.Put (Natural (Directory));
-      Rose.Console_IO.New_Line;
-
       Caps :=
         (Caps with delta
            Filled                => True,
