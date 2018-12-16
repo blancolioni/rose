@@ -1,4 +1,4 @@
-with System;
+with System.Storage_Elements;
 
 with Rose.Addresses;                   use Rose.Addresses;
 with Rose.Capabilities;
@@ -26,6 +26,7 @@ package Rose.Boot.Console is
    procedure Put (Cap : Rose.Capabilities.Capability);
    procedure Put (X : Word_8);
    procedure Put (X : Natural);
+   procedure Put (Item : System.Storage_Elements.Storage_Array);
 
    procedure Show_Stack (EIP, CS, PSW, ESP, SS : Word_32);
    pragma Export (C, Show_Stack, "debug_show_stack");

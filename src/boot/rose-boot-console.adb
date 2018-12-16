@@ -1,5 +1,3 @@
-with System.Storage_Elements;           use System.Storage_Elements;
-
 with Ada.Unchecked_Conversion;
 
 with Rose.Arch;
@@ -391,6 +389,31 @@ package body Rose.Boot.Console is
       Buffer (12) := Hex_Digit (N3 mod 16);
 
       Put (Buffer);
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put (Item : System.Storage_Elements.Storage_Array) is
+      Offset : Word_16 := 0;
+   begin
+      for X of Item loop
+         if Offset mod 16 = 0 then
+            Put (Offset);
+            Put (":");
+         end if;
+         Put (" ");
+         Put (Word_8 (X));
+         Offset := Offset + 1;
+         if Offset mod 16 = 0 then
+            New_Line;
+         end if;
+      end loop;
+
+      if Offset mod 16 /= 0 then
+         New_Line;
+      end if;
    end Put;
 
    --------------
