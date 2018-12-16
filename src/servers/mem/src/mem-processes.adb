@@ -100,13 +100,13 @@ package body Mem.Processes is
    procedure Add_Segment
      (Process       : Rose.Objects.Capability_Identifier;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean)
    is
-      use Rose.Addresses;
       use type Rose.Objects.Object_Id;
       P : Memory_Process_Record renames Process_Table (Process);
       Region_Base : Rose.Objects.Page_Object_Id;
@@ -122,8 +122,7 @@ package body Mem.Processes is
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
         (Base         => Virtual_Base,
-         Bound        => Virtual_Base +
-           Virtual_Page_Address (Region_Bound - Region_Base),
+         Bound         => Virtual_Bound,
          Region       => Region,
          Region_Base  => Region_Base,
          Region_Bound => Region_Bound,

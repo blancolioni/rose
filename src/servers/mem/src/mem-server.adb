@@ -41,11 +41,12 @@ package body Mem.Server is
       Stack_Bound : Rose.Words.Word);
 
    procedure Add_Segment
-     (Id           : Rose.Objects.Capability_Identifier;
-      Virtual_Base : Rose.Words.Word;
-      Region       : Rose.Capabilities.Capability;
-      Offset       : Rose.Words.Word;
-      Flags        : Rose.Words.Word);
+     (Id            : Rose.Objects.Capability_Identifier;
+      Virtual_Base  : Rose.Words.Word;
+      Virtual_Bound : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Offset        : Rose.Words.Word;
+      Flags         : Rose.Words.Word);
 
    procedure Add_Nonpersistent_Segment
      (Id            : in     Rose.Objects.Capability_Identifier;
@@ -95,11 +96,12 @@ package body Mem.Server is
    -----------------
 
    procedure Add_Segment
-     (Id           : Rose.Objects.Capability_Identifier;
-      Virtual_Base : Rose.Words.Word;
-      Region       : Rose.Capabilities.Capability;
-      Offset       : Rose.Words.Word;
-      Flags        : Rose.Words.Word)
+     (Id            : Rose.Objects.Capability_Identifier;
+      Virtual_Base  : Rose.Words.Word;
+      Virtual_Bound : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Offset        : Rose.Words.Word;
+      Flags         : Rose.Words.Word)
    is
       use Rose.Interfaces.Process_Memory;
       use Rose.Interfaces.Region.Client;
@@ -111,6 +113,7 @@ package body Mem.Server is
       Mem.Processes.Add_Segment
         (Process       => Id,
          Virtual_Base  => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
+         Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Region        => Client,
          Region_Offset => Offset,
          Readable      => (Flags and Segment_Readable) /= 0,

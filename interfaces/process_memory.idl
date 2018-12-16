@@ -6,10 +6,11 @@ interface Process_Memory : Cap is
    Segment_Initialized : constant := 8;
    
    procedure Add_Segment
-     (Virtual_Base : Word;
-      Region       : interface Region;
-      Offset       : Word;
-      Flags        : Word);
+     (Virtual_Base  : Word;
+      Virtual_Bound : Word;
+      Region        : interface Region;
+      Region_Offset : Word;
+      Flags         : Word);
    
    procedure Add_Nonpersistent_Segment
      (Virtual_Base  : Word;
