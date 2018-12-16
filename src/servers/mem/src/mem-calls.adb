@@ -106,7 +106,11 @@ package body Mem.Calls is
       Rose.System_Calls.Send_Word
         (Params,
          Rose.Words.Word
-           (Rose.Addresses.To_Virtual_Address (Address)));
+           (Rose.Addresses.Virtual_Address_To_Page
+                (Rose.Addresses.To_Virtual_Address (Address))));
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word'(3));
+
       Rose.System_Calls.Invoke_Capability (Params);
    end Load_Page;
 
