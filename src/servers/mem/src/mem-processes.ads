@@ -53,6 +53,7 @@ package Mem.Processes is
    procedure Add_Segment
      (Process       : Rose.Objects.Capability_Identifier;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;

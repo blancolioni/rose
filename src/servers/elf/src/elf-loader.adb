@@ -96,6 +96,7 @@ package body Elf.Loader is
       use Elf.Format;
       Segment_Base  : Rose.Objects.Object_Id;
       Segment_Bound : Rose.Objects.Object_Id;
+      Virtual_Bound : constant Word := V_Address + Memory_Size;
       Region        : Region_Client := Image_Region;
       Flags         : Word;
    begin
@@ -145,8 +146,9 @@ package body Elf.Loader is
             Add_Segment
               (Item         => Process,
                Virtual_Base => V_Address / Rose.Limits.Page_Size,
+               Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
                Region       => Region,
-               Offset       => File_Offset,
+               Region_Offset => File_Offset,
                Flags        => Flags);
 
          when others =>
