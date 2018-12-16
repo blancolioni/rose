@@ -96,6 +96,7 @@ package body Elf.Loader is
       use Elf.Format;
       Segment_Base  : Rose.Objects.Object_Id;
       Segment_Bound : Rose.Objects.Object_Id;
+      Region_Offset : Rose.Words.Word_32;
       Virtual_Bound : constant Word := V_Address + Memory_Size;
       Region        : Region_Client := Image_Region;
       Flags         : Word;
@@ -121,10 +122,13 @@ package body Elf.Loader is
                    Rose.Objects.Object_Id (File_Size - 1)
                  / Rose.Limits.Page_Size
                  + 1;
+               Region_Offset := File_Offset;
             else
                Region :=
                  Reserve_Storage
-                   (Top_Store, Word_64 (File_Size));
+                   (Top_Store, Word_64 (Memory_Size));
+               Region_Offset := 0;
+
                Get_Range (Region, Segment_Base, Segment_Bound);
 
                declare
@@ -148,7 +152,7 @@ package body Elf.Loader is
                Virtual_Base => V_Address / Rose.Limits.Page_Size,
                Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
                Region       => Region,
-               Region_Offset => File_Offset,
+               Region_Offset => Region_Offset,
                Flags        => Flags);
 
          when others =>
