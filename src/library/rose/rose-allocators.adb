@@ -52,19 +52,6 @@ package body Rose.Allocators is
          Next_Index    : constant Natural :=
                            Next_Start + (Current_Index - Current_Start) * 2;
       begin
---           Rose.Console_IO.Put ("alloc: split: level = ");
---           Rose.Console_IO.Put (Natural (Level));
---           Rose.Console_IO.Put ("; start = ");
---           Rose.Console_IO.Put (Current_Start);
---           Rose.Console_IO.Put ("; index = ");
---           Rose.Console_IO.Put (Current_Index);
---           Rose.Console_IO.Put ("; count = ");
---           Rose.Console_IO.Put (Allocator.Count (Level));
---           Rose.Console_IO.Put ("; next-start = ");
---           Rose.Console_IO.Put (Next_Start);
---           Rose.Console_IO.Put ("; next-index = ");
---           Rose.Console_IO.Put (Next_Index);
---           Rose.Console_IO.New_Line;
          Allocator.Count (Level) := Allocator.Count (Level) - 1;
          Allocator.Free (Current_Index) := False;
          Allocator.Count (Level + 1) := Allocator.Count (Level + 1) + 2;
@@ -76,12 +63,6 @@ package body Rose.Allocators is
          Order := Order - 1;
          Alloc_Size := Alloc_Size * 2;
       end loop;
-
---        Rose.Console_IO.Put ("alloc: size = ");
---        Rose.Console_IO.Put (Size);
---        Rose.Console_IO.Put ("; order = ");
---        Rose.Console_IO.Put (Natural (Order));
---        Rose.Console_IO.New_Line;
 
       while Allocator.Count (Order) = 0 loop
          declare
@@ -96,6 +77,7 @@ package body Rose.Allocators is
             end loop;
 
             if not Found then
+               Rose.Console_IO.Put_Line ("store: out of memory");
                return 0;
             end if;
          end;
@@ -103,10 +85,18 @@ package body Rose.Allocators is
 
       declare
          Index : constant Natural := Get_Free (Order);
+         Result : constant Natural :=
+                    (Index - First_Free_Index (Order))
+                    * 2 ** Natural (Order_Type'Last - Order)
+                    + 1;
       begin
-         return (Index - First_Free_Index (Order))
-           * 2 ** Natural (Order_Type'Last - Order)
-           + 1;
+         if Index > 0 then
+            Allocator.Free (Index) := False;
+            return Result;
+         else
+            Rose.Console_IO.Put_Line ("store: expected a free slot");
+            return 0;
+         end if;
       end;
 
    end Allocate;
