@@ -561,13 +561,14 @@ package body Init.Run is
 
             if First then
                Init.Installer.Install_Exec_Library
-                 (Create_Cap    => Create_Cap,
-                  Storage_Cap   => Storage_Cap,
-                  Reserve_Cap   => Reserve_Storage_Cap,
-                  Launch_Cap    => Launch_Elf_Cap,
-                  Cap_Stream    => Params.Caps (0),
-                  Binary_Stream => Params.Caps (1),
-                  Binary_Length => Params.Data (0));
+                 (Create_Cap      => Create_Cap,
+                  Storage_Cap     => Storage_Cap,
+                  Reserve_Cap     => Reserve_Storage_Cap,
+                  Launch_Cap      => Launch_Elf_Cap,
+                  Cap_Stream      => Params.Caps (0),
+                  Standard_Output => Console_Write_Cap,
+                  Binary_Stream   => Params.Caps (1),
+                  Binary_Length   => Params.Data (0));
                First := False;
             else
                declare

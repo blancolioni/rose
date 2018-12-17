@@ -16,6 +16,8 @@ package body Init.Installer is
    Install_Cap : Rose.Capabilities.Capability :=
                    Rose.Capabilities.Null_Capability;
 
+   Exec_Region_Length : constant := 2 ** 20;
+
    Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
 
    function Reserve_Storage
@@ -93,13 +95,14 @@ package body Init.Installer is
    --------------------------
 
    procedure Install_Exec_Library
-     (Create_Cap    : Rose.Capabilities.Capability;
-      Storage_Cap   : Rose.Capabilities.Capability;
-      Reserve_Cap   : Rose.Capabilities.Capability;
-      Launch_Cap    : Rose.Capabilities.Capability;
-      Cap_Stream    : Rose.Capabilities.Capability;
-      Binary_Stream : Rose.Capabilities.Capability;
-      Binary_Length : Rose.Words.Word)
+     (Create_Cap      : Rose.Capabilities.Capability;
+      Storage_Cap     : Rose.Capabilities.Capability;
+      Reserve_Cap     : Rose.Capabilities.Capability;
+      Launch_Cap      : Rose.Capabilities.Capability;
+      Cap_Stream      : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Binary_Stream   : Rose.Capabilities.Capability;
+      Binary_Length   : Rose.Words.Word)
    is
       use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
@@ -111,6 +114,9 @@ package body Init.Installer is
       Cap_Reader  : Stream_Reader_Client;
 
       Params      : aliased Rose.Invocation.Invocation_Record;
+      Exec_Region : constant Region_Client :=
+                      Reserve_Storage
+                        (Reserve_Cap, Rose.Words.Word_64 (Exec_Region_Length));
    begin
 
       Open (Exec_Reader, Binary_Stream);
@@ -123,6 +129,10 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Storage_Cap);
       Copy_Caps (Cap_Reader, Params, Create_Cap);
+      Rose.System_Calls.Send_Cap
+        (Params, Standard_Output);
+      Rose.System_Calls.Send_Cap
+        (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Invoke_Capability (Params);
       Install_Cap := Params.Caps (0);
    end Install_Exec_Library;
