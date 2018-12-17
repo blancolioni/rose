@@ -698,8 +698,6 @@ package body Rose.Kernel.Processes is
       Executable    : Boolean;
       User          : Boolean)
    is
-      use Rose.Words;
-      use type Rose.Objects.Object_Id;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       Rose.Kernel.Page_Table.Map_Page
