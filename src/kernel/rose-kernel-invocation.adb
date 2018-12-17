@@ -50,7 +50,8 @@ package body Rose.Kernel.Invocation is
       Params.Reply_Cap := Params.Cap;
 
       if not Current_Process_Cap (Params.Cap, Cap) then
-         Rose.Boot.Console.Put ("invoke: bad cap ");
+         Rose.Kernel.Processes.Debug.Put (Pid);
+         Rose.Boot.Console.Put (": invoke: bad cap ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Cap));
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (Params.all, True);
