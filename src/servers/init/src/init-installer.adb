@@ -132,6 +132,8 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Standard_Output);
       Rose.System_Calls.Send_Cap
+        (Params, Launch_Cap);
+      Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Invoke_Capability (Params);
       Install_Cap := Params.Caps (0);
