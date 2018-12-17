@@ -296,7 +296,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: giving up");
@@ -339,7 +339,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: giving up");
