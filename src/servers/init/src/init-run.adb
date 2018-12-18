@@ -22,6 +22,7 @@ package body Init.Run is
 
    NL : constant Character := Character'Val (10);
 
+   Memory_Priority        : constant := 3;
    Device_Driver_Priority : constant := 4;
    File_System_Priority   : constant := 10;
    Low_Priority           : constant := 12;
@@ -275,7 +276,7 @@ package body Init.Run is
       declare
          Mem_Id : constant Rose.Objects.Object_Id :=
                     Init.Calls.Launch_Boot_Module
-                      (Boot_Cap, Mem_Module, Device_Driver_Priority,
+                      (Boot_Cap, Mem_Module, Memory_Priority,
                        (Create_Endpoint_Cap, Console_Write_Cap,
                         Mem_Region_Count_Cap, Mem_Get_Region_Cap,
                         Page_On_Cap));
