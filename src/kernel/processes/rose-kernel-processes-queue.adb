@@ -2,6 +2,7 @@ with Rose.Words;
 with Rose.Kernel.Debug;
 with Rose.Kernel.Panic;
 
+with Rose.Kernel.Heap;
 with Rose.Kernel.Processes.Debug;
 with Rose.Boot.Console;
 
@@ -21,6 +22,13 @@ package body Rose.Kernel.Processes.Queue is
 
    procedure Choose_Process is
    begin
+
+      if Have_Process_Handlers
+        and then Process_Table (Mem_Process).State = Blocked
+        and then Rose.Kernel.Heap.Available_Heap <= 64 * 1024
+      then
+         Expand_Heap (128 * 1024);
+      end if;
 
       if not Image_Write_Active then
 
