@@ -1159,9 +1159,24 @@ package body Rose.Kernel.Processes is
    is
       Current_Process : Kernel_Process_Entry renames Process_Table (Pid);
    begin
+      if Current_Process.State = State then
+         return;
+      end if;
+
       if Log_State_Changes then
          Debug.Put (Pid);
-         Rose.Boot.Console.Put (": state <- ");
+         Rose.Boot.Console.Put (": state: ");
+         Rose.Boot.Console.Put
+           (case Current_Process.State is
+               when Ready       => "ready",
+               when Starting    => "starting",
+               when Blocked     => "blocked",
+               when Interrupted => "interrupted",
+               when Available   => "available",
+               when Running     => "running",
+               when Faulted     => "faulted",
+               when Killed      => "killed");
+         Rose.Boot.Console.Put (" -> ");
          Rose.Boot.Console.Put
            (case State is
                when Ready       => "ready",
