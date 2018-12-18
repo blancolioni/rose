@@ -199,10 +199,10 @@ package body Rose.Kernel.Processes is
       use Rose.Kernel.Page_Table;
       Proc : Kernel_Process_Entry renames Process_Table (Pid);
       System_Call_Page : constant Physical_Page_Address :=
-                           Physical_Address_To_Page
-                             (To_Kernel_Physical_Address
-                                (To_Virtual_Address
-                                   (System_Call_Entry'Address)));
+                                  Rose.Kernel.Heap.Get_Physical_Page
+                                    (Virtual_Address_To_Page
+                                       (To_Virtual_Address
+                                          (System_Call_Entry'Address)));
       Directory_VP            : Virtual_Page_Address;
       Physical_Directory_Page : Physical_Page_Address;
    begin
@@ -219,8 +219,8 @@ package body Rose.Kernel.Processes is
 
       Directory_VP := Rose.Kernel.Heap.Allocate_Page;
       Physical_Directory_Page :=
-        Physical_Page_Address
-          (Directory_VP - Kernel_Virtual_Page_Base);
+        Rose.Kernel.Heap.Get_Physical_Page (Directory_VP);
+
       Proc.Directory_Page :=
         Physical_Page_To_Address (Physical_Directory_Page);
 
@@ -701,10 +701,8 @@ package body Rose.Kernel.Processes is
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
       Rose.Kernel.Page_Table.Map_Page
-        (Virtual_Page_Address
-           (Rose.Addresses.Physical_Address_To_Page
-                (P.Directory_Page
-                 + Kernel_Virtual_Base)),
+        (Rose.Kernel.Heap.Get_Virtual_Page
+           (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page,
          Physical_Page  => Physical_Page,
          Readable       => Readable,
@@ -726,10 +724,8 @@ package body Rose.Kernel.Processes is
    begin
       return Rose.Kernel.Page_Table.Mapped_Physical_Page
         (Directory_Page =>
-           Virtual_Page_Address
-             (Rose.Addresses.Physical_Address_To_Page
-                  (P.Directory_Page
-                   + Kernel_Virtual_Base)),
+           Rose.Kernel.Heap.Get_Virtual_Page
+             (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page);
    end Mapped_Physical_Page;
 
@@ -1353,9 +1349,8 @@ package body Rose.Kernel.Processes is
    begin
       Rose.Kernel.Page_Table.Unmap_Page
         (Directory_Page =>
-           Virtual_Page_Address
-             (Physical_Address_To_Page
-                  (P.Directory_Page + Kernel_Virtual_Base)),
+           Rose.Kernel.Heap.Get_Virtual_Page
+             (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page);
    end Unmap_Page;
 
