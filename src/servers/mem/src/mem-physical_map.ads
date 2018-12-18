@@ -16,6 +16,10 @@ package Mem.Physical_Map is
 
    procedure Deallocate_Page (Page : Rose.Addresses.Physical_Page_Address);
 
+   function Take_Memory
+     (Size : Rose.Addresses.Physical_Bytes)
+      return Rose.Addresses.Physical_Address;
+
    function Region_Map_Page_Cap
      (Page : Rose.Addresses.Physical_Page_Address)
       return Rose.Capabilities.Capability;
