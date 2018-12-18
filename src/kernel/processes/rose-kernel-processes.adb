@@ -332,6 +332,56 @@ package body Rose.Kernel.Processes is
       P.Cap_Cache (Cap) := (others => <>);
    end Delete_Cap;
 
+   -----------------
+   -- Expand_Heap --
+   -----------------
+
+   procedure Expand_Heap
+     (Amount : Rose.Addresses.Physical_Bytes)
+   is
+      use Rose.Invocation;
+      P : Kernel_Process_Entry renames Process_Table (Mem_Process);
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if P.State = Blocked then
+         Params.Control.Flags := (Send   => True,
+                                  Recv_Words => True,
+                                  others => False);
+
+         Params.Cap := Mem_Page_Fault_Cap;
+         Params.Endpoint := 16#2363_36CC_C1A7#;
+         Params.Identifier := 0;
+
+         Send_Word (Params, Rose.Words.Word (Amount));
+         Params.Control.Last_Recv_Word := 1;
+
+         Params.Reply_Cap :=
+           New_Cap
+             (Mem_Process,
+              Rose.Capabilities.Layout.Capability_Layout'
+                (Header  => Rose.Capabilities.Layout.Capability_Header'
+                   (Cap_Type         => Rose.Capabilities.Layout.Kernel_Cap,
+                    Single_Use       => True,
+                    Endpoint         => 5,
+                    Identifier       => 0,
+                    others           => <>),
+                 Payload => 0));
+
+         Rose.Boot.Console.Put ("kernel: expanding heap by ");
+         Rose.Boot.Console.Put (Natural (Amount) / 1024);
+         Rose.Boot.Console.Put ("K");
+         Rose.Boot.Console.New_Line;
+
+         Send_Cap
+           (From_Process_Id => 1,
+            To_Process_Id   => Mem_Process,
+            Sender_Cap      => 0,
+            Receiver_Cap    => Mem_Page_Fault_Cap,
+            Params          => Params);
+
+      end if;
+   end Expand_Heap;
+
    -------------------
    -- Find_Endpoint --
    -------------------
