@@ -120,10 +120,6 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                   return;
                end if;
 
-               Rose.Boot.Console.Put ("new pid: ");
-               Rose.Kernel.Processes.Debug.Put (Pid);
-               Rose.Boot.Console.New_Line;
-
                for Index in 0 .. Params.Control.Last_Sent_Cap loop
                   Copy_Cap (Current_Process_Id, Pid,
                             Params.Caps (Index));
