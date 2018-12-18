@@ -13,6 +13,10 @@ package body Elf.Loader is
    use Rose.Interfaces.Process_Memory.Client;
    use Rose.Interfaces.Storage.Client;
 
+   Stack_Bound : constant := 16#E000_0000#;
+   Stack_Size  : constant := 16#0001_0000#;
+   Stack_Base  : constant := Stack_Bound - Stack_Size;
+
    procedure Read
      (Region : Region_Client;
       Base   : Rose.Objects.Object_Id;
@@ -71,6 +75,26 @@ package body Elf.Loader is
 
       Start := Header.E_Entry;
       Scan_Program_Headers (Store, Image, Base, Process, Header);
+
+      Rose.Console_IO.Put_Line ("elf: adding stack segment ...");
+      declare
+         use type Rose.Words.Word;
+         Region : constant Rose.Interfaces.Region.Client.Region_Client :=
+           Reserve_Storage
+             (Store, Rose.Words.Word_64 (Stack_Size));
+      begin
+         Add_Segment
+           (Item          => Process,
+            Virtual_Base  => Stack_Base / Rose.Limits.Page_Size,
+            Virtual_Bound => Stack_Bound / Rose.Limits.Page_Size,
+            Region        => Region,
+            Region_Offset => 0,
+            Flags         =>
+              Rose.Interfaces.Process_Memory.Segment_Readable
+            + Rose.Interfaces.Process_Memory.Segment_Writable);
+      end;
+
+      Rose.Console_IO.Put_Line ("elf: ready");
    end Load_Elf_Image;
 
    ----------------------------
