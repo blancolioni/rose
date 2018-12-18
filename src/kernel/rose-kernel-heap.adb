@@ -2,7 +2,8 @@ with System.Storage_Elements;
 
 with Rose.Boot.Console;
 
---  with Rose.Kernel.Page_Table;
+with Rose.Words;
+with Rose.Kernel.Page_Table;
 with Rose.Kernel.Panic;
 with Rose.Kernel.Physical_Memory;
 
@@ -16,6 +17,27 @@ package body Rose.Kernel.Heap is
 
    Next_IPC_Buffer : Virtual_Page_Address :=
                        16#E_0000#;
+
+   type Heap_Region_Page_Count is mod 2 ** 14;
+
+   type Heap_Region_Record is
+      record
+         Physical_Base  : Physical_Page_Address  := 0;
+         Virtual_Base   : Virtual_Page_Address   := 0;
+         Page_Count     : Heap_Region_Page_Count := 0;
+      end record
+   with Pack, Size => 64;
+
+   Max_Heap_Regions : constant := 4096 * 8 / 64;
+   type Heap_Region_Index is mod Max_Heap_Regions;
+
+   type Heap_Region_Array is array (Heap_Region_Index) of Heap_Region_Record
+     with Pack, Size => 4096 * 8;
+
+   Heap_Regions        : Heap_Region_Array;
+   Next_Region         : Heap_Region_Index := 0;
+   Initial_Physical_Bound : Physical_Page_Address;
+   Initial_Virtual_Bound  : Virtual_Page_Address;
 
    --------------
    -- Allocate --
@@ -37,27 +59,15 @@ package body Rose.Kernel.Heap is
          Rose.Boot.Console.Put ("Heap: allocating ");
          Rose.Boot.Console.Put (Physical_Address (Count));
          Rose.Boot.Console.Put (" bytes at ");
-         Rose.Boot.Console.Put (Physical_Address (Result));
+         Rose.Boot.Console.Put (Get_Physical_Address (Result));
+         Rose.Boot.Console.Put (" ");
+         Rose.Boot.Console.Put (Rose.Words.Word (Result));
          Rose.Boot.Console.New_Line;
       end if;
 
       if Heap_End >= Heap_Bound then
          Kernel.Panic.Panic ("Kernel heap exhausted ", Heap_Bound);
       end if;
-
-      --  Make sure we're mapped
---        for I in Virtual_Address_To_Page (Result) ..
---          Virtual_Address_To_Page (Heap_End)
---        loop
---           Rose.Boot.Console.Put ("Mapping: ");
---           Rose.Boot.Console.Put (Physical_Address (I));
---           Rose.Boot.Console.Put (" to ");
---           Rose.Boot.Console.Put (Physical_Address (I - 16#C_0000#));
---           Rose.Boot.Console.New_Line;
-
---           Page_Table.Map_Page (Physical_Page_Address (I - 16#C_0000#),
---                                I, True, True, False, False);
---        end loop;
 
       declare
          use System.Storage_Elements;
@@ -83,8 +93,16 @@ package body Rose.Kernel.Heap is
    end Allocate_Page;
 
    function Allocate_Page return Physical_Page_Address
-   is (Physical_Page_Address (Virtual_Page_Address'(Allocate_Page)
-                              - Kernel_Virtual_Page_Base));
+   is (Get_Physical_Page (Allocate_Page));
+
+   --------------------
+   -- Available_Heap --
+   --------------------
+
+   function Available_Heap return Physical_Bytes is
+   begin
+      return Physical_Bytes (Heap_Bound - Heap_End);
+   end Available_Heap;
 
    ----------
    -- Free --
@@ -95,6 +113,63 @@ package body Rose.Kernel.Heap is
    begin
       null;    --  UMMMMMAAAAAAAAAAAAA
    end Free;
+
+   --------------------------
+   -- Get_Physical_Address --
+   --------------------------
+
+   function Get_Physical_Address
+     (Virtual : Virtual_Address)
+      return Physical_Address
+   is
+      Virtual_Page : constant Virtual_Page_Address :=
+                       Virtual_Address_To_Page (Virtual);
+      Physical_Page : constant Physical_Page_Address :=
+                        Get_Physical_Page (Virtual_Page);
+   begin
+      return Physical_Page_To_Address (Physical_Page)
+        + Physical_Address (Virtual - Virtual_Page_To_Address (Virtual_Page));
+   end Get_Physical_Address;
+
+   -----------------------
+   -- Get_Physical_Page --
+   -----------------------
+
+   function Get_Physical_Page
+     (Virtual_Page : Virtual_Page_Address)
+      return Physical_Page_Address
+   is
+      Physical : Physical_Page_Address := 16#DEAD_0#;
+
+   begin
+      if Next_Region = 0
+        or else Virtual_Page < Initial_Virtual_Bound
+      then
+         Physical :=
+           Physical_Page_Address
+             (Virtual_Page - Kernel_Virtual_Page_Base);
+      else
+         for Index in 0 .. Next_Region - 1 loop
+            declare
+               R : Heap_Region_Record renames Heap_Regions (Index);
+               Base  : constant Virtual_Page_Address :=
+                         R.Virtual_Base;
+               Bound : constant Virtual_Page_Address :=
+                         Base + Virtual_Page_Address (R.Page_Count);
+            begin
+               if Virtual_Page in Base .. Bound - 1 then
+                  Physical :=
+                    Physical_Page_Address (Virtual_Page - Base)
+                    + R.Physical_Base;
+                  exit;
+               end if;
+            end;
+         end loop;
+      end if;
+
+      return Physical;
+
+   end Get_Physical_Page;
 
    ----------------
    -- Get_Status --
@@ -108,6 +183,134 @@ package body Rose.Kernel.Heap is
       Allocated := Physical_Bytes (Heap_End - Heap_Start);
       Available := Physical_Bytes (Heap_Bound - Heap_End);
    end Get_Status;
+
+   -------------------------
+   -- Get_Virtual_Address --
+   -------------------------
+
+   function Get_Virtual_Address
+     (Physical : Physical_Address)
+      return Virtual_Address
+   is
+      Physical_Page : constant Physical_Page_Address :=
+                        Physical_Address_To_Page (Physical);
+      Virtual_Page  : constant Virtual_Page_Address :=
+                        Get_Virtual_Page (Physical_Page);
+   begin
+      return Virtual_Page_To_Address (Virtual_Page)
+        + Virtual_Address
+        (Physical - Physical_Page_To_Address (Physical_Page));
+   end Get_Virtual_Address;
+
+   ----------------------
+   -- Get_Virtual_Page --
+   ----------------------
+
+   function Get_Virtual_Page
+     (Physical_Page : Physical_Page_Address)
+      return Virtual_Page_Address
+   is
+      Virtual : Virtual_Page_Address := 16#DEAD_0#;
+
+   begin
+      if Next_Region = 0
+        or else Physical_Page < Initial_Physical_Bound
+      then
+         Virtual :=
+           Virtual_Page_Address
+             (Physical_Page + Kernel_Virtual_Page_Base);
+      else
+         for Index in 0 .. Next_Region - 1 loop
+            declare
+               R     : Heap_Region_Record renames Heap_Regions (Index);
+               Base  : constant Physical_Page_Address :=
+                         R.Physical_Base;
+               Bound : constant Physical_Page_Address :=
+                         Base + Physical_Page_Address (R.Page_Count);
+            begin
+               if Physical_Page in Base .. Bound - 1 then
+                  Virtual :=
+                    Virtual_Page_Address (Physical_Page - Base)
+                    + R.Virtual_Base;
+                  exit;
+               end if;
+            end;
+         end loop;
+      end if;
+
+      return Virtual;
+
+   end Get_Virtual_Page;
+
+   -------------------------
+   -- Increase_Heap_Bound --
+   -------------------------
+
+   procedure Increase_Heap_Bound
+     (Start  : Physical_Address;
+      Amount : Physical_Bytes)
+   is
+      use Rose.Words;
+      Base_Virtual_Page : constant Virtual_Page_Address :=
+                            Virtual_Address_To_Page (Heap_Bound);
+      Bound_Virtual_Page : constant Virtual_Page_Address :=
+                             Virtual_Address_To_Page
+                               (Align_Up_To_Page_Boundary
+                                  (Heap_Bound + Virtual_Bytes (Amount)));
+      Physical_Page      : Physical_Page_Address :=
+                             Physical_Address_To_Page (Start);
+      Region_Index       : constant Heap_Region_Index := Next_Region;
+   begin
+      Next_Region := Next_Region + 1;
+
+      Heap_Regions (Region_Index) :=
+        Heap_Region_Record'
+          (Physical_Base => Physical_Page,
+           Virtual_Base  => Base_Virtual_Page,
+           Page_Count    =>
+             Heap_Region_Page_Count (Bound_Virtual_Page - Base_Virtual_Page));
+
+      for Page in Base_Virtual_Page .. Bound_Virtual_Page - 1 loop
+         Rose.Kernel.Page_Table.Map_Kernel_Page
+           (Virtual_Page  => Page,
+            Physical_Page => Physical_Page,
+            Readable      => True,
+            Writable      => True,
+            Executable    => False,
+            User          => False);
+         Physical_Page := Physical_Page + 1;
+      end loop;
+      Rose.Boot.Console.Put ("kernel: added ");
+      Rose.Boot.Console.Put (Natural (Amount) / 1024);
+      Rose.Boot.Console.Put ("K starting at ");
+      Rose.Boot.Console.Put (Rose.Words.Word (Start));
+      Rose.Boot.Console.Put (" physical ");
+      Rose.Boot.Console.Put (Rose.Words.Word (Heap_Bound));
+      Rose.Boot.Console.Put (" virtual");
+      Rose.Boot.Console.New_Line;
+      Rose.Boot.Console.Put ("kernel: region=");
+      Rose.Boot.Console.Put (Natural (Region_Index));
+      Rose.Boot.Console.Put (" virt base=");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word (Heap_Regions (Region_Index).Virtual_Base) * 4096);
+      Rose.Boot.Console.Put (" phys base=");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word (Heap_Regions (Region_Index).Physical_Base) * 4096);
+      Rose.Boot.Console.Put (" page count=");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word (Heap_Regions (Region_Index).Page_Count));
+      Rose.Boot.Console.Put (" virt bound=");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word (Heap_Regions (Region_Index).Virtual_Base) * 4096
+         + Rose.Words.Word (Heap_Regions (Region_Index).Page_Count) * 4096);
+      Rose.Boot.Console.Put (" phys bound=");
+      Rose.Boot.Console.Put
+        (Rose.Words.Word (Heap_Regions (Region_Index).Physical_Base) * 4096
+         + Rose.Words.Word (Heap_Regions (Region_Index).Page_Count) * 4096);
+      Rose.Boot.Console.New_Line;
+
+      Heap_Bound := Virtual_Page_To_Address (Bound_Virtual_Page);
+   end Increase_Heap_Bound;
 
    ---------------------
    -- Initialise_Heap --
@@ -127,10 +330,15 @@ package body Rose.Kernel.Heap is
          Size       => Required,
          Usage      => Physical_Memory.Kernel_Mem);
 
-      Heap_Start := To_Kernel_Virtual_Address (Heap_Phys_Start);
+      Heap_Start :=
+        Virtual_Address (Heap_Phys_Start) + Kernel_Virtual_Base;
       Heap_Phys_Bound :=
         Align_Up_To_Page_Boundary (Heap_Phys_Start + Required);
-      Heap_Bound := To_Kernel_Virtual_Address (Heap_Phys_Bound);
+      Heap_Bound :=
+        Virtual_Address (Heap_Phys_Bound) + Kernel_Virtual_Base;
+
+      Initial_Physical_Bound := Physical_Address_To_Page (Heap_Phys_Bound);
+      Initial_Virtual_Bound  := Virtual_Address_To_Page (Heap_Bound);
 
       Rose.Boot.Console.Put ("   heap start: ");
       Rose.Boot.Console.Put (Heap_Phys_Start);
@@ -147,51 +355,6 @@ package body Rose.Kernel.Heap is
       Rose.Boot.Console.New_Line;
 
       Rose.Boot.Console.New_Line;
-
-      --  As long as we don't exceed 4M, we're paged in
-
---        if False then
---           --  Get some physical memory for ourselves
---           Phys_Addr :=
---             Physical_Memory.Allocate_Bytes
---             (Constraint => Physical_Memory.Page_Aligned,
---              Size       => Required,
---              Usage      => Physical_Memory.Kernel_Heap);
---
---           Rose.Boot.Console.Put ("   heap physical address: ");
---           Rose.Boot.Console.Put (Phys_Addr);
---           Rose.Boot.Console.New_Line;
---
---           --  Make sure we're paged in
---           declare
---              Heap_Virtual_Page_Start : constant Virtual_Page_Address :=
---                Virtual_Address_To_Page (Heap_Start);
---              Heap_Virtual_Page_End   : constant Virtual_Page_Address :=
---                Virtual_Address_To_Page (Heap_End - 1);
---              Physical_Page           : Physical_Page_Address :=
---                Physical_Address_To_Page (Phys_Addr);
---
---           begin
---              for I in Heap_Virtual_Page_Start .. Heap_Virtual_Page_End loop
---                 Page_Table.Map_Page (Physical_Page, I,
---                                      Present    => True,
---                                      Writable   => True,
---                                      Executable => False,
---                                      User       => False);
---                 Physical_Page := Physical_Page + 1;
---              end loop;
---           end;
---        end if;
-
---        Physical_Memory.Allocate_Region
---          (Physical_Address (Heap_Start),
---           Physical_Address (Heap_Bound),
---           Physical_Memory.RAM,
---           Physical_Memory.Kernel_Heap,
---           Success);
---        if not Success then
---           Kernel.Panic.Panic ("Cannot allocate kernel heap", Required);
---        end if;
 
       Heap_End := Heap_Start;
 
