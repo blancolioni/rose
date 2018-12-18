@@ -263,6 +263,13 @@ package Rose.Kernel.Processes is
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
 
+   function Directory_Page
+     (Pid : Process_Id)
+      return Rose.Addresses.Physical_Address;
+
+   procedure Expand_Heap
+     (Amount : Rose.Addresses.Physical_Bytes);
+
    procedure Report_Current_Process;
 
    procedure Set_Process_Handlers
@@ -487,6 +494,11 @@ private
 
    function Current_Object_Id return Rose.Objects.Object_Id
    is (Current_Process.Oid);
+
+   function Directory_Page
+     (Pid : Process_Id)
+      return Rose.Addresses.Physical_Address
+   is (Process_Table (Pid).Directory_Page);
 
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
