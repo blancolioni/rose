@@ -298,6 +298,7 @@ private
 
    type Process_Id is new Rose.Words.Word;
    Null_Process_Id : constant Process_Id := 0;
+   Next_Pid : Process_Id := 1;
 
    Cached_Capability_Count : constant := 256;
 
