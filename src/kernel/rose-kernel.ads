@@ -45,16 +45,6 @@ private
    function Kernel_Physical_Bound return Rose.Addresses.Physical_Address
    is (Physical_Address (Kernel_Bound - Kernel_Virtual_Base));
 
-   function To_Kernel_Virtual_Address
-     (Phys_Addr : Physical_Address)
-     return Virtual_Address
-   is (Virtual_Address (Phys_Addr) + Kernel_Virtual_Base);
-
-   function To_Kernel_Physical_Address
-     (Virtual_Addr : Virtual_Address)
-     return Physical_Address
-   is (Physical_Address (Virtual_Addr - Kernel_Virtual_Base));
-
    Checkpoint_Active    : Boolean := False;
    Image_Write_Active   : Boolean := False;
    Current_Image_Object : Rose.Objects.Object_Id :=
