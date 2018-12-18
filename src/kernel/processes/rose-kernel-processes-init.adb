@@ -189,7 +189,7 @@ package body Rose.Kernel.Processes.Init is
                           (File_Addr, Heap_Addr, Virtual_Bytes (File_Size));
 
                         Phys_Addr :=
-                          Physical_Address (Heap_Addr - Kernel_Virtual_Base);
+                          Rose.Kernel.Heap.Get_Physical_Address (Heap_Addr);
 
                      else
                         --  we need to allocate kernel heap
@@ -199,8 +199,10 @@ package body Rose.Kernel.Processes.Init is
                              Virtual_Bytes (Alignment));
                         Rose.Arch.Copy_Memory
                           (File_Addr, Heap_Addr, Virtual_Bytes (File_Size));
+
                         Phys_Addr :=
-                          Physical_Address (Heap_Addr - Kernel_Virtual_Base);
+                          Rose.Kernel.Heap.Get_Physical_Address
+                            (Heap_Addr);
                      end if;
                      Range_Index := Data_Range_Index;
                   end if;
@@ -225,11 +227,6 @@ package body Rose.Kernel.Processes.Init is
                     (Align_Up_To_Page_Boundary
                        (Rose.Addresses.Physical_Address (Memory_Size)))
                       / Virtual_Page_Bytes;
-
-                  Rose.Boot.Console.Put (Launch_Params.Data (Word_Index));
-                  Rose.Boot.Console.Put (" ");
-                  Rose.Boot.Console.Put (Launch_Params.Data (Word_Index + 1));
-                  Rose.Boot.Console.New_Line;
 
                   if Executable then
                      Proc.Code_Page := Phys_Page;
@@ -306,8 +303,7 @@ package body Rose.Kernel.Processes.Init is
 
          Directory_VP := Rose.Kernel.Heap.Allocate_Page;
          Physical_Directory_Page :=
-           Physical_Page_Address
-             (Directory_VP - Kernel_Virtual_Page_Base);
+           Rose.Kernel.Heap.Get_Physical_Page (Directory_VP);
 
          Rose.Kernel.Page_Table.Init_User_Page_Directory (Directory_VP);
 
@@ -318,10 +314,9 @@ package body Rose.Kernel.Processes.Init is
 
          if Environment = null then
             Proc.Env_Page :=
-              Physical_Address_To_Page
-                (To_Kernel_Physical_Address
-                   (To_Virtual_Address
-                      (Empty_Environment'Address)));
+              Rose.Kernel.Heap.Get_Physical_Page
+                (Virtual_Address_To_Page
+                   (To_Virtual_Address (Empty_Environment'Address)));
          else
             Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
          end if;
@@ -329,11 +324,10 @@ package body Rose.Kernel.Processes.Init is
          declare
             use Rose.Kernel.Page_Table;
             System_Call_Page : constant Physical_Page_Address :=
-                                 Physical_Address_To_Page
-                                   (To_Kernel_Physical_Address
+                                 Rose.Kernel.Heap.Get_Physical_Page
+                                   (Virtual_Address_To_Page
                                       (To_Virtual_Address
                                          (System_Call_Entry'Address)));
-
          begin
             Map_Page
               (Directory_Page => Directory_VP,
@@ -365,8 +359,7 @@ package body Rose.Kernel.Processes.Init is
                Rose.Boot.Console.Put_Line ("attaching environment page");
                Map_Kernel_Page
                  (Virtual_Page  =>
-                    Virtual_Page_Address
-                      (Proc.Env_Page + Kernel_Virtual_Page_Base),
+                    Rose.Kernel.Heap.Get_Virtual_Page (Proc.Env_Page),
                   Physical_Page => Proc.Env_Page,
                   Readable      => True,
                   Writable      => True,
@@ -375,8 +368,9 @@ package body Rose.Kernel.Processes.Init is
 
                declare
                   Kernel_Page_Address : constant Virtual_Address :=
-                                          (Virtual_Address (Proc.Env_Page)
-                                           + Kernel_Virtual_Page_Base)
+                                          Virtual_Address
+                                            (Rose.Kernel.Heap.Get_Virtual_Page
+                                               (Proc.Env_Page))
                                           * 4096;
                   Kernel_Env_Page   : Rose.Environment_Pages.Environment_Page;
                   pragma Import (Ada, Kernel_Env_Page);
