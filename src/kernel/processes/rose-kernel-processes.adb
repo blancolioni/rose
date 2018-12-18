@@ -784,7 +784,7 @@ package body Rose.Kernel.Processes is
    function New_Process
      return Process_Id
    is
-      Pid               : Process_Id := 1;
+      Pid               : Process_Id := Next_Pid;
    begin
 
       while Process_Table (Pid).State /= Available loop
@@ -793,6 +793,7 @@ package body Rose.Kernel.Processes is
 
       Create_Process_Table_Entry (Pid);
 
+      Next_Pid := Pid + 1;
       return Pid;
 
    end New_Process;
