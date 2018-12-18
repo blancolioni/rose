@@ -227,15 +227,6 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Page_Table.Init_User_Page_Directory (Directory_VP);
       Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
 
-      Map_Page
-        (Directory_Page => Directory_VP,
-         Virtual_Page   =>
-           Virtual_Address_To_Page (Process_Stack_Bound - 1),
-         Physical_Page  => Proc.Stack_Page,
-         Readable       => True,
-         Writable       => True,
-         Executable     => False,
-         User           => True);
       Proc.Page_Ranges (Stack_Range_Index) :=
         (Virtual_Address_To_Page (Process_Stack_Bound - 16#1_0000#),
          Virtual_Address_To_Page (Process_Stack_Bound));
@@ -252,16 +243,6 @@ package body Rose.Kernel.Processes is
          Writable       => True,
          Executable     => False,
          User           => True);
-
-      Map_Kernel_Page
-        (Virtual_Page  =>
-           Virtual_Page_Address
-             (Proc.Env_Page + Kernel_Virtual_Page_Base),
-         Physical_Page => Proc.Env_Page,
-         Readable      => True,
-         Writable      => True,
-         Executable    => False,
-         User          => False);
 
       Map_Page
         (Directory_Page => Directory_VP,
