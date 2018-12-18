@@ -111,11 +111,15 @@ package body Rose.Kernel.Capabilities.Page_Table is
          Writable      => Writable,
          Executable    => Executable,
          User          => True);
-      Rose.Kernel.Clock.Update_Mem
-        (Allocated =>
-           Physical_Bytes (Allocated_Pages * Rose.Limits.Page_Size),
-         Available =>
-           Physical_Bytes (Available_Pages * Rose.Limits.Page_Size));
+
+      if Available_Pages > 0 then
+         Rose.Kernel.Clock.Update_Mem
+           (Allocated =>
+              Physical_Bytes (Allocated_Pages * Rose.Limits.Page_Size),
+            Available =>
+              Physical_Bytes (Available_Pages * Rose.Limits.Page_Size));
+      end if;
+
       Params.Control :=
         (Flags  => (Rose.Invocation.Reply => True, others => False),
          others => <>);
