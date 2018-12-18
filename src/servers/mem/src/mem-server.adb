@@ -40,6 +40,12 @@ package body Mem.Server is
       Stack_Base  : Rose.Words.Word;
       Stack_Bound : Rose.Words.Word);
 
+   procedure Take_Physical_Memory
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Size   : in     Rose.Words.Word;
+      Start  :    out Rose.Words.Word;
+      Amount :    out Rose.Words.Word);
+
    procedure Add_Segment
      (Id            : Rose.Objects.Capability_Identifier;
       Virtual_Base  : Rose.Words.Word;
@@ -133,7 +139,8 @@ package body Mem.Server is
         (Server_Context => Server,
          New_Process    => New_Process'Access,
          Register_Process => Register_Process'Access,
-         Page_Fault     => Page_Fault'Access);
+         Page_Fault     => Page_Fault'Access,
+         Take_Physical_Memory => Take_Physical_Memory'Access);
 
       Rose.Interfaces.Process_Memory.Server.Attach_Interface
         (Server_Context => Server,
@@ -373,5 +380,23 @@ package body Mem.Server is
       Rose.System_Calls.Invoke_Capability (Params);
       Rose.Server.Start_Server (Server);
    end Start_Server;
+
+   --------------------------
+   -- Take_Physical_Memory --
+   --------------------------
+
+   procedure Take_Physical_Memory
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Size   : in     Rose.Words.Word;
+      Start  :    out Rose.Words.Word;
+      Amount :    out Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Start := Rose.Words.Word
+        (Mem.Physical_Map.Take_Memory
+           (Rose.Addresses.Physical_Bytes (Size)));
+      Amount := Size;
+   end Take_Physical_Memory;
 
 end Mem.Server;
