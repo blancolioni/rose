@@ -167,8 +167,9 @@ package body Rose.Kernel.Processes.Queue is
          if Log then
             Rose.Kernel.Debug.Put_Call
               ("reply",
-               Current_Process.Cap_Cache
-                 (Current_Process.Current_Params.Cap),
+               Cap_Layout
+                 (Current_Process_Id,
+                  Current_Process.Current_Params.Cap),
                Current_Process.Current_Params);
 
             if Log_Details then
