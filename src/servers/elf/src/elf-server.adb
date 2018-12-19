@@ -21,20 +21,22 @@ package body Elf.Server is
    Server_Context : Rose.Server.Server_Context;
    Memory_Client  : Rose.Interfaces.Memory.Client.Memory_Client;
 
-   procedure Launch
+   function Launch
      (Id    : Rose.Objects.Capability_Identifier;
       Image : Rose.Capabilities.Capability;
       Store : Rose.Capabilities.Capability;
-      Caps  : Rose.Capabilities.Capability_Array);
+      Caps  : Rose.Capabilities.Capability_Array)
+      return Rose.Objects.Object_Id;
 
    procedure Create_Process
      (Caps      : Rose.Capabilities.Capability_Array;
       Process   : out Rose.Capabilities.Capability;
       Start_Cap : out Rose.Capabilities.Capability);
 
-   procedure Start_Process
+   function Start_Process
      (Cap   : Rose.Capabilities.Capability;
-      Start : Rose.Words.Word);
+      Start : Rose.Words.Word)
+      return Rose.Objects.Object_Id;
 
    --------------------
    -- Create_Process --
@@ -77,11 +79,12 @@ package body Elf.Server is
    -- Launch --
    ------------
 
-   procedure Launch
+   function Launch
      (Id    : Rose.Objects.Capability_Identifier;
       Image : Rose.Capabilities.Capability;
       Store : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
+      return Rose.Objects.Object_Id
    is
       pragma Unreferenced (Id);
       use Rose.Interfaces.Process_Memory.Client;
@@ -107,9 +110,10 @@ package body Elf.Server is
       Elf.Loader.Load_Elf_Image
         (Process_Memory, Storage, Region, Start, Success);
       if Success then
-         Start_Process (Start_Cap, Start);
+         return Start_Process (Start_Cap, Start);
       else
          Rose.Console_IO.Put_Line ("elf: failed to load process");
+         return 0;
       end if;
    end Launch;
 
@@ -117,15 +121,19 @@ package body Elf.Server is
    -- Start_Process --
    -------------------
 
-   procedure Start_Process
+   function Start_Process
      (Cap   : Rose.Capabilities.Capability;
       Start : Rose.Words.Word)
+      return Rose.Objects.Object_Id
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Cap);
       Rose.System_Calls.Send_Word (Params, Start);
       Rose.System_Calls.Invoke_Capability (Params);
+      return Rose.Objects.Object_Id
+        (Rose.System_Calls.Get_Word_64
+           (Params, 0));
    end Start_Process;
 
    ------------------

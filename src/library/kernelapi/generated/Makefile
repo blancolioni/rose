@@ -1,7 +1,8 @@
 IDL=cap block_device file_system directory file file_system \
     stream_reader stream_writer stream seekable storage \
     ata partitions keyboard_handler interrupt_handler installer \
-    launch exec region executable memory process process_memory
+    launch exec region executable memory process process_memory \
+    service
 
 all: $(IDL)
 

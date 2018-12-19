@@ -281,6 +281,14 @@ package body Rose.Kernel.Processes.Init is
 
          Proc.Oid := Rose.Objects.Object_Id (Pid);
 
+         declare
+            use Rose.Objects;
+         begin
+            if Trace_Object_Id = Proc.Oid then
+               Proc.Flags (Trace) := True;
+            end if;
+         end;
+
          Proc.Stack :=
            Rose.Kernel.Arch.Process_Stack_Frame
              (Start_EIP => Start_Address (Image));

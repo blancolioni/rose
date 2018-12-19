@@ -19,9 +19,10 @@ package body Exec.Server is
       ELF_Image : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
-   procedure On_Launch
+   function On_Launch
      (Id   : Rose.Objects.Capability_Identifier;
-      Caps : Rose.Capabilities.Capability_Array);
+      Caps : Rose.Capabilities.Capability_Array)
+      return Rose.Objects.Object_Id;
 
    Context : Rose.Server.Server_Context;
    Region : Rose.Interfaces.Region.Client.Region_Client;
@@ -32,7 +33,6 @@ package body Exec.Server is
 
    procedure Create_Server is
    begin
-      Rose.Console_IO.Put_Line ("exec: creating server");
       Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
 
       Rose.Interfaces.Exec.Server.Create_Server
@@ -62,9 +62,10 @@ package body Exec.Server is
    -- On_Launch --
    ---------------
 
-   procedure On_Launch
-     (Id   : in     Rose.Objects.Capability_Identifier;
+   function On_Launch
+     (Id   : Rose.Objects.Capability_Identifier;
       Caps : Rose.Capabilities.Capability_Array)
+      return Rose.Objects.Object_Id
    is
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -78,6 +79,9 @@ package body Exec.Server is
          Send_Cap (Params, Cap);
       end loop;
       Invoke_Capability (Params);
+      return Rose.Objects.Object_Id
+        (Rose.System_Calls.Get_Word_64
+           (Params, 0));
    end On_Launch;
 
    ------------------
@@ -86,6 +90,7 @@ package body Exec.Server is
 
    procedure Start_Server is
    begin
+      Rose.Console_IO.Put_Line ("exec: ready");
       Rose.Server.Start_Server (Context);
    end Start_Server;
 
