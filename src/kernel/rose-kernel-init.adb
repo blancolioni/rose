@@ -94,10 +94,10 @@ package body Rose.Kernel.Init is
       Log_Port_IO :=
         Rose.Kernel.Command_Line.Have_Argument ("log-port-io");
 
-      if Rose.Kernel.Command_Line.Have_Argument ("log-object-id") then
-         Log_Object_Id := Rose.Objects.Object_Id
+      if Rose.Kernel.Command_Line.Have_Argument ("trace-object-id") then
+         Trace_Object_Id := Rose.Objects.Object_Id
            (Rose.Kernel.Command_Line.Integer_Argument
-              ("log-object-id"));
+              ("trace-object-id"));
       end if;
 
       Rose.Boot.Console.Put_Line ("Loading boot modules");

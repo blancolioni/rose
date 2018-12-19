@@ -276,6 +276,14 @@ package body Rose.Kernel.Processes is
          Executable     => True,
          User           => True);
 
+      declare
+         use type Rose.Objects.Object_Id;
+      begin
+         if Proc.Oid = Trace_Object_Id then
+            Proc.Flags (Trace) := True;
+         end if;
+      end;
+
    end Create_Process_Table_Entry;
 
    ----------------
@@ -461,7 +469,6 @@ package body Rose.Kernel.Processes is
       return Rose.Kernel.Interrupts.Interrupt_Handler_Status
    is
       use type Rose.Words.Word;
-      use type Rose.Objects.Object_Id;
       Virtual_Address : constant Rose.Addresses.Virtual_Address :=
                           Rose.Addresses.Virtual_Address (Page_Fault_Address);
       Virtual_Page    : constant Rose.Addresses.Virtual_Page_Address :=
@@ -479,9 +486,7 @@ package body Rose.Kernel.Processes is
             Addr    => Virtual_Address);
       end if;
 
-      if Log_Page_Faults
-        or else To_Object_Id (Current_Process_Id) = Log_Object_Id
-      then
+      if Log_Page_Faults or else Trace (Current_Process_Id) then
          Rose.Boot.Console.Put ("page-fault: ");
          Rose.Boot.Console.Put ("pid ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
@@ -757,7 +762,7 @@ package body Rose.Kernel.Processes is
                                  Get_Cap_Page_Index (Cache.Cap);
                begin
                   if P.Flags (Trace) then
-                     Debug.Put (Current_Process_Id);
+                     Debug.Put (Pid);
                      Rose.Boot.Console.Put (": dropping cap: ");
                      Rose.Boot.Console.Put (Natural (Cache.Cap));
                      Rose.Boot.Console.Put (" age=");
@@ -789,7 +794,7 @@ package body Rose.Kernel.Processes is
             end if;
 
             if P.Flags (Trace) then
-               Debug.Put (Current_Process_Id);
+               Debug.Put (Pid);
                Rose.Boot.Console.Put (": loading cap: ");
                Rose.Boot.Console.Put (Natural (Cap));
                Rose.Boot.Console.Put (" age=");
