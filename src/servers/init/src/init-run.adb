@@ -3,6 +3,7 @@ with Rose.Words;
 
 with Rose.Devices.Partitions;
 
+with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Storage;
 
@@ -244,7 +245,8 @@ package body Init.Run is
             Interface_Cap : constant Rose.Capabilities.Capability :=
                               Copy_Cap_From_Process
                                 (Copy_Id_Cap,
-                                 Rose.Interfaces.Get_Interface_Endpoint);
+                                 Rose.Interfaces.Block_Device
+                                 .Block_Device_Interface);
          begin
             if Is_Active_Swap then
                Active_Swap_Cap := Interface_Cap;
