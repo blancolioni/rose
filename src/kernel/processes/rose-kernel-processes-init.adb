@@ -399,18 +399,23 @@ package body Rose.Kernel.Processes.Init is
 
             if Pid = 2 then
 
-               Rose.Boot.Console.Put_Line
-                 ("init: adding create cap");
-
                declare
-                  use Rose.Capabilities.Layout;
+                  Cap : constant Rose.Capabilities.Capability :=
+                          Create_Cap (Pid);
                begin
-                  Proc.Cap_Cache (1) :=
-                    Capability_Layout'
-                      (Header => Capability_Header'
-                         (Cap_Type    => Create_Cap,
-                          others      => <>),
-                       Payload => 0);
+                  Set_Cap
+                    (Pid, Cap,
+                     Rose.Capabilities.Layout.Capability_Layout'
+                       (Header => Rose.Capabilities.Layout.Capability_Header'
+                            (Cap_Type    =>
+                                 Rose.Capabilities.Layout.Create_Cap,
+                             others      => <>),
+                        Payload => 0));
+                  Rose.Boot.Console.Put
+                    ("init: adding create cap as ");
+                  Rose.Boot.Console.Put (Natural (Cap));
+                  Rose.Boot.Console.New_Line;
+
                end;
 
                if Use_Serial_Port then
