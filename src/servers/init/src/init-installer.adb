@@ -1,7 +1,6 @@
 with System.Storage_Elements;
 
 with Rose.Limits;
-with Rose.Objects;
 
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Stream_Reader.Client;
@@ -136,6 +135,22 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Invoke_Capability (Params);
+
+      declare
+         Exec_Object : constant Rose.Objects.Object_Id :=
+                         Rose.System_Calls.Get_Object_Id
+                           (Params, 0);
+         Copy_Exec_Cap : constant Rose.Capabilities.Capability :=
+                           Init.Calls.Create_Copy_Cap
+                             (Create_Cap, Exec_Object);
+         Install_Cap   : constant Rose.Capabilities.Capability :=
+                           Init.Calls.
+                             (Create_Cap,
+                              (3, 5,
+                               Word (IsoFS_Id mod 2 ** 32),
+                               Word (IsoFS_Id / 2 ** 32)));
+      begin
+
       Install_Cap := Params.Caps (0);
    end Install_Exec_Library;
 
@@ -148,7 +163,7 @@ package body Init.Installer is
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word)
-      return Rose.Capabilities.Capability
+      return Rose.Objects.Object_Id
    is
       pragma Unreferenced (Binary_Length);
       use Rose.Interfaces.Stream_Reader.Client;
@@ -169,11 +184,12 @@ package body Init.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
       then
          return 0;
       else
-         return Params.Caps (0);
+         return Rose.Objects.Object_Id
+           (Rose.System_Calls.Get_Word_64 (Params, 0));
       end if;
 
    end Install_Executable;

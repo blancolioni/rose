@@ -1,6 +1,7 @@
 interface Launch is
 
-   procedure Launch
-     (Caps : Capability_Array);      
+   function Launch
+     (Caps    : Capability_Array)
+     return Object_Id;
 
 end Launch;

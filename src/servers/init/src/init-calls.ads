@@ -15,6 +15,11 @@ package Init.Calls is
       Data   : Array_Of_Words)
       return Rose.Capabilities.Capability;
 
+   function Create_Copy_Cap
+     (Cap    : Rose.Capabilities.Capability;
+      Object : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability;
+
    function Call
      (Cap    : Rose.Capabilities.Capability;
       Data   : Rose.Words.Word)
