@@ -37,6 +37,8 @@ package Rose.Kernel.Processes is
      (Process : Process_Id;
       Address : Rose.Words.Word);
 
+   function Trace (Process : Process_Id) return Boolean;
+
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
 
@@ -541,6 +543,10 @@ private
 
    function Current_Object_Id return Rose.Objects.Object_Id
    is (Current_Process.Oid);
+
+   function Trace (Process : Process_Id) return Boolean
+   is (Is_Valid_Process_Id (Process)
+       and then Process_Table (Process).Flags (Trace));
 
    function Directory_Page
      (Pid : Process_Id)
