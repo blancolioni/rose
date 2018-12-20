@@ -129,6 +129,27 @@ package body Rose.Kernel.Processes is
                              Capability (Page - 1)
                              * Capabilities_Per_Page + Index;
                   begin
+                     if Cap > P.Last_Cap then
+                        if Cap > P.Last_Cap + 1 then
+                           Rose.Boot.Console.Put
+                             ("kernel: ");
+                           Debug.Put (Pid);
+                           Rose.Boot.Console.Put
+                             (": last cap = ");
+                           Rose.Boot.Console.Put
+                             (Natural (P.Last_Cap));
+                           Rose.Boot.Console.Put
+                             (" but new cap = ");
+                           Rose.Boot.Console.Put (Natural (Page));
+                           Rose.Boot.Console.Put ("/");
+                           Rose.Boot.Console.Put (Natural (Index));
+                           Rose.Boot.Console.Put ("/");
+                           Rose.Boot.Console.Put (Natural (Cap));
+                           Rose.Boot.Console.New_Line;
+                        end if;
+                        P.Last_Cap := Cap;
+                     end if;
+
                      if not P.Is_Cached (Cap) then
                         Cap_Page (Index).Header.Cap_Type := Other_Cap;
                         return Cap;
