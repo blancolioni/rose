@@ -34,6 +34,7 @@ package body Exec.Server is
    procedure Create_Server is
    begin
       Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
+      Exec.Library.Set_Region (Region);
 
       Rose.Interfaces.Exec.Server.Create_Server
         (Server_Context => Context,
