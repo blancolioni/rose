@@ -112,33 +112,18 @@ package body Rose.Kernel.Processes is
      (Pid : Process_Id)
       return Rose.Capabilities.Capability
    is
-      use Rose.Capabilities, Rose.Capabilities.Layout;
+      use Rose.Capabilities;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      for Page in Capability_Page_Index loop
-         Load_Cap_Page (Pid, Page);
-         declare
-            Cap_Page : Capability_Page;
-            pragma Import (Ada, Cap_Page);
-            for Cap_Page'Address use P.Cap_Pages (Page);
-         begin
-            for Index in Cap_Page'Range loop
-               if Cap_Page (Index).Header.Cap_Type = Null_Cap then
-                  declare
-                     Cap : constant Capability :=
-                             Capability (Page - 1)
-                             * Capabilities_Per_Page + Index;
-                  begin
-                     if not P.Is_Cached (Cap) then
-                        Cap_Page (Index).Header.Cap_Type := Other_Cap;
-                        return Cap;
-                     end if;
-                  end;
-               end if;
-            end loop;
-         end;
+      for Cap in Capability range 1 .. Max_Capability_Index loop
+         if not P.Is_Active (Cap) then
+            P.Is_Active (Cap) := True;
+            if Cap > P.Last_Cap then
+               P.Last_Cap := Cap;
+            end if;
+            return Cap;
+         end if;
       end loop;
-
       Debug.Put (Pid);
       Rose.Boot.Console.Put_Line (": out of capabilities");
       return 0;
@@ -296,6 +281,7 @@ package body Rose.Kernel.Processes is
    is
    begin
       Set_Cap (Pid, Cap, (others => <>));
+      Process_Table (Pid).Is_Active (Cap) := False;
    end Delete_Cap;
 
    -----------------
@@ -588,11 +574,18 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Boolean
    is
+      use type Rose.Capabilities.Capability;
       use Rose.Capabilities.Layout;
       Layout : Capability_Layout;
    begin
-      Get_Cap (Pid, Cap, Layout);
-      return Layout.Header.Cap_Type /= Null_Cap;
+      if Cap > Process_Table (Pid).Last_Cap
+        or else not Process_Table (Pid).Is_Active (Cap)
+      then
+         return False;
+      else
+         Get_Cap (Pid, Cap, Layout);
+         return Layout.Header.Cap_Type /= Null_Cap;
+      end if;
    end Has_Cap;
 
    ---------------------------
@@ -1183,6 +1176,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       To.Current_Params := Params;
+      To.Current_Params.Cap := To.Receive_Cap;
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
