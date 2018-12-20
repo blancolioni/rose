@@ -574,6 +574,7 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Boolean
    is
+      use type Rose.Capabilities.Capability;
       use Rose.Capabilities.Layout;
       Layout : Capability_Layout;
    begin
