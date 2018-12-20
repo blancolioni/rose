@@ -77,7 +77,7 @@ package body Rose.Kernel.Processes.Init is
       declare
          Pid : constant Rose.Kernel.Processes.Process_Id :=
                  Load_Boot_Module
-                   (Priority    => 15,
+                   (Priority    => Process_Priority'Last,
                     Module      => Rose.Kernel.Modules.Init_Module,
                     Environment => null);
       begin
