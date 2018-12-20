@@ -1175,6 +1175,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       To.Current_Params := Params;
+      To.Current_Params.Cap := To.Receive_Cap;
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
