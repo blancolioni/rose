@@ -1,8 +1,9 @@
 interface Executable is
 
-   procedure Launch
+   function Launch
      (Image : interface Region;
       Store : interface Storage;
-      Caps  : Capability_Array);      
+      Caps  : Capability_Array)
+     return Object_Id;
 
 end Executable;
