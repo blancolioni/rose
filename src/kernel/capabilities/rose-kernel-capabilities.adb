@@ -3,6 +3,7 @@ with Rose.Kernel.Capabilities.Boot;
 with Rose.Kernel.Capabilities.Copy;
 with Rose.Kernel.Capabilities.Create;
 with Rose.Kernel.Capabilities.Endpoint;
+with Rose.Kernel.Capabilities.Interrupt;
 with Rose.Kernel.Capabilities.Kernel_Caps;
 with Rose.Kernel.Capabilities.Meta;
 with Rose.Kernel.Capabilities.Pages;
@@ -43,6 +44,8 @@ package body Rose.Kernel.Capabilities is
             Handlers.Create.Handle (Cap, Params);
          when Endpoint_Cap =>
             Handlers.Endpoint.Handle (Cap, Params);
+         when Interrupt_Cap =>
+            Handlers.Interrupt.Handle (Cap, Params);
          when Kernel_Cap =>
             Handlers.Kernel_Caps.Handle (Cap, Params);
          when Meta_Cap =>
