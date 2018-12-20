@@ -69,13 +69,6 @@ package body Restore.Installer is
          Filter    => (Rose.Directories.Directory => True, others => False),
          Process   => Install_From_Directory'Access);
 
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end;
-
       if False then
          Write_Initial_System_Image (To);
       end if;
@@ -196,6 +189,10 @@ package body Restore.Installer is
          Rose.Console_IO.New_Line;
          return;
       end if;
+
+      Install_Executable
+        (Exec_Path => Binary_File_Name (1 .. Binary_File_Name_Last),
+         Cap_Path  => Caps_File_Name (1 .. Caps_File_Name_Last));
 
    end Install_With_Caps;
 
