@@ -3,11 +3,13 @@ with Rose.Words;
 
 with Rose.Devices.Partitions;
 
+with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Storage;
 
 with Rose.Interfaces.Partitions.Client;
 
+with Rose.Interfaces.Exec;
 with Rose.Interfaces.Executable;
 with Rose.Interfaces.Installer;
 with Rose.Interfaces.Memory;
@@ -244,7 +246,8 @@ package body Init.Run is
             Interface_Cap : constant Rose.Capabilities.Capability :=
                               Copy_Cap_From_Process
                                 (Copy_Id_Cap,
-                                 Rose.Interfaces.Get_Interface_Endpoint);
+                                 Rose.Interfaces.Block_Device
+                                 .Block_Device_Interface);
          begin
             if Is_Active_Swap then
                Active_Swap_Cap := Interface_Cap;
@@ -550,6 +553,10 @@ package body Init.Run is
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
          Reply  : aliased Rose.Invocation.Invocation_Record;
+         Exec   : Rose.Objects.Object_Id :=
+                    Rose.Objects.Null_Object_Id;
+         Install_Cap : Rose.Capabilities.Capability :=
+                         Rose.Capabilities.Null_Capability;
          First  : Boolean := True;
       begin
          loop
@@ -561,26 +568,41 @@ package body Init.Run is
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
             if First then
-               Init.Installer.Install_Exec_Library
-                 (Create_Cap      => Create_Cap,
-                  Storage_Cap     => Storage_Cap,
-                  Reserve_Cap     => Reserve_Storage_Cap,
-                  Launch_Cap      => Launch_Elf_Cap,
-                  Cap_Stream      => Params.Caps (0),
-                  Standard_Output => Console_Write_Cap,
-                  Binary_Stream   => Params.Caps (1),
-                  Binary_Length   => Params.Data (0));
+               Exec :=
+                 Init.Installer.Install_Exec_Library
+                   (Create_Cap      => Create_Cap,
+                    Storage_Cap     => Storage_Cap,
+                    Reserve_Cap     => Reserve_Storage_Cap,
+                    Launch_Cap      => Launch_Elf_Cap,
+                    Cap_Stream      => Params.Caps (0),
+                    Standard_Output => Console_Write_Cap,
+                    Binary_Stream   => Params.Caps (1),
+                    Binary_Length   => Params.Data (0));
+               declare
+                  Copy_Exec_Cap : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap,
+                                       (9, 1,
+                                        Word (Exec mod 2 ** 32),
+                                        Word (Exec / 2 ** 32)));
+               begin
+                  Install_Cap :=
+                    Copy_Cap_From_Process
+                      (Copy_Exec_Cap,
+                       Rose.Interfaces.Exec.Install_Endpoint);
+               end;
                First := False;
             else
                declare
-                  Launch_Cap : constant Rose.Capabilities.Capability :=
-                                 Init.Installer.Install_Executable
-                                   (Create_Cap    => Create_Cap,
-                                    Cap_Stream    => Params.Caps (0),
-                                    Binary_Stream => Params.Caps (1),
-                                    Binary_Length => Params.Data (0));
+                  Object : constant Rose.Objects.Object_Id :=
+                             Init.Installer.Install_Executable
+                               (Create_Cap    => Create_Cap,
+                                Install_Cap   => Install_Cap,
+                                Cap_Stream    => Params.Caps (0),
+                                Binary_Stream => Params.Caps (1),
+                                Binary_Length => Params.Data (0));
                begin
-                  Rose.System_Calls.Send_Cap (Reply, Launch_Cap);
+                  Rose.System_Calls.Send_Object_Id (Reply, Object);
                end;
             end if;
 

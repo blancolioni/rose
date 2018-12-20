@@ -85,11 +85,11 @@ package Rose.System_Calls is
       To        : out System.Storage_Elements.Storage_Array;
       Last      : out System.Storage_Elements.Storage_Count);
 
-   procedure Copy_Received_Caps
+   function Copy_Received_Caps
      (Params    : Rose.Invocation.Invocation_Record;
       Start     : Rose.Invocation.Capability_Index;
-      To        : out Rose.Capabilities.Capability_Array;
-      Last      : out Natural);
+      To        : in out Rose.Capabilities.Capability_Array)
+      return Natural;
 
    procedure Copy_Text
      (Params   : Rose.Invocation.Invocation_Record;
@@ -106,6 +106,12 @@ package Rose.System_Calls is
      (Params : Rose.Invocation.Invocation_Record;
       Index  : Rose.Invocation.Parameter_Word_Index)
       return Rose.Words.Word_64;
+
+   function Get_Object_Id
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Rose.Objects.Object_Id
+   is (Rose.Objects.Object_Id (Get_Word_64 (Params, Index)));
 
    procedure Initialize_Send
      (Params : in out Rose.Invocation.Invocation_Record;
