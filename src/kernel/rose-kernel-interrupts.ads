@@ -1,3 +1,4 @@
+with Rose.Capabilities;
 with Rose.Words;
 
 with Rose.Arch.Interrupts;
@@ -25,6 +26,15 @@ package Rose.Kernel.Interrupts is
    procedure Set_Handler
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
       Handler   : Exception_Handler);
+
+   procedure Set_Handler
+     (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+      Object    : Rose.Objects.Object_Id;
+      Cap       : Rose.Capabilities.Capability);
+
+   function Has_Handler
+     (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector)
+      return Boolean;
 
    function Handle_Interrupt
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
