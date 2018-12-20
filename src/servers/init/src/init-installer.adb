@@ -12,9 +12,6 @@ with Init.Calls;
 
 package body Init.Installer is
 
-   Install_Cap : Rose.Capabilities.Capability :=
-                   Rose.Capabilities.Null_Capability;
-
    Exec_Region_Length : constant := 2 ** 20;
 
    Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
@@ -93,7 +90,7 @@ package body Init.Installer is
    -- Install_Exec_Library --
    --------------------------
 
-   procedure Install_Exec_Library
+   function Install_Exec_Library
      (Create_Cap      : Rose.Capabilities.Capability;
       Storage_Cap     : Rose.Capabilities.Capability;
       Reserve_Cap     : Rose.Capabilities.Capability;
@@ -102,6 +99,7 @@ package body Init.Installer is
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
+      return Rose.Objects.Object_Id
    is
       use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
@@ -136,22 +134,7 @@ package body Init.Installer is
         (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Invoke_Capability (Params);
 
-      declare
-         Exec_Object : constant Rose.Objects.Object_Id :=
-                         Rose.System_Calls.Get_Object_Id
-                           (Params, 0);
-         Copy_Exec_Cap : constant Rose.Capabilities.Capability :=
-                           Init.Calls.Create_Copy_Cap
-                             (Create_Cap, Exec_Object);
-         Install_Cap   : constant Rose.Capabilities.Capability :=
-                           Init.Calls.
-                             (Create_Cap,
-                              (3, 5,
-                               Word (IsoFS_Id mod 2 ** 32),
-                               Word (IsoFS_Id / 2 ** 32)));
-      begin
-
-      Install_Cap := Params.Caps (0);
+      return Rose.System_Calls.Get_Object_Id (Params, 0);
    end Install_Exec_Library;
 
    ------------------------
@@ -160,6 +143,7 @@ package body Init.Installer is
 
    function Install_Executable
      (Create_Cap    : Rose.Capabilities.Capability;
+      Install_Cap   : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word)
