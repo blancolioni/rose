@@ -215,7 +215,7 @@ package body Rose.Kernel.Processes is
    begin
 
       Proc.Oid := Rose.Objects.Object_Id (Pid);
-      Proc.Priority := Process_Priority'Last;
+      Proc.Priority := Process_Priority'Last - 1;
 
       Proc.State := Starting;
       Proc.Quantum_Ticks := 10;
