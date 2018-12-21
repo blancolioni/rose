@@ -364,7 +364,6 @@ package body Rose.Kernel.Processes.Init is
                User           => True);
 
             if Environment /= null then
-               Rose.Boot.Console.Put_Line ("attaching environment page");
                Map_Kernel_Page
                  (Virtual_Page  =>
                     Rose.Kernel.Heap.Get_Virtual_Page (Proc.Env_Page),
@@ -387,7 +386,6 @@ package body Rose.Kernel.Processes.Init is
                begin
                   Kernel_Env_Page := Environment.all;
                end;
-               Rose.Boot.Console.Put_Line ("done");
             end if;
 
             Launch_Params.Data (6) :=
