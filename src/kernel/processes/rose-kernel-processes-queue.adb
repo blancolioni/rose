@@ -2,6 +2,7 @@ with Rose.Words;
 with Rose.Kernel.Debug;
 with Rose.Kernel.Panic;
 
+with Rose.Kernel.Heap;
 with Rose.Kernel.Processes.Debug;
 with Rose.Boot.Console;
 
@@ -21,6 +22,13 @@ package body Rose.Kernel.Processes.Queue is
 
    procedure Choose_Process is
    begin
+
+      if Have_Process_Handlers
+        and then Process_Table (Mem_Process).State = Blocked
+        and then Rose.Kernel.Heap.Available_Heap <= 64 * 1024
+      then
+         Expand_Heap (128 * 1024);
+      end if;
 
       if not Image_Write_Active then
 
@@ -134,9 +142,8 @@ package body Rose.Kernel.Processes.Queue is
    ----------------------------
 
    procedure Resume_Current_Process is
-      use type Rose.Objects.Object_Id;
-      Log         : constant Boolean := Log_Reply
-        or else Current_Object_Id = Log_Object_Id;
+      Log         : constant Boolean :=
+                      Log_Reply or else Trace (Current_Process_Id);
       Log_Details : constant Boolean := False;
    begin
       Invocation_Reply := (if Current_Process.Flags (Invoke_Reply)
@@ -159,8 +166,9 @@ package body Rose.Kernel.Processes.Queue is
          if Log then
             Rose.Kernel.Debug.Put_Call
               ("reply",
-               Current_Process.Cap_Cache
-                 (Current_Process.Current_Params.Cap),
+               Cap_Layout
+                 (Current_Process_Id,
+                  Current_Process.Current_Params.Cap),
                Current_Process.Current_Params);
 
             if Log_Details then

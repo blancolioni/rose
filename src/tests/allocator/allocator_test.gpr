@@ -1,0 +1,12 @@
+project Allocator_Test is
+
+   for Source_Dirs use ("src", "../../library/rose");
+   for Object_Dir use "obj";
+   for Main use ("main.adb");
+
+   package Compiler is
+      for Switches ("ada") use ("-g", "-gnata", "-gnato", "-fstack-check");
+   end Compiler;
+
+end Allocator_Test;
+

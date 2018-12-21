@@ -28,28 +28,30 @@ package body Rose.Kernel.Init is
         + 64 * Physical_Page_Bytes;   --  initial page tables
       Process_Table_Size : constant Physical_Bytes :=
                              Processes.Process_Table_Heap_Size;
-      --  for each boot module, five page table pages
-      --  page directory, first code and data page, top of stack page
-      --  and an environment page
+      --  first three boot modules (init, console, mem) require
+      --  three pages each: page directory, first data page,
+      --  top of stack page.
+      --  other boot modules can be entirely allocated from heap
+      --  once the mem process is running.
       Boot_Module_Heap   : constant Physical_Bytes :=
-                             Physical_Bytes (Modules.Last_Boot_Module)
-                             * 16#5000#;
+                             3 * 3 * 16#1000#;
 
       --  Module_Size : constant Virtual_Bytes :=
       --    Modules.Module_Heap_Size;
       Heap_Size       : constant Physical_Bytes :=
                           Page_Table_Size
                             + Process_Table_Size
-                            + Boot_Module_Heap
-                            + 16#4_0000#;
-      --    Page_Table_Size + Process_Table_Size + Module_Size;
-
+                            + Boot_Module_Heap;
    begin
 
       Rose.Boot.Console.Put ("Kernel init: ");
       Rose.Boot.Console.Put (Kernel_Physical_Base);
       Rose.Boot.Console.Put (" - ");
       Rose.Boot.Console.Put (Kernel_Physical_Bound);
+      Rose.Boot.Console.New_Line;
+      Rose.Boot.Console.Put ("kernel: heap size ");
+      Rose.Boot.Console.Put (Natural (Heap_Size / 1024));
+      Rose.Boot.Console.Put ("K");
       Rose.Boot.Console.New_Line;
 
       --  Protect low RAM and Kernel
@@ -92,10 +94,10 @@ package body Rose.Kernel.Init is
       Log_Port_IO :=
         Rose.Kernel.Command_Line.Have_Argument ("log-port-io");
 
-      if Rose.Kernel.Command_Line.Have_Argument ("log-object-id") then
-         Log_Object_Id := Rose.Objects.Object_Id
+      if Rose.Kernel.Command_Line.Have_Argument ("trace-object-id") then
+         Trace_Object_Id := Rose.Objects.Object_Id
            (Rose.Kernel.Command_Line.Integer_Argument
-              ("log-object-id"));
+              ("trace-object-id"));
       end if;
 
       Rose.Boot.Console.Put_Line ("Loading boot modules");

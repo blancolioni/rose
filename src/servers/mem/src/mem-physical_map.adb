@@ -198,4 +198,19 @@ package body Mem.Physical_Map is
       return Region_Table (1).Unmap_Page_Cap;
    end Region_Unmap_Page_Cap;
 
+   -----------------
+   -- Take_Memory --
+   -----------------
+
+   function Take_Memory
+     (Size : Rose.Addresses.Physical_Bytes)
+      return Rose.Addresses.Physical_Address
+   is
+      Page_Count : constant Physical_Page_Address :=
+                     Physical_Page_Address (Size / Rose.Limits.Page_Size);
+   begin
+      Region_Table (1).Bound := Region_Table (1).Bound - Page_Count;
+      return Physical_Page_To_Address (Region_Table (1).Bound);
+   end Take_Memory;
+
 end Mem.Physical_Map;

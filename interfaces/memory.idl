@@ -23,4 +23,9 @@ interface Memory is
       Physical_Page   : Word;
       Action          : Page_Access_Type);
    
+   function Take_Physical_Memory
+     (Size   : Word;
+      Start  : out Word;
+      Amount : out Word);
+     
 end Memory;

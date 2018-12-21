@@ -29,10 +29,11 @@ package body Rose.Kernel.Invocation is
       use Rose.Capabilities.Layout;
       use Rose.Invocation;
       use Rose.Kernel.Processes;
-      use type Rose.Objects.Object_Id;
       Pid : constant Process_Id := Current_Process_Id;
-      Log         : constant Boolean := Log_Invocation
-        or else Current_Object_Id = Log_Object_Id;
+      Log         : constant Boolean :=
+                      Log_Invocation
+                          or else Rose.Kernel.Processes.Trace
+                            (Current_Process_Id);
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
       function To_Word_32 is
@@ -49,7 +50,7 @@ package body Rose.Kernel.Invocation is
 
       Params.Reply_Cap := Params.Cap;
 
-      if not Current_Process_Cap (Params.Cap, Cap) then
+      if not Has_Cap (Pid, Params.Cap) then
          Rose.Kernel.Processes.Debug.Put (Pid);
          Rose.Boot.Console.Put (": invoke: bad cap ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Cap));
@@ -58,6 +59,7 @@ package body Rose.Kernel.Invocation is
          Rose.Kernel.Panic.Panic ("bad cap");
          Return_Error (Params, Rose.Invocation.Invalid_Capability);
       else
+         Get_Cap (Pid, Params.Cap, Cap);
          if Log then
             Rose.Kernel.Debug.Put_Call
               ("invoke", Cap, Params.all);

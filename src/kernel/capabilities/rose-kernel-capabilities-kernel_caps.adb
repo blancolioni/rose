@@ -11,6 +11,8 @@ with Rose.Boot.Console;
 
 with Rose.Kernel.Capabilities.Processes;
 
+with Rose.Kernel.Heap;
+
 package body Rose.Kernel.Capabilities.Kernel_Caps is
 
    function Process_Cap
@@ -149,6 +151,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
+
+         when Add_Heap_Memory =>
+            Rose.Kernel.Heap.Increase_Heap_Bound
+              (Start  => Physical_Address (Params.Data (0)),
+               Amount => Physical_Bytes (Params.Data (1)));
 
          when others =>
             Rose.Kernel.Panic.Panic
