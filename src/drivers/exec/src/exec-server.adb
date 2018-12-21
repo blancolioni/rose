@@ -16,7 +16,8 @@ package body Exec.Server is
 
    function On_Install
      (Id        : Rose.Objects.Capability_Identifier;
-      ELF_Image : Rose.Capabilities.Capability)
+      ELF_Image : Rose.Capabilities.Capability;
+      Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
    function On_Launch
@@ -48,15 +49,17 @@ package body Exec.Server is
 
    function On_Install
      (Id        : Rose.Objects.Capability_Identifier;
-      ELF_Image : Rose.Capabilities.Capability)
+      ELF_Image : Rose.Capabilities.Capability;
+      Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
       use Rose.Interfaces.Stream_Reader.Client;
       Reader : Stream_Reader_Client;
    begin
+      Rose.Console_IO.Put_Line ("exec: installing");
       Open (Reader, ELF_Image);
-      return Exec.Library.Install (Reader);
+      return Exec.Library.Install (Reader, Caps);
    end On_Install;
 
    ---------------
@@ -72,10 +75,14 @@ package body Exec.Server is
       Params : aliased Rose.Invocation.Invocation_Record;
       Base, Bound : Rose.Objects.Page_Object_Id;
    begin
+      Rose.Console_IO.Put_Line ("exec: launching");
       Exec.Library.Get_Image_Pages (Id, Base, Bound);
       Initialize_Send (Params, Create_Process_Cap);
-      Send_Object_Id (Params, Base);
-      Send_Object_Id (Params, Bound);
+      Send_Cap (Params, Region_Cap);
+      Send_Cap (Params, Storage_Cap);
+
+      Exec.Library.Send_Install_Caps (Id, Params);
+
       for Cap of Caps loop
          Send_Cap (Params, Cap);
       end loop;
@@ -91,7 +98,6 @@ package body Exec.Server is
 
    procedure Start_Server is
    begin
-      Rose.Console_IO.Put_Line ("exec: ready");
       Rose.Server.Start_Server (Context);
    end Start_Server;
 

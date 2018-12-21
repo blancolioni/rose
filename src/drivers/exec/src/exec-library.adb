@@ -8,10 +8,12 @@ with Rose.Interfaces.Launch;
 package body Exec.Library is
 
    Max_Installed_Programs : constant := 100;
+   Max_Start_Caps         : constant := 16;
 
    type Installed_Program_Record is
       record
          Installed : Boolean := False;
+         Caps      : Rose.Capabilities.Capability_Array (1 .. Max_Start_Caps);
          ELF_Base  : Rose.Objects.Page_Object_Id;
          ELF_Bound : Rose.Objects.Page_Object_Id;
       end record;
@@ -52,7 +54,8 @@ package body Exec.Library is
    -------------
 
    function Install
-     (ELF_Image    : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client)
+     (ELF_Image    : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      Caps         : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       use type Rose.Objects.Capability_Identifier;
@@ -74,6 +77,9 @@ package body Exec.Library is
                      Installed_Programs (Installed_Count);
       begin
          Install.Installed := True;
+         Install.Caps := (others => 0);
+         Install.Caps (1 .. Caps'Length) := Caps;
+
          Install.ELF_Base := Next_Page;
 
          loop
@@ -91,6 +97,26 @@ package body Exec.Library is
          Endpoint_Id => Rose.Interfaces.Launch.Launch_Endpoint,
          Identifier  => Installed_Count);
    end Install;
+
+   -----------------------
+   -- Send_Install_Caps --
+   -----------------------
+
+   procedure Send_Install_Caps
+     (Id     : Rose.Objects.Capability_Identifier;
+      Params : in out Rose.Invocation.Invocation_Record)
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if Id in Installed_Program_Index
+        and then Installed_Programs (Id).Installed
+      then
+         for Cap of Installed_Programs (Id).Caps loop
+            exit when Cap = 0;
+            Rose.Invocation.Send_Cap (Params, Cap);
+         end loop;
+      end if;
+   end Send_Install_Caps;
 
    --------------------
    -- Set_Region --
