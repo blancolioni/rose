@@ -1,4 +1,5 @@
 with Rose.Boot.Console;
+with Rose.Arch.Interrupt_Table;
 
 with Rose.Words;
 
@@ -71,6 +72,10 @@ package body Rose.Kernel.Capabilities.Interrupt is
                  (Vector,
                   Rose.Kernel.Processes.Current_Object_Id,
                   Handler_Cap);
+               if Vector in 32 .. 47 then
+                  Rose.Arch.Interrupt_Table.Enable_Interrupt (Vector);
+               end if;
+
             end;
 
             Params.Control.Flags :=

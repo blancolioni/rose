@@ -24,6 +24,9 @@ package body ATA.Server is
 
    Device_Cap  : Rose.Capabilities.Capability;
 
+   Master_Endpoint : constant := 16#A3AD_150D#;
+   Slave_Endpoint  : constant := 16#5C52_EAF3#;
+
    type Vendor_Device_Record is
       record
          Vendor : Rose.Words.Word_32;
@@ -196,8 +199,7 @@ package body ATA.Server is
                         (Create_Endpoint_Cap);
       Interrupt_Cap : constant Rose.Capabilities.Capability :=
                         Rose.System_Calls.Server.Create_Endpoint
-                          (Create_Endpoint_Cap,
-                           16#A3AD_150D#);
+                          (Create_Endpoint_Cap, Master_Endpoint);
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -240,6 +242,10 @@ package body ATA.Server is
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
+            when Master_Endpoint =>
+               Rose.Console_IO.Put_Line ("interrupt on master");
+            when Slave_Endpoint =>
+               Rose.Console_IO.Put_Line ("interrupt on slave");
             when Rose.Interfaces.Get_Interface_Endpoint =>
                declare
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
