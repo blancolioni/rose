@@ -132,6 +132,8 @@ package body Init.Installer is
         (Params, Launch_Cap);
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Exec_Region));
+      Rose.System_Calls.Send_Cap
+        (Params, Storage_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
       return Rose.System_Calls.Get_Object_Id (Params, 0);
@@ -147,7 +149,7 @@ package body Init.Installer is
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word)
-      return Rose.Objects.Object_Id
+      return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Binary_Length);
       use Rose.Interfaces.Stream_Reader.Client;
@@ -168,12 +170,11 @@ package body Init.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
       then
          return 0;
       else
-         return Rose.Objects.Object_Id
-           (Rose.System_Calls.Get_Word_64 (Params, 0));
+         return Params.Caps (0);
       end if;
 
    end Install_Executable;
