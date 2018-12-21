@@ -14,6 +14,7 @@ package body Rose.Kernel.Processes is
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
+   Log_Cap_Cache      : constant Boolean := False;
 
    First_Persistent_Pid : constant Process_Id := 0;
 
@@ -754,7 +755,7 @@ package body Rose.Kernel.Processes is
                   Page_Index : constant Capability_Page_Index :=
                                  Get_Cap_Page_Index (Cache.Cap);
                begin
-                  if P.Flags (Trace) then
+                  if Log_Cap_Cache and then P.Flags (Trace) then
                      Debug.Put (Pid);
                      Rose.Boot.Console.Put (": dropping cap: ");
                      Rose.Boot.Console.Put (Natural (Cache.Cap));
@@ -786,7 +787,7 @@ package body Rose.Kernel.Processes is
                P.Is_Cached (Cached.Cap) := False;
             end if;
 
-            if P.Flags (Trace) then
+            if Log_Cap_Cache and then P.Flags (Trace) then
                Debug.Put (Pid);
                Rose.Boot.Console.Put (": loading cap: ");
                Rose.Boot.Console.Put (Natural (Cap));

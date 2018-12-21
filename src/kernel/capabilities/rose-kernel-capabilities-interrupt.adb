@@ -23,8 +23,12 @@ package body Rose.Kernel.Capabilities.Interrupt is
       case Cap.Header.Endpoint is
          when Reserve_Interrupt_Endpoint =>
             if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               Rose.Kernel.Processes.Debug.Put
+                 (Rose.Kernel.Processes.Current_Process_Id);
+               Rose.Boot.Console.Put (": while installing IRQ ");
+               Rose.Boot.Console.Put (Natural (Cap.Payload));
                Rose.Boot.Console.Put_Line
-                 ("interrupt: missing handler cap");
+                 (": missing handler cap");
                Rose.Kernel.Processes.Return_Error
                  (Params, Rose.Invocation.Request_Error);
                return;

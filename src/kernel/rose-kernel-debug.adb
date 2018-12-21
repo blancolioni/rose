@@ -86,7 +86,7 @@ package body Rose.Kernel.Debug is
             if I > 0 then
                Put (" ");
             end if;
-            Put (Word_8 (Params.Caps (I)));
+            Put (Natural (Params.Caps (I)));
          end loop;
          Put (">");
       end if;
