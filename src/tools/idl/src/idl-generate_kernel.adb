@@ -463,15 +463,13 @@ package body IDL.Generate_Kernel is
                     ("Rose.Capabilities.Capability_Array",
                      Syn.Literal (1), Syn.Literal (16))));
             Block.Add_Declaration
-              (Syn.Declarations.New_Object_Declaration
-                 ("Cap_Count", Syn.Named_Subtype ("Natural")));
-            Block.Add_Statement
-              (Syn.Statements.New_Procedure_Call_Statement
-                 ("Rose.System_Calls.Copy_Received_Caps",
-                  Syn.Object ("Parameters"),
-                  Syn.Literal (Recv_Caps),
-                  Syn.Object ("Caps"),
-                  Syn.Object ("Cap_Count")));
+              (Syn.Declarations.New_Constant_Declaration
+                 ("Cap_Count", "Natural",
+                  (Syn.Expressions.New_Function_Call_Expression
+                       ("Rose.System_Calls.Copy_Received_Caps",
+                        Syn.Object ("Parameters"),
+                        Syn.Literal (Recv_Caps),
+                        Syn.Object ("Caps")))));
          else
             if Is_String (Base_Type) then
                Block.Add_Declaration
@@ -567,16 +565,19 @@ package body IDL.Generate_Kernel is
                  ("Rose.System_Calls.Send_Storage_Offset",
                   Syn.Object ("Parameters"),
                   Syn.Object (Base_Name)));
+         elsif Is_Object_Id (Base_Type) then
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Send_Object_Id",
+                  Syn.Object ("Parameters"),
+                  Syn.Object (Base_Name)));
          else
             if Get_Size (Base_Type) > Default_Size then
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
-                    ((if Is_Object_Id (Base_Type)
-                     then "Rose.System_Calls.Send_Object_Id"
-                     else "Rose.System_Calls.Send_Word"),
+                    ("Rose.System_Calls.Send_Word",
                      Syn.Object ("Parameters"),
                      (if Is_Word_Type (Base_Type)
-                      or else Is_Object_Id (Base_Type)
                       then Syn.Object (Base_Name)
                       else Syn.Expressions.New_Function_Call_Expression
                         ("Rose.Words.Word_64", Base_Name))));
@@ -657,7 +658,7 @@ package body IDL.Generate_Kernel is
             for Arg of Args loop
                if Is_Capability_Array (Get_Type (Arg)) then
                   Expr.Add_Actual_Argument
-                    (Syn.Object (Get_Ada_Name (Arg) & " (1 .. Cap_Count"));
+                    (Syn.Object (Get_Ada_Name (Arg) & " (1 .. Cap_Count)"));
                else
                   Expr.Add_Actual_Argument
                     (Syn.Object (Get_Ada_Name (Arg)));
@@ -766,6 +767,12 @@ package body IDL.Generate_Kernel is
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
                     ("Rose.System_Calls.Send_Storage_Offset",
+                     Syn.Object ("Parameters"),
+                     Syn.Object ("Result")));
+            elsif Is_Object_Id (Ret_Type) then
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    ("Rose.System_Calls.Send_Object_Id",
                      Syn.Object ("Parameters"),
                      Syn.Object ("Result")));
             else

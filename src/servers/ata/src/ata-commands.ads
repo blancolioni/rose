@@ -32,6 +32,10 @@ package ATA.Commands is
       Command      : ATA_Command)
       return Boolean;
 
+   procedure Send_Control
+     (Drive : ATA.Drives.ATA_Drive;
+      Value : Rose.Words.Word_8);
+
    function Wait_For_Status
      (Drive     : ATA.Drives.ATA_Drive;
       Mask      : ATA.Drives.ATA_Status;
@@ -53,9 +57,6 @@ package ATA.Commands is
       Success : out Boolean);
 
    procedure Flush
-     (Drive : ATA.Drives.ATA_Drive);
-
-   procedure Reset
      (Drive : ATA.Drives.ATA_Drive);
 
 private

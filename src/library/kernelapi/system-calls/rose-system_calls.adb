@@ -35,16 +35,17 @@ package body Rose.System_Calls is
    -- Copy_Received_Caps --
    ------------------------
 
-   procedure Copy_Received_Caps
+   function Copy_Received_Caps
      (Params    : Rose.Invocation.Invocation_Record;
       Start     : Rose.Invocation.Capability_Index;
-      To        : out Rose.Capabilities.Capability_Array;
-      Last      : out Natural)
+      To        : in out Rose.Capabilities.Capability_Array)
+      return Natural
    is
+      Last : Natural := To'First - 1;
    begin
-      Last := To'First - 1;
+
       if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
-         return;
+         return 0;
       end if;
 
       for Index in Start .. Params.Control.Last_Sent_Cap loop
@@ -52,6 +53,7 @@ package body Rose.System_Calls is
          Last := Last + 1;
          To (Last) := Params.Caps (Index);
       end loop;
+      return Last;
    end Copy_Received_Caps;
 
    ------------------------
