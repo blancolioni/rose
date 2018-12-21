@@ -194,9 +194,17 @@ package body ATA.Server is
       Receive_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Receive_Cap
                         (Create_Endpoint_Cap);
+      Interrupt_Cap : constant Rose.Capabilities.Capability :=
+                        Rose.System_Calls.Server.Create_Endpoint
+                          (Create_Endpoint_Cap,
+                           16#A3AD_150D#);
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
+
+      Rose.System_Calls.Initialize_Send (Params, Reserve_IRQ_Cap);
+      Rose.System_Calls.Send_Cap (Params, Interrupt_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
@@ -296,7 +304,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: giving up");
@@ -339,7 +347,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: giving up");
