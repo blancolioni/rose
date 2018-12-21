@@ -599,7 +599,7 @@ package body Init.Run is
                First := False;
             else
                declare
-                  Object : constant Rose.Objects.Object_Id :=
+                  Launch : constant Rose.Capabilities.Capability :=
                              Init.Installer.Install_Executable
                                (Create_Cap    => Create_Cap,
                                 Install_Cap   => Install_Cap,
@@ -607,7 +607,7 @@ package body Init.Run is
                                 Binary_Stream => Params.Caps (1),
                                 Binary_Length => Params.Data (0));
                begin
-                  Rose.System_Calls.Send_Object_Id (Reply, Object);
+                  Rose.System_Calls.Send_Cap (Reply, Launch);
                end;
             end if;
 
