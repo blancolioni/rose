@@ -376,7 +376,7 @@ package body Init.Run is
          Reserve_IRQ           : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
-                                      (6, 1, 14, 0));
+                                      (6, 1, 46, 0));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,

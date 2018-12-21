@@ -175,10 +175,7 @@ package body Rose.Kernel.Interrupts is
       Handler   : Interrupt_Handler_Access)
    is
    begin
-      Rose.Boot.Console.Put (Natural (Interrupt));
-      Rose.Boot.Console.Put (": set");
       if Interrupt_Table (Interrupt) = null then
-         Rose.Boot.Console.Put (" first");
          Interrupt_Table (Interrupt) :=
            Interrupt_Handler_Table (Interrupt_Handler_Count)'Access;
       else
@@ -192,8 +189,6 @@ package body Rose.Kernel.Interrupts is
             It.Next := Handler;
          end;
       end if;
-      Rose.Boot.Console.Put (" handler");
-      Rose.Boot.Console.New_Line;
    end Set_Handler;
 
    -----------------
