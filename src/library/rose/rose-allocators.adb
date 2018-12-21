@@ -86,12 +86,15 @@ package body Rose.Allocators is
       declare
          Index : constant Natural := Get_Free (Order);
          Result : constant Natural :=
-                    (Index - First_Free_Index (Order))
-                    * 2 ** Natural (Order_Type'Last - Order)
-                    + 1;
+                    (if Index = 0 then 0
+                     else (Index - First_Free_Index (Order))
+                     * 2 ** Natural (Order_Type'Last - Order)
+                     + 1);
       begin
          if Index > 0 then
             Allocator.Free (Index) := False;
+            Allocator.Count (Order) :=
+              Allocator.Count (Order) - 1;
             return Result;
          else
             Rose.Console_IO.Put_Line ("store: expected a free slot");

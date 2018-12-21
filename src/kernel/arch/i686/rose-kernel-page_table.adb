@@ -266,7 +266,7 @@ package body Rose.Kernel.Page_Table is
             Table_Page := (others => <>);
             Init_Page_Entry (Directory (Directory_Index));
             Directory (Directory_Index).PFA :=
-              Physical_Page_Address (Addr - Kernel_Virtual_Page_Base);
+              Rose.Kernel.Heap.Get_Physical_Page (Addr);
             Directory (Directory_Index).User := User;
             Directory (Directory_Index).Writable := True;
          end;
@@ -281,7 +281,7 @@ package body Rose.Kernel.Page_Table is
                        Physical_Address (Directory (Directory_Index).PFA)
                        * Physical_Page_Bytes;
          Addr      : constant Virtual_Address :=
-                       Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+                       Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
          Table_Page : Page_Table_Array;
          for Table_Page'Address use System'To_Address (Addr);
          pragma Import (Ada, Table_Page);
@@ -327,7 +327,7 @@ package body Rose.Kernel.Page_Table is
                          Physical_Address (Directory (Directory_Index).PFA)
                          * Physical_Page_Bytes;
          Addr        : constant Virtual_Address :=
-                         Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+                         Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
          Table_Page  : Page_Table_Array;
          for Table_Page'Address use System'To_Address (Addr);
          pragma Import (Ada, Table_Page);
@@ -357,12 +357,16 @@ package body Rose.Kernel.Page_Table is
    is
       use Rose.Words;
       Directory_Address : constant Virtual_Address :=
-                            Virtual_Address (Directory_Page
-                                             + Kernel_Virtual_Base);
+                            Rose.Kernel.Heap.Get_Virtual_Address
+                              (Directory_Page);
       Directory         : Page_Table_Array;
       pragma Import (Ada, Directory);
       for Directory'Address use System'To_Address (Directory_Address);
    begin
+      Rose.Boot.Console.Put ("directory page: ");
+      Rose.Boot.Console.Put (Rose.Words.Word (Directory_Page));
+      Rose.Boot.Console.New_Line;
+
       for Index in Directory'Range loop
 
          if Directory (Index).Present then
@@ -375,12 +379,13 @@ package body Rose.Kernel.Page_Table is
                Rose.Boot.Console.Put ("  ");
                Show_Page_Entry (Directory (Index));
 
-               if Index < 16#0300# then
+               if Index not in 16#0300# .. 16#03E0# then
                   declare
-                     Page_Entry_Address : constant Word_32 :=
-                                            Word_32 (Directory (Index).PFA)
-                                            * 4096
-                                              + Word_32 (Kernel_Virtual_Base);
+                     Page_Entry_Address : constant Virtual_Address :=
+                                          Rose.Kernel.Heap.Get_Virtual_Address
+                                              (Physical_Address
+                                                 (Directory (Index).PFA)
+                                               * 4096);
                      Page_Table         : Page_Table_Array;
                      pragma Import (Ada, Page_Table);
                      for Page_Table'Address use
@@ -490,7 +495,7 @@ package body Rose.Kernel.Page_Table is
                           Physical_Address (Directory (Directory_Index).PFA)
                           * Physical_Page_Bytes;
       Addr            : constant Virtual_Address :=
-                          Virtual_Address (Phys_Addr + Kernel_Virtual_Base);
+                          Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
       Table_Page      : Page_Table_Array;
       for Table_Page'Address use System'To_Address (Addr);
       pragma Import (Ada, Table_Page);

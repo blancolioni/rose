@@ -3,6 +3,7 @@ with Rose.Capabilities.Layout;
 with Rose.Invocation;
 with Rose.Words;
 
+private with System;
 private with Rose.Kernel.Arch;
 private with Rose.Kernel.Interrupts;
 private with Rose.Kernel.Limits;
@@ -29,17 +30,14 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id)
       return Rose.Objects.Object_Id;
 
-   function Current_Process_Cap
-     (Cap_Index : Rose.Capabilities.Capability;
-      Cap       : out Rose.Capabilities.Layout.Capability_Layout)
-      return Boolean;
-
    function New_Process
      return Process_Id;
 
    procedure Start_Process
      (Process : Process_Id;
       Address : Rose.Words.Word);
+
+   function Trace (Process : Process_Id) return Boolean;
 
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
@@ -53,13 +51,11 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id)
       return Rose.Capabilities.Capability;
 
-   function Create_Caps
+   procedure Create_Caps
      (Pid   : Process_Id;
-      Count : Natural)
-      return Rose.Capabilities.Capability;
-   --  Create Count caps and return the first.  They
-   --  are guaranteed to be sequential, or the return
-   --  value is Null_Capability
+      Caps  : out Rose.Capabilities.Capability_Array);
+   --  Fill caps with new capabilities.  If any cannot be allocated,
+   --  then none will be, and then first element of Caps will be zero.
 
    procedure Copy_Cap
      (From_Process_Id : Process_Id;
@@ -75,6 +71,18 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)
       return Boolean;
+
+   procedure Get_Cap
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Layout : out Rose.Capabilities.Layout.Capability_Layout);
+
+   procedure Update_Cap
+     (Pid    : Process_Id;
+      Cap    : Rose.Capabilities.Capability;
+      Update : not null access
+        procedure
+          (Layout : in out Rose.Capabilities.Layout.Capability_Layout));
 
    function Cap_Type
      (Pid : Process_Id;
@@ -263,6 +271,13 @@ package Rose.Kernel.Processes is
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
 
+   function Directory_Page
+     (Pid : Process_Id)
+      return Rose.Addresses.Physical_Address;
+
+   procedure Expand_Heap
+     (Amount : Rose.Addresses.Physical_Bytes);
+
    procedure Report_Current_Process;
 
    procedure Set_Process_Handlers
@@ -285,18 +300,29 @@ package Rose.Kernel.Processes is
 private
 
    type Process_Flag is
-     (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply, Interrupt_Resume);
+     (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply, Interrupt_Resume,
+      Trace);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
    type Process_Id is new Rose.Words.Word;
    Null_Process_Id : constant Process_Id := 0;
+   Next_Pid : Process_Id := 1;
 
-   Cached_Capability_Count : constant := 256;
+   Capability_Cache_Size : constant := 16;
+   type Cached_Capability_Count is range 0 .. Capability_Cache_Size;
+   subtype Cached_Capability_Index is Cached_Capability_Count range
+     1 .. Cached_Capability_Count'Last;
+
+   type Cached_Capability is
+      record
+         Cap    : Rose.Capabilities.Capability := 0;
+         Tick   : Rose.Words.Word_32 := 0;
+         Layout : Rose.Capabilities.Layout.Capability_Layout;
+      end record;
 
    type Capability_Cache_Array is
-     array (Rose.Capabilities.Capability range 1 .. Cached_Capability_Count)
-     of Rose.Capabilities.Layout.Capability_Layout;
+     array (Cached_Capability_Index) of Cached_Capability;
 
    Capabilities_Per_Page : constant :=
                    Rose.Addresses.Physical_Page_Bytes
@@ -309,12 +335,20 @@ private
 
    Max_Capability_Pages : constant := 16;
    Max_Capability_Index    : constant :=
-                               Cached_Capability_Count
-                                 + Capabilities_Per_Page
-                               * Max_Capability_Pages;
+                               Capabilities_Per_Page
+                                 * Max_Capability_Pages;
+
+   type Capability_Page_Count is range 0 .. Max_Capability_Pages;
+   subtype Capability_Page_Index is Capability_Page_Count range
+     1 .. Capability_Page_Count'Last;
 
    type Capability_Page_Array is
-     array (1 .. Max_Capability_Pages) of Rose.Addresses.Physical_Page_Address;
+     array (Capability_Page_Index) of System.Address;
+
+   type Cap_Present_Array is
+     array (Rose.Capabilities.Capability range 1 .. Max_Capability_Index)
+     of Boolean
+     with Pack, Size => Max_Capability_Index;
 
    Max_Registered_Endpoints : constant := 32;
    type Registered_Endpoint_Record is
@@ -384,8 +418,13 @@ private
                                Rose.Capabilities.Null_Capability;
          Send_Cap          : Rose.Capabilities.Capability :=
                                Rose.Capabilities.Null_Capability;
-         Cap_Cache         : Capability_Cache_Array;
-         Cap_Pages         : Capability_Page_Array;
+         Last_Cap          : Rose.Capabilities.Capability := 0;
+         Cached_Caps       : Capability_Cache_Array := (others => <>);
+         Is_Cached         : Cap_Present_Array := (others => False);
+         Is_Active         : Cap_Present_Array := (others => False);
+         Next_Cap_Tick     : Rose.Words.Word_32 := 0;
+         Cap_Pages         : Capability_Page_Array  :=
+                               (others => System.Null_Address);
          Endpoints         : Registered_Endpoint_Array;
          Page_Ranges       : Page_Range_Array;
          Page_Flags        : Page_Flag_Array;
@@ -480,6 +519,25 @@ private
    function Create_Cap return Rose.Capabilities.Capability
    is (Create_Cap (Current_Process_Id));
 
+   function Get_Cap_Page_Index
+     (Cap : Rose.Capabilities.Capability)
+      return Capability_Page_Index
+   is (Capability_Page_Count (Natural (Cap) / Capabilities_Per_Page) + 1);
+
+   function Load_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
+     return Cached_Capability_Index;
+
+   procedure Load_Cap_Page
+     (Pid  : Process_Id;
+      Page : Capability_Page_Index);
+
+   function Cap_Layout
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Layout.Capability_Layout;
+
    function To_Object_Id
      (Pid : Process_Id)
       return Rose.Objects.Object_Id
@@ -487,6 +545,15 @@ private
 
    function Current_Object_Id return Rose.Objects.Object_Id
    is (Current_Process.Oid);
+
+   function Trace (Process : Process_Id) return Boolean
+   is (Is_Valid_Process_Id (Process)
+       and then Process_Table (Process).Flags (Trace));
+
+   function Directory_Page
+     (Pid : Process_Id)
+      return Rose.Addresses.Physical_Address
+   is (Process_Table (Pid).Directory_Page);
 
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
