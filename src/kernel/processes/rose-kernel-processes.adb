@@ -486,6 +486,18 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
          Debug.Report_Process (Current_Process_Id);
+         if Rose.Words.Word (Virtual_Address)
+           /= Current_Process.Stack.EIP
+         then
+            declare
+               Code : System.Storage_Elements.Storage_Array (1 .. 16);
+               pragma Import (Ada, Code);
+               for Code'Address use
+                 System'To_Address (Current_Process.Stack.EIP);
+            begin
+               Rose.Boot.Console.Put (Code);
+            end;
+         end if;
       end if;
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
@@ -1413,8 +1425,7 @@ package body Rose.Kernel.Processes is
    begin
 
       if Log_Shared_Buffers then
-         Rose.Boot.Console.Put ("pid ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (From_Process));
+         Debug.Put (From_Process);
          Rose.Boot.Console.Put (": share page with ");
          Debug.Put (To_Process);
          Rose.Boot.Console.New_Line;
