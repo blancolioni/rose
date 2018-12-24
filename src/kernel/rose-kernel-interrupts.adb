@@ -75,7 +75,9 @@ package body Rose.Kernel.Interrupts is
       pragma Import (C, Page_Fault_Address, "page_fault_address");
    begin
 
-      if False and then Interrupt /= Clock_Interrupt then
+      if Interrupt /= Clock_Interrupt
+        and then Interrupt /= Page_Fault
+      then
          Rose.Boot.Console.Put ("handle-interrupt: vector = ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Interrupt));
          Rose.Boot.Console.Put (" code = ");
