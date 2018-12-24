@@ -658,7 +658,7 @@ package body IDL.Generate_Kernel is
             for Arg of Args loop
                if Is_Capability_Array (Get_Type (Arg)) then
                   Expr.Add_Actual_Argument
-                    (Syn.Object (Get_Ada_Name (Arg) & " (1 .. Cap_Count)"));
+                    (Syn.Object ("Caps (1 .. Cap_Count)"));
                else
                   Expr.Add_Actual_Argument
                     (Syn.Object (Get_Ada_Name (Arg)));
