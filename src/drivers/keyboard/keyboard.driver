@@ -1,8 +1,8 @@
 caps = {
    create-endpoint
    register-interrupt = 33       # register interrupt cap
-   port-out-8 = 96
-   port-out-8 = 100
    port-in-8 = 96
    port-in-8 = 100
+   port-out-8 = 96
+   port-out-8 = 100
 }

@@ -12,6 +12,7 @@ OBJECTS= \
 	$(BUILDDIR)/keyboard.o \
 	$(BUILDDIR)/keyboard-codes.o \
 	$(BUILDDIR)/keyboard-driver.o \
+	$(BUILDDIR)/keyboard-logging.o \
 	$(BUILDDIR)/keyboard-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \

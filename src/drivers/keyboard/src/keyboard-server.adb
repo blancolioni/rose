@@ -10,6 +10,8 @@ with Rose.Interfaces.Stream_Reader;
 with Rose.Devices.Port_IO;
 
 with Keyboard.Codes;
+with Keyboard.Commands;
+with Keyboard.Logging;
 
 package body Keyboard.Server is
 
@@ -25,6 +27,9 @@ package body Keyboard.Server is
    Have_Blocked_Request : Boolean := False;
    Blocked_Request : aliased Rose.Invocation.Invocation_Record;
 
+--     Initialized : Boolean := False;
+--     Have_Aux    : Boolean := False;
+
    procedure Add_To_Buffer (Keys : System.Storage_Elements.Storage_Array);
 
    procedure Register_IRQ;
@@ -33,6 +38,21 @@ package body Keyboard.Server is
      (To_Address : System.Address;
       Length     : System.Storage_Elements.Storage_Count;
       Reply      : in out Rose.Invocation.Invocation_Record);
+
+   procedure Send (Command : Rose.Words.Word_8);
+   procedure Send (Command : Rose.Words.Word_8;
+                   Data    : Rose.Words.Word_8);
+   function Receive return Rose.Words.Word_8;
+
+   procedure Scan_Keyboard
+     (Code    : out Rose.Words.Word_8;
+      Aux     : out Boolean;
+      Success : out Boolean);
+
+   procedure Wait;
+   procedure Clear_Keys;
+
+   procedure Initialize_Keyboard;
 
    -------------------
    -- Add_To_Buffer --
@@ -56,6 +76,17 @@ package body Keyboard.Server is
       end loop;
    end Add_To_Buffer;
 
+   ----------------
+   -- Clear_Keys --
+   ----------------
+
+   procedure Clear_Keys is
+      Code         : Rose.Words.Word_8;
+      Aux, Success : Boolean;
+   begin
+      Scan_Keyboard (Code, Aux, Success);
+   end Clear_Keys;
+
    -------------------
    -- Create_Server --
    -------------------
@@ -69,8 +100,73 @@ package body Keyboard.Server is
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,
            Rose.Interfaces.Stream_Reader.Read_Endpoint);
-      Register_IRQ;
+      Initialize_Keyboard;
    end Create_Server;
+
+   -------------------------
+   -- Initialize_Keyboard --
+   -------------------------
+
+   procedure Initialize_Keyboard is
+      use Rose.Words;
+      use Keyboard.Commands;
+      Current_Config : Word_8;
+   begin
+      Send (Disable_Aux);
+      Send (Disable_Keyboard);
+      Clear_Keys;
+      Send (Read_Controller);
+      Current_Config := Receive;
+--        Have_Aux := (Current_Config and 16#10#) /= 0;
+
+      Send (Self_Test);
+
+      declare
+         Test_Result : constant Word_8 := Receive;
+      begin
+         if Test_Result /= 16#55# then
+            Keyboard.Logging.Log
+              ("keyboard: self-test failed", Test_Result);
+            return;
+         end if;
+      end;
+
+      Register_IRQ;
+
+      Current_Config := Current_Config or 16#01#;
+
+--        if Have_Aux then
+--           null;
+--        end if;
+--
+      Send (Write_Controller, Current_Config);
+      Send (Enable_Keyboard);
+
+--        if Have_Aux then
+--           null;
+--        end if;
+--
+   end Initialize_Keyboard;
+
+   -------------
+   -- Receive --
+   -------------
+
+   function Receive return Rose.Words.Word_8 is
+      use Rose.Devices.Port_IO;
+      use Rose.Words;
+   begin
+      for I in 1 .. 16 loop
+         declare
+            Status : constant Word_8 := Port_In_8 (Read_Status_Cap);
+         begin
+            if (Status and Commands.KB_OUT_FULL) /= 0 then
+               return Port_In_8 (Read_Key_Cap);
+            end if;
+         end;
+      end loop;
+      return 0;
+   end Receive;
 
    ------------------
    -- Register_IRQ --
@@ -87,6 +183,49 @@ package body Keyboard.Server is
       Rose.System_Calls.Send_Cap (Params, Key_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end Register_IRQ;
+
+   -------------------
+   -- Scan_Keyboard --
+   -------------------
+
+   procedure Scan_Keyboard
+     (Code    : out Rose.Words.Word_8;
+      Aux     : out Boolean;
+      Success : out Boolean)
+   is
+      use Rose.Words;
+      use Rose.Devices.Port_IO;
+      Status : constant Word_8 := Port_In_8 (Read_Status_Cap);
+      pragma Unreferenced (Status);
+   begin
+      Code := Port_In_8 (Read_Key_Cap);
+      Aux := False;
+      Success := True;
+   end Scan_Keyboard;
+
+   ----------
+   -- Send --
+   ----------
+
+   procedure Send (Command : Rose.Words.Word_8) is
+   begin
+      Rose.Devices.Port_IO.Port_Out_8
+        (Command_Cap, Command);
+   end Send;
+
+   ----------
+   -- Send --
+   ----------
+
+   procedure Send (Command : Rose.Words.Word_8;
+                   Data    : Rose.Words.Word_8)
+   is
+   begin
+      Wait;
+      Rose.Devices.Port_IO.Port_Out_8 (Command_Cap, Command);
+      Wait;
+      Rose.Devices.Port_IO.Port_Out_8 (Data_Cap, Data);
+   end Send;
 
    -----------------
    -- Send_Buffer --
@@ -153,6 +292,10 @@ package body Keyboard.Server is
       end Read_Key_Code;
 
    begin
+
+      Rose.Devices.Port_IO.Port_Out_8
+        (Command_Cap, 16#F4#);
+
       loop
          Send_Reply := True;
          Rose.System_Calls.Initialize_Receive (Params, Receive_Cap);
@@ -224,5 +367,27 @@ package body Keyboard.Server is
 
       end loop;
    end Start_Server;
+
+   ----------
+   -- Wait --
+   ----------
+
+   procedure Wait is
+   begin
+      for I in 1 .. 16 loop
+         declare
+            use Rose.Words;
+            Status : constant Word_8 :=
+                       Rose.Devices.Port_IO.Port_In_8 (Read_Status_Cap);
+         begin
+            if (Status and Commands.KB_OUT_FULL) /= 0 then
+               Clear_Keys;
+            end if;
+            exit when
+              (Status and (Commands.KB_IN_FULL or Commands.KB_OUT_FULL))
+                = 0;
+         end;
+      end loop;
+   end Wait;
 
 end Keyboard.Server;
