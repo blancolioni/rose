@@ -20,6 +20,6 @@ package Init.Installer is
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word)
-      return Rose.Objects.Object_Id;
+      return Rose.Capabilities.Capability;
 
 end Init.Installer;
