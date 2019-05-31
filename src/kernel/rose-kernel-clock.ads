@@ -1,4 +1,6 @@
+with Rose.Capabilities;
 with Rose.Kernel.Interrupts;
+with Rose.Words;
 
 package Rose.Kernel.Clock is
 
@@ -7,5 +9,12 @@ package Rose.Kernel.Clock is
 
    procedure Update_Mem
      (Allocated, Available : Rose.Addresses.Physical_Bytes);
+
+   procedure Set_Timeout
+     (Timeout : Rose.Words.Word;
+      Object  : Rose.Objects.Object_Id;
+      Cap     : Rose.Capabilities.Capability);
+
+   function Current_Ticks return Rose.Words.Word;
 
 end Rose.Kernel.Clock;
