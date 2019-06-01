@@ -347,14 +347,21 @@ package body Init.Run is
          Receive_Timeout := Timer_Caps (1);
          Send_Timeout := Timer_Caps (2);
 
-         Control_Cap :=
-           Init.Calls.Call (Timer_Cap, Send_Timeout, (1 => 2_000));
          Init.Calls.Send_String
            (Console_Write_Cap, Waiting_For_Timeout_Message);
 
-         Init.Calls.Receive (Receive_Timeout);
-         Init.Calls.Send_String
-           (Console_Write_Cap, Received_Timeout_Message);
+         for I in 1 .. 3 loop
+            Control_Cap :=
+              Init.Calls.Call
+                (Timer_Cap, Send_Timeout,
+                 (1 => Rose.Words.Word (I * 1000)));
+         end loop;
+
+         for I in 1 .. 3 loop
+            Init.Calls.Receive (Receive_Timeout);
+            Init.Calls.Send_String
+              (Console_Write_Cap, Received_Timeout_Message);
+         end loop;
       end;
 
       declare
