@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Boot.Console;
 
 with Rose.Arch.Interrupts;

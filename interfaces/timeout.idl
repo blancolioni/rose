@@ -1,0 +1,5 @@
+interface Timeout is
+
+   procedure On_Timeout;
+   
+end Timeout;
