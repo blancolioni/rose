@@ -146,6 +146,7 @@ package body Timer.Server is
                   Queue (Queue_Front);
    begin
       Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
+      Params.Control.Flags (Rose.Invocation.Block) := False;
       Rose.System_Calls.Invoke_Capability (Params);
       Queue_Front := Queue_Front - 1;
       if Queue_Front > 0 then
@@ -170,9 +171,13 @@ package body Timer.Server is
                        Timeout => To_Ticks (Milliseconds) + Current_Ticks,
                        Cap     => Cap);
       Index     : Timer_Count := Queue_Front;
+      Reset     : constant Boolean :=
+                    (Queue_Front = 0
+                     or else New_Entry.Timeout
+                     < Queue (Queue_Front).Timeout);
    begin
       while Index > 0
-        and then Queue (Index).Timeout > New_Entry.Timeout
+        and then Queue (Index).Timeout < New_Entry.Timeout
       loop
          Queue (Index + 1) := Queue (Index);
          Index := Index - 1;
@@ -180,16 +185,22 @@ package body Timer.Server is
       Queue (Index + 1) := New_Entry;
       Queue_Front := Queue_Front + 1;
 
-      Rose.Console_IO.Put ("Set_Timeout: ");
-      Rose.Console_IO.Put
-        ((Natural (Milliseconds) + 500) / 1000);
-      Rose.Console_IO.Put ("s");
-      Rose.Console_IO.Put (" in ");
-      Rose.Console_IO.Put (Natural (New_Entry.Timeout));
-      Rose.Console_IO.Put (" ticks");
-      Rose.Console_IO.New_Line;
+--        Rose.Console_IO.Put ("Set_Timeout: ");
+--        Rose.Console_IO.Put
+--          ((Natural (Milliseconds) + 500) / 1000);
+--        Rose.Console_IO.Put ("s");
+--        Rose.Console_IO.Put (" in ");
+--        Rose.Console_IO.Put (Natural (New_Entry.Timeout));
+--        Rose.Console_IO.Put (" ticks");
+--        Rose.Console_IO.Put ("; index = ");
+--        Rose.Console_IO.Put (Natural (Index));
+--        Rose.Console_IO.Put ("; queue length = ");
+--        Rose.Console_IO.Put (Natural (Queue_Front));
+--        Rose.Console_IO.New_Line;
 
-      Update_Timer_Queue;
+      if Reset then
+         Update_Timer_Queue;
+      end if;
 
       declare
          Result_Cap : constant Rose.Capabilities.Capability :=
@@ -222,7 +233,6 @@ package body Timer.Server is
       Rose.System_Calls.Send_Cap
         (Params, Timeout_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
-      Rose.Console_IO.Put_Line ("Ready");
    end Set_Timer;
 
    ------------------
