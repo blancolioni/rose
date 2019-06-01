@@ -458,7 +458,8 @@ package body Init.Run is
                                        Control_0_Cap,
                                        Data_0_Cap_8,
                                        Data_0_Cap_Read_16,
-                                       Data_0_Cap_Write_16));
+                                       Data_0_Cap_Write_16,
+                                       Timer_Cap));
          Copy_Ata_Cap          : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
