@@ -21,4 +21,6 @@ package ATA is
    Data_1_Cap_Read_16  : constant Rose.Capabilities.Capability := 13;
    Data_1_Cap_Write_16 : constant Rose.Capabilities.Capability := 14;
 
+   Set_Timeout_Cap     : constant Rose.Capabilities.Capability := 15;
+
 end ATA;
