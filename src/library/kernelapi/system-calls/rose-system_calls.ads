@@ -107,6 +107,12 @@ package Rose.System_Calls is
       Index  : Rose.Invocation.Parameter_Word_Index)
       return Rose.Words.Word_64;
 
+   function Get_Object_Id
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Rose.Objects.Object_Id
+   is (Rose.Objects.Object_Id (Get_Word_64 (Params, Index)));
+
    procedure Initialize_Send
      (Params : in out Rose.Invocation.Invocation_Record;
       Cap    : Rose.Capabilities.Capability);

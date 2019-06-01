@@ -76,7 +76,6 @@ package body Elf.Loader is
       Start := Header.E_Entry;
       Scan_Program_Headers (Store, Image, Base, Process, Header);
 
-      Rose.Console_IO.Put_Line ("elf: adding stack segment ...");
       declare
          use type Rose.Words.Word;
          Region : constant Rose.Interfaces.Region.Client.Region_Client :=
@@ -93,8 +92,6 @@ package body Elf.Loader is
               Rose.Interfaces.Process_Memory.Segment_Readable
             + Rose.Interfaces.Process_Memory.Segment_Writable);
       end;
-
-      Rose.Console_IO.Put_Line ("elf: ready");
    end Load_Elf_Image;
 
    ----------------------------

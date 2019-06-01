@@ -418,8 +418,10 @@ private
                                Rose.Capabilities.Null_Capability;
          Send_Cap          : Rose.Capabilities.Capability :=
                                Rose.Capabilities.Null_Capability;
+         Last_Cap          : Rose.Capabilities.Capability := 0;
          Cached_Caps       : Capability_Cache_Array := (others => <>);
          Is_Cached         : Cap_Present_Array := (others => False);
+         Is_Active         : Cap_Present_Array := (others => False);
          Next_Cap_Tick     : Rose.Words.Word_32 := 0;
          Cap_Pages         : Capability_Page_Array  :=
                                (others => System.Null_Address);

@@ -238,17 +238,6 @@ package body ATA.Commands is
 
    end Read_Sectors_ATAPI;
 
-   -----------
-   -- Reset --
-   -----------
-
-   procedure Reset
-     (Drive : ATA.Drives.ATA_Drive)
-   is
-   begin
-      ATA.Drives.Reset (Drive);
-   end Reset;
-
    --------------------
    -- Sector_Command --
    --------------------
@@ -328,6 +317,21 @@ package body ATA.Commands is
       return True;
    end Send_Command;
 
+   ------------------
+   -- Send_Control --
+   ------------------
+
+   procedure Send_Control
+     (Drive : ATA.Drives.ATA_Drive;
+      Value : Rose.Words.Word_8)
+   is
+      Command_Port : constant Rose.Capabilities.Capability :=
+                       ATA.Drives.Command_Port (Drive);
+   begin
+      Rose.Devices.Port_IO.Port_Out_8
+        (Command_Port, R_Control, Value);
+   end Send_Control;
+
    ---------------------
    -- To_Select_Drive --
    ---------------------
@@ -361,8 +365,8 @@ package body ATA.Commands is
       Data_Port : constant Rose.Capabilities.Capability :=
                     ATA.Drives.Data_8_Port (Drive);
    begin
-      for I in 1 .. 200 loop
-         if I mod 40 = 0 then
+      for I in 1 .. 400 loop
+         if I mod 100 = 0 then
             Rose.Console_IO.Put_Line ("waiting ...");
          end if;
          X := ATA.Drives.ATA_Status
@@ -374,7 +378,7 @@ package body ATA.Commands is
             return False;
          end if;
       end loop;
-      if False then
+      if True then
          Rose.Console_IO.Put ("wait for status: giving up; last status ");
          Rose.Console_IO.Put (Rose.Words.Word_8 (X));
          Rose.Console_IO.Put ("; expected ");

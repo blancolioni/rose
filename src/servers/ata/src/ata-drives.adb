@@ -269,6 +269,15 @@ package body ATA.Drives is
      (Drive : ATA_Drive)
    is
    begin
+      ATA.Commands.Send_Control (Drive, 16#04#);
+      ATA.Commands.Send_Control (Drive, 16#00#);
+      if not ATA.Commands.Wait_For_Status
+        (Drive, ATA.Drives.Status_Busy, 0)
+      then
+         ATA.Drives.Log (Drive, "reset failed");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
       Drive.Dead := False;
    end Reset;
 
