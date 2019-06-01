@@ -14,7 +14,8 @@ ENVIRONMENT_OBJECTS= \
 LIBROSE_OBJECTS=$(BUILDDIR)/rose-strings.o
 BLOCK_DEVICE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o
+	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-block_device-server.o
 
 OBJECTS= \
 	$(BUILDDIR)/partition.o \
@@ -24,6 +25,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

@@ -1,49 +1,54 @@
 with System.Storage_Elements;
 
 with Rose.Console_IO;
-with Rose.Invocation;
-with Rose.System_Calls.Server;
+with Rose.Objects;
 with Rose.Words;
 
 with Rose.Command_Line;
 
 with Rose.Interfaces.Block_Device.Client;
+with Rose.Interfaces.Block_Device.Server;
+
+with Rose.Server;
 
 package body Partition.Server is
 
    use Rose.Interfaces.Block_Device;
 
---     Partition_Base_Address : Block_Address_Type;
-   Partition_Block_Count  : Block_Address_Type;
-   Partition_Block_Size   : Block_Size_Type;
+   Partition_Block_Count : Block_Address_Type;
+   Partition_Block_Size  : Block_Size_Type;
 
-   Device_Base_Address    : Block_Address_Type;
-   Device_Block_Count     : Block_Address_Type;
-   Device_Block_Size      : Block_Size_Type;
+   Device_Base_Address   : Block_Address_Type;
+   Device_Block_Count    : Block_Address_Type;
+   Device_Block_Size     : Block_Size_Type;
 
-   Block_Size_Ratio       : Block_Address_Type;
+   Block_Size_Ratio      : Block_Address_Type;
 
    Device_Total_Block_Count : Block_Address_Type;
 
    Device_Client      : Client.Block_Device_Client;
-
-   Get_Parameters_Cap   : Rose.Capabilities.Capability;
-   Read_Cap, Write_Cap  : Rose.Capabilities.Capability;
-
---     function To_Device_Block_Count
---       (Count : Block_Address_Type)
---        return Block_Address_Type
---     is (Count * Block_Size_Ratio);
---
---     function To_Partition_Block_Count
---       (Count : Block_Address_Type)
---        return Block_Address_Type
---     is ((Count + Block_Size_Ratio - 1) / Block_Size_Ratio);
---
+   Partition_Server   : Rose.Server.Server_Context;
 
    function To_Word_32
      (X : String)
       return Rose.Words.Word_32;
+
+   procedure Get_Parameters
+     (Id          : in     Rose.Objects.Capability_Identifier;
+      Block_Count :    out Block_Address_Type;
+      Block_Size  :    out Rose.Interfaces.Block_Device.Block_Size_Type);
+
+   procedure Read_Blocks
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Start  : in     Block_Address_Type;
+      Count  : in     Natural;
+      Blocks :    out System.Storage_Elements.Storage_Array);
+
+   procedure Write_Blocks
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Start  : in     Block_Address_Type;
+      Count  : in     Natural;
+      Blocks : in     System.Storage_Elements.Storage_Array);
 
    -------------------
    -- Create_Server --
@@ -56,25 +61,6 @@ package body Partition.Server is
 
       Client.Get_Parameters
         (Device_Client, Device_Total_Block_Count, Device_Block_Size);
-
-      Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap,
-         Rose.Interfaces.Get_Interface_Endpoint);
-
-      Get_Parameters_Cap :=
-        Rose.System_Calls.Server.Create_Endpoint
-          (Create_Endpoint_Cap,
-           Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
-
-      Read_Cap :=
-        Rose.System_Calls.Server.Create_Endpoint
-          (Create_Endpoint_Cap,
-           Rose.Interfaces.Block_Device.Read_Blocks_Endpoint);
-
-      Write_Cap :=
-        Rose.System_Calls.Server.Create_Endpoint
-          (Create_Endpoint_Cap,
-           Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
 
       declare
          Argument : String (1 .. 20);
@@ -96,9 +82,6 @@ package body Partition.Server is
 
       Block_Size_Ratio :=
         Block_Address_Type (Partition_Block_Size / Device_Block_Size);
-
---        Partition_Base_Address :=
---          (Device_Base_Address + Block_Size_Ratio - 1) / Block_Size_Ratio;
 
       declare
          use Rose.Words;
@@ -142,85 +125,56 @@ package body Partition.Server is
       Rose.Console_IO.Put ("M");
       Rose.Console_IO.New_Line;
 
+      Rose.Interfaces.Block_Device.Server.Create_Server
+        (Server_Context => Partition_Server,
+         Get_Parameters => Get_Parameters'Access,
+         Read_Blocks    => Read_Blocks'Access,
+         Write_Blocks   => Write_Blocks'Access);
+
    end Create_Server;
+
+   --------------------
+   -- Get_Parameters --
+   --------------------
+
+   procedure Get_Parameters
+     (Id          : in     Rose.Objects.Capability_Identifier;
+      Block_Count :    out Block_Address_Type;
+      Block_Size  :    out Rose.Interfaces.Block_Device.Block_Size_Type)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Block_Count := Partition_Block_Count;
+      Block_Size  := Partition_Block_Size;
+   end Get_Parameters;
+
+   -----------------
+   -- Read_Blocks --
+   -----------------
+
+   procedure Read_Blocks
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Start  : in     Block_Address_Type;
+      Count  : in     Natural;
+      Blocks :    out System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Client.Read_Blocks
+        (Item   => Device_Client,
+         Start  =>
+           Device_Base_Address + Start * Block_Size_Ratio,
+         Count  => Count * Positive (Block_Size_Ratio),
+         Blocks => Blocks);
+   end Read_Blocks;
 
    ------------------
    -- Start_Server --
    ------------------
 
    procedure Start_Server is
-      Receive_Cap : constant Rose.Capabilities.Capability :=
-                      Rose.System_Calls.Server.Create_Receive_Cap
-                        (Create_Endpoint_Cap);
-      Params      : aliased Rose.Invocation.Invocation_Record;
-      Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
-      loop
-         Rose.System_Calls.Initialize_Receive (Params, Receive_Cap);
-         Rose.System_Calls.Receive_Words (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
-         Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
-
-         case Params.Endpoint is
-            when Rose.Interfaces.Get_Interface_Endpoint =>
-               Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
-               Rose.System_Calls.Send_Cap (Reply, Read_Cap);
-               Rose.System_Calls.Send_Cap (Reply, Write_Cap);
-
-            when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
-               Rose.System_Calls.Send_Word
-                 (Reply, Rose.Words.Word_64 (Partition_Block_Count));
-               Rose.System_Calls.Send_Word
-                 (Reply, Rose.Words.Word_32 (Partition_Block_Size));
-            when Rose.Interfaces.Block_Device.Read_Blocks_Endpoint =>
-               declare
-                  use System.Storage_Elements;
-                  Part_Address : constant Block_Address_Type :=
-                                  Block_Address_Type
-                                     (Rose.System_Calls.Get_Word_64
-                                        (Params, 0));
-                  Part_Count   : constant Natural :=
-                                   Natural (Rose.System_Calls.Get_Word_32
-                                            (Params, 2));
-                  Storage      : Storage_Array (1 .. Params.Buffer_Length);
-                  pragma Import (Ada, Storage);
-                  for Storage'Address use Params.Buffer_Address;
-               begin
-                  Client.Read_Blocks
-                    (Item   => Device_Client,
-                     Start  =>
-                       Device_Base_Address + Part_Address * Block_Size_Ratio,
-                     Count  => Part_Count * Positive (Block_Size_Ratio),
-                     Blocks => Storage);
-               end;
-            when Rose.Interfaces.Block_Device.Write_Blocks_Endpoint =>
-               declare
-                  use System.Storage_Elements;
-                  Part_Address : constant Block_Address_Type :=
-                                   Block_Address_Type
-                                     (Rose.System_Calls.Get_Word_64
-                                        (Params, 0));
-                  Part_Count   : constant Natural :=
-                                   Natural (Rose.System_Calls.Get_Word_32
-                                            (Params, 2));
-                  Storage      : Storage_Array (1 .. Params.Buffer_Length);
-                  pragma Import (Ada, Storage);
-                  for Storage'Address use Params.Buffer_Address;
-               begin
-                  Client.Write_Blocks
-                    (Item   => Device_Client,
-                     Start  =>
-                       Device_Base_Address + Part_Address * Block_Size_Ratio,
-                     Count  => Part_Count * Positive (Block_Size_Ratio),
-                     Blocks => Storage);
-               end;
-            when others =>
-               Rose.Console_IO.Put ("partition: bad endpoint: ");
-               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
-               Rose.Console_IO.New_Line;
-         end case;
-         Rose.System_Calls.Invoke_Capability (Reply);
-      end loop;
+      Rose.Server.Start_Server (Partition_Server);
    end Start_Server;
 
    ----------------
@@ -241,5 +195,25 @@ package body Partition.Server is
          end loop;
       end return;
    end To_Word_32;
+
+   ------------------
+   -- Write_Blocks --
+   ------------------
+
+   procedure Write_Blocks
+     (Id     : in     Rose.Objects.Capability_Identifier;
+      Start  : in     Block_Address_Type;
+      Count  : in     Natural;
+      Blocks : in     System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Client.Write_Blocks
+        (Item   => Device_Client,
+         Start  =>
+           Device_Base_Address + Start * Block_Size_Ratio,
+         Count  => Count * Positive (Block_Size_Ratio),
+         Blocks => Blocks);
+   end Write_Blocks;
 
 end Partition.Server;
