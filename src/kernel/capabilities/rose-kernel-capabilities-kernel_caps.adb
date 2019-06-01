@@ -11,6 +11,7 @@ with Rose.Boot.Console;
 
 with Rose.Kernel.Capabilities.Processes;
 
+with Rose.Kernel.Clock;
 with Rose.Kernel.Heap;
 
 package body Rose.Kernel.Capabilities.Kernel_Caps is
@@ -156,6 +157,52 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             Rose.Kernel.Heap.Increase_Heap_Bound
               (Start  => Physical_Address (Params.Data (0)),
                Amount => Physical_Bytes (Params.Data (1)));
+
+         when Set_Timeout_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Words)
+              or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+            then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Invalid_Operation);
+               return;
+            end if;
+
+            declare
+               Cap : constant Rose.Capabilities.Capability :=
+                       Params.Caps (0);
+               Timeout : constant Rose.Words.Word :=
+                           Params.Data (0);
+            begin
+               Rose.Kernel.Clock.Set_Timeout
+                 (Timeout, Rose.Kernel.Processes.Current_Object_Id, Cap);
+            end;
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
+         when Get_Current_Ticks_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Recv_Words) then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Invalid_Operation);
+               return;
+            end if;
+
+            Params.all :=
+              (Control =>
+                 (Flags          =>
+                      (Rose.Invocation.Reply => True,
+                       others                     => False),
+                  others         => <>),
+               others  => <>);
+
+            Rose.Invocation.Send_Word
+              (Params.all,
+               Rose.Kernel.Clock.Current_Ticks);
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
 
          when others =>
             Rose.Kernel.Panic.Panic
