@@ -149,9 +149,7 @@ package body Timer.Server is
       Params.Control.Flags (Rose.Invocation.Block) := False;
       Rose.System_Calls.Invoke_Capability (Params);
       Queue_Front := Queue_Front - 1;
-      if Queue_Front > 0 then
-         Set_Timer (Queue (Queue_Front).Timeout);
-      end if;
+      Update_Timer_Queue;
    end On_Timeout;
 
    ---------------
@@ -185,19 +183,6 @@ package body Timer.Server is
       Queue (Index + 1) := New_Entry;
       Queue_Front := Queue_Front + 1;
 
---        Rose.Console_IO.Put ("Set_Timeout: ");
---        Rose.Console_IO.Put
---          ((Natural (Milliseconds) + 500) / 1000);
---        Rose.Console_IO.Put ("s");
---        Rose.Console_IO.Put (" in ");
---        Rose.Console_IO.Put (Natural (New_Entry.Timeout));
---        Rose.Console_IO.Put (" ticks");
---        Rose.Console_IO.Put ("; index = ");
---        Rose.Console_IO.Put (Natural (Index));
---        Rose.Console_IO.Put ("; queue length = ");
---        Rose.Console_IO.Put (Natural (Queue_Front));
---        Rose.Console_IO.New_Line;
-
       if Reset then
          Update_Timer_Queue;
       end if;
@@ -221,12 +206,6 @@ package body Timer.Server is
    procedure Set_Timer (Ticks : Ticks_Type) is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
---        Rose.Console_IO.Put ("Next timeout: ");
---        Rose.Console_IO.Put
---          (Natural (Ticks) / 100);
---        Rose.Console_IO.Put ("s");
---        Rose.Console_IO.New_Line;
-
       Rose.System_Calls.Initialize_Send (Params, Set_Timeout_Cap);
       Rose.System_Calls.Send_Word
         (Params, Rose.Words.Word (Ticks));
@@ -250,21 +229,12 @@ package body Timer.Server is
 
    procedure Update_Timer_Queue is
    begin
---        Rose.Console_IO.Put ("Update_Timer_Queue: length = ");
---        Rose.Console_IO.Put (Natural (Queue_Front));
---        Rose.Console_IO.New_Line;
-
       if Queue_Front > 0 then
          declare
             Ticks : constant Ticks_Type :=
                       Queue (Queue_Front).Timeout;
             Current : constant Ticks_Type := Current_Ticks;
          begin
---              Rose.Console_IO.Put ("Update timeout queue: ");
---              Rose.Console_IO.Put (Natural (Ticks) / 100);
---              Rose.Console_IO.Put ("s");
---              Rose.Console_IO.New_Line;
-
             Set_Timer
               (if Ticks < Current then 0 else Ticks - Current);
          end;
