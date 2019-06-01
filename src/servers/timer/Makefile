@@ -13,7 +13,6 @@ OBJECTS= \
 	$(BUILDDIR)/timer-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
-	$(BUILDDIR)/rose-containers-bounded_doubly_linked_lists.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces-cap-server.o \
 	$(BUILDDIR)/rose-interfaces-timeout-server.o \
