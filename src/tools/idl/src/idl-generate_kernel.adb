@@ -376,7 +376,9 @@ package body IDL.Generate_Kernel is
                            Syn.Literal (Recv_Words))));
                end loop;
             end if;
-         elsif Is_Interface (Base_Type) then
+         elsif Is_Interface (Base_Type)
+           or else Is_Capability (Base_Type)
+         then
             Block.Add_Declaration
               (Syn.Declarations.New_Constant_Declaration
                  (Base_Name,
