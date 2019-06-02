@@ -158,7 +158,9 @@ package body Rose.Kernel.Processes.Queue is
             Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
             Rose.Boot.Console.Put (": resuming with no reply");
             Rose.Boot.Console.New_Line;
-            Debug.Report_Process (Current_Process_Id);
+            if Log_Details then
+               Debug.Report_Process (Current_Process_Id);
+            end if;
          end if;
       end if;
 

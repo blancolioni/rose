@@ -124,6 +124,11 @@ package body Rose.Kernel.Capabilities.Processes is
             Rose.Kernel.Processes.Start_Process
               (Pid, Params.Data (0));
 
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply => True, others => False);
+            Rose.Invocation.Send_Object_Id
+              (Params.all, Cap.Payload);
+
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);

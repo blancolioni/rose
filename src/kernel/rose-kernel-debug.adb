@@ -39,7 +39,7 @@ package body Rose.Kernel.Debug is
         (Rose.Kernel.Processes.Current_Process_Id);
       Put (": ");
       Put (Name & ":");
-      Put (Word_8 (Params.Cap));
+      Put (Natural (Params.Cap));
       Put (" ");
       Put_Cap_Type (Layout.Header.Cap_Type);
       Put (": ep=");
@@ -86,7 +86,7 @@ package body Rose.Kernel.Debug is
             if I > 0 then
                Put (" ");
             end if;
-            Put (Word_8 (Params.Caps (I)));
+            Put (Natural (Params.Caps (I)));
          end loop;
          Put (">");
       end if;
@@ -108,7 +108,7 @@ package body Rose.Kernel.Debug is
 
       if Params.Control.Flags (Recv_Words) then
          Put (" R ");
-         Put (Word_8 (Params.Control.Last_Recv_Word));
+         Put (Natural (Params.Control.Last_Recv_Word));
       end if;
 
       New_Line;

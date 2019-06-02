@@ -1,0 +1,8 @@
+interface Timer is
+
+   function Set_Timer
+     (Milliseconds : Word;
+      Cap          : Capability)
+     return interface Cap;
+       
+end Timer;

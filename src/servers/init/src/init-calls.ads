@@ -16,6 +16,12 @@ package Init.Calls is
       return Rose.Capabilities.Capability;
 
    function Call
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability;
+      Data     : Array_Of_Words)
+      return Rose.Capabilities.Capability;
+
+   function Call
      (Cap    : Rose.Capabilities.Capability;
       Data   : Rose.Words.Word)
       return Rose.Capabilities.Capability
@@ -32,6 +38,14 @@ package Init.Calls is
 
    procedure Send
      (Cap    : Rose.Capabilities.Capability);
+
+   procedure Receive
+     (Cap : Rose.Capabilities.Capability);
+
+   procedure Send_Cap
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability;
+      Data     : Array_Of_Words);
 
    procedure Send_String
      (Cap     : Rose.Capabilities.Capability;

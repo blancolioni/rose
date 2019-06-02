@@ -3,11 +3,15 @@ with Rose.Words;
 
 with Rose.Devices.Partitions;
 
+with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Storage;
+with Rose.Interfaces.Timer;
+with Rose.Interfaces.Timeout;
 
 with Rose.Interfaces.Partitions.Client;
 
+with Rose.Interfaces.Exec;
 with Rose.Interfaces.Executable;
 with Rose.Interfaces.Installer;
 with Rose.Interfaces.Memory;
@@ -37,6 +41,7 @@ package body Init.Run is
    Scan_Module      : constant := 9;
    Partition_Module : constant := 10;
    Elf_Module       : constant := 11;
+   Timer_Module     : constant := 12;
 
    --------------
    -- Run_Init --
@@ -84,6 +89,7 @@ package body Init.Run is
                                Init.Calls.Call
                                  (Create_Cap, (7, 1, 0, 0));
       Mem_Cap              : Rose.Capabilities.Capability;
+      Timer_Cap            : Rose.Capabilities.Capability;
       PCI_Cap              : Rose.Capabilities.Capability;
 
       Hd0_Cap              : Rose.Capabilities.Capability;
@@ -244,7 +250,8 @@ package body Init.Run is
             Interface_Cap : constant Rose.Capabilities.Capability :=
                               Copy_Cap_From_Process
                                 (Copy_Id_Cap,
-                                 Rose.Interfaces.Get_Interface_Endpoint);
+                                 Rose.Interfaces.Block_Device
+                                 .Block_Device_Interface);
          begin
             if Is_Active_Swap then
                Active_Swap_Cap := Interface_Cap;
@@ -290,6 +297,71 @@ package body Init.Run is
          Mem_Cap :=
            Copy_Cap_From_Process
              (Copy_Mem_Cap, Rose.Interfaces.Memory.Memory_Interface);
+      end;
+
+      declare
+         Set_Timeout_Cap : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Call
+                               (Create_Cap,
+                                (7, 6, 0, 0));
+         Get_Ticks_Cap   : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Call
+                               (Create_Cap,
+                                (7, 7, 0, 0));
+         Timer_Id       : constant Rose.Objects.Object_Id :=
+                            Init.Calls.Launch_Boot_Module
+                              (Boot_Cap, Timer_Module, Device_Driver_Priority,
+                               (Create_Endpoint_Cap, Console_Write_Cap,
+                                Set_Timeout_Cap, Get_Ticks_Cap));
+         Copy_Timeout_Cap : constant Rose.Capabilities.Capability :=
+                              Init.Calls.Call
+                                (Create_Cap,
+                                 (9, 1,
+                                  Word (Timer_Id mod 2 ** 32),
+                                  Word (Timer_Id / 2 ** 32)));
+         Timer_Caps       : Init.Calls.Array_Of_Capabilities (1 .. 2);
+         Receive_Timeout  : Rose.Capabilities.Capability;
+         Send_Timeout     : Rose.Capabilities.Capability;
+         Control_Cap      : Rose.Capabilities.Capability with Unreferenced;
+
+         Waiting_For_Timeout_Message : constant String :=
+                                         "checking timeout server ..."
+                                         & NL;
+         Received_Timeout_Message    : constant String :=
+                                         "received timeout message"
+                                         & NL;
+      begin
+         Timer_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Timeout_Cap, Rose.Interfaces.Timer.Set_Timer_Endpoint);
+
+         Init.Calls.Call
+           (Cap         => Create_Endpoint_Cap,
+            Data        =>
+              (Rose.Words.Word_32
+                   (Rose.Interfaces.Timeout.On_Timeout_Endpoint mod 2 ** 32),
+               Rose.Words.Word_32
+                 (Rose.Interfaces.Timeout.On_Timeout_Endpoint / 2 ** 32)),
+            Result_Caps => Timer_Caps);
+
+         Receive_Timeout := Timer_Caps (1);
+         Send_Timeout := Timer_Caps (2);
+
+         Init.Calls.Send_String
+           (Console_Write_Cap, Waiting_For_Timeout_Message);
+
+         for I in 1 .. 3 loop
+            Control_Cap :=
+              Init.Calls.Call
+                (Timer_Cap, Send_Timeout,
+                 (1 => Rose.Words.Word (I * 1000)));
+         end loop;
+
+         for I in 1 .. 3 loop
+            Init.Calls.Receive (Receive_Timeout);
+            Init.Calls.Send_String
+              (Console_Write_Cap, Received_Timeout_Message);
+         end loop;
       end;
 
       declare
@@ -370,6 +442,10 @@ package body Init.Run is
                                        16#0001_0001#,
                                        16#0000_01F0#,
                                        16#0000_01F7#));
+         Reserve_IRQ           : constant Rose.Capabilities.Capability :=
+                                   Init.Calls.Call
+                                     (Create_Cap,
+                                      (6, 1, 46, 0));
          Ata_Id               : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,
@@ -377,11 +453,13 @@ package body Init.Run is
                                       (Create_Endpoint_Cap,
                                        Console_Write_Cap,
                                        PCI_Cap,
+                                       Reserve_IRQ,
                                        Command_0_Cap,
                                        Control_0_Cap,
                                        Data_0_Cap_8,
                                        Data_0_Cap_Read_16,
-                                       Data_0_Cap_Write_16));
+                                       Data_0_Cap_Write_16,
+                                       Timer_Cap));
          Copy_Ata_Cap          : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Call
                                     (Create_Cap,
@@ -550,6 +628,10 @@ package body Init.Run is
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
          Reply  : aliased Rose.Invocation.Invocation_Record;
+         Exec   : Rose.Objects.Object_Id :=
+                    Rose.Objects.Null_Object_Id;
+         Install_Cap : Rose.Capabilities.Capability :=
+                         Rose.Capabilities.Null_Capability;
          First  : Boolean := True;
       begin
          loop
@@ -561,26 +643,41 @@ package body Init.Run is
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
             if First then
-               Init.Installer.Install_Exec_Library
-                 (Create_Cap      => Create_Cap,
-                  Storage_Cap     => Storage_Cap,
-                  Reserve_Cap     => Reserve_Storage_Cap,
-                  Launch_Cap      => Launch_Elf_Cap,
-                  Cap_Stream      => Params.Caps (0),
-                  Standard_Output => Console_Write_Cap,
-                  Binary_Stream   => Params.Caps (1),
-                  Binary_Length   => Params.Data (0));
+               Exec :=
+                 Init.Installer.Install_Exec_Library
+                   (Create_Cap      => Create_Cap,
+                    Storage_Cap     => Storage_Cap,
+                    Reserve_Cap     => Reserve_Storage_Cap,
+                    Launch_Cap      => Launch_Elf_Cap,
+                    Cap_Stream      => Params.Caps (0),
+                    Standard_Output => Console_Write_Cap,
+                    Binary_Stream   => Params.Caps (1),
+                    Binary_Length   => Params.Data (0));
+               declare
+                  Copy_Exec_Cap : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap,
+                                       (9, 1,
+                                        Word (Exec mod 2 ** 32),
+                                        Word (Exec / 2 ** 32)));
+               begin
+                  Install_Cap :=
+                    Copy_Cap_From_Process
+                      (Copy_Exec_Cap,
+                       Rose.Interfaces.Exec.Install_Endpoint);
+               end;
                First := False;
             else
                declare
-                  Launch_Cap : constant Rose.Capabilities.Capability :=
-                                 Init.Installer.Install_Executable
-                                   (Create_Cap    => Create_Cap,
-                                    Cap_Stream    => Params.Caps (0),
-                                    Binary_Stream => Params.Caps (1),
-                                    Binary_Length => Params.Data (0));
+                  Launch : constant Rose.Capabilities.Capability :=
+                             Init.Installer.Install_Executable
+                               (Create_Cap    => Create_Cap,
+                                Install_Cap   => Install_Cap,
+                                Cap_Stream    => Params.Caps (0),
+                                Binary_Stream => Params.Caps (1),
+                                Binary_Length => Params.Data (0));
                begin
-                  Rose.System_Calls.Send_Cap (Reply, Launch_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Launch);
                end;
             end if;
 

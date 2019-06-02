@@ -24,6 +24,9 @@ package body ATA.Server is
 
    Device_Cap  : Rose.Capabilities.Capability;
 
+   Master_Endpoint : constant := 16#A3AD_150D#;
+   Slave_Endpoint  : constant := 16#5C52_EAF3#;
+
    type Vendor_Device_Record is
       record
          Vendor : Rose.Words.Word_32;
@@ -194,9 +197,16 @@ package body ATA.Server is
       Receive_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Receive_Cap
                         (Create_Endpoint_Cap);
+      Interrupt_Cap : constant Rose.Capabilities.Capability :=
+                        Rose.System_Calls.Server.Create_Endpoint
+                          (Create_Endpoint_Cap, Master_Endpoint);
       Params      : aliased Rose.Invocation.Invocation_Record;
       Reply       : aliased Rose.Invocation.Invocation_Record;
    begin
+
+      Rose.System_Calls.Initialize_Send (Params, Reserve_IRQ_Cap);
+      Rose.System_Calls.Send_Cap (Params, Interrupt_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
@@ -232,6 +242,10 @@ package body ATA.Server is
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
+            when Master_Endpoint =>
+               Rose.Console_IO.Put_Line ("interrupt on master");
+            when Slave_Endpoint =>
+               Rose.Console_IO.Put_Line ("interrupt on slave");
             when Rose.Interfaces.Get_Interface_Endpoint =>
                declare
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
@@ -296,7 +310,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: read failed: giving up");
@@ -339,7 +353,7 @@ package body ATA.Server is
                      elsif I = 2 then
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: resetting");
-                        ATA.Commands.Reset (Drive);
+                        ATA.Drives.Reset (Drive);
                      else
                         Rose.Console_IO.Put_Line
                           ("ata: write failed: giving up");
