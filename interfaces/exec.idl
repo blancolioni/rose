@@ -1,5 +1,8 @@
 interface Exec : Launch is
 
-   function Install (Executable : interface Stream_Reader) return interface Launch;
+   function Install 
+     (Executable : interface Stream_Reader;
+      Install_Caps : Capability_Array)
+     return interface Launch;
       
 end Exec;
