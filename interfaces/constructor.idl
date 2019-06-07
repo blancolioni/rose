@@ -1,0 +1,5 @@
+interface Constructor is
+
+   function Create return Capability;
+
+end Constructor;
