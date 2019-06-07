@@ -9,8 +9,12 @@ with ATA.Drives;
 package ATA.Commands is
 
    type ATA_Command_Type is new Rose.Words.Word_8;
-   ATA_Read_Sectors   : constant ATA_Command_Type := 16#20#;
-   ATA_Write_Sectors  : constant ATA_Command_Type := 16#30#;
+   ATA_Read_Sector    : constant ATA_Command_Type := 16#20#;
+   ATA_Write_Sector   : constant ATA_Command_Type := 16#30#;
+   ATA_Read_Multiple  : constant ATA_Command_Type := 16#C4#;
+   ATA_Write_Multiple : constant ATA_Command_Type := 16#C5#;
+   ATA_Set_Multiple   : constant ATA_Command_Type := 16#C6#;
+
    ATA_Flush          : constant ATA_Command_Type := 16#37#;
 
    ATA_Identify       : constant ATA_Command_Type := 16#EC#;
@@ -40,6 +44,10 @@ package ATA.Commands is
      (Drive     : ATA.Drives.ATA_Drive;
       Mask      : ATA.Drives.ATA_Status;
       Value     : ATA.Drives.ATA_Status)
+      return Boolean;
+
+   function Check_Drive_OK
+     (Drive     : ATA.Drives.ATA_Drive)
       return Boolean;
 
    procedure Read_Sectors

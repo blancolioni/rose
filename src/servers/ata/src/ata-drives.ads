@@ -8,6 +8,7 @@ package ATA.Drives is
 
    type ATA_Status is new Rose.Words.Word_8;
 
+   Status_Error      : constant ATA_Status := 16#01#;
    Status_DRQ        : constant ATA_Status := 16#08#;
    Status_Busy       : constant ATA_Status := 16#80#;
 
