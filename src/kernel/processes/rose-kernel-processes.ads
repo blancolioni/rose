@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Addresses;
 with Rose.Capabilities.Layout;
 with Rose.Invocation;
@@ -270,6 +272,13 @@ package Rose.Kernel.Processes is
      (Pid          : Process_Id;
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
+
+   procedure Iterate_Mapped_Pages
+     (Pid     : Process_Id;
+      Process : not null access
+        procedure (Virtual  : Rose.Addresses.Virtual_Page_Address;
+                   Physical : Rose.Addresses.Physical_Page_Address;
+                   Page     : System.Storage_Elements.Storage_Array));
 
    function Directory_Page
      (Pid : Process_Id)

@@ -1,7 +1,11 @@
+with System.Storage_Elements;
+
 with Rose.Boot.Console;
 
 with Rose.Kernel.Processes;
 with Rose.Kernel.Capabilities.Meta;
+
+with Rose.Words;
 
 package body Rose.Kernel.Capabilities.Processes is
 
@@ -106,6 +110,36 @@ package body Rose.Kernel.Capabilities.Processes is
                Rose.Kernel.Processes.Ready);
 
          when Faulted_Process_Endpoint =>
+
+            declare
+               procedure Dump_Page
+                 (Virtual  : Rose.Addresses.Virtual_Page_Address;
+                  Physical : Rose.Addresses.Physical_Page_Address;
+                  Page     : System.Storage_Elements.Storage_Array);
+
+               ---------------
+               -- Dump_Page --
+               ---------------
+
+               procedure Dump_Page
+                 (Virtual  : Rose.Addresses.Virtual_Page_Address;
+                  Physical : Rose.Addresses.Physical_Page_Address;
+                  Page     : System.Storage_Elements.Storage_Array)
+               is
+                  use Rose.Words;
+               begin
+                  Rose.Boot.Console.Put ("virtual: ");
+                  Rose.Boot.Console.Put (Rose.Words.Word_32 (Virtual) * 4096);
+                  Rose.Boot.Console.Put (" physical: ");
+                  Rose.Boot.Console.Put (Rose.Words.Word_32 (Physical) * 4096);
+                  Rose.Boot.Console.New_Line;
+                  Rose.Boot.Console.Put (Page);
+               end Dump_Page;
+
+            begin
+               Rose.Kernel.Processes.Iterate_Mapped_Pages
+                 (Pid, Dump_Page'Access);
+            end;
 
             Rose.Kernel.Processes.Set_Current_State
               (Pid, Rose.Kernel.Processes.Faulted);

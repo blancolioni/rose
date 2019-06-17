@@ -1,5 +1,3 @@
-with System.Storage_Elements;
-
 with Rose.Boot.Console;
 
 with Rose.Arch.Interrupts;
@@ -42,6 +40,9 @@ package body Rose.Kernel.Processes is
 
    procedure Create_Process_Table_Entry
      (Pid : Rose.Kernel.Processes.Process_Id);
+
+   Mapped_Page : System.Storage_Elements.Storage_Array (1 .. 4096)
+     with Alignment => 4096, Unreferenced;
 
    ----------------
    -- Cap_Layout --
@@ -716,6 +717,23 @@ package body Rose.Kernel.Processes is
       end if;
       return False;
    end Is_Valid_Entry;
+
+   --------------------------
+   -- Iterate_Mapped_Pages --
+   --------------------------
+
+   procedure Iterate_Mapped_Pages
+     (Pid     : Process_Id;
+      Process : not null access
+        procedure (Virtual  : Rose.Addresses.Virtual_Page_Address;
+                   Physical : Rose.Addresses.Physical_Page_Address;
+                   Page     : System.Storage_Elements.Storage_Array))
+   is
+      pragma Unreferenced (Process);
+   begin
+      Rose.Kernel.Page_Table.Report_Mapped_Pages
+        (Directory_Page => Directory_Page (Pid));
+   end Iterate_Mapped_Pages;
 
    --------------
    -- Load_Cap --
