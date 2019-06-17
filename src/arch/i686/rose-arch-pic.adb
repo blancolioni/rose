@@ -11,7 +11,7 @@ package body Rose.Arch.PIC is
       Port     : constant Word_16 :=
                    (if IRQ < 8 then PIC_1_Data else PIC_2_Data);
       Value    : constant Word_8 :=
-                   Inb (Port) or not (2 ** Natural (IRQ_Line));
+                   Inb (Port) and not (2 ** Natural (IRQ_Line));
    begin
       Outb (Port, Value);
    end Enable_IRQ;
