@@ -1168,6 +1168,19 @@ package body Rose.Kernel.Processes is
 
    end Send_Cap;
 
+   -------------------------
+   -- Send_Queued_Message --
+   -------------------------
+
+   procedure Send_Queued_Message
+     (Process : Process_Id)
+   is
+      To   : Kernel_Process_Entry renames Process_Table (Process);
+   begin
+      To.Flags (Message_Queued) := False;
+      Send_Cap (1, Process, 0, To.Queued_Params.Cap, To.Queued_Params);
+   end Send_Queued_Message;
+
    ----------------
    -- Send_Reply --
    ----------------
@@ -1250,11 +1263,30 @@ package body Rose.Kernel.Processes is
       if Endpoint in To.Endpoints'Range
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
-         Send_Cap (From_Process_Id, To_Process_Id,
-                   Sender_Cap, Sender_Cap,
-                   (Params with delta
-                      Endpoint => To.Endpoints (Endpoint).Endpoint,
-                      Identifier => Identifier));
+         --        Available, Starting, Ready,
+         --          Running, Blocked, Interrupted, Faulted, Killed
+
+         declare
+            Send_Params : constant Rose.Invocation.Invocation_Record :=
+                            (Params with delta
+                               Endpoint   => To.Endpoints (Endpoint).Endpoint,
+                               Identifier => Identifier);
+         begin
+            case Current_State (To_Process_Id) is
+               when Blocked =>
+                  Send_Cap (From_Process_Id, To_Process_Id,
+                            Sender_Cap, Sender_Cap, Send_Params);
+               when Available | Faulted | Killed =>
+                  Debug.Put (From_Process_Id);
+                  Rose.Boot.Console.Put ("->");
+                  Debug.Put (To_Process_Id);
+                  Rose.Boot.Console.Put (": to cannot accept messages");
+                  Rose.Boot.Console.New_Line;
+               when Starting | Ready | Running | Interrupted =>
+                  To.Queued_Params := Send_Params;
+                  To.Flags (Message_Queued) := True;
+            end case;
+         end;
          return;
       else
          Rose.Boot.Console.Put ("bad endpoint: ");
