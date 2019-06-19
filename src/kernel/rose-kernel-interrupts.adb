@@ -2,7 +2,7 @@ with Rose.Capabilities.Layout;
 with Rose.Invocation;
 
 with Rose.Boot.Console;
-with Rose.Kernel.Processes.Debug;
+with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Interrupts is
 
