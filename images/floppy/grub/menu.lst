@@ -17,6 +17,7 @@ title Rose boot
     module /partition
     module /elf
     module /timer
+    module /caps
     boot
 
 title Rose process log
@@ -34,6 +35,7 @@ title Rose process log
     module /partition
     module /elf
     module /timer
+    module /caps
     boot
 
 title Rose invocation debug
@@ -51,6 +53,7 @@ title Rose invocation debug
     module /partition
     module /elf
     module /timer
+    module /caps
     boot
 
 title Rose port debug
@@ -68,5 +71,6 @@ title Rose port debug
     module /partition
     module /elf
     module /timer
+    module /caps
     boot
 
