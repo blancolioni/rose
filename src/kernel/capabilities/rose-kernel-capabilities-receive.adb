@@ -18,6 +18,8 @@ package body Rose.Kernel.Capabilities.Receive is
 
       if Rose.Kernel.Processes.Has_Queued_Message (Receiver_Id) then
          Rose.Kernel.Processes.Send_Queued_Message (Receiver_Id);
+         Rose.Kernel.Processes.Get_Current_Invocation
+           (Receiver_Id, Params.all);
       else
          declare
             Next_Sender : constant Rose.Kernel.Processes.Process_Id :=
