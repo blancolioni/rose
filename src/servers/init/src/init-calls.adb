@@ -77,6 +77,36 @@ package body Init.Calls is
       end if;
    end Call;
 
+   ----------
+   -- Call --
+   ----------
+
+   function Call
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability;
+      Data     : Array_Of_Words)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.System_Calls;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Initialize_Send (Params, Cap);
+      for W of Data loop
+         Rose.System_Calls.Send_Word (Params, W);
+      end loop;
+      Params.Control.Flags (Rose.Invocation.Send_Caps) := True;
+      Params.Control.Flags (Rose.Invocation.Recv_Caps) := True;
+      Params.Control.Last_Recv_Cap := 0;
+      Params.Control.Last_Sent_Cap := 0;
+      Params.Caps (Params.Caps'First) := Sent_Cap;
+      Rose.System_Calls.Invoke_Capability (Params);
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return 0;
+      else
+         return Params.Caps (Params.Caps'First);
+      end if;
+   end Call;
+
    -------------------
    -- Get_Interface --
    -------------------
@@ -199,6 +229,24 @@ package body Init.Calls is
 
    end Launch_Boot_Module;
 
+   -------------
+   -- Receive --
+   -------------
+
+   procedure Receive
+     (Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Receive (Params, Cap);
+      Rose.System_Calls.Receive_Words
+        (Params, Natural (Rose.Invocation.Parameter_Word_Index'Last) + 1);
+      Rose.System_Calls.Receive_Caps
+        (Params, Natural (Rose.Invocation.Capability_Index'Last) + 1);
+      Params.Control.Flags (Rose.Invocation.Recv_Buffer) := True;
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Receive;
+
    ----------
    -- Send --
    ----------
@@ -237,6 +285,37 @@ package body Init.Calls is
    begin
       Send (Cap, Data);
    end Send;
+
+   --------------
+   -- Send_Cap --
+   --------------
+
+   procedure Send_Cap
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability;
+      Data     : Array_Of_Words)
+   is
+      use Rose.Invocation;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Params.Cap := Cap;
+      Params.Control.Flags := (Send       => True,
+                               Send_Words => Data'Length > 0,
+                               Send_Caps  => True,
+                               Block      => False,
+                               others     => False);
+      Params.Control.Last_Sent_Word := 0;
+      for Value of Data loop
+         Params.Data (Params.Control.Last_Sent_Word) := Value;
+         Params.Control.Last_Sent_Word :=
+           Params.Control.Last_Sent_Word + 1;
+      end loop;
+      Params.Control.Last_Sent_Word :=
+        Params.Control.Last_Sent_Word - 1;
+      Params.Control.Last_Sent_Cap := 0;
+      Params.Caps (Params.Caps'First) := Sent_Cap;
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Send_Cap;
 
    -----------------
    -- Send_String --

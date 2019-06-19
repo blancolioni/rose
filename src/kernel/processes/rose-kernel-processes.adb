@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Boot.Console;
 
 with Rose.Arch.Interrupts;
@@ -9,11 +11,13 @@ with Rose.Kernel.Processes;
 with Rose.Kernel.Heap;
 
 with Rose.Kernel.Panic;
+with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Processes is
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
+   Log_Cap_Cache      : constant Boolean := False;
 
    First_Persistent_Pid : constant Process_Id := 0;
 
@@ -408,6 +412,18 @@ package body Rose.Kernel.Processes is
       Layout := P.Cached_Caps (Load_Cap (Pid, Cap)).Layout;
    end Get_Cap;
 
+   ----------------------------
+   -- Get_Current_Invocation --
+   ----------------------------
+
+   procedure Get_Current_Invocation
+     (Pid        : Process_Id;
+      Invocation : out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      Invocation := Process_Table (Pid).Current_Params;
+   end Get_Current_Invocation;
+
    ----------------------
    -- Get_Process_Name --
    ----------------------
@@ -485,6 +501,18 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
          Debug.Report_Process (Current_Process_Id);
+         if Rose.Words.Word (Virtual_Address)
+           /= Current_Process.Stack.EIP
+         then
+            declare
+               Code : System.Storage_Elements.Storage_Array (1 .. 16);
+               pragma Import (Ada, Code);
+               for Code'Address use
+                 System'To_Address (Current_Process.Stack.EIP);
+            begin
+               Rose.Boot.Console.Put (Code);
+            end;
+         end if;
       end if;
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
@@ -754,7 +782,7 @@ package body Rose.Kernel.Processes is
                   Page_Index : constant Capability_Page_Index :=
                                  Get_Cap_Page_Index (Cache.Cap);
                begin
-                  if P.Flags (Trace) then
+                  if Log_Cap_Cache and then P.Flags (Trace) then
                      Debug.Put (Pid);
                      Rose.Boot.Console.Put (": dropping cap: ");
                      Rose.Boot.Console.Put (Natural (Cache.Cap));
@@ -786,7 +814,7 @@ package body Rose.Kernel.Processes is
                P.Is_Cached (Cached.Cap) := False;
             end if;
 
-            if P.Flags (Trace) then
+            if Log_Cap_Cache and then P.Flags (Trace) then
                Debug.Put (Pid);
                Rose.Boot.Console.Put (": loading cap: ");
                Rose.Boot.Console.Put (Natural (Cap));
@@ -1149,9 +1177,49 @@ package body Rose.Kernel.Processes is
 
       end if;
 
+      if Trace (To_Process_Id) then
+         Debug.Put (To_Process_Id);
+         Rose.Boot.Console.Put (": sending message");
+         Rose.Boot.Console.Put (": cap=");
+         Rose.Boot.Console.Put (Natural (To.Current_Params.Cap));
+         Rose.Boot.Console.New_Line;
+         Rose.Invocation.Trace.Put (To.Current_Params, True);
+      end if;
+
       Set_Current_State (To_Process_Id, Ready);
 
    end Send_Cap;
+
+   -------------------------
+   -- Send_Queued_Message --
+   -------------------------
+
+   procedure Send_Queued_Message
+     (Process : Process_Id)
+   is
+      To   : Kernel_Process_Entry renames Process_Table (Process);
+   begin
+      Debug.Put (Process);
+      Rose.Boot.Console.Put (": sending queued message");
+      Rose.Boot.Console.Put (": cap=");
+      Rose.Boot.Console.Put (Natural (To.Queued_Params.Cap));
+      Rose.Boot.Console.Put ("; ep=");
+      Rose.Boot.Console.Put (Rose.Words.Word_32 (To.Queued_Endpoint));
+      Rose.Boot.Console.Put ("; id=");
+      Rose.Boot.Console.Put (Natural (To.Queued_Cap_Id));
+      Rose.Boot.Console.New_Line;
+      Rose.Invocation.Trace.Put (To.Queued_Params, True);
+
+      To.Flags (Message_Queued) := False;
+      Send_To_Endpoint
+        (From_Process_Id => 1,
+         To_Process_Id   => Process,
+         Sender_Cap      => To.Queued_Params.Cap,
+         Endpoint        => To.Queued_Endpoint,
+         Identifier      => To.Queued_Cap_Id,
+         Params          => To.Queued_Params);
+
+   end Send_Queued_Message;
 
    ----------------
    -- Send_Reply --
@@ -1235,11 +1303,29 @@ package body Rose.Kernel.Processes is
       if Endpoint in To.Endpoints'Range
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
-         Send_Cap (From_Process_Id, To_Process_Id,
-                   Sender_Cap, Sender_Cap,
-                   (Params with delta
-                      Endpoint => To.Endpoints (Endpoint).Endpoint,
-                      Identifier => Identifier));
+         declare
+            Send_Params : constant Rose.Invocation.Invocation_Record :=
+                            (Params with delta
+                               Endpoint   => To.Endpoints (Endpoint).Endpoint,
+                               Identifier => Identifier);
+         begin
+            case Current_State (To_Process_Id) is
+               when Blocked =>
+                  Send_Cap (From_Process_Id, To_Process_Id,
+                            Sender_Cap, Sender_Cap, Send_Params);
+               when Available | Faulted | Killed =>
+                  Debug.Put (From_Process_Id);
+                  Rose.Boot.Console.Put ("->");
+                  Debug.Put (To_Process_Id);
+                  Rose.Boot.Console.Put (": to cannot accept messages");
+                  Rose.Boot.Console.New_Line;
+               when Starting | Ready | Running | Interrupted =>
+                  To.Queued_Params := Send_Params;
+                  To.Queued_Endpoint := Endpoint;
+                  To.Queued_Cap_Id := Identifier;
+                  To.Flags (Message_Queued) := True;
+            end case;
+         end;
          return;
       else
          Rose.Boot.Console.Put ("bad endpoint: ");
@@ -1412,8 +1498,7 @@ package body Rose.Kernel.Processes is
    begin
 
       if Log_Shared_Buffers then
-         Rose.Boot.Console.Put ("pid ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (From_Process));
+         Debug.Put (From_Process);
          Rose.Boot.Console.Put (": share page with ");
          Debug.Put (To_Process);
          Rose.Boot.Console.New_Line;
@@ -1468,6 +1553,24 @@ package body Rose.Kernel.Processes is
       Set_Current_State (Process, Ready);
       Rose.Kernel.Processes.Queue.Queue_Process (Process);
    end Start_Process;
+
+   -----------------
+   -- Start_Trace --
+   -----------------
+
+   procedure Start_Trace (Process : Process_Id) is
+   begin
+      Process_Table (Process).Flags (Trace) := True;
+   end Start_Trace;
+
+   ----------------
+   -- Stop_Trace --
+   ----------------
+
+   procedure Stop_Trace (Process : Process_Id) is
+   begin
+      Process_Table (Process).Flags (Trace) := False;
+   end Stop_Trace;
 
    -------------------
    -- To_Process_Id --

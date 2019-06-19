@@ -1,16 +1,32 @@
---  with Rose.Invocation;
-with Rose.Words;                       use Rose.Words;
+with Rose.Invocation;
 
 with Rose.Boot.Console;
 with Rose.Kernel.Heap;
 with Rose.Kernel.Processes.Queue;
 
+with Rose.Capabilities.Layout;
+
 package body Rose.Kernel.Clock is
 
-   Ticks : Word_32 := 0;
+   use Rose.Words;
+
+   Ticks : Word := 0;
+
+   Remaining_Ticks : Word := 0;
+   Timeout_Object  : Rose.Objects.Object_Id;
+   Timeout_Cap     : Rose.Capabilities.Capability;
 
    Current_Allocated_Memory : Physical_Bytes := 0;
    Current_Available_Memory : Physical_Bytes := 0;
+
+   -------------------
+   -- Current_Ticks --
+   -------------------
+
+   function Current_Ticks return Rose.Words.Word is
+   begin
+      return Ticks;
+   end Current_Ticks;
 
    -----------------------
    -- Handle_Clock_Tick --
@@ -45,6 +61,40 @@ package body Rose.Kernel.Clock is
          end;
       end if;
 
+      if Remaining_Ticks > 0 then
+         Remaining_Ticks := Remaining_Ticks - 1;
+         if Remaining_Ticks = 0 then
+            declare
+               use Rose.Invocation;
+               Pid    : constant Rose.Kernel.Processes.Process_Id :=
+                          Rose.Kernel.Processes.To_Process_Id
+                            (Timeout_Object);
+               Params : constant Rose.Invocation.Invocation_Record :=
+                          Invocation_Record'
+                            (Control        => Control_Word'
+                               (Flags          =>
+                                  (Send => True,
+                                   others => False),
+                                Last_Sent_Word => 0,
+                                others         => <>),
+                             Cap            => Timeout_Cap,
+                             others         => <>);
+               Layout : Rose.Capabilities.Layout.Capability_Layout;
+            begin
+
+               Rose.Kernel.Processes.Get_Cap (Pid, Timeout_Cap, Layout);
+
+               Rose.Kernel.Processes.Send_To_Endpoint
+                 (From_Process_Id => Rose.Kernel.Processes.To_Process_Id (1),
+                  To_Process_Id   => Pid,
+                  Sender_Cap      => Params.Cap,
+                  Endpoint        => Layout.Header.Endpoint,
+                  Identifier      => Layout.Header.Identifier,
+                  Params          => Params);
+            end;
+         end if;
+      end if;
+
       if Rose.Kernel.Processes.Use_Tick then
          Rose.Kernel.Processes.Set_Current_State
            (Current_Pid, Rose.Kernel.Processes.Ready);
@@ -52,31 +102,23 @@ package body Rose.Kernel.Clock is
          return Rose.Kernel.Interrupts.Not_Finished;
       end if;
 
---      if Ticks mod 10 = 0 then
---           declare
---              use System.Machine_Code;
---              use Rose.Invocation;
---
---              Params : aliased Invocation_Record :=
---                         Invocation_Record'
---                           (Control   =>
---                              (Endpoint => 1,
---                               Flags    => (Send => True, others => False),
---                               others   => <>),
---                            Cap       => 1,
---                            Reply_Cap => 0,
---                            Data      => (others => 0));
---           begin
---              Asm ("movl %0, %%eax",
---                   Inputs   =>
---                     System.Address'Asm_Input
---                       ("g", Params'Address),
---                   Volatile => True);
---              Asm ("int $0x30", Volatile => True);
---           end;
---      end if;
       return Rose.Kernel.Interrupts.Finished;
    end Handle_Clock_Tick;
+
+   -----------------
+   -- Set_Timeout --
+   -----------------
+
+   procedure Set_Timeout
+     (Timeout : Rose.Words.Word;
+      Object  : Rose.Objects.Object_Id;
+      Cap     : Rose.Capabilities.Capability)
+   is
+   begin
+      Remaining_Ticks := Timeout;
+      Timeout_Object  := Object;
+      Timeout_Cap     := Cap;
+   end Set_Timeout;
 
    ----------------
    -- Update_Mem --

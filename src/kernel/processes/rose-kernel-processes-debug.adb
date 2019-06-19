@@ -21,6 +21,19 @@ package body Rose.Kernel.Processes.Debug is
          end if;
          Rose.Boot.Console.Put (Ch);
       end loop;
+      Rose.Boot.Console.Put ("[");
+      Rose.Boot.Console.Put
+        (case Process_Table (Pid).State is
+            when Available   => "A",
+            when Starting    => "S",
+            when Ready       => "R",
+            when Running     => "X",
+            when Blocked     => "B",
+            when Interrupted => "I",
+            when Faulted     => "F",
+            when Killed      => "K");
+
+      Rose.Boot.Console.Put ("]");
    end Put;
 
    --------------------
