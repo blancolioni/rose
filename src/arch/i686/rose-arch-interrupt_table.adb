@@ -105,6 +105,30 @@ package body Rose.Arch.Interrupt_Table is
    procedure IRQ_07;
    pragma Import (C, IRQ_07, "hwint7");
 
+   procedure IRQ_08;
+   pragma Import (C, IRQ_08, "hwint8");
+
+   procedure IRQ_09;
+   pragma Import (C, IRQ_09, "hwint9");
+
+   procedure IRQ_10;
+   pragma Import (C, IRQ_10, "hwint10");
+
+   procedure IRQ_11;
+   pragma Import (C, IRQ_11, "hwint11");
+
+   procedure IRQ_12;
+   pragma Import (C, IRQ_12, "hwint12");
+
+   procedure IRQ_13;
+   pragma Import (C, IRQ_13, "hwint13");
+
+   procedure IRQ_14;
+   pragma Import (C, IRQ_14, "hwint14");
+
+   procedure IRQ_15;
+   pragma Import (C, IRQ_15, "hwint15");
+
    procedure Handle_Processor_Exception
      (Vector : Rose.Arch.Interrupts.Interrupt_Vector;
       Code   : Rose.Words.Word_32);
@@ -156,6 +180,14 @@ package body Rose.Arch.Interrupt_Table is
       Handler (37, IRQ_05'Access);
       Handler (38, IRQ_06'Access);
       Handler (39, IRQ_07'Access);
+      Handler (40, IRQ_08'Access);
+      Handler (41, IRQ_09'Access);
+      Handler (42, IRQ_10'Access);
+      Handler (43, IRQ_11'Access);
+      Handler (44, IRQ_12'Access);
+      Handler (45, IRQ_13'Access);
+      Handler (46, IRQ_14'Access);
+      Handler (47, IRQ_15'Access);
 
    end Create_Boot_Interrupt_Table;
 
