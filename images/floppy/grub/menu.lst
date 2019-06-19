@@ -16,11 +16,13 @@ title Rose boot
     module /scan
     module /partition
     module /elf
+    module /timer
+    module /caps
     boot
 
 title Rose process log
     root (fd0)
-    kernel /kernel trace-object-id=15
+    kernel /kernel trace-object-id=2
     module /init
     module /console
     module /mem
@@ -32,6 +34,8 @@ title Rose process log
     module /scan
     module /partition
     module /elf
+    module /timer
+    module /caps
     boot
 
 title Rose invocation debug
@@ -48,6 +52,8 @@ title Rose invocation debug
     module /scan
     module /partition
     module /elf
+    module /timer
+    module /caps
     boot
 
 title Rose port debug
@@ -64,5 +70,7 @@ title Rose port debug
     module /scan
     module /partition
     module /elf
+    module /timer
+    module /caps
     boot
 

@@ -4,6 +4,7 @@ with Rose.Arch;
 with Rose.Version;
 
 with Rose.Devices.Console;              use Rose.Devices.Console;
+with Rose.Kernel.Clock;
 
 package body Rose.Boot.Console is
 
@@ -31,7 +32,10 @@ package body Rose.Boot.Console is
         (System.Storage_Elements.Integer_Address
            (Console_Start));
 
+   Serial_Start_Of_Line : Boolean := True;
+
    procedure Put_Serial_Port (Ch : Character);
+   procedure Put_Serial_Time_Stamp;
 
    --  Current_Offset: current index into Console_Memory
    function Current_Offset return Natural;
@@ -447,12 +451,40 @@ package body Rose.Boot.Console is
    procedure Put_Serial_Port (Ch : Character) is
       Flag : Word_8;
    begin
+      if Serial_Start_Of_Line then
+         Serial_Start_Of_Line := False;
+         Put_Serial_Time_Stamp;
+      end if;
+
       loop
          Flag := Rose.Arch.Inb (Serial_Port + 5);
          exit when (Flag and 16#20#) /= 0;
       end loop;
       Rose.Arch.Outb (Serial_Port, Character'Pos (Ch));
+
+      Serial_Start_Of_Line := Ch = Character'Val (10);
+
    end Put_Serial_Port;
+
+   ---------------------------
+   -- Put_Serial_Time_Stamp --
+   ---------------------------
+
+   procedure Put_Serial_Time_Stamp is
+      S : String (1 .. 10);
+      X : Word := Rose.Kernel.Clock.Current_Ticks;
+   begin
+      for Ch of reverse S loop
+         Ch := Character'Val (X mod 10 + 48);
+         X := X / 10;
+      end loop;
+      Put_Serial_Port ('[');
+      for Ch of S loop
+         Put_Serial_Port (Ch);
+      end loop;
+      Put_Serial_Port (']');
+      Put_Serial_Port (' ');
+   end Put_Serial_Time_Stamp;
 
    ----------------
    -- Put_String --
