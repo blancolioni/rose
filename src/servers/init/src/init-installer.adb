@@ -49,7 +49,7 @@ package body Init.Installer is
    begin
       loop
          Read (From, Storage, Last);
-         exit when Has_Error or else Last = 0;
+         exit when Has_Error or else Last < 16;
          Rose.System_Calls.Send_Cap
            (To,
             Init.Calls.Call (Create_Cap, Layout));
