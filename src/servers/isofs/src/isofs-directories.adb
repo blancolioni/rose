@@ -659,7 +659,7 @@ package body IsoFS.Directories is
          Buffer (Buffer'First + I - 1) :=
            Sector_Data (Storage_Count (Current_Offset));
          Current_Offset := Current_Offset + 1;
-         if Current_Offset > ISO_Sector_Size then
+         if I < Count and then Current_Offset > ISO_Sector_Size then
             Current_Offset := 1;
             Current_Sector := Current_Sector + 1;
             Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
