@@ -206,6 +206,13 @@ package Rose.Kernel.Processes is
      (Receiver_Id : Process_Id;
       Params      : Rose.Invocation.Invocation_Record);
 
+   function Has_Queued_Message
+     (Process : Process_Id)
+      return Boolean;
+
+   procedure Send_Queued_Message
+     (Process : Process_Id);
+
    function Next_Blocked_Sender
      (Receiver_Id : Process_Id)
       return Process_Id;
@@ -300,8 +307,8 @@ package Rose.Kernel.Processes is
 private
 
    type Process_Flag is
-     (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply, Interrupt_Resume,
-      Trace);
+     (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply,
+      Interrupt_Resume, Message_Queued, Trace);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -437,6 +444,9 @@ private
          Waiting_Endpoint  : Rose.Objects.Endpoint_Index;
          Waiting_Cap_Id    : Rose.Objects.Capability_Identifier;
          Current_Params    : Rose.Invocation.Invocation_Record;
+         Queued_Params     : Rose.Invocation.Invocation_Record;
+         Queued_Endpoint   : Rose.Objects.Endpoint_Index;
+         Queued_Cap_Id     : Rose.Objects.Capability_Identifier;
          Code_Page         : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
@@ -554,6 +564,11 @@ private
      (Pid : Process_Id)
       return Rose.Addresses.Physical_Address
    is (Process_Table (Pid).Directory_Page);
+
+   function Has_Queued_Message
+     (Process : Process_Id)
+      return Boolean
+   is (Process_Table (Process).Flags (Message_Queued));
 
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;

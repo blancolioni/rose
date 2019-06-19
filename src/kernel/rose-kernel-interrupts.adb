@@ -99,7 +99,7 @@ package body Rose.Kernel.Interrupts is
             when Capability_Handler =>
                Send_Interrupt_Cap
                  (It.Handler_Object, It.Handler_Cap, Argument);
-               New_State := Not_Finished;
+               New_State := Finished;
          end case;
          if New_State = Not_Finished then
             State := New_State;
@@ -167,8 +167,7 @@ package body Rose.Kernel.Interrupts is
    is
    begin
       if Interrupt_Table (Interrupt) = null then
-         Interrupt_Table (Interrupt) :=
-           Interrupt_Handler_Table (Interrupt_Handler_Count)'Access;
+         Interrupt_Table (Interrupt) := Handler;
       else
          declare
             It : Interrupt_Handler_Access :=
