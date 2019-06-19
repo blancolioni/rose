@@ -1178,7 +1178,14 @@ package body Rose.Kernel.Processes is
       To   : Kernel_Process_Entry renames Process_Table (Process);
    begin
       To.Flags (Message_Queued) := False;
-      Send_Cap (1, Process, 0, To.Queued_Params.Cap, To.Queued_Params);
+      Send_To_Endpoint
+        (From_Process_Id => 1,
+         To_Process_Id   => Process,
+         Sender_Cap      => 0,
+         Endpoint        => To.Queued_Endpoint,
+         Identifier      => To.Queued_Cap_Id,
+         Params          => To.Queued_Params);
+
    end Send_Queued_Message;
 
    ----------------
@@ -1263,9 +1270,6 @@ package body Rose.Kernel.Processes is
       if Endpoint in To.Endpoints'Range
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
-         --        Available, Starting, Ready,
-         --          Running, Blocked, Interrupted, Faulted, Killed
-
          declare
             Send_Params : constant Rose.Invocation.Invocation_Record :=
                             (Params with delta
@@ -1284,6 +1288,8 @@ package body Rose.Kernel.Processes is
                   Rose.Boot.Console.New_Line;
                when Starting | Ready | Running | Interrupted =>
                   To.Queued_Params := Send_Params;
+                  To.Queued_Endpoint := Endpoint;
+                  To.Queued_Cap_Id := Identifier;
                   To.Flags (Message_Queued) := True;
             end case;
          end;

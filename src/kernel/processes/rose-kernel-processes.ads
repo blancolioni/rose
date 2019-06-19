@@ -445,6 +445,8 @@ private
          Waiting_Cap_Id    : Rose.Objects.Capability_Identifier;
          Current_Params    : Rose.Invocation.Invocation_Record;
          Queued_Params     : Rose.Invocation.Invocation_Record;
+         Queued_Endpoint   : Rose.Objects.Endpoint_Index;
+         Queued_Cap_Id     : Rose.Objects.Capability_Identifier;
          Code_Page         : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
