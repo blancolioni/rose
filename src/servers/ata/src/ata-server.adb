@@ -8,6 +8,8 @@ with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
 
 with Rose.Devices.PCI.Client;
+with Rose.Devices.Port_IO;
+
 with Rose.Console_IO;
 
 with Rose.Devices.Block;
@@ -24,8 +26,8 @@ package body ATA.Server is
 
    Device_Cap  : Rose.Capabilities.Capability;
 
-   Master_Endpoint : constant := 16#A3AD_150D#;
-   Slave_Endpoint  : constant := 16#5C52_EAF3#;
+   Primary_Endpoint   : constant := 16#A3AD_150D#;
+   Secondary_Endpoint : constant := 16#5C52_EAF3#;
 
    type Vendor_Device_Record is
       record
@@ -199,7 +201,7 @@ package body ATA.Server is
                         (Create_Endpoint_Cap);
       Interrupt_Cap : constant Rose.Capabilities.Capability :=
                         Rose.System_Calls.Server.Create_Endpoint
-                          (Create_Endpoint_Cap, Master_Endpoint);
+                          (Create_Endpoint_Cap, Primary_Endpoint);
       Params        : aliased Rose.Invocation.Invocation_Record;
       Reply         : aliased Rose.Invocation.Invocation_Record;
       Send_Reply    : Boolean;
@@ -244,11 +246,25 @@ package body ATA.Server is
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
-            when Master_Endpoint =>
-               Rose.Console_IO.Put_Line ("interrupt on master");
+            when Primary_Endpoint =>
+               declare
+                  use ATA.Drives;
+                  Drive : constant ATA_Drive :=
+                            Get (0);
+                  Status : constant ATA_Status :=
+                             ATA_Status
+                               (Rose.Devices.Port_IO.Port_In_8
+                                  (Data_8_Port (Drive), 7));
+               begin
+                  if (Status and Status_Error) /= 0 then
+                     Log (Drive, "error status");
+                  end if;
+               end;
+
                Send_Reply := False;
-            when Slave_Endpoint =>
-               Rose.Console_IO.Put_Line ("interrupt on slave");
+
+            when Secondary_Endpoint =>
+               Rose.Console_IO.Put_Line ("slave interrupt");
                Send_Reply := False;
             when Rose.Interfaces.Get_Interface_Endpoint =>
                declare
