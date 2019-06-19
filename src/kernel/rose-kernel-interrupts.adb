@@ -67,23 +67,12 @@ package body Rose.Kernel.Interrupts is
       Argument  : Rose.Words.Word)
       return Interrupt_Handler_Status
    is
-      use Rose.Arch.Interrupts;
       It        : Interrupt_Handler_Access := Interrupt_Table (Interrupt);
       State     : Interrupt_Handler_Status := Finished;
       New_State : Interrupt_Handler_Status;
       Page_Fault_Address : Rose.Words.Word_32;
       pragma Import (C, Page_Fault_Address, "page_fault_address");
    begin
-
-      if Interrupt /= Clock_Interrupt
-        and then Interrupt /= Page_Fault
-      then
-         Rose.Boot.Console.Put ("handle-interrupt: vector = ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (Interrupt));
-         Rose.Boot.Console.Put (" code = ");
-         Rose.Boot.Console.Put (Argument);
-         Rose.Boot.Console.New_Line;
-      end if;
 
       if It = null then
          Rose.Boot.Console.Put ("kernel: ");
