@@ -200,8 +200,9 @@ package body ATA.Server is
       Interrupt_Cap : constant Rose.Capabilities.Capability :=
                         Rose.System_Calls.Server.Create_Endpoint
                           (Create_Endpoint_Cap, Master_Endpoint);
-      Params      : aliased Rose.Invocation.Invocation_Record;
-      Reply       : aliased Rose.Invocation.Invocation_Record;
+      Params        : aliased Rose.Invocation.Invocation_Record;
+      Reply         : aliased Rose.Invocation.Invocation_Record;
+      Send_Reply    : Boolean;
    begin
 
       Rose.System_Calls.Initialize_Send (Params, Reserve_IRQ_Cap);
@@ -228,6 +229,7 @@ package body ATA.Server is
          Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
 
       loop
+         Send_Reply := True;
          Params := (others => <>);
          Params.Control.Flags (Rose.Invocation.Receive) := True;
          Params.Control.Flags (Rose.Invocation.Block) := True;
@@ -244,8 +246,10 @@ package body ATA.Server is
          case Params.Endpoint is
             when Master_Endpoint =>
                Rose.Console_IO.Put_Line ("interrupt on master");
+               Send_Reply := False;
             when Slave_Endpoint =>
                Rose.Console_IO.Put_Line ("interrupt on slave");
+               Send_Reply := False;
             when Rose.Interfaces.Get_Interface_Endpoint =>
                declare
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
@@ -385,7 +389,9 @@ package body ATA.Server is
 
          end case;
 
-         Rose.System_Calls.Invoke_Capability (Reply);
+         if Send_Reply then
+            Rose.System_Calls.Invoke_Capability (Reply);
+         end if;
 
       end loop;
    end Start_Server;
