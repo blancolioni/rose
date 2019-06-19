@@ -1521,6 +1521,24 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Processes.Queue.Queue_Process (Process);
    end Start_Process;
 
+   -----------------
+   -- Start_Trace --
+   -----------------
+
+   procedure Start_Trace (Process : Process_Id) is
+   begin
+      Process_Table (Process).Flags (Trace) := True;
+   end Start_Trace;
+
+   ----------------
+   -- Stop_Trace --
+   ----------------
+
+   procedure Stop_Trace (Process : Process_Id) is
+   begin
+      Process_Table (Process).Flags (Trace) := False;
+   end Stop_Trace;
+
    -------------------
    -- To_Process_Id --
    -------------------
