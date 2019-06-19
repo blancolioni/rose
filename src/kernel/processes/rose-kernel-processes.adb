@@ -11,6 +11,7 @@ with Rose.Kernel.Processes;
 with Rose.Kernel.Heap;
 
 with Rose.Kernel.Panic;
+with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Processes is
 
@@ -410,6 +411,18 @@ package body Rose.Kernel.Processes is
    begin
       Layout := P.Cached_Caps (Load_Cap (Pid, Cap)).Layout;
    end Get_Cap;
+
+   ----------------------------
+   -- Get_Current_Invocation --
+   ----------------------------
+
+   procedure Get_Current_Invocation
+     (Pid        : Process_Id;
+      Invocation : out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      Invocation := Process_Table (Pid).Current_Params;
+   end Get_Current_Invocation;
 
    ----------------------
    -- Get_Process_Name --
@@ -1164,6 +1177,15 @@ package body Rose.Kernel.Processes is
 
       end if;
 
+      if Trace (To_Process_Id) then
+         Debug.Put (To_Process_Id);
+         Rose.Boot.Console.Put (": sending message");
+         Rose.Boot.Console.Put (": cap=");
+         Rose.Boot.Console.Put (Natural (To.Current_Params.Cap));
+         Rose.Boot.Console.New_Line;
+         Rose.Invocation.Trace.Put (To.Current_Params, True);
+      end if;
+
       Set_Current_State (To_Process_Id, Ready);
 
    end Send_Cap;
@@ -1177,11 +1199,22 @@ package body Rose.Kernel.Processes is
    is
       To   : Kernel_Process_Entry renames Process_Table (Process);
    begin
+      Debug.Put (Process);
+      Rose.Boot.Console.Put (": sending queued message");
+      Rose.Boot.Console.Put (": cap=");
+      Rose.Boot.Console.Put (Natural (To.Queued_Params.Cap));
+      Rose.Boot.Console.Put ("; ep=");
+      Rose.Boot.Console.Put (Rose.Words.Word_32 (To.Queued_Endpoint));
+      Rose.Boot.Console.Put ("; id=");
+      Rose.Boot.Console.Put (Natural (To.Queued_Cap_Id));
+      Rose.Boot.Console.New_Line;
+      Rose.Invocation.Trace.Put (To.Queued_Params, True);
+
       To.Flags (Message_Queued) := False;
       Send_To_Endpoint
         (From_Process_Id => 1,
          To_Process_Id   => Process,
-         Sender_Cap      => 0,
+         Sender_Cap      => To.Queued_Params.Cap,
          Endpoint        => To.Queued_Endpoint,
          Identifier      => To.Queued_Cap_Id,
          Params          => To.Queued_Params);
