@@ -39,6 +39,9 @@ package Rose.Kernel.Processes is
 
    function Trace (Process : Process_Id) return Boolean;
 
+   procedure Start_Trace (Process : Process_Id);
+   procedure Stop_Trace (Process : Process_Id);
+
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
 
