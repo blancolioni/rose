@@ -4,11 +4,31 @@ with Rose.Console_IO;
 
 package body ATA.Commands is
 
+   Max_Status_Wait  : constant := 100_000;
+   Warn_Status_Wait : constant := 100;
+
+   Selected_Drive      : ATA.Drives.ATA_Drive_Index := 0;
+   Have_Selected_Drive : Boolean := False;
+
+   function Poll_Status_Bits
+     (Drive : ATA.Drives.ATA_Drive;
+      Busy  : Boolean := False;
+      DRQ   : Boolean := False)
+      return Boolean;
+
+   function Check_Drive_OK
+     (Drive : ATA.Drives.ATA_Drive)
+      return Boolean;
+
    function To_Select_Drive
      (Master  : Boolean;
       LBA     : Boolean;
       Address : Rose.Devices.Block.Block_Address_Type := 0)
       return Rose.Words.Word_8;
+
+   function Select_Drive
+     (Drive : ATA.Drives.ATA_Drive)
+      return Boolean;
 
    procedure Sector_Command
      (Drive   : ATA.Drives.ATA_Drive;
@@ -22,6 +42,27 @@ package body ATA.Commands is
       Count   : Positive;
       Sector  : out System.Storage_Elements.Storage_Array;
       Success : out Boolean);
+
+   --------------------
+   -- Check_Drive_OK --
+   --------------------
+
+   function Check_Drive_OK
+     (Drive : ATA.Drives.ATA_Drive)
+      return Boolean
+   is
+      use ATA.Drives;
+      Status : constant ATA_Status :=
+                 ATA_Status
+                   (Rose.Devices.Port_IO.Port_In_8
+                      (Data_8_Port (Drive), 7));
+   begin
+      if (Status and Status_Error) /= 0 then
+         Log (Drive, "check_drive_ok: error status");
+         return False;
+      end if;
+      return True;
+   end Check_Drive_OK;
 
    -----------
    -- Flush --
@@ -55,6 +96,50 @@ package body ATA.Commands is
                others  => <>);
    end Initialize_Command;
 
+   ----------------------
+   -- Poll_Status_Bits --
+   ----------------------
+
+   function Poll_Status_Bits
+     (Drive : ATA.Drives.ATA_Drive;
+      Busy  : Boolean := False;
+      DRQ   : Boolean := False)
+      return Boolean
+   is
+      Status : ATA.Drives.ATA_Status;
+   begin
+      for I in 1 .. Max_Status_Wait loop
+
+         Status :=
+           ATA.Drives.ATA_Status
+             (Rose.Devices.Port_IO.Port_In_8
+                (ATA.Drives.Data_8_Port (Drive), 7));
+
+         declare
+            use ATA.Drives;
+            Busy_Bit : constant Boolean :=
+                         (Status and Status_Busy) /= 0;
+            DRQ_Bit  : constant Boolean :=
+                         (Status and Status_DRQ) /= 0;
+         begin
+            if Busy_Bit = Busy and then DRQ_Bit = DRQ then
+               if I > Warn_Status_Wait then
+                  Log (Drive, "excessive polls in Poll_Status_Bits");
+               end if;
+               return True;
+            end if;
+         end;
+
+      end loop;
+
+      Rose.Console_IO.Put ("last status: ");
+      Rose.Console_IO.Put (Rose.Words.Word_8 (Status));
+      Rose.Console_IO.New_Line;
+      ATA.Drives.Log (Drive, "Poll_Status_Bits: could not read drive status");
+      return False;
+
+   end Poll_Status_Bits;
+
    -----------------
    -- Read_Sector --
    -----------------
@@ -66,7 +151,6 @@ package body ATA.Commands is
       Sectors : out System.Storage_Elements.Storage_Array;
       Success : out Boolean)
    is
-      use ATA.Drives;
       use System.Storage_Elements;
       Index : Storage_Offset := Sectors'First - 1;
       Command : ATA_Command;
@@ -78,6 +162,10 @@ package body ATA.Commands is
 
       if ATA.Drives.Is_Dead (Drive) then
          ATA.Drives.Log (Drive, "drive is dead");
+      end if;
+
+      if not Select_Drive (Drive) then
+         ATA.Drives.Log (Drive, "Read_Sectors: select drive failed");
       end if;
 
       if ATA.Drives.Is_Atapi (Drive) then
@@ -98,10 +186,12 @@ package body ATA.Commands is
                return;
             end if;
 
-            if not Wait_For_Status
-              (Drive, Status_Busy or Status_DRQ, Status_DRQ)
+            if not Poll_Status_Bits
+              (Drive,
+               Busy => False,
+               DRQ  => True)
             then
-               ATA.Drives.Log (Drive, "unresponsive");
+               ATA.Drives.Log (Drive, "waiting for DRQ failed");
                ATA.Drives.Set_Dead (Drive);
                return;
             end if;
@@ -118,6 +208,11 @@ package body ATA.Commands is
                   Sectors (Index) := Storage_Element (D / 256);
                end;
             end loop;
+
+            if not Check_Drive_OK (Drive) then
+               ATA.Drives.Log (Drive, "error detected after read");
+               return;
+            end if;
          end;
       end loop;
 
@@ -159,10 +254,6 @@ package body ATA.Commands is
 
       Success := False;
 
-      Rose.Devices.Port_IO.Port_Out_8
-        (Command_Port, R_Select_Drive,
-         To_Select_Drive (ATA.Drives.Is_Master (Drive), False, 0));
-
       Data (1) := (1, 0);
       Data (2) := (4, Word_8 (Block_Size mod 256));
       Data (3) := (5, Word_8 (Block_Size / 256));
@@ -172,9 +263,7 @@ package body ATA.Commands is
         (Port => Command_Port,
          Data => Data (1 .. 4));
 
-      if not Wait_For_Status
-        (Drive, Status_Busy or Status_DRQ, Status_DRQ)
-      then
+      if not Poll_Status_Bits (Drive) then
          ATA.Drives.Log (Drive, "unresponsive after sending ATA command");
          ATA.Drives.Set_Dead (Drive);
          return;
@@ -214,9 +303,9 @@ package body ATA.Commands is
       begin
          if Available_Size /= Block_Size then
             Rose.Console_IO.Put ("ata: expected ");
-            Rose.Console_IO.Put (Block_Size);
+            Rose.Console_IO.Put (Natural (Block_Size));
             Rose.Console_IO.Put (" bytes, but drive reported ");
-            Rose.Console_IO.Put (Available_Size);
+            Rose.Console_IO.Put (Natural (Available_Size));
             Rose.Console_IO.New_Line;
             return;
          end if;
@@ -271,6 +360,49 @@ package body ATA.Commands is
    end Sector_Command;
 
    ------------------
+   -- Select_Drive --
+   ------------------
+
+   function Select_Drive
+     (Drive : ATA.Drives.ATA_Drive)
+      return Boolean
+   is
+      use type ATA.Drives.ATA_Drive_Index;
+   begin
+
+      if Have_Selected_Drive
+        and then Selected_Drive = ATA.Drives.Drive_Index (Drive)
+      then
+         return True;
+      end if;
+
+      if not Poll_Status_Bits (Drive) then
+         ATA.Drives.Log
+           (Drive, "select-drive: pre poll status bits failed");
+         return False;
+      end if;
+
+      Rose.Devices.Port_IO.Port_Out_8
+        (ATA.Drives.Command_Port (Drive), R_Select_Drive,
+         To_Select_Drive
+           (Master  => ATA.Drives.Is_Master (Drive),
+            LBA     => True,
+            Address => 0));
+
+      if not Poll_Status_Bits (Drive) then
+         ATA.Drives.Log
+           (Drive, "select-drive: post poll status bits failed");
+         return False;
+      end if;
+
+      Selected_Drive := ATA.Drives.Drive_Index (Drive);
+      Have_Selected_Drive := True;
+
+      return True;
+
+   end Select_Drive;
+
+   ------------------
    -- Send_Command --
    ------------------
 
@@ -282,10 +414,6 @@ package body ATA.Commands is
       Command_Port : constant Rose.Capabilities.Capability :=
                        ATA.Drives.Command_Port (Drive);
    begin
-      Rose.Devices.Port_IO.Port_Out_8
-        (Command_Port, R_Select_Drive,
-         To_Select_Drive (Command.Master, Command.Use_LBA, Command.LBA));
-
       declare
          use Rose.Words;
          Data : Rose.Devices.Port_IO.Word_8_Data_Array (1 .. 6);
@@ -428,10 +556,8 @@ package body ATA.Commands is
                return;
             end if;
 
-            if not Wait_For_Status
-              (Drive, ATA.Drives.Status_Busy, 0)
-            then
-               ATA.Drives.Log (Drive, "unresponsive");
+            if not Poll_Status_Bits (Drive) then
+               ATA.Drives.Log (Drive, "unresponsive after write");
                ATA.Drives.Set_Dead (Drive);
                return;
             end if;
