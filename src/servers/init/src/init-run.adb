@@ -335,33 +335,36 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Timeout_Cap, Rose.Interfaces.Timer.Set_Timer_Endpoint);
 
-         Init.Calls.Call
-           (Cap         => Create_Endpoint_Cap,
-            Data        =>
-              (Rose.Words.Word_32
-                   (Rose.Interfaces.Timeout.On_Timeout_Endpoint mod 2 ** 32),
-               Rose.Words.Word_32
-                 (Rose.Interfaces.Timeout.On_Timeout_Endpoint / 2 ** 32)),
-            Result_Caps => Timer_Caps);
+         if False then
+            Init.Calls.Call
+              (Cap         => Create_Endpoint_Cap,
+               Data        =>
+                 (Rose.Words.Word_32
+                      (Rose.Interfaces.Timeout.On_Timeout_Endpoint
+                       mod 2 ** 32),
+                  Rose.Words.Word_32
+                    (Rose.Interfaces.Timeout.On_Timeout_Endpoint / 2 ** 32)),
+               Result_Caps => Timer_Caps);
 
-         Receive_Timeout := Timer_Caps (1);
-         Send_Timeout := Timer_Caps (2);
+            Receive_Timeout := Timer_Caps (1);
+            Send_Timeout := Timer_Caps (2);
 
-         Init.Calls.Send_String
-           (Console_Write_Cap, Waiting_For_Timeout_Message);
-
-         for I in 1 .. 3 loop
-            Control_Cap :=
-              Init.Calls.Call
-                (Timer_Cap, Send_Timeout,
-                 (1 => Rose.Words.Word (I * 1000)));
-         end loop;
-
-         for I in 1 .. 3 loop
-            Init.Calls.Receive (Receive_Timeout);
             Init.Calls.Send_String
-              (Console_Write_Cap, Received_Timeout_Message);
-         end loop;
+              (Console_Write_Cap, Waiting_For_Timeout_Message);
+
+            for I in 1 .. 3 loop
+               Control_Cap :=
+                 Init.Calls.Call
+                   (Timer_Cap, Send_Timeout,
+                    (1 => Rose.Words.Word (I * 1000)));
+            end loop;
+
+            for I in 1 .. 3 loop
+               Init.Calls.Receive (Receive_Timeout);
+               Init.Calls.Send_String
+                 (Console_Write_Cap, Received_Timeout_Message);
+            end loop;
+         end if;
       end;
 
       declare
