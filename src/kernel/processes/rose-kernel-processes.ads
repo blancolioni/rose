@@ -42,6 +42,10 @@ package Rose.Kernel.Processes is
    procedure Set_Current_Invocation
      (Invocation : Rose.Invocation.Invocation_Record);
 
+   procedure Get_Current_Invocation
+     (Pid        : Process_Id;
+      Invocation : out Rose.Invocation.Invocation_Record);
+
    procedure Get_Process_Name
      (Pid  : Process_Id;
       Name : out String;
