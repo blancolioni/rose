@@ -1199,16 +1199,18 @@ package body Rose.Kernel.Processes is
    is
       To   : Kernel_Process_Entry renames Process_Table (Process);
    begin
-      Debug.Put (Process);
-      Rose.Boot.Console.Put (": sending queued message");
-      Rose.Boot.Console.Put (": cap=");
-      Rose.Boot.Console.Put (Natural (To.Queued_Params.Cap));
-      Rose.Boot.Console.Put ("; ep=");
-      Rose.Boot.Console.Put (Rose.Words.Word_32 (To.Queued_Endpoint));
-      Rose.Boot.Console.Put ("; id=");
-      Rose.Boot.Console.Put (Natural (To.Queued_Cap_Id));
-      Rose.Boot.Console.New_Line;
-      Rose.Invocation.Trace.Put (To.Queued_Params, True);
+      if To.Flags (Trace) then
+         Debug.Put (Process);
+         Rose.Boot.Console.Put (": sending queued message");
+         Rose.Boot.Console.Put (": cap=");
+         Rose.Boot.Console.Put (Natural (To.Queued_Params.Cap));
+         Rose.Boot.Console.Put ("; ep=");
+         Rose.Boot.Console.Put (Rose.Words.Word_32 (To.Queued_Endpoint));
+         Rose.Boot.Console.Put ("; id=");
+         Rose.Boot.Console.Put (Natural (To.Queued_Cap_Id));
+         Rose.Boot.Console.New_Line;
+         Rose.Invocation.Trace.Put (To.Queued_Params, True);
+      end if;
 
       To.Flags (Message_Queued) := False;
       Send_To_Endpoint
