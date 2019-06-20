@@ -1,5 +1,6 @@
 with Rose.Console_IO;
 with Rose.Devices.Port_IO;
+with Rose.Invocation;
 with Rose.Objects;
 with Rose.System_Calls.Server;
 
@@ -33,6 +34,7 @@ package body ATA.Drives is
       use Rose.Words;
       Command : ATA.Commands.ATA_Command;
    begin
+
       ATA.Commands.Initialize_Command
         (Item    => Command,
          Command => (if Atapi
@@ -190,6 +192,9 @@ package body ATA.Drives is
            Data_8_Cap         => Data_Cap_8,
            Data_16_Read_Cap   => Data_Read_Cap_16,
            Data_16_Write_Cap  => Data_Write_Cap_16,
+           Interrupt_Cap      =>
+             Rose.System_Calls.Server.Create_Receive_Cap
+               (Create_Endpoint_Cap),
            Base_DMA           => Base_DMA,
            Block_Size         => 512,
            Block_Count        => 0,
@@ -301,5 +306,52 @@ package body ATA.Drives is
    begin
       Drive.Status := Status;
    end Set_Status;
+
+   ------------------------
+   -- Wait_For_Interrupt --
+   ------------------------
+
+   function Wait_For_Interrupt
+     (Drive : ATA_Drive)
+      return Boolean
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Params := (others => <>);
+      Params.Control.Flags (Rose.Invocation.Receive) := True;
+      Params.Control.Flags (Rose.Invocation.Block) := True;
+      Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
+      Params.Control.Last_Recv_Word := 0;
+      Params.Cap := Drive.Interrupt_Cap;
+
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      case Params.Endpoint is
+         when Primary_Endpoint =>
+            declare
+               Drive  : constant ATA_Drive :=
+                          Get (0);
+               Status : constant ATA_Status :=
+                          ATA_Status
+                            (Rose.Devices.Port_IO.Port_In_8
+                               (Data_8_Port (Drive), 7));
+            begin
+               if (Status and Status_Error) /= 0 then
+                  Log (Drive, "interrupt: error status");
+                  return False;
+               else
+                  Log (Drive, "interrupt: received");
+               end if;
+            end;
+
+         when Secondary_Endpoint =>
+            Log (Drive, "received secondary interrupt");
+
+         when others =>
+            Log (Drive, "ignoring message while waiting for interrupt");
+      end case;
+
+      return True;
+   end Wait_For_Interrupt;
 
 end ATA.Drives;

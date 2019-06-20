@@ -24,4 +24,7 @@ package ATA is
 
    Set_Timeout_Cap     : constant Rose.Capabilities.Capability := 16;
 
+   Primary_Endpoint   : constant := 16#A3AD_150D#;
+   Secondary_Endpoint : constant := 16#5C52_EAF3#;
+
 end ATA;
