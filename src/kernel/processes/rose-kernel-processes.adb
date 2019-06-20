@@ -1322,6 +1322,10 @@ package body Rose.Kernel.Processes is
                   Rose.Boot.Console.Put (": to cannot accept messages");
                   Rose.Boot.Console.New_Line;
                when Starting | Ready | Running | Interrupted =>
+                  if To.Flags (Message_Queued) then
+                     Rose.Boot.Console.Put_Line ("lost queued message");
+                  end if;
+
                   To.Queued_Params := Send_Params;
                   To.Queued_Endpoint := Endpoint;
                   To.Queued_Cap_Id := Identifier;
