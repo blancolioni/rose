@@ -556,7 +556,7 @@ package body ATA.Commands is
                return;
             end if;
 
-            if not Poll_Status_Bits (Drive) then
+            if not Poll_Status_Bits (Drive, DRQ => True) then
                ATA.Drives.Log (Drive, "unresponsive after write");
                ATA.Drives.Set_Dead (Drive);
                return;
