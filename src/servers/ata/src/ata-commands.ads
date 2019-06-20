@@ -29,8 +29,14 @@ package ATA.Commands is
 
    function Send_Command
      (Drive        : ATA.Drives.ATA_Drive;
-      Command      : ATA_Command)
+      Command      : ATA_Command;
+      Log          : Boolean := False)
       return Boolean;
+
+   procedure Log_Command
+     (Drive   : ATA.Drives.ATA_Drive;
+      Message : String;
+      Command : ATA_Command);
 
    procedure Send_Control
      (Drive : ATA.Drives.ATA_Drive;
@@ -58,6 +64,8 @@ package ATA.Commands is
 
    procedure Flush
      (Drive : ATA.Drives.ATA_Drive);
+
+   function Current_Selected_Drive return ATA.Drives.ATA_Drive_Index;
 
 private
 

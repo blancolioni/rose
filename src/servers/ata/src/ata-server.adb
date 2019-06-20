@@ -26,9 +26,6 @@ package body ATA.Server is
 
    Device_Cap  : Rose.Capabilities.Capability;
 
-   Primary_Endpoint   : constant := 16#A3AD_150D#;
-   Secondary_Endpoint : constant := 16#5C52_EAF3#;
-
    type Vendor_Device_Record is
       record
          Vendor : Rose.Words.Word_32;
@@ -257,14 +254,21 @@ package body ATA.Server is
                declare
                   use ATA.Drives;
                   Drive : constant ATA_Drive :=
-                            Get (0);
+                            Get (ATA.Commands.Current_Selected_Drive);
                   Status : constant ATA_Status :=
                              ATA_Status
                                (Rose.Devices.Port_IO.Port_In_8
                                   (Data_8_Port (Drive), 7));
                begin
                   if (Status and Status_Error) /= 0 then
-                     Log (Drive, "error status");
+                     Rose.Console_IO.Put ("IRQ: primary: status=");
+                     Rose.Console_IO.Put (Rose.Words.Word_8 (Status));
+                     Rose.Console_IO.Put ("; error = ");
+                     Rose.Console_IO.Put
+                       (Rose.Devices.Port_IO.Port_In_8
+                          (Data_8_Port (Drive), 1));
+                     Rose.Console_IO.New_Line;
+                     Log (Drive, "error detected after interrupt");
                   end if;
                end;
 

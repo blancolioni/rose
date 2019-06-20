@@ -82,6 +82,10 @@ package ATA.Drives is
      (Drive : ATA_Drive)
       return Rose.Devices.Block.Block_Address_Type;
 
+   function Wait_For_Interrupt
+     (Drive : ATA_Drive)
+      return Boolean;
+
    procedure Log
      (Drive   : ATA_Drive;
       Message : String);
@@ -120,6 +124,7 @@ private
          Get_Parameters_Cap : Rose.Capabilities.Capability := 0;
          Read_Block_Cap     : Rose.Capabilities.Capability := 0;
          Write_Block_Cap    : Rose.Capabilities.Capability := 0;
+         Interrupt_Cap      : Rose.Capabilities.Capability := 0;
       end record;
 
    type ATA_Drive is access all ATA_Drive_Record;
