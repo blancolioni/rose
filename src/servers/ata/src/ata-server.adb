@@ -196,19 +196,26 @@ package body ATA.Server is
    ------------------
 
    procedure Start_Server is
-      Receive_Cap : constant Rose.Capabilities.Capability :=
-                      Rose.System_Calls.Server.Create_Receive_Cap
-                        (Create_Endpoint_Cap);
-      Interrupt_Cap : constant Rose.Capabilities.Capability :=
-                        Rose.System_Calls.Server.Create_Endpoint
-                          (Create_Endpoint_Cap, Primary_Endpoint);
-      Params        : aliased Rose.Invocation.Invocation_Record;
-      Reply         : aliased Rose.Invocation.Invocation_Record;
-      Send_Reply    : Boolean;
+      Receive_Cap             : constant Rose.Capabilities.Capability :=
+                                  Rose.System_Calls.Server.Create_Receive_Cap
+                                    (Create_Endpoint_Cap);
+      Primary_Interrupt_Cap   : constant Rose.Capabilities.Capability :=
+                                  Rose.System_Calls.Server.Create_Endpoint
+                                    (Create_Endpoint_Cap, Primary_Endpoint);
+      Secondary_Interrupt_Cap : constant Rose.Capabilities.Capability :=
+                                  Rose.System_Calls.Server.Create_Endpoint
+                                    (Create_Endpoint_Cap, Secondary_Endpoint);
+      Params                  : aliased Rose.Invocation.Invocation_Record;
+      Reply                   : aliased Rose.Invocation.Invocation_Record;
+      Send_Reply              : Boolean;
    begin
 
-      Rose.System_Calls.Initialize_Send (Params, Reserve_IRQ_Cap);
-      Rose.System_Calls.Send_Cap (Params, Interrupt_Cap);
+      Rose.System_Calls.Initialize_Send (Params, Primary_IRQ_Cap);
+      Rose.System_Calls.Send_Cap (Params, Primary_Interrupt_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      Rose.System_Calls.Initialize_Send (Params, Secondary_IRQ_Cap);
+      Rose.System_Calls.Send_Cap (Params, Secondary_Interrupt_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
@@ -264,7 +271,7 @@ package body ATA.Server is
                Send_Reply := False;
 
             when Secondary_Endpoint =>
-               Rose.Console_IO.Put_Line ("slave interrupt");
+               Rose.Console_IO.Put_Line ("secondary interrupt");
                Send_Reply := False;
             when Rose.Interfaces.Get_Interface_Endpoint =>
                declare

@@ -445,18 +445,23 @@ package body Init.Run is
                                        16#0001_0001#,
                                        16#0000_01F0#,
                                        16#0000_01F7#));
-         Reserve_IRQ           : constant Rose.Capabilities.Capability :=
+         Reserve_Primary_IRQ   : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap,
                                       (6, 1, 46, 0));
-         Ata_Id               : constant Rose.Objects.Object_Id :=
+         Reserve_Secondary_IRQ : constant Rose.Capabilities.Capability :=
+                                   Init.Calls.Call
+                                     (Create_Cap,
+                                      (6, 1, 47, 0));
+         Ata_Id                : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
                                      (Boot_Cap, ATA_Module,
                                       Device_Driver_Priority,
                                       (Create_Endpoint_Cap,
                                        Console_Write_Cap,
                                        PCI_Cap,
-                                       Reserve_IRQ,
+                                       Reserve_Primary_IRQ,
+                                       Reserve_Secondary_IRQ,
                                        Command_0_Cap,
                                        Control_0_Cap,
                                        Data_0_Cap_8,
