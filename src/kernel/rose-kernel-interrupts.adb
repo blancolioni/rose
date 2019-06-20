@@ -70,8 +70,6 @@ package body Rose.Kernel.Interrupts is
       It        : Interrupt_Handler_Access := Interrupt_Table (Interrupt);
       State     : Interrupt_Handler_Status := Finished;
       New_State : Interrupt_Handler_Status;
-      Page_Fault_Address : Rose.Words.Word_32;
-      pragma Import (C, Page_Fault_Address, "page_fault_address");
    begin
 
       if It = null then
@@ -79,8 +77,6 @@ package body Rose.Kernel.Interrupts is
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Interrupt));
          Rose.Boot.Console.Put (" ");
          Rose.Boot.Console.Put (Argument);
-         Rose.Boot.Console.Put (" ");
-         Rose.Boot.Console.Put (Page_Fault_Address);
          Rose.Boot.Console.Put (": no handler                       ");
          Rose.Boot.Console.New_Line;
       end if;
