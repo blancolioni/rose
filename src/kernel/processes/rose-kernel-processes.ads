@@ -214,14 +214,16 @@ package Rose.Kernel.Processes is
       Params      : Rose.Invocation.Invocation_Record);
 
    function Has_Queued_Message
-     (Process : Process_Id)
+     (Process  : Process_Id;
+      Endpoint    : Rose.Objects.Endpoint_Index)
       return Boolean;
 
    procedure Send_Queued_Message
      (Process : Process_Id);
 
    function Next_Blocked_Sender
-     (Receiver_Id : Process_Id)
+     (Receiver_Id : Process_Id;
+      Endpoint    : Rose.Objects.Endpoint_Index)
       return Process_Id;
 
    procedure Unblock_And_Send
@@ -572,10 +574,10 @@ private
       return Rose.Addresses.Physical_Address
    is (Process_Table (Pid).Directory_Page);
 
-   function Has_Queued_Message
-     (Process : Process_Id)
-      return Boolean
-   is (Process_Table (Process).Flags (Message_Queued));
+--     function Has_Queued_Message
+--       (Process : Process_Id)
+--        return Boolean
+--     is (Process_Table (Process).Flags (Message_Queued));
 
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
