@@ -17,8 +17,14 @@ package body Rose.Kernel.Debug is
       use Rose.Invocation;
       use Rose.Words;
 
-      procedure Put_Flag (Name  : String;
-                          Flag  : Invocation_Flag);
+      procedure Put_Flag
+        (Name  : String;
+         Flag  : Invocation_Flag);
+
+      procedure Put_Value
+        (Name       : String;
+         Enabled_By : Invocation_Flag;
+         Value      : Natural);
 
       --------------
       -- Put_Flag --
@@ -33,6 +39,24 @@ package body Rose.Kernel.Debug is
             Put (Name);
          end if;
       end Put_Flag;
+
+      ---------------
+      -- Put_Value --
+      ---------------
+
+      procedure Put_Value
+        (Name       : String;
+         Enabled_By : Invocation_Flag;
+         Value      : Natural)
+      is
+      begin
+         if Params.Control.Flags (Enabled_By) then
+            Put (" ");
+            Put (Name);
+            Put ("=");
+            Put (Value);
+         end if;
+      end Put_Value;
 
    begin
       Rose.Kernel.Processes.Debug.Put
@@ -63,6 +87,11 @@ package body Rose.Kernel.Debug is
       Put_Flag ("SB", Send_Buffer);
       Put_Flag ("WB", Writable_Buffer);
       Put_Flag ("MR", Create_Reply_Cap);
+
+      Put_Value ("lsw", Send_Words, Natural (Params.Control.Last_Sent_Word));
+      Put_Value ("lrw", Recv_Words, Natural (Params.Control.Last_Recv_Word));
+      Put_Value ("lsc", Send_Caps, Natural (Params.Control.Last_Sent_Cap));
+      Put_Value ("lrc", Recv_Caps, Natural (Params.Control.Last_Recv_Cap));
 
       Put (" ep=");
       Put (Word_32 (Word_64 (Params.Endpoint) / 2 ** 32));
