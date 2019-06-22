@@ -30,6 +30,12 @@ package Rose.System_Calls.Server is
      (Create_Cap   : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
+   function Create_Receive_Cap
+     (Create_Cap   : Rose.Capabilities.Capability;
+      Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
+      return Rose.Capabilities.Capability;
+
    procedure Send_Reply
      (Cap  : Rose.Capabilities.Capability;
       Data : Sent_Words_Array := No_Sent_Words);
