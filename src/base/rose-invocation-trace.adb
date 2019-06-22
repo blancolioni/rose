@@ -40,16 +40,27 @@ package body Rose.Invocation.Trace is
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Buffer) then
-         Rose.Boot.Console.Put (" SB");
+         if Invocation.Control.Flags (Rose.Invocation.Writable_Buffer) then
+            Rose.Boot.Console.Put (" WB");
+         else
+            Rose.Boot.Console.Put (" RB");
+         end if;
       end if;
-      if Invocation.Control.Flags (Rose.Invocation.Recv_Buffer) then
-         Rose.Boot.Console.Put (" RB");
+
+      if Invocation.Control.Flags (Rose.Invocation.No_Trace) then
+         Rose.Boot.Console.Put (" NT");
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Caps) then
          Rose.Boot.Console.Put (" lsc=");
          Rose.Boot.Console.Put
            (Rose.Words.Word_8 (Invocation.Control.Last_Sent_Cap));
+      end if;
+
+      if Invocation.Control.Flags (Rose.Invocation.Recv_Caps) then
+         Rose.Boot.Console.Put (" lrc=");
+         Rose.Boot.Console.Put
+           (Rose.Words.Word_8 (Invocation.Control.Last_Recv_Cap));
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Words) then

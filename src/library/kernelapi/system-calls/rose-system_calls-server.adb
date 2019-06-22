@@ -92,6 +92,28 @@ package body Rose.System_Calls.Server is
         (Create_Cap, (1 => 0));
    end Create_Receive_Cap;
 
+   ------------------------
+   -- Create_Receive_Cap --
+   ------------------------
+
+   function Create_Receive_Cap
+     (Create_Cap   : Rose.Capabilities.Capability;
+      Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
+      return Rose.Capabilities.Capability
+   is
+      Entry_Cap    : Rose.Capabilities.Capability;
+      Endpoint_Cap : Rose.Capabilities.Capability;
+   begin
+      Create_Endpoint
+        (Create_Cap   => Create_Cap,
+         Endpoint_Id  => Endpoint_Id,
+         Identifier   => Identifier,
+         Entry_Cap    => Entry_Cap,
+         Endpoint_Cap => Endpoint_Cap);
+      return Entry_Cap;
+   end Create_Receive_Cap;
+
    ----------------
    -- Delete_Cap --
    ----------------

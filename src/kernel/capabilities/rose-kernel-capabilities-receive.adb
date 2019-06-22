@@ -10,13 +10,14 @@ package body Rose.Kernel.Capabilities.Receive is
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access)
    is
-      pragma Unreferenced (Cap);
       use type Rose.Kernel.Processes.Process_Id;
       Receiver_Id : constant Rose.Kernel.Processes.Process_Id :=
                       Rose.Kernel.Processes.Current_Process_Id;
    begin
 
-      if Rose.Kernel.Processes.Has_Queued_Message (Receiver_Id) then
+      if Rose.Kernel.Processes.Has_Queued_Message
+        (Receiver_Id, Cap.Header.Endpoint)
+      then
          Rose.Kernel.Processes.Send_Queued_Message (Receiver_Id);
          Rose.Kernel.Processes.Get_Current_Invocation
            (Receiver_Id, Params.all);
@@ -24,7 +25,7 @@ package body Rose.Kernel.Capabilities.Receive is
          declare
             Next_Sender : constant Rose.Kernel.Processes.Process_Id :=
                             Rose.Kernel.Processes.Next_Blocked_Sender
-                              (Receiver_Id);
+                              (Receiver_Id, Cap.Header.Endpoint);
          begin
             if Next_Sender = Rose.Kernel.Processes.Null_Process_Id then
                if Params.Control.Flags (Rose.Invocation.Block) then
