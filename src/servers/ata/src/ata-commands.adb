@@ -4,17 +4,11 @@ with Rose.Console_IO;
 
 package body ATA.Commands is
 
-   Max_Status_Wait  : constant := 100_000;
+   Max_Status_Wait  : constant := 400;
    Warn_Status_Wait : constant := 100;
 
    Selected_Drive      : ATA.Drives.ATA_Drive_Index := 0;
    Have_Selected_Drive : Boolean := False;
-
-   function Poll_Status_Bits
-     (Drive : ATA.Drives.ATA_Drive;
-      Busy  : Boolean := False;
-      DRQ   : Boolean := False)
-      return Boolean;
 
    function Check_Drive_OK
      (Drive : ATA.Drives.ATA_Drive)
@@ -144,6 +138,14 @@ package body ATA.Commands is
    is
       Status : ATA.Drives.ATA_Status;
    begin
+
+      for I in 1 .. 4 loop
+         Status :=
+           ATA.Drives.ATA_Status
+             (Rose.Devices.Port_IO.Port_In_8
+                (ATA.Drives.Data_8_Port (Drive), 7));
+      end loop;
+
       for I in 1 .. Max_Status_Wait loop
 
          Status :=
@@ -157,8 +159,12 @@ package body ATA.Commands is
                          (Status and Status_Busy) /= 0;
             DRQ_Bit  : constant Boolean :=
                          (Status and Status_DRQ) /= 0;
+            Err_Bit  : constant Boolean :=
+                         (Status and Status_Error) /= 0;
          begin
-            if Busy_Bit = Busy and then
+            if Err_Bit then
+               return False;
+            elsif Busy_Bit = Busy and then
               (not DRQ or else DRQ_Bit)
             then
                if I > Warn_Status_Wait then
@@ -254,12 +260,19 @@ package body ATA.Commands is
                return;
             end if;
 
+            if not ATA.Drives.Wait_For_Interrupt (Drive) then
+               ATA.Drives.Log
+                 (Drive, "read: ready interrupt failed to arrive");
+               ATA.Drives.Set_Dead (Drive);
+               return;
+            end if;
+
             if not Poll_Status_Bits
               (Drive,
                Busy => False,
                DRQ  => True)
             then
-               ATA.Drives.Log (Drive, "waiting for DRQ failed");
+               ATA.Drives.Log (Drive, "read: waiting for DRQ failed");
                ATA.Drives.Set_Dead (Drive);
                return;
             end if;
@@ -351,7 +364,7 @@ package body ATA.Commands is
       end loop;
 
       if not Wait_For_Interrupt (Drive) then
-         ATA.Drives.Log (Drive, "no IRQ after sending ATAPI command");
+         ATA.Drives.Log (Drive, "no IRQ after sending ATAPI packet");
          ATA.Drives.Set_Dead (Drive);
          return;
       end if;
@@ -388,6 +401,16 @@ package body ATA.Commands is
             Sector (Index) := Storage_Element (D / 256);
          end;
       end loop;
+
+      if not Wait_For_Interrupt (Drive) then
+         ATA.Drives.Log (Drive, "no IRQ after reading ATAPI data");
+         ATA.Drives.Set_Dead (Drive);
+         return;
+      end if;
+
+      if not Poll_Status_Bits (Drive) then
+         return;
+      end if;
 
       Success := True;
 
@@ -567,41 +590,41 @@ package body ATA.Commands is
    -- Wait_For_Status --
    ---------------------
 
-   function Wait_For_Status
-     (Drive     : ATA.Drives.ATA_Drive;
-      Mask      : ATA.Drives.ATA_Status;
-      Value     : ATA.Drives.ATA_Status)
-      return Boolean
-   is
-      use type ATA.Drives.ATA_Status;
-      X : ATA.Drives.ATA_Status := 0;
-      Data_Port : constant Rose.Capabilities.Capability :=
-                    ATA.Drives.Data_8_Port (Drive);
-   begin
-      for I in 1 .. 400 loop
-         if I mod 100 = 0 then
-            Rose.Console_IO.Put_Line ("waiting ...");
-         end if;
-         X := ATA.Drives.ATA_Status
-           (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
-         if (X and Mask) = Value then
-            return True;
-         end if;
-         if (X and 1) /= 0 then
-            return False;
-         end if;
-      end loop;
-      if True then
-         Rose.Console_IO.Put ("wait for status: giving up; last status ");
-         Rose.Console_IO.Put (Rose.Words.Word_8 (X));
-         Rose.Console_IO.Put ("; expected ");
-         Rose.Console_IO.Put (Rose.Words.Word_8 (Mask));
-         Rose.Console_IO.Put (" ");
-         Rose.Console_IO.Put (Rose.Words.Word_8 (Value));
-         Rose.Console_IO.New_Line;
-      end if;
-      return False;
-   end Wait_For_Status;
+--     function Wait_For_Status
+--       (Drive     : ATA.Drives.ATA_Drive;
+--        Mask      : ATA.Drives.ATA_Status;
+--        Value     : ATA.Drives.ATA_Status)
+--        return Boolean
+--     is
+--        use type ATA.Drives.ATA_Status;
+--        X : ATA.Drives.ATA_Status := 0;
+--        Data_Port : constant Rose.Capabilities.Capability :=
+--                      ATA.Drives.Data_8_Port (Drive);
+--     begin
+--        for I in 1 .. 400 loop
+--           if I mod 100 = 0 then
+--              Rose.Console_IO.Put_Line ("waiting ...");
+--           end if;
+--           X := ATA.Drives.ATA_Status
+--             (Rose.Devices.Port_IO.Port_In_8 (Data_Port, 7));
+--           if (X and Mask) = Value then
+--              return True;
+--           end if;
+--           if (X and 1) /= 0 then
+--              return False;
+--           end if;
+--        end loop;
+--        if True then
+--           Rose.Console_IO.Put ("wait for status: giving up; last status ");
+--           Rose.Console_IO.Put (Rose.Words.Word_8 (X));
+--           Rose.Console_IO.Put ("; expected ");
+--           Rose.Console_IO.Put (Rose.Words.Word_8 (Mask));
+--           Rose.Console_IO.Put (" ");
+--           Rose.Console_IO.Put (Rose.Words.Word_8 (Value));
+--           Rose.Console_IO.New_Line;
+--        end if;
+--        return False;
+--     end Wait_For_Status;
 
    ------------------
    -- Write_Sector --
@@ -622,10 +645,6 @@ package body ATA.Commands is
    begin
 
       Success := False;
-
-      Rose.Console_IO.Put ("ata: write ");
-      Rose.Console_IO.Put (Natural (Address));
-      Rose.Console_IO.New_Line;
 
       if ATA.Drives.Is_Dead (Drive) then
          ATA.Drives.Log (Drive, "drive is dead");
@@ -663,24 +682,18 @@ package body ATA.Commands is
                end;
             end loop;
 
-            Rose.Console_IO.Put_Line ("write: waiting for interrupt");
             if not ATA.Drives.Wait_For_Interrupt (Drive) then
                ATA.Drives.Log (Drive, "did not get interupt after write");
                return;
             end if;
-
-            Rose.Console_IO.Put_Line ("write: checking for errors");
 
             if not Check_Drive_OK (Drive) then
                ATA.Drives.Log (Drive, "error detected after write");
                return;
             end if;
 
-            Flush (Drive);
-
          end;
       end loop;
-
       Success := True;
 
    end Write_Sectors;

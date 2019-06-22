@@ -240,7 +240,6 @@ package body ATA.Server is
          Params.Control.Flags (Rose.Invocation.Receive) := True;
          Params.Control.Flags (Rose.Invocation.Block) := True;
          Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
-         Params.Control.Flags (Rose.Invocation.Recv_Buffer) := True;
          Params.Control.Last_Recv_Word :=
            Rose.Invocation.Parameter_Word_Index'Last;
          Params.Cap := Receive_Cap;

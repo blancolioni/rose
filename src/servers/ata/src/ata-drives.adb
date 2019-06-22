@@ -47,7 +47,7 @@ package body ATA.Drives is
          return False;
       end if;
 
-      if not ATA.Commands.Wait_For_Status (Drive, Status_DRQ, Status_DRQ) then
+      if not ATA.Commands.Poll_Status_Bits (Drive, DRQ => True) then
          return False;
       end if;
 
@@ -163,6 +163,11 @@ package body ATA.Drives is
 
       end if;
 
+      Drive.Interrupt_Cap :=
+        Rose.System_Calls.Server.Create_Receive_Cap
+          (Create_Cap   => Create_Endpoint_Cap,
+           Endpoint_Id  => Primary_Endpoint);
+
       return True;
    end Identify;
 
@@ -192,9 +197,7 @@ package body ATA.Drives is
            Data_8_Cap         => Data_Cap_8,
            Data_16_Read_Cap   => Data_Read_Cap_16,
            Data_16_Write_Cap  => Data_Write_Cap_16,
-           Interrupt_Cap      =>
-             Rose.System_Calls.Server.Create_Receive_Cap
-               (Create_Endpoint_Cap),
+           Interrupt_Cap      => Rose.Capabilities.Null_Capability,
            Base_DMA           => Base_DMA,
            Block_Size         => 512,
            Block_Count        => 0,
@@ -276,9 +279,7 @@ package body ATA.Drives is
    begin
       ATA.Commands.Send_Control (Drive, 16#04#);
       ATA.Commands.Send_Control (Drive, 16#00#);
-      if not ATA.Commands.Wait_For_Status
-        (Drive, ATA.Drives.Status_Busy, 0)
-      then
+      if not ATA.Commands.Poll_Status_Bits (Drive) then
          ATA.Drives.Log (Drive, "reset failed");
          ATA.Drives.Set_Dead (Drive);
          return;
@@ -317,6 +318,7 @@ package body ATA.Drives is
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+
       Params := (others => <>);
       Params.Control.Flags (Rose.Invocation.Receive) := True;
       Params.Control.Flags (Rose.Invocation.Block) := True;
@@ -329,8 +331,6 @@ package body ATA.Drives is
       case Params.Endpoint is
          when Primary_Endpoint =>
             declare
-               Drive  : constant ATA_Drive :=
-                          Get (0);
                Status : constant ATA_Status :=
                           ATA_Status
                             (Rose.Devices.Port_IO.Port_In_8
@@ -339,8 +339,6 @@ package body ATA.Drives is
                if (Status and Status_Error) /= 0 then
                   Log (Drive, "interrupt: error status");
                   return False;
-               else
-                  Log (Drive, "interrupt: received");
                end if;
             end;
 
