@@ -19,7 +19,7 @@ package Rose.Invocation is
    type Invocation_Flag is
      (Writable_Buffer,
       Send_Buffer,
-      Recv_Buffer,
+      No_Trace,
       Error,
       Send,
       Receive,

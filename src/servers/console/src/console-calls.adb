@@ -51,7 +51,6 @@ package body Console.Calls is
                (Flags          =>
                   (Receive     => True,
                    Block       => True,
-                   Recv_Buffer => True,
                    others     => False),
                 others         => <>),
            Cap           => Receive_Cap,

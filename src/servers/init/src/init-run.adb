@@ -108,6 +108,9 @@ package body Init.Run is
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
 
+      Receive_Timeout  : Rose.Capabilities.Capability;
+      Send_Timeout     : Rose.Capabilities.Capability;
+
       function Copy_Cap_From_Process
         (Copy_Cap   : Rose.Capabilities.Capability;
          Endpoint   : Rose.Objects.Endpoint_Id;
@@ -127,6 +130,8 @@ package body Init.Run is
       function Is_Log_Partition (Low, High : Word_64) return Boolean
       is (Low = Rose.Devices.Partitions.Log_Id_Low
           and then High = Rose.Devices.Partitions.Log_Id_High);
+
+      procedure Wait (Milliseconds : Natural);
 
       ---------------------------
       -- Copy_Cap_From_Process --
@@ -164,6 +169,7 @@ package body Init.Run is
             exit when Cap /= Null_Capability;
             Init.Calls.Send_String
               (Console_Write_Cap, Retry_Message);
+            Wait (1000);
             Cap := Init.Calls.Call (Copy_Cap, Data);
          end loop;
 
@@ -264,6 +270,20 @@ package body Init.Run is
 
       end Load_Partition;
 
+      ----------
+      -- Wait --
+      ----------
+
+      procedure Wait (Milliseconds : Natural) is
+         Control_Cap : constant Rose.Capabilities.Capability :=
+                         Init.Calls.Call
+                           (Timer_Cap, Send_Timeout,
+                            (1 => Rose.Words.Word (Milliseconds)));
+      begin
+         pragma Unreferenced (Control_Cap);
+         Init.Calls.Receive (Receive_Timeout);
+      end Wait;
+
    begin
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Console_Id :=
@@ -320,51 +340,26 @@ package body Init.Run is
                                   Word (Timer_Id mod 2 ** 32),
                                   Word (Timer_Id / 2 ** 32)));
          Timer_Caps       : Init.Calls.Array_Of_Capabilities (1 .. 2);
-         Receive_Timeout  : Rose.Capabilities.Capability;
-         Send_Timeout     : Rose.Capabilities.Capability;
          Control_Cap      : Rose.Capabilities.Capability with Unreferenced;
 
-         Waiting_For_Timeout_Message : constant String :=
-                                         "checking timeout server ..."
-                                         & NL;
-         Received_Timeout_Message    : constant String :=
-                                         "received timeout message"
-                                         & NL;
       begin
          Timer_Cap :=
            Copy_Cap_From_Process
              (Copy_Timeout_Cap, Rose.Interfaces.Timer.Set_Timer_Endpoint);
 
-         if False then
-            Init.Calls.Call
-              (Cap         => Create_Endpoint_Cap,
-               Data        =>
-                 (Rose.Words.Word_32
-                      (Rose.Interfaces.Timeout.On_Timeout_Endpoint
-                       mod 2 ** 32),
-                  Rose.Words.Word_32
-                    (Rose.Interfaces.Timeout.On_Timeout_Endpoint / 2 ** 32)),
-               Result_Caps => Timer_Caps);
+         Init.Calls.Call
+           (Cap         => Create_Endpoint_Cap,
+            Data        =>
+              (Rose.Words.Word_32
+                   (Rose.Interfaces.Timeout.On_Timeout_Endpoint
+                    mod 2 ** 32),
+               Rose.Words.Word_32
+                 (Rose.Interfaces.Timeout.On_Timeout_Endpoint / 2 ** 32)),
+            Result_Caps => Timer_Caps);
 
-            Receive_Timeout := Timer_Caps (1);
-            Send_Timeout := Timer_Caps (2);
+         Receive_Timeout := Timer_Caps (1);
+         Send_Timeout := Timer_Caps (2);
 
-            Init.Calls.Send_String
-              (Console_Write_Cap, Waiting_For_Timeout_Message);
-
-            for I in 1 .. 3 loop
-               Control_Cap :=
-                 Init.Calls.Call
-                   (Timer_Cap, Send_Timeout,
-                    (1 => Rose.Words.Word (I * 1000)));
-            end loop;
-
-            for I in 1 .. 3 loop
-               Init.Calls.Receive (Receive_Timeout);
-               Init.Calls.Send_String
-                 (Console_Write_Cap, Received_Timeout_Message);
-            end loop;
-         end if;
       end;
 
       declare
