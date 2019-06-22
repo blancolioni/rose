@@ -44,6 +44,7 @@ package body Rose.Devices.Port_IO is
       Params.Control.Flags := (Send       => True,
                                Block      => True,
                                Recv_Words => True,
+                               No_Trace   => True,
                                others     => False);
       Params.Control.Last_Recv_Word := 0;
       Params.Cap := Port;
@@ -66,7 +67,8 @@ package body Rose.Devices.Port_IO is
       Params.Control.Flags := (Send   => True,
                                Block  => True,
                                Recv_Words => True,
-                               others => False);
+                               No_Trace   => True,
+                               others     => False);
       Params.Control.Last_Recv_Word := 0;
       Params.Cap := Port;
       Rose.System_Calls.Invoke_Capability (Params);
@@ -154,6 +156,7 @@ package body Rose.Devices.Port_IO is
       Params.Control.Flags := (Send       => True,
                                Block      => True,
                                Send_Words => True,
+                               No_Trace   => True,
                                others     => False);
       Params.Control.Last_Sent_Word := 0;
       Params.Cap := Port;
