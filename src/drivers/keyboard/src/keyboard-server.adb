@@ -185,6 +185,9 @@ package body Keyboard.Server is
                end;
 
             when Rose.Interfaces.Interrupt_Handler.Handle_Interrupt_Endpoint =>
+
+               Send_Reply := False;
+
                while Key_Code_Available loop
                   declare
                      use System.Storage_Elements;
