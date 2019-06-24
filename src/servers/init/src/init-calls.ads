@@ -55,6 +55,7 @@ package Init.Calls is
      (Cap          : Rose.Capabilities.Capability;
       Module_Index : Rose.Words.Word;
       Priority     : Rose.Words.Word;
+      Cap_Set_Cap  : Rose.Capabilities.Capability;
       Launch_Caps  : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
@@ -62,6 +63,7 @@ package Init.Calls is
      (Cap          : Rose.Capabilities.Capability;
       Module_Index : Rose.Words.Word;
       Priority     : Rose.Words.Word;
+      Cap_Set_Cap  : Rose.Capabilities.Capability;
       Launch_Caps  : Array_Of_Capabilities;
       Launch_Words : Array_Of_Words)
       return Rose.Objects.Object_Id;

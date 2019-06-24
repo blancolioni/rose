@@ -159,13 +159,14 @@ package body Init.Calls is
      (Cap          : Rose.Capabilities.Capability;
       Module_Index : Rose.Words.Word;
       Priority     : Rose.Words.Word;
+      Cap_Set_Cap  : Rose.Capabilities.Capability;
       Launch_Caps  : Array_Of_Capabilities)
       return Rose.Objects.Object_Id
    is
       No_Words : Array_Of_Words (1 .. 0);
    begin
       return Launch_Boot_Module
-        (Cap, Module_Index, Priority, Launch_Caps, No_Words);
+        (Cap, Module_Index, Priority, Cap_Set_Cap, Launch_Caps, No_Words);
    end Launch_Boot_Module;
 
    ------------------------
@@ -176,10 +177,12 @@ package body Init.Calls is
      (Cap          : Rose.Capabilities.Capability;
       Module_Index : Rose.Words.Word;
       Priority     : Rose.Words.Word;
+      Cap_Set_Cap  : Rose.Capabilities.Capability;
       Launch_Caps  : Array_Of_Capabilities;
       Launch_Words : Array_Of_Words)
       return Rose.Objects.Object_Id
    is
+      pragma Unreferenced (Cap_Set_Cap);
       use Rose.Invocation;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
