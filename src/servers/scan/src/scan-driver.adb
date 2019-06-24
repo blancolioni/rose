@@ -7,6 +7,7 @@ with Rose.Console_IO;
 with Rose.Words;
 
 with Rose.Invocation;
+with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Partitions;
@@ -21,6 +22,10 @@ procedure Scan.Driver is
    Block_Count  : Rose.Interfaces.Block_Device.Block_Address_Type;
 
 begin
+
+   Console_Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+   Block_Device_Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
    Rose.Console_IO.Open (Console_Cap);
 
    Rose.Interfaces.Block_Device.Client.Open

@@ -6,6 +6,7 @@ with Rose.Console_IO;
 with Rose.Directories;
 
 with Rose.Invocation;
+with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Rose.Devices.Checkpoints;
@@ -13,8 +14,33 @@ with Restore.Installer;
 
 procedure Restore.Driver is
    use Rose.Interfaces.Block_Device.Client;
+
+   procedure Next (Cap : out Rose.Capabilities.Capability);
+
+   ----------
+   -- Next --
+   ----------
+
+   procedure Next (Cap : out Rose.Capabilities.Capability) is
+   begin
+      Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+   end Next;
+
    Device : Block_Device_Client;
+
 begin
+
+   Next (Delete_Endpoint_Cap);
+   Next (Console_Cap);
+   Next (Active_Swap_Cap);
+   Next (Inactive_Swap_Cap);
+   Next (Log_Cap);
+   Next (Add_Storage_Cap);
+   Next (Reserve_Storage_Cap);
+   Next (Write_System_Image);
+   Next (Install_Media_Cap);
+   Next (Install_Exec_Cap);
+
    Rose.Console_IO.Open (Console_Cap);
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");

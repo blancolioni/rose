@@ -2,6 +2,7 @@ with Rose.Objects;
 with Rose.Words;
 
 with Rose.Console_IO;
+with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Region.Server;
@@ -22,6 +23,15 @@ package body Store.Server is
 
    procedure Create_Server is
    begin
+
+      Delete_Endpoint_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Console_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+
       Rose.Interfaces.Storage.Server.Create_Server
         (Server_Context    => Server_Context,
          Reserve_Storage   => Reserve_Storage'Access,
