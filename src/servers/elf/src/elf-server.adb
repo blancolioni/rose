@@ -5,6 +5,7 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Console_IO;
+with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Executable.Server;
 
@@ -68,7 +69,26 @@ package body Elf.Server is
    -------------------
 
    procedure Create_Server is
+      procedure Next (Cap : out Rose.Capabilities.Capability);
+
+      ----------
+      -- Next --
+      ----------
+
+      procedure Next (Cap : out Rose.Capabilities.Capability) is
+      begin
+         Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      end Next;
+
    begin
+      Next (Delete_Endpoint_Cap);
+      Next (Rescind_Endpoint_Cap);
+      Next (Console_Cap);
+      Next (Memory_Cap);
+      Next (Create_Process_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+
       Rose.Interfaces.Executable.Server.Create_Server
         (Server_Context => Server_Context,
          Launch         => Launch'Access);

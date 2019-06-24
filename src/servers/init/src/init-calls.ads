@@ -52,20 +52,22 @@ package Init.Calls is
       Message : String);
 
    function Launch_Boot_Module
-     (Cap          : Rose.Capabilities.Capability;
-      Module_Index : Rose.Words.Word;
-      Priority     : Rose.Words.Word;
-      Cap_Set_Cap  : Rose.Capabilities.Capability;
-      Launch_Caps  : Array_Of_Capabilities)
+     (Cap            : Rose.Capabilities.Capability;
+      Module_Index   : Rose.Words.Word;
+      Priority       : Rose.Words.Word;
+      Create_Cap     : Rose.Capabilities.Capability;
+      Create_Cap_Set : Rose.Capabilities.Capability;
+      Launch_Caps    : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
    function Launch_Boot_Module
-     (Cap          : Rose.Capabilities.Capability;
-      Module_Index : Rose.Words.Word;
-      Priority     : Rose.Words.Word;
-      Cap_Set_Cap  : Rose.Capabilities.Capability;
-      Launch_Caps  : Array_Of_Capabilities;
-      Launch_Words : Array_Of_Words)
+     (Cap            : Rose.Capabilities.Capability;
+      Module_Index   : Rose.Words.Word;
+      Priority       : Rose.Words.Word;
+      Create_Cap     : Rose.Capabilities.Capability;
+      Create_Cap_Set : Rose.Capabilities.Capability;
+      Launch_Caps    : Array_Of_Capabilities;
+      Launch_Words   : Array_Of_Words)
       return Rose.Objects.Object_Id;
 
    procedure Get_Interface

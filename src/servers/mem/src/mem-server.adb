@@ -13,6 +13,7 @@ with Rose.Interfaces.Region.Client;
 
 with Rose.Server;
 with Rose.System_Calls;
+with Rose.System_Calls.Client;
 
 with Mem.Calls;
 with Mem.Physical_Map;
@@ -133,6 +134,18 @@ package body Mem.Server is
 
    procedure Create_Server is
    begin
+
+      Console_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Region_Count_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Region_Range_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Start_Paging_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+
       Mem.Calls.Load_Memory_Map;
 
       Rose.Interfaces.Memory.Server.Create_Server
