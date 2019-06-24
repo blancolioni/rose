@@ -25,6 +25,9 @@ package body Keyboard.Server is
    Have_Blocked_Request : Boolean := False;
    Blocked_Request : aliased Rose.Invocation.Invocation_Record;
 
+   Keyboard_Pending   : constant := 16#01#;
+--     Keyboard_Not_Ready : constant := 16#02#;
+
    procedure Add_To_Buffer (Keys : System.Storage_Elements.Storage_Array);
 
    procedure Register_IRQ;
@@ -140,7 +143,7 @@ package body Keyboard.Server is
          Status : constant Word_8 :=
                     Rose.Devices.Port_IO.Port_In_8 (Read_Status_Cap);
       begin
-         return (Status and 16#20#) /= 0;
+         return (Status and Keyboard_Pending) /= 0;
       end Key_Code_Available;
 
       -------------------
@@ -212,6 +215,7 @@ package body Keyboard.Server is
                            Blocked_Request.Buffer_Length,
                            Reply);
                      end if;
+
                   end;
                end loop;
 
