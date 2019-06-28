@@ -1,53 +1,21 @@
-ARCH=i686
+TARGET=i686-elf
 BUILDDIR=./build/obj
-RELOC=$(BUILDDIR)/exec.reloc.o
-GCC=gcc
 DEFINES=
+GCC=$(TARGET)-gcc
+GPRBUILD=gprbuild
+GPRBUILD_ARGS=--compiler-subst=ada,$(GCC) --RTS=/home/fraser/kiln/rose-trunk/rts/build/i686-elf
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
-UTIL=../../library/util.c
+UTIL=/home/fraser/kiln/rose-trunk/src/library/util.c
 CFILES=$(UTIL)
-ENVIRONMENT_OBJECTS= \
-	$(BUILDDIR)/rose-environment.o \
-	$(BUILDDIR)/rose-environment_pages.o \
-	$(BUILDDIR)/rose-command_line.o
-
-LIBROSE_OBJECTS=
-
-BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o
-
-OBJECTS= \
-	$(BUILDDIR)/exec.o \
-	$(BUILDDIR)/exec-driver.o \
-	$(BUILDDIR)/exec-library.o \
-	$(BUILDDIR)/exec-server.o \
-	$(BUILDDIR)/rose.o \
-	$(BUILDDIR)/rose-capabilities.o \
-	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-exec.o \
-	$(BUILDDIR)/rose-interfaces-exec-server.o \
-	$(BUILDDIR)/rose-interfaces-region.o \
-	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
-	$(BUILDDIR)/rose-invocation.o \
-	$(BUILDDIR)/rose-server.o \
-	$(BUILDDIR)/rose-system_calls.o \
-	$(BUILDDIR)/rose-system_calls-server.o \
-	$(BUILDDIR)/rose-system_calls-client.o \
-	$(BUILDDIR)/rose-objects.o \
-	$(BUILDDIR)/rose-words.o \
-	$(LIBROSE_OBJECTS) \
-
-all: exec $(RELOC)
-	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/drivers/exec $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+OBJECTS=/home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/exec-driver.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/exec-library.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/exec.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/exec-server.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-capabilities.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-console_io.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-exec.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-exec-server.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-launch.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-region-client.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-region.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-stream_reader-client.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-interfaces-stream_reader.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-invocation.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-limits.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-objects.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-server.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-system_calls-client.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-system_calls.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-system_calls-server.o /home/fraser/kiln/rose-trunk/src/drivers/exec/build/obj/rose-words.o
+all: exec
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(TARGET)/drivers/exec $(OBJECTS) /home/fraser/kiln/rose-trunk/build/$(TARGET)/kernel/obj/util.o /home/fraser/kiln/rose-trunk/rts/build/i686-elf/adalib/libgnat.a -g
 
 exec:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild --RTS=../../../rts/build/i686
+	$(GPRBUILD) $(GPRBUILD_ARGS)
 
-$(RELOC): $(OBJECTS)
-	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g
+$(BUILDDIR)/ada_rts.o: ../../library/asm/i686/ada_rts.s
+	$(GCC) -c -m32 ../../library/asm/i686/ada_rts.s -o $(BUILDDIR)/ada_rts.o
+

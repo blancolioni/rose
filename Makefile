@@ -1,27 +1,29 @@
 ARCH=i686
-TARGET=$(ARCH)-unknown-rose
+TARGET=$(ARCH)-elf
 ROSE=./build/$(TARGET)/rose
-BUILDDIR=./build/$(ARCH)/kernel/obj
-MODULEDIR=./build/$(ARCH)/modules
-DRIVERDIR=./build/$(ARCH)/drivers
+BUILDDIR=./build/$(TARGET)/kernel/obj
+MODULEDIR=./build/$(TARGET)/modules
+DRIVERDIR=./build/$(TARGET)/drivers
 RELOC=$(BUILDDIR)/rose.reloc.o
-GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
-PROJDRIVERS=projects/drivers_$(ARCH).gpr
+PROJDRIVERS=projects/drivers_$(TARGET).gpr
 TOOLS=idl configure-driver
+GCC=$(TARGET)-gcc
+GPRBUILD=gprbuild
+GPRBUILD_ARGS=--compiler-subst=ada,$(TARGET)-gcc --RTS=`pwd`/rts/build/$(TARGET)
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=keyboard exec
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps
 
-all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd floppy iso finished
+all: prepare interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd floppy iso finished
 
 rts:
 	(cd rts; make)
 
 tools: $(TOOLS)
-	
+
 interfaces:
 	(cd src/library/kernelapi/generated; make)
 
@@ -43,7 +45,7 @@ stripped:
 
 hdd:
 	sh ./scripts/rose-hdd-install
-	
+
 iso:
 	sh ./scripts/rose-iso-install
 
@@ -61,7 +63,7 @@ $(ROSE): $(RELOC)
 $(RELOC): kernel boot
 
 kernel:
-	gnatmake -Pprojects/kernel_$(ARCH)
+	$(GPRBUILD) $(GPRBUILD_ARGS) -Pprojects/kernel_$(ARCH)
 
 boot:
 	(cd src/asm/$(ARCH); make)
@@ -73,7 +75,8 @@ idl:
 configure-driver:
 	(cd src/tools/configure-driver; make)
 
-config:
+prepare:
+	echo $(BUILDDIR)
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(MODULEDIR)
 	mkdir -p $(DRIVERDIR)
