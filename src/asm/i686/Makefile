@@ -1,11 +1,11 @@
 all: rose
 
 ARCH=i686
-TARGET=$(ARCH)-unknown-rose
-ROSE=../../../build/$(ARCH)/$(TARGET)
-BUILDDIR=../../../build/$(ARCH)/kernel/obj
+TARGET=$(ARCH)-elf
+ROSE=../../../build/$(TARGET)/$(TARGET)-rose
+BUILDDIR=../../../build/$(TARGET)/kernel/obj
 RELOC=$(BUILDDIR)/rose.reloc.o
-GCC=gcc
+GCC=$(TARGET)-gcc
 DEFINES=-D__KERNEL__  -DBRING_UP -DDEBUG -DEVT_TRACE
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -O3
 INCLUDE=-I./include

@@ -1,0 +1,13 @@
+#!/bin/sh
+export ROOT=`pwd`
+export TARGET=i686-elf
+BOOT_MODULES="init console store mem pci ata isofs restore scan partition elf timer caps"
+DRIVERS="exec keyboard"
+
+echo -n Configure boot modules:
+for item in $BOOT_MODULES; do sh ./config/configure.sh servers $item modules; done
+echo
+
+echo -n Configure drivers:
+for item in $DRIVERS; do sh ./config/configure.sh drivers $item drivers; done
+echo

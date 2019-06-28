@@ -1,10 +1,10 @@
 #!/bin/sh
-objdump -d -S -f -h -t build/i686/i686-unknown-rose > ./logs/rose-objdump.txt
+objdump -d -S -f -h -t build/i686-elf/i686-elf-rose > ./logs/rose-objdump.txt
 for module in init console mem pci ata restore scan store partition elf
-do objdump -d -S -f -h -t build/i686/modules/$module > ./logs/rose-$module-objdump.txt
-   readelf -a build/i686/modules/$module > ./logs/rose-$module-elf.txt
+do objdump -d -S -f -h -t build/i686-elf/modules/$module > ./logs/rose-$module-objdump.txt
+   readelf -a build/i686-elf/modules/$module > ./logs/rose-$module-elf.txt
 done
 for driver in exec keyboard
-do objdump -d -S -f -h -t build/i686/drivers/$driver > ./logs/rose-$driver-objdump.txt
-   readelf -a build/i686/drivers/$driver > ./logs/rose-$driver-elf.txt
+do objdump -d -S -f -h -t build/i686-elf/drivers/$driver > ./logs/rose-$driver-objdump.txt
+   readelf -a build/i686-elf/drivers/$driver > ./logs/rose-$driver-elf.txt
 done
