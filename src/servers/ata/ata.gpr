@@ -1,14 +1,16 @@
-project ATA is
+project ata is
 
-   for Source_Dirs use
+   for Source_Dirs use 
       ("src",
        "../../base",
        "../../library/capabilities",
        "../../library/kernelapi/console",
+       "../../library/rose",
        "../../library/kernelapi/devices",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
        "../../library/kernelapi/arch/i686");
+
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("ata-driver.adb");
@@ -27,11 +29,12 @@ project ATA is
    end Binder;
 
    package Linker is
-      for Default_Switches ("ada") use ("-m32", "../../../build/i686/kernel/obj/util.o", "-nostdlib");
+      for Default_Switches ("ada") use ("-m32", "../../../build/i686-elf/kernel/obj/util.o", "-nostdlib");
    end Linker;
 
    package Pretty_Printer is
       for Default_Switches ("ada") use ("-M72");
    end Pretty_Printer;
 
-end ATA;
+end ata;
+

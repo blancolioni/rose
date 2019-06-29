@@ -1,9 +1,9 @@
-ARCH=i686
-BUILD=./build/$(ARCH)
+TARGET=i686-elf
+BUILD=./build/$(TARGET)
 ADAINCLUDE=$(BUILD)/adainclude
 ADALIB=$(BUILD)/adalib
 OBJ=$(BUILD)/obj
-
+GPRBUILD=gprbuild -v --compiler-subst=ada,$(TARGET)-gcc
 all: clean config copy rts
 
 clean:
@@ -19,4 +19,4 @@ copy:
 	sh ./copy-runtime.sh
 
 rts:
-	gprbuild rts.gpr
+	$(GPRBUILD) rts.gpr

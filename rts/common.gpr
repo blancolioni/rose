@@ -7,12 +7,15 @@
 abstract project Common is
    type Mode_Name  is ("debug", "release");
    type Arch_Name  is ("i686");
-
+   type Binary_Format_Name is ("elf");
+   
    Mode  : Mode_Name  := "release";
    Arch  : Arch_Name  := "i686";
-
+   Binary_Format : Binary_Format_Name := "elf";
+       Target  := Arch & "-" & Binary_Format;
+       
    Source_Dir        := "src";
-   Build_Dir         := "build/" & Arch;
+   Build_Dir         := "build/" & Target;
 
    for Source_Dirs use ();
 
