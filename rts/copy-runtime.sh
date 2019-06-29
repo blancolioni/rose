@@ -7,7 +7,7 @@ do
     mkdir -p ./gnat-src
     rm -f ./gnat-src/$f
     cp /usr/lib/gcc/x86_64-redhat-linux/8/adainclude/$f ./gnat-src
-    rm -f ./build/i686/adainclude/$f
-    ln -s `pwd`/gnat-src/$f `pwd`/build/i686/adainclude/$f
+    rm -f ./build/i686-elf/adainclude/$f
+    ln -s `pwd`/gnat-src/$f `pwd`/build/i686-elf/adainclude/$f
 done
-cp arch/i686/system.ads ./build/i686/adainclude
+cp arch/i686/system.ads ./build/i686-elf/adainclude

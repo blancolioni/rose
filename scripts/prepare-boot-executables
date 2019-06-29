@@ -1,9 +1,9 @@
 #!/bin/sh
 rm -rf images/tmp
 mkdir -p images/tmp
-cp build/i686/i686-unknown-rose images/tmp/kernel
-cp build/i686/modules/* images/tmp
+cp build/i686-elf/i686-elf-rose images/tmp/kernel
+cp build/i686-elf/modules/* images/tmp
 strip images/tmp/*
 mkdir -p images/drivers
-cp build/i686/drivers/* images/drivers
+cp build/i686-elf/drivers/* images/drivers
 strip images/drivers/*

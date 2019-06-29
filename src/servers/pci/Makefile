@@ -1,42 +1,21 @@
-ARCH=i686
+TARGET=i686-elf
 BUILDDIR=./build/obj
-RELOC=$(BUILDDIR)/pci.reloc.o
-GCC=gcc
 DEFINES=
+GCC=$(TARGET)-gcc
+GPRBUILD=gprbuild
+GPRBUILD_ARGS=--compiler-subst=ada,$(GCC) --RTS=/home/fraser/kiln/rose-trunk/rts/build/i686-elf
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
-UTIL=../../library/util.c
+UTIL=/home/fraser/kiln/rose-trunk/src/library/util.c
 CFILES=$(UTIL)
-OBJECTS= \
-	$(BUILDDIR)/ada_rts.o \
-	$(BUILDDIR)/b__pci-driver.o \
-	$(BUILDDIR)/pci-devices.o \
-	$(BUILDDIR)/pci-driver.o \
-	$(BUILDDIR)/pci.o \
-	$(BUILDDIR)/pci-server.o \
-	$(BUILDDIR)/rose.o \
-	$(BUILDDIR)/rose-capabilities.o \
-	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-devices.o \
-	$(BUILDDIR)/rose-devices-pci.o \
-	$(BUILDDIR)/rose-devices-pci-server.o \
-	$(BUILDDIR)/rose-devices-port_io.o \
-	$(BUILDDIR)/rose-invocation.o \
-	$(BUILDDIR)/rose-system_calls.o \
-	$(BUILDDIR)/rose-system_calls-client.o \
-	$(BUILDDIR)/rose-system_calls-server.o \
-	$(BUILDDIR)/rose-objects.o \
-	$(BUILDDIR)/rose-words.o
-
-all: pci $(RELOC)
-	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/pci $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+OBJECTS=/home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/pci-devices.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/pci-driver.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/pci.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/pci-server.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-capabilities.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-console_io.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-devices.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-devices-pci.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-devices-pci-server.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-devices-port_io.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-invocation.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-objects.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-system_calls-client.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-system_calls.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-system_calls-server.o /home/fraser/kiln/rose-trunk/src/servers/pci/build/obj/rose-words.o
+all: pci
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(TARGET)/modules/pci $(OBJECTS) /home/fraser/kiln/rose-trunk/build/$(TARGET)/kernel/obj/util.o /home/fraser/kiln/rose-trunk/rts/build/i686-elf/adalib/libgnat.a -g
 
 pci:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild --RTS=../../../rts/build/i686
-
-$(RELOC): $(OBJECTS)
-	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g
+	$(GPRBUILD) $(GPRBUILD_ARGS)
 
 $(BUILDDIR)/ada_rts.o: ../../library/asm/i686/ada_rts.s
 	$(GCC) -c -m32 ../../library/asm/i686/ada_rts.s -o $(BUILDDIR)/ada_rts.o
+

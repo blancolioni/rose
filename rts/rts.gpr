@@ -28,6 +28,7 @@ library project RTS is
    for Object_Dir   use Common.Build_Dir & "/obj";
 
    package Builder is
+      for Global_Configuration_Pragmas use "gnat.adc";
       Ada_Switches := ("-gnat2012", "-O0", "-g3", "-x", "-gnatg",
                        "-gnatec=../../../gnat.adc", "-q");--, "-gnatd.n");
 
@@ -35,7 +36,7 @@ library project RTS is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib");
+      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib", "-gnatg");
    end Compiler;
 
    for Library_Kind use "static";
