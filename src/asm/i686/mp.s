@@ -25,7 +25,7 @@
 .global stack_fault_exception, protection_fault_exception, protection_fault_exception, page_fault_exception
 .global reserved_15_exception
 
-.set INVOKE_WORDS, 40      # size of invocation record
+.set INVOKE_WORDS, 28      # size of invocation record
 
 .set CURR_PROC_PTR, 20     # offset from stack pointer to process table entry address after trap
 

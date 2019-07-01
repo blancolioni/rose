@@ -52,7 +52,7 @@ package Rose.Invocation is
       Unknown_Error);
 
    Max_Parameter_Words : constant := 16;
-   Max_Capabilities    : constant := 16;
+   Max_Capabilities    : constant := 4;
 
    type Parameter_Word_Index is mod Max_Parameter_Words;
    type Capability_Index is mod Max_Capabilities;
@@ -94,7 +94,7 @@ package Rose.Invocation is
          Buffer_Address : System.Address := System.Null_Address;
          Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
-     with Pack, Size => 40 * 4 * 8;
+     with Pack, Size => 28 * 4 * 8;
 
    type Invocation_Access is access all Invocation_Record;
 

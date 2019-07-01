@@ -2158,7 +2158,7 @@ package body IDL.Generate_Kernel is
                        Get_Return_Type (Subpr);
          begin
             if Is_Interface (Result) then
-               Recv_Caps := Recv_Caps + 8;
+               Recv_Caps := Recv_Caps + 1;
             elsif Is_Scalar (Result) then
                Recv_Words := Recv_Words + 1;
             else
