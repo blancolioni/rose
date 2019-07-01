@@ -15,6 +15,7 @@ CFILES=$(UTIL)
 KERNOBJECTS=\
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-addresses.o \
+	$(BUILDDIR)/rose-boot-check.o \
 	$(BUILDDIR)/rose-boot-console.o \
 	$(BUILDDIR)/rose-boot-memory.o \
 	$(BUILDDIR)/rose-boot-sequence.o \
@@ -77,7 +78,7 @@ OBJECTS=\
 
 rose: $(ROSE)
 
-$(ROSE): $(RELOC) $(BUILDDIR)/linker.ld $(BUILDDIR)/startup.o
+$(ROSE): $(RELOC) $(BUILDDIR)/linker.ld $(BUILDDIR)/boot.o
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o $(ROSE) $(RELOC)
 	size $(ROSE)
 
@@ -85,8 +86,8 @@ $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g
 	size $(RELOC)
 
-$(BUILDDIR)/startup.o: startup.s
-	$(GCC) $(DEFINES) $(GCC_OPTS) -c -o $(BUILDDIR)/startup.o -Iinclude startup.s
+$(BUILDDIR)/boot.o: boot.s
+	$(GCC) $(DEFINES) $(GCC_OPTS) -c -o $(BUILDDIR)/boot.o -Iinclude boot.s
 
 $(BUILDDIR)/mp.o: mp.s
 	$(GCC) $(DEFINES) $(GCC_OPTS) -c -o $(BUILDDIR)/mp.o -Iinclude mp.s

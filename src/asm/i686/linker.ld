@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf32-i386)
-STARTUP(../../../build/i686/kernel/obj/startup.o)
+STARTUP(../../../build/i686/kernel/obj/boot.o)
 ENTRY (boot)
 
 SECTIONS
