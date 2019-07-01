@@ -55,6 +55,7 @@ package body Rose.Multiboot is
 
    procedure Get_String
      (From_Tag_Address : Word;
+      Offset           : Word;
       Text             : out String;
       Last             : out Natural);
 
@@ -85,6 +86,7 @@ package body Rose.Multiboot is
 
    procedure Get_String
      (From_Tag_Address : Word;
+      Offset           : Word;
       Text             : out String;
       Last             : out Natural)
    is
@@ -93,8 +95,8 @@ package body Rose.Multiboot is
       for Size'Address use System'To_Address (From_Tag_Address + 4);
       pragma Import (Ada, Size);
       Start : constant System.Address :=
-                System'To_Address (From_Tag_Address + 8);
-      Storage : Storage_Array (1 .. Size - 8);
+                System'To_Address (From_Tag_Address + Offset);
+      Storage : Storage_Array (1 .. Size - Storage_Count (Offset));
       for Storage'Address use Start;
       pragma Import (Ada, Storage);
    begin
@@ -162,6 +164,11 @@ package body Rose.Multiboot is
       begin
          Report (Start);
          Found (Tag) := True;
+
+         if Tag = Basic_Memory_Info then
+            Physmem_Low := 0;
+            Physmem_High := Get_Word_32 (Start, 12);
+         end if;
       end Process_Record;
 
    begin
@@ -190,12 +197,6 @@ package body Rose.Multiboot is
       Tag      : constant Multiboot_Tag_Type :=
                    Multiboot_Tag_Type'Val (Tag_Type);
    begin
-      Put ("multiboot: tag=");
-      Put (Natural (Tag_Type));
-      Put ("; size=");
-      Put (Natural (Size));
-      New_Line;
-
       case Tag is
          when Command_Line =>
             Put ("command line: ");
@@ -203,7 +204,7 @@ package body Rose.Multiboot is
                Line : String (1 .. 100);
                Last : Natural;
             begin
-               Get_String (Tag_Address, Line, Last);
+               Get_String (Tag_Address, 8, Line, Last);
                Put (Line (1 .. Last));
                New_Line;
             end;
@@ -214,7 +215,7 @@ package body Rose.Multiboot is
                Line : String (1 .. 100);
                Last : Natural;
             begin
-               Get_String (Tag_Address, Line, Last);
+               Get_String (Tag_Address, 8, Line, Last);
                Put (Line (1 .. Last));
                New_Line;
             end;
@@ -232,6 +233,12 @@ package body Rose.Multiboot is
             Put (Get_Word_32 (Tag_Address, 8));
             New_Line;
          when others =>
+            Put ("multiboot: tag=");
+            Put (Natural (Tag_Type));
+            Put ("; size=");
+            Put (Natural (Size));
+            New_Line;
+
             Put ("payload:");
             for I in 2 .. Size / 4 - 1 loop
                Put (" ");
@@ -265,7 +272,7 @@ package body Rose.Multiboot is
          Last         : Natural;
          Start        : Natural := 1;
       begin
-         Get_String (Info_Start, Command_Line, Last);
+         Get_String (Info_Start, 8, Command_Line, Last);
          for I in 1 .. Last + 1 loop
             if I = Last + 1
               or else Command_Line (I) = ' '
@@ -296,7 +303,51 @@ package body Rose.Multiboot is
         procedure (Available : Boolean;
                    Low       : Rose.Words.Word_64;
                    High      : Rose.Words.Word_64))
-   is null;
+   is
+      procedure Process_Memory_Region
+        (Start : Word);
+
+      ---------------------------
+      -- Process_Memory_Region --
+      ---------------------------
+
+      procedure Process_Memory_Region
+        (Start : Word)
+      is
+         use Rose.Boot.Console;
+         Size       : constant Word_32 := Get_Word_32 (Start, 4);
+         Entry_Size : constant Word_32 := Get_Word_32 (Start, 8);
+         Version    : constant Word_32 := Get_Word_32 (Start, 12);
+         Addr       : Word_32 := 16;
+      begin
+         while Addr < Size loop
+            declare
+               Base       : constant Word_32 := Get_Word_32 (Start, Addr);
+               Length     : constant Word_32 := Get_Word_32 (Start, Addr + 8);
+               Entry_Type : constant Word_32 := Get_Word_32 (Start, Addr + 16);
+               Reserved   : constant Word_32 := Get_Word_32 (Start, Addr + 20);
+            begin
+               Put ("region: addr=");
+               Put (Addr);
+               Put ("; base = ");
+               Put (Base);
+               Put ("; bound=");
+               Put (Base + Length);
+               Put ("; Type=");
+               Put (Natural (Entry_Type));
+               New_Line;
+               Process (Entry_Type = 1,
+                        Word_64 (Base), Word_64 (Base + Length));
+               Addr := Addr + Entry_Size;
+            end;
+         end loop;
+      end Process_Memory_Region;
+
+   begin
+      Scan_Multiboot_Tags
+        (Match   => Memory_Map,
+         Process => Process_Memory_Region'Access);
+   end Scan_Memory_Map;
 
    ------------------
    -- Scan_Modules --
@@ -309,8 +360,23 @@ package body Rose.Multiboot is
                    Mod_Text   : String))
    is
       procedure Process_Module
+        (Start : Word);
+
+      --------------------
+      -- Process_Module --
+      --------------------
+
+      procedure Process_Module
         (Start : Word)
-      is null;
+      is
+         Base : constant Word_32 := Get_Word_32 (Start, 8);
+         Bound : constant Word_32 := Get_Word_32 (Start, 12);
+         Command : String (1 .. 200);
+         Last    : Natural;
+      begin
+         Get_String (Start, 16, Command, Last);
+         Process (Base, Bound, Command (1 .. Last));
+      end Process_Module;
 
    begin
 
