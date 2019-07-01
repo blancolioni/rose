@@ -1,6 +1,6 @@
 ARCH=i686
 TARGET=$(ARCH)-unknown-rose
-ROSE=./build/$(TARGET)/rose
+ROSE=./build/$(TARGET)
 BUILDDIR=./build/$(ARCH)/kernel/obj
 MODULEDIR=./build/$(ARCH)/modules
 DRIVERDIR=./build/$(ARCH)/drivers
@@ -15,7 +15,7 @@ NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 DRIVERS=keyboard exec
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps
 
-all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd floppy iso finished
+all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd iso finished
 
 rts:
 	(cd rts; make)

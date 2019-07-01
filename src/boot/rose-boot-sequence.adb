@@ -1,3 +1,4 @@
+with Rose.Boot.Check;
 with Rose.Boot.Console;
 with Rose.Boot.Memory;
 with Rose.Kernel.Init;
@@ -13,18 +14,20 @@ package body Rose.Boot.Sequence is
       end record;
 
    Console_Item      : aliased String := "Console";
+   Check_Item        : aliased String := "Check";
    Memory_Item       : aliased String := "Memory";
    Kernel_Item       : aliased String := "Kernel";
 
    Boot_Item_List : constant array (Positive range <>) of Boot_Info :=
-     (
-      (Item_Name => Console_Item'Access,
-       Item_Proc => Rose.Boot.Console.Init_Boot_Console'Access),
-      (Item_Name => Memory_Item'Access,
-       Item_Proc => Rose.Boot.Memory.Configure_Memory'Access),
-      (Item_Name => Kernel_Item'Access,
-       Item_Proc => Rose.Kernel.Init.Init_Kernel'Access)
-     );
+                  ((Item_Name => Console_Item'Access,
+                    Item_Proc => Rose.Boot.Console.Init_Boot_Console'Access),
+                   (Item_Name => Check_Item'Access,
+                    Item_Proc => Rose.Boot.Check.Check_Boot_Loader'Access),
+                   (Item_Name => Memory_Item'Access,
+                    Item_Proc => Rose.Boot.Memory.Configure_Memory'Access),
+                   (Item_Name => Kernel_Item'Access,
+                    Item_Proc => Rose.Kernel.Init.Init_Kernel'Access)
+                  );
 
    ----------------------------
    --  Execute_Boot_Sequence --

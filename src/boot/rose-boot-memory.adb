@@ -8,7 +8,7 @@ with Rose.Words;                       use Rose.Words;
 
 package body Rose.Boot.Memory is
 
-   Report_Memory_Allocation : constant Boolean := False;
+   Report_Memory_Allocation : constant Boolean := True;
 
    procedure Process_Multiboot_Info;
    --  Record the physical memory locations of modules and command line.
