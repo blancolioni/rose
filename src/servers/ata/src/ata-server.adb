@@ -54,7 +54,41 @@ package body ATA.Server is
 
    procedure Create_Server is
       use type Rose.Capabilities.Capability;
+
+      procedure Next (Cap : out Rose.Capabilities.Capability);
+
+      ----------
+      -- Next --
+      ----------
+
+      procedure Next (Cap : out Rose.Capabilities.Capability) is
+      begin
+         Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      end Next;
+
    begin
+
+      Next (Console_Cap);
+      Rose.Console_IO.Open (Console_Cap);
+      Rose.Console_IO.Put_Line ("ata: creating server");
+
+      Next (PCI_Cap);
+      Next (Primary_IRQ_Cap);
+      Next (Secondary_IRQ_Cap);
+
+      Next (Command_0_Cap);
+      Next (Control_0_Cap);
+      Next (Data_0_Cap_8);
+      Next (Data_0_Cap_Read_16);
+      Next (Data_0_Cap_Write_16);
+
+      Next (Command_1_Cap);
+      Next (Control_1_Cap);
+      Next (Data_1_Cap_8);
+      Next (Data_1_Cap_Read_16);
+      Next (Data_1_Cap_Write_16);
+
+      Next (Set_Timeout_Cap);
 
       Device_Cap := Rose.Capabilities.Null_Capability;
 

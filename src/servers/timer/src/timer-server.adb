@@ -8,6 +8,7 @@ with Rose.Interfaces.Timeout.Server;
 with Rose.Interfaces.Timer.Server;
 
 with Rose.Server;
+with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 package body Timer.Server is
@@ -59,7 +60,17 @@ package body Timer.Server is
 
    procedure Create_Server is
    begin
+
+      Console_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Rose.Console_IO.Open (Console_Cap);
       Rose.Console_IO.Put_Line ("timer: creating server");
+
+      Set_Timeout_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Get_Current_Ticks_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
       Timeout_Cap :=
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,

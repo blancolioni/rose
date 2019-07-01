@@ -1,4 +1,3 @@
-with Rose.Console_IO;
 with Rose.Objects;
 
 with Rose.Interfaces.Constructor.Server;
@@ -14,7 +13,7 @@ package body Caps.Server is
 
    type Cap_Set_Entry is
       record
-         Active : Boolean;
+         Active : Boolean := False;
          Id     : Rose.Objects.Capability_Identifier;
          Set    : Rose.Capabilities.Capability_Array (1 .. Max_Cap_Set_Size);
          First  : Natural;
@@ -90,8 +89,6 @@ package body Caps.Server is
 
    procedure Create_Server is
    begin
-      Rose.Console_IO.Put_Line ("caps: creating server");
-
       Rose.Interfaces.Constructor.Server.Create_Server
         (Server, Create'Access);
 

@@ -1,6 +1,7 @@
 with System.Storage_Elements;
 
 with Rose.Objects;
+with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Directory.Server;
@@ -263,8 +264,24 @@ package body IsoFS.Server is
    ------------------
 
    procedure Start_Server is
+      procedure Next (Cap : out Rose.Capabilities.Capability);
+
+      ----------
+      -- Next --
+      ----------
+
+      procedure Next (Cap : out Rose.Capabilities.Capability) is
+      begin
+         Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      end Next;
+
    begin
-      Rose.Console_IO.Put_Line ("isofs: creating server");
+      Next (Console_Cap);
+      Next (Device_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+      Rose.Console_IO.Put_Line ("isofs: starting server");
+
       Rose.Interfaces.Block_Device.Client.Open
         (Device, Device_Cap);
 
