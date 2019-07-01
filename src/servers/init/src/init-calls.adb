@@ -156,17 +156,19 @@ package body Init.Calls is
    ------------------------
 
    function Launch_Boot_Module
-     (Cap          : Rose.Capabilities.Capability;
-      Module_Index : Rose.Words.Word;
-      Priority     : Rose.Words.Word;
-      Cap_Set_Cap  : Rose.Capabilities.Capability;
-      Launch_Caps  : Array_Of_Capabilities)
+     (Cap             : Rose.Capabilities.Capability;
+      Module_Index    : Rose.Words.Word;
+      Priority        : Rose.Words.Word;
+      Create_Cap      : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability;
+      Launch_Caps     : Array_Of_Capabilities)
       return Rose.Objects.Object_Id
    is
       No_Words : Array_Of_Words (1 .. 0);
    begin
       return Launch_Boot_Module
-        (Cap, Module_Index, Priority, Cap_Set_Cap, Launch_Caps, No_Words);
+        (Cap, Module_Index, Priority,
+         Create_Cap, Create_Cap_Set, Launch_Caps, No_Words);
    end Launch_Boot_Module;
 
    ------------------------
@@ -174,15 +176,16 @@ package body Init.Calls is
    ------------------------
 
    function Launch_Boot_Module
-     (Cap          : Rose.Capabilities.Capability;
-      Module_Index : Rose.Words.Word;
-      Priority     : Rose.Words.Word;
-      Cap_Set_Cap  : Rose.Capabilities.Capability;
-      Launch_Caps  : Array_Of_Capabilities;
-      Launch_Words : Array_Of_Words)
+     (Cap            : Rose.Capabilities.Capability;
+      Module_Index   : Rose.Words.Word;
+      Priority       : Rose.Words.Word;
+      Create_Cap     : Rose.Capabilities.Capability;
+      Create_Cap_Set : Rose.Capabilities.Capability;
+      Launch_Caps    : Array_Of_Capabilities;
+      Launch_Words   : Array_Of_Words)
       return Rose.Objects.Object_Id
    is
-      pragma Unreferenced (Cap_Set_Cap);
+      use Rose.Capabilities;
       use Rose.Invocation;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -190,12 +193,11 @@ package body Init.Calls is
       Params.Control.Flags := (Send             => True,
                                Send_Words       => True,
                                Recv_Words       => True,
-                               Send_Caps        => Launch_Caps'Length > 0,
+                               Send_Caps        => False,
                                Block            => True,
                                Create_Reply_Cap => True,
                                others           => False);
       Params.Control.Last_Sent_Word := 1;
-      Params.Control.Last_Sent_Cap := 0;
       Params.Data (0) := Module_Index;
       Params.Data (1) := Priority;
 
@@ -205,13 +207,47 @@ package body Init.Calls is
          Params.Data (Params.Control.Last_Sent_Word) := W;
       end loop;
 
-      for Launch_Cap of Launch_Caps loop
-         Params.Caps (Params.Control.Last_Sent_Cap) := Launch_Cap;
-         Params.Control.Last_Sent_Cap :=
-           Params.Control.Last_Sent_Cap + 1;
-      end loop;
-      Params.Control.Last_Sent_Cap :=
-        Params.Control.Last_Sent_Cap - 1;
+      Rose.System_Calls.Send_Cap (Params, Create_Cap);
+
+      if Create_Cap_Set = Null_Capability then
+         for Launch_Cap of Launch_Caps loop
+            Rose.System_Calls.Send_Cap (Params, Launch_Cap);
+         end loop;
+      else
+         declare
+            No_Arguments : Array_Of_Words (1 .. 0);
+            Cap_Set : constant Rose.Capabilities.Capability :=
+                             Call (Create_Cap_Set, No_Arguments);
+            Insert       : Rose.Capabilities.Capability;
+            Take_Next    : Rose.Capabilities.Capability;
+            Cap_Params   : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Cap_Params, Cap_Set);
+            Rose.System_Calls.Receive_Caps (Cap_Params, 2);
+            Rose.System_Calls.Invoke_Capability (Cap_Params);
+            Insert := Cap_Params.Caps (0);
+            Take_Next := Cap_Params.Caps (1);
+
+            Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+
+            for Cap of Launch_Caps loop
+               Rose.System_Calls.Send_Cap (Cap_Params, Cap);
+               if Cap_Params.Control.Last_Sent_Cap
+                 = Capability_Index'Last
+               then
+                  Rose.System_Calls.Invoke_Capability (Cap_Params);
+                  Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+               end if;
+            end loop;
+
+            if Cap_Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               Rose.System_Calls.Invoke_Capability (Cap_Params);
+            end if;
+
+            Rose.System_Calls.Send_Cap (Params, Take_Next);
+
+         end;
+      end if;
 
       Rose.System_Calls.Invoke_Capability (Params);
 

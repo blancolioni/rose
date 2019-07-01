@@ -10,6 +10,7 @@ with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Block_Device.Server;
 
 with Rose.Server;
+with Rose.System_Calls.Client;
 
 package body Partition.Server is
 
@@ -56,6 +57,14 @@ package body Partition.Server is
 
    procedure Create_Server is
    begin
+      Console_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Block_Device_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+
       Client.Open
         (Device_Client, Block_Device_Cap);
 

@@ -1,5 +1,7 @@
 with Rose.Invocation;
 with Rose.Objects;
+
+with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Rose.Console_IO;
@@ -10,6 +12,25 @@ with Rose.Devices.PCI.Server;
 with PCI.Devices;
 
 package body PCI.Server is
+
+   procedure Create_Caps is
+   begin
+      Console_Cap :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Rose.Console_IO.Open (Console_Cap);
+      Rose.Console_IO.Put_Line ("pci: starting");
+
+      Command_Port_Out :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Data_Port_Out :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+      Data_Port_In :=
+        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+
+   end Create_Caps;
 
    ------------------
    -- Scan_Devices --
