@@ -57,9 +57,9 @@ package Rose.System_Calls is
       Storage  : System.Storage_Elements.Storage_Array;
       Writable : Boolean);
 
-    procedure Send_Cap
-      (Params : in out Rose.Invocation.Invocation_Record;
-       Cap    : Rose.Capabilities.Capability);
+   procedure Send_Cap
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Cap    : Rose.Capabilities.Capability);
 
    procedure Send_Buffer
       (Params   : in out Rose.Invocation.Invocation_Record;

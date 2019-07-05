@@ -1,0 +1,45 @@
+--  -*- Mode: Ada -*-
+
+library project rts is
+
+   type Arch_Type is ("i686");
+
+   Arch : Arch_Type := "i686";
+
+   for Languages use ("Ada");
+   for Source_Dirs use ("src/adainclude", "src/arch/" & Arch, "../base", "../library/capabilities", "../library/kernelapi/system-calls", "../library/kernelapi/arch/" & Arch);
+   for Object_Dir use "build/" & Arch & "/obj";
+
+--     for Source_Files use ("ada.ads",
+--                           "a-unccon.ads",
+--                           "a-uncdea.ads",
+--                           "gnat.ads",
+--                           "g-souinf.ads",
+--                           "interfac.ads",
+--  			 "system.ads",
+--                           "s-atacco.adb", "s-atacco.ads",
+--                           "s-maccod.ads",
+--                           "s-stoele.adb", "s-stoele.ads",
+--  			 "s-unstyp.ads",
+--                           "last_chance_handler.adb",
+--  			 "last_chance_handler.ads",
+--                           "memory.adb", "memory.ads",
+--                           "s-parame.ads", "s-parame.adb",
+--                           "s-secsta.adb", "s-secsta.ads",
+--  			 "a-textio.ads", "a-textio.adb");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "restrictions.adc";
+      for Default_Switches ("Ada") use ("-gnat2012",
+				       "-O3", "-g3", "-x", "-gnatg");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-march=i686", "-m32", "-O3", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib");
+   end Compiler;
+
+   for Library_Kind use "static";
+   for Library_Name use "gnat";
+   for Library_Dir use "build/" & Arch & "/adalib";
+
+end rts;
