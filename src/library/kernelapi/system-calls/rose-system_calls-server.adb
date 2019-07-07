@@ -204,5 +204,4 @@ package body Rose.System_Calls.Server is
       Invoke_Capability (Params);
    end Send_Reply_Caps;
 
-
 end Rose.System_Calls.Server;

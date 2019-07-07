@@ -49,7 +49,8 @@ package Rose.Invocation is
       Invalid_Object,
       Operation_Not_Implemented,
       Missing_Data,
-      Unknown_Error);
+      Unknown_Error,
+      Undefined_Error);
 
    Max_Parameter_Words : constant := 16;
    Max_Capabilities    : constant := 16;
@@ -68,6 +69,7 @@ package Rose.Invocation is
    type Control_Word_Header is new Word_8;
 
    type Word_3 is mod 2 ** 3;
+   type Word_4 is mod 2 ** 4;
 
    type Control_Word is
       record
@@ -87,8 +89,9 @@ package Rose.Invocation is
          Reply_Cap      : Rose.Capabilities.Capability := 0;
          Endpoint       : Rose.Objects.Endpoint_Id     := 0;
          Identifier     : Rose.Objects.Capability_Identifier := 0;
-         Reserved       : Word_8 := 0;
+         Unused         : Word_8 := 0;
          Error          : Invocation_Error := OK;
+         Extra_Errors   : Word_4 := 0;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
          Buffer_Address : System.Address := System.Null_Address;
