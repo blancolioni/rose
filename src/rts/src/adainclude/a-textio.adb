@@ -17,14 +17,23 @@ package body Ada.Text_IO is
 
    File_Control : array (Open_File_Index) of File_Control_Block;
 
+   Standard_Input_File : constant File_Type :=
+                    File_Type'
+                      (Is_Open => True,
+                       Mode    => In_File,
+                       In_Cap  => System.Caps.Standard_Input,
+                       Out_Cap => Rose.Capabilities.Null_Capability,
+                       Control => 1);
+
    Standard_Output_File : constant File_Type :=
                     File_Type'
                       (Is_Open => True,
                        Mode    => Out_File,
                        In_Cap  => Rose.Capabilities.Null_Capability,
                        Out_Cap => System.Caps.Standard_Output,
-                       Control => 1);
+                       Control => 2);
 
+   Current_Input_File  : File_Type := Standard_Input_File;
    Current_Output_File : File_Type := Standard_Output_File;
 
    -----------
@@ -50,6 +59,57 @@ package body Ada.Text_IO is
          FCB.Buffer_Last := 0;
       end if;
    end Flush;
+
+   --------------
+   -- Get_Line --
+   --------------
+
+   procedure Get_Line
+     (Line : out String;
+      Last : out Natural)
+   is
+   begin
+      Get_Line (Current_Input_File, Line, Last);
+   end Get_Line;
+
+   --------------
+   -- Get_Line --
+   --------------
+
+   procedure Get_Line
+     (File : File_Type;
+      Line : out String;
+      Last : out Natural)
+   is
+      pragma Unreferenced (File, Line);
+   begin
+      Last := 0;
+   end Get_Line;
+
+   --------------
+   -- Get_Line --
+   --------------
+
+   function Get_Line return String is
+   begin
+      return Get_Line (Current_Input_File);
+   end Get_Line;
+
+   --------------
+   -- Get_Line --
+   --------------
+
+   function Get_Line (File : File_Type) return String is
+      Buffer : String (1 .. 200);
+      Last   : Natural;
+   begin
+      Get_Line (File, Buffer, Last);
+      if Last = Buffer'Last then
+         return Buffer & Get_Line (File);
+      else
+         return Buffer (1 .. Last);
+      end if;
+   end Get_Line;
 
    --------------
    -- New_Line --
@@ -132,6 +192,15 @@ package body Ada.Text_IO is
       New_Line (File);
    end Put_Line;
 
+   ---------------
+   -- Set_Input --
+   ---------------
+
+   procedure Set_Input (File : File_Type) is
+   begin
+      Current_Input_File := File;
+   end Set_Input;
+
    ----------------
    -- Set_Output --
    ----------------
@@ -140,6 +209,15 @@ package body Ada.Text_IO is
    begin
       Current_Output_File := File;
    end Set_Output;
+
+   --------------------
+   -- Standard_Input --
+   --------------------
+
+   function Standard_Input return File_Type is
+   begin
+      return Standard_Input_File;
+   end Standard_Input;
 
    ---------------------
    -- Standard_Output --
