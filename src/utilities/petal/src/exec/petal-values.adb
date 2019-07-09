@@ -1,25 +1,5 @@
 package body Petal.Values is
 
-   --------------
-   -- To_Value --
-   --------------
-
-   function To_Value (From : Boolean) return Petal_Value is
-   begin
-      return To_Value (if From then "true" else "false");
-   end To_Value;
-
-   --------------
-   -- To_Value --
-   --------------
-
-   function To_Value (From : String) return Petal_Value is
-      Result : String (1 .. Max_String_Length) := (others => ' ');
-   begin
-      Result (1 .. From'Length) := From;
-      return Petal_Value (Result);
-   end To_Value;
-
    ----------------
    -- To_Boolean --
    ----------------
@@ -30,12 +10,23 @@ package body Petal.Values is
       return S /= "" and then S /= "false";
    end To_Boolean;
 
+   -------------------
+   -- To_Capability --
+   -------------------
+
+   function To_Capability
+     (Value : Petal_Value) return Rose.Capabilities.Capability
+   is
+   begin
+      return Rose.Capabilities.Capability (To_Integer (Value));
+   end To_Capability;
+
    ----------------
    -- To_Integer --
    ----------------
 
    function To_Integer (Value : Petal_Value) return Integer is
-      S : constant String := To_String (Value);
+      S     : constant String := To_String (Value);
       First : Boolean := True;
       Neg   : Boolean := False;
       Acc   : Integer := 0;
@@ -68,15 +59,24 @@ package body Petal.Values is
       return "";
    end To_String;
 
-   -------------------
-   -- To_Capability --
-   -------------------
+   --------------
+   -- To_Value --
+   --------------
 
-   function To_Capability
-     (Value : Petal_Value) return Rose.Capabilities.Capability
-   is
+   function To_Value (From : Boolean) return Petal_Value is
    begin
-      return Rose.Capabilities.Capability (To_Integer (Value));
-   end To_Capability;
+      return To_Value (if From then "true" else "false");
+   end To_Value;
+
+   --------------
+   -- To_Value --
+   --------------
+
+   function To_Value (From : String) return Petal_Value is
+      Result : String (1 .. Max_String_Length) := (others => ' ');
+   begin
+      Result (1 .. From'Length) := From;
+      return Petal_Value (Result);
+   end To_Value;
 
 end Petal.Values;
