@@ -1,7 +1,3 @@
-with Rose.Words;
-
-with Rose.Console_IO;
-
 with Rose.System_Calls.Server;
 
 package body Rose.Server is
@@ -105,9 +101,9 @@ package body Rose.Server is
                Rose.System_Calls.Invoke_Capability (Params);
             end if;
          else
-            Rose.Console_IO.Put ("server: unknown endpoint: ");
-            Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
-            Rose.Console_IO.New_Line;
+--              Rose.Console_IO.Put ("server: unknown endpoint: ");
+--              Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
+--              Rose.Console_IO.New_Line;
             Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
             Rose.System_Calls.Send_Error
               (Params, Rose.Invocation.Invalid_Endpoint);
