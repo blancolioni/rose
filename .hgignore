@@ -13,7 +13,6 @@ src/rvm/hd0.img
 src/rvm/rvm.gpr
 *.log
 src/utilities/petal/src/petal-config_paths.ads
-src/utilities/petal/petal.gpr
 src/utilities/idl/src/idl-paths.ads
 src/utilities/idl/idl.gpr
 src/servers/login/src/login-config_paths.ads

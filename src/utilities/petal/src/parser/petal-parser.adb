@@ -8,14 +8,17 @@ package body Petal.Parser is
                   Tok_Ampersand, Tok_Semicolon,
                   Tok_End_Of_Line);
 
-   ----------------
-   -- Is_Command --
-   ----------------
+   ---------------
+   -- Arguments --
+   ---------------
 
-   function Is_Command (Element : Parse_Element) return Boolean is
+   function Arguments
+     (Element : Parse_Element)
+      return Petal.Actual_Arguments.Actual_Argument_Container
+   is
    begin
-      return Element.Is_Command;
-   end Is_Command;
+      return Element.Arguments;
+   end Arguments;
 
    -------------
    -- Command --
@@ -39,17 +42,41 @@ package body Petal.Parser is
       return Element.Context;
    end Context;
 
-   ---------------
-   -- Arguments --
-   ---------------
+   -------------
+   -- Element --
+   -------------
 
-   function Arguments
-     (Element : Parse_Element)
-      return Petal.Actual_Arguments.Actual_Argument_Container
-   is
+   function Element (Result : Parse_Result) return Parse_Element is
    begin
-      return Element.Arguments;
-   end Arguments;
+      return Result.Elements (Result.Current);
+   end Element;
+
+   -----------------
+   -- Has_Element --
+   -----------------
+
+   function Has_Element (Result : Parse_Result) return Boolean is
+   begin
+      return Result.Current <= Result.Count;
+   end Has_Element;
+
+   ----------------
+   -- Is_Command --
+   ----------------
+
+   function Is_Command (Element : Parse_Element) return Boolean is
+   begin
+      return Element.Is_Command;
+   end Is_Command;
+
+   ----------
+   -- Next --
+   ----------
+
+   procedure Next (Result : in out Parse_Result) is
+   begin
+      Result.Current := Result.Current + 1;
+   end Next;
 
    -----------
    -- Parse --
@@ -85,7 +112,7 @@ package body Petal.Parser is
       procedure Error (Message : String) is
       begin
          Ada.Text_IO.Put_Line
-           (Ada.Text_IO.Standard_Error,
+           (Ada.Text_IO.Standard_Output,
             Message);
          Result.Count := 0;
       end Error;
@@ -258,32 +285,5 @@ package body Petal.Parser is
          end if;
       end loop;
    end Parse;
-
-   -----------------
-   -- Has_Element --
-   -----------------
-
-   function Has_Element (Result : Parse_Result) return Boolean is
-   begin
-      return Result.Current <= Result.Count;
-   end Has_Element;
-
-   -------------
-   -- Element --
-   -------------
-
-   function Element (Result : Parse_Result) return Parse_Element is
-   begin
-      return Result.Elements (Result.Current);
-   end Element;
-
-   ----------
-   -- Next --
-   ----------
-
-   procedure Next (Result : in out Parse_Result) is
-   begin
-      Result.Current := Result.Current + 1;
-   end Next;
 
 end Petal.Parser;

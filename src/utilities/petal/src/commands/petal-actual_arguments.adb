@@ -23,34 +23,47 @@ package body Petal.Actual_Arguments is
       end loop;
    end Add_Argument;
 
-   ----------------
-   -- To_Boolean --
-   ----------------
+   --------------------
+   -- Extra_Argument --
+   --------------------
 
-   function To_Boolean (Argument : Actual_Argument) return Boolean is
-   begin
-      return Petal.Values.To_Boolean (Argument.Value);
-   end To_Boolean;
-
-   ---------------
-   -- To_String --
-   ---------------
-
-   function To_String (Argument : Actual_Argument) return String is
-   begin
-      return Petal.Values.To_String (Argument.Value);
-   end To_String;
-
-   ----------------------
-   -- To_Stream_Reader --
-   ----------------------
-
-   function To_Stream_Reader
-     (Argument : Actual_Argument) return Rose.Capabilities.Capability
+   function Extra_Argument
+     (Container : Actual_Argument_Container; Index : Positive)
+      return Actual_Argument
    is
+      Count : Natural := 0;
    begin
-      return Petal.Values.To_Capability (Argument.Value);
-   end To_Stream_Reader;
+      for Argument of Container loop
+         exit when not Argument.Valid;
+         if Petal.Formal_Arguments.Is_Positional (Argument.Formal) then
+            Count := Count + 1;
+            if Count = Index then
+               return Argument;
+            end if;
+         end if;
+      end loop;
+      return Argument : Actual_Argument do
+         Argument.Valid := False;
+      end return;
+   end Extra_Argument;
+
+   --------------------------
+   -- Extra_Argument_Count --
+   --------------------------
+
+   function Extra_Argument_Count
+     (Container : Actual_Argument_Container) return Natural
+   is
+      Count : Natural := 0;
+   begin
+      for Argument of Container loop
+         exit when not Argument.Valid;
+         if Petal.Formal_Arguments.Is_Positional (Argument.Formal) then
+            Count := Count + 1;
+         end if;
+      end loop;
+      return Count;
+   end Extra_Argument_Count;
 
    --------------------
    -- Named_Argument --
@@ -96,46 +109,33 @@ package body Petal.Actual_Arguments is
       return Default_Value;
    end Named_Argument;
 
-   --------------------------
-   -- Extra_Argument_Count --
-   --------------------------
+   ----------------
+   -- To_Boolean --
+   ----------------
 
-   function Extra_Argument_Count
-     (Container : Actual_Argument_Container) return Natural
-   is
-      Count : Natural := 0;
+   function To_Boolean (Argument : Actual_Argument) return Boolean is
    begin
-      for Argument of Container loop
-         exit when not Argument.Valid;
-         if Petal.Formal_Arguments.Is_Positional (Argument.Formal) then
-            Count := Count + 1;
-         end if;
-      end loop;
-      return Count;
-   end Extra_Argument_Count;
+      return Petal.Values.To_Boolean (Argument.Value);
+   end To_Boolean;
 
-   --------------------
-   -- Extra_Argument --
-   --------------------
+   ----------------------
+   -- To_Stream_Reader --
+   ----------------------
 
-   function Extra_Argument
-     (Container : Actual_Argument_Container; Index : Positive)
-      return Actual_Argument
+   function To_Stream_Reader
+     (Argument : Actual_Argument) return Rose.Capabilities.Capability
    is
-      Count : Natural := 0;
    begin
-      for Argument of Container loop
-         exit when not Argument.Valid;
-         if Petal.Formal_Arguments.Is_Positional (Argument.Formal) then
-            Count := Count + 1;
-            if Count = Index then
-               return Argument;
-            end if;
-         end if;
-      end loop;
-      return Argument : Actual_Argument do
-         Argument.Valid := False;
-      end return;
-   end Extra_Argument;
+      return Petal.Values.To_Capability (Argument.Value);
+   end To_Stream_Reader;
+
+   ---------------
+   -- To_String --
+   ---------------
+
+   function To_String (Argument : Actual_Argument) return String is
+   begin
+      return Petal.Values.To_String (Argument.Value);
+   end To_String;
 
 end Petal.Actual_Arguments;

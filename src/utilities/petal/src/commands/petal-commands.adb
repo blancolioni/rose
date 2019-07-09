@@ -25,137 +25,6 @@ package body Petal.Commands is
    Command_Array : array (1 .. Max_Commands) of aliased Petal_Command_Record;
    Command_Count : Natural := 0;
 
-   ----------------------------
-   -- Default_Launch_Context --
-   ----------------------------
-
-   function Default_Launch_Context return Launch_Context is
-   begin
-      return Launch_Context'
-        (Standard_Caps => (others => 0),
-         Extra_Caps    => (others => 0),
-         Wait          => True);
-   end Default_Launch_Context;
-
-   -----------------
-   -- Is_Built_In --
-   -----------------
-
-   function Is_Built_In (Command : Petal_Command) return Boolean is
-   begin
-      return Command.Built_In;
-   end Is_Built_In;
-
-   -------------
-   -- Execute --
-   -------------
-
-   procedure Execute
-     (Command   : Petal_Command;
-      Context   : Launch_Context;
-      Arguments : Petal.Actual_Arguments.Actual_Argument_Container)
-   is
-      Result : constant Petal.Values.Petal_Value :=
-                 Execute (Command, Context, Arguments);
-   begin
-      pragma Unreferenced (Result);
-   end Execute;
-
-   -------------
-   -- Execute --
-   -------------
-
-   function Execute
-     (Command   : Petal_Command; Context : Launch_Context;
-      Arguments : Petal.Actual_Arguments.Actual_Argument_Container)
-      return Petal.Values.Petal_Value
-   is
-   begin
-      if Command.Built_In then
-         return Command.Execute (Context, Arguments);
-      else
-         Ada.Text_IO.Put_Line
-           ("launching:" & Command.Launch'Image);
-         return Petal.Values.To_Value (True);
-      end if;
-   end Execute;
-
-   ---------------------
-   -- Formal_Argument --
-   ---------------------
-
-   function Formal_Argument
-     (Command : Petal_Command; Long_Name : String)
-      return Petal.Formal_Arguments.Formal_Argument
-   is
-   begin
-      for Argument of Command.Named_Formals loop
-         if Petal.Formal_Arguments.Long_Name (Argument) = Long_Name then
-            return Argument;
-         end if;
-      end loop;
-      return Petal.Formal_Arguments.No_Formal_Argument;
-   end Formal_Argument;
-
-   ---------------------
-   -- Formal_Argument --
-   ---------------------
-
-   function Formal_Argument
-     (Command : Petal_Command; Short_Name : Character)
-      return Petal.Formal_Arguments.Formal_Argument
-   is
-   begin
-      for Argument of Command.Named_Formals loop
-         if Petal.Formal_Arguments.Short_Name (Argument) = Short_Name then
-            return Argument;
-         end if;
-      end loop;
-      return Petal.Formal_Arguments.No_Formal_Argument;
-   end Formal_Argument;
-
-   ----------------------------
-   -- Indexed_Argument_Count --
-   ----------------------------
-
-   function Indexed_Argument_Count (Command : Petal_Command) return Natural is
-   begin
-      return Command.Indexed_Formal_Count;
-   end Indexed_Argument_Count;
-
-   ----------------------
-   -- Indexed_Argument --
-   ----------------------
-
-   function Indexed_Argument
-     (Command : Petal_Command;
-      Index   : Positive)
-      return Petal.Formal_Arguments.Formal_Argument
-   is
-   begin
-      return Command.Indexed_Formals (Index);
-   end Indexed_Argument;
-
-   -------------------------
-   -- Has_Extra_Arguments --
-   -------------------------
-
-   function Has_Extra_Arguments (Command : Petal_Command) return Boolean is
-   begin
-      return Command.Has_Extra_Formals;
-   end Has_Extra_Arguments;
-
-   ---------------------
-   -- Extra_Arguments --
-   ---------------------
-
-   function Extra_Arguments
-     (Command : Petal_Command) return Petal.Formal_Arguments.Formal_Argument
-   is
-   begin
-      return Command.Extra_Formals;
-   end Extra_Arguments;
-
    ---------------------
    -- Create_Built_In --
    ---------------------
@@ -217,5 +86,136 @@ package body Petal.Commands is
       Command_Count := Command_Count + 1;
       return Command_Array (Command_Count)'Access;
    end Create_With_Launch_Cap;
+
+   ----------------------------
+   -- Default_Launch_Context --
+   ----------------------------
+
+   function Default_Launch_Context return Launch_Context is
+   begin
+      return Launch_Context'
+        (Standard_Caps => (others => 0),
+         Extra_Caps    => (others => 0),
+         Wait          => True);
+   end Default_Launch_Context;
+
+   -------------
+   -- Execute --
+   -------------
+
+   procedure Execute
+     (Command   : Petal_Command;
+      Context   : Launch_Context;
+      Arguments : Petal.Actual_Arguments.Actual_Argument_Container)
+   is
+      Result : constant Petal.Values.Petal_Value :=
+                 Execute (Command, Context, Arguments);
+   begin
+      pragma Unreferenced (Result);
+   end Execute;
+
+   -------------
+   -- Execute --
+   -------------
+
+   function Execute
+     (Command   : Petal_Command; Context : Launch_Context;
+      Arguments : Petal.Actual_Arguments.Actual_Argument_Container)
+      return Petal.Values.Petal_Value
+   is
+   begin
+      if Command.Built_In then
+         return Command.Execute (Context, Arguments);
+      else
+         Ada.Text_IO.Put_Line
+           ("launching:" & Command.Launch'Image);
+         return Petal.Values.To_Value (True);
+      end if;
+   end Execute;
+
+   ---------------------
+   -- Extra_Arguments --
+   ---------------------
+
+   function Extra_Arguments
+     (Command : Petal_Command) return Petal.Formal_Arguments.Formal_Argument
+   is
+   begin
+      return Command.Extra_Formals;
+   end Extra_Arguments;
+
+   ---------------------
+   -- Formal_Argument --
+   ---------------------
+
+   function Formal_Argument
+     (Command : Petal_Command; Long_Name : String)
+      return Petal.Formal_Arguments.Formal_Argument
+   is
+   begin
+      for Argument of Command.Named_Formals loop
+         if Petal.Formal_Arguments.Long_Name (Argument) = Long_Name then
+            return Argument;
+         end if;
+      end loop;
+      return Petal.Formal_Arguments.No_Formal_Argument;
+   end Formal_Argument;
+
+   ---------------------
+   -- Formal_Argument --
+   ---------------------
+
+   function Formal_Argument
+     (Command : Petal_Command; Short_Name : Character)
+      return Petal.Formal_Arguments.Formal_Argument
+   is
+   begin
+      for Argument of Command.Named_Formals loop
+         if Petal.Formal_Arguments.Short_Name (Argument) = Short_Name then
+            return Argument;
+         end if;
+      end loop;
+      return Petal.Formal_Arguments.No_Formal_Argument;
+   end Formal_Argument;
+
+   -------------------------
+   -- Has_Extra_Arguments --
+   -------------------------
+
+   function Has_Extra_Arguments (Command : Petal_Command) return Boolean is
+   begin
+      return Command.Has_Extra_Formals;
+   end Has_Extra_Arguments;
+
+   ----------------------
+   -- Indexed_Argument --
+   ----------------------
+
+   function Indexed_Argument
+     (Command : Petal_Command;
+      Index   : Positive)
+      return Petal.Formal_Arguments.Formal_Argument
+   is
+   begin
+      return Command.Indexed_Formals (Index);
+   end Indexed_Argument;
+
+   ----------------------------
+   -- Indexed_Argument_Count --
+   ----------------------------
+
+   function Indexed_Argument_Count (Command : Petal_Command) return Natural is
+   begin
+      return Command.Indexed_Formal_Count;
+   end Indexed_Argument_Count;
+
+   -----------------
+   -- Is_Built_In --
+   -----------------
+
+   function Is_Built_In (Command : Petal_Command) return Boolean is
+   begin
+      return Command.Built_In;
+   end Is_Built_In;
 
 end Petal.Commands;

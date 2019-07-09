@@ -10,7 +10,7 @@ project Petal_Unix is
    end Pretty_Printer;
 
    package Compiler is
-      for Switches ("ada") use ("-g", "-gnata", "-gnato", "-fstack-check");
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-gnat12", "-fno-strict-aliasing");
    end Compiler;
 
 end Petal_Unix;

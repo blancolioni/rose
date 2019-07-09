@@ -19,6 +19,42 @@ package body Petal.Formal_Arguments is
      array (1 .. Max_Formal_Arguments) of aliased Formal_Argument_Record;
    Formal_Argument_Count : Natural := 0;
 
+   -------------------
+   -- Default_Value --
+   -------------------
+
+   function Default_Value (Argument : Formal_Argument) return Boolean is
+   begin
+      return Petal.Values.To_Boolean (Argument.Default_Value);
+   end Default_Value;
+
+   -------------------
+   -- Default_Value --
+   -------------------
+
+   function Default_Value (Argument : Formal_Argument) return Integer is
+   begin
+      return Petal.Values.To_Integer (Argument.Default_Value);
+   end Default_Value;
+
+   -------------------
+   -- Default_Value --
+   -------------------
+
+   function Default_Value (Argument : Formal_Argument) return String is
+   begin
+      return Petal.Values.To_String (Argument.Default_Value);
+   end Default_Value;
+
+   -------------------
+   -- Expected_Type --
+   -------------------
+
+   function Expected_Type (Argument : Formal_Argument) return Argument_Type is
+   begin
+      return Argument.Expected_Type;
+   end Expected_Type;
+
    --------------
    -- Is_Named --
    --------------
@@ -53,51 +89,6 @@ package body Petal.Formal_Arguments is
       return Argument.Long_Name (1 .. Last);
    end Long_Name;
 
-   ----------------
-   -- Short_Name --
-   ----------------
-
-   function Short_Name (Argument : Formal_Argument) return Character is
-   begin
-      return Argument.Short_Name;
-   end Short_Name;
-
-   -------------------
-   -- Expected_Type --
-   -------------------
-
-   function Expected_Type (Argument : Formal_Argument) return Argument_Type is
-   begin
-      return Argument.Expected_Type;
-   end Expected_Type;
-
-   -------------------
-   -- Default_Value --
-   -------------------
-
-   function Default_Value (Argument : Formal_Argument) return Boolean is
-   begin
-      return Petal.Values.To_Boolean (Argument.Default_Value);
-   end Default_Value;
-
-   -------------------
-   -- Default_Value --
-   -------------------
-
-   function Default_Value (Argument : Formal_Argument) return Integer is
-   begin
-      return Petal.Values.To_Integer (Argument.Default_Value);
-   end Default_Value;
-
-   -------------------
-   -- Default_Value --
-   -------------------
-
-   function Default_Value (Argument : Formal_Argument) return String is
-   begin
-      return Petal.Values.To_String (Argument.Default_Value);
-   end Default_Value;
-
    --------------------
    -- Named_Argument --
    --------------------
@@ -125,17 +116,105 @@ package body Petal.Formal_Arguments is
       return Formal_Argument_Container (Formal_Argument_Count)'Access;
    end Named_Argument;
 
+   ----------------------------
+   -- Named_Boolean_Argument --
+   ----------------------------
+
+   function Named_Boolean_Argument
+     (Long_Name     : String;
+      Short_Name    : Character;
+      Default_Value : Boolean := False)
+      return Formal_Argument
+   is
+      pragma Unreferenced (Default_Value);
+   begin
+      return Named_Argument
+        (Long_Name     => Long_Name,
+         Short_Name    => Short_Name,
+         Value_Type    => Petal.Values.Boolean_Value,
+         Expected_Type => Value_Argument);
+   end Named_Boolean_Argument;
+
+   ----------------------------
+   -- Named_Integer_Argument --
+   ----------------------------
+
+   function Named_Integer_Argument
+     (Long_Name     : String; Short_Name : Character;
+      Default_Value : Integer := 0)
+      return Formal_Argument
+   is
+      pragma Unreferenced (Default_Value);
+   begin
+      return Named_Argument
+        (Long_Name     => Long_Name,
+         Short_Name    => Short_Name,
+         Value_Type    => Petal.Values.Integer_Value,
+         Expected_Type => Value_Argument);
+   end Named_Integer_Argument;
+
+   --------------------------------
+   -- Named_Read_Stream_Argument --
+   --------------------------------
+
+   function Named_Read_Stream_Argument
+     (Long_Name : String; Short_Name : Character) return Formal_Argument
+   is
+   begin
+      return Named_Argument
+        (Long_Name     => Long_Name,
+         Short_Name    => Short_Name,
+         Value_Type    => Petal.Values.Boolean_Value,
+         Expected_Type => Read_Stream_Argument);
+   end Named_Read_Stream_Argument;
+
+   ---------------------------
+   -- Named_String_Argument --
+   ---------------------------
+
+   function Named_String_Argument
+     (Long_Name     : String;
+      Short_Name    : Character;
+      Default_Value : String := "")
+      return Formal_Argument
+   is
+      pragma Unreferenced (Default_Value);
+   begin
+      return Named_Argument
+        (Long_Name     => Long_Name,
+         Short_Name    => Short_Name,
+         Value_Type    => Petal.Values.String_Value,
+         Expected_Type => Value_Argument);
+   end Named_String_Argument;
+
+   ---------------------------------
+   -- Named_Write_Stream_Argument --
+   ---------------------------------
+
+   function Named_Write_Stream_Argument
+     (Long_Name : String; Short_Name : Character) return Formal_Argument
+   is
+   begin
+      return Named_Argument
+        (Long_Name     => Long_Name,
+         Short_Name    => Short_Name,
+         Value_Type    => Petal.Values.Boolean_Value,
+         Expected_Type => Write_Stream_Argument);
+   end Named_Write_Stream_Argument;
+
    -------------------------
    -- Positional_Argument --
    -------------------------
 
    function Positional_Argument
-     (Key           : String; Required : Boolean;
+     (Key           : String;
+      Required      : Boolean;
       Multiple      : Boolean;
       Value_Type    : Petal.Values.Value_Type;
       Expected_Type : Argument_Type)
       return Formal_Argument
    is
+      pragma Unreferenced (Required, Multiple);
       Internal_Key : Formal_Argument_Name := (others => ' ');
    begin
       Internal_Key (1 .. Key'Length) := Key;
@@ -154,86 +233,6 @@ package body Petal.Formal_Arguments is
       return Formal_Argument_Container (Formal_Argument_Count)'Access;
    end Positional_Argument;
 
-   ----------------------------
-   -- Named_Boolean_Argument --
-   ----------------------------
-
-   function Named_Boolean_Argument
-     (Long_Name     : String;
-      Short_Name    : Character;
-      Default_Value : Boolean := False)
-      return Formal_Argument
-   is
-   begin
-      return Named_Argument
-        (Long_Name     => Long_Name,
-         Short_Name    => Short_Name,
-         Value_Type    => Petal.Values.Boolean_Value,
-         Expected_Type => Value_Argument);
-   end Named_Boolean_Argument;
-
-   ----------------------------
-   -- Named_Integer_Argument --
-   ----------------------------
-
-   function Named_Integer_Argument
-     (Long_Name : String; Short_Name : Character; Default_Value : Integer := 0)
-      return Formal_Argument
-   is
-   begin
-      return Named_Argument
-        (Long_Name     => Long_Name,
-         Short_Name    => Short_Name,
-         Value_Type    => Petal.Values.Integer_Value,
-         Expected_Type => Value_Argument);
-   end Named_Integer_Argument;
-
-   ---------------------------
-   -- Named_String_Argument --
-   ---------------------------
-
-   function Named_String_Argument
-     (Long_Name : String; Short_Name : Character; Default_Value : String := "")
-      return Formal_Argument
-   is
-   begin
-      return Named_Argument
-        (Long_Name     => Long_Name,
-         Short_Name    => Short_Name,
-         Value_Type    => Petal.Values.String_Value,
-         Expected_Type => Value_Argument);
-   end Named_String_Argument;
-
-   --------------------------------
-   -- Named_Read_Stream_Argument --
-   --------------------------------
-
-   function Named_Read_Stream_Argument
-     (Long_Name : String; Short_Name : Character) return Formal_Argument
-   is
-   begin
-      return Named_Argument
-        (Long_Name     => Long_Name,
-         Short_Name    => Short_Name,
-         Value_Type    => Petal.Values.Boolean_Value,
-         Expected_Type => Read_Stream_Argument);
-   end Named_Read_Stream_Argument;
-
-   ---------------------------------
-   -- Named_Write_Stream_Argument --
-   ---------------------------------
-
-   function Named_Write_Stream_Argument
-     (Long_Name : String; Short_Name : Character) return Formal_Argument
-   is
-   begin
-      return Named_Argument
-        (Long_Name     => Long_Name,
-         Short_Name    => Short_Name,
-         Value_Type    => Petal.Values.Boolean_Value,
-         Expected_Type => Write_Stream_Argument);
-   end Named_Write_Stream_Argument;
-
    ---------------------------------
    -- Positional_Integer_Argument --
    ---------------------------------
@@ -242,6 +241,7 @@ package body Petal.Formal_Arguments is
      (Key : String; Required, Multiple : Boolean; Default_Value : Integer := 0)
       return Formal_Argument
    is
+      pragma Unreferenced (Default_Value);
    begin
       return Positional_Argument
         (Key           => Key,
@@ -250,23 +250,6 @@ package body Petal.Formal_Arguments is
          Value_Type    => Petal.Values.Integer_Value,
          Expected_Type => Value_Argument);
    end Positional_Integer_Argument;
-
-   --------------------------------
-   -- Positional_String_Argument --
-   --------------------------------
-
-   function Positional_String_Argument
-     (Key : String; Required, Multiple : Boolean; Default_Value : String := "")
-      return Formal_Argument
-   is
-   begin
-      return Positional_Argument
-        (Key           => Key,
-         Required      => Required,
-         Multiple      => Multiple,
-         Value_Type    => Petal.Values.String_Value,
-         Expected_Type => Value_Argument);
-   end Positional_String_Argument;
 
    -------------------------------------
    -- Positional_Read_Stream_Argument --
@@ -284,6 +267,24 @@ package body Petal.Formal_Arguments is
          Expected_Type => Read_Stream_Argument);
    end Positional_Read_Stream_Argument;
 
+   --------------------------------
+   -- Positional_String_Argument --
+   --------------------------------
+
+   function Positional_String_Argument
+     (Key : String; Required, Multiple : Boolean; Default_Value : String := "")
+      return Formal_Argument
+   is
+      pragma Unreferenced (Default_Value);
+   begin
+      return Positional_Argument
+        (Key           => Key,
+         Required      => Required,
+         Multiple      => Multiple,
+         Value_Type    => Petal.Values.String_Value,
+         Expected_Type => Value_Argument);
+   end Positional_String_Argument;
+
    --------------------------------------
    -- Positional_Write_Stream_Argument --
    --------------------------------------
@@ -299,5 +300,14 @@ package body Petal.Formal_Arguments is
          Value_Type    => Petal.Values.Boolean_Value,
          Expected_Type => Write_Stream_Argument);
    end Positional_Write_Stream_Argument;
+
+   ----------------
+   -- Short_Name --
+   ----------------
+
+   function Short_Name (Argument : Formal_Argument) return Character is
+   begin
+      return Argument.Short_Name;
+   end Short_Name;
 
 end Petal.Formal_Arguments;

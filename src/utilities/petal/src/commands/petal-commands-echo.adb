@@ -42,6 +42,7 @@ package body Petal.Commands.Echo is
       Arguments : Petal.Actual_Arguments.Actual_Argument_Container)
       return Petal.Values.Petal_Value
    is
+      pragma Unreferenced (Context);
       Version  : constant Boolean :=
                    Petal.Actual_Arguments.To_Boolean
                      (Petal.Actual_Arguments.Named_Argument
