@@ -153,6 +153,6 @@ private
    Frontend_Exceptions       : constant Boolean := False;
    ZCX_By_Default            : constant Boolean := False;
 
-   Run_Time_Name : constant String := "Rose Kernel Run Time";
+   Run_Time_Name : constant String := "Rose Run Time";
 
 end System;

@@ -19,4 +19,4 @@ copy:
 	sh ./copy-runtime.sh
 
 rts:
-	gprbuild rts.gpr
+	gprbuild -v rts.gpr
