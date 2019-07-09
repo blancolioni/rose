@@ -25,9 +25,23 @@ package Ada.Text_IO is
    procedure Flush (File : File_Type);
    procedure Flush;
 
+   function Standard_Input return File_Type;
    function Standard_Output return File_Type;
 
+   procedure Set_Input (File : File_Type);
    procedure Set_Output (File : File_Type);
+
+   procedure Get_Line
+     (Line : out String;
+      Last : out Natural);
+
+   procedure Get_Line
+     (File : File_Type;
+      Line : out String;
+      Last : out Natural);
+
+   function Get_Line return String;
+   function Get_Line (File : File_Type) return String;
 
 private
 
