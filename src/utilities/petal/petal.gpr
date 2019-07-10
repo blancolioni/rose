@@ -22,5 +22,5 @@ project Petal is
    package Linker is
       for Default_Switches ("ada") use ("-m32", "-nostdlib");
    end Linker;
-   
+
 end Petal;
