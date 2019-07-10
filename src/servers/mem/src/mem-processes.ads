@@ -19,6 +19,10 @@ package Mem.Processes is
      (Process : Rose.Objects.Object_Id)
       return Rose.Objects.Capability_Identifier;
 
+   function Get_Process_Heap_Bound
+     (Process : Rose.Objects.Capability_Identifier)
+      return Rose.Addresses.Virtual_Page_Address;
+
    procedure Get_Process_Segment
      (Process         : Rose.Objects.Capability_Identifier;
       Virtual_Page    : Rose.Addresses.Virtual_Page_Address;
@@ -58,7 +62,8 @@ package Mem.Processes is
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
-      Executable    : Boolean);
+      Executable    : Boolean;
+      Resizable     : Boolean);
 
    procedure Add_Nonpersistent_Segment
      (Process       : Rose.Objects.Capability_Identifier;
@@ -66,6 +71,11 @@ package Mem.Processes is
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Readable      : Boolean;
       Writable      : Boolean;
-      Executable    : Boolean);
+      Executable    : Boolean;
+      Resizable     : Boolean);
+
+   procedure Resize_Segment
+     (Process           : Rose.Objects.Capability_Identifier;
+      New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address);
 
 end Mem.Processes;

@@ -29,13 +29,14 @@ package body Mem.Processes is
 
    type Segment_Record is
       record
-         Base         : Rose.Addresses.Virtual_Page_Address := 0;
-         Bound        : Rose.Addresses.Virtual_Page_Address := 0;
-         Region       : Rose.Interfaces.Region.Client.Region_Client;
-         Region_Base  : Rose.Objects.Object_Id := 0;
-         Region_Bound : Rose.Objects.Object_Id := 0;
+         Base          : Rose.Addresses.Virtual_Page_Address := 0;
+         Bound         : Rose.Addresses.Virtual_Page_Address := 0;
+         Limit         : Rose.Addresses.Virtual_Page_Address := 0;
+         Region        : Rose.Interfaces.Region.Client.Region_Client;
+         Region_Base   : Rose.Objects.Object_Id := 0;
+         Region_Bound  : Rose.Objects.Object_Id := 0;
          Region_Offset : Rose.Objects.Object_Id := 0;
-         Flags        : Segment_Flag_Array := (others => False);
+         Flags         : Segment_Flag_Array := (others => False);
       end record;
 
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
@@ -68,7 +69,8 @@ package body Mem.Processes is
       Virtual_Bound  : Rose.Addresses.Virtual_Page_Address;
       Readable       : Boolean;
       Writable       : Boolean;
-      Executable     : Boolean)
+      Executable     : Boolean;
+      Resizable      : Boolean)
    is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
@@ -79,7 +81,8 @@ package body Mem.Processes is
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
         (Base         => Virtual_Base,
-         Bound        => Virtual_Bound,
+         Bound        => (if Resizable then Virtual_Base else Virtual_Bound),
+         Limit        => Virtual_Bound,
          Region       => <>,
          Region_Base  => 0,
          Region_Bound => 0,
@@ -88,9 +91,8 @@ package body Mem.Processes is
            (Read       => Readable,
             Write      => Writable,
             Execute    => Executable,
-            Extensible => False,
+            Extensible => Resizable,
             Persistent => False));
-
    end Add_Nonpersistent_Segment;
 
    -----------------
@@ -105,7 +107,8 @@ package body Mem.Processes is
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
-      Executable    : Boolean)
+      Executable    : Boolean;
+      Resizable     : Boolean)
    is
       use type Rose.Objects.Object_Id;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -122,7 +125,8 @@ package body Mem.Processes is
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
         (Base         => Virtual_Base,
-         Bound         => Virtual_Bound,
+         Bound        => (if Resizable then Virtual_Base else Virtual_Bound),
+         Limit        => Virtual_Bound,
          Region       => Region,
          Region_Base  => Region_Base,
          Region_Bound => Region_Bound,
@@ -132,7 +136,7 @@ package body Mem.Processes is
            (Read => Readable,
             Write => Writable,
             Execute => Executable,
-            Extensible => False,
+            Extensible => Resizable,
             Persistent => True));
 
    end Add_Segment;
@@ -168,6 +172,24 @@ package body Mem.Processes is
          return Process_Table (Process).Oid;
       end if;
    end Get_Object_Id;
+
+   ----------------------------
+   -- Get_Process_Heap_Bound --
+   ----------------------------
+
+   function Get_Process_Heap_Bound
+     (Process : Rose.Objects.Capability_Identifier)
+     return Rose.Addresses.Virtual_Page_Address
+   is
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments loop
+         if Segment.Flags (Extensible) then
+            return Segment.Bound;
+         end if;
+      end loop;
+      return 0;
+   end Get_Process_Heap_Bound;
 
    --------------------
    -- Get_Process_Id --
@@ -347,6 +369,37 @@ package body Mem.Processes is
 
       return Next_Pid;
    end Register_Process;
+
+   --------------------
+   -- Resize_Segment --
+   --------------------
+
+   procedure Resize_Segment
+     (Process           : Rose.Objects.Capability_Identifier;
+      New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address)
+   is
+   begin
+
+      if Is_Valid_Process_Id (Process) then
+         declare
+            use Rose.Addresses;
+            P : Memory_Process_Record renames Process_Table (Process);
+         begin
+            for Segment of P.Segments loop
+               if New_Virtual_Bound in Segment.Base .. Segment.Limit then
+                  if New_Virtual_Bound < Segment.Bound then
+                     for I in New_Virtual_Bound .. Segment.Bound - 1 loop
+                        Mem.Calls.Unmap (P.Oid, I);
+                     end loop;
+                  end if;
+
+                  Segment.Bound := New_Virtual_Bound;
+                  return;
+               end if;
+            end loop;
+         end;
+      end if;
+   end Resize_Segment;
 
    --------------------
    -- Resume_Process --

@@ -61,6 +61,14 @@ package body Mem.Server is
       Virtual_Bound : in     Rose.Words.Word;
       Flags         : in     Rose.Words.Word);
 
+   function Current_Heap_Top
+     (Id : Rose.Objects.Capability_Identifier)
+     return Rose.Words.Word;
+
+   procedure Request_Heap_Top
+     (Id      : Rose.Objects.Capability_Identifier;
+      New_Top : Rose.Words.Word);
+
    procedure Page_Fault
      (Id       : Rose.Objects.Capability_Identifier;
       Object   : Rose.Objects.Object_Id;
@@ -95,7 +103,8 @@ package body Mem.Server is
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Readable     => (Flags and Segment_Readable) /= 0,
          Writable     => (Flags and Segment_Writable) /= 0,
-         Executable   => (Flags and Segment_Executable) /= 0);
+         Executable   => (Flags and Segment_Executable) /= 0,
+         Resizable    => (Flags and Segment_Resizable) /= 0);
    end Add_Nonpersistent_Segment;
 
    -----------------
@@ -125,7 +134,8 @@ package body Mem.Server is
          Region_Offset => Offset,
          Readable      => (Flags and Segment_Readable) /= 0,
          Writable      => (Flags and Segment_Writable) /= 0,
-         Executable    => (Flags and Segment_Executable) /= 0);
+         Executable    => (Flags and Segment_Executable) /= 0,
+         Resizable    => (Flags and Segment_Resizable) /= 0);
    end Add_Segment;
 
    -------------------
@@ -159,11 +169,27 @@ package body Mem.Server is
         (Server_Context => Server,
          Add_Segment    => Add_Segment'Access,
          Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
+         Current_Heap_Top => Current_Heap_Top'Access,
+         Request_Heap_Top => Request_Heap_Top'Access,
          Destroy        => Kill'Access,
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
          Instanced      => True);
 
    end Create_Server;
+
+   ----------------------
+   -- Current_Heap_Top --
+   ----------------------
+
+   function Current_Heap_Top
+     (Id : Rose.Objects.Capability_Identifier)
+     return Rose.Words.Word
+   is
+   begin
+      return Rose.Words.Word
+        (Mem.Processes.Get_Process_Heap_Bound
+           (Process => Id));
+   end Current_Heap_Top;
 
    ----------
    -- Kill --
@@ -358,29 +384,53 @@ package body Mem.Server is
          Virtual_Bound => A (Exec_Bound),
          Readable      => True,
          Writable      => False,
-         Executable    => True);
+         Executable    => True,
+         Resizable     => False);
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Process_Id,
          Virtual_Base  => A (Text_Base),
          Virtual_Bound => A (Text_Bound),
          Readable      => True,
          Writable      => False,
-         Executable    => False);
+         Executable    => False,
+         Resizable     => False);
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Process_Id,
          Virtual_Base  => A (Data_Base),
          Virtual_Bound => A (Data_Bound),
          Readable      => True,
          Writable      => True,
-         Executable    => False);
+         Executable    => False,
+         Resizable     => False);
+      Mem.Processes.Add_Nonpersistent_Segment
+        (Process       => Process_Id,
+         Virtual_Base  => A (Data_Bound),
+         Virtual_Bound => A (Data_Bound),
+         Readable      => True,
+         Writable      => True,
+         Executable    => False,
+         Resizable     => True);
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Process_Id,
          Virtual_Base  => A (Stack_Base),
          Virtual_Bound => A (Stack_Bound),
          Readable      => True,
          Writable      => True,
-         Executable    => False);
+         Executable    => False,
+         Resizable     => False);
    end Register_Process;
+
+--
+   procedure Request_Heap_Top
+     (Id      : Rose.Objects.Capability_Identifier;
+      New_Top : Rose.Words.Word)
+   is
+   begin
+      Mem.Processes.Resize_Segment
+        (Process      => Id,
+         New_Virtual_Bound =>
+           Rose.Addresses.Virtual_Page_Address (New_Top));
+   end Request_Heap_Top;
 
    ------------------
    -- Start_Server --
