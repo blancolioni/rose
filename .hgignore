@@ -56,3 +56,9 @@ images/iso/boot/launch
 images/iso/rose-install/drivers/*
 images/iso/rose/install/drivers/*.cap
 src/tests/allocator/obj/*
+images/iso/boot/caps
+images/iso/boot/elf
+images/iso/boot/servers
+images/iso/boot/timer
+src/rts/support/*.o
+src/rts/support/librose-util.a
