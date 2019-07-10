@@ -1,4 +1,4 @@
-pragma Restrictions (No_Allocators);
+--  pragma Restrictions (No_Allocators);
 pragma Restrictions (No_Calendar);
 pragma Restrictions (No_Dispatch);
 pragma Restrictions (No_Enumeration_Maps);
