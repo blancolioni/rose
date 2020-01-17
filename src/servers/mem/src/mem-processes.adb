@@ -20,8 +20,7 @@ package body Mem.Processes is
    subtype Page_Buffer is
      System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
 
-   Buffer : Page_Buffer
-     with Alignment => Rose.Limits.Page_Size;
+   Buffer : Page_Buffer;
 
    Max_Segments : constant := 8;
    type Segment_Count is range 0 .. Max_Segments;
