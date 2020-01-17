@@ -31,11 +31,11 @@ library project RTS is
       Ada_Switches := ("-gnat2012", "-O0", "-g3", "-x", "-gnatg",
                        "-gnatec=../../../gnat.adc", "-q");--, "-gnatd.n");
 
-      for Default_Switches ("Ada") use Ada_Switches & ("-m32", "-march=i586");
+      for Default_Switches ("Ada") use Ada_Switches;
    end Builder;
 
    package Compiler is
-      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib");
+      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib", "-m32", "-march=i586");
    end Compiler;
 
    for Library_Kind use "static";
