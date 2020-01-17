@@ -55,7 +55,7 @@ package body IDL.Endpoints is
             begin
                for Item of Config loop
                   Table.Insert (Item.Config_Name, Item.Value);
-                  Numbers.Insert (Item.Value);
+                  Numbers.Include (Item.Value);
                end loop;
             end;
          end if;
