@@ -4,3 +4,4 @@ logs
 src/library/kernelapi/generated
 src/tools/idl/idl.gpr
 src/tools/idl/src/idl-paths.ads
+rts/gnat-src
