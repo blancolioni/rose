@@ -5,6 +5,8 @@ Persistent capability-based kernel
 
 The build process requires [alix](https://github.com/blancolioni/alix) to generate source files from .idl specifications.
 
+On Fedora, you'll need the following packages: qemu-img gcc-gnat gprbuild make xorriso 
+
 ## Build
 
 ```
