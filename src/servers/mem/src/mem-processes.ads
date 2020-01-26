@@ -68,4 +68,9 @@ package Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean);
 
+   procedure Allocate_Physical_Page
+     (Process       : Rose.Objects.Capability_Identifier;
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      R, W, X       : Boolean := False);
+
 end Mem.Processes;
