@@ -56,6 +56,7 @@ package body Keyboard.Codes is
       begin
          for Ch of Sequence loop
             exit when Last >= Result'Last;
+            Last := Last + 1;
             Result (Last) := Character'Pos (Ch);
          end loop;
       end Copy;
