@@ -4,6 +4,8 @@ with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Words;
 
+with Rose.Console_IO;
+
 with Rose.Interfaces.Interrupt_Handler;
 with Rose.Interfaces.Stream_Reader;
 
@@ -204,6 +206,13 @@ package body Keyboard.Server is
                         Pressed => Code < 16#80#,
                         Result  => Result,
                         Last    => Last);
+
+                     if Last > 0 then
+                        for Code of Result (1 .. Last) loop
+                           Rose.Console_IO.Put (Character'Val (Code));
+                        end loop;
+                        Rose.Console_IO.Flush;
+                     end if;
 
                      Add_To_Buffer (Result (1 .. Last));
 

@@ -5,6 +5,7 @@ project Keyboard is
        "../../base",
        "../../library/capabilities",
        "../../library/kernelapi/devices",
+       "../../library/kernelapi/console",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
        "../../library/kernelapi/arch/i686");
