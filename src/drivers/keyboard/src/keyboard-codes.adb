@@ -26,7 +26,19 @@ package body Keyboard.Codes is
 
    Key_Code : constant array (Rose.Words.Word_8) of Key_Entry :=
                 (16#01# => Fn (0),
-                 16#0E# => Asc ('`', '~'),
+                 16#02# => Asc ('1', '!'),
+                 16#03# => Asc ('2', '@'),
+                 16#04# => Asc ('3', '#'),
+                 16#05# => Asc ('4', '$'),
+                 16#06# => Asc ('5', '%'),
+                 16#07# => Asc ('6', '^'),
+                 16#08# => Asc ('7', '&'),
+                 16#09# => Asc ('8', '*'),
+                 16#0A# => Asc ('9', '('),
+                 16#0B# => Asc ('0', ')'),
+                 16#0C# => Asc ('-', '_'),
+                 16#0D# => Asc ('=', '+'),
+                 16#29# => Asc ('`', '~'),
                  others => <>);
 
    Current_Mod : array (Key_Modifier) of Boolean := (others => False);
