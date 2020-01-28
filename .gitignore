@@ -5,3 +5,13 @@ src/library/kernelapi/generated
 src/tools/idl/idl.gpr
 src/tools/idl/src/idl-paths.ads
 rts/gnat-src
+doc/rose-book/*.aux
+doc/rose-book/*.dvi
+doc/rose-book/*.log
+doc/rose-book/*.lot
+doc/rose-book/*.out
+doc/rose-book/*.toc
+doc/rose-book/*.idx
+doc/rose-book/*.lof
+doc/rose-book/*.pdf
+*~
