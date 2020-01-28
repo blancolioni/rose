@@ -11,8 +11,6 @@ with Tropos.Writer;
 
 package body IDL.Endpoints is
 
-   Endpoint_File_Name : constant String := "interfaces.txt";
-
    type Endpoint_Value_Record is
       record
          Endpoint : Ada.Strings.Unbounded.Unbounded_String;
@@ -36,6 +34,10 @@ package body IDL.Endpoints is
    Numbers    : WL.String_Sets.Set;
    Loaded     : Boolean := False;
    Randomised : Boolean := False;
+
+   Table_Path : Ada.Strings.Unbounded.Unbounded_String;
+
+   function Endpoint_File_Name return String;
 
    procedure Check_Loaded (Key : String);
    procedure Save_Table;
@@ -96,6 +98,20 @@ package body IDL.Endpoints is
       end if;
    end Check_Loaded;
 
+   ------------------------
+   -- Endpoint_File_Name --
+   ------------------------
+
+   function Endpoint_File_Name return String is
+      use Ada.Strings.Unbounded;
+   begin
+      if Table_Path = Null_Unbounded_String then
+         return "interfaces.txt";
+      else
+         return To_String (Table_Path);
+      end if;
+   end Endpoint_File_Name;
+
    -----------------
    -- Endpoint_Id --
    -----------------
@@ -136,5 +152,14 @@ package body IDL.Endpoints is
       end loop;
       Tropos.Writer.Write_Config (Config, Endpoint_File_Name);
    end Save_Table;
+
+   --------------------
+   -- Set_Table_Path --
+   --------------------
+
+   procedure Set_Table_Path (Path : String) is
+   begin
+      Table_Path := Ada.Strings.Unbounded.To_Unbounded_String (Path);
+   end Set_Table_Path;
 
 end IDL.Endpoints;
