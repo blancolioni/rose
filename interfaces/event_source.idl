@@ -1,0 +1,6 @@
+interface Event_Source is
+
+   procedure Add_Listener
+      (Listener : interface Event_Listener);
+
+end Event_Source;
