@@ -42,6 +42,7 @@ package body Keyboard.Server is
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,
            Rose.Interfaces.Event_Source.Add_Listener_Endpoint);
+      Have_Listener := False;
 
       Register_IRQ;
    end Create_Server;
