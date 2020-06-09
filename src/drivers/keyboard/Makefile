@@ -18,7 +18,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-devices-port_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-event_listener-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
