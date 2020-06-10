@@ -154,14 +154,18 @@ package body Elf.Loader is
 
                declare
                   Offset      : Word_32 := 0;
+                  Image_Start : constant Rose.Objects.Object_Id :=
+                                  Rose.Objects.Object_Id
+                                    (File_Offset / Rose.Limits.Page_Size);
                   Page_Offset : Rose.Objects.Object_Id;
                   Page        : System.Storage_Elements.Storage_Array
                     (1 .. Rose.Limits.Page_Size);
                begin
-                  while Offset < Memory_Size loop
+                  while Offset < File_Size loop
                      Page_Offset :=
                        Rose.Objects.Object_Id (Offset / Rose.Limits.Page_Size);
-                     Get (Image_Region, Base_Object + Page_Offset, Page);
+                     Get (Image_Region,
+                          Base_Object + Image_Start + Page_Offset, Page);
                      Put (Region, Segment_Base + Page_Offset, Page);
                      Offset := Offset + Rose.Limits.Page_Size;
                   end loop;

@@ -20,7 +20,7 @@ project IsoFS is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcdefhiklnoprst", "-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing");
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcdefhiklnoprst", "-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-gnat2020");
    end Compiler;
 
    package Binder is

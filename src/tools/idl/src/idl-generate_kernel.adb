@@ -1341,12 +1341,11 @@ package body IDL.Generate_Kernel is
       end;
 
       declare
-         Type_Dec : Syn.Declaration'Class :=
+         Type_Dec : constant Syn.Declaration'Class :=
                       Syn.Declarations.New_Private_Type_Declaration
                         (Record_Name,
                          Interface_Record);
       begin
-         Type_Dec.Set_Private_Spec;
          Pkg.Append (Type_Dec);
       end;
 

@@ -1,0 +1,5 @@
+interface Event_Listener is
+
+   procedure On_Event (Code : Word);
+   
+end Event_Listener;

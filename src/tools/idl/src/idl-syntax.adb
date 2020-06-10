@@ -762,7 +762,7 @@ package body IDL.Syntax is
 
       procedure Scan (Ancestor : IDL_Interface) is
       begin
-         Set.Insert (Get_Ada_Name (Ancestor));
+         Set.Include (Get_Ada_Name (Ancestor));
          for I in 1 .. Get_Num_Inherited (Ancestor) loop
             declare
                Next : constant IDL_Interface := Get_Inherited (Ancestor, I);
@@ -861,7 +861,7 @@ package body IDL.Syntax is
          Name : constant String := Get_Ada_Name (X);
       begin
          if not Visited.Contains (Name) then
-            Visited.Insert (Name);
+            Visited.Include (Name);
             for J in 1 .. X.Num_Inherited loop
                Scan (X.Inherited (J));
             end loop;

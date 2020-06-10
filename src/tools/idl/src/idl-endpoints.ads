@@ -5,4 +5,6 @@ package IDL.Endpoints is
       Subprogram_Name : String)
       return String;
 
+   procedure Set_Table_Path (Path : String);
+
 end IDL.Endpoints;

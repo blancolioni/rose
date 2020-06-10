@@ -9,6 +9,9 @@ with Rose.Interfaces.Process_Memory;
 
 with Mem.Calls;
 
+with Mem.Physical_Map;
+with Mem.Virtual_Map;
+
 package body Mem.Processes is
 
    type Process_State is (Available, Active, Faulted);
@@ -18,10 +21,8 @@ package body Mem.Processes is
    type Segment_Flag_Array is array (Segment_Flag) of Boolean;
 
    subtype Page_Buffer is
-     System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
-
-   Buffer : Page_Buffer
-     with Alignment => Rose.Limits.Page_Size;
+     System.Storage_Elements.Storage_Array (1 .. 4096);
+   Long_Buffer : System.Storage_Elements.Storage_Array (1 .. 8192);
 
    Max_Segments : constant := 8;
    type Segment_Count is range 0 .. Max_Segments;
@@ -138,8 +139,56 @@ package body Mem.Processes is
             Execute => Executable,
             Extensible => Resizable,
             Persistent => True));
-
    end Add_Segment;
+
+   ----------------------------
+   -- Allocate_Physical_Page --
+   ----------------------------
+
+   procedure Allocate_Physical_Page
+     (Process       : Rose.Objects.Capability_Identifier;
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      R, W, X       : Boolean := False)
+   is
+      Have_Page : Boolean;
+      Page      : Rose.Addresses.Physical_Page_Address;
+      P         : Memory_Process_Record renames Process_Table (Process);
+   begin
+      Mem.Physical_Map.Allocate_Page
+        (Page, Have_Page);
+      if not Have_Page then
+         Mem.Virtual_Map.Reclaim (Page, Have_Page);
+      end if;
+
+      if not Have_Page then
+         Rose.Console_IO.Put_Line ("no page");
+         return;
+      else
+
+         Initialize_Page
+           (Process       => Process,
+            Physical_Page => Page,
+            Virtual_Page  => Virtual_Page);
+
+         Mem.Virtual_Map.Map
+           (Process       => P.Oid,
+            Virtual_Page  => Virtual_Page,
+            Physical_Page => Page,
+            Readable      => R,
+            Writable      => W,
+            Executable    => X);
+
+         declare
+            use Rose.Words;
+         begin
+            Rose.Console_IO.Put ("mem: preallocating phys ");
+            Rose.Console_IO.Put (Rose.Words.Word_32 (Virtual_Page) * 4096);
+            Rose.Console_IO.Put (" -> ");
+            Rose.Console_IO.Put (Rose.Words.Word_32 (Page) * 4096);
+            Rose.Console_IO.New_Line;
+         end;
+      end if;
+   end Allocate_Physical_Page;
 
    -------------------
    -- Fault_Process --
@@ -260,13 +309,23 @@ package body Mem.Processes is
    is
       use Rose.Addresses;
       P : Memory_Process_Record renames Process_Table (Process);
+      Base : constant System.Address := Long_Buffer'Address;
+      X    : constant Virtual_Address := To_Virtual_Address (Base);
+      Y    : constant Virtual_Address :=
+               (if X mod 4096 = 0 then X
+                else X - (X mod 4096) + 4096);
+      Addr : constant System.Address := To_System_Address (Y);
+      Buffer : Page_Buffer;
+      pragma Import (Ada, Buffer);
+      for Buffer'Address use Addr;
    begin
+
       for Segment of P.Segments loop
          if Virtual_Page >= Segment.Base
            and then Virtual_Page < Segment.Bound
          then
 
-            Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
+            Mem.Calls.Load_Page (Physical_Page, Addr);
 
             if Segment.Flags (Persistent) then
                declare

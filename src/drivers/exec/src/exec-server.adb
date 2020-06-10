@@ -86,7 +86,12 @@ package body Exec.Server is
       for Cap of Caps loop
          Send_Cap (Params, Cap);
       end loop;
+
+      Send_Cap (Params, Console_Cap);
+
       Invoke_Capability (Params);
+      Rose.Console_IO.Put_Line ("exec: done");
+
       return Rose.Objects.Object_Id
         (Rose.System_Calls.Get_Word_64
            (Params, 0));

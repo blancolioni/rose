@@ -10,7 +10,7 @@ project Kernel_I686 is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatw.f.h.wael", "-gnatyABM79OSabcdefhiklnoprstux", "-g", "-gnatp", "-gnat12", "-fno-strict-aliasing", "-m32", "-O3");
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatw.f.h.wael", "-gnatyABM79OSabcdefhiklnoprstux", "-g", "-gnatp", "-gnat12", "-fno-strict-aliasing", "-m32", "-O3", "-gnat2020");
    end Compiler;
 
    package Binder is

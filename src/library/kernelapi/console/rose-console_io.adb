@@ -37,6 +37,7 @@ package body Rose.Console_IO is
    is
    begin
       Con_Cap := Console_Cap;
+      Buffer_Length := 0;
    end Open;
 
    ---------

@@ -78,4 +78,9 @@ package Mem.Processes is
      (Process           : Rose.Objects.Capability_Identifier;
       New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address);
 
+   procedure Allocate_Physical_Page
+     (Process       : Rose.Objects.Capability_Identifier;
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      R, W, X       : Boolean := False);
+
 end Mem.Processes;
