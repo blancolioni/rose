@@ -18,6 +18,7 @@ package Rose.Boot.Console is
    procedure Put (Ch : Character);
    procedure Put (Item : Word_16);
    procedure Put (Item : Word_32);
+   procedure Put (Item : Word_64);
    procedure Put (Addr : Physical_Address);
    procedure Put (Addr : Virtual_Address);
    procedure Put (Addr : System.Address);
