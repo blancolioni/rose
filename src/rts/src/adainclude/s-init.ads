@@ -1,5 +1,5 @@
 package System.Init is
 
-   procedure Initialize_RTS;
+   pragma Elaborate_Body;
 
 end System.Init;
