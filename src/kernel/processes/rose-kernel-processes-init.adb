@@ -57,6 +57,7 @@ package body Rose.Kernel.Processes.Init is
       end loop;
 
       Current_Process := Process_Table (1)'Access;
+      Current_Process.Flags (Boot_Module) := True;
 
       Current_Process.Stack :=
         Rose.Kernel.Arch.Process_Stack_Frame
@@ -280,6 +281,7 @@ package body Rose.Kernel.Processes.Init is
          end if;
 
          Proc.Oid := Rose.Objects.Object_Id (Pid);
+         Proc.Flags (Boot_Module) := True;
 
          declare
             use Rose.Objects;

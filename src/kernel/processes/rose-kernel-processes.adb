@@ -665,6 +665,10 @@ package body Rose.Kernel.Processes is
          return False;
       end if;
 
+      if P.Flags (Wait_Reply) then
+         return False;
+      end if;
+
       declare
          use Rose.Objects;
          use type Rose.Capabilities.Layout.Capability_Type;
@@ -1023,7 +1027,6 @@ package body Rose.Kernel.Processes is
       P : Kernel_Process_Entry renames Process_Table (Receiver_Id);
    begin
       P.Flags (Receive_Any) := False;
-      P.Flags (Receive_Caps) := False;
       P.Current_Params := Params;
       P.Receive_Cap := Params.Cap;
 
@@ -1278,6 +1281,12 @@ package body Rose.Kernel.Processes is
       if To.State /= Blocked then
          return;
       end if;
+
+      if not To.Flags (Wait_Reply) then
+         return;
+      end if;
+
+      To.Flags (Wait_Reply) := False;
 
       To.Current_Params := Params;
       To.Current_Params.Cap := To.Receive_Cap;
@@ -1775,5 +1784,14 @@ package body Rose.Kernel.Processes is
          end;
       end if;
    end Wait_For_Receiver;
+
+   --------------------
+   -- Wait_For_Reply --
+   --------------------
+
+   procedure Wait_For_Reply (Pid : Process_Id) is
+   begin
+      Process_Table (Pid).Flags (Wait_Reply) := True;
+   end Wait_For_Reply;
 
 end Rose.Kernel.Processes;
