@@ -6,6 +6,7 @@ with Rose.Devices.Partitions;
 with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.Constructor;
 with Rose.Interfaces.File_System;
+with Rose.Interfaces.Map;
 with Rose.Interfaces.Storage;
 with Rose.Interfaces.Timer;
 with Rose.Interfaces.Timeout;
@@ -671,9 +672,17 @@ package body Init.Run is
          Reply  : aliased Rose.Invocation.Invocation_Record;
          Exec   : Rose.Objects.Object_Id :=
                     Rose.Objects.Null_Object_Id;
+         Command : Rose.Objects.Object_Id :=
+                     Rose.Objects.Null_Object_Id;
          Install_Cap : Rose.Capabilities.Capability :=
                          Rose.Capabilities.Null_Capability;
-         First  : Boolean := True;
+         Find_Cap    : Rose.Capabilities.Capability :=
+                         Rose.Capabilities.Null_Capability
+                           with Unreferenced;
+         Add_Cap     : Rose.Capabilities.Capability :=
+                         Rose.Capabilities.Null_Capability;
+         Do_Exec     : Boolean := True;
+         Do_Command  : Boolean := True;
       begin
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
@@ -683,7 +692,8 @@ package body Init.Run is
 
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
-            if First then
+            if Do_Exec then
+               Do_Exec := False;
                Exec :=
                  Init.Installer.Install_Exec_Library
                    (Create_Cap      => Create_Cap,
@@ -707,7 +717,36 @@ package body Init.Run is
                       (Copy_Exec_Cap,
                        Rose.Interfaces.Exec.Install_Endpoint);
                end;
-               First := False;
+            elsif Do_Command then
+               Do_Command := False;
+               Command :=
+                 Init.Installer.Install_Command_Library
+                   (Create_Cap      => Create_Cap,
+                    Storage_Cap     => Storage_Cap,
+                    Reserve_Cap     => Reserve_Storage_Cap,
+                    Launch_Cap      => Launch_Elf_Cap,
+                    Cap_Stream      => Params.Caps (0),
+                    Standard_Output => Console_Write_Cap,
+                    Binary_Stream   => Params.Caps (1),
+                    Binary_Length   => Params.Data (0));
+
+               declare
+                  Copy_Command_Cap : constant Rose.Capabilities.Capability :=
+                                       Init.Calls.Call
+                                         (Create_Cap,
+                                          (9, 1,
+                                           Word (Command mod 2 ** 32),
+                                           Word (Command / 2 ** 32)));
+               begin
+                  Add_Cap :=
+                    Copy_Cap_From_Process
+                      (Copy_Command_Cap,
+                       Rose.Interfaces.Map.Add_Endpoint);
+                  Find_Cap :=
+                    Copy_Cap_From_Process
+                      (Copy_Command_Cap,
+                       Rose.Interfaces.Map.Find_Endpoint);
+               end;
             else
                declare
                   Launch : constant Rose.Capabilities.Capability :=
@@ -718,7 +757,16 @@ package body Init.Run is
                                 Binary_Stream => Params.Caps (1),
                                 Binary_Length => Params.Data (0));
                begin
-                  Rose.System_Calls.Send_Cap (Reply, Launch);
+                  Wait (2000);
+                  if Params.Data (1) = 0 then
+                     Rose.System_Calls.Send_Cap (Reply, Launch);
+                  elsif Params.Data (1) = 1 then
+                     Rose.System_Calls.Send_Cap (Reply, Add_Cap);
+                     Rose.System_Calls.Send_Cap (Reply, Launch);
+                  else
+                     Init.Calls.Send_String
+                       (Console_Write_Cap, "init: bad action");
+                  end if;
                end;
             end if;
 
