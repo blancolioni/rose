@@ -316,6 +316,17 @@ package body Rose.Boot.Console is
    -- Put --
    ---------
 
+   procedure Put (Item : Word_64) is
+   begin
+      Put (Word_32 (Item / 2 ** 32));
+      Put ("_");
+      Put (Word_32 (Item mod 2 ** 32));
+   end Put;
+
+   ---------
+   -- Put --
+   ---------
+
    procedure Put (Cap : Rose.Capabilities.Capability) is
    begin
       Put ("cap-");

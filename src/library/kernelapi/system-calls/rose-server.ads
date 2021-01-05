@@ -45,7 +45,7 @@ package Rose.Server is
 private
 
    Max_Handled_Endpoints  : constant := 20;
-   Max_Endpoint_Instances : constant := 40;
+   Max_Endpoint_Instances : constant := 60;
 
    type Instanced_Handler_Record is
       record

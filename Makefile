@@ -12,16 +12,18 @@ TOOLS=idl configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=keyboard exec
+DRIVERS=command keyboard exec
+UTILITIES=echo
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps
 
-all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) exports stripped hdd iso finished
+all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
 
 rts:
 	(cd rts; make)
+	(cd src/rts; make)
 
 tools: $(TOOLS)
-	
+
 interfaces:
 	(cd src/library/kernelapi/generated; make)
 
@@ -35,6 +37,11 @@ $(DRIVERS): %:
 	(cd src/drivers/$@; make)
 	(cd images/iso/rose/install/drivers; configure-driver ../../../../../src/drivers/$@/$@.driver)
 
+$(UTILITIES): %:
+	(cd src/utilities/$@; make)
+	(cp src/utilities/$@/build/bin/$@-driver images/iso/rose/install/bin/$@)
+	(cd images/iso/rose/install/bin; configure-driver ../../../../../src/utilities/$@/$@.caps)
+
 exports:
 	sh ./scripts/export-elf-trace
 
@@ -43,7 +50,7 @@ stripped:
 
 hdd:
 	sh ./scripts/rose-hdd-install
-	
+
 iso:
 	sh ./scripts/rose-iso-install
 

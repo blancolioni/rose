@@ -103,6 +103,10 @@ package body Rose.Kernel.Capabilities.Endpoint is
                                 Cap.Header.Identifier);
          begin
             Set_Cap (Pid, Params.Reply_Cap, Reply_Layout);
+
+            if Params.Control.Flags (Rose.Invocation.Block) then
+               Wait_For_Reply (Rose.Kernel.Processes.Current_Process_Id);
+            end if;
          end;
       end if;
 

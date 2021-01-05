@@ -1,0 +1,14 @@
+interface Map is
+
+   procedure Add
+     (Name : String;
+      Cap  : interface Launch);
+      
+   procedure Remove
+     (Name : String);
+      
+   function Find
+     (Name : String)
+     return interface Launch;
+      
+end Map;

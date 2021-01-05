@@ -132,6 +132,12 @@ package Rose.Kernel.Processes is
       Endpoint_Index : Rose.Objects.Endpoint_Index)
       return Boolean;
 
+   function Is_Blocked_On_Reply
+     (Pid : Process_Id)
+      return Boolean;
+
+   procedure Wait_For_Reply (Pid : Process_Id);
+
    function Create_Endpoint
      (Pid        : Process_Id;
       Endpoint   : Rose.Objects.Endpoint_Id)
@@ -255,6 +261,10 @@ package Rose.Kernel.Processes is
      (Id : Process_Id)
       return Boolean;
 
+   function Is_Boot_Module
+     (Id : Process_Id)
+      return Boolean;
+
    procedure Copy_Cap_Layout
      (From_Process_Id : Process_Id;
       From_Cap        : Rose.Capabilities.Capability;
@@ -316,8 +326,8 @@ package Rose.Kernel.Processes is
 private
 
    type Process_Flag is
-     (Receive_Any, Receive_Caps, Receive_Cap, Invoke_Reply,
-      Interrupt_Resume, Message_Queued, Trace);
+     (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
+      Interrupt_Resume, Message_Queued, Trace, Boot_Module);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -573,6 +583,16 @@ private
      (Pid : Process_Id)
       return Rose.Addresses.Physical_Address
    is (Process_Table (Pid).Directory_Page);
+
+   function Is_Boot_Module
+     (Id : Process_Id)
+      return Boolean
+   is (Process_Table (Id).Flags (Boot_Module));
+
+   function Is_Blocked_On_Reply
+     (Pid : Process_Id)
+      return Boolean
+   is (Process_Table (Pid).Flags (Wait_Reply));
 
 --     function Has_Queued_Message
 --       (Process : Process_Id)

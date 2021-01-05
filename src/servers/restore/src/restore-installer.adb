@@ -1,3 +1,5 @@
+with Rose.Words;
+
 with Rose.Console_IO;
 with Rose.Directories;
 
@@ -13,27 +15,72 @@ package body Restore.Installer is
    procedure Write_Initial_System_Image
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
 
-   procedure Install_From_Directory
-     (Directory_Entry : Rose.Directories.Directory_Entry_Type);
-
-   procedure Install_With_Caps
-     (Cap_File_Entry : Rose.Directories.Directory_Entry_Type);
+   --  procedure Install_From_Directory
+   --    (Directory_Entry : Rose.Directories.Directory_Entry_Type);
+   --
+   --  procedure Install_With_Caps
+   --    (Cap_File_Entry : Rose.Directories.Directory_Entry_Type);
 
    procedure Install_Executable
-     (Exec_Path : String;
-      Cap_Path  : String);
+     (Root_Path : String;
+      Directory : String;
+      Name      : String;
+      Action    : Install_Action);
+
+   procedure Append
+     (To   : in out String;
+      Last : in out Natural;
+      S    : String);
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (To   : in out String;
+      Last : in out Natural;
+      S    : String)
+   is
+   begin
+      for Ch of S loop
+         Last := Last + 1;
+         To (Last) := Ch;
+      end loop;
+   end Append;
 
    -------------
    -- Install --
    -------------
 
    procedure Install
-     (To   : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (To     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+      Source : Step_Iterator)
    is
       use type Rose.Directories.File_Kind;
       Install_Directory : constant String := "/rose/install";
-      Exec_Path : constant String := "/rose/install/exec";
-      Exec_Cap  : constant String := "/rose/install/exec.cap";
+
+      procedure Process_Executable
+        (Name     : String;
+         Category : String;
+         Action   : Install_Action);
+
+      ------------------------
+      -- Process_Executable --
+      ------------------------
+
+      procedure Process_Executable
+        (Name     : String;
+         Category : String;
+         Action   : Install_Action)
+      is
+      begin
+         Install_Executable
+           (Root_Path => Install_Directory,
+            Directory => Category,
+            Name      => Name,
+            Action    => Action);
+      end Process_Executable;
+
    begin
 
       if not Rose.Directories.Exists (Install_Directory) then
@@ -49,25 +96,13 @@ package body Restore.Installer is
            ("install: /rose/install is not a directory");
       end if;
 
-      if not Rose.Directories.Exists (Exec_Path) then
-         Rose.Console_IO.Put_Line
-           ("install: cannot find exec");
-         return;
-      end if;
+      --  Process_Executable ("exec", "", Launch);
+      --  Process_Executable ("command", "drivers", Launch)
 
-      if not Rose.Directories.Exists (Exec_Cap) then
-         Rose.Console_IO.Put_Line
-           ("install: cannot find exec.cap");
-         return;
-      end if;
+      --  Launch_Executable (Exec_Path, Exec_Cap);
+      --  Launch_Executable (Command_Path, Command_Cap);
 
-      Install_Executable (Exec_Path, Exec_Cap);
-
-      Rose.Directories.Search
-        (Directory => Install_Directory,
-         Pattern   => "*",
-         Filter    => (Rose.Directories.Directory => True, others => False),
-         Process   => Install_From_Directory'Access);
+      Source (Process_Executable'Access);
 
       if False then
          Write_Initial_System_Image (To);
@@ -80,18 +115,50 @@ package body Restore.Installer is
    ------------------------
 
    procedure Install_Executable
-     (Exec_Path : String;
-      Cap_Path  : String)
+     (Root_Path : String;
+      Directory : String;
+      Name      : String;
+      Action    : Install_Action)
    is
       use Rose.Interfaces.Stream_Reader.Client;
-      Caps_Reader   : Stream_Reader_Client;
-      Binary_Reader : Stream_Reader_Client;
+      Caps_Reader    : Stream_Reader_Client;
+      Binary_Reader  : Stream_Reader_Client;
+      Exec_Path      : String (1 .. 200);
+      Exec_Path_Last : Natural := 0;
+      Cap_Path       : String (1 .. 200);
+      Cap_Path_Last  : Natural := 0;
    begin
-      Rose.Directories.Open (Caps_Reader, Cap_Path);
-      Rose.Directories.Open (Binary_Reader, Exec_Path);
+
+      Append (Exec_Path, Exec_Path_Last, Root_Path);
+      Append (Exec_Path, Exec_Path_Last, "/");
+      if Directory /= "" then
+         Append (Exec_Path, Exec_Path_Last, Directory);
+         Append (Exec_Path, Exec_Path_Last, "/");
+      end if;
+      Append (Exec_Path, Exec_Path_Last, Name);
+      Cap_Path := Exec_Path;
+      Cap_Path_Last := Exec_Path_Last;
+      Append (Cap_Path, Cap_Path_Last, ".cap");
+
+      if not Rose.Directories.Exists (Exec_Path (1 .. Exec_Path_Last)) then
+         Rose.Console_IO.Put ("install: cannot find ");
+         Rose.Console_IO.Put (Exec_Path (1 .. Exec_Path_Last));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      if not Rose.Directories.Exists (Cap_Path (1 .. Cap_Path_Last)) then
+         Rose.Console_IO.Put ("install: cannot find ");
+         Rose.Console_IO.Put (Cap_Path (1 .. Cap_Path_Last));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      Rose.Directories.Open (Caps_Reader, Cap_Path (1 .. Cap_Path_Last));
+      Rose.Directories.Open (Binary_Reader, Exec_Path (1 .. Exec_Path_Last));
 
       Rose.Console_IO.Put ("installing: ");
-      Rose.Console_IO.Put (Exec_Path);
+      Rose.Console_IO.Put (Exec_Path (1 .. Exec_Path_Last));
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Flush;
 
@@ -104,7 +171,10 @@ package body Restore.Installer is
          Rose.System_Calls.Send_Cap
            (Params, Get_Interface_Cap (Binary_Reader));
          Rose.System_Calls.Send_Word
-           (Params, Natural (Rose.Directories.Size (Exec_Path)));
+           (Params,
+            Natural (Rose.Directories.Size (Exec_Path (1 .. Exec_Path_Last))));
+         Rose.System_Calls.Send_Word
+           (Params, Rose.Words.Word_32'(Install_Action'Pos (Action)));
          Rose.System_Calls.Receive_Caps (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
          if Params.Control.Flags (Rose.Invocation.Error) then
@@ -112,89 +182,33 @@ package body Restore.Installer is
          else
             Rose.Console_IO.Put_Line ("done");
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then
-               Rose.System_Calls.Initialize_Send (Params, Params.Caps (0));
-               Rose.System_Calls.Invoke_Capability (Params);
+               declare
+                  Reply : aliased Rose.Invocation.Invocation_Record;
+               begin
+                  case Action is
+                     when Launch =>
+                        Rose.Console_IO.Put ("launching ");
+                        Rose.Console_IO.Put (Name);
+                        Rose.Console_IO.New_Line;
+                        Rose.System_Calls.Initialize_Send
+                          (Reply, Params.Caps (0));
+                        Rose.System_Calls.Invoke_Capability (Reply);
+                     when Save =>
+                        Rose.Console_IO.Put ("saving ");
+                        Rose.Console_IO.Put (Name);
+                        Rose.Console_IO.New_Line;
+                        Rose.System_Calls.Initialize_Send
+                          (Reply, Params.Caps (0));
+                        Rose.System_Calls.Send_Text (Reply, Name);
+                        Rose.System_Calls.Send_Cap (Reply, Params.Caps (1));
+                        Rose.System_Calls.Invoke_Capability (Reply);
+                  end case;
+               end;
             end if;
          end if;
       end;
 
    end Install_Executable;
-
-   ----------------------------
-   -- Install_From_Directory --
-   ----------------------------
-
-   procedure Install_From_Directory
-     (Directory_Entry : Rose.Directories.Directory_Entry_Type)
-   is
-      Full_Name      : String (1 .. 100);
-      Full_Name_Last : Natural;
-      Simple_Name      : String (1 .. 100);
-      Simple_Name_Last : Natural;
-   begin
-      Rose.Directories.Full_Name
-        (Directory_Entry, Full_Name, Full_Name_Last);
-      Rose.Directories.Simple_Name
-        (Directory_Entry, Simple_Name, Simple_Name_Last);
-
-      if Full_Name_Last = 0 then
-         Rose.Console_IO.Put_Line ("directory entry: no name");
-         return;
-      elsif  (Simple_Name_Last = 1
-              and then Simple_Name (1) = '.')
-        or else (Simple_Name_Last = 2
-                 and then Simple_Name (1) = '.'
-                 and then Simple_Name (2) = '.')
-      then
-         return;
-      end if;
-
-      Rose.Console_IO.Put ("install: entering directory ");
-      Rose.Console_IO.Put_Line (Full_Name (1 .. Full_Name_Last));
-
-      Rose.Directories.Search
-        (Directory => Full_Name (1 .. Full_Name_Last),
-         Pattern   => "*.cap",
-         Filter    =>
-           (Rose.Directories.Ordinary_File => True, others => False),
-         Process   => Install_With_Caps'Access);
-   end Install_From_Directory;
-
-   -----------------------
-   -- Install_With_Caps --
-   -----------------------
-
-   procedure Install_With_Caps
-     (Cap_File_Entry : Rose.Directories.Directory_Entry_Type)
-   is
-      Caps_File_Name        : String (1 .. 100);
-      Caps_File_Name_Last   : Natural;
-      Binary_File_Name      : String (1 .. 100);
-      Binary_File_Name_Last : Natural;
-   begin
-      Rose.Directories.Full_Name
-        (Cap_File_Entry, Caps_File_Name, Caps_File_Name_Last);
-      Binary_File_Name_Last := Caps_File_Name_Last - 4;  --  "*.cap"
-
-      Binary_File_Name (1 .. Binary_File_Name_Last) :=
-        Caps_File_Name (1 .. Binary_File_Name_Last);
-
-      if not Rose.Directories.Exists
-        (Binary_File_Name (1 .. Binary_File_Name_Last))
-      then
-         Rose.Console_IO.Put ("install: ");
-         Rose.Console_IO.Put
-           (Binary_File_Name (1 .. Binary_File_Name_Last));
-         Rose.Console_IO.Put (": no such file");
-         Rose.Console_IO.New_Line;
-         return;
-      end if;
-
-      Install_Executable
-        (Exec_Path => Binary_File_Name (1 .. Binary_File_Name_Last),
-         Cap_Path  => Caps_File_Name (1 .. Caps_File_Name_Last));
-
-   end Install_With_Caps;
 
    --------------------------------
    -- Write_Initial_System_Image --

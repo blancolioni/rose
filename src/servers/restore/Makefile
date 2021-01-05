@@ -27,6 +27,7 @@ OBJECTS= \
 	$(BUILDDIR)/b__restore-driver.o \
 	$(BUILDDIR)/restore-driver.o \
 	$(BUILDDIR)/restore-installer.o \
+	$(BUILDDIR)/restore-installer-default.o \
 	$(BUILDDIR)/restore.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \

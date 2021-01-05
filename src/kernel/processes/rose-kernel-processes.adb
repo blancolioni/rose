@@ -1,5 +1,3 @@
-with System.Storage_Elements;
-
 with Rose.Boot.Console;
 
 with Rose.Arch.Interrupts;
@@ -245,10 +243,27 @@ package body Rose.Kernel.Processes is
         (Valid  => True, Readable => True, Writable => True,
          others => False);
 
+      Proc.Page_Ranges (Invocation_Range_Index) :=
+        (Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
+         Virtual_Address_To_Page (Invocation_Buffer_Range_Bound));
+
+      Proc.Invocation_Buffer :=
+        Proc.Page_Ranges (Invocation_Range_Index).Base;
+
       Map_Page
         (Directory_Page => Directory_VP,
          Virtual_Page   =>
            Virtual_Address_To_Page (Environment_Base),
+         Physical_Page  => Proc.Env_Page,
+         Readable       => True,
+         Writable       => True,
+         Executable     => False,
+         User           => True);
+
+      Map_Page
+        (Directory_Page => Directory_VP,
+         Virtual_Page   =>
+           Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
          Physical_Page  => Proc.Env_Page,
          Readable       => True,
          Writable       => True,
@@ -501,18 +516,6 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
          Debug.Report_Process (Current_Process_Id);
-         if Rose.Words.Word (Virtual_Address)
-           /= Current_Process.Stack.EIP
-         then
-            declare
-               Code : System.Storage_Elements.Storage_Array (1 .. 16);
-               pragma Import (Ada, Code);
-               for Code'Address use
-                 System'To_Address (Current_Process.Stack.EIP);
-            begin
-               Rose.Boot.Console.Put (Code);
-            end;
-         end if;
       end if;
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
@@ -665,6 +668,10 @@ package body Rose.Kernel.Processes is
          return False;
       end if;
 
+      if P.Flags (Wait_Reply) then
+         return False;
+      end if;
+
       declare
          use Rose.Objects;
          use type Rose.Capabilities.Layout.Capability_Type;
@@ -683,14 +690,26 @@ package body Rose.Kernel.Processes is
                              or else Endpoint = Endpoint_Index;
          begin
             if not Blocked then
-               Rose.Boot.Console.Put ("receiver is blocked on ");
+               Debug.Put (Current_Process_Id);
+               Rose.Boot.Console.Put (": receiver ");
+               Debug.Put (Pid);
+               Rose.Boot.Console.Put (" is blocked on ");
                Rose.Boot.Console.Put
                  (Rose.Words.Word_8
                     (Rec.Header.Endpoint));
+               Rose.Boot.Console.Put (" ");
+               Rose.Boot.Console.Put
+                 (Rose.Words.Word_64
+                    (P.Endpoints (Rec.Header.Endpoint).Endpoint));
+               Rose.Boot.Console.New_Line;
+
                Rose.Boot.Console.Put (" but we are sending to ");
                Rose.Boot.Console.Put
                  (Rose.Words.Word_8
                     (Endpoint_Index));
+               Rose.Boot.Console.Put (" ");
+               Rose.Boot.Console.Put
+                 (Rose.Words.Word_64 (P.Endpoints (Endpoint_Index).Endpoint));
                Rose.Boot.Console.New_Line;
             end if;
 
@@ -1023,7 +1042,6 @@ package body Rose.Kernel.Processes is
       P : Kernel_Process_Entry renames Process_Table (Receiver_Id);
    begin
       P.Flags (Receive_Any) := False;
-      P.Flags (Receive_Caps) := False;
       P.Current_Params := Params;
       P.Receive_Cap := Params.Cap;
 
@@ -1278,6 +1296,12 @@ package body Rose.Kernel.Processes is
       if To.State /= Blocked then
          return;
       end if;
+
+      if not To.Flags (Wait_Reply) then
+         return;
+      end if;
+
+      To.Flags (Wait_Reply) := False;
 
       To.Current_Params := Params;
       To.Current_Params.Cap := To.Receive_Cap;
@@ -1775,5 +1799,14 @@ package body Rose.Kernel.Processes is
          end;
       end if;
    end Wait_For_Receiver;
+
+   --------------------
+   -- Wait_For_Reply --
+   --------------------
+
+   procedure Wait_For_Reply (Pid : Process_Id) is
+   begin
+      Process_Table (Pid).Flags (Wait_Reply) := True;
+   end Wait_For_Reply;
 
 end Rose.Kernel.Processes;

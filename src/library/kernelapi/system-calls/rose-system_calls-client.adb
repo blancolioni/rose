@@ -48,7 +48,6 @@ package body Rose.System_Calls.Client is
       end if;
    end Get_Capability;
 
-
    ---------------
    -- Get_Value --
    ---------------

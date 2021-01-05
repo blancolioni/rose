@@ -1,8 +1,6 @@
 with Rose.Invocation;
 with Rose.Objects;
 
-with Rose.Console_IO;
-
 with Rose.Server;
 with Rose.System_Calls;
 
@@ -57,7 +55,6 @@ package body Exec.Server is
       use Rose.Interfaces.Stream_Reader.Client;
       Reader : Stream_Reader_Client;
    begin
-      Rose.Console_IO.Put_Line ("exec: installing");
       Open (Reader, ELF_Image);
       return Exec.Library.Install (Reader, Caps);
    end On_Install;
@@ -75,7 +72,6 @@ package body Exec.Server is
       Params : aliased Rose.Invocation.Invocation_Record;
       Base, Bound : Rose.Objects.Page_Object_Id;
    begin
-      Rose.Console_IO.Put_Line ("exec: launching");
       Exec.Library.Get_Image_Pages (Id, Base, Bound);
       Initialize_Send (Params, Create_Process_Cap);
       Send_Cap (Params, Region_Cap);
@@ -90,7 +86,6 @@ package body Exec.Server is
       Send_Cap (Params, Console_Cap);
 
       Invoke_Capability (Params);
-      Rose.Console_IO.Put_Line ("exec: done");
 
       return Rose.Objects.Object_Id
         (Rose.System_Calls.Get_Word_64

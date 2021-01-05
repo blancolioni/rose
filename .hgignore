@@ -13,7 +13,6 @@ src/rvm/hd0.img
 src/rvm/rvm.gpr
 *.log
 src/utilities/petal/src/petal-config_paths.ads
-src/utilities/petal/petal.gpr
 src/utilities/idl/src/idl-paths.ads
 src/utilities/idl/idl.gpr
 src/servers/login/src/login-config_paths.ads
@@ -57,3 +56,9 @@ images/iso/boot/launch
 images/iso/rose-install/drivers/*
 images/iso/rose/install/drivers/*.cap
 src/tests/allocator/obj/*
+images/iso/boot/caps
+images/iso/boot/elf
+images/iso/boot/servers
+images/iso/boot/timer
+src/rts/support/*.o
+src/rts/support/librose-util.a
