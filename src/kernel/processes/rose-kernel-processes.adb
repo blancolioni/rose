@@ -1,5 +1,3 @@
-with System.Storage_Elements;
-
 with Rose.Boot.Console;
 
 with Rose.Arch.Interrupts;
@@ -245,10 +243,27 @@ package body Rose.Kernel.Processes is
         (Valid  => True, Readable => True, Writable => True,
          others => False);
 
+      Proc.Page_Ranges (Invocation_Range_Index) :=
+        (Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
+         Virtual_Address_To_Page (Invocation_Buffer_Range_Bound));
+
+      Proc.Invocation_Buffer :=
+        Proc.Page_Ranges (Invocation_Range_Index).Base;
+
       Map_Page
         (Directory_Page => Directory_VP,
          Virtual_Page   =>
            Virtual_Address_To_Page (Environment_Base),
+         Physical_Page  => Proc.Env_Page,
+         Readable       => True,
+         Writable       => True,
+         Executable     => False,
+         User           => True);
+
+      Map_Page
+        (Directory_Page => Directory_VP,
+         Virtual_Page   =>
+           Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
          Physical_Page  => Proc.Env_Page,
          Readable       => True,
          Writable       => True,
@@ -501,18 +516,6 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (if Protection_Violation then "p" else "-");
          Rose.Boot.Console.New_Line;
          Debug.Report_Process (Current_Process_Id);
-         if Rose.Words.Word (Virtual_Address)
-           /= Current_Process.Stack.EIP
-         then
-            declare
-               Code : System.Storage_Elements.Storage_Array (1 .. 16);
-               pragma Import (Ada, Code);
-               for Code'Address use
-                 System'To_Address (Current_Process.Stack.EIP);
-            begin
-               Rose.Boot.Console.Put (Code);
-            end;
-         end if;
       end if;
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
@@ -687,14 +690,26 @@ package body Rose.Kernel.Processes is
                              or else Endpoint = Endpoint_Index;
          begin
             if not Blocked then
-               Rose.Boot.Console.Put ("receiver is blocked on ");
+               Debug.Put (Current_Process_Id);
+               Rose.Boot.Console.Put (": receiver ");
+               Debug.Put (Pid);
+               Rose.Boot.Console.Put (" is blocked on ");
                Rose.Boot.Console.Put
                  (Rose.Words.Word_8
                     (Rec.Header.Endpoint));
+               Rose.Boot.Console.Put (" ");
+               Rose.Boot.Console.Put
+                 (Rose.Words.Word_64
+                    (P.Endpoints (Rec.Header.Endpoint).Endpoint));
+               Rose.Boot.Console.New_Line;
+
                Rose.Boot.Console.Put (" but we are sending to ");
                Rose.Boot.Console.Put
                  (Rose.Words.Word_8
                     (Endpoint_Index));
+               Rose.Boot.Console.Put (" ");
+               Rose.Boot.Console.Put
+                 (Rose.Words.Word_64 (P.Endpoints (Endpoint_Index).Endpoint));
                Rose.Boot.Console.New_Line;
             end if;
 
