@@ -38,6 +38,7 @@ $(DRIVERS): %:
 	(cd images/iso/rose/install/drivers; configure-driver ../../../../../src/drivers/$@/$@.driver)
 
 $(UTILITIES): %:
+	mkdir -p images/iso/rose/install/bin/
 	(cd src/utilities/$@; make)
 	(cp src/utilities/$@/build/bin/$@-driver images/iso/rose/install/bin/$@)
 	(cd images/iso/rose/install/bin; configure-driver ../../../../../src/utilities/$@/$@.caps)
