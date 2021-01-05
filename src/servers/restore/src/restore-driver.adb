@@ -10,9 +10,10 @@ with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Rose.Devices.Checkpoints;
-with Restore.Installer;
+with Restore.Installer.Default;
 
 procedure Restore.Driver is
+
    use Rose.Interfaces.Block_Device.Client;
 
    procedure Next (Cap : out Rose.Capabilities.Capability);
@@ -72,7 +73,9 @@ begin
       begin
          Open_Cap_Set (File_System, Install_Media_Cap);
          Rose.Directories.Open_Root_File_System (File_System);
-         Restore.Installer.Install (Device);
+         Restore.Installer.Install
+           (To     => Device,
+            Source => Restore.Installer.Default.Iterate_Steps'Access);
       end;
    end if;
 
