@@ -13,6 +13,7 @@ On Fedora, you'll need the following packages: qemu-img gcc-gnat gprbuild make x
 cd rose
 (cd rts ; make)
 make idl
+(cd src/rts ; make)
 make
 ```
 
