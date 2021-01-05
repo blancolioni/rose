@@ -151,10 +151,6 @@ package body Rose.Server is
              (Endpoint   => Endpoint,
               Identifier => Identifier,
               Capability => Cap);
-      else
-         Rose.Console_IO.Put ("server error: too many instances: max is ");
-         Rose.Console_IO.Put (Natural (Max_Endpoint_Instances));
-         Rose.Console_IO.New_Line;
       end if;
    end Set_Instance_Cap;
 
