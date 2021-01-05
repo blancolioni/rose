@@ -14,6 +14,8 @@ with Rose.Kernel.Capabilities.Processes;
 with Rose.Kernel.Clock;
 with Rose.Kernel.Heap;
 
+with Rose.Kernel.Processes.Debug;
+
 package body Rose.Kernel.Capabilities.Kernel_Caps is
 
    function Process_Cap
@@ -104,8 +106,6 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             end;
 
          when Create_Process_Endpoint =>
-            Rose.Boot.Console.Put_Line ("kernel: create process");
-
             declare
                use Rose.Kernel.Processes;
                Pid : constant Process_Id := New_Process;
@@ -120,6 +120,10 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                      Rose.Kernel.Processes.Ready);
                   return;
                end if;
+
+               Rose.Boot.Console.Put ("kernel: create process ");
+               Rose.Kernel.Processes.Debug.Put (Pid);
+               Rose.Boot.Console.New_Line;
 
                for Index in 0 .. Params.Control.Last_Sent_Cap loop
                   Copy_Cap (Current_Process_Id, Pid,
