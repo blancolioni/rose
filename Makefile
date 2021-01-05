@@ -91,3 +91,5 @@ clean:
 	rm -f `find . -name "b~*" -print`
 	rm -f src/tools/idl/idl.gpr
 	rm -f src/tools/configure-driver/configure.gpr
+	rm -f src/rts/support/librose-util.a
+
