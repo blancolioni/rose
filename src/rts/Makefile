@@ -9,7 +9,7 @@ GCC=gcc
 DEFINES=
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
 
-all: clean config copy support rts
+all: clean config copy support init rts
 
 clean:
 	rm -rf build
@@ -25,6 +25,9 @@ copy:
 rts:
 	gprbuild -v rts.gpr
 	ar r $(ADALIB)/libgnat.a support/*.o
+
+init:	
+	gcc -c -m32 start/start.c -o start/start.o
 
 support: support/librose-util.a
 
