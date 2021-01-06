@@ -82,6 +82,13 @@ begin
    Rose.Console_IO.Put_Line ("restore: done");
 
    declare
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end;
+
+   declare
       use Rose.Invocation;
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
