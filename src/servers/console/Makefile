@@ -16,7 +16,11 @@ OBJECTS= \
 	$(BUILDDIR)/console-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
+	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer-server.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-system_calls-server.o \

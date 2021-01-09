@@ -15,6 +15,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces-cap-server.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-interfaces-timeout-server.o \
 	$(BUILDDIR)/rose-interfaces-timer-server.o \
 	$(BUILDDIR)/rose-invocation.o \
