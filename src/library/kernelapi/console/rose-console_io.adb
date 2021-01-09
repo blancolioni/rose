@@ -1,11 +1,12 @@
-with Rose.System_Calls.Client;
+with Rose.Interfaces.Stream_Writer.Client;
 
 package body Rose.Console_IO is
 
-   Con_Cap : Rose.Capabilities.Capability;
+   Client : Rose.Interfaces.Stream_Writer.Client.Stream_Writer_Client;
 
    Text_Buffer   : String (1 .. 4096)
      with Alignment => 4096;
+
    Buffer_Length : Natural := 0;
 
    procedure Send_Buffer;
@@ -36,7 +37,7 @@ package body Rose.Console_IO is
      (Console_Cap : Rose.Capabilities.Capability)
    is
    begin
-      Con_Cap := Console_Cap;
+      Rose.Interfaces.Stream_Writer.Client.Open (Client, Console_Cap);
       Buffer_Length := 0;
    end Open;
 
@@ -261,9 +262,14 @@ package body Rose.Console_IO is
    -----------------
 
    procedure Send_Buffer is
+      use System.Storage_Elements;
+      Storage_Buffer : Storage_Array (1 .. Storage_Count (Buffer_Length));
+      for Storage_Buffer'Address use Text_Buffer'Address;
+      pragma Import (Ada, Storage_Buffer);
    begin
-      Rose.System_Calls.Client.Send_String
-        (Con_Cap, Text_Buffer (1 .. Buffer_Length));
+      Rose.Interfaces.Stream_Writer.Client.Write
+        (Item   => Client,
+         Buffer => Storage_Buffer);
       Buffer_Length := 0;
    end Send_Buffer;
 

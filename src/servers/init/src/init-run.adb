@@ -8,6 +8,7 @@ with Rose.Interfaces.Constructor;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Map;
 with Rose.Interfaces.Storage;
+with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
 with Rose.Interfaces.Timeout;
 
@@ -78,10 +79,12 @@ package body Init.Run is
       Exit_Cap             : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (2, 31, 0, 0));
-      Copy_Console_Cap     : Rose.Capabilities.Capability;
-      Console_Id           : Rose.Objects.Object_Id;
-      Console_Write_Cap    : Rose.Capabilities.Capability :=
-                               Null_Capability;
+      Copy_Console_Cap      : Rose.Capabilities.Capability;
+      Console_Id            : Rose.Objects.Object_Id;
+      Console_Interface_Cap : Rose.Capabilities.Capability :=
+                                Null_Capability;
+      Console_Stream_Cap    : Rose.Capabilities.Capability :=
+                                Null_Capability;
       Mem_Region_Count_Cap : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (10, 2, 0, 0));
@@ -174,9 +177,9 @@ package body Init.Run is
          end if;
 
          if Cap = Null_Capability then
-            if Console_Write_Cap /= Null_Capability then
+            if Console_Interface_Cap /= Null_Capability then
                Init.Calls.Send_String
-                 (Console_Write_Cap, Fail_Message);
+                 (Console_Interface_Cap, Fail_Message);
             end if;
             Init.Calls.Send (Exit_Cap);
          end if;
@@ -240,7 +243,7 @@ package body Init.Run is
            Init.Calls.Launch_Boot_Module
              (Boot_Cap, Partition_Module, Device_Driver_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
-              (Console_Write_Cap,
+              (Console_Interface_Cap,
                Device_Cap),
               (Rose.Words.Word (Start_Address),
                Rose.Words.Word (Start_Address + Length),
@@ -298,8 +301,15 @@ package body Init.Run is
           (Create_Cap,
            (9, 1, Word (Console_Id mod 2 ** 32), Word (Console_Id / 2 ** 32)));
 
-      Console_Write_Cap :=
-        Copy_Cap_From_Process (Copy_Console_Cap, 16#C025_0130#);
+      Console_Interface_Cap :=
+        Copy_Cap_From_Process
+          (Copy_Console_Cap,
+           Rose.Interfaces.Stream_Writer.Stream_Writer_Interface);
+
+      Console_Stream_Cap :=
+        Copy_Cap_From_Process
+          (Copy_Console_Cap,
+           Rose.Interfaces.Stream_Writer.Write_Endpoint);
 
       declare
          Cap_Set_Id : constant Rose.Objects.Object_Id :=
@@ -308,7 +318,7 @@ package body Init.Run is
                            Device_Driver_Priority,
                            Create_Endpoint_Cap,
                            Rose.Capabilities.Null_Capability,
-                           (1 => Console_Write_Cap));
+                           (1 => Console_Interface_Cap));
          Copy_Cap_Set_Cap : constant Rose.Capabilities.Capability :=
                               Init.Calls.Call
                                 (Create_Cap,
@@ -328,7 +338,7 @@ package body Init.Run is
                       (Boot_Cap, Mem_Module, Memory_Priority,
                        Create_Endpoint_Cap,
                        Cap_Set_Cap,
-                       (Console_Write_Cap,
+                       (Console_Interface_Cap,
                         Mem_Region_Count_Cap, Mem_Get_Region_Cap,
                         Page_On_Cap));
          Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
@@ -356,7 +366,7 @@ package body Init.Run is
                             Init.Calls.Launch_Boot_Module
                                (Boot_Cap, Timer_Module, Device_Driver_Priority,
                                 Create_Endpoint_Cap, Cap_Set_Cap,
-                               (Console_Write_Cap,
+                               (Console_Interface_Cap,
                                 Set_Timeout_Cap, Get_Ticks_Cap));
          Copy_Timeout_Cap : constant Rose.Capabilities.Capability :=
                               Init.Calls.Call
@@ -413,7 +423,7 @@ package body Init.Run is
                                   Init.Calls.Launch_Boot_Module
                                     (Boot_Cap, PCI_Module, Low_Priority,
                                      Create_Endpoint_Cap, Cap_Set_Cap,
-                                     (Console_Write_Cap,
+                                     (Console_Interface_Cap,
                                       Command_Port_Out_Cap,
                                       Data_Port_Out_Cap,
                                       Data_Port_In_Cap));
@@ -478,7 +488,7 @@ package body Init.Run is
                                      (Boot_Cap, ATA_Module,
                                       Device_Driver_Priority,
                                       Create_Endpoint_Cap, Cap_Set_Cap,
-                                      (Console_Write_Cap,
+                                      (Console_Interface_Cap,
                                        PCI_Cap,
                                        Reserve_Primary_IRQ,
                                        Reserve_Secondary_IRQ,
@@ -516,7 +526,7 @@ package body Init.Run is
                         (Boot_Cap, Store_Module, Device_Driver_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Delete_Cap,
-                          Console_Write_Cap));
+                          Console_Interface_Cap));
          Copy_Store_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -548,7 +558,7 @@ package body Init.Run is
                               (Boot_Cap, Elf_Module, Device_Driver_Priority,
                                Create_Endpoint_Cap, Cap_Set_Cap,
                                (Delete_Cap, Rescind_Cap,
-                                Console_Write_Cap,
+                                Console_Interface_Cap,
                                 Mem_Cap, Create_Process_Cap));
          Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
@@ -569,7 +579,7 @@ package body Init.Run is
                      Init.Calls.Launch_Boot_Module
                        (Boot_Cap, Scan_Module, File_System_Priority,
                         Create_Endpoint_Cap, Cap_Set_Cap,
-                        (Console_Write_Cap,
+                        (Console_Interface_Cap,
                          Hd0_Cap));
          Copy_Scan_Cap : constant Rose.Capabilities.Capability :=
                            Init.Calls.Call
@@ -617,7 +627,7 @@ package body Init.Run is
                       Init.Calls.Launch_Boot_Module
                         (Boot_Cap, ISOFS_Module, File_System_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
-                         (Console_Write_Cap,
+                         (Console_Interface_Cap,
                           Hd1_Cap));
          Copy_IsoFS_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
@@ -643,7 +653,7 @@ package body Init.Run is
                           (Boot_Cap, Restore_Module, File_System_Priority,
                            Create_Endpoint_Cap, Cap_Set_Cap,
                            (Delete_Cap,
-                            Console_Write_Cap,
+                            Console_Interface_Cap,
                             Active_Swap_Cap,
                             Inactive_Swap_Cap,
                             Log_Cap,
@@ -687,7 +697,7 @@ package body Init.Run is
                     Reserve_Cap     => Reserve_Storage_Cap,
                     Launch_Cap      => Launch_Elf_Cap,
                     Cap_Stream      => Params.Caps (0),
-                    Standard_Output => Console_Write_Cap,
+                    Standard_Output => Console_Interface_Cap,
                     Binary_Stream   => Params.Caps (1),
                     Binary_Length   => Params.Data (0));
                declare
@@ -712,7 +722,7 @@ package body Init.Run is
                     Reserve_Cap     => Reserve_Storage_Cap,
                     Launch_Cap      => Launch_Elf_Cap,
                     Cap_Stream      => Params.Caps (0),
-                    Standard_Output => Console_Write_Cap,
+                    Standard_Output => Console_Interface_Cap,
                     Binary_Stream   => Params.Caps (1),
                     Binary_Length   => Params.Data (0));
 
@@ -751,7 +761,7 @@ package body Init.Run is
                      Rose.System_Calls.Send_Cap (Reply, Launch);
                   else
                      Init.Calls.Send_String
-                       (Console_Write_Cap, "init: bad action");
+                       (Console_Stream_Cap, "init: bad action");
                   end if;
                end;
             end if;
@@ -761,7 +771,7 @@ package body Init.Run is
       end;
 
       Init.Calls.Send_String
-        (Console_Write_Cap, "init: exiting" & NL);
+        (Console_Stream_Cap, "init: exiting" & NL);
       Init.Calls.Send (Exit_Cap);
 
    end Run_Init;

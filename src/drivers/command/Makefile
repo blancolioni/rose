@@ -18,6 +18,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-map-server.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
