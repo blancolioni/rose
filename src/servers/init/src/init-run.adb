@@ -155,34 +155,20 @@ package body Init.Run is
                    Word_32 (Identifier));
          Cap  : Capability :=
                   Init.Calls.Call (Copy_Cap, Data);
-         Hex_Digits : constant String := "0123456789ABCDEF";
-         Retry_Message : String :=
-                           "init: failed to copy endpoint; retrying "
-                           & "            " & NL;
          Fail_Message  : constant String :=
                            "init: failed to copy endpoint; giving up"
                            & NL;
-         It            : Word_64 := Rose.Words.Word_64 (Endpoint);
       begin
-         for I in 1 .. 12 loop
-            Retry_Message (Retry_Message'Last - I) :=
-              Hex_Digits (Natural (It mod 16) + 1);
-            It := It / 16;
-         end loop;
 
          if Timer_Cap = Null_Capability then
             for I in 1 .. 16 loop
                exit when Cap /= Null_Capability;
-               Init.Calls.Send_String
-                 (Console_Write_Cap, Retry_Message);
                Cap := Init.Calls.Call (Copy_Cap, Data);
             end loop;
          else
             for I in 1 .. 4 loop
                exit when Cap /= Null_Capability;
-               Init.Calls.Send_String
-                 (Console_Write_Cap, Retry_Message);
-               Wait (1000);
+               Wait (500);
                Cap := Init.Calls.Call (Copy_Cap, Data);
             end loop;
          end if;
@@ -757,7 +743,7 @@ package body Init.Run is
                                 Binary_Stream => Params.Caps (1),
                                 Binary_Length => Params.Data (0));
                begin
-                  Wait (2000);
+                  Wait (1000);
                   if Params.Data (1) = 0 then
                      Rose.System_Calls.Send_Cap (Reply, Launch);
                   elsif Params.Data (1) = 1 then
