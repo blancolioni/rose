@@ -17,6 +17,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-constructor-server.o \
 	$(BUILDDIR)/rose-interfaces-cap-server.o \
 	$(BUILDDIR)/rose-interfaces-cap_set-server.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

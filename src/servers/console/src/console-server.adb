@@ -1,25 +1,47 @@
-with Rose.System_Calls.Server;
+with System.Storage_Elements;
 
-with Console.Calls;
+with Rose.Objects;
+
+with Rose.Server;
+
+with Rose.Interfaces.Stream_Writer.Server;
+
 with Console.IO;
 
 package body Console.Server is
 
-   Entry_Cap    : Rose.Capabilities.Capability;
-   Endpoint_Cap : Rose.Capabilities.Capability;
+   Server_Context : Rose.Server.Server_Context;
 
-   ---------------------
-   -- Create_Console --
-   ---------------------
+   procedure Handle_Write
+     (Id     : Rose.Objects.Capability_Identifier;
+      Buffer : System.Storage_Elements.Storage_Array);
+
+   ---------------------------
+   -- Create_Console_Server --
+   ---------------------------
 
    procedure Create_Console_Server is
    begin
-      Rose.System_Calls.Server.Create_Endpoint
-        (Create_Cap   => Create_Endpoint_Cap,
-         Endpoint_Id  => Endpoint_Id,
-         Entry_Cap    => Entry_Cap,
-         Endpoint_Cap => Endpoint_Cap);
+      Rose.Interfaces.Stream_Writer.Server.Create_Server
+        (Server_Context => Server_Context,
+         Write          => Handle_Write'Access);
    end Create_Console_Server;
+
+   ------------------
+   -- Handle_Write --
+   ------------------
+
+   procedure Handle_Write
+     (Id     : Rose.Objects.Capability_Identifier;
+      Buffer : System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      S : String (1 .. Natural (Buffer'Length));
+      for S'Address use Buffer'Address;
+      pragma Import (Ada, S);
+   begin
+      Console.IO.Put (S);
+   end Handle_Write;
 
    ------------------
    -- Start_Server --
@@ -27,12 +49,7 @@ package body Console.Server is
 
    procedure Start_Server is
    begin
-      loop
-         Console.Calls.Invoke_Receive_Cap
-           (Receive_Cap => Entry_Cap,
-            Process     =>
-              Console.IO.Put'Access);
-      end loop;
+      Rose.Server.Start_Server (Server_Context);
    end Start_Server;
 
 end Console.Server;
