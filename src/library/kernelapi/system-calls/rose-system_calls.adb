@@ -6,9 +6,6 @@ package body Rose.System_Calls is
    Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
-   procedure Invoke_Capability_Wrapper
-     (Item : aliased in out Rose.Invocation.Invocation_Record);
-
    procedure Send_Native_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
@@ -311,27 +308,6 @@ package body Rose.System_Calls is
    -----------------------
 
    procedure Invoke_Capability
-     (Item : aliased in out Rose.Invocation.Invocation_Record)
-   is
-      use Rose.Words;
-      Check_Stack : array (Word_8) of Word_8;
-   begin
-      for I in Check_Stack'Range loop
-         Check_Stack (I) := I;
-      end loop;
-      Invoke_Capability_Wrapper (Item);
-      for I in Check_Stack'Range loop
-         if Check_Stack (I) /= I then
-            Check_Stack (0) := 1 / Check_Stack (0);
-         end if;
-      end loop;
-   end Invoke_Capability;
-
-   -------------------------------
-   -- Invoke_Capability_Wrapper --
-   -------------------------------
-
-   procedure Invoke_Capability_Wrapper
      (Item : aliased in out Rose.Invocation.Invocation_Record)
    is separate;
 
