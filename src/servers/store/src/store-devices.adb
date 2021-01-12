@@ -510,6 +510,10 @@ package body Store.Devices is
           (Allocator, Alloc_Size / Minimum_Bank_Size);
 
       if Alloc_Index = 0 then
+         Rose.Console_IO.Put ("store: cannot allocate ");
+         Rose.Console_IO.Put (Alloc_Size);
+         Rose.Console_IO.Put (" bytes");
+         Rose.Console_IO.New_Line;
          return 0;
       end if;
 
@@ -521,6 +525,12 @@ package body Store.Devices is
          Store    : Positive := 1;
          Base     : Object_Id;
          Bound    : Object_Id;
+         Cap      : constant Rose.Capabilities.Capability :=
+              Rose.System_Calls.Server.Create_Endpoint
+                (Create_Endpoint_Cap,
+                 Rose.Interfaces.Region.Region_Interface,
+                 Capability_Identifier (Region_Count));
+
       begin
          while Backing_Stores (Store).Allocator_Bound <= Alloc_Index loop
             Store := Store + 1;
@@ -538,13 +548,9 @@ package body Store.Devices is
            (Backing_Device => Store,
             Base           => Base,
             Bound          => Bound,
-            Access_Cap     =>
-              Rose.System_Calls.Server.Create_Endpoint
-                (Create_Endpoint_Cap,
-                 Rose.Interfaces.Region.Region_Interface,
-                 Capability_Identifier (Region_Count)));
+            Access_Cap     => Cap);
 
-         return New_Bank.Access_Cap;
+         return Cap;
       end;
    end Reserve_Storage;
 

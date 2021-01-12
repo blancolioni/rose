@@ -125,6 +125,7 @@ package body Mem.Server is
 
       Client : Region_Client;
    begin
+
       Open (Client, Region);
       Mem.Processes.Add_Segment
         (Process       => Id,

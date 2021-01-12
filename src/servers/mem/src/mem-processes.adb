@@ -417,14 +417,19 @@ package body Mem.Processes is
       end loop;
 
       Rose.Interfaces.Process.Client.Open (Client, Process_Cap);
-      Process_Table (Next_Pid) :=
-        Memory_Process_Record'
-          (State        => Active,
-           Oid          =>
-             Rose.Interfaces.Process.Client.Get_Object_Id (Client),
-           Segments     => <>,
-           Num_Segments => 0,
-           Process      => Client);
+
+      declare
+         Oid : constant Rose.Objects.Object_Id :=
+                 Rose.Interfaces.Process.Client.Get_Object_Id (Client);
+      begin
+         Process_Table (Next_Pid) :=
+           Memory_Process_Record'
+             (State        => Active,
+              Oid          => Oid,
+              Segments     => <>,
+              Num_Segments => 0,
+              Process      => Client);
+      end;
 
       return Next_Pid;
    end Register_Process;
