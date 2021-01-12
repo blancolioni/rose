@@ -16,7 +16,9 @@ DRIVERS=command keyboard exec
 UTILITIES=echo
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps
 
-all: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
+rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
+
+all: rts idl rose
 
 rts:
 	(cd rts; make)
@@ -90,6 +92,8 @@ config:
 
 clean:
 	(cd src/library/kernelapi/generated; make clean)
+	(cd rts; make clean)
+	(cd src/rts; make clean)
 	rm -rf build/*
 	rm -rf `find src -name build -print`
 	rm -f `find src -name "*.o" -print`
