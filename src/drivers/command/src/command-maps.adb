@@ -88,9 +88,23 @@ package body Command.Maps is
    is
       Rec : Command_Record renames Command_Array (Index);
    begin
-      return Rec.Name_Length > 0
+      if Rec.Name_Length > 0
         and then Rec.Name_Length = Name'Length
-        and then Rec.Name (1 .. Rec.Name_Length) = Name;
+      then
+         declare
+            Index : Natural := 0;
+         begin
+            for Ch of Name loop
+               Index := Index + 1;
+               if Rec.Name (Index) /= Ch then
+                  return False;
+               end if;
+            end loop;
+         end;
+         return True;
+      end if;
+
+      return False;
    end Match;
 
 end Command.Maps;
