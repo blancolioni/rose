@@ -71,10 +71,18 @@ package body Exec.Server is
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
       Base, Bound : Rose.Objects.Page_Object_Id;
+      Subregion_Cap : Rose.Interfaces.Region.Client.Region_Client;
    begin
+
       Exec.Library.Get_Image_Pages (Id, Base, Bound);
+      Subregion_Cap :=
+        Rose.Interfaces.Region.Client.Create_Subregion
+          (Region, Base, Bound, 1);
+
       Initialize_Send (Params, Create_Process_Cap);
-      Send_Cap (Params, Region_Cap);
+      Send_Cap
+        (Params,
+         Rose.Interfaces.Region.Client.Get_Interface_Cap (Subregion_Cap));
       Send_Cap (Params, Storage_Cap);
 
       Exec.Library.Send_Install_Caps (Id, Params);
