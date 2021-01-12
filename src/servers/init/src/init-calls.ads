@@ -51,6 +51,16 @@ package Init.Calls is
      (Cap     : Rose.Capabilities.Capability;
       Message : String);
 
+   function Find_In_Map
+     (Find_Cap : Rose.Capabilities.Capability;
+      Key      : String)
+      return Rose.Capabilities.Capability;
+
+   function Create_Cap_Set_With
+     (Create_Cap_Set  : Rose.Capabilities.Capability;
+      Caps            : Array_Of_Capabilities)
+      return Rose.Capabilities.Capability;
+
    function Launch_Boot_Module
      (Cap            : Rose.Capabilities.Capability;
       Module_Index   : Rose.Words.Word;
@@ -68,6 +78,11 @@ package Init.Calls is
       Create_Cap_Set : Rose.Capabilities.Capability;
       Launch_Caps    : Array_Of_Capabilities;
       Launch_Words   : Array_Of_Words)
+      return Rose.Objects.Object_Id;
+
+   function Launch
+     (Launch_Cap  : Rose.Capabilities.Capability;
+      Caps        : Array_Of_Capabilities)
       return Rose.Objects.Object_Id;
 
    procedure Get_Interface

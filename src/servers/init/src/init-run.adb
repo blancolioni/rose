@@ -120,6 +120,9 @@ package body Init.Run is
       Receive_Timeout  : Rose.Capabilities.Capability;
       Send_Timeout     : Rose.Capabilities.Capability;
 
+      Find_Cap    : Rose.Capabilities.Capability :=
+                      Rose.Capabilities.Null_Capability;
+
       function Copy_Cap_From_Process
         (Copy_Cap   : Rose.Capabilities.Capability;
          Endpoint   : Rose.Objects.Endpoint_Id;
@@ -672,9 +675,6 @@ package body Init.Run is
                      Rose.Objects.Null_Object_Id;
          Install_Cap : Rose.Capabilities.Capability :=
                          Rose.Capabilities.Null_Capability;
-         Find_Cap    : Rose.Capabilities.Capability :=
-                         Rose.Capabilities.Null_Capability
-                           with Unreferenced;
          Add_Cap     : Rose.Capabilities.Capability :=
                          Rose.Capabilities.Null_Capability;
          Do_Exec     : Boolean := True;
@@ -768,6 +768,34 @@ package body Init.Run is
 
             Rose.System_Calls.Invoke_Capability (Reply);
          end loop;
+      end;
+
+      declare
+         Launch_Echo_Cap : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Find_In_Map
+                               (Find_Cap => Find_Cap,
+                                Key      => "echo");
+         Standard_Caps : constant Rose.Capabilities.Capability :=
+                           Init.Calls.Create_Cap_Set_With
+                             (Create_Cap_Set => Cap_Set_Cap,
+                              Caps           =>
+                                (Rose.Capabilities.Null_Capability,
+                                 Console_Stream_Cap));
+         Echo_Object     : Rose.Objects.Object_Id with Unreferenced;
+      begin
+         if Launch_Echo_Cap = Rose.Capabilities.Null_Capability then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: unable to find 'echo'" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: testing Ada.Text_IO" & NL);
+            Echo_Object :=
+              Init.Calls.Launch
+                (Launch_Echo_Cap,
+                 (Exit_Cap, Standard_Caps, Create_Cap,
+                  Rose.Capabilities.Null_Capability));
+            Wait (1000);
+         end if;
       end;
 
       Init.Calls.Send_String
