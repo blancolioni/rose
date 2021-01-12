@@ -6,6 +6,8 @@ with Rose.Words;                       use Rose.Words;
 
 package Rose.Invocation is
 
+   pragma Preelaborate;
+
    --  Invocation flags:
    --    Error         An error occurred while processing request.
    --                  The error type can be found in Words (0)
