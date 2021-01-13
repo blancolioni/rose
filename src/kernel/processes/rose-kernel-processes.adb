@@ -423,8 +423,11 @@ package body Rose.Kernel.Processes is
       Layout : out Rose.Capabilities.Layout.Capability_Layout)
    is
       P : Kernel_Process_Entry renames Process_Table (Pid);
+      Index : constant Cached_Capability_Index := Load_Cap (Pid, Cap);
+      Full_Cap : Rose.Capabilities.Layout.Capability_Layout
+      renames P.Cached_Caps (Index).Layout;
    begin
-      Layout := P.Cached_Caps (Load_Cap (Pid, Cap)).Layout;
+      Layout := Full_Cap;
    end Get_Cap;
 
    ----------------------------

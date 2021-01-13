@@ -37,10 +37,6 @@ package body Rose.Kernel.Invocation is
                             (No_Trace);
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
-      function To_Word_32 is
-        new Ada.Unchecked_Conversion (Rose.Invocation.Invocation_Access,
-                                      Rose.Words.Word_32);
-      pragma Unreferenced (To_Word_32);
    begin
 
       if Params.Control.Flags (Block)
