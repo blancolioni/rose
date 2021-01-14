@@ -3,7 +3,7 @@ IDL=cap block_device file_system directory file file_system \
     ata partitions keyboard_handler interrupt_handler installer \
     launch exec region executable memory process process_memory \
     timeout timer constructor cap_set terminal event_source event_listener \
-    map
+    map heap
 INTERFACES=../../../../interfaces/interfaces.txt
 all: $(IDL)
 

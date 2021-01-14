@@ -19,6 +19,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-heap-server.o \
 	$(BUILDDIR)/rose-interfaces-memory.o \
 	$(BUILDDIR)/rose-interfaces-memory-server.o \
 	$(BUILDDIR)/rose-interfaces-process.o \

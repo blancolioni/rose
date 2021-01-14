@@ -4,6 +4,7 @@ with Rose.Console_IO;
 with Rose.System_Calls.Server;
 with Rose.Limits;
 
+with Rose.Interfaces.Heap;
 with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.Process_Memory;
 
@@ -49,6 +50,7 @@ package body Mem.Processes is
          Segments     : Segment_Record_Array;
          Num_Segments : Segment_Count;
          Process      : Rose.Interfaces.Process.Client.Process_Client;
+         Heap         : Rose.Capabilities.Capability;
       end record;
 
    subtype Real_Process_Id is
@@ -203,6 +205,18 @@ package body Mem.Processes is
         (P.Process);
       P.State := Faulted;
    end Fault_Process;
+
+   ------------------
+   -- Get_Heap_Cap --
+   ------------------
+
+   function Get_Heap_Cap
+     (Process : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Process_Table (Process).Heap;
+   end Get_Heap_Cap;
 
    -------------------
    -- Get_Object_Id --
@@ -421,6 +435,12 @@ package body Mem.Processes is
       declare
          Oid : constant Rose.Objects.Object_Id :=
                  Rose.Interfaces.Process.Client.Get_Object_Id (Client);
+         Heap_Cap : constant Rose.Capabilities.Capability :=
+                      Rose.System_Calls.Server.Create_Endpoint
+                        (Create_Cap   => Create_Endpoint_Cap,
+                         Endpoint_Id  =>
+                           Rose.Interfaces.Heap.Heap_Interface,
+                         Identifier   => Next_Pid);
       begin
          Process_Table (Next_Pid) :=
            Memory_Process_Record'
@@ -428,6 +448,7 @@ package body Mem.Processes is
               Oid          => Oid,
               Segments     => <>,
               Num_Segments => 0,
+              Heap         => Heap_Cap,
               Process      => Client);
       end;
 

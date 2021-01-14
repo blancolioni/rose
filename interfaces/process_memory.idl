@@ -18,7 +18,6 @@ interface Process_Memory : Cap is
       Virtual_Bound : Word;
       Flags         : Word);
 
-   function Current_Heap_Top return Word;
-   procedure Request_Heap_Top (New_Top : Word);
-
+   function Heap return interface Heap;
+   
 end Process_Memory;

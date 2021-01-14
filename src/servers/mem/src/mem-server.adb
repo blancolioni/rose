@@ -6,6 +6,7 @@ with Rose.Words;
 
 with Rose.Console_IO;
 
+with Rose.Interfaces.Heap.Server;
 with Rose.Interfaces.Memory.Server;
 with Rose.Interfaces.Process_Memory.Server;
 
@@ -61,13 +62,17 @@ package body Mem.Server is
       Virtual_Bound : in     Rose.Words.Word;
       Flags         : in     Rose.Words.Word);
 
-   function Current_Heap_Top
+   function Heap
      (Id : Rose.Objects.Capability_Identifier)
-     return Rose.Words.Word;
+      return Rose.Capabilities.Capability;
 
-   procedure Request_Heap_Top
-     (Id      : Rose.Objects.Capability_Identifier;
-      New_Top : Rose.Words.Word);
+   function Current_Bound
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word;
+
+   procedure Request_New_Bound
+     (Id        : Rose.Objects.Capability_Identifier;
+      New_Bound : Rose.Words.Word);
 
    procedure Page_Fault
      (Id       : Rose.Objects.Capability_Identifier;
@@ -170,11 +175,16 @@ package body Mem.Server is
         (Server_Context => Server,
          Add_Segment    => Add_Segment'Access,
          Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
-         Current_Heap_Top => Current_Heap_Top'Access,
-         Request_Heap_Top => Request_Heap_Top'Access,
          Destroy        => Kill'Access,
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
+         Heap           => Heap'Access,
          Instanced      => True);
+
+      Rose.Interfaces.Heap.Server.Attach_Interface
+        (Server_Context    => Server,
+         Current_Bound     => Current_Bound'Access,
+         Request_New_Bound => Request_New_Bound'Access,
+         Instanced         => True);
 
    end Create_Server;
 
@@ -182,7 +192,7 @@ package body Mem.Server is
    -- Current_Heap_Top --
    ----------------------
 
-   function Current_Heap_Top
+   function Current_Bound
      (Id : Rose.Objects.Capability_Identifier)
      return Rose.Words.Word
    is
@@ -190,7 +200,19 @@ package body Mem.Server is
       return Rose.Words.Word
         (Mem.Processes.Get_Process_Heap_Bound
            (Process => Id));
-   end Current_Heap_Top;
+   end Current_Bound;
+
+   ----------
+   -- Heap --
+   ----------
+
+   function Heap
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Mem.Processes.Get_Heap_Cap (Id);
+   end Heap;
 
    ----------
    -- Kill --
@@ -421,17 +443,20 @@ package body Mem.Server is
          Resizable     => False);
    end Register_Process;
 
---
-   procedure Request_Heap_Top
-     (Id      : Rose.Objects.Capability_Identifier;
-      New_Top : Rose.Words.Word)
+   ----------------------
+   -- Request_Heap_Top --
+   ----------------------
+
+   procedure Request_New_Bound
+     (Id        : Rose.Objects.Capability_Identifier;
+      New_Bound : Rose.Words.Word)
    is
    begin
       Mem.Processes.Resize_Segment
         (Process      => Id,
          New_Virtual_Bound =>
-           Rose.Addresses.Virtual_Page_Address (New_Top));
-   end Request_Heap_Top;
+           Rose.Addresses.Virtual_Page_Address (New_Bound));
+   end Request_New_Bound;
 
    ------------------
    -- Start_Server --
