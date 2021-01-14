@@ -1,5 +1,3 @@
-with System.Storage_Elements;
-
 with Rose.Console_IO;
 with Rose.System_Calls.Server;
 with Rose.Limits;
@@ -14,6 +12,9 @@ with Mem.Physical_Map;
 with Mem.Virtual_Map;
 
 package body Mem.Processes is
+
+   Environment_Base              : constant := 16#E000_0000#;
+   Environment_Bound             : constant := 16#E100_0000#;
 
    type Process_State is (Available, Active, Faulted);
 
@@ -61,6 +62,89 @@ package body Mem.Processes is
 
    Process_Table : Memory_Process_Table;
    Next_Pid      : Real_Process_Id := 1;
+
+   ---------------------
+   -- Add_Environment --
+   ---------------------
+
+   procedure Add_Environment
+     (Process       : Rose.Objects.Capability_Identifier;
+      Environment   : System.Storage_Elements.Storage_Array)
+   is
+      use System.Storage_Elements;
+      use Rose.Addresses;
+
+      Virt_Page : Rose.Addresses.Virtual_Page_Address :=
+                    Rose.Addresses.Virtual_Address_To_Page
+                      (Environment_Base);
+
+      procedure Save_Environment_Page
+        (Index : in out Storage_Offset);
+
+      ---------------------------
+      -- Save_Environment_Page --
+      ---------------------------
+
+      procedure Save_Environment_Page
+        (Index : in out Storage_Offset)
+      is
+         Have_Page : Boolean;
+         Phys_Page : Physical_Page_Address;
+         Base      : constant Storage_Offset := Index;
+         Bound     : constant Storage_Offset :=
+                       Index + Physical_Page_Bytes;
+      begin
+
+         Mem.Physical_Map.Allocate_Page
+           (Phys_Page, Have_Page);
+
+         if not Have_Page then
+            Mem.Virtual_Map.Reclaim (Phys_Page, Have_Page);
+         end if;
+
+         if not Have_Page then
+            Rose.Console_IO.Put_Line ("mem: environment: no page");
+         else
+
+            declare
+               Addr      : constant System.Address :=
+                             To_System_Address
+                               (Rose.Addresses.Virtual_Page_To_Address
+                                  (Virt_Page));
+               Saved_Env : Page_Buffer;
+               pragma Import (Ada, Saved_Env);
+               for Saved_Env'Address use Addr;
+            begin
+               Mem.Calls.Load_Page (Phys_Page, Addr);
+               Saved_Env := Environment (Base .. Bound - 1);
+               Mem.Calls.Unload_Page (Phys_Page, Addr);
+            end;
+
+            Mem.Virtual_Map.Map
+              (Process       => Process_Table (Process).Oid,
+               Virtual_Page  => Virt_Page,
+               Physical_Page => Phys_Page,
+               Readable      => True,
+               Writable      => True,
+               Executable    => False);
+
+            Index := Bound;
+            Virt_Page := Virt_Page + 1;
+         end if;
+      end Save_Environment_Page;
+
+      Page_Bound  : constant Virtual_Page_Address :=
+                      Virtual_Address_To_Page
+                        (Environment_Bound);
+      Start_Index : Storage_Offset := Environment'First;
+
+   begin
+      while Start_Index <= Environment'Last
+        and then Virt_Page < Page_Bound
+      loop
+         Save_Environment_Page (Start_Index);
+      end loop;
+   end Add_Environment;
 
    -------------------------------
    -- Add_Nonpersistent_Segment --
@@ -339,7 +423,7 @@ package body Mem.Processes is
            and then Virtual_Page < Segment.Bound
          then
 
-            Mem.Calls.Load_Page (Physical_Page, Addr);
+            Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
 
             if Segment.Flags (Persistent) then
                declare

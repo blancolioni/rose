@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Addresses;
 with Rose.Capabilities;
 with Rose.Invocation;
@@ -26,8 +28,8 @@ package body Mem.Server is
    Server : Rose.Server.Server_Context;
 
    function New_Process
-     (Id         : Rose.Objects.Capability_Identifier;
-      Process    : Rose.Capabilities.Capability)
+     (Id          : Rose.Objects.Capability_Identifier;
+      Process     : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
    procedure Register_Process
@@ -40,7 +42,8 @@ package body Mem.Server is
       Data_Base   : Rose.Words.Word;
       Data_Bound  : Rose.Words.Word;
       Stack_Base  : Rose.Words.Word;
-      Stack_Bound : Rose.Words.Word);
+      Stack_Bound : Rose.Words.Word;
+      Environment : System.Storage_Elements.Storage_Array);
 
    procedure Take_Physical_Memory
      (Id     : in     Rose.Objects.Capability_Identifier;
@@ -228,8 +231,8 @@ package body Mem.Server is
    -----------------
 
    function New_Process
-     (Id         : Rose.Objects.Capability_Identifier;
-      Process    : Rose.Capabilities.Capability)
+     (Id          : Rose.Objects.Capability_Identifier;
+      Process     : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
@@ -390,7 +393,8 @@ package body Mem.Server is
       Data_Base   : Rose.Words.Word;
       Data_Bound  : Rose.Words.Word;
       Stack_Base  : Rose.Words.Word;
-      Stack_Bound : Rose.Words.Word)
+      Stack_Bound : Rose.Words.Word;
+      Environment : System.Storage_Elements.Storage_Array)
    is
       pragma Unreferenced (Id);
       Process_Id : constant Rose.Objects.Capability_Identifier :=
@@ -441,6 +445,7 @@ package body Mem.Server is
          Writable      => True,
          Executable    => False,
          Resizable     => False);
+      Mem.Processes.Add_Environment (Process_Id, Environment);
    end Register_Process;
 
    ----------------------

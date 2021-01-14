@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Invocation;
 with Rose.Objects;
 
@@ -21,7 +23,7 @@ package body Exec.Server is
    function On_Launch
      (Id          : Rose.Objects.Capability_Identifier;
       Caps        : Rose.Capabilities.Capability_Array;
-      Environment : String)
+      Environment : System.Storage_Elements.Storage_Array)
       return Rose.Objects.Object_Id;
 
    Context : Rose.Server.Server_Context;
@@ -67,7 +69,7 @@ package body Exec.Server is
    function On_Launch
      (Id          : Rose.Objects.Capability_Identifier;
       Caps        : Rose.Capabilities.Capability_Array;
-      Environment : String)
+      Environment : System.Storage_Elements.Storage_Array)
       return Rose.Objects.Object_Id
    is
       use Rose.System_Calls;
@@ -79,7 +81,7 @@ package body Exec.Server is
       Exec.Library.Get_Image_Pages (Id, Base, Bound);
       Subregion_Cap :=
         Rose.Interfaces.Region.Client.Create_Subregion
-          (Region, Base, Bound, 1);
+          (Region, Base, Bound, 5);
 
       Initialize_Send (Params, Create_Process_Cap);
       Send_Cap
@@ -94,7 +96,7 @@ package body Exec.Server is
       end loop;
 
       Send_Cap (Params, Console_Cap);
-      Rose.System_Calls.Send_Text (Params, Environment);
+      Rose.System_Calls.Send_Storage_Array (Params, Environment, False);
 
       Invoke_Capability (Params);
 

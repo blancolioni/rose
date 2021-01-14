@@ -2,7 +2,7 @@ interface Launch is
 
    function Launch
      (Caps        : Capability_Array;
-      Environment : String)
+      Environment : Storage_Array)
      return Object_Id;
 
 end Launch;
