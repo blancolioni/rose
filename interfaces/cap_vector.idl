@@ -1,0 +1,13 @@
+interface Cap_Vector is
+
+   procedure Append
+     (Caps : Capability_Array);
+     
+   function Get_Cap
+     (Index : Positive)
+     return Capability;
+
+   function Length
+     return Natural;
+     
+end Cap_Set;
