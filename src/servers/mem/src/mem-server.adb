@@ -152,16 +152,17 @@ package body Mem.Server is
    -------------------
 
    procedure Create_Server is
+
+      function Get_Cap (Index : Positive) return Rose.Capabilities.Capability
+      is (Rose.System_Calls.Client.Get_Capability
+          (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
+
    begin
 
-      Console_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
-      Region_Count_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
-      Region_Range_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
-      Start_Paging_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Console_Cap      := Get_Cap (1);
+      Region_Count_Cap := Get_Cap (2);
+      Region_Range_Cap := Get_Cap (3);
+      Start_Paging_Cap := Get_Cap (4);
 
       Rose.Console_IO.Open (Console_Cap);
 

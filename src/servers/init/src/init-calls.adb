@@ -120,17 +120,21 @@ package body Init.Calls is
       No_Arguments : Array_Of_Words (1 .. 0);
       Cap_Set      : constant Rose.Capabilities.Capability :=
                        Call (Create_Cap_Set, No_Arguments);
-      Insert       : Rose.Capabilities.Capability;
-      Take_Next    : Rose.Capabilities.Capability;
+      Append       : Rose.Capabilities.Capability;
+      Get_Cap      : Rose.Capabilities.Capability;
+      pragma Unreferenced (Get_Cap);
+      Length       : Rose.Capabilities.Capability;
+      pragma Unreferenced (Length);
       Cap_Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Cap_Params, Cap_Set);
-      Rose.System_Calls.Receive_Caps (Cap_Params, 2);
+      Rose.System_Calls.Receive_Caps (Cap_Params, 3);
       Rose.System_Calls.Invoke_Capability (Cap_Params);
-      Insert := Cap_Params.Caps (0);
-      Take_Next := Cap_Params.Caps (1);
+      Append := Cap_Params.Caps (0);
+      Get_Cap := Cap_Params.Caps (1);
+      Length  := Cap_Params.Caps (2);
 
-      Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+      Rose.System_Calls.Initialize_Send (Cap_Params, Append);
 
       for Cap of Caps loop
          Rose.System_Calls.Send_Cap (Cap_Params, Cap);
@@ -138,7 +142,7 @@ package body Init.Calls is
            = Capability_Index'Last
          then
             Rose.System_Calls.Invoke_Capability (Cap_Params);
-            Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+            Rose.System_Calls.Initialize_Send (Cap_Params, Append);
          end if;
       end loop;
 
@@ -146,7 +150,7 @@ package body Init.Calls is
          Rose.System_Calls.Invoke_Capability (Cap_Params);
       end if;
 
-      return Take_Next;
+      return Cap_Set;
 
    end Create_Cap_Set_With;
 
@@ -347,17 +351,17 @@ package body Init.Calls is
             No_Arguments : Array_Of_Words (1 .. 0);
             Cap_Set : constant Rose.Capabilities.Capability :=
                              Call (Create_Cap_Set, No_Arguments);
-            Insert       : Rose.Capabilities.Capability;
-            Take_Next    : Rose.Capabilities.Capability;
+            Append       : Rose.Capabilities.Capability;
+            Get_Cap      : Rose.Capabilities.Capability;
             Cap_Params   : aliased Rose.Invocation.Invocation_Record;
          begin
             Rose.System_Calls.Initialize_Send (Cap_Params, Cap_Set);
-            Rose.System_Calls.Receive_Caps (Cap_Params, 2);
+            Rose.System_Calls.Receive_Caps (Cap_Params, 3);
             Rose.System_Calls.Invoke_Capability (Cap_Params);
-            Insert := Cap_Params.Caps (0);
-            Take_Next := Cap_Params.Caps (1);
+            Append := Cap_Params.Caps (0);
+            Get_Cap := Cap_Params.Caps (1);
 
-            Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+            Rose.System_Calls.Initialize_Send (Cap_Params, Append);
 
             for Cap of Launch_Caps loop
                Rose.System_Calls.Send_Cap (Cap_Params, Cap);
@@ -365,7 +369,7 @@ package body Init.Calls is
                  = Capability_Index'Last
                then
                   Rose.System_Calls.Invoke_Capability (Cap_Params);
-                  Rose.System_Calls.Initialize_Send (Cap_Params, Insert);
+                  Rose.System_Calls.Initialize_Send (Cap_Params, Append);
                end if;
             end loop;
 
@@ -373,7 +377,7 @@ package body Init.Calls is
                Rose.System_Calls.Invoke_Capability (Cap_Params);
             end if;
 
-            Rose.System_Calls.Send_Cap (Params, Take_Next);
+            Rose.System_Calls.Send_Cap (Params, Get_Cap);
 
          end;
       end if;

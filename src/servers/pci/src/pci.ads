@@ -3,7 +3,7 @@ with Rose.Capabilities;
 package PCI is
 
    Create_Endpoint_Cap : constant Rose.Capabilities.Capability := 1;
-   Take_Next_Cap       : constant Rose.Capabilities.Capability := 2;
+   Get_Cap_From_Set    : constant Rose.Capabilities.Capability := 2;
 
    Console_Cap         : Rose.Capabilities.Capability;
    Command_Port_Out    : Rose.Capabilities.Capability;

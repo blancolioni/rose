@@ -792,8 +792,7 @@ package body Init.Run is
             Echo_Object :=
               Init.Calls.Launch
                 (Launch_Echo_Cap,
-                 (Exit_Cap, Standard_Caps, Create_Cap,
-                  Rose.Capabilities.Null_Capability));
+                 (Exit_Cap, Create_Cap, Cap_Set_Cap, Standard_Caps));
             Wait (1000);
          end if;
       end;

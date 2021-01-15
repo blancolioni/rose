@@ -1,6 +1,8 @@
 with System.Storage_Elements;
 
 with Rose.Objects;
+with Rose.Words;
+
 with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Block_Device.Client;
@@ -264,6 +266,9 @@ package body IsoFS.Server is
    ------------------
 
    procedure Start_Server is
+
+      Next_Cap_Index : Positive := 1;
+
       procedure Next (Cap : out Rose.Capabilities.Capability);
 
       ----------
@@ -272,7 +277,10 @@ package body IsoFS.Server is
 
       procedure Next (Cap : out Rose.Capabilities.Capability) is
       begin
-         Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+         Cap :=
+           Rose.System_Calls.Client.Get_Capability
+             (Get_Cap_From_Set, (1 => Rose.Words.Word (Next_Cap_Index)));
+         Next_Cap_Index := Next_Cap_Index + 1;
       end Next;
 
    begin

@@ -55,6 +55,8 @@ package body ATA.Server is
    procedure Create_Server is
       use type Rose.Capabilities.Capability;
 
+      Next_Cap_Index : Positive := 1;
+
       procedure Next (Cap : out Rose.Capabilities.Capability);
 
       ----------
@@ -63,7 +65,10 @@ package body ATA.Server is
 
       procedure Next (Cap : out Rose.Capabilities.Capability) is
       begin
-         Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+         Cap :=
+           Rose.System_Calls.Client.Get_Capability
+             (Get_Cap_From_Set, (1 => Rose.Words.Word (Next_Cap_Index)));
+         Next_Cap_Index := Next_Cap_Index + 1;
       end Next;
 
    begin
