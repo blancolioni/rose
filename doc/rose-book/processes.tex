@@ -2,9 +2,63 @@
 
 A process is named by a launch capability.  Invoking the capability executes the process.
 
-Object ids in the range 16\#0000\_0000\_0000\_0001\# to 16\#0000\_FFFF\_FFFF\_FFFF\# represent processes.
+Object ids in the range $0$ to $2^{24} - 1$ represent processes.
 
 Process id 1 is used to refer to the Kernel.
 
 \section{Launch Capability}
+
+\section{Initial Capabilities}
+
+The initial environment is inherited from the parent process, along with capabilities defined when the process is installed.
+
+The generated interface libraries rely on caps 1, 2, and 3 being the ones from table \ref{table:standard-caps}.
+
+The standard libraries rely on cap 4 being a capability for the {\tt Cap\_Set} interface.
+The set referenced by this cap is defined by Table \ref{table:standard-cap-env}.
+The environment accessed by the Ada\.Environment\_Variables package contains an entry for each {\em Id} in the table, with the index of the corresponding capability in the cap set.
+
+\begin{table}[ht]
+\begin{tabular}{l l l l l}
+\hline\hline
+\# & Cap & Type & Description \\
+\hline
+1 & Destroy & Method & Ends process \\
+2 & Create Endpoint & Method & Endpoint constructor \\
+3 & Create Cap\_Set & Method & Cap set constructor \\
+4 & Argument\_Caps & Interface & Cap set containing supplied caps \\
+\hline
+\end{tabular}
+\caption{Standard process capabilities}
+\label{table:standard-caps}
+\end{table}
+
+\begin{table}[ht]
+\begin{tabular}{l l l l}
+\hline\hline
+\# & Id & Interface & Description \\
+\hline
+1 & Standard\_Input & Stream\_Reader & Standard input stream \\
+2 & Standard\_Output & Stream\_Writer & Standard output stream \\
+3 & Standard\_Error & Stream\_Writer & Standard error stream \\
+4 & Current\_Directory & Directory & Start directory \\
+5 & Heap & Heap & Heap management \\
+6 & Clock & Clock & System clock \\
+\hline
+\end{tabular}
+\caption{Standard capability environment}
+\label{table:standard-cap-env}
+\end{table}
+
+\section{Example}
+
+Consider the following excerpt from a shell session:
+
+{\tt user\$ cat readme.txt }
+
+A launch capability for the {\tt cat} program is found in the shell's environment.  A new environment is created, setting environment capabilities for input/output streams.  The argument is interpreted as the name of a file, a {\tt stream-reader} capability to this file is added to the environment.
+
+\section{Environment}
+
+The environment is supplied as a table of entries starting at a known address.
 
