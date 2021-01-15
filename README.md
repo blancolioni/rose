@@ -10,11 +10,9 @@ On Fedora, you'll need the following packages: qemu-img gcc-gnat gprbuild make x
 ## Build
 
 ```
+git clone https://github.com/blancolioni/rose.git
 cd rose
-(cd rts ; make)
-make idl
-(cd src/rts ; make)
-make
+./clean-build.sh
 ```
 
 A bootable iso is created in the images directory.
