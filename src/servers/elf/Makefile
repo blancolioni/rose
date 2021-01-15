@@ -21,6 +21,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-executable.o \
 	$(BUILDDIR)/rose-interfaces-executable-server.o \
+	$(BUILDDIR)/rose-interfaces-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-memory-client.o \
 	$(BUILDDIR)/rose-interfaces-process-client.o \
 	$(BUILDDIR)/rose-interfaces-process_memory-client.o \

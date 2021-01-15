@@ -21,10 +21,14 @@ procedure Scan.Driver is
    Block_Size   : Rose.Interfaces.Block_Device.Block_Size_Type;
    Block_Count  : Rose.Interfaces.Block_Device.Block_Address_Type;
 
+   function Get_Cap (Index : Positive) return Rose.Capabilities.Capability
+   is (Rose.System_Calls.Client.Get_Capability
+       (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
+
 begin
 
-   Console_Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
-   Block_Device_Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+   Console_Cap := Get_Cap (1);
+   Block_Device_Cap := Get_Cap (2);
 
    Rose.Console_IO.Open (Console_Cap);
 

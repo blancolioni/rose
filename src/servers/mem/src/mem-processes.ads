@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Addresses;
 with Rose.Capabilities;
 with Rose.Objects;
@@ -49,6 +51,10 @@ package Mem.Processes is
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Objects.Capability_Identifier;
 
+   function Get_Heap_Cap
+     (Process : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
    procedure Initialize_Page
      (Process       : Rose.Objects.Capability_Identifier;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
@@ -73,6 +79,10 @@ package Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       Resizable     : Boolean);
+
+   procedure Add_Environment
+     (Process       : Rose.Objects.Capability_Identifier;
+      Environment   : System.Storage_Elements.Storage_Array);
 
    procedure Resize_Segment
      (Process           : Rose.Objects.Capability_Identifier;

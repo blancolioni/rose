@@ -52,6 +52,7 @@ with System.Traceback.Symbolic;
 --  it will install symbolic tracebacks as the default decorator. Otherwise,
 --  symbolic tracebacks are not supported, and we fall back to hexadecimal
 --  addresses.
+with Rose.System_Calls.Client;
 pragma Warnings (On);
 
 package body Ada.Exceptions is
@@ -961,7 +962,20 @@ package body Ada.Exceptions is
 
       --  Go ahead and raise appropriate exception
 
-      Raise_Exception_Always (EF, Message);
+      Rose.System_Calls.Client.Send_String
+        (Cap     => 6,
+         Message => Message);
+      Rose.System_Calls.Client.Send_String
+        (Cap     => 6,
+         Message => (1 => Character'Val (10)));
+
+      if True then
+         loop
+            null;
+         end loop;
+      else
+         Raise_Exception_Always (EF, Message);
+      end if;
    end Raise_Exception;
 
    ----------------------------

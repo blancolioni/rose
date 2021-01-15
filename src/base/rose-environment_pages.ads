@@ -7,16 +7,24 @@ package Rose.Environment_Pages is
 
    type Environment_Page is private;
 
+   procedure Clear (Page : in out Environment_Page);
+
    procedure Get_Environment_Value
      (Page  : Environment_Page;
       Name  : String;
       Value : out String;
       Last  : out Natural);
 
+   procedure Insert_Environment_Value
+     (Page     : in out Environment_Page;
+      Name     : String;
+      Value    : String;
+      Inserted : out Boolean);
+
    procedure Set_Environment_Value
-     (Page  : in out Environment_Page;
-      Name  : String;
-      Value : String);
+     (Page     : in out Environment_Page;
+      Name     : String;
+      Value    : String);
 
    procedure Delete_Environment_Value
      (Page  : in out Environment_Page;

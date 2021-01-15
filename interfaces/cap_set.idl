@@ -1,8 +1,13 @@
 interface Cap_Set is
 
-   procedure Insert
+   procedure Append
      (Caps : Capability_Array);
      
-   function Take_Next return Capability;
+   function Get_Cap
+     (Index : Positive)
+     return Capability;
 
+   function Length
+     return Natural;
+     
 end Cap_Set;

@@ -4,8 +4,8 @@ with Rose.Capabilities;
 
 package Elf is
 
-   Create_Endpoint_Cap  : constant Rose.Capabilities.Capability := 1;
-   Take_Next_Cap        : constant Rose.Capabilities.Capability := 2;
+   Create_Endpoint_Cap : constant Rose.Capabilities.Capability := 1;
+   Get_Cap_From_Set    : constant Rose.Capabilities.Capability := 2;
 
    Delete_Endpoint_Cap  : Rose.Capabilities.Capability;
    Rescind_Endpoint_Cap : Rose.Capabilities.Capability;

@@ -36,19 +36,48 @@ package body Caps.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
-   procedure Insert
+   procedure Append
      (Id   : Rose.Objects.Capability_Identifier;
       Caps : Rose.Capabilities.Capability_Array);
 
-   function Take_Next
-     (Id   : Rose.Objects.Capability_Identifier)
+   function Get_Cap
+     (Id    : Rose.Objects.Capability_Identifier;
+      Index : Positive)
       return Rose.Capabilities.Capability;
+
+   function Length
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural;
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier);
 
    function Get_Cap_Set_Object_Id
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Object_Id;
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (Id   : Rose.Objects.Capability_Identifier;
+      Caps : Rose.Capabilities.Capability_Array)
+   is
+   begin
+      if Id not in 1 .. Max_Cap_Set_Count then
+         return;
+      end if;
+
+      declare
+         Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
+      begin
+         for Cap of Caps loop
+            exit when Set.Last = Max_Cap_Set_Size;
+            Set.Last := Set.Last + 1;
+            Set.Set (Set.Last) := Cap;
+         end loop;
+      end;
+   end Append;
 
    ------------
    -- Create --
@@ -94,8 +123,9 @@ package body Caps.Server is
 
       Rose.Interfaces.Cap_Set.Server.Attach_Interface
         (Server_Context => Server,
-         Insert         => Insert'Access,
-         Take_Next      => Take_Next'Access,
+         Append         => Append'Access,
+         Get_Cap        => Get_Cap'Access,
+         Length         => Length'Access,
          Instanced      => True);
 
       Rose.Interfaces.Cap.Server.Attach_Interface
@@ -117,6 +147,31 @@ package body Caps.Server is
       end if;
    end Destroy;
 
+   -------------
+   -- Get_Cap --
+   -------------
+
+   function Get_Cap
+     (Id    : Rose.Objects.Capability_Identifier;
+      Index : Positive)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if Id not in 1 .. Max_Cap_Set_Count then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      declare
+         Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
+      begin
+         if Index > Set.Last then
+            return Rose.Capabilities.Null_Capability;
+         end if;
+
+         return Set.Set (Index);
+      end;
+   end Get_Cap;
+
    ---------------------------
    -- Get_Cap_Set_Object_Id --
    ---------------------------
@@ -131,28 +186,24 @@ package body Caps.Server is
    end Get_Cap_Set_Object_Id;
 
    ------------
-   -- Insert --
+   -- Length --
    ------------
 
-   procedure Insert
-     (Id   : Rose.Objects.Capability_Identifier;
-      Caps : Rose.Capabilities.Capability_Array)
+   function Length
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural
    is
    begin
       if Id not in 1 .. Max_Cap_Set_Count then
-         return;
+         return 0;
       end if;
 
       declare
          Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
       begin
-         for Cap of Caps loop
-            exit when Set.Last = Max_Cap_Set_Size;
-            Set.Last := Set.Last + 1;
-            Set.Set (Set.Last) := Cap;
-         end loop;
+         return Set.Last;
       end;
-   end Insert;
+   end Length;
 
    -------------
    -- Next_Id --
@@ -176,33 +227,5 @@ package body Caps.Server is
    begin
       Rose.Server.Start_Server (Server);
    end Start_Server;
-
-   ---------------
-   -- Take_Next --
-   ---------------
-
-   function Take_Next
-     (Id   : Rose.Objects.Capability_Identifier)
-      return Rose.Capabilities.Capability
-   is
-   begin
-      if Id not in 1 .. Max_Cap_Set_Count then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      declare
-         Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
-      begin
-         if Set.First > Set.Last then
-            return Rose.Capabilities.Null_Capability;
-         end if;
-
-         return Cap : constant Rose.Capabilities.Capability :=
-           Set.Set (Set.First)
-         do
-            Set.First := Set.First + 1;
-         end return;
-      end;
-   end Take_Next;
 
 end Caps.Server;
