@@ -187,16 +187,10 @@ package body Restore.Installer is
                begin
                   case Action is
                      when Launch =>
-                        Rose.Console_IO.Put ("launching ");
-                        Rose.Console_IO.Put (Name);
-                        Rose.Console_IO.New_Line;
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
                         Rose.System_Calls.Invoke_Capability (Reply);
                      when Save =>
-                        Rose.Console_IO.Put ("saving ");
-                        Rose.Console_IO.Put (Name);
-                        Rose.Console_IO.New_Line;
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
                         Rose.System_Calls.Send_Text (Reply, Name);

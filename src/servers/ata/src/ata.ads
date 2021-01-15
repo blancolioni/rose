@@ -2,8 +2,8 @@ with Rose.Capabilities;
 
 package ATA is
 
-   Create_Endpoint_Cap : Rose.Capabilities.Capability := 1;
-   Take_Next_Cap       : Rose.Capabilities.Capability := 2;
+   Create_Endpoint_Cap : constant Rose.Capabilities.Capability := 1;
+   Get_Cap_From_Set    : constant Rose.Capabilities.Capability := 2;
 
    Console_Cap         : Rose.Capabilities.Capability;
    PCI_Cap             : Rose.Capabilities.Capability;

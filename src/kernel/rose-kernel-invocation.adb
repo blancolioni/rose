@@ -65,6 +65,10 @@ package body Rose.Kernel.Invocation is
             end if;
          end if;
 
+         if Cap.Header.Single_Use then
+            Rose.Kernel.Processes.Delete_Cap (Pid, Params.Cap);
+         end if;
+
          Rose.Kernel.Capabilities.Handle
            (Cap, Params);
       end if;

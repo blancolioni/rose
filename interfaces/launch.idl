@@ -1,7 +1,8 @@
 interface Launch is
 
    function Launch
-     (Caps    : Capability_Array)
+     (Caps        : Capability_Array;
+      Environment : Storage_Array)
      return Object_Id;
 
 end Launch;

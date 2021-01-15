@@ -1,5 +1,3 @@
-with Rose.Addresses;
-
 package body Rose.CRTL is
 
    type GCC_Exception_Access is access all Integer;
@@ -10,8 +8,8 @@ package body Rose.CRTL is
 
    type Unwind_Reason_Code is new Integer;
 
-   Current_Top : Rose.Addresses.Virtual_Page_Address := 0
-     with Unreferenced;
+   Heap        : System.Storage_Elements.Storage_Array (1 .. 65536);
+   Current_Top : System.Storage_Elements.Storage_Offset := Heap'First;
 
    Exception_Tracebacks : Integer := 0;
    pragma Export (C, Exception_Tracebacks, "__gl_exception_tracebacks");
@@ -60,13 +58,25 @@ package body Rose.CRTL is
       return        Integer;
    pragma Export (C, Backtrace, "__gnat_backtrace");
 
+   --------------
+   -- Allocate --
+   --------------
+
    function Allocate
      (Size : System.Storage_Elements.Storage_Count)
      return System.Address
    is
-      pragma Unreferenced (Size);
+      use System.Storage_Elements;
    begin
-      return System.Null_Address;
+      if Size = 0 or else Current_Top + Size > Heap'Last then
+         return System.Null_Address;
+      end if;
+
+      return Result : constant System.Address :=
+        Heap (Current_Top)'Address
+      do
+         Current_Top := Current_Top + Size;
+      end return;
    end Allocate;
 
    procedure Deallocate

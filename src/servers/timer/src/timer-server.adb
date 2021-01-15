@@ -59,17 +59,17 @@ package body Timer.Server is
    -------------------
 
    procedure Create_Server is
+      function Get_Cap (Index : Positive) return Rose.Capabilities.Capability
+      is (Rose.System_Calls.Client.Get_Capability
+          (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
    begin
 
-      Console_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Console_Cap := Get_Cap (1);
       Rose.Console_IO.Open (Console_Cap);
       Rose.Console_IO.Put_Line ("timer: creating server");
 
-      Set_Timeout_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
-      Get_Current_Ticks_Cap :=
-        Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Set_Timeout_Cap := Get_Cap (2);
+      Get_Current_Ticks_Cap := Get_Cap (3);
 
       Timeout_Cap :=
         Rose.System_Calls.Server.Create_Endpoint

@@ -7,6 +7,19 @@ package body Rose.Environment_Pages is
       First : out Natural;
       Last  : out Natural);
 
+   -----------
+   -- Clear --
+   -----------
+
+   procedure Clear (Page : in out Environment_Page) is
+   begin
+      Page := (others => <>);
+   end Clear;
+
+   ------------------------------
+   -- Delete_Environment_Value --
+   ------------------------------
+
    procedure Delete_Environment_Value
      (Page  : in out Environment_Page;
       Name  : String)
@@ -130,14 +143,15 @@ package body Rose.Environment_Pages is
 
    end Get_Environment_Value;
 
-   ---------------------------
-   -- Set_Environment_Value --
-   ---------------------------
+   ------------------------------
+   -- Insert_Environment_Value --
+   ------------------------------
 
-   procedure Set_Environment_Value
-     (Page  : in out Environment_Page;
-      Name  : String;
-      Value : String)
+   procedure Insert_Environment_Value
+     (Page     : in out Environment_Page;
+      Name     : String;
+      Value    : String;
+      Inserted : out Boolean)
    is
       use Rose.Words;
       Index : Natural;
@@ -151,6 +165,7 @@ package body Rose.Environment_Pages is
       end if;
 
       if Natural (Page.Value_Count) >= Max_Values_Per_Page then
+         Inserted := False;
          return;
       end if;
 
@@ -171,6 +186,7 @@ package body Rose.Environment_Pages is
       end if;
 
       if New_Start + New_Length > Page.Text'Last then
+         Inserted := False;
          return;
       end if;
 
@@ -196,6 +212,23 @@ package body Rose.Environment_Pages is
          end loop;
          Page.Text_Length := Word_32 (To_Index);
       end;
+
+      Inserted := True;
+
+   end Insert_Environment_Value;
+
+   ---------------------------
+   -- Set_Environment_Value --
+   ---------------------------
+
+   procedure Set_Environment_Value
+     (Page     : in out Environment_Page;
+      Name     : String;
+      Value    : String)
+   is
+      Inserted : Boolean with Unreferenced;
+   begin
+      Insert_Environment_Value (Page, Name, Value, Inserted);
    end Set_Environment_Value;
 
 end Rose.Environment_Pages;

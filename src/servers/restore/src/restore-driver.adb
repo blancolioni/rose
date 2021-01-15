@@ -1,5 +1,6 @@
-with Rose.Interfaces.Block_Device.Client;
+with Rose.Words;
 
+with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.File_System.Client;
 
 with Rose.Console_IO;
@@ -16,6 +17,8 @@ procedure Restore.Driver is
 
    use Rose.Interfaces.Block_Device.Client;
 
+   Next_Cap_Index : Positive := 1;
+
    procedure Next (Cap : out Rose.Capabilities.Capability);
 
    ----------
@@ -24,7 +27,10 @@ procedure Restore.Driver is
 
    procedure Next (Cap : out Rose.Capabilities.Capability) is
    begin
-      Cap := Rose.System_Calls.Client.Get_Capability (Take_Next_Cap);
+      Cap :=
+        Rose.System_Calls.Client.Get_Capability
+          (Get_Cap_From_Set, (1 => Rose.Words.Word (Next_Cap_Index)));
+      Next_Cap_Index := Next_Cap_Index + 1;
    end Next;
 
    Device : Block_Device_Client;

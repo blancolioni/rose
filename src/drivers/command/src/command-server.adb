@@ -1,5 +1,4 @@
 with Rose.Objects;
-with Rose.Console_IO;
 
 with Rose.Server;
 with Rose.Interfaces.Map.Server;
@@ -35,11 +34,6 @@ package body Command.Server is
    is
       pragma Unreferenced (Id);
    begin
-      Rose.Console_IO.Put ("command: saving cap ");
-      Rose.Console_IO.Put (Natural (Cap));
-      Rose.Console_IO.Put (" as ");
-      Rose.Console_IO.Put (Name);
-      Rose.Console_IO.New_Line;
       Command.Maps.Insert (Name, Cap);
    end Add_Handler;
 
@@ -67,7 +61,13 @@ package body Command.Server is
    is
       pragma Unreferenced (Id);
    begin
-      return Maps.Find (Name);
+      return Cap : constant Rose.Capabilities.Capability :=
+        Maps.Find (Name);
+      --  do
+      --     Rose.Console_IO.Put ("command: returning cap ");
+      --     Rose.Console_IO.Put (Natural (Cap));
+      --     Rose.Console_IO.New_Line;
+      --  end return;
    end Find_Handler;
 
    --------------------
