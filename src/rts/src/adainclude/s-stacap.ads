@@ -7,12 +7,4 @@ private package System.Standard_Caps is
    Cap_Set_Constructor   : constant Rose.Capabilities.Capability := 3;
    Argument_Cap_Set      : constant Rose.Capabilities.Capability := 4;
 
-   Standard_Streams_Cap  : Rose.Capabilities.Capability := 0;
-   Standard_Input_Cap    : Rose.Capabilities.Capability := 0;
-   Standard_Output_Cap   : Rose.Capabilities.Capability := 0;
-   Standard_Error_Cap    : Rose.Capabilities.Capability := 0;
-
-   Current_Directory_Cap : Rose.Capabilities.Capability := 0;
-   Clock_Cap             : Rose.Capabilities.Capability := 0;
-
 end System.Standard_Caps;

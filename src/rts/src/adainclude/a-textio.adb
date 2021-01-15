@@ -1,5 +1,4 @@
 with System.Caps;
-with System.Init;
 
 with Rose.System_Calls.Client;
 
@@ -55,7 +54,7 @@ package body Ada.Text_IO is
    begin
       if FCB.Buffer_Last > 0 then
          Rose.System_Calls.Client.Send_String
-           (Cap     => 6,
+           (Cap     => File.Out_Cap,
             Message => FCB.Buffer (1 .. FCB.Buffer_Last));
          FCB.Buffer_Last := 0;
       end if;
