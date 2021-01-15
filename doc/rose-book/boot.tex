@@ -1,18 +1,26 @@
 \chapter{Boot Sequence}
 
+\section{Overview}
+
+The boot process initialises the kernel and starts the first process, {\tt init}.
+
 \section{Initial Processes}
 
 \subsection{{\tt init}}
 
-The {\tt init} program executes a series of commands created from a Petal script.  These are compiled with the executable, using an Aquarius plugin to generate an array of command records which implement the script.
-
-The script is restricted to a subset of the full Petal language.
-
-The kernel gives the init process a single {\tt create} capability.
+The kernel gives the init process a single {\tt create} capability, which is used to create launch and copy capabilities for the boot modules.
 
 \subsection{console}
 
 The console program implements a stream writer interface, and sends anything it receives to its device.  For rose-x86 it writes directly to the console buffer, which is mapped by the kernel at boot time.  Normally this is the first server launched by {\tt init}.
+
+\subsection{cap set}
+
+The cap set process allows other processes to create a set of capabilities, which can be referenced using a single capability.  Once this process is running, the remaining boot processes are not limited to four capabilities each.
+
+\subsection{timer}
+
+The kernel provides a single timeout, so there is a timer server which multiplexes multiple timers onto it.
 
 \subsection{mem}
 
@@ -20,7 +28,11 @@ The standard memory manager is launched with a memory capability, which can be q
 
 \subsection{pci}
 
+Scans the PCI bus.
+
 \subsection{ata}
+
+Drive for ATA/ATAPI storage.
 
 \section{First Boot}
 
