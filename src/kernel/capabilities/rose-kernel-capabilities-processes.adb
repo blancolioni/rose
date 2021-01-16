@@ -133,6 +133,30 @@ package body Rose.Kernel.Capabilities.Processes is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Initial_Cap_Endpoint =>
+            if Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+                  declare
+                     Cap    : constant Rose.Capabilities.Capability :=
+                                Rose.Kernel.Processes.Create_Cap
+                                  (Pid);
+                     Layout : Rose.Capabilities.Layout.Capability_Layout;
+                  begin
+                     Rose.Kernel.Processes.Get_Cap
+                       (Current_Pid, Params.Caps (Cap_Index), Layout);
+
+                     Rose.Kernel.Processes.Set_Cap
+                       (Pid, Cap, Layout);
+                  end;
+               end loop;
+            end if;
+
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply => True, others => False);
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when others =>
             Rose.Boot.Console.Put ("invalid endpoint: ");
             Rose.Boot.Console.Put (Natural (Cap.Header.Endpoint));
