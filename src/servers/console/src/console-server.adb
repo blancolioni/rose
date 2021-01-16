@@ -22,6 +22,7 @@ package body Console.Server is
 
    procedure Create_Console_Server is
    begin
+      Rose.Server.Set_Create_Endpoint_Cap (1);
       Rose.Interfaces.Stream_Writer.Server.Create_Server
         (Server_Context => Server_Context,
          Write          => Handle_Write'Access);

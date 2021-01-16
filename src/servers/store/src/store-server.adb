@@ -27,6 +27,8 @@ package body Store.Server is
           (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
    begin
 
+      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+
       Delete_Endpoint_Cap := Get_Cap (1);
       Console_Cap := Get_Cap (2);
 

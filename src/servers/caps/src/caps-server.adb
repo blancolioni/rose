@@ -118,6 +118,8 @@ package body Caps.Server is
 
    procedure Create_Server is
    begin
+      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+
       Rose.Interfaces.Constructor.Server.Create_Server
         (Server, Create'Access);
 

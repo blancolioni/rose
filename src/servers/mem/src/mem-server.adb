@@ -32,6 +32,10 @@ package body Mem.Server is
       Process     : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
+   procedure Exit_Process
+     (Id          : Rose.Objects.Capability_Identifier;
+      Exit_Status : Natural);
+
    procedure Register_Process
      (Id          : Rose.Objects.Capability_Identifier;
       Process     : Rose.Capabilities.Capability;
@@ -159,6 +163,8 @@ package body Mem.Server is
 
    begin
 
+      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+
       Console_Cap      := Get_Cap (1);
       Region_Count_Cap := Get_Cap (2);
       Region_Range_Cap := Get_Cap (3);
@@ -182,6 +188,7 @@ package body Mem.Server is
          Destroy        => Kill'Access,
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
          Heap           => Heap'Access,
+         Exit_Process   => Exit_Process'Access,
          Instanced      => True);
 
       Rose.Interfaces.Heap.Server.Attach_Interface
@@ -205,6 +212,19 @@ package body Mem.Server is
         (Mem.Processes.Get_Process_Heap_Bound
            (Process => Id));
    end Current_Bound;
+
+   ------------------
+   -- Exit_Process --
+   ------------------
+
+   procedure Exit_Process
+     (Id          : Rose.Objects.Capability_Identifier;
+      Exit_Status : Natural)
+   is
+      pragma Unreferenced (Exit_Status);
+   begin
+      Mem.Processes.Kill_Process (Id);
+   end Exit_Process;
 
    ----------
    -- Heap --
