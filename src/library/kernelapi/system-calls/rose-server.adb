@@ -2,6 +2,34 @@ with Rose.System_Calls.Server;
 
 package body Rose.Server is
 
+   Create_Endpoint_Cap : Rose.Capabilities.Capability := 3;
+
+   -------------------------------
+   -- Create_Anonymous_Endpoint --
+   -------------------------------
+
+   procedure Create_Anonymous_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id)
+   is
+   begin
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap, Endpoint_Id);
+   end Create_Anonymous_Endpoint;
+
+   ---------------------
+   -- Create_Endpoint --
+   ---------------------
+
+   function Create_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Endpoint_Cap, Endpoint_Id, Identifier);
+   end Create_Endpoint;
+
    ----------------------
    -- Get_Instance_Cap --
    ----------------------
@@ -131,6 +159,17 @@ package body Rose.Server is
           (Endpoint => Endpoint,
            Handler  => Handler);
    end Register_Handler;
+
+   -----------------------------
+   -- Set_Create_Endpoint_Cap --
+   -----------------------------
+
+   procedure Set_Create_Endpoint_Cap
+     (Cap      : Rose.Capabilities.Capability)
+   is
+   begin
+      Create_Endpoint_Cap := Cap;
+   end Set_Create_Endpoint_Cap;
 
    ----------------------
    -- Set_Instance_Cap --
