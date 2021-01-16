@@ -1536,8 +1536,6 @@ package body IDL.Generate_Kernel is
           ("Rose.Interfaces." & Package_Name);
 
       Server_Pkg.With_Package ("Rose.Server");
-      Server_Pkg.With_Package ("Rose.System_Calls.Server",
-                               Body_With => True);
 
       Server_Pkg.With_Package ("Rose.Invocation",
                                Body_With => True, Use_Package => True);
@@ -1632,8 +1630,7 @@ package body IDL.Generate_Kernel is
                         Endpoint_Object,
                         Identifier_Object,
                         New_Function_Call_Expression
-                          ("Rose.System_Calls.Server.Create_Endpoint",
-                           Literal (1),
+                          ("Rose.Server.Create_Endpoint",
                            Endpoint_Object,
                            Identifier_Object))));
                Check_Instance.Append
@@ -1753,8 +1750,7 @@ package body IDL.Generate_Kernel is
                  (Syn.Statements.New_Assignment_Statement
                     (Get_Ada_Name (Subpr) & "_Cap",
                      Syn.Expressions.New_Function_Call_Expression
-                       ("Rose.System_Calls.Server.Create_Endpoint",
-                        Syn.Literal (1),
+                       ("Rose.Server.Create_Endpoint",
                         Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"))));
             end Create_Endpoint;
 
@@ -1781,9 +1777,8 @@ package body IDL.Generate_Kernel is
             begin
                Create_Endpoint_Seq.Append
                  (Syn.Statements.New_Procedure_Call_Statement
-                    ("Rose.System_Calls.Server.Create_Anonymous_Endpoint",
-                        Syn.Literal (1),
-                        Syn.Object (Get_Ada_Name (Item) & "_Interface")));
+                    ("Rose.Server.Create_Anonymous_Endpoint",
+                     Syn.Object (Get_Ada_Name (Item) & "_Interface")));
 
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
@@ -2207,7 +2202,7 @@ package body IDL.Generate_Kernel is
    is
       use IDL.Syntax;
 
-      Have_Capability_With       : Boolean := False;
+      Have_Capability_With : Boolean := False;
 
       procedure Add_Dependent_Withs (Subpr : IDL_Subprogram);
 
@@ -2271,6 +2266,7 @@ package body IDL.Generate_Kernel is
       if Server and then not Have_Capability_With then
          Pkg.With_Package ("Rose.Capabilities", Body_With => True);
       end if;
+
    end With_Packages;
 
 end IDL.Generate_Kernel;
