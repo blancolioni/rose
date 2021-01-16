@@ -20,4 +20,7 @@ interface Process_Memory : Cap is
 
    function Heap return interface Heap;
    
+   procedure Exit_Process
+     (Exit_Status : Natural);
+     
 end Process_Memory;
