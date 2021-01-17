@@ -9,9 +9,9 @@ with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Executable.Server;
 
+with Rose.Interfaces.Kernel_Process.Client;
 with Rose.Interfaces.Memory.Client;
 with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Process_Memory.Client;
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Storage.Client;
 
@@ -113,43 +113,45 @@ package body Elf.Server is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
-      use Rose.Interfaces.Process_Memory.Client;
-      Process        : Rose.Capabilities.Capability;
+      use Rose.Interfaces.Process.Client;
+
+      Kernel_Process : Rose.Capabilities.Capability;
       Start_Cap      : Rose.Capabilities.Capability;
       Initial_Cap    : Rose.Capabilities.Capability;
+      Kernel_Client  : Rose.Interfaces.Kernel_Process
+        .Client.Kernel_Process_Client;
       Process_Client : Rose.Interfaces.Process.Client.Process_Client;
-      Process_Memory : Process_Memory_Client;
       Region         : Rose.Interfaces.Region.Client.Region_Client;
       Storage        : Rose.Interfaces.Storage.Client.Storage_Client;
       Start          : Rose.Words.Word;
       Success        : Boolean;
    begin
-      Create_Process (Process, Start_Cap, Initial_Cap);
-      Rose.Interfaces.Process.Client.Open (Process_Client, Process);
-
-      Process_Memory :=
+      Create_Process (Kernel_Process, Start_Cap, Initial_Cap);
+      Rose.Interfaces.Kernel_Process.Client.Open
+        (Kernel_Client, Kernel_Process);
+      Process_Client :=
         Rose.Interfaces.Memory.Client.New_Process
           (Item    => Memory_Client,
-           Process => Process_Client);
+           Process => Kernel_Client);
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
          Rose.System_Calls.Initialize_Send (Params, Initial_Cap);
          Rose.System_Calls.Send_Cap (Params,
-                                     Get_Exit_Process_Cap (Process_Memory));
+                                     Get_Exit_Process_Cap (Process_Client));
          Rose.System_Calls.Send_Cap (Params,
-                                     Get_Heap_Cap (Process_Memory));
+                                     Get_Heap_Interface_Cap (Process_Client));
          Rose.System_Calls.Invoke_Capability (Params);
       end;
 
-      Rose.Console_IO.Put ("sending ");
-      Rose.Console_IO.Put (Natural (Caps'Length));
-      Rose.Console_IO.Put (" initial cap");
-      if Caps'Length /= 1 then
-         Rose.Console_IO.Put ("s");
-      end if;
-      Rose.Console_IO.New_Line;
+      --  Rose.Console_IO.Put ("sending ");
+      --  Rose.Console_IO.Put (Natural (Caps'Length));
+      --  Rose.Console_IO.Put (" initial cap");
+      --  if Caps'Length /= 1 then
+         --  Rose.Console_IO.Put ("s");
+      --  end if;
+      --  Rose.Console_IO.New_Line;
 
       if Caps'Length > 0 then
          declare
@@ -166,10 +168,10 @@ package body Elf.Server is
       Rose.Interfaces.Region.Client.Open (Region, Image);
       Rose.Interfaces.Storage.Client.Open (Storage, Store);
       Elf.Loader.Load_Elf_Image
-        (Process_Memory, Storage, Region, Start, Success);
+        (Process_Client, Storage, Region, Start, Success);
       if Success then
          Start_Process (Start_Cap, Start);
-         return Get_Interface_Cap (Process_Memory);
+         return Get_Interface_Cap (Process_Client);
       else
          Rose.Console_IO.Put_Line ("elf: failed to load process");
          return 0;

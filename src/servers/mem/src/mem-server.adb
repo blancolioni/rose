@@ -10,7 +10,9 @@ with Rose.Console_IO;
 
 with Rose.Interfaces.Heap.Server;
 with Rose.Interfaces.Memory.Server;
-with Rose.Interfaces.Process_Memory.Server;
+with Rose.Interfaces.Process.Server;
+with Rose.Interfaces.Receiver.Server;
+with Rose.Interfaces.Segment;
 
 with Rose.Interfaces.Region.Client;
 
@@ -69,7 +71,15 @@ package body Mem.Server is
       Virtual_Bound : in     Rose.Words.Word;
       Flags         : in     Rose.Words.Word);
 
-   function Heap
+   procedure Send_Cap
+     (Id  : Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability);
+
+   function Published_Interface
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
+   function Heap_Interface
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
@@ -88,7 +98,7 @@ package body Mem.Server is
       Physical : Rose.Words.Word;
       Action   : Rose.Interfaces.Memory.Page_Access_Type);
 
-   procedure Kill (Id : Rose.Objects.Capability_Identifier);
+   procedure Destroy (Id : Rose.Objects.Capability_Identifier);
 
    procedure Protection_Fault
      (Process : Rose.Objects.Object_Id;
@@ -105,7 +115,7 @@ package body Mem.Server is
       Virtual_Bound : Rose.Words.Word;
       Flags         : Rose.Words.Word)
    is
-      use Rose.Interfaces.Process_Memory;
+      use Rose.Interfaces.Segment;
       use type Rose.Words.Word;
 
    begin
@@ -131,7 +141,7 @@ package body Mem.Server is
       Offset        : Rose.Words.Word;
       Flags         : Rose.Words.Word)
    is
-      use Rose.Interfaces.Process_Memory;
+      use Rose.Interfaces.Segment;
       use Rose.Interfaces.Region.Client;
       use type Rose.Words.Word;
 
@@ -181,14 +191,15 @@ package body Mem.Server is
          Page_Fault     => Page_Fault'Access,
          Take_Physical_Memory => Take_Physical_Memory'Access);
 
-      Rose.Interfaces.Process_Memory.Server.Attach_Interface
+      Rose.Interfaces.Process.Server.Attach_Interface
         (Server_Context => Server,
+         Destroy => Destroy'Access,
          Add_Segment    => Add_Segment'Access,
          Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
-         Destroy        => Kill'Access,
+         Published_Interface => Published_Interface'Access,
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
-         Heap           => Heap'Access,
          Exit_Process   => Exit_Process'Access,
+         Heap_Interface => Heap_Interface'Access,
          Instanced      => True);
 
       Rose.Interfaces.Heap.Server.Attach_Interface
@@ -196,6 +207,11 @@ package body Mem.Server is
          Current_Bound     => Current_Bound'Access,
          Request_New_Bound => Request_New_Bound'Access,
          Instanced         => True);
+
+      Rose.Interfaces.Receiver.Server.Attach_Interface
+        (Server_Context => Server,
+         Send_Cap       => Send_Cap'Access,
+         Instanced      => True);
 
    end Create_Server;
 
@@ -213,6 +229,15 @@ package body Mem.Server is
            (Process => Id));
    end Current_Bound;
 
+   -------------
+   -- Destroy --
+   -------------
+
+   procedure Destroy (Id : Rose.Objects.Capability_Identifier) is
+   begin
+      Mem.Processes.Kill_Process (Id);
+   end Destroy;
+
    ------------------
    -- Exit_Process --
    ------------------
@@ -226,26 +251,17 @@ package body Mem.Server is
       Mem.Processes.Kill_Process (Id);
    end Exit_Process;
 
-   ----------
-   -- Heap --
-   ----------
+   --------------------
+   -- Heap_Interface --
+   --------------------
 
-   function Heap
+   function Heap_Interface
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
    begin
       return Mem.Processes.Get_Heap_Cap (Id);
-   end Heap;
-
-   ----------
-   -- Kill --
-   ----------
-
-   procedure Kill (Id : Rose.Objects.Capability_Identifier) is
-   begin
-      Mem.Processes.Kill_Process (Id);
-   end Kill;
+   end Heap_Interface;
 
    -----------------
    -- New_Process --
@@ -400,6 +416,18 @@ package body Mem.Server is
       Mem.Processes.Fault_Process (Mem.Processes.Get_Process_Id (Process));
    end Protection_Fault;
 
+   -------------------------
+   -- Published_Interface --
+   -------------------------
+
+   function Published_Interface
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Mem.Processes.Published_Interface_Cap (Id);
+   end Published_Interface;
+
    ----------------------
    -- Register_Process --
    ----------------------
@@ -483,6 +511,18 @@ package body Mem.Server is
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;
+
+   --------------
+   -- Send_Cap --
+   --------------
+
+   procedure Send_Cap
+     (Id  : Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability)
+   is
+   begin
+      Mem.Processes.Set_Published_Interface_Cap (Id, Cap);
+   end Send_Cap;
 
    ------------------
    -- Start_Server --

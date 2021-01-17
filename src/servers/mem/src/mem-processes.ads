@@ -55,6 +55,14 @@ package Mem.Processes is
      (Process : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
+   procedure Set_Published_Interface_Cap
+     (Process : Rose.Objects.Capability_Identifier;
+      Cap     : Rose.Capabilities.Capability);
+
+   function Published_Interface_Cap
+     (Process : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
    procedure Initialize_Page
      (Process       : Rose.Objects.Capability_Identifier;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
