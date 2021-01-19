@@ -2,7 +2,7 @@ with Rose.System_Calls.Server;
 
 package body Rose.Server is
 
-   Create_Endpoint_Cap : Rose.Capabilities.Capability := 3;
+   Create_Endpoint_Cap : Rose.Capabilities.Capability := 4;
 
    -------------------------------
    -- Create_Anonymous_Endpoint --
@@ -82,6 +82,30 @@ package body Rose.Server is
       return False;
    end Has_Instance;
 
+   -----------------------
+   -- Publish_Interface --
+   -----------------------
+
+   procedure Publish_Interface
+     (Process_Cap   : Rose.Capabilities.Capability;
+      Interface_Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Process_Cap);
+      Params.Control.Last_Recv_Cap := 7;
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      declare
+         Publish_Cap : constant Rose.Capabilities.Capability :=
+                         Params.Caps (7);
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Publish_Cap);
+         Rose.System_Calls.Send_Cap (Params, Interface_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+   end Publish_Interface;
+
    ---------------------
    -- Receive_Message --
    ---------------------
@@ -94,7 +118,7 @@ package body Rose.Server is
    begin
       if Context.Receive_Cap = Rose.Capabilities.Null_Capability then
          Context.Receive_Cap :=
-           Rose.System_Calls.Server.Create_Receive_Cap (1);
+           Rose.System_Calls.Server.Create_Receive_Cap (Create_Endpoint_Cap);
       end if;
 
       Rose.System_Calls.Initialize_Receive (Params, Context.Receive_Cap);

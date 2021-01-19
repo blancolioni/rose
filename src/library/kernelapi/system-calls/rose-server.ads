@@ -53,6 +53,10 @@ package Rose.Server is
    procedure Create_Anonymous_Endpoint
      (Endpoint_Id  : Rose.Objects.Endpoint_Id);
 
+   procedure Publish_Interface
+     (Process_Cap   : Rose.Capabilities.Capability;
+      Interface_Cap : Rose.Capabilities.Capability);
+
 private
 
    Max_Handled_Endpoints  : constant := 20;
