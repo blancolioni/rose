@@ -1,7 +1,11 @@
-interface Process : Cap is
+interface Process : Segment, Server, Cap is
 
-   procedure Resume;
-   procedure Fault;
-   procedure Notify (Flags : Word_32);
+   function Heap_Interface return interface Heap;
+   
+   procedure Exit_Process
+     (Exit_Status : Natural);
+     
+   procedure Publish_Interface
+     (Interface_Cap : Capability);
      
 end Process;

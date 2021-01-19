@@ -24,7 +24,7 @@ package body Exec.Server is
      (Id          : Rose.Objects.Capability_Identifier;
       Caps        : Rose.Capabilities.Capability_Array;
       Environment : System.Storage_Elements.Storage_Array)
-      return Rose.Objects.Object_Id;
+      return Rose.Capabilities.Capability;
 
    Context : Rose.Server.Server_Context;
    Region : Rose.Interfaces.Region.Client.Region_Client;
@@ -38,7 +38,7 @@ package body Exec.Server is
       Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
       Exec.Library.Set_Region (Region);
 
-      Rose.Interfaces.Exec.Server.Create_Server
+      Rose.Interfaces.Exec.Server.Publish_Interface
         (Server_Context => Context,
          Install        => On_Install'Access,
          Launch         => On_Launch'Access);
@@ -70,7 +70,7 @@ package body Exec.Server is
      (Id          : Rose.Objects.Capability_Identifier;
       Caps        : Rose.Capabilities.Capability_Array;
       Environment : System.Storage_Elements.Storage_Array)
-      return Rose.Objects.Object_Id
+      return Rose.Capabilities.Capability
    is
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -100,9 +100,13 @@ package body Exec.Server is
 
       Invoke_Capability (Params);
 
-      return Rose.Objects.Object_Id
-        (Rose.System_Calls.Get_Word_64
-           (Params, 0));
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Rose.Capabilities.Null_Capability;
+      else
+         return Params.Caps (0);
+      end if;
    end On_Launch;
 
    ------------------

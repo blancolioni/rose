@@ -23,10 +23,9 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-memory.o \
 	$(BUILDDIR)/rose-interfaces-memory-server.o \
 	$(BUILDDIR)/rose-interfaces-process.o \
-	$(BUILDDIR)/rose-interfaces-process-client.o \
-	$(BUILDDIR)/rose-interfaces-process_memory.o \
-	$(BUILDDIR)/rose-interfaces-process_memory-server.o \
-	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
+	$(BUILDDIR)/rose-interfaces-process-server.o \
+	$(BUILDDIR)/rose-interfaces-receiver-server.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \

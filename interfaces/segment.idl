@@ -1,4 +1,4 @@
-interface Process_Memory : Cap is
+interface Segment is
 
    Segment_Readable    : constant := 1;
    Segment_Writable    : constant := 2;
@@ -18,6 +18,4 @@ interface Process_Memory : Cap is
       Virtual_Bound : Word;
       Flags         : Word);
 
-   function Heap return interface Heap;
-   
-end Process_Memory;
+end Segment;

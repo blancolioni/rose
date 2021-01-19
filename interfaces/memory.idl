@@ -3,8 +3,8 @@ interface Memory is
    type Page_Access_Type is (Read, Write, Execute);
    
    function New_Process
-     (Process     : interface Process)
-     return interface Process_Memory;
+     (Process     : interface Kernel_Process)
+     return interface Process;
    
    procedure Register_Process
      (Process     : interface Process;

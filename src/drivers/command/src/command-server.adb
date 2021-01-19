@@ -43,7 +43,7 @@ package body Command.Server is
 
    procedure Create_Server is
    begin
-      Rose.Interfaces.Map.Server.Create_Server
+      Rose.Interfaces.Map.Server.Publish_Interface
         (Server_Context => Context,
          Add            => Add_Handler'Access,
          Remove         => Remove_Handler'Access,

@@ -87,7 +87,6 @@ package Init.Calls is
 
    procedure Get_Interface
      (Cap            : Rose.Capabilities.Capability;
-      Identifier     : Rose.Objects.Capability_Identifier;
       Interface_Caps : out Array_Of_Capabilities);
 
 end Init.Calls;

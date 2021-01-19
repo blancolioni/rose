@@ -35,6 +35,9 @@ package body Rose.Kernel.Invocation is
                         (Current_Process_Id)
                           and then not Params.Control.Flags
                             (No_Trace);
+        --  or else Params.Control.Last_Sent_Cap > 3
+        --      or else Params.Control.Last_Sent_Word > 7;
+
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
    begin
@@ -43,6 +46,17 @@ package body Rose.Kernel.Invocation is
         or else Params.Control.Flags (Send_Buffer)
       then
          Set_Current_State (Pid, Blocked);
+      end if;
+
+      if False then
+         if Params.Control.Last_Sent_Cap > 3 then
+            Rose.Boot.Console.Put_Line
+              ("warning: more than 4 sent caps is deprecated");
+         end if;
+         if Params.Control.Last_Sent_Word > 7 then
+            Rose.Boot.Console.Put_Line
+              ("warning: more than 8 sent words is deprecated");
+         end if;
       end if;
 
       Params.Reply_Cap := Params.Cap;

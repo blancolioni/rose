@@ -42,6 +42,21 @@ package Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
+   procedure Set_Create_Endpoint_Cap
+     (Cap      : Rose.Capabilities.Capability);
+
+   function Create_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
+      return Rose.Capabilities.Capability;
+
+   procedure Create_Anonymous_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id);
+
+   procedure Publish_Interface
+     (Process_Cap   : Rose.Capabilities.Capability;
+      Interface_Cap : Rose.Capabilities.Capability);
+
 private
 
    Max_Handled_Endpoints  : constant := 20;

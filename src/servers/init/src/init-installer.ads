@@ -1,4 +1,3 @@
-with Rose.Objects;
 with Rose.Words;
 
 package Init.Installer is
@@ -12,7 +11,7 @@ package Init.Installer is
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
-      return Rose.Objects.Object_Id;
+      return Rose.Capabilities.Capability;
 
    function Install_Command_Library
      (Create_Cap      : Rose.Capabilities.Capability;
@@ -23,7 +22,7 @@ package Init.Installer is
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
-      return Rose.Objects.Object_Id;
+      return Rose.Capabilities.Capability;
 
    function Install_Executable
      (Create_Cap    : Rose.Capabilities.Capability;

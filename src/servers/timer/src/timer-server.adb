@@ -64,6 +64,8 @@ package body Timer.Server is
           (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
    begin
 
+      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+
       Console_Cap := Get_Cap (1);
       Rose.Console_IO.Open (Console_Cap);
       Rose.Console_IO.Put_Line ("timer: creating server");

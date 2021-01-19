@@ -5,6 +5,7 @@ package Rose.Kernel.Capabilities.Processes is
    Faulted_Process_Endpoint   : constant Rose.Objects.Endpoint_Index := 3;
    Notify_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 4;
    Start_Process_Endpoint     : constant Rose.Objects.Endpoint_Index := 5;
+   Initial_Cap_Endpoint       : constant Rose.Objects.Endpoint_Index := 6;
 
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;

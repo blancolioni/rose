@@ -4,6 +4,6 @@ interface Executable is
      (Image : interface Region;
       Store : interface Storage;
       Caps  : Capability_Array)
-     return Object_Id;
+     return interface Process;
 
 end Executable;

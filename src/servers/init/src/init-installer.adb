@@ -1,6 +1,7 @@
 with System.Storage_Elements;
 
 with Rose.Limits;
+with Rose.Objects;
 
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Stream_Reader.Client;
@@ -99,7 +100,7 @@ package body Init.Installer is
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
-      return Rose.Objects.Object_Id
+      return Rose.Capabilities.Capability
    is
       use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
@@ -136,7 +137,14 @@ package body Init.Installer is
         (Params, Storage_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
-      return Rose.System_Calls.Get_Object_Id (Params, 0);
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return 0;
+      else
+         return Params.Caps (0);
+      end if;
+
    end Install_Command_Library;
 
    --------------------------
@@ -152,7 +160,7 @@ package body Init.Installer is
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
-      return Rose.Objects.Object_Id
+      return Rose.Capabilities.Capability
    is
       use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
@@ -189,7 +197,14 @@ package body Init.Installer is
         (Params, Storage_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
-      return Rose.System_Calls.Get_Object_Id (Params, 0);
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return 0;
+      else
+         return Params.Caps (0);
+      end if;
+
    end Install_Exec_Library;
 
    ------------------------

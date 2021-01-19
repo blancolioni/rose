@@ -1,0 +1,5 @@
+interface Receiver is
+
+   procedure Send_Cap (Cap : Capability);
+     
+end Receiver;

@@ -16,8 +16,7 @@ package Rose.System_Calls is
    type Sent_Words_Array is array (Positive range <>) of Rose.Words.Word;
    No_Sent_Words : Sent_Words_Array (1 .. 0);
 
-   type Sent_Caps_Array is
-     array (Positive range <>) of Rose.Capabilities.Capability;
+   subtype Sent_Caps_Array is Rose.Capabilities.Capability_Array;
    No_Sent_Caps : Sent_Caps_Array (1 .. 0);
 
    type Invocation_Flag_Array is

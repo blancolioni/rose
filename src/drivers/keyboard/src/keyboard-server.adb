@@ -12,10 +12,13 @@ with Rose.Interfaces.Event_Source;
 
 with Rose.Devices.Port_IO;
 
+with Rose.Server;
+
 with Keyboard.Codes;
 
 package body Keyboard.Server is
 
+   Event_Source_Cap : Rose.Capabilities.Capability;
    Receive_Cap      : Rose.Capabilities.Capability;
    Add_Listener_Cap : Rose.Capabilities.Capability;
    Key_Cap          : Rose.Capabilities.Capability;
@@ -38,6 +41,11 @@ package body Keyboard.Server is
       Receive_Cap :=
         Rose.System_Calls.Server.Create_Receive_Cap
           (Create_Endpoint_Cap);
+      Event_Source_Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Endpoint_Cap,
+           Rose.Interfaces.Event_Source.Event_Source_Interface);
+
       Add_Listener_Cap :=
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,
@@ -45,6 +53,9 @@ package body Keyboard.Server is
       Have_Listener := False;
 
       Register_IRQ;
+
+      Rose.Server.Publish_Interface (3, Event_Source_Cap);
+
    end Create_Server;
 
    ------------------
@@ -107,6 +118,9 @@ package body Keyboard.Server is
 
          case Params.Endpoint is
             when Rose.Interfaces.Get_Interface_Endpoint =>
+               Rose.System_Calls.Send_Cap (Reply, Add_Listener_Cap);
+
+            when Rose.Interfaces.Event_Source.Event_Source_Interface =>
                Rose.System_Calls.Send_Cap (Reply, Add_Listener_Cap);
 
             when Rose.Interfaces.Event_Source.Add_Listener_Endpoint =>

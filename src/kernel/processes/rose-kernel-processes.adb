@@ -679,6 +679,7 @@ package body Rose.Kernel.Processes is
          use Rose.Objects;
          use type Rose.Capabilities.Layout.Capability_Type;
          Rec : Rose.Capabilities.Layout.Capability_Layout;
+         Log : constant Boolean := False;
       begin
          Get_Cap (Pid, P.Receive_Cap, Rec);
          if Rec.Header.Cap_Type /= Rose.Capabilities.Layout.Receive_Cap then
@@ -693,27 +694,30 @@ package body Rose.Kernel.Processes is
                              or else Endpoint = Endpoint_Index;
          begin
             if not Blocked then
-               Debug.Put (Current_Process_Id);
-               Rose.Boot.Console.Put (": receiver ");
-               Debug.Put (Pid);
-               Rose.Boot.Console.Put (" is blocked on ");
-               Rose.Boot.Console.Put
-                 (Rose.Words.Word_8
-                    (Rec.Header.Endpoint));
-               Rose.Boot.Console.Put (" ");
-               Rose.Boot.Console.Put
-                 (Rose.Words.Word_64
-                    (P.Endpoints (Rec.Header.Endpoint).Endpoint));
-               Rose.Boot.Console.New_Line;
+               if Log then
+                  Debug.Put (Current_Process_Id);
+                  Rose.Boot.Console.Put (": receiver ");
+                  Debug.Put (Pid);
+                  Rose.Boot.Console.Put (" is blocked on ");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_8
+                       (Rec.Header.Endpoint));
+                  Rose.Boot.Console.Put (" ");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_64
+                       (P.Endpoints (Rec.Header.Endpoint).Endpoint));
+                  Rose.Boot.Console.New_Line;
 
-               Rose.Boot.Console.Put (" but we are sending to ");
-               Rose.Boot.Console.Put
-                 (Rose.Words.Word_8
-                    (Endpoint_Index));
-               Rose.Boot.Console.Put (" ");
-               Rose.Boot.Console.Put
-                 (Rose.Words.Word_64 (P.Endpoints (Endpoint_Index).Endpoint));
-               Rose.Boot.Console.New_Line;
+                  Rose.Boot.Console.Put (" but we are sending to ");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_8
+                       (Endpoint_Index));
+                  Rose.Boot.Console.Put (" ");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_64
+                       (P.Endpoints (Endpoint_Index).Endpoint));
+                  Rose.Boot.Console.New_Line;
+               end if;
             end if;
 
             return Blocked;

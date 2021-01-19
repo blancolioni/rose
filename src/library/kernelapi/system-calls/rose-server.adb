@@ -2,6 +2,34 @@ with Rose.System_Calls.Server;
 
 package body Rose.Server is
 
+   Create_Endpoint_Cap : Rose.Capabilities.Capability := 4;
+
+   -------------------------------
+   -- Create_Anonymous_Endpoint --
+   -------------------------------
+
+   procedure Create_Anonymous_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id)
+   is
+   begin
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap, Endpoint_Id);
+   end Create_Anonymous_Endpoint;
+
+   ---------------------
+   -- Create_Endpoint --
+   ---------------------
+
+   function Create_Endpoint
+     (Endpoint_Id  : Rose.Objects.Endpoint_Id;
+      Identifier   : Rose.Objects.Capability_Identifier := 0)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Endpoint_Cap, Endpoint_Id, Identifier);
+   end Create_Endpoint;
+
    ----------------------
    -- Get_Instance_Cap --
    ----------------------
@@ -54,6 +82,30 @@ package body Rose.Server is
       return False;
    end Has_Instance;
 
+   -----------------------
+   -- Publish_Interface --
+   -----------------------
+
+   procedure Publish_Interface
+     (Process_Cap   : Rose.Capabilities.Capability;
+      Interface_Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Process_Cap);
+      Params.Control.Last_Recv_Cap := 7;
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      declare
+         Publish_Cap : constant Rose.Capabilities.Capability :=
+                         Params.Caps (7);
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Publish_Cap);
+         Rose.System_Calls.Send_Cap (Params, Interface_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+   end Publish_Interface;
+
    ---------------------
    -- Receive_Message --
    ---------------------
@@ -66,7 +118,7 @@ package body Rose.Server is
    begin
       if Context.Receive_Cap = Rose.Capabilities.Null_Capability then
          Context.Receive_Cap :=
-           Rose.System_Calls.Server.Create_Receive_Cap (1);
+           Rose.System_Calls.Server.Create_Receive_Cap (Create_Endpoint_Cap);
       end if;
 
       Rose.System_Calls.Initialize_Receive (Params, Context.Receive_Cap);
@@ -131,6 +183,17 @@ package body Rose.Server is
           (Endpoint => Endpoint,
            Handler  => Handler);
    end Register_Handler;
+
+   -----------------------------
+   -- Set_Create_Endpoint_Cap --
+   -----------------------------
+
+   procedure Set_Create_Endpoint_Cap
+     (Cap      : Rose.Capabilities.Capability)
+   is
+   begin
+      Create_Endpoint_Cap := Cap;
+   end Set_Create_Endpoint_Cap;
 
    ----------------------
    -- Set_Instance_Cap --

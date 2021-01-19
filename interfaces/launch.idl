@@ -3,6 +3,6 @@ interface Launch is
    function Launch
      (Caps        : Capability_Array;
       Environment : Storage_Array)
-     return Object_Id;
+     return interface Process;
 
 end Launch;

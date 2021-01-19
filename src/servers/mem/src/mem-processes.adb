@@ -3,8 +3,8 @@ with Rose.System_Calls.Server;
 with Rose.Limits;
 
 with Rose.Interfaces.Heap;
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Process_Memory;
+with Rose.Interfaces.Process;
+with Rose.Interfaces.Kernel_Process.Client;
 
 with Mem.Calls;
 
@@ -44,14 +44,18 @@ package body Mem.Processes is
 
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
 
+   subtype Kernel_Process_Client is
+     Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
+
    type Memory_Process_Record is
       record
          State        : Process_State := Available;
          Oid          : Rose.Objects.Object_Id;
          Segments     : Segment_Record_Array;
          Num_Segments : Segment_Count;
-         Process      : Rose.Interfaces.Process.Client.Process_Client;
+         Process      : Kernel_Process_Client;
          Heap         : Rose.Capabilities.Capability;
+         Server       : Rose.Capabilities.Capability;
       end record;
 
    subtype Real_Process_Id is
@@ -283,10 +287,10 @@ package body Mem.Processes is
    procedure Fault_Process
      (Process         : Rose.Objects.Capability_Identifier)
    is
+      use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
    begin
-      Rose.Interfaces.Process.Client.Fault
-        (P.Process);
+      Fault (P.Process);
       P.State := Faulted;
    end Fault_Process;
 
@@ -467,9 +471,10 @@ package body Mem.Processes is
    ------------------
 
    procedure Kill_Process (Process : Rose.Objects.Capability_Identifier) is
+      use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
    begin
-      Rose.Interfaces.Process.Client.Destroy (P.Process);
+      Destroy (P.Process);
       P.State := Available;
    end Kill_Process;
 
@@ -485,10 +490,22 @@ package body Mem.Processes is
       return Rose.System_Calls.Server.Create_Endpoint
         (Create_Cap   => Create_Endpoint_Cap,
          Endpoint_Id  =>
-           Rose.Interfaces.Process_Memory.Process_Memory_Interface,
+           Rose.Interfaces.Process.Process_Interface,
          Identifier   =>
            Register_Process (Process_Cap));
    end New_Process;
+
+   -----------------------------
+   -- Published_Interface_Cap --
+   -----------------------------
+
+   function Published_Interface_Cap
+     (Process : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Process_Table (Process).Server;
+   end Published_Interface_Cap;
 
    ----------------------
    -- Register_Process --
@@ -500,7 +517,7 @@ package body Mem.Processes is
    is
       use Rose.Objects;
       Start  : constant Capability_Identifier := Next_Pid;
-      Client : Rose.Interfaces.Process.Client.Process_Client;
+      Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
    begin
       while Process_Table (Next_Pid).State /= Available loop
          if Next_Pid = Process_Table'Last then
@@ -514,11 +531,11 @@ package body Mem.Processes is
          end if;
       end loop;
 
-      Rose.Interfaces.Process.Client.Open (Client, Process_Cap);
+      Rose.Interfaces.Kernel_Process.Client.Open (Client, Process_Cap);
 
       declare
          Oid : constant Rose.Objects.Object_Id :=
-                 Rose.Interfaces.Process.Client.Get_Object_Id (Client);
+                 Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client);
          Heap_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Endpoint
                         (Create_Cap   => Create_Endpoint_Cap,
@@ -533,6 +550,7 @@ package body Mem.Processes is
               Segments     => <>,
               Num_Segments => 0,
               Heap         => Heap_Cap,
+              Server       => 0,
               Process      => Client);
       end;
 
@@ -579,7 +597,19 @@ package body Mem.Processes is
    is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
-      Rose.Interfaces.Process.Client.Resume (P.Process);
+      Rose.Interfaces.Kernel_Process.Client.Resume (P.Process);
    end Resume_Process;
+
+   ---------------------------------
+   -- Set_Published_Interface_Cap --
+   ---------------------------------
+
+   procedure Set_Published_Interface_Cap
+     (Process : Rose.Objects.Capability_Identifier;
+      Cap     : Rose.Capabilities.Capability)
+   is
+   begin
+      Process_Table (Process).Server := Cap;
+   end Set_Published_Interface_Cap;
 
 end Mem.Processes;
