@@ -5,4 +5,7 @@ interface Process : Segment, Server, Cap is
    procedure Exit_Process
      (Exit_Status : Natural);
      
+   procedure Publish_Interface
+     (Interface_Cap : Capability);
+     
 end Process;
