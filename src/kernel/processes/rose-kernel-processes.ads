@@ -37,6 +37,9 @@ package Rose.Kernel.Processes is
      (Process : Process_Id;
       Address : Rose.Words.Word);
 
+   procedure Kill_Process
+     (Process : Process_Id);
+
    function Trace (Process : Process_Id) return Boolean;
 
    procedure Start_Trace (Process : Process_Id);

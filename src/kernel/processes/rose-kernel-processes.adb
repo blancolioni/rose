@@ -773,6 +773,18 @@ package body Rose.Kernel.Processes is
       return False;
    end Is_Valid_Entry;
 
+   ------------------
+   -- Kill_Process --
+   ------------------
+
+   procedure Kill_Process
+     (Process : Process_Id)
+   is
+      P : Kernel_Process_Entry renames Process_Table (Process);
+   begin
+      P.State := Available;
+   end Kill_Process;
+
    --------------
    -- Load_Cap --
    --------------
