@@ -38,7 +38,7 @@ package body Exec.Server is
       Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
       Exec.Library.Set_Region (Region);
 
-      Rose.Interfaces.Exec.Server.Create_Server
+      Rose.Interfaces.Exec.Server.Publish_Interface
         (Server_Context => Context,
          Install        => On_Install'Access,
          Launch         => On_Launch'Access);
