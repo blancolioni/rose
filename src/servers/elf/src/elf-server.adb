@@ -142,6 +142,9 @@ package body Elf.Server is
                                      Get_Exit_Process_Cap (Process_Client));
          Rose.System_Calls.Send_Cap (Params,
                                      Get_Heap_Interface_Cap (Process_Client));
+         Rose.System_Calls.Send_Cap
+           (Params,
+            Get_Interface_Cap (Process_Client));
          Rose.System_Calls.Invoke_Capability (Params);
       end;
 
