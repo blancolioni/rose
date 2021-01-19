@@ -5,8 +5,8 @@ with Rose.Devices.Partitions;
 
 with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.Constructor;
+with Rose.Interfaces.Exec;
 with Rose.Interfaces.File_System;
-with Rose.Interfaces.Map;
 with Rose.Interfaces.Storage;
 with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
@@ -14,9 +14,7 @@ with Rose.Interfaces.Timeout;
 
 with Rose.Interfaces.Partitions.Client;
 
-with Rose.Interfaces.Exec;
 with Rose.Interfaces.Executable;
-with Rose.Interfaces.Installer;
 with Rose.Interfaces.Memory;
 
 with Rose.Invocation;
@@ -129,6 +127,10 @@ package body Init.Run is
          Identifier : Rose.Objects.Capability_Identifier := 0)
          return Rose.Capabilities.Capability;
 
+      function Get_Public_Interface_From_Process
+        (Process_Cap : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability;
+
       procedure Load_Partition
         (Client            : Rose.Interfaces.Partitions
          .Client.Partitions_Client;
@@ -189,6 +191,36 @@ package body Init.Run is
 
          return Cap;
       end Copy_Cap_From_Process;
+
+      ---------------------------------------
+      -- Get_Public_Interface_From_Process --
+      ---------------------------------------
+
+      function Get_Public_Interface_From_Process
+        (Process_Cap : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability
+      is
+         Caps          : Init.Calls.Array_Of_Capabilities (1 .. 7);
+         Public_Cap    : Rose.Capabilities.Capability;
+         Interface_Cap : Rose.Capabilities.Capability := Null_Capability;
+      begin
+         --  get process interface caps
+         Init.Calls.Get_Interface (Process_Cap, Caps);
+
+         --  public interface cap is in Caps (3)
+         Public_Cap := Caps (3);
+
+         if Public_Cap /= Null_Capability then
+            for I in 1 .. 4 loop
+               Init.Calls.Get_Interface (Public_Cap, Caps);
+               Interface_Cap := Caps (1);
+               exit when Interface_Cap /= Null_Capability;
+               Wait (500);
+            end loop;
+         end if;
+
+         return Interface_Cap;
+      end Get_Public_Interface_From_Process;
 
       --------------------
       -- Load_Partition --
@@ -615,9 +647,9 @@ package body Init.Run is
          Init.Calls.Call
            (Create_Endpoint_Cap,
             (Rose.Words.Word
-                 (Rose.Interfaces.Installer.Install_Endpoint mod 2 ** 32),
+                 (Rose.Interfaces.Exec.Install_Endpoint mod 2 ** 32),
              Rose.Words.Word
-               (Rose.Interfaces.Installer.Install_Endpoint / 2 ** 32)),
+               (Rose.Interfaces.Exec.Install_Endpoint / 2 ** 32)),
             Install_Caps);
          Install_Receiver := Install_Caps (1);
          Install_Endpoint := Install_Caps (2);
@@ -669,10 +701,6 @@ package body Init.Run is
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
          Reply  : aliased Rose.Invocation.Invocation_Record;
-         Exec   : Rose.Objects.Object_Id :=
-                    Rose.Objects.Null_Object_Id;
-         Command : Rose.Objects.Object_Id :=
-                     Rose.Objects.Null_Object_Id;
          Install_Cap : Rose.Capabilities.Capability :=
                          Rose.Capabilities.Null_Capability;
          Add_Cap     : Rose.Capabilities.Capability :=
@@ -690,60 +718,70 @@ package body Init.Run is
 
             if Do_Exec then
                Do_Exec := False;
-               Exec :=
-                 Init.Installer.Install_Exec_Library
-                   (Create_Cap      => Create_Cap,
-                    Storage_Cap     => Storage_Cap,
-                    Reserve_Cap     => Reserve_Storage_Cap,
-                    Launch_Cap      => Launch_Elf_Cap,
-                    Cap_Stream      => Params.Caps (0),
-                    Standard_Output => Console_Interface_Cap,
-                    Binary_Stream   => Params.Caps (1),
-                    Binary_Length   => Params.Data (0));
-               declare
-                  Copy_Exec_Cap : constant Rose.Capabilities.Capability :=
-                                    Init.Calls.Call
-                                      (Create_Cap,
-                                       (9, 1,
-                                        Word (Exec mod 2 ** 32),
-                                        Word (Exec / 2 ** 32)));
-               begin
-                  Install_Cap :=
-                    Copy_Cap_From_Process
-                      (Copy_Exec_Cap,
-                       Rose.Interfaces.Exec.Install_Endpoint);
-               end;
-            elsif Do_Command then
-               Do_Command := False;
-               Command :=
-                 Init.Installer.Install_Command_Library
-                   (Create_Cap      => Create_Cap,
-                    Storage_Cap     => Storage_Cap,
-                    Reserve_Cap     => Reserve_Storage_Cap,
-                    Launch_Cap      => Launch_Elf_Cap,
-                    Cap_Stream      => Params.Caps (0),
-                    Standard_Output => Console_Interface_Cap,
-                    Binary_Stream   => Params.Caps (1),
-                    Binary_Length   => Params.Data (0));
 
                declare
-                  Copy_Command_Cap : constant Rose.Capabilities.Capability :=
-                                       Init.Calls.Call
-                                         (Create_Cap,
-                                          (9, 1,
-                                           Word (Command mod 2 ** 32),
-                                           Word (Command / 2 ** 32)));
+                  Exec_Cap : constant Rose.Capabilities.Capability :=
+                               Init.Installer.Install_Exec_Library
+                                 (Create_Cap      => Create_Cap,
+                                  Storage_Cap     => Storage_Cap,
+                                  Reserve_Cap     => Reserve_Storage_Cap,
+                                  Launch_Cap      => Launch_Elf_Cap,
+                                  Cap_Stream      => Params.Caps (0),
+                                  Standard_Output => Console_Interface_Cap,
+                                  Binary_Stream   => Params.Caps (1),
+                                  Binary_Length   => Params.Data (0));
+                  Caps     : Init.Calls.Array_Of_Capabilities (1 .. 2);
+                  Public_Cap : constant Rose.Capabilities.Capability :=
+                                 Get_Public_Interface_From_Process (Exec_Cap);
                begin
-                  Add_Cap :=
-                    Copy_Cap_From_Process
-                      (Copy_Command_Cap,
-                       Rose.Interfaces.Map.Add_Endpoint);
-                  Find_Cap :=
-                    Copy_Cap_From_Process
-                      (Copy_Command_Cap,
-                       Rose.Interfaces.Map.Find_Endpoint);
+                  Install_Cap := Null_Capability;
+
+                  if Public_Cap = Null_Capability then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "unable to find exec interface" & NL);
+                  else
+                     Init.Calls.Get_Interface (Public_Cap, Caps);
+                     Install_Cap := Caps (2);
+                  end if;
+               end;
+
+            elsif Do_Command then
+               Do_Command := False;
+
+               declare
+                  Command_Cap : constant Rose.Capabilities.Capability :=
+                                  Init.Installer.Install_Command_Library
+                                    (Create_Cap      => Create_Cap,
+                                     Storage_Cap     => Storage_Cap,
+                                     Reserve_Cap     => Reserve_Storage_Cap,
+                                     Launch_Cap      => Launch_Elf_Cap,
+                                     Cap_Stream      => Params.Caps (0),
+                                     Standard_Output => Console_Interface_Cap,
+                                     Binary_Stream   => Params.Caps (1),
+                                     Binary_Length   => Params.Data (0));
+                  Caps     : Init.Calls.Array_Of_Capabilities (1 .. 3);
+                  Public_Cap : constant Rose.Capabilities.Capability :=
+                                  Get_Public_Interface_From_Process
+                                    (Command_Cap);
+               begin
+                  Add_Cap := Null_Capability;
+                  for I in 1 .. 4 loop
+                     Init.Calls.Get_Interface (Public_Cap, Caps);
+                     Add_Cap := Caps (1);
+                     Find_Cap := Caps (3);
+                     exit when Add_Cap /= Null_Capability;
+                     Wait (500);
+                  end loop;
+
+                  if Add_Cap = Null_Capability then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "unable to find command interface" & NL);
+                  end if;
                end;
             else
+
                declare
                   Launch : constant Rose.Capabilities.Capability :=
                              Init.Installer.Install_Executable
@@ -770,6 +808,10 @@ package body Init.Run is
          end loop;
       end;
 
+      Init.Calls.Send_String
+        (Console_Stream_Cap,
+         "completed initial install" & NL);
+
       declare
          Launch_Echo_Cap : constant Rose.Capabilities.Capability :=
                              Init.Calls.Find_In_Map
@@ -792,7 +834,7 @@ package body Init.Run is
             Echo_Object :=
               Init.Calls.Launch
                 (Launch_Echo_Cap,
-                 (Exit_Cap, Create_Cap, Cap_Set_Cap, Standard_Caps));
+                 (Create_Cap, Cap_Set_Cap, Standard_Caps));
             Wait (1000);
          end if;
       end;

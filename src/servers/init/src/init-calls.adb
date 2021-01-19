@@ -202,7 +202,6 @@ package body Init.Calls is
 
    procedure Get_Interface
      (Cap            : Rose.Capabilities.Capability;
-      Identifier     : Rose.Objects.Capability_Identifier;
       Interface_Caps : out Array_Of_Capabilities)
    is
       use Rose.Invocation;
@@ -210,7 +209,6 @@ package body Init.Calls is
    begin
       Params.Cap := Cap;
       Params.Control.Flags := (Send             => True,
-                               Send_Words       => True,
                                Block            => True,
                                Recv_Caps        => True,
                                Create_Reply_Cap => True,
@@ -218,8 +216,6 @@ package body Init.Calls is
       Params.Control.Last_Sent_Word := 0;
       Params.Control.Last_Recv_Cap :=
         Capability_Index (Interface_Caps'Length - 1);
-
-      Params.Data (0) := Rose.Words.Word (Identifier);
 
       Rose.System_Calls.Invoke_Capability (Params);
 
