@@ -71,10 +71,6 @@ package body Mem.Server is
       Virtual_Bound : in     Rose.Words.Word;
       Flags         : in     Rose.Words.Word);
 
-   procedure Send_Cap
-     (Id  : Rose.Objects.Capability_Identifier;
-      Cap : Rose.Capabilities.Capability);
-
    function Published_Interface
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
@@ -90,6 +86,15 @@ package body Mem.Server is
    procedure Request_New_Bound
      (Id        : Rose.Objects.Capability_Identifier;
       New_Bound : Rose.Words.Word);
+
+   procedure Publish_Interface
+     (Id            : Rose.Objects.Capability_Identifier;
+      Interface_Cap : Rose.Capabilities.Capability);
+
+   procedure Send_Cap
+     (Id  : Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability)
+      renames Publish_Interface;
 
    procedure Page_Fault
      (Id       : Rose.Objects.Capability_Identifier;
@@ -200,6 +205,7 @@ package body Mem.Server is
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
          Exit_Process   => Exit_Process'Access,
          Heap_Interface => Heap_Interface'Access,
+         Publish_Interface => Publish_Interface'Access,
          Instanced      => True);
 
       Rose.Interfaces.Heap.Server.Attach_Interface
@@ -416,6 +422,18 @@ package body Mem.Server is
       Mem.Processes.Fault_Process (Mem.Processes.Get_Process_Id (Process));
    end Protection_Fault;
 
+   -----------------------
+   -- Publish_Interface --
+   -----------------------
+
+   procedure Publish_Interface
+     (Id            : Rose.Objects.Capability_Identifier;
+      Interface_Cap : Rose.Capabilities.Capability)
+   is
+   begin
+      Mem.Processes.Set_Published_Interface_Cap (Id, Interface_Cap);
+   end Publish_Interface;
+
    -------------------------
    -- Published_Interface --
    -------------------------
@@ -511,18 +529,6 @@ package body Mem.Server is
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;
-
-   --------------
-   -- Send_Cap --
-   --------------
-
-   procedure Send_Cap
-     (Id  : Rose.Objects.Capability_Identifier;
-      Cap : Rose.Capabilities.Capability)
-   is
-   begin
-      Mem.Processes.Set_Published_Interface_Cap (Id, Cap);
-   end Send_Cap;
 
    ------------------
    -- Start_Server --
