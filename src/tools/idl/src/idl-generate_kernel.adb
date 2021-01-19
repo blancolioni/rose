@@ -1529,6 +1529,9 @@ package body IDL.Generate_Kernel is
       Package_Name   : constant String :=
                          Interface_Name & ".Server";
 
+      type Generated_Procedure is
+        (Create, Attach, Publish);
+
    begin
 
       Server_Pkg :=
@@ -1554,6 +1557,9 @@ package body IDL.Generate_Kernel is
       Server_Pkg.Append_To_Body
         (Syn.Declarations.New_Object_Declaration
            ("Server_Instance", "Rose.Server.Server_Instance"));
+      Server_Pkg.Append_To_Body
+        (Syn.Declarations.New_Object_Declaration
+           ("Published_Cap", "Rose.Capabilities.Capability", Syn.Literal (0)));
 
       declare
          procedure Add_Handler (Subpr : IDL_Subprogram);
@@ -1729,7 +1735,7 @@ package body IDL.Generate_Kernel is
          Scan_Subprograms (Item, True, Generate_Override'Access);
       end;
 
-      for Attach_Procedure in Boolean loop
+      for Gen in Generated_Procedure loop
          declare
             Block       : Syn.Blocks.Block_Type;
             Create_Endpoint_Seq : Syn.Statements.Sequence_Of_Statements;
@@ -1738,20 +1744,25 @@ package body IDL.Generate_Kernel is
             procedure Register_Endpoint (Subpr : IDL_Subprogram);
             procedure Save_Handler (Subpr : IDL_Subprogram);
 
-            procedure Register_Interface (Item : IDL_Interface);
+            procedure Register_Interface (Child : IDL_Interface);
 
             ---------------------
             -- Create_Endpoint --
             ---------------------
 
             procedure Create_Endpoint (Subpr : IDL_Subprogram) is
-            begin
-               Create_Endpoint_Seq.Append
-                 (Syn.Statements.New_Assignment_Statement
+               Assignment : constant Syn.Statement'Class :=
+                  Syn.Statements.New_Assignment_Statement
                     (Get_Ada_Name (Subpr) & "_Cap",
                      Syn.Expressions.New_Function_Call_Expression
                        ("Rose.Server.Create_Endpoint",
-                        Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint"))));
+                        Syn.Object (Get_Ada_Name (Subpr) & "_Endpoint")));
+            begin
+               if Gen = Publish then
+                  Block.Append (Assignment);
+               else
+                  Create_Endpoint_Seq.Append (Assignment);
+               end if;
             end Create_Endpoint;
 
             -----------------------
@@ -1773,21 +1784,42 @@ package body IDL.Generate_Kernel is
             -- Register_Interface --
             ------------------------
 
-            procedure Register_Interface (Item : IDL_Interface) is
+            procedure Register_Interface
+              (Child : IDL_Interface)
+            is
             begin
-               Create_Endpoint_Seq.Append
-                 (Syn.Statements.New_Procedure_Call_Statement
-                    ("Rose.Server.Create_Anonymous_Endpoint",
-                     Syn.Object (Get_Ada_Name (Item) & "_Interface")));
+
+               if Gen = Publish then
+                  if Child = Item then
+                     Block.Append
+                       (Syn.Statements.New_Assignment_Statement
+                          ("Published_Cap",
+                           Syn.Expressions.New_Function_Call_Expression
+                             ("Rose.Server.Create_Endpoint",
+                              Syn.Object
+                                (Get_Ada_Name (Child) & "_Interface"))));
+                  else
+                     Block.Append
+                       (Syn.Statements.New_Procedure_Call_Statement
+                          ("Rose.Server.Create_Anonymous_Endpoint",
+                           Syn.Object (Get_Ada_Name (Child) & "_Interface")));
+                  end if;
+               else
+                  Create_Endpoint_Seq.Append
+                    (Syn.Statements.New_Procedure_Call_Statement
+                       ("Rose.Server.Create_Anonymous_Endpoint",
+                        Syn.Object (Get_Ada_Name (Child) & "_Interface")));
+               end if;
 
                Block.Append
                  (Syn.Statements.New_Procedure_Call_Statement
                     ("Rose.Server.Register_Handler",
                      Syn.Object ("Server_Context"),
-                     Syn.Object (Get_Ada_Name (Item) & "_Interface"),
+                     Syn.Object (Get_Ada_Name (Child) & "_Interface"),
                      Syn.Object
-                       ("Handle_Get_" & Get_Ada_Name (Item)
+                       ("Handle_Get_" & Get_Ada_Name (Child)
                         & "_Interface'Access")));
+
             end Register_Interface;
 
             ------------------
@@ -1807,20 +1839,32 @@ package body IDL.Generate_Kernel is
             Scan_Subprograms (Item, True, Save_Handler'Access);
             Scan_Subprograms (Item, True, Create_Endpoint'Access);
             Scan_Ancestors (Item, True, Register_Interface'Access);
-            Block.Append
-              (Syn.Statements.If_Statement
-                 (Syn.Expressions.Operator
-                      ("not",
-                       Syn.Object ("Instanced")),
-                  Create_Endpoint_Seq));
+
+            if Gen /= Publish then
+               Block.Append
+                 (Syn.Statements.If_Statement
+                    (Syn.Expressions.Operator
+                         ("not",
+                          Syn.Object ("Instanced")),
+                     Create_Endpoint_Seq));
+            end if;
 
             Scan_Subprograms (Item, True, Register_Endpoint'Access);
 
+            if Gen = Publish then
+               Block.Add_Statement
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    (Procedure_Name => "Rose.Server.Publish_Interface",
+                     Argument_1     => Syn.Literal (3),
+                     Argument_2     => Syn.Object ("Published_Cap")));
+            end if;
+
             declare
                Proc_Name : constant String :=
-                             (if Attach_Procedure
-                              then "Attach_Interface"
-                              else "Create_Server");
+                             (case Gen is
+                                 when Attach => "Attach_Interface",
+                                 when Create => "Create_Server",
+                                 when Publish => "Publish_Interface");
                Proc      : Syn.Declarations.Subprogram_Declaration'Class :=
                              Syn.Declarations.New_Procedure
                                (Proc_Name, Block);
@@ -1845,10 +1889,12 @@ package body IDL.Generate_Kernel is
                   Arg_Type       => "Rose.Server.Server_Context");
                Scan_Subprograms (Item, True, Add_Endpoint_Handler'Access);
 
-               Proc.Add_Formal_Argument
-                 (Arg_Name    => "Instanced",
-                  Arg_Type    => "Boolean",
-                  Arg_Default => Syn.Literal (False));
+               if Gen /= Publish then
+                  Proc.Add_Formal_Argument
+                    (Arg_Name    => "Instanced",
+                     Arg_Type    => "Boolean",
+                     Arg_Default => Syn.Literal (False));
+               end if;
 
                Server_Pkg.Add_Separator;
                Server_Pkg.Append (Proc);
