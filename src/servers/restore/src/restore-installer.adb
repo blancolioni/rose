@@ -161,7 +161,6 @@ package body Restore.Installer is
       Rose.Console_IO.Put (Exec_Path (1 .. Exec_Path_Last));
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Flush;
-      Rose.Console_IO.New_Line;
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
