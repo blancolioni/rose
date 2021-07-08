@@ -155,7 +155,7 @@ package body Rose.Kernel.Processes.Queue is
         and then not Current_Process.Flags (Interrupt_Resume)
       then
          if Log then
-            Rose.Boot.Console.Put (Rose.Words.Word_8 (Current_Process_Id));
+            Debug.Put (Current_Process_Id);
             Rose.Boot.Console.Put (": resuming with no reply");
             Rose.Boot.Console.New_Line;
             if Log_Details then

@@ -16,6 +16,22 @@ package body System.Caps is
 
    Get_Cap               : Rose.Capabilities.Capability := 0;
 
+   procedure Exit_Process (Status : Integer);
+   pragma Export (C, Exit_Process, "exit");
+
+   ------------------
+   -- Exit_Process --
+   ------------------
+
+   procedure Exit_Process (Status : Integer) is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send
+        (Params, System.Standard_Caps.Exit_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Status));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Exit_Process;
+
    -------------------------
    -- Get_Environment_Cap --
    -------------------------

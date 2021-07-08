@@ -43,8 +43,8 @@ package body Rose.Kernel.Capabilities.Processes is
                        (Current_Pid, Destroy_Cap,
                         Capability_Layout'
                           (Header  =>
-                               (Cap_Type => Meta_Cap,
-                                Endpoint => Meta.Delete_Cap,
+                               (Cap_Type => Process_Cap,
+                                Endpoint => Kill_Process_Endpoint,
                                 others   => <>),
                            Payload => Cap.Payload));
                      Rose.Kernel.Processes.Set_Cap
@@ -109,6 +109,16 @@ package body Rose.Kernel.Capabilities.Processes is
 
             Rose.Kernel.Processes.Set_Current_State
               (Pid, Rose.Kernel.Processes.Faulted);
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
+         when Kill_Process_Endpoint =>
+            Rose.Boot.Console.Put ("Killing: ");
+            Rose.Boot.Console.Put (Natural (Cap.Payload));
+            Rose.Boot.Console.New_Line;
+
+            Rose.Kernel.Processes.Kill_Process (Pid);
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
