@@ -1580,6 +1580,12 @@ package body IDL.Generate_Kernel is
                  (Name & "_Cap",
                   "Rose.Capabilities.Capability",
                   Syn.Literal (0)));
+            Server_Pkg.Append
+              (Syn.Declarations.New_Function
+                 (Name        => "Get_" & Name & "_Cap",
+                  Result_Type => "Rose.Capabilities.Capability",
+                  Result      => Syn.Object (Name & "_Cap")));
+
          end Add_Handler;
 
       begin
@@ -2310,7 +2316,8 @@ package body IDL.Generate_Kernel is
       Scan_Subprograms (Top_Interface, True, Add_Dependent_Withs'Access);
 
       if Server and then not Have_Capability_With then
-         Pkg.With_Package ("Rose.Capabilities", Body_With => True);
+         Pkg.With_Package ("Rose.Capabilities");
+         --  , Body_With => True);
       end if;
 
    end With_Packages;
