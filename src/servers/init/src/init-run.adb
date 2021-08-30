@@ -27,23 +27,25 @@ package body Init.Run is
 
    NL : constant Character := Character'Val (10);
 
+   Checkpoint_Priority    : constant := 2;
    Memory_Priority        : constant := 3;
    Device_Driver_Priority : constant := 4;
    File_System_Priority   : constant := 10;
    Low_Priority           : constant := 12;
 
-   Console_Module   : constant := 2;
-   Mem_Module       : constant := 3;
-   PCI_Module       : constant := 4;
-   ATA_Module       : constant := 5;
-   Store_Module     : constant := 6;
-   ISOFS_Module     : constant := 7;
-   Restore_Module   : constant := 8;
-   Scan_Module      : constant := 9;
-   Partition_Module : constant := 10;
-   Elf_Module       : constant := 11;
-   Timer_Module     : constant := 12;
-   Cap_Set_Module   : constant := 13;
+   Console_Module    : constant := 2;
+   Mem_Module        : constant := 3;
+   PCI_Module        : constant := 4;
+   ATA_Module        : constant := 5;
+   Store_Module      : constant := 6;
+   ISOFS_Module      : constant := 7;
+   Restore_Module    : constant := 8;
+   Scan_Module       : constant := 9;
+   Partition_Module  : constant := 10;
+   Elf_Module        : constant := 11;
+   Timer_Module      : constant := 12;
+   Cap_Set_Module    : constant := 13;
+   Checkpoint_Module : constant := 14;
 
    --------------
    -- Run_Init --
@@ -642,6 +644,18 @@ package body Init.Run is
       end;
 
       declare
+         Checkpoint_Id : constant Rose.Objects.Object_Id :=
+           Init.Calls.Launch_Boot_Module
+             (Boot_Cap, Checkpoint_Module, Checkpoint_Priority,
+              Create_Endpoint_Cap, Cap_Set_Cap,
+              (Console_Interface_Cap,
+               Timer_Cap));
+         pragma Unreferenced (Checkpoint_Id);
+      begin
+         null;
+      end;
+
+      declare
          Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
       begin
          Init.Calls.Call
@@ -835,7 +849,7 @@ package body Init.Run is
               Init.Calls.Launch
                 (Launch_Echo_Cap,
                  (Create_Cap, Cap_Set_Cap, Standard_Caps));
-            Wait (1000);
+            Wait (4000);
          end if;
       end;
 

@@ -14,7 +14,7 @@ NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec
 UTILITIES=echo
-BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps
+BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
 
