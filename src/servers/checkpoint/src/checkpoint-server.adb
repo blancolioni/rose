@@ -1,3 +1,4 @@
+with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
 
@@ -14,9 +15,16 @@ package body Checkpoint.Server is
    Timer : Rose.Interfaces.Timer.Client.Timer_Client;
 
    Timeout_Cap : Rose.Interfaces.Cap.Client.Cap_Client;
+   Enter_Checkpoint_Cap : Rose.Capabilities.Capability;
+   Leave_Checkpoint_Cap : Rose.Capabilities.Capability;
 
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier);
+
+   procedure Enter_Checkpoint;
+   procedure Leave_Checkpoint;
+
+   procedure Execute_Checkpoint;
 
    -------------------
    -- Create_Server --
@@ -31,6 +39,9 @@ package body Checkpoint.Server is
       Timer_Cap   : constant Rose.Capabilities.Capability := Get_Cap (2);
 
    begin
+
+      Enter_Checkpoint_Cap := Get_Cap (3);
+      Leave_Checkpoint_Cap := Get_Cap (4);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
@@ -51,6 +62,37 @@ package body Checkpoint.Server is
 
    end Create_Server;
 
+   ----------------------
+   -- Enter_Checkpoint --
+   ----------------------
+
+   procedure Enter_Checkpoint is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Enter_Checkpoint_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Enter_Checkpoint;
+
+   ------------------------
+   -- Execute_Checkpoint --
+   ------------------------
+
+   procedure Execute_Checkpoint is
+   begin
+      null;
+   end Execute_Checkpoint;
+
+   ----------------------
+   -- Leave_Checkpoint --
+   ----------------------
+
+   procedure Leave_Checkpoint is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Leave_Checkpoint_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Leave_Checkpoint;
+
    ----------------
    -- On_Timeout --
    ----------------
@@ -60,8 +102,12 @@ package body Checkpoint.Server is
    is
       pragma Unreferenced (Id);
    begin
-      Rose.Console_IO.Put_Line ("running checkpoint ...");
       Rose.Interfaces.Cap.Client.Destroy (Timeout_Cap);
+
+      Enter_Checkpoint;
+      Execute_Checkpoint;
+      Leave_Checkpoint;
+
       Timeout_Cap :=
         Rose.Interfaces.Timer.Client.Set_Timer
           (Item         => Timer,

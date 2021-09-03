@@ -19,6 +19,8 @@ package body Rose.Kernel.Processes is
 
    First_Persistent_Pid : constant Process_Id := 0;
 
+   Active_Checkpoint : Boolean := False;
+
    procedure Show_Address
      (Addr : Rose.Words.Word);
    pragma Export (C, Show_Address, "debug_show_address");
@@ -41,6 +43,12 @@ package body Rose.Kernel.Processes is
 
    procedure Create_Process_Table_Entry
      (Pid : Rose.Kernel.Processes.Process_Id);
+
+   procedure Disable_Write_Pages
+     (Process : in out Kernel_Process_Entry);
+
+   procedure Enable_Write_Pages
+     (Process : in out Kernel_Process_Entry);
 
    ----------------
    -- Cap_Layout --
@@ -280,6 +288,8 @@ package body Rose.Kernel.Processes is
          Executable     => True,
          User           => True);
 
+      Proc.Flags := (Persistent => True, others => False);
+
       declare
          use type Rose.Objects.Object_Id;
       begin
@@ -302,6 +312,58 @@ package body Rose.Kernel.Processes is
       Set_Cap (Pid, Cap, (others => <>));
       Process_Table (Pid).Is_Active (Cap) := False;
    end Delete_Cap;
+
+   -------------------------
+   -- Disable_Write_Pages --
+   -------------------------
+
+   procedure Disable_Write_Pages
+     (Process : in out Kernel_Process_Entry)
+   is
+      Addr : constant Rose.Addresses.Virtual_Page_Address :=
+               Rose.Kernel.Heap.Get_Virtual_Page
+                 (Physical_Address_To_Page (Process.Directory_Page));
+   begin
+      Debug.Put (Process.Pid);
+      Rose.Boot.Console.Put (": disable write pages");
+      Rose.Boot.Console.New_Line;
+      Rose.Kernel.Page_Table.Activate_Page_Directory (Addr);
+      Rose.Kernel.Page_Table.Disable_Page_Writes (Addr);
+   end Disable_Write_Pages;
+
+   ------------------------
+   -- Enable_Write_Pages --
+   ------------------------
+
+   procedure Enable_Write_Pages
+     (Process : in out Kernel_Process_Entry)
+   is
+      Addr : constant Rose.Addresses.Virtual_Page_Address :=
+               Rose.Kernel.Heap.Get_Virtual_Page
+                 (Physical_Address_To_Page (Process.Directory_Page));
+   begin
+      Debug.Put (Process.Pid);
+      Rose.Boot.Console.Put (": enable write pages");
+      Rose.Boot.Console.New_Line;
+      Rose.Kernel.Page_Table.Activate_Page_Directory (Addr);
+      Rose.Kernel.Page_Table.Enable_Page_Writes (Addr);
+   end Enable_Write_Pages;
+
+   ----------------------
+   -- Enter_Checkpoint --
+   ----------------------
+
+   procedure Enter_Checkpoint is
+   begin
+      Active_Checkpoint := True;
+      for P of Process_Table.all loop
+         if P.State /= Available
+           and then P.Flags (Persistent)
+         then
+            Disable_Write_Pages (P);
+         end if;
+      end loop;
+   end Enter_Checkpoint;
 
    -----------------
    -- Expand_Heap --
@@ -550,6 +612,28 @@ package body Rose.Kernel.Processes is
       Params : Invocation_Record renames Page_Fault_Params;
    begin
 
+      if Active_Checkpoint
+        and then Is_Mapped
+        and then Write_Attempt
+      then
+         --  write attempt failed because of active checkpoint.
+         --  record situation and return
+
+         Debug.Put (Current_Process_Id);
+         Rose.Boot.Console.Put (": checkpoint write blocked");
+         Rose.Boot.Console.New_Line;
+
+         declare
+            Proc : Kernel_Process_Entry renames
+                     Process_Table (Current_Process_Id);
+         begin
+            Proc.Flags (Checkpoint_Page_Fault) := True;
+            Proc.Checkpoint_Fault := Virtual_Page;
+         end;
+
+         return;
+      end if;
+
       if Current_Process_Id = Mem_Process then
          Rose.Boot.Console.Put ("virtual ");
          Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
@@ -784,6 +868,22 @@ package body Rose.Kernel.Processes is
    begin
       P.State := Available;
    end Kill_Process;
+
+   ----------------------
+   -- Leave_Checkpoint --
+   ----------------------
+
+   procedure Leave_Checkpoint is
+   begin
+      for P of Process_Table.all loop
+         if P.State /= Available
+           and then P.Flags (Persistent)
+         then
+            Enable_Write_Pages (P);
+         end if;
+      end loop;
+      Active_Checkpoint := False;
+   end Leave_Checkpoint;
 
    --------------
    -- Load_Cap --

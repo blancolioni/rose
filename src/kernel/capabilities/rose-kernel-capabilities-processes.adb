@@ -119,9 +119,14 @@ package body Rose.Kernel.Capabilities.Processes is
             Rose.Boot.Console.New_Line;
 
             Rose.Kernel.Processes.Kill_Process (Pid);
-            Rose.Kernel.Processes.Set_Current_State
-              (Rose.Kernel.Processes.Current_Process_Id,
-               Rose.Kernel.Processes.Ready);
+            if Rose.Kernel.Processes."/="
+              (Pid,
+               Rose.Kernel.Processes.Current_Process_Id)
+            then
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
+            end if;
 
          when Start_Process_Endpoint =>
 

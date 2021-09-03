@@ -1,4 +1,5 @@
 with System;                            use System;
+with System.Machine_Code;
 
 with Rose.Addresses;
 with Rose.Words;
@@ -14,36 +15,36 @@ package body Rose.Kernel.Page_Table is
 
    type Page_Entry is
       record
-         PFA               : Physical_Page_Address := 0;
-         Available_11      : Boolean               := False;
-         Available_10      : Boolean               := False;
-         Available_9       : Boolean               := False;
-         Global            : Boolean               := False;
-         Zero              : Boolean               := False;
-         Dirty             : Boolean               := False;
-         Accessed          : Boolean               := False;
-         Cache_Disable     : Boolean               := False;
-         Transparent_Write : Boolean               := False;
-         User              : Boolean               := False;
-         Writable          : Boolean               := False;
-         Present           : Boolean               := False;
+         PFA                  : Physical_Page_Address := 0;
+         Available_11         : Boolean               := False;
+         Available_10         : Boolean               := False;
+         Checkpoint_Read_Only : Boolean               := False;
+         Global               : Boolean               := False;
+         Zero                 : Boolean               := False;
+         Dirty                : Boolean               := False;
+         Accessed             : Boolean               := False;
+         Cache_Disable        : Boolean               := False;
+         Transparent_Write    : Boolean               := False;
+         User                 : Boolean               := False;
+         Writable             : Boolean               := False;
+         Present              : Boolean               := False;
       end record;
 
    for Page_Entry use
       record
-         Present           at 0 range 0 .. 0;
-         Writable          at 0 range 1 .. 1;
-         User              at 0 range 2 .. 2;
-         Transparent_Write at 0 range 3 .. 3;
-         Cache_Disable     at 0 range 4 .. 4;
-         Accessed          at 0 range 5 .. 5;
-         Dirty             at 0 range 6 .. 6;
-         Zero              at 0 range 7 .. 7;
-         Global            at 1 range 0 .. 0;
-         Available_9       at 1 range 1 .. 1;
-         Available_10      at 1 range 2 .. 2;
-         Available_11      at 1 range 3 .. 3;
-         PFA               at 1 range 4 .. 23;
+         Present              at 0 range 0 .. 0;
+         Writable             at 0 range 1 .. 1;
+         User                 at 0 range 2 .. 2;
+         Transparent_Write    at 0 range 3 .. 3;
+         Cache_Disable        at 0 range 4 .. 4;
+         Accessed             at 0 range 5 .. 5;
+         Dirty                at 0 range 6 .. 6;
+         Zero                 at 0 range 7 .. 7;
+         Global               at 1 range 0 .. 0;
+         Checkpoint_Read_Only at 1 range 1 .. 1;
+         Available_10         at 1 range 2 .. 2;
+         Available_11         at 1 range 3 .. 3;
+         PFA                  at 1 range 4 .. 23;
       end record;
 
    for Page_Entry'Size use 32;
@@ -102,6 +103,28 @@ package body Rose.Kernel.Page_Table is
      (Directory      : in out Page_Table_Array;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address);
 
+   -----------------------------
+   -- Activate_Page_Directory --
+   -----------------------------
+
+   procedure Activate_Page_Directory
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      use System.Machine_Code;
+      use Rose.Words;
+      Directory_Address : constant Rose.Addresses.Virtual_Address :=
+                            Rose.Addresses.Virtual_Page_To_Address
+                              (Directory_Page);
+      Physical_Address  : constant Rose.Addresses.Physical_Address :=
+                            Rose.Kernel.Heap.Get_Physical_Address
+                              (Directory_Address);
+   begin
+      Asm ("mov %0, %%eax",
+           Inputs   => Word_32'Asm_Input ("g", Word_32 (Physical_Address)),
+           Volatile => True);
+      Asm ("mov %%eax, %%cr3", Volatile => True);
+   end Activate_Page_Directory;
+
    -------------------------
    -- Allocate_Page_Block --
    -------------------------
@@ -124,25 +147,98 @@ package body Rose.Kernel.Page_Table is
 --        end loop;
 --     end Allocate_Page_Table_Block;
 
+   -------------------------
+   -- Disable_Page_Writes --
+   -------------------------
+
+   procedure Disable_Page_Writes
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+   begin
+      for Directory_Entry of
+        Directory (0 .. First_Kernel_Page_Entry_Index - 1)
+      loop
+         if Directory_Entry.Present then
+            declare
+               Phys_Addr  : constant Physical_Address :=
+                              Physical_Address
+                                (Directory_Entry.PFA) * Physical_Page_Bytes;
+               Addr       : constant Virtual_Address :=
+                              Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
+               Table_Page : Page_Table_Array;
+               for Table_Page'Address use System'To_Address (Addr);
+               pragma Import (Ada, Table_Page);
+            begin
+               for Table_Entry of Table_Page loop
+                  if Table_Entry.Present
+                    and then Table_Entry.Writable
+                  then
+                     Table_Entry.Writable := False;
+                     Table_Entry.Checkpoint_Read_Only := True;
+                     if Log_Checkpoint_Pages then
+                        Show_Page_Entry (Table_Entry);
+                     end if;
+                  end if;
+               end loop;
+            end;
+         end if;
+      end loop;
+
+   end Disable_Page_Writes;
+
+   ------------------------
+   -- Enable_Page_Writes --
+   ------------------------
+
+   procedure Enable_Page_Writes
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+   begin
+      for Directory_Entry of
+        Directory (0 .. First_Kernel_Page_Entry_Index - 1)
+      loop
+         if Directory_Entry.Present then
+            declare
+               Phys_Addr  : constant Physical_Address :=
+                              Physical_Address
+                                (Directory_Entry.PFA) * Physical_Page_Bytes;
+               Addr       : constant Virtual_Address :=
+                              Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
+               Table_Page : Page_Table_Array;
+               for Table_Page'Address use System'To_Address (Addr);
+               pragma Import (Ada, Table_Page);
+            begin
+               for Table_Entry of Table_Page loop
+                  if Table_Entry.Present
+                    and then Table_Entry.Checkpoint_Read_Only
+                  then
+                     Table_Entry.Writable := True;
+                     Table_Entry.Checkpoint_Read_Only := False;
+                     if Log_Checkpoint_Pages then
+                        Show_Page_Entry (Table_Entry);
+                     end if;
+                  end if;
+               end loop;
+            end;
+         end if;
+      end loop;
+   end Enable_Page_Writes;
+
    ---------------------
    -- Init_Page_Entry --
    ---------------------
 
    procedure Init_Page_Entry (P : in out Page_Entry) is
    begin
-      P.PFA               := 0;
-      P.Available_11      := False;
-      P.Available_10      := False;
-      P.Available_9       := False;
-      P.Global            := False;
-      P.Zero              := False;
-      P.Dirty             := False;
-      P.Accessed          := False;
-      P.Cache_Disable     := False;
-      P.Transparent_Write := False;
-      P.User              := True;
-      P.Writable          := False;
-      P.Present           := True;
+      P := (Present => True, others => <>);
    end Init_Page_Entry;
 
    ---------------------
@@ -438,7 +534,7 @@ package body Rose.Kernel.Page_Table is
       Rose.Boot.Console.Put (" ");
       Put_Flag (Page.Available_11, "z");
       Put_Flag (Page.Available_10, "y");
-      Put_Flag (Page.Available_9, "x");
+      Put_Flag (Page.Checkpoint_Read_Only, "r");
       Put_Flag (Page.Global, "g");
       Put_Flag (Page.Zero, "0");
       Put_Flag (Page.Dirty, "d");

@@ -217,7 +217,7 @@ package body Init.Run is
                Init.Calls.Get_Interface (Public_Cap, Caps);
                Interface_Cap := Caps (1);
                exit when Interface_Cap /= Null_Capability;
-               Wait (500);
+               Wait (1000);
             end loop;
          end if;
 
@@ -644,12 +644,20 @@ package body Init.Run is
       end;
 
       declare
-         Checkpoint_Id : constant Rose.Objects.Object_Id :=
+         Enter_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
+                                  Init.Calls.Call
+                                    (Create_Cap, (7, 8, 0, 0));
+         Leave_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
+                                  Init.Calls.Call
+                                    (Create_Cap, (7, 9, 0, 0));
+         Checkpoint_Id        : constant Rose.Objects.Object_Id :=
            Init.Calls.Launch_Boot_Module
              (Boot_Cap, Checkpoint_Module, Checkpoint_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
               (Console_Interface_Cap,
-               Timer_Cap));
+               Timer_Cap,
+               Enter_Checkpoint_Cap,
+               Leave_Checkpoint_Cap));
          pragma Unreferenced (Checkpoint_Id);
       begin
          null;

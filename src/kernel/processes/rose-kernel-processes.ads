@@ -326,11 +326,15 @@ package Rose.Kernel.Processes is
    function Page_Fault_Count
      return Natural;
 
+   procedure Enter_Checkpoint;
+   procedure Leave_Checkpoint;
+
 private
 
    type Process_Flag is
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
-      Interrupt_Resume, Message_Queued, Trace, Boot_Module);
+      Interrupt_Resume, Message_Queued, Trace, Boot_Module,
+      Persistent, Checkpoint_Page_Fault);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -474,6 +478,7 @@ private
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
          Env_Page          : Rose.Addresses.Physical_Page_Address;
          Invocation_Buffer : Rose.Addresses.Virtual_Page_Address;
+         Checkpoint_Fault  : Rose.Addresses.Virtual_Page_Address;
          Saved_Stack_Value : Rose.Words.Word_32;
       end record;
 

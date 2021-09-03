@@ -4,6 +4,8 @@ with Rose.Invocation;
 with Rose.Boot.Console;
 with Rose.Kernel.Processes;
 
+with Rose.Kernel.Processes.Debug;
+
 package body Rose.Kernel.Interrupts is
 
    type Interrupt_Argument_Spec is
@@ -77,8 +79,19 @@ package body Rose.Kernel.Interrupts is
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Interrupt));
          Rose.Boot.Console.Put (" ");
          Rose.Boot.Console.Put (Argument);
+         if Natural (Interrupt) = 16#0E# then
+            declare
+               Page_Fault_Address : Rose.Words.Word_32;
+               pragma Import (C, Page_Fault_Address, "page_fault_address");
+            begin
+               Rose.Boot.Console.Put (" ");
+               Rose.Boot.Console.Put (Page_Fault_Address);
+            end;
+         end if;
          Rose.Boot.Console.Put (": no handler                       ");
          Rose.Boot.Console.New_Line;
+         Rose.Kernel.Processes.Debug.Report_Process
+           (Rose.Kernel.Processes.Current_Process_Id);
       end if;
 
       while It /= null loop

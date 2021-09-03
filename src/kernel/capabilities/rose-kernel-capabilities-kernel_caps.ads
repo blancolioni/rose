@@ -8,6 +8,9 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    Set_Timeout_Endpoint       : constant Rose.Objects.Endpoint_Index := 6;
    Get_Current_Ticks_Endpoint : constant Rose.Objects.Endpoint_Index := 7;
 
+   Enter_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 8;
+   Leave_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 9;
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

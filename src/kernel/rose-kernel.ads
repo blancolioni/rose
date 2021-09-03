@@ -61,6 +61,8 @@ private
    Log_Cap_Copy             : Boolean := False;
    Log_Endpoint_Cap_Create  : Boolean := False;
    Log_Page_Faults          : Boolean := False;
+   Log_Checkpoints          : Boolean := False;
+   Log_Checkpoint_Pages     : Boolean := False;
 
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
