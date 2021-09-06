@@ -839,6 +839,30 @@ package body Init.Run is
          end if;
       end;
 
+      declare
+         Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Find_In_Map
+                               (Find_Cap => Find_Cap,
+                                Key      => "petal");
+         Standard_Caps   : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Create_Cap_Set_With
+                               (Create_Cap_Set => Cap_Set_Cap,
+                                Caps           =>
+                                  (Rose.Capabilities.Null_Capability,
+                                   Console_Stream_Cap));
+         Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
+      begin
+         if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: unable to find 'petal'" & NL);
+         else
+            Petal_Object :=
+              Init.Calls.Launch
+                (Launch_Petal_Cap,
+                 (Create_Cap, Cap_Set_Cap, Standard_Caps));
+         end if;
+      end;
+
       Init.Calls.Send_String
         (Console_Stream_Cap, "init: exiting" & NL);
       Init.Calls.Send (Exit_Cap);
