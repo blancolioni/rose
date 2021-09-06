@@ -15,6 +15,7 @@ package body Restore.Installer.Default is
       Process ("command", "drivers", Launch);
       Process ("keyboard", "drivers", Launch);
       Process ("echo", "bin", Save);
+      Process ("petal", "bin", Save);
    end Iterate_Steps;
 
 end Restore.Installer.Default;
