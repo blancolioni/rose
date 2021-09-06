@@ -36,6 +36,25 @@ package body Ada.Text_IO is
    Current_Input_File  : File_Type := Standard_Input_File;
    Current_Output_File : File_Type := Standard_Output_File;
 
+   -----------------
+   -- End_Of_File --
+   -----------------
+
+   function End_Of_File (File : File_Type) return Boolean is
+      pragma Unreferenced (File);
+   begin
+      return True;
+   end End_Of_File;
+
+   -----------------
+   -- End_Of_File --
+   -----------------
+
+   function End_Of_File return Boolean is
+   begin
+      return End_Of_File (Current_Input_File);
+   end End_Of_File;
+
    -----------
    -- Flush --
    -----------
