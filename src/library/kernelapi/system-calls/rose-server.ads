@@ -22,6 +22,13 @@ package Rose.Server is
      (Context : in out Server_Context);
    --  receive messages until the server is killed
 
+   procedure Block_Current_Request
+     (Context : in out Server_Context);
+
+   procedure Unblock_Endpoint
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id);
+
    type Server_Instance is limited private;
 
    function Has_Instance
@@ -76,6 +83,8 @@ private
       record
          Endpoint  : Rose.Objects.Endpoint_Id;
          Handler   : Invocation_Handler;
+         Blocked   : Boolean;
+         Params    : Rose.Invocation.Invocation_Record;
       end record;
 
    type Endpoint_Array is
@@ -87,6 +96,7 @@ private
                             Rose.Capabilities.Null_Capability;
          Endpoint_Count : Natural := 0;
          Endpoints      : Endpoint_Array;
+         Block_Reply    : Boolean := False;
       end record;
 
    type Server_Instance is limited
