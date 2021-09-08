@@ -12,8 +12,23 @@ with Rose.Interfaces.Stream_Reader.Client;
 
 package body Restore.Installer is
 
+   type Array_Of_Capabilities is
+     array (Positive range <>) of Rose.Capabilities.Capability;
+
+   procedure Get_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities);
+
+   function Get_Public_Interface_From_Process
+     (Process_Cap : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+
    procedure Write_Initial_System_Image
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+
+   Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability
+                                with Unreferenced;
 
    --  procedure Install_From_Directory
    --    (Directory_Entry : Rose.Directories.Directory_Entry_Type);
@@ -25,7 +40,8 @@ package body Restore.Installer is
      (Root_Path : String;
       Directory : String;
       Name      : String;
-      Action    : Install_Action);
+      Action    : Install_Action;
+      Flags     : Install_Flag_Array);
 
    procedure Append
      (To   : in out String;
@@ -48,6 +64,74 @@ package body Restore.Installer is
       end loop;
    end Append;
 
+   -------------------
+   -- Get_Interface --
+   -------------------
+
+   procedure Get_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities)
+   is
+      use Rose.Invocation;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Params.Cap := Cap;
+      Params.Control.Flags := (Send             => True,
+                               Block            => True,
+                               Recv_Caps        => True,
+                               Create_Reply_Cap => True,
+                               others           => False);
+      Params.Control.Last_Sent_Word := 0;
+      Params.Control.Last_Recv_Cap :=
+        Capability_Index (Interface_Caps'Length - 1);
+
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      Interface_Caps := (others => 0);
+
+      if not (Params.Control.Flags (Error)
+              or else not Params.Control.Flags (Send_Caps))
+      then
+         declare
+            Last : Natural := Interface_Caps'First - 1;
+         begin
+            for Index in 0 .. Params.Control.Last_Sent_Cap loop
+               Last := Last + 1;
+               exit when Last > Interface_Caps'Length;
+               Interface_Caps (Last) := Params.Caps (Index);
+            end loop;
+         end;
+      end if;
+   end Get_Interface;
+
+   ---------------------------------------
+   -- Get_Public_Interface_From_Process --
+   ---------------------------------------
+
+   function Get_Public_Interface_From_Process
+     (Process_Cap : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Capabilities;
+      Caps          : Array_Of_Capabilities (1 .. 7);
+      Public_Cap    : Rose.Capabilities.Capability;
+      Interface_Cap : Rose.Capabilities.Capability :=
+                        Rose.Capabilities.Null_Capability;
+   begin
+      --  get process interface caps
+      Get_Interface (Process_Cap, Caps);
+
+      --  public interface cap is in Caps (3)
+      Public_Cap := Caps (3);
+
+      if Public_Cap /= Null_Capability then
+         Get_Interface (Public_Cap, Caps);
+         Interface_Cap := Caps (1);
+      end if;
+
+      return Interface_Cap;
+   end Get_Public_Interface_From_Process;
+
    -------------
    -- Install --
    -------------
@@ -62,7 +146,8 @@ package body Restore.Installer is
       procedure Process_Executable
         (Name     : String;
          Category : String;
-         Action   : Install_Action);
+         Action   : Install_Action;
+         Flags    : Install_Flag_Array);
 
       ------------------------
       -- Process_Executable --
@@ -71,14 +156,16 @@ package body Restore.Installer is
       procedure Process_Executable
         (Name     : String;
          Category : String;
-         Action   : Install_Action)
+         Action   : Install_Action;
+         Flags    : Install_Flag_Array)
       is
       begin
          Install_Executable
            (Root_Path => Install_Directory,
             Directory => Category,
             Name      => Name,
-            Action    => Action);
+            Action    => Action,
+            Flags     => Flags);
       end Process_Executable;
 
    begin
@@ -118,7 +205,8 @@ package body Restore.Installer is
      (Root_Path : String;
       Directory : String;
       Name      : String;
-      Action    : Install_Action)
+      Action    : Install_Action;
+      Flags     : Install_Flag_Array)
    is
       use Rose.Interfaces.Stream_Reader.Client;
       Caps_Reader    : Stream_Reader_Client;
@@ -127,7 +215,16 @@ package body Restore.Installer is
       Exec_Path_Last : Natural := 0;
       Cap_Path       : String (1 .. 200);
       Cap_Path_Last  : Natural := 0;
+      Flag_Word      : Natural := 0;
+      Flag_Bit       : Positive := 1;
    begin
+
+      for Flag of Flags loop
+         if Flag then
+            Flag_Word := Flag_Word + Flag_Bit;
+         end if;
+         Flag_Bit := Flag_Bit * 2;
+      end loop;
 
       Append (Exec_Path, Exec_Path_Last, Root_Path);
       Append (Exec_Path, Exec_Path_Last, "/");
@@ -174,7 +271,9 @@ package body Restore.Installer is
            (Params,
             Natural (Rose.Directories.Size (Exec_Path (1 .. Exec_Path_Last))));
          Rose.System_Calls.Send_Word
-           (Params, Rose.Words.Word_32'(Install_Action'Pos (Action)));
+           (Params, Rose.Words.Word'(Install_Action'Pos (Action)));
+         Rose.System_Calls.Send_Word
+           (Params, Rose.Words.Word (Flag_Word));
          Rose.System_Calls.Receive_Caps (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
          if Params.Control.Flags (Rose.Invocation.Error) then
@@ -189,7 +288,17 @@ package body Restore.Installer is
                      when Launch =>
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
+                        Rose.System_Calls.Receive_Caps (Reply, 1);
                         Rose.System_Calls.Invoke_Capability (Reply);
+
+                        if Flags (Provides_Keyboard_Interface) then
+                           Keyboard_Interface_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Reply.Caps (0));
+                           Rose.Console_IO.Put_Line
+                             ("restore: saved keyboard interface");
+                        end if;
+
                      when Save =>
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));

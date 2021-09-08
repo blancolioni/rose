@@ -711,6 +711,7 @@ package body Init.Run is
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
             Rose.System_Calls.Receive_Caps (Params, 2);
+            Rose.System_Calls.Receive_Words (Params, 3);
             Rose.System_Calls.Invoke_Capability (Params);
             exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
 

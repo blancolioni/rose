@@ -4,6 +4,17 @@ package body Rose.Server is
 
    Create_Endpoint_Cap : Rose.Capabilities.Capability := 4;
 
+   ---------------------------
+   -- Block_Current_Request --
+   ---------------------------
+
+   procedure Block_Current_Request
+     (Context : in out Server_Context)
+   is
+   begin
+      Context.Block_Reply := True;
+   end Block_Current_Request;
+
    -------------------------------
    -- Create_Anonymous_Endpoint --
    -------------------------------
@@ -138,10 +149,17 @@ package body Rose.Server is
             declare
                use type Rose.Objects.Endpoint_Id;
                Rec : Endpoint_Record renames Context.Endpoints (I);
+               Saved_Params : constant Rose.Invocation.Invocation_Record :=
+                                Params;
             begin
                if Rec.Endpoint = Params.Endpoint then
                   if Rec.Handler /= null then
+                     Context.Block_Reply := False;
                      Rec.Handler (Params);
+                     if Context.Block_Reply then
+                        Rec.Blocked := True;
+                        Rec.Params := Saved_Params;
+                     end if;
                   end if;
                   Handled := True;
                   exit;
@@ -150,15 +168,13 @@ package body Rose.Server is
          end loop;
 
          if Handled then
-            if Params.Control.Flags (Rose.Invocation.Reply)
+            if not Context.Block_Reply
+              and then Params.Control.Flags (Rose.Invocation.Reply)
               and then Params.Cap /= Rose.Capabilities.Null_Capability
             then
                Rose.System_Calls.Invoke_Capability (Params);
             end if;
          else
---              Rose.Console_IO.Put ("server: unknown endpoint: ");
---              Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
---              Rose.Console_IO.New_Line;
             Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
             Rose.System_Calls.Send_Error
               (Params, Rose.Invocation.Invalid_Endpoint);
@@ -181,7 +197,9 @@ package body Rose.Server is
       Context.Endpoints (Context.Endpoint_Count) :=
         Endpoint_Record'
           (Endpoint => Endpoint,
-           Handler  => Handler);
+           Handler  => Handler,
+           Blocked  => False,
+           Params   => <>);
    end Register_Handler;
 
    -----------------------------
@@ -229,5 +247,56 @@ package body Rose.Server is
          Receive_Message (Context);
       end loop;
    end Start_Server;
+
+   ----------------------
+   -- Unblock_Endpoint --
+   ----------------------
+
+   procedure Unblock_Endpoint
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id)
+   is
+      use type Rose.Capabilities.Capability;
+      Handled : Boolean := False;
+      Params  : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Context.Block_Reply := False;
+
+      for I in 1 .. Context.Endpoint_Count loop
+         declare
+            use type Rose.Objects.Endpoint_Id;
+            Rec : Endpoint_Record renames Context.Endpoints (I);
+         begin
+            if Rec.Endpoint = Endpoint then
+               if not Rec.Blocked then
+                  return;
+               end if;
+
+               if Rec.Handler /= null then
+                  Params := Rec.Params;
+                  Rec.Handler (Params);
+                  if not Context.Block_Reply then
+                     Rec.Blocked := False;
+                  end if;
+               end if;
+               Handled := True;
+               exit;
+            end if;
+         end;
+      end loop;
+
+      if Handled then
+         if not Context.Block_Reply
+           and then Params.Control.Flags (Rose.Invocation.Reply)
+           and then Params.Cap /= Rose.Capabilities.Null_Capability
+         then
+            Rose.System_Calls.Invoke_Capability (Params);
+         end if;
+      else
+         Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
+         Rose.System_Calls.Send_Error
+           (Params, Rose.Invocation.Invalid_Endpoint);
+      end if;
+   end Unblock_Endpoint;
 
 end Rose.Server;

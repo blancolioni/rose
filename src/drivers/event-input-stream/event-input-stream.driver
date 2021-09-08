@@ -1,0 +1,5 @@
+caps = {
+   create-endpoint
+   keyboard-events
+   console
+}

@@ -432,6 +432,8 @@ package body Mem.Server is
    is
    begin
       Mem.Processes.Set_Published_Interface_Cap (Id, Interface_Cap);
+      Rose.Server.Unblock_Endpoint
+        (Server, Rose.Interfaces.Process.Published_Interface_Endpoint);
    end Publish_Interface;
 
    -------------------------
@@ -442,8 +444,22 @@ package body Mem.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Capability_Identifier;
    begin
-      return Mem.Processes.Published_Interface_Cap (Id);
+      if Id = 0 then
+         Rose.Console_IO.Put_Line
+           ("mem: bad pid: 0");
+         return 0;
+      end if;
+
+      return Cap : constant Rose.Capabilities.Capability :=
+        Mem.Processes.Published_Interface_Cap (Id)
+      do
+         if Cap = Rose.Capabilities.Null_Capability then
+            Rose.Server.Block_Current_Request (Server);
+         end if;
+      end return;
    end Published_Interface;
 
    ----------------------

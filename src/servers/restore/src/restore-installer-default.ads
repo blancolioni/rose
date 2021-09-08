@@ -4,6 +4,7 @@ package Restore.Installer.Default is
      (Process : not null access
         procedure (Name     : String;
                    Category : String;
-                   Action   : Install_Action));
+                   Action   : Install_Action;
+                   Flags : Install_Flag_Array));
 
 end Restore.Installer.Default;
