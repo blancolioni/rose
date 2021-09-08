@@ -31,10 +31,11 @@ package body Rose.Kernel.Invocation is
       use Rose.Kernel.Processes;
       Pid : constant Process_Id := Current_Process_Id;
       Log         : constant Boolean :=
-                      Rose.Kernel.Processes.Trace
-                        (Current_Process_Id)
-                          and then not Params.Control.Flags
-                            (No_Trace);
+                      (Rose.Kernel.Processes.Trace
+                         (Current_Process_Id)
+                       or else Log_Invocation)
+        and then not Params.Control.Flags
+          (No_Trace);
         --  or else Params.Control.Last_Sent_Cap > 3
         --      or else Params.Control.Last_Sent_Word > 7;
 
