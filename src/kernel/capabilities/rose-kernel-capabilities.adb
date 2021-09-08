@@ -19,6 +19,8 @@ with Rose.Boot.Console;
 with Rose.Kernel.Processes;
 with Rose.Kernel.Processes.Debug;
 
+with Rose.Kernel.Debug;
+
 package body Rose.Kernel.Capabilities is
 
    use Rose.Capabilities.Layout;
@@ -33,6 +35,10 @@ package body Rose.Kernel.Capabilities is
    is
       package Handlers renames Rose.Kernel.Capabilities;
    begin
+      if Log_Invocation then
+         Rose.Kernel.Debug.Put_Call
+           ("invoke", Cap, Params.all);
+      end if;
       case Cap.Header.Cap_Type is
          when Arch_Cap =>
             Handlers.Arch.Handle (Cap, Params);
