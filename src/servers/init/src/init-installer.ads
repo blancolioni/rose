@@ -1,5 +1,7 @@
 with Rose.Words;
 
+with Init.Calls;
+
 package Init.Installer is
 
    function Install_Exec_Library
@@ -29,7 +31,8 @@ package Init.Installer is
       Install_Cap   : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
-      Binary_Length : Rose.Words.Word)
+      Binary_Length : Rose.Words.Word;
+      Extra_Caps    : Init.Calls.Array_Of_Capabilities)
       return Rose.Capabilities.Capability;
 
 end Init.Installer;
