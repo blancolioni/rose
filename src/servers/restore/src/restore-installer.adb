@@ -27,8 +27,9 @@ package body Restore.Installer is
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
 
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
-                              Rose.Capabilities.Null_Capability
-                                with Unreferenced;
+                              Rose.Capabilities.Null_Capability;
+   Input_Stream_Cap       : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
 
    --  procedure Install_From_Directory
    --    (Directory_Entry : Rose.Directories.Directory_Entry_Type);
@@ -191,6 +192,26 @@ package body Restore.Installer is
 
       Source (Process_Executable'Access);
 
+      Rose.Console_IO.Put
+        ("sending caps: keyboard=");
+      Rose.Console_IO.Put (Natural (Keyboard_Interface_Cap));
+      Rose.Console_IO.Put
+        ("; input stream=");
+      Rose.Console_IO.Put (Natural (Input_Stream_Cap));
+      Rose.Console_IO.New_Line;
+
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+         Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         Rose.System_Calls.Send_Cap (Params, Input_Stream_Cap);
+         Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+         Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(99));
+
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+
       if False then
          Write_Initial_System_Image (To);
       end if;
@@ -274,6 +295,11 @@ package body Restore.Installer is
            (Params, Rose.Words.Word'(Install_Action'Pos (Action)));
          Rose.System_Calls.Send_Word
            (Params, Rose.Words.Word (Flag_Word));
+
+         if Flags (Requires_Keyboard_Interface) then
+            Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         end if;
+
          Rose.System_Calls.Receive_Caps (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
          if Params.Control.Flags (Rose.Invocation.Error) then
@@ -295,8 +321,12 @@ package body Restore.Installer is
                            Keyboard_Interface_Cap :=
                              Get_Public_Interface_From_Process
                                (Reply.Caps (0));
-                           Rose.Console_IO.Put_Line
-                             ("restore: saved keyboard interface");
+                        end if;
+
+                        if Flags (Provides_Input_Stream) then
+                           Input_Stream_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Reply.Caps (0));
                         end if;
 
                      when Save =>
