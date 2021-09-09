@@ -192,14 +192,6 @@ package body Restore.Installer is
 
       Source (Process_Executable'Access);
 
-      Rose.Console_IO.Put
-        ("sending caps: keyboard=");
-      Rose.Console_IO.Put (Natural (Keyboard_Interface_Cap));
-      Rose.Console_IO.Put
-        ("; input stream=");
-      Rose.Console_IO.Put (Natural (Input_Stream_Cap));
-      Rose.Console_IO.New_Line;
-
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
