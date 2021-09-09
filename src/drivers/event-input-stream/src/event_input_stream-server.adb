@@ -8,8 +8,7 @@ with Rose.Interfaces.Event_Listener;
 with Rose.Interfaces.Stream_Reader;
 
 with Rose.System_Calls.Server;
-
-with Rose.Console_IO;
+with Rose.Server;
 
 package body Event_Input_Stream.Server is
 
@@ -27,6 +26,11 @@ package body Event_Input_Stream.Server is
       Receive_Cap     : constant Rose.Capabilities.Capability :=
                           Rose.System_Calls.Server.Create_Receive_Cap
                             (Create_Endpoint_Cap);
+      Interface_Cap   : constant Rose.Capabilities.Capability :=
+                          Rose.System_Calls.Server.Create_Endpoint
+                            (Create_Endpoint_Cap,
+                             Rose.Interfaces.Stream_Reader
+                             .Stream_Reader_Interface);
       Read_Cap        : constant Rose.Capabilities.Capability :=
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
@@ -37,8 +41,6 @@ package body Event_Input_Stream.Server is
       Waiting_Request : Rose.Capabilities.Capability := 0;
    begin
 
-      Rose.Console_IO.Open (Console_Cap);
-
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
          Rose.Interfaces.Get_Interface_Endpoint);
@@ -46,6 +48,8 @@ package body Event_Input_Stream.Server is
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
          Rose.Interfaces.Event_Listener.On_Event_Endpoint);
+
+      Rose.Server.Publish_Interface (3, Event_Source_Cap);
 
       loop
          Rose.System_Calls.Initialize_Receive (Params, Receive_Cap);
@@ -55,6 +59,9 @@ package body Event_Input_Stream.Server is
 
          case Params.Endpoint is
             when Rose.Interfaces.Get_Interface_Endpoint =>
+               Rose.System_Calls.Send_Cap (Reply, Interface_Cap);
+
+            when Rose.Interfaces.Stream_Reader.Stream_Reader_Interface =>
                Rose.System_Calls.Send_Cap (Reply, Read_Cap);
 
             when Rose.Interfaces.Event_Listener.On_Event_Endpoint =>
@@ -97,10 +104,7 @@ package body Event_Input_Stream.Server is
                end;
 
             when others =>
-               Rose.Console_IO.Put
-                 ("event-stream: unknown endpoint: ");
-               Rose.Console_IO.Put (Rose.Words.Word_64 (Params.Endpoint));
-               Rose.Console_IO.New_Line;
+               null;
 
          end case;
 

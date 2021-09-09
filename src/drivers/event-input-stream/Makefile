@@ -20,6 +20,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-system_calls-server.o \
