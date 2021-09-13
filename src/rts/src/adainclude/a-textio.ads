@@ -43,6 +43,9 @@ package Ada.Text_IO is
    function Get_Line return String;
    function Get_Line (File : File_Type) return String;
 
+   function End_Of_File (File : File_Type) return Boolean;
+   function End_Of_File return Boolean;
+
 private
 
    Max_Open_Files    : constant := 20;
