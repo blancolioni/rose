@@ -1,5 +1,6 @@
 with System.Caps;
 
+with Rose.Invocation;
 with Rose.System_Calls.Client;
 
 package body Ada.Text_IO is
@@ -8,11 +9,13 @@ package body Ada.Text_IO is
 
    type File_Control_Block is
       record
-         Open         : Boolean := False;
-         Current_Line : Count := 0;
-         Current_Col  : Count := 0;
+         Open         : Boolean     := False;
+         At_End       : Boolean     := False;
+         Current_Line : Count       := 0;
+         Current_Col  : Count       := 0;
          Buffer       : File_Buffer := (others => Character'Val (0));
-         Buffer_Last  : Natural := 0;
+         Buffer_First : Positive    := 1;
+         Buffer_Last  : Natural     := 0;
       end record;
 
    File_Control : array (Open_File_Index) of File_Control_Block;
@@ -36,14 +39,21 @@ package body Ada.Text_IO is
    Current_Input_File  : File_Type := Standard_Input_File;
    Current_Output_File : File_Type := Standard_Output_File;
 
+   procedure Read_Input_Stream
+     (Cap : Rose.Capabilities.Capability;
+      FCB : in out File_Control_Block);
+
+   procedure Log (Message : String;
+                  X       : Natural)
+     with Unreferenced;
+
    -----------------
    -- End_Of_File --
    -----------------
 
    function End_Of_File (File : File_Type) return Boolean is
-      pragma Unreferenced (File);
    begin
-      return True;
+      return File_Control (File.Control).At_End;
    end End_Of_File;
 
    -----------------
@@ -100,9 +110,30 @@ package body Ada.Text_IO is
       Line : out String;
       Last : out Natural)
    is
-      pragma Unreferenced (File, Line);
+      FCB   : File_Control_Block renames File_Control (File.Control);
+      Index : Positive renames FCB.Buffer_First;
    begin
-      Last := 0;
+      Last := Line'First - 1;
+      for Ch of Line loop
+         if Index > FCB.Buffer_Last then
+            Read_Input_Stream (File.In_Cap, FCB);
+            if FCB.Buffer_Last = 0 then
+               FCB.At_End := True;
+               return;
+            end if;
+            Index := 1;
+         end if;
+
+         if FCB.Buffer (Index) = LF then
+            Index := Index + 1;
+            exit;
+         end if;
+
+         Last := Last + 1;
+         Ch := FCB.Buffer (Index);
+         Index := Index + 1;
+
+      end loop;
    end Get_Line;
 
    --------------
@@ -129,6 +160,58 @@ package body Ada.Text_IO is
          return Buffer (1 .. Last);
       end if;
    end Get_Line;
+
+   ---------
+   -- Log --
+   ---------
+
+   procedure Log
+     (Message : String;
+      X       : Natural)
+   is
+      Buffer : String (1 .. 200);
+      Last   : Natural := 0;
+
+      procedure Add (Ch : Character);
+
+      ---------
+      -- Add --
+      ---------
+
+      procedure Add (Ch : Character) is
+      begin
+         Last := Last + 1;
+         Buffer (Last) := Ch;
+      end Add;
+
+   begin
+      for Ch of Message loop
+         Add (Ch);
+      end loop;
+
+      if X = 0 then
+         Add ('0');
+      else
+         declare
+            It    : Natural := X;
+            Buf   : String (1 .. 20);
+            Index : Natural := 0;
+         begin
+            while It /= 0 loop
+               Index := Index + 1;
+               Buf (Index) := Character'Val (It mod 10 + 48);
+               It := It / 10;
+            end loop;
+            for I in reverse 1 .. Index loop
+               Add (Buf (I));
+            end loop;
+         end;
+      end if;
+      Add (Character'Val (10));
+      Rose.System_Calls.Client.Send_String
+        (Cap     => Standard_Output_File.Out_Cap,
+         Message => Buffer (1 .. Last));
+   end Log;
 
    --------------
    -- New_Line --
@@ -210,6 +293,32 @@ package body Ada.Text_IO is
       Put (File, Item);
       New_Line (File);
    end Put_Line;
+
+   -----------------------
+   -- Read_Input_Stream --
+   -----------------------
+
+   procedure Read_Input_Stream
+     (Cap : Rose.Capabilities.Capability;
+      FCB : in out File_Control_Block)
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Cap = Rose.Capabilities.Null_Capability then
+         FCB.Buffer_Last := 0;
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Cap);
+      Rose.System_Calls.Receive_Buffer (Params, Max_Buffer_Length);
+      Rose.System_Calls.Invoke_Capability (Params);
+      Rose.System_Calls.Copy_Text
+        (Params => Params,
+         Count  => Natural (Params.Data (0)),
+         To     => FCB.Buffer,
+         Last   => FCB.Buffer_Last);
+   end Read_Input_Stream;
 
    ---------------
    -- Set_Input --
