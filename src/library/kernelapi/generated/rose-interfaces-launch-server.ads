@@ -4,6 +4,8 @@ with System.Storage_Elements;
 
 package Rose.Interfaces.Launch.Server is
 
+   function Get_Launch_Cap return Rose.Capabilities.Capability;
+
    type Launch_Handler is access
      function
        (Id          : Rose.Objects.Capability_Identifier;

@@ -136,6 +136,41 @@ package body Rose.Interfaces.Region.Server is
          Handle_Create_Subregion'Access);
    end Create_Server;
 
+   ------------------------------
+   -- Get_Create_Subregion_Cap --
+   ------------------------------
+
+   function Get_Create_Subregion_Cap return Rose.Capabilities.Capability
+   is (Create_Subregion_Cap);
+
+   -----------------
+   -- Get_Get_Cap --
+   -----------------
+
+   function Get_Get_Cap return Rose.Capabilities.Capability
+   is (Get_Cap);
+
+   -----------------------
+   -- Get_Get_Range_Cap --
+   -----------------------
+
+   function Get_Get_Range_Cap return Rose.Capabilities.Capability
+   is (Get_Range_Cap);
+
+   -----------------
+   -- Get_Put_Cap --
+   -----------------
+
+   function Get_Put_Cap return Rose.Capabilities.Capability
+   is (Put_Cap);
+
+   ------------------
+   -- Get_Read_Cap --
+   ------------------
+
+   function Get_Read_Cap return Rose.Capabilities.Capability
+   is (Read_Cap);
+
    -----------------------------
    -- Handle_Create_Subregion --
    -----------------------------

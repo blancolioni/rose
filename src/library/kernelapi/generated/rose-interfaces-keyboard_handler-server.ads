@@ -1,7 +1,10 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Keyboard_Handler.Server is
+
+   function Get_Handle_Key_Cap return Rose.Capabilities.Capability;
 
    type Handle_Key_Handler is access
      procedure

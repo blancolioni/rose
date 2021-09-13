@@ -1,7 +1,10 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Event_Listener.Server is
+
+   function Get_On_Event_Cap return Rose.Capabilities.Capability;
 
    type On_Event_Handler is access
      procedure

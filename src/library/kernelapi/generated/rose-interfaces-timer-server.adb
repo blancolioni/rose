@@ -62,6 +62,13 @@ package body Rose.Interfaces.Timer.Server is
          Handle_Set_Timer'Access);
    end Create_Server;
 
+   -----------------------
+   -- Get_Set_Timer_Cap --
+   -----------------------
+
+   function Get_Set_Timer_Cap return Rose.Capabilities.Capability
+   is (Set_Timer_Cap);
+
    --------------------------------
    -- Handle_Get_Timer_Interface --
    --------------------------------

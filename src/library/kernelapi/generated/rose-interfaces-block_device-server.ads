@@ -1,8 +1,13 @@
 with Rose.Server;
 with Rose.Interfaces.Block_Device;
 with System.Storage_Elements;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Block_Device.Server is
+
+   function Get_Get_Parameters_Cap return Rose.Capabilities.Capability;
+   function Get_Read_Blocks_Cap return Rose.Capabilities.Capability;
+   function Get_Write_Blocks_Cap return Rose.Capabilities.Capability;
 
    type Get_Parameters_Handler is access
      procedure

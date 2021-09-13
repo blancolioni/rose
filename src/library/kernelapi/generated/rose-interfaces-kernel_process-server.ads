@@ -1,8 +1,15 @@
 with Rose.Server;
 with Rose.Objects;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Kernel_Process.Server is
+
+   function Get_Destroy_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Object_Id_Cap return Rose.Capabilities.Capability;
+   function Get_Resume_Cap return Rose.Capabilities.Capability;
+   function Get_Fault_Cap return Rose.Capabilities.Capability;
+   function Get_Notify_Cap return Rose.Capabilities.Capability;
 
    type Destroy_Handler is access
      procedure (Id : Rose.Objects.Capability_Identifier);

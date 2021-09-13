@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.File_System.Server is
 
+   function Get_Root_Directory_Cap return Rose.Capabilities.Capability;
+
    type Root_Directory_Handler is access
      function (Id : Rose.Objects.Capability_Identifier)
         return Rose.Capabilities.Capability;

@@ -1,7 +1,10 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Seekable.Server is
+
+   function Get_Seek_Cap return Rose.Capabilities.Capability;
 
    type Seek_Handler is access
      procedure

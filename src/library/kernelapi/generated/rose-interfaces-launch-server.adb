@@ -62,6 +62,13 @@ package body Rose.Interfaces.Launch.Server is
          Handle_Launch'Access);
    end Create_Server;
 
+   --------------------
+   -- Get_Launch_Cap --
+   --------------------
+
+   function Get_Launch_Cap return Rose.Capabilities.Capability
+   is (Launch_Cap);
+
    ---------------------------------
    -- Handle_Get_Launch_Interface --
    ---------------------------------

@@ -122,6 +122,34 @@ package body Rose.Interfaces.Memory.Server is
          Handle_Take_Physical_Memory'Access);
    end Create_Server;
 
+   -------------------------
+   -- Get_New_Process_Cap --
+   -------------------------
+
+   function Get_New_Process_Cap return Rose.Capabilities.Capability
+   is (New_Process_Cap);
+
+   ------------------------
+   -- Get_Page_Fault_Cap --
+   ------------------------
+
+   function Get_Page_Fault_Cap return Rose.Capabilities.Capability
+   is (Page_Fault_Cap);
+
+   ------------------------------
+   -- Get_Register_Process_Cap --
+   ------------------------------
+
+   function Get_Register_Process_Cap return Rose.Capabilities.Capability
+   is (Register_Process_Cap);
+
+   ----------------------------------
+   -- Get_Take_Physical_Memory_Cap --
+   ----------------------------------
+
+   function Get_Take_Physical_Memory_Cap return Rose.Capabilities.Capability
+   is (Take_Physical_Memory_Cap);
+
    ---------------------------------
    -- Handle_Get_Memory_Interface --
    ---------------------------------

@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.File.Server is
 
@@ -146,6 +145,27 @@ package body Rose.Interfaces.File.Server is
          Seek_Endpoint,
          Handle_Seek'Access);
    end Create_Server;
+
+   ------------------
+   -- Get_Read_Cap --
+   ------------------
+
+   function Get_Read_Cap return Rose.Capabilities.Capability
+   is (Read_Cap);
+
+   ------------------
+   -- Get_Seek_Cap --
+   ------------------
+
+   function Get_Seek_Cap return Rose.Capabilities.Capability
+   is (Seek_Cap);
+
+   -------------------
+   -- Get_Write_Cap --
+   -------------------
+
+   function Get_Write_Cap return Rose.Capabilities.Capability
+   is (Write_Cap);
 
    -------------------------------
    -- Handle_Get_File_Interface --

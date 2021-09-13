@@ -4,6 +4,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Timer.Server is
 
+   function Get_Set_Timer_Cap return Rose.Capabilities.Capability;
+
    type Set_Timer_Handler is access
      function
        (Id           : Rose.Objects.Capability_Identifier;

@@ -7,6 +7,11 @@ with Rose.Interfaces.Memory;
 
 package Rose.Interfaces.Memory.Server is
 
+   function Get_New_Process_Cap return Rose.Capabilities.Capability;
+   function Get_Register_Process_Cap return Rose.Capabilities.Capability;
+   function Get_Page_Fault_Cap return Rose.Capabilities.Capability;
+   function Get_Take_Physical_Memory_Cap return Rose.Capabilities.Capability;
+
    type New_Process_Handler is access
      function
        (Id      : Rose.Objects.Capability_Identifier;

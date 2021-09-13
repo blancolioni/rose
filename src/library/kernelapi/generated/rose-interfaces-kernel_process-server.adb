@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Kernel_Process.Server is
 
@@ -148,6 +147,41 @@ package body Rose.Interfaces.Kernel_Process.Server is
          Notify_Endpoint,
          Handle_Notify'Access);
    end Create_Server;
+
+   ---------------------
+   -- Get_Destroy_Cap --
+   ---------------------
+
+   function Get_Destroy_Cap return Rose.Capabilities.Capability
+   is (Destroy_Cap);
+
+   -------------------
+   -- Get_Fault_Cap --
+   -------------------
+
+   function Get_Fault_Cap return Rose.Capabilities.Capability
+   is (Fault_Cap);
+
+   ---------------------------
+   -- Get_Get_Object_Id_Cap --
+   ---------------------------
+
+   function Get_Get_Object_Id_Cap return Rose.Capabilities.Capability
+   is (Get_Object_Id_Cap);
+
+   --------------------
+   -- Get_Notify_Cap --
+   --------------------
+
+   function Get_Notify_Cap return Rose.Capabilities.Capability
+   is (Notify_Cap);
+
+   --------------------
+   -- Get_Resume_Cap --
+   --------------------
+
+   function Get_Resume_Cap return Rose.Capabilities.Capability
+   is (Resume_Cap);
 
    --------------------
    -- Handle_Destroy --

@@ -62,6 +62,13 @@ package body Rose.Interfaces.Constructor.Server is
          Handle_Create'Access);
    end Create_Server;
 
+   --------------------
+   -- Get_Create_Cap --
+   --------------------
+
+   function Get_Create_Cap return Rose.Capabilities.Capability
+   is (Create_Cap);
+
    -------------------
    -- Handle_Create --
    -------------------

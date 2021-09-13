@@ -3,6 +3,10 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Map.Server is
 
+   function Get_Add_Cap return Rose.Capabilities.Capability;
+   function Get_Remove_Cap return Rose.Capabilities.Capability;
+   function Get_Find_Cap return Rose.Capabilities.Capability;
+
    type Add_Handler is access
      procedure
        (Id   : Rose.Objects.Capability_Identifier;

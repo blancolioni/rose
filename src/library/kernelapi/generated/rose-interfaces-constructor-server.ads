@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Constructor.Server is
 
+   function Get_Create_Cap return Rose.Capabilities.Capability;
+
    type Create_Handler is access
      function (Id : Rose.Objects.Capability_Identifier)
         return Rose.Capabilities.Capability;

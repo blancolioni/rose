@@ -1,7 +1,11 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Partitions.Server is
+
+   function Get_Partition_Count_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Partition_Cap return Rose.Capabilities.Capability;
 
    type Partition_Count_Handler is access
      function (Id : Rose.Objects.Capability_Identifier) return Natural;

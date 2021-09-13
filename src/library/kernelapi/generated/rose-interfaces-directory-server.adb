@@ -240,6 +240,76 @@ package body Rose.Interfaces.Directory.Server is
          Handle_Create_File'Access);
    end Create_Server;
 
+   ------------------------------
+   -- Get_Create_Directory_Cap --
+   ------------------------------
+
+   function Get_Create_Directory_Cap return Rose.Capabilities.Capability
+   is (Create_Directory_Cap);
+
+   -------------------------
+   -- Get_Create_File_Cap --
+   -------------------------
+
+   function Get_Create_File_Cap return Rose.Capabilities.Capability
+   is (Create_File_Cap);
+
+   -----------------------------------
+   -- Get_Directory_Entry_Count_Cap --
+   -----------------------------------
+
+   function Get_Directory_Entry_Count_Cap return Rose.Capabilities.Capability
+   is (Directory_Entry_Count_Cap);
+
+   ----------------------------------
+   -- Get_Directory_Entry_Kind_Cap --
+   ----------------------------------
+
+   function Get_Directory_Entry_Kind_Cap return Rose.Capabilities.Capability
+   is (Directory_Entry_Kind_Cap);
+
+   ----------------------------------
+   -- Get_Directory_Entry_Name_Cap --
+   ----------------------------------
+
+   function Get_Directory_Entry_Name_Cap return Rose.Capabilities.Capability
+   is (Directory_Entry_Name_Cap);
+
+   ----------------------------------
+   -- Get_Directory_Entry_Size_Cap --
+   ----------------------------------
+
+   function Get_Directory_Entry_Size_Cap return Rose.Capabilities.Capability
+   is (Directory_Entry_Size_Cap);
+
+   ------------------------
+   -- Get_Find_Entry_Cap --
+   ------------------------
+
+   function Get_Find_Entry_Cap return Rose.Capabilities.Capability
+   is (Find_Entry_Cap);
+
+   ---------------------------
+   -- Get_Get_Directory_Cap --
+   ---------------------------
+
+   function Get_Get_Directory_Cap return Rose.Capabilities.Capability
+   is (Get_Directory_Cap);
+
+   -------------------------------
+   -- Get_Get_Ordinary_File_Cap --
+   -------------------------------
+
+   function Get_Get_Ordinary_File_Cap return Rose.Capabilities.Capability
+   is (Get_Ordinary_File_Cap);
+
+   -----------------------
+   -- Get_Read_File_Cap --
+   -----------------------
+
+   function Get_Read_File_Cap return Rose.Capabilities.Capability
+   is (Read_File_Cap);
+
    -----------------------------
    -- Handle_Create_Directory --
    -----------------------------

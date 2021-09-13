@@ -4,6 +4,10 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Segment.Server is
 
+   function Get_Add_Segment_Cap return Rose.Capabilities.Capability;
+   function Get_Add_Nonpersistent_Segment_Cap
+      return Rose.Capabilities.Capability;
+
    type Add_Segment_Handler is access
      procedure
        (Id            : Rose.Objects.Capability_Identifier;

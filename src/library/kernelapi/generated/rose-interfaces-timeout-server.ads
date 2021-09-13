@@ -1,6 +1,9 @@
 with Rose.Server;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Timeout.Server is
+
+   function Get_On_Timeout_Cap return Rose.Capabilities.Capability;
 
    type On_Timeout_Handler is access
      procedure (Id : Rose.Objects.Capability_Identifier);
