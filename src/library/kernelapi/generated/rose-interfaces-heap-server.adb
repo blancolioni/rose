@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Heap.Server is
 
@@ -84,6 +83,20 @@ package body Rose.Interfaces.Heap.Server is
          Request_New_Bound_Endpoint,
          Handle_Request_New_Bound'Access);
    end Create_Server;
+
+   ---------------------------
+   -- Get_Current_Bound_Cap --
+   ---------------------------
+
+   function Get_Current_Bound_Cap return Rose.Capabilities.Capability
+   is (Current_Bound_Cap);
+
+   -------------------------------
+   -- Get_Request_New_Bound_Cap --
+   -------------------------------
+
+   function Get_Request_New_Bound_Cap return Rose.Capabilities.Capability
+   is (Request_New_Bound_Cap);
 
    --------------------------
    -- Handle_Current_Bound --

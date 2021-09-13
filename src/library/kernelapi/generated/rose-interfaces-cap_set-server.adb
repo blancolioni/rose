@@ -98,6 +98,27 @@ package body Rose.Interfaces.Cap_Set.Server is
          Handle_Length'Access);
    end Create_Server;
 
+   --------------------
+   -- Get_Append_Cap --
+   --------------------
+
+   function Get_Append_Cap return Rose.Capabilities.Capability
+   is (Append_Cap);
+
+   ---------------------
+   -- Get_Get_Cap_Cap --
+   ---------------------
+
+   function Get_Get_Cap_Cap return Rose.Capabilities.Capability
+   is (Get_Cap_Cap);
+
+   --------------------
+   -- Get_Length_Cap --
+   --------------------
+
+   function Get_Length_Cap return Rose.Capabilities.Capability
+   is (Length_Cap);
+
    -------------------
    -- Handle_Append --
    -------------------

@@ -50,10 +50,15 @@ package body Rose.Kernel.Processes.Init is
              (System'To_Address (Table_Address)));
 
       for I in Process_Table'Range loop
-         Process_Table (I).Pid := I;
-         Process_Table (I).Oid := Rose.Objects.Null_Object_Id;
-         Process_Table (I).State := Available;
-         Process_Table (I).Name := (others => ' ');
+         declare
+            P : Kernel_Process_Entry renames Process_Table (I);
+         begin
+            P.Pid := I;
+            P.Oid := Rose.Objects.Null_Object_Id;
+            P.State := Available;
+            P.Name := (others => ' ');
+            P.Shared_Pages := (others => (0, 0));
+         end;
       end loop;
 
       Current_Process := Process_Table (1)'Access;
@@ -440,7 +445,7 @@ package body Rose.Kernel.Processes.Init is
          Proc.Page_Ranges (Invocation_Range_Index) :=
            (Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
             Virtual_Address_To_Page (Invocation_Buffer_Range_Bound));
-         Proc.Invocation_Buffer :=
+         Proc.Shared_Pages (1).Page :=
            Proc.Page_Ranges (Invocation_Range_Index).Base;
 
          Proc.Directory_Page :=

@@ -84,6 +84,20 @@ package body Rose.Interfaces.Storage.Server is
          Handle_Add_Backing_Store'Access);
    end Create_Server;
 
+   -------------------------------
+   -- Get_Add_Backing_Store_Cap --
+   -------------------------------
+
+   function Get_Add_Backing_Store_Cap return Rose.Capabilities.Capability
+   is (Add_Backing_Store_Cap);
+
+   -----------------------------
+   -- Get_Reserve_Storage_Cap --
+   -----------------------------
+
+   function Get_Reserve_Storage_Cap return Rose.Capabilities.Capability
+   is (Reserve_Storage_Cap);
+
    ------------------------------
    -- Handle_Add_Backing_Store --
    ------------------------------

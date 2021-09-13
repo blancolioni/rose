@@ -64,6 +64,13 @@ package body Rose.Interfaces.Event_Source.Server is
          Handle_Add_Listener'Access);
    end Create_Server;
 
+   --------------------------
+   -- Get_Add_Listener_Cap --
+   --------------------------
+
+   function Get_Add_Listener_Cap return Rose.Capabilities.Capability
+   is (Add_Listener_Cap);
+
    -------------------------
    -- Handle_Add_Listener --
    -------------------------

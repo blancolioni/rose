@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Keyboard_Handler.Server is
 
@@ -62,6 +61,13 @@ package body Rose.Interfaces.Keyboard_Handler.Server is
          Handle_Key_Endpoint,
          Handle_Handle_Key'Access);
    end Create_Server;
+
+   ------------------------
+   -- Get_Handle_Key_Cap --
+   ------------------------
+
+   function Get_Handle_Key_Cap return Rose.Capabilities.Capability
+   is (Handle_Key_Cap);
 
    -------------------------------------------
    -- Handle_Get_Keyboard_Handler_Interface --

@@ -115,7 +115,7 @@ package body Petal.Actual_Arguments is
 
    function To_Boolean (Argument : Actual_Argument) return Boolean is
    begin
-      return Petal.Values.To_Boolean (Argument.Value);
+      return Argument.Valid and then Petal.Values.To_Boolean (Argument.Value);
    end To_Boolean;
 
    ----------------------

@@ -1,18 +1,17 @@
---                              -*- Mode: Ada -*-
-project Petal is
+project petal is
 
-   for Source_Dirs use ("src", "src/parser", "src/driver", "src/exec", "src/commands", "src/read");
+   for Source_Dirs use ("./src", "./src/commands", "./src/driver", "./src/exec", "./src/parser", "./src/read", "./src/rose");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("petal-driver.adb");
 
    package Builder is
-      for Global_Configuration_Pragmas use "gnat.adc";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=/home/fraser/kiln/rose-trunk/src/rts/build/i686-rose");
+      for Global_Configuration_Pragmas use "petal-pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../rts/build/i686-rose");
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing");
+      for Default_Switches ("ada") use ("-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst");
    end Compiler;
 
    package Binder is
@@ -20,7 +19,12 @@ project Petal is
    end Binder;
 
    package Linker is
-      for Default_Switches ("ada") use ("-m32", "-nostdlib");
+      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../rts/start/start.o");
    end Linker;
 
-end Petal;
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end petal;
+

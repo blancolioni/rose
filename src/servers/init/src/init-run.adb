@@ -85,6 +85,11 @@ package body Init.Run is
                                 Null_Capability;
       Console_Stream_Cap    : Rose.Capabilities.Capability :=
                                 Null_Capability;
+      Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
+                                 Null_Capability
+                                   with Unreferenced;
+      Console_Input_Stream_Cap : Rose.Capabilities.Capability :=
+                                   Null_Capability;
       Mem_Region_Count_Cap : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (10, 2, 0, 0));
@@ -732,7 +737,8 @@ package body Init.Run is
       begin
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
-            Rose.System_Calls.Receive_Caps (Params, 2);
+            Rose.System_Calls.Receive_Caps (Params, 3);
+            Rose.System_Calls.Receive_Words (Params, 3);
             Rose.System_Calls.Invoke_Capability (Params);
             exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
 
@@ -802,16 +808,35 @@ package body Init.Run is
                         "unable to find command interface" & NL);
                   end if;
                end;
+            elsif Params.Data (1) = 99 then
+               Keyboard_Interface_Cap := Params.Caps (0);
+               Console_Input_Stream_Cap := Params.Caps (1);
+               if Console_Input_Stream_Cap = Null_Capability then
+                  Init.Calls.Send_String
+                    (Console_Stream_Cap,
+                     "did not receive input stream cap" & NL);
+               else
+                  Init.Calls.Send_String
+                    (Console_Stream_Cap, "received input stream cap" & NL);
+               end if;
             else
 
                declare
+                  Extra_Caps : constant
+                    Init.Calls.Array_Of_Capabilities (1 .. 1)
+                    := (1 => Params.Caps (2));
+                  Last_Cap   : constant Natural
+                    := (if Params.Caps (2)
+                        = Null_Capability
+                        then 0 else 1);
                   Launch : constant Rose.Capabilities.Capability :=
                              Init.Installer.Install_Executable
                                (Create_Cap    => Create_Cap,
                                 Install_Cap   => Install_Cap,
                                 Cap_Stream    => Params.Caps (0),
                                 Binary_Stream => Params.Caps (1),
-                                Binary_Length => Params.Data (0));
+                                Binary_Length => Params.Data (0),
+                                Extra_Caps    => Extra_Caps (1 .. Last_Cap));
                begin
                   Wait (1000);
                   if Params.Data (1) = 0 then
@@ -843,7 +868,7 @@ package body Init.Run is
                            Init.Calls.Create_Cap_Set_With
                              (Create_Cap_Set => Cap_Set_Cap,
                               Caps           =>
-                                (Rose.Capabilities.Null_Capability,
+                                (Console_Input_Stream_Cap,
                                  Console_Stream_Cap));
          Echo_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
@@ -858,6 +883,30 @@ package body Init.Run is
                 (Launch_Echo_Cap,
                  (Create_Cap, Cap_Set_Cap, Standard_Caps));
             Wait (4000);
+         end if;
+      end;
+
+      declare
+         Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Find_In_Map
+                               (Find_Cap => Find_Cap,
+                                Key      => "petal");
+         Standard_Caps   : constant Rose.Capabilities.Capability :=
+                             Init.Calls.Create_Cap_Set_With
+                               (Create_Cap_Set => Cap_Set_Cap,
+                                Caps           =>
+                                  (Console_Input_Stream_Cap,
+                                   Console_Stream_Cap));
+         Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
+      begin
+         if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: unable to find 'petal'" & NL);
+         else
+            Petal_Object :=
+              Init.Calls.Launch
+                (Launch_Petal_Cap,
+                 (Create_Cap, Cap_Set_Cap, Standard_Caps));
          end if;
       end;
 

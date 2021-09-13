@@ -9,8 +9,6 @@ with Rose.Interfaces.Stream_Reader.Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Init.Calls;
-
 package body Init.Installer is
 
    Exec_Region_Length : constant := 2 ** 20;
@@ -216,7 +214,8 @@ package body Init.Installer is
       Install_Cap   : Rose.Capabilities.Capability;
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
-      Binary_Length : Rose.Words.Word)
+      Binary_Length : Rose.Words.Word;
+      Extra_Caps    : Init.Calls.Array_Of_Capabilities)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Binary_Length);
@@ -234,6 +233,10 @@ package body Init.Installer is
 
       Open (Client, Cap_Stream);
       Copy_Caps (Client, Params, Create_Cap);
+
+      for Cap of Extra_Caps loop
+         Rose.System_Calls.Send_Cap (Params, Cap);
+      end loop;
 
       Rose.System_Calls.Invoke_Capability (Params);
 

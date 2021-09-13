@@ -5,6 +5,16 @@ with Rose.Objects;
 
 package Rose.Interfaces.Process.Server is
 
+   function Get_Add_Segment_Cap return Rose.Capabilities.Capability;
+   function Get_Add_Nonpersistent_Segment_Cap
+      return Rose.Capabilities.Capability;
+   function Get_Published_Interface_Cap return Rose.Capabilities.Capability;
+   function Get_Destroy_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Object_Id_Cap return Rose.Capabilities.Capability;
+   function Get_Heap_Interface_Cap return Rose.Capabilities.Capability;
+   function Get_Exit_Process_Cap return Rose.Capabilities.Capability;
+   function Get_Publish_Interface_Cap return Rose.Capabilities.Capability;
+
    type Add_Segment_Handler is access
      procedure
        (Id            : Rose.Objects.Capability_Identifier;

@@ -12,8 +12,8 @@ TOOLS=idl configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=command keyboard exec
-UTILITIES=echo
+DRIVERS=command keyboard event-input-stream exec
+UTILITIES=echo petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished

@@ -84,6 +84,21 @@ package body Rose.Interfaces.Segment.Server is
          Handle_Add_Nonpersistent_Segment'Access);
    end Create_Server;
 
+   ---------------------------------------
+   -- Get_Add_Nonpersistent_Segment_Cap --
+   ---------------------------------------
+
+   function Get_Add_Nonpersistent_Segment_Cap
+      return Rose.Capabilities.Capability
+   is (Add_Nonpersistent_Segment_Cap);
+
+   -------------------------
+   -- Get_Add_Segment_Cap --
+   -------------------------
+
+   function Get_Add_Segment_Cap return Rose.Capabilities.Capability
+   is (Add_Segment_Cap);
+
    --------------------------------------
    -- Handle_Add_Nonpersistent_Segment --
    --------------------------------------

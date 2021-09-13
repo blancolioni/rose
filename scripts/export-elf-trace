@@ -8,7 +8,7 @@ for driver in exec command keyboard
 do objdump -d -S -f -h -t build/i686/drivers/$driver > ./logs/rose-$driver-objdump.txt
    readelf -a build/i686/drivers/$driver > ./logs/rose-$driver-elf.txt
 done
-for binary in echo
+for binary in echo petal
 do objdump -d -S -f -h -t src/utilities/$binary/build/bin/$binary-driver > ./logs/rose-$binary-objdump.txt
    readelf -a src/utilities/$binary/build/bin/$binary-driver > ./logs/rose-$binary-elf.txt
 done

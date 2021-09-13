@@ -1,7 +1,11 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Heap.Server is
+
+   function Get_Current_Bound_Cap return Rose.Capabilities.Capability;
+   function Get_Request_New_Bound_Cap return Rose.Capabilities.Capability;
 
    type Current_Bound_Handler is access
      function (Id : Rose.Objects.Capability_Identifier)

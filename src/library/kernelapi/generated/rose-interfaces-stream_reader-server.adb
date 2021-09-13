@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Stream_Reader.Server is
 
@@ -62,6 +61,13 @@ package body Rose.Interfaces.Stream_Reader.Server is
          Read_Endpoint,
          Handle_Read'Access);
    end Create_Server;
+
+   ------------------
+   -- Get_Read_Cap --
+   ------------------
+
+   function Get_Read_Cap return Rose.Capabilities.Capability
+   is (Read_Cap);
 
    ----------------------------------------
    -- Handle_Get_Stream_Reader_Interface --

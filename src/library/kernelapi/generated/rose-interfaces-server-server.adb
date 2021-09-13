@@ -65,6 +65,13 @@ package body Rose.Interfaces.Server.Server is
    end Create_Server;
 
    ---------------------------------
+   -- Get_Published_Interface_Cap --
+   ---------------------------------
+
+   function Get_Published_Interface_Cap return Rose.Capabilities.Capability
+   is (Published_Interface_Cap);
+
+   ---------------------------------
    -- Handle_Get_Server_Interface --
    ---------------------------------
 

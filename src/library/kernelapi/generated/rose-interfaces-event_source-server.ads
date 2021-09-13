@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Event_Source.Server is
 
+   function Get_Add_Listener_Cap return Rose.Capabilities.Capability;
+
    type Add_Listener_Handler is access
      procedure
        (Id       : Rose.Objects.Capability_Identifier;

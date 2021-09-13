@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Executable.Server is
 
+   function Get_Launch_Cap return Rose.Capabilities.Capability;
+
    type Launch_Handler is access
      function
        (Id    : Rose.Objects.Capability_Identifier;

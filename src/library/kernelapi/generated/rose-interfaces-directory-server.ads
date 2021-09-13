@@ -5,6 +5,18 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Directory.Server is
 
+   function Get_Directory_Entry_Count_Cap
+      return Rose.Capabilities.Capability;
+   function Get_Directory_Entry_Name_Cap return Rose.Capabilities.Capability;
+   function Get_Directory_Entry_Kind_Cap return Rose.Capabilities.Capability;
+   function Get_Directory_Entry_Size_Cap return Rose.Capabilities.Capability;
+   function Get_Find_Entry_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Ordinary_File_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Directory_Cap return Rose.Capabilities.Capability;
+   function Get_Read_File_Cap return Rose.Capabilities.Capability;
+   function Get_Create_Directory_Cap return Rose.Capabilities.Capability;
+   function Get_Create_File_Cap return Rose.Capabilities.Capability;
+
    type Directory_Entry_Count_Handler is access
      function (Id : Rose.Objects.Capability_Identifier) return Natural;
 

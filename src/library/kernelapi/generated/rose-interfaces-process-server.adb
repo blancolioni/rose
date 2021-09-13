@@ -238,6 +238,63 @@ package body Rose.Interfaces.Process.Server is
          Handle_Publish_Interface'Access);
    end Create_Server;
 
+   ---------------------------------------
+   -- Get_Add_Nonpersistent_Segment_Cap --
+   ---------------------------------------
+
+   function Get_Add_Nonpersistent_Segment_Cap
+      return Rose.Capabilities.Capability
+   is (Add_Nonpersistent_Segment_Cap);
+
+   -------------------------
+   -- Get_Add_Segment_Cap --
+   -------------------------
+
+   function Get_Add_Segment_Cap return Rose.Capabilities.Capability
+   is (Add_Segment_Cap);
+
+   ---------------------
+   -- Get_Destroy_Cap --
+   ---------------------
+
+   function Get_Destroy_Cap return Rose.Capabilities.Capability
+   is (Destroy_Cap);
+
+   --------------------------
+   -- Get_Exit_Process_Cap --
+   --------------------------
+
+   function Get_Exit_Process_Cap return Rose.Capabilities.Capability
+   is (Exit_Process_Cap);
+
+   ---------------------------
+   -- Get_Get_Object_Id_Cap --
+   ---------------------------
+
+   function Get_Get_Object_Id_Cap return Rose.Capabilities.Capability
+   is (Get_Object_Id_Cap);
+
+   ----------------------------
+   -- Get_Heap_Interface_Cap --
+   ----------------------------
+
+   function Get_Heap_Interface_Cap return Rose.Capabilities.Capability
+   is (Heap_Interface_Cap);
+
+   -------------------------------
+   -- Get_Publish_Interface_Cap --
+   -------------------------------
+
+   function Get_Publish_Interface_Cap return Rose.Capabilities.Capability
+   is (Publish_Interface_Cap);
+
+   ---------------------------------
+   -- Get_Published_Interface_Cap --
+   ---------------------------------
+
+   function Get_Published_Interface_Cap return Rose.Capabilities.Capability
+   is (Published_Interface_Cap);
+
    --------------------------------------
    -- Handle_Add_Nonpersistent_Segment --
    --------------------------------------

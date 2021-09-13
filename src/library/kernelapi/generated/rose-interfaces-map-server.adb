@@ -98,6 +98,27 @@ package body Rose.Interfaces.Map.Server is
          Handle_Find'Access);
    end Create_Server;
 
+   -----------------
+   -- Get_Add_Cap --
+   -----------------
+
+   function Get_Add_Cap return Rose.Capabilities.Capability
+   is (Add_Cap);
+
+   ------------------
+   -- Get_Find_Cap --
+   ------------------
+
+   function Get_Find_Cap return Rose.Capabilities.Capability
+   is (Find_Cap);
+
+   --------------------
+   -- Get_Remove_Cap --
+   --------------------
+
+   function Get_Remove_Cap return Rose.Capabilities.Capability
+   is (Remove_Cap);
+
    ----------------
    -- Handle_Add --
    ----------------

@@ -92,6 +92,20 @@ package body Rose.Interfaces.Exec.Server is
          Handle_Install'Access);
    end Create_Server;
 
+   ---------------------
+   -- Get_Install_Cap --
+   ---------------------
+
+   function Get_Install_Cap return Rose.Capabilities.Capability
+   is (Install_Cap);
+
+   --------------------
+   -- Get_Launch_Cap --
+   --------------------
+
+   function Get_Launch_Cap return Rose.Capabilities.Capability
+   is (Launch_Cap);
+
    -------------------------------
    -- Handle_Get_Exec_Interface --
    -------------------------------

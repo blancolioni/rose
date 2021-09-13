@@ -6,6 +6,12 @@ with Rose.Words;
 
 package Rose.Interfaces.Region.Server is
 
+   function Get_Get_Range_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Cap return Rose.Capabilities.Capability;
+   function Get_Put_Cap return Rose.Capabilities.Capability;
+   function Get_Read_Cap return Rose.Capabilities.Capability;
+   function Get_Create_Subregion_Cap return Rose.Capabilities.Capability;
+
    type Get_Range_Handler is access
      procedure
        (Id         : in     Rose.Objects.Capability_Identifier;

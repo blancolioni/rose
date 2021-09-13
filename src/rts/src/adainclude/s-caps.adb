@@ -80,6 +80,9 @@ package body System.Caps is
    begin
       if Standard_Input_Cap = Rose.Capabilities.Null_Capability then
          Standard_Input_Cap := Get_Environment_Cap (1);
+         Standard_Input_Cap :=
+           Rose.System_Calls.Client.Get_Capability
+             (Standard_Input_Cap, (1 => 0));
       end if;
       return Standard_Input_Cap;
    end Standard_Input;

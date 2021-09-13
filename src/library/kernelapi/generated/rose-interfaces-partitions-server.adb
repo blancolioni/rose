@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Partitions.Server is
 
@@ -84,6 +83,20 @@ package body Rose.Interfaces.Partitions.Server is
          Get_Partition_Endpoint,
          Handle_Get_Partition'Access);
    end Create_Server;
+
+   ---------------------------
+   -- Get_Get_Partition_Cap --
+   ---------------------------
+
+   function Get_Get_Partition_Cap return Rose.Capabilities.Capability
+   is (Get_Partition_Cap);
+
+   -----------------------------
+   -- Get_Partition_Count_Cap --
+   -----------------------------
+
+   function Get_Partition_Count_Cap return Rose.Capabilities.Capability
+   is (Partition_Count_Cap);
 
    --------------------------
    -- Handle_Get_Partition --

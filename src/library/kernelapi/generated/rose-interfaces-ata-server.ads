@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Ata.Server is
 
+   function Get_Get_Device_Cap return Rose.Capabilities.Capability;
+
    type Get_Device_Handler is access
      function (Id : Rose.Objects.Capability_Identifier)
         return Rose.Capabilities.Capability;
