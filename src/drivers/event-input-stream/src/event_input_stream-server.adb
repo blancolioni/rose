@@ -11,8 +11,6 @@ with Rose.Interfaces.Stream_Reader.Server;
 with Rose.System_Calls;
 with Rose.Server;
 
---  with Rose.Console_IO;
-
 package body Event_Input_Stream.Server is
 
    Cooked_Mode  : constant Boolean := True;

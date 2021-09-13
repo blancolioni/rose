@@ -15,7 +15,7 @@ package body Elf.Loader is
    use Rose.Interfaces.Storage.Client;
 
    Stack_Bound : constant := 16#E000_0000#;
-   Stack_Size  : constant := 16#0001_0000#;
+   Stack_Size  : constant := 16#0010_0000#;
    Stack_Base  : constant := Stack_Bound - Stack_Size;
 
    procedure Read
