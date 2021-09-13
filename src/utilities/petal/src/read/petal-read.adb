@@ -1,4 +1,4 @@
-with Ada.Text_IO;
+with Ada_Text_IO;
 
 with Petal.Commands;
 with Petal.Parser;
@@ -21,21 +21,22 @@ package body Petal.Read is
    -----------------
 
    procedure Reader_Loop is
+      use Ada_Text_IO;
       Line : String (1 .. 2000);
       Last : Natural;
    begin
       Done := False;
 
       while not Done loop
-         Ada.Text_IO.Put ("petal> ");
-         Ada.Text_IO.Flush;
+         Put ("petal> ");
+         Flush;
 
-         if Ada.Text_IO.End_Of_File then
-            Ada.Text_IO.Put_Line ("logout");
+         if End_Of_File then
+            Put_Line ("logout");
             exit;
          end if;
 
-         Ada.Text_IO.Get_Line (Line, Last);
+         Get_Line (Line, Last);
 
          declare
             Result : Petal.Parser.Parse_Result;

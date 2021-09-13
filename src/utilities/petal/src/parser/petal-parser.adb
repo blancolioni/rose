@@ -143,6 +143,8 @@ package body Petal.Parser is
             return;
          end if;
 
+         Current_Text := (others => ' ');
+
          Current_Text (1) := Current_Char;
          Text_Length := 1;
 
