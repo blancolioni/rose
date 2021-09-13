@@ -247,8 +247,9 @@ package body Rose.Kernel.Processes is
         (Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
          Virtual_Address_To_Page (Invocation_Buffer_Range_Bound));
 
-      Proc.Invocation_Buffer :=
-        Proc.Page_Ranges (Invocation_Range_Index).Base;
+      Proc.Shared_Pages :=
+        (1 => (Proc.Page_Ranges (Invocation_Range_Index).Base, 0),
+         others => (0, 0));
 
       Map_Page
         (Directory_Page => Directory_VP,
@@ -287,6 +288,10 @@ package body Rose.Kernel.Processes is
             Proc.Flags (Trace) := True;
          end if;
       end;
+
+      --  if Pid = 19 or else Pid = 20 or else Pid = 22 then
+      --     Proc.Flags (Trace) := True;
+      --  end if;
 
    end Create_Process_Table_Entry;
 
@@ -1582,11 +1587,43 @@ package body Rose.Kernel.Processes is
                                 Virtual_Page => Address);
       P                  : constant Kernel_Process_Access :=
                              Process_Table (To_Process)'Access;
-      Virtual_Page       : constant Virtual_Page_Address :=
-                             P.Invocation_Buffer;
+      Index              : Shared_Page_Index := 1;
+      Virtual_Page       : Virtual_Page_Address :=
+                             P.Shared_Pages (Index).Page;
    begin
 
-      if Log_Shared_Buffers then
+      while Index < Max_Shared_Pages
+        and then P.Shared_Pages (Index).Pid /= 0
+      loop
+         Index := Index + 1;
+         Virtual_Page := Virtual_Page + 1;
+      end loop;
+
+      if P.Shared_Pages (Index).Pid /= 0 then
+         Rose.Boot.Console.Put ("share page ");
+         Debug.Put (From_Process);
+         Rose.Boot.Console.Put (" -> ");
+         Debug.Put (To_Process);
+         Rose.Boot.Console.Put (": out of shared buffers");
+         Rose.Boot.Console.New_Line;
+
+         Rose.Boot.Console.Put ("currently sharing with");
+         for Rec of P.Shared_Pages loop
+            Rose.Boot.Console.Put (" ");
+            Debug.Put (Rec.Pid);
+         end loop;
+         Rose.Boot.Console.New_Line;
+         Panic.Panic ("ran out of shared buffers");
+      end if;
+
+      P.Shared_Pages (Index) := Shared_Page_Record'
+        (Page => Virtual_Page,
+         Pid  => From_Process);
+
+      if Log_Shared_Buffers
+        or else (Process_Table (From_Process).Flags (Trace)
+                 and then Process_Table (To_Process).Flags (Trace))
+      then
          Debug.Put (From_Process);
          Rose.Boot.Console.Put (": share page with ");
          Debug.Put (To_Process);
@@ -1609,7 +1646,7 @@ package body Rose.Kernel.Processes is
          Writable      => Writable,
          Executable    => False,
          User          => True);
-      P.Invocation_Buffer := P.Invocation_Buffer + 1;
+
    end Share_Page;
 
    ------------------
@@ -1706,25 +1743,30 @@ package body Rose.Kernel.Processes is
    -----------------------------
 
    procedure Unmap_Invocation_Buffer
-     (Pid : Process_Id)
+     (From_Pid, To_Pid : Process_Id)
    is
-      use Rose.Words;
-      P : Kernel_Process_Entry renames Process_Table (Pid);
-      Base : constant Virtual_Page_Address :=
-               P.Page_Ranges (Invocation_Range_Index).Base;
+      P : Kernel_Process_Entry renames Process_Table (From_Pid);
+      --  Base : constant Virtual_Page_Address :=
+      --           P.Page_Ranges (Invocation_Range_Index).Base;
+      --  Found : Boolean := False;
    begin
-      while P.Invocation_Buffer > Base loop
-         P.Invocation_Buffer := P.Invocation_Buffer - 1;
-         if Log_Shared_Buffers then
-            Debug.Put (Pid);
-            Rose.Boot.Console.Put (": unmap buffer page ");
-            Rose.Boot.Console.Put
-              (Rose.Words.Word (P.Invocation_Buffer) * 4096);
-            Rose.Boot.Console.New_Line;
-         end if;
+      for Rec of P.Shared_Pages loop
+         if Rec.Pid = To_Pid then
+            if Log_Shared_Buffers
+              or else P.Flags (Trace)
+            then
+               Debug.Put (From_Pid);
+               Rose.Boot.Console.Put (" -> ");
+               Debug.Put (To_Pid);
+               Rose.Boot.Console.Put (": unmap buffer page");
+               Rose.Boot.Console.New_Line;
+            end if;
 
-         Unmap_Page (Pid, P.Invocation_Buffer);
+            Unmap_Page (From_Pid, Rec.Page);
+            Rec.Pid := 0;
+         end if;
       end loop;
+
    end Unmap_Invocation_Buffer;
 
    ----------------
