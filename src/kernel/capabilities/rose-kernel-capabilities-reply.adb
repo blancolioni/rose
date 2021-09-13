@@ -27,7 +27,7 @@ package body Rose.Kernel.Capabilities.Reply is
          Rose.Boot.Console.Put (": receiver is not waiting for reply");
          Rose.Boot.Console.New_Line;
       else
-         Rose.Kernel.Processes.Unmap_Invocation_Buffer (From_Pid);
+         Rose.Kernel.Processes.Unmap_Invocation_Buffer (From_Pid, To_Pid);
          Rose.Kernel.Processes.Send_Reply
            (From_Pid, To_Pid, Params.all);
       end if;

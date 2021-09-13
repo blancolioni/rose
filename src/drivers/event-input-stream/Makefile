@@ -14,9 +14,11 @@ OBJECTS= \
 	$(BUILDDIR)/event_input_stream-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
-	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-event_listener.o \
+	$(BUILDDIR)/rose-interfaces-event_listener-server.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \

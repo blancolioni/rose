@@ -293,7 +293,7 @@ package Rose.Kernel.Processes is
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address);
 
    procedure Unmap_Invocation_Buffer
-     (Pid : Process_Id);
+     (From_Pid, To_Pid : Process_Id);
 
    function Mapped_Physical_Page
      (Pid          : Process_Id;
@@ -432,6 +432,20 @@ private
 
    subtype Process_Name is String (1 .. 16);
 
+   type Shared_Page_Record is
+      record
+         Page : Virtual_Page_Address;
+         Pid  : Process_Id;
+      end record;
+
+   Max_Shared_Pages : constant := 4;
+   type Shared_Page_Count is range 0 .. Max_Shared_Pages;
+   subtype Shared_Page_Index is
+     Shared_Page_Count range 1 .. Shared_Page_Count'Last;
+
+   type Shared_Page_Array is
+     array (Shared_Page_Index) of Shared_Page_Record;
+
    type Kernel_Process_Entry is
       record
          Stack             : Rose.Kernel.Arch.Stack_Frame;
@@ -473,7 +487,7 @@ private
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
          Env_Page          : Rose.Addresses.Physical_Page_Address;
-         Invocation_Buffer : Rose.Addresses.Virtual_Page_Address;
+         Shared_Pages      : Shared_Page_Array;
          Saved_Stack_Value : Rose.Words.Word_32;
       end record;
 
