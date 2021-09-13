@@ -873,7 +873,7 @@ package body Init.Run is
                              Init.Calls.Create_Cap_Set_With
                                (Create_Cap_Set => Cap_Set_Cap,
                                 Caps           =>
-                                  (Rose.Capabilities.Null_Capability,
+                                  (Console_Input_Stream_Cap,
                                    Console_Stream_Cap));
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
