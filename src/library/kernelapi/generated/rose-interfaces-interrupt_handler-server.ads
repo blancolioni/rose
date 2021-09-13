@@ -1,7 +1,10 @@
 with Rose.Server;
 with Rose.Words;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Interrupt_Handler.Server is
+
+   function Get_Handle_Interrupt_Cap return Rose.Capabilities.Capability;
 
    type Handle_Interrupt_Handler is access
      procedure

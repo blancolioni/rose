@@ -1,7 +1,10 @@
 with Rose.Server;
 with System.Storage_Elements;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Stream_Writer.Server is
+
+   function Get_Write_Cap return Rose.Capabilities.Capability;
 
    type Write_Handler is access
      procedure

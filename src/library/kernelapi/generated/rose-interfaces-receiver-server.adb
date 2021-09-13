@@ -62,6 +62,13 @@ package body Rose.Interfaces.Receiver.Server is
          Handle_Send_Cap'Access);
    end Create_Server;
 
+   ----------------------
+   -- Get_Send_Cap_Cap --
+   ----------------------
+
+   function Get_Send_Cap_Cap return Rose.Capabilities.Capability
+   is (Send_Cap_Cap);
+
    -----------------------------------
    -- Handle_Get_Receiver_Interface --
    -----------------------------------

@@ -1,7 +1,11 @@
 with Rose.Server;
 with System.Storage_Elements;
+with Rose.Capabilities;
 
 package Rose.Interfaces.Stream.Server is
+
+   function Get_Read_Cap return Rose.Capabilities.Capability;
+   function Get_Write_Cap return Rose.Capabilities.Capability;
 
    type Read_Handler is access
      procedure

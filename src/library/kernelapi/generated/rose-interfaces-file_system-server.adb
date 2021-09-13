@@ -64,6 +64,13 @@ package body Rose.Interfaces.File_System.Server is
          Handle_Root_Directory'Access);
    end Create_Server;
 
+   ----------------------------
+   -- Get_Root_Directory_Cap --
+   ----------------------------
+
+   function Get_Root_Directory_Cap return Rose.Capabilities.Capability
+   is (Root_Directory_Cap);
+
    --------------------------------------
    -- Handle_Get_File_System_Interface --
    --------------------------------------

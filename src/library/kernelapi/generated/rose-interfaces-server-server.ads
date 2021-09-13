@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Server.Server is
 
+   function Get_Published_Interface_Cap return Rose.Capabilities.Capability;
+
    type Published_Interface_Handler is access
      function (Id : Rose.Objects.Capability_Identifier)
         return Rose.Capabilities.Capability;

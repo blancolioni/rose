@@ -62,6 +62,13 @@ package body Rose.Interfaces.Ata.Server is
          Handle_Get_Device'Access);
    end Create_Server;
 
+   ------------------------
+   -- Get_Get_Device_Cap --
+   ------------------------
+
+   function Get_Get_Device_Cap return Rose.Capabilities.Capability
+   is (Get_Device_Cap);
+
    ------------------------------
    -- Handle_Get_Ata_Interface --
    ------------------------------

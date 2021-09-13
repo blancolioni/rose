@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Timeout.Server is
 
@@ -62,6 +61,13 @@ package body Rose.Interfaces.Timeout.Server is
          On_Timeout_Endpoint,
          Handle_On_Timeout'Access);
    end Create_Server;
+
+   ------------------------
+   -- Get_On_Timeout_Cap --
+   ------------------------
+
+   function Get_On_Timeout_Cap return Rose.Capabilities.Capability
+   is (On_Timeout_Cap);
 
    ----------------------------------
    -- Handle_Get_Timeout_Interface --

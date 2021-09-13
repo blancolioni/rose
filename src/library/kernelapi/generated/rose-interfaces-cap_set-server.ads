@@ -3,6 +3,10 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Cap_Set.Server is
 
+   function Get_Append_Cap return Rose.Capabilities.Capability;
+   function Get_Get_Cap_Cap return Rose.Capabilities.Capability;
+   function Get_Length_Cap return Rose.Capabilities.Capability;
+
    type Append_Handler is access
      procedure
        (Id   : Rose.Objects.Capability_Identifier;

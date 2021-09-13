@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Block_Device.Server is
 
@@ -104,6 +103,27 @@ package body Rose.Interfaces.Block_Device.Server is
          Write_Blocks_Endpoint,
          Handle_Write_Blocks'Access);
    end Create_Server;
+
+   ----------------------------
+   -- Get_Get_Parameters_Cap --
+   ----------------------------
+
+   function Get_Get_Parameters_Cap return Rose.Capabilities.Capability
+   is (Get_Parameters_Cap);
+
+   -------------------------
+   -- Get_Read_Blocks_Cap --
+   -------------------------
+
+   function Get_Read_Blocks_Cap return Rose.Capabilities.Capability
+   is (Read_Blocks_Cap);
+
+   --------------------------
+   -- Get_Write_Blocks_Cap --
+   --------------------------
+
+   function Get_Write_Blocks_Cap return Rose.Capabilities.Capability
+   is (Write_Blocks_Cap);
 
    ---------------------------------------
    -- Handle_Get_Block_Device_Interface --

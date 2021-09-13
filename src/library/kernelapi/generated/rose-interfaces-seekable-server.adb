@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Seekable.Server is
 
@@ -62,6 +61,13 @@ package body Rose.Interfaces.Seekable.Server is
          Seek_Endpoint,
          Handle_Seek'Access);
    end Create_Server;
+
+   ------------------
+   -- Get_Seek_Cap --
+   ------------------
+
+   function Get_Seek_Cap return Rose.Capabilities.Capability
+   is (Seek_Cap);
 
    -----------------------------------
    -- Handle_Get_Seekable_Interface --

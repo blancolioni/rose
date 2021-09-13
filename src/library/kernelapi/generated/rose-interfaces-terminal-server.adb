@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Terminal.Server is
 
@@ -116,6 +115,20 @@ package body Rose.Interfaces.Terminal.Server is
          Write_Endpoint,
          Handle_Write'Access);
    end Create_Server;
+
+   ------------------
+   -- Get_Read_Cap --
+   ------------------
+
+   function Get_Read_Cap return Rose.Capabilities.Capability
+   is (Read_Cap);
+
+   -------------------
+   -- Get_Write_Cap --
+   -------------------
+
+   function Get_Write_Cap return Rose.Capabilities.Capability
+   is (Write_Cap);
 
    ---------------------------------
    -- Handle_Get_Stream_Interface --

@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Event_Listener.Server is
 
@@ -62,6 +61,13 @@ package body Rose.Interfaces.Event_Listener.Server is
          On_Event_Endpoint,
          Handle_On_Event'Access);
    end Create_Server;
+
+   ----------------------
+   -- Get_On_Event_Cap --
+   ----------------------
+
+   function Get_On_Event_Cap return Rose.Capabilities.Capability
+   is (On_Event_Cap);
 
    -----------------------------------------
    -- Handle_Get_Event_Listener_Interface --

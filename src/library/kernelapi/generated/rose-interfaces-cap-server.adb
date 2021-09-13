@@ -1,6 +1,5 @@
 with Rose.Invocation;                  use Rose.Invocation;
 with Rose.System_Calls;                use Rose.System_Calls;
-with Rose.Capabilities;
 
 package body Rose.Interfaces.Cap.Server is
 
@@ -82,6 +81,20 @@ package body Rose.Interfaces.Cap.Server is
          Get_Object_Id_Endpoint,
          Handle_Get_Object_Id'Access);
    end Create_Server;
+
+   ---------------------
+   -- Get_Destroy_Cap --
+   ---------------------
+
+   function Get_Destroy_Cap return Rose.Capabilities.Capability
+   is (Destroy_Cap);
+
+   ---------------------------
+   -- Get_Get_Object_Id_Cap --
+   ---------------------------
+
+   function Get_Get_Object_Id_Cap return Rose.Capabilities.Capability
+   is (Get_Object_Id_Cap);
 
    --------------------
    -- Handle_Destroy --

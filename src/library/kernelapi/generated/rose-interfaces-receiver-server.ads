@@ -3,6 +3,8 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Receiver.Server is
 
+   function Get_Send_Cap_Cap return Rose.Capabilities.Capability;
+
    type Send_Cap_Handler is access
      procedure
        (Id  : Rose.Objects.Capability_Identifier;

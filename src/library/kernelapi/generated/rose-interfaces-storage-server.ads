@@ -4,6 +4,9 @@ with Rose.Capabilities;
 
 package Rose.Interfaces.Storage.Server is
 
+   function Get_Reserve_Storage_Cap return Rose.Capabilities.Capability;
+   function Get_Add_Backing_Store_Cap return Rose.Capabilities.Capability;
+
    type Reserve_Storage_Handler is access
      function
        (Id   : Rose.Objects.Capability_Identifier;
