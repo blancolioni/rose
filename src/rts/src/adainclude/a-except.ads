@@ -42,7 +42,7 @@
 --  older bootstrap compilers that do not support Ada 2005 features, and
 --  Ada.Exceptions is part of the compiler sources.
 
-pragma Polling (Off);
+--  pragma Polling (Off);
 --  We must turn polling off for this unit, because otherwise we get
 --  elaboration circularities with ourself.
 

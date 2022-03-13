@@ -31,7 +31,7 @@
 
 pragma Compiler_Unit_Warning;
 
-pragma Polling (Off);
+--  pragma Polling (Off);
 --  We must turn polling off for this unit, because otherwise we get an
 --  infinite loop from the code within the Poll routine itself.
 
