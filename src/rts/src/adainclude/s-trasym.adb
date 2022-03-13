@@ -33,7 +33,7 @@
 --  is not supported. It returns tracebacks as lists of hexadecimal addresses
 --  of the form "0x...".
 
-pragma Polling (Off);
+--  pragma Polling (Off);
 --  We must turn polling off for this unit, because otherwise we can get
 --  elaboration circularities when polling is turned on.
 

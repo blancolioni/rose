@@ -59,7 +59,7 @@ private
    type Map is
       record
          Length   : Count_Type                    := 0;
-         Elements : Elements_Type (1 .. Capacity) := (others => <>);
+         Elements : Elements_Type (1 .. Capacity);
          Buckets  : Buckets_Type (1 .. Modulus)   := (others => 0);
       end record;
 

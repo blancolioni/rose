@@ -40,7 +40,7 @@ package Rose.Capabilities.Layout is
    type Capability_Layout is
       record
          Header   : Capability_Header;
-         Payload  : Rose.Objects.Object_Id;
+         Payload  : Rose.Objects.Object_Id := 0;
       end record
         with Pack, Size => 128;
 

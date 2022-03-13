@@ -36,7 +36,7 @@ pragma Compiler_Unit_Warning;
 --  of System.Standard_Library, since this would cause order of elaboration
 --  problems (Elaborate_Body would have the same problem).
 
-pragma Polling (Off);
+--  pragma Polling (Off);
 --  We must turn polling off for this unit, because otherwise we get
 --  elaboration circularities with Ada.Exceptions if polling is on.
 
