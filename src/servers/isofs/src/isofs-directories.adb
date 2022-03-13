@@ -30,8 +30,8 @@ package body IsoFS.Directories is
 
    type Cache_Element is
       record
-         Tick   : Rose.Words.Word_32;
-         Sector : ISO_Sector;
+         Tick   : Rose.Words.Word_32 := 0;
+         Sector : ISO_Sector         := (others => 0);
       end record;
 
    package Sector_Cache is

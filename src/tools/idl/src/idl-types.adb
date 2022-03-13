@@ -99,8 +99,9 @@ package body IDL.Types is
    is
    begin
       To_Record.Fields.Append
-        ((Ada.Strings.Unbounded.To_Unbounded_String (Name),
-         Field_Type));
+        (Record_Field_Type'
+           (Ada.Strings.Unbounded.To_Unbounded_String (Name),
+            Field_Type));
    end Add_Field;
 
    ------------------------
@@ -127,7 +128,7 @@ package body IDL.Types is
    is
 
    begin
-      To_Enum.Fields.Append ((+Name, null));
+      To_Enum.Fields.Append (Record_Field_Type'(+Name, null));
    end Add_Literal;
 
    --------------------

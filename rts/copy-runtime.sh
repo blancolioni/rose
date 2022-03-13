@@ -1,5 +1,5 @@
 #!/bin/sh
-GCCVERSION=10
+GCCVERSION=11
 for f in "ada.ads" "a-unccon.ads" "a-uncdea.ads" "gnat.ads" "g-souinf.ads" \
    interfac.ads s-atacco.adb s-atacco.ads s-maccod.ads s-stoele.adb \
    s-stoele.ads i-c.ads s-addima.ads s-addope.ads s-imgint.ads \
