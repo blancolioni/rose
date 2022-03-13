@@ -854,8 +854,6 @@ package body Init.Run is
             Init.Calls.Send_String
               (Console_Stream_Cap, "init: unable to find 'echo'" & NL);
          else
-            Init.Calls.Send_String
-              (Console_Stream_Cap, "init: testing Ada.Text_IO" & NL);
             Echo_Object :=
               Init.Calls.Launch
                 (Launch_Echo_Cap,
