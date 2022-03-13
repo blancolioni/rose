@@ -27,6 +27,8 @@ you would call ready for production.
 
 ## Screenshots
 
-<img width="363" alt="rose-boot" src="https://user-images.githubusercontent.com/53253609/158062282-6eb41c80-2752-47f1-9f02-e131b956bf00.png">
+<img width="361" alt="rose-boot" src="https://user-images.githubusercontent.com/53253609/158064366-a33f056f-e68d-43de-aa72-92bda9d55517.png">
 
-Petal is the rose shell, obviously.
+The bar at the top contains a beautiful rose, the amount of allocated kernel memory, the total available memory, the currently running process, the number of page faults, and the up time.
+
+At the end of the boot, a petal shell is launched.  At the prompt I typed a command, and received a result.
