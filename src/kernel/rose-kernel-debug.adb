@@ -143,6 +143,30 @@ package body Rose.Kernel.Debug is
       New_Line;
    end Put_Call;
 
+   --------------------
+   -- Put_Cap_Layout --
+   --------------------
+
+   procedure Put_Cap_Layout
+     (Name   : String;
+      Cap    : Rose.Capabilities.Capability;
+      Layout : Rose.Capabilities.Layout.Capability_Layout)
+   is
+      use Rose.Boot.Console;
+   begin
+      Put (Name & ":");
+      Put (Natural (Cap));
+      Put (" ");
+      Put_Cap_Type (Layout.Header.Cap_Type);
+      Put (": ep=");
+      Put (Rose.Words.Word_16 (Layout.Header.Endpoint));
+      Put (" id=");
+      Put (Natural (Layout.Header.Identifier));
+      Put (" payload=");
+      Put (Rose.Words.Word_32 (Layout.Payload));
+      New_Line;
+   end Put_Cap_Layout;
+
    ------------------
    -- Put_Cap_Type --
    ------------------
