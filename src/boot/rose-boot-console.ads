@@ -58,6 +58,8 @@ package Rose.Boot.Console is
       Heap_Allocated  : Rose.Addresses.Physical_Bytes;
       Heap_Available  : Rose.Addresses.Physical_Bytes);
 
+   procedure Checkpoint_Status (On : Boolean);
+
 private
 
    Terminal_Line, Terminal_Column : Natural := 0;

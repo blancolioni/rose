@@ -25,6 +25,8 @@ package body Rose.Boot.Console is
    Serial_Port_Enabled : constant Boolean := True;
    Display_Enabled     : Boolean := True;
 
+   Active_Checkpoint   : Boolean := False;
+
    --  use the known boot virtual address that points to the console
    Console_Memory : Console_Memory_Array;
    for Console_Memory'Address use
@@ -55,6 +57,29 @@ package body Rose.Boot.Console is
                          Update : Boolean);
 
    procedure Enable_Serial_Port;
+
+   -----------------------
+   -- Checkpoint_Status --
+   -----------------------
+
+   procedure Checkpoint_Status (On : Boolean) is
+   begin
+      if Active_Checkpoint then
+         Active_Checkpoint := On;
+      elsif On then
+         Active_Checkpoint := True;
+      else
+         Active_Checkpoint := False;
+      end if;
+
+      if On then
+         Status_Memory (14) :=
+           Status_Background + Status_Foreground + 12;
+      else
+         Status_Memory (14) :=
+           Status_Background + Status_Foreground + 32;
+      end if;
+   end Checkpoint_Status;
 
    -----------
    -- Clear --
@@ -700,6 +725,12 @@ package body Rose.Boot.Console is
          Status_Memory (I) :=
            Status_Colours (I) + Character'Pos (Status_Chars (I));
       end loop;
+
+      --  if Active_Checkpoint then
+      --     Status_Memory (14) :=
+      --       Status_Background + Status_Foreground + 12;
+      --  end if;
+
    end Status_Line;
 
    -------------------
