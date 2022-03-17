@@ -144,6 +144,25 @@ package body Rose.System_Calls is
       end if;
    end Copy_Text;
 
+   ----------------
+   -- Delete_Cap --
+   ----------------
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Cap /= 0 then
+         Initialize_Send (Params, Delete_Cap_Capability);
+         Send_Cap (Params, Cap);
+         Invoke_Capability (Params);
+      end if;
+   end Delete_Cap;
+
+   -------------------
+   -- Get_Local_Cap --
+   -------------------
+
    function Get_Local_Cap
      (Cap_Type : Local_Cap_Type)
       return Rose.Capabilities.Capability
@@ -437,6 +456,21 @@ package body Rose.System_Calls is
            Rose.Invocation.Parameter_Word_Index (Count - 1);
       end if;
    end Receive_Words;
+
+   -----------------
+   -- Rescind_Cap --
+   -----------------
+
+   procedure Rescind_Cap (Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Cap /= 0 then
+         Initialize_Send (Params, Rescind_Cap_Capability);
+         Send_Cap (Params, Cap);
+         Invoke_Capability (Params);
+      end if;
+   end Rescind_Cap;
 
    -----------------
    -- Send_Buffer --
