@@ -6,9 +6,37 @@ package body Rose.System_Calls is
    Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
+   Argument_Cap_Set : constant Rose.Capabilities.Capability := 3;
+
+   type Local_Cap_Type is
+     (Create_Endpoint, Delete_Cap, Rescind_Cap);
+
+   Cap_Loaded    : array (Local_Cap_Type) of Boolean := (others => False);
+   Local_Cap     : array (Local_Cap_Type) of Rose.Capabilities.Capability :=
+                                 (others => 0);
+   Set_Index        : constant array (Local_Cap_Type) of Rose.Words.Word :=
+                        (Create_Endpoint => 8,
+                         Delete_Cap      => 6,
+                         Rescind_Cap     => 7);
+
+   Get_Environment_Cap       : Rose.Capabilities.Capability := 0;
+
    procedure Send_Native_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
+
+   function Get_Local_Cap
+     (Cap_Type : Local_Cap_Type)
+      return Rose.Capabilities.Capability;
+
+   function Create_Endpoint_Capability return Rose.Capabilities.Capability
+   is (Get_Local_Cap (Create_Endpoint));
+
+   function Delete_Cap_Capability return Rose.Capabilities.Capability
+   is (Get_Local_Cap (Delete_Cap));
+
+   function Rescind_Cap_Capability return Rose.Capabilities.Capability
+   is (Get_Local_Cap (Rescind_Cap));
 
    --------------------------
    -- Copy_Received_Buffer --
@@ -115,6 +143,39 @@ package body Rose.System_Calls is
          end;
       end if;
    end Copy_Text;
+
+   function Get_Local_Cap
+     (Cap_Type : Local_Cap_Type)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if not Cap_Loaded (Cap_Type) then
+         if Get_Environment_Cap = 0 then
+            declare
+               Params : aliased Rose.Invocation.Invocation_Record;
+            begin
+               Initialize_Send (Params, Argument_Cap_Set);
+               Receive_Caps (Params, 3);
+               Invoke_Capability (Params);
+               Get_Environment_Cap := Params.Caps (1);
+            end;
+         end if;
+
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Initialize_Send (Params, Get_Environment_Cap);
+            Send_Word (Params, Set_Index (Cap_Type));
+            Receive_Caps (Params, 1);
+            Invoke_Capability (Params);
+            Local_Cap (Cap_Type) := Params.Caps (1);
+            Cap_Loaded (Cap_Type) := True;
+         end;
+      end if;
+
+      return Local_Cap (Cap_Type);
+   end Get_Local_Cap;
 
    -----------------
    -- Get_Word_32 --
@@ -581,5 +642,40 @@ package body Rose.System_Calls is
          Send_Word (Params, Rose.Words.Word_64 (Value));
       end if;
    end Send_Word;
+
+   ----------------------
+   -- Use_Capabilities --
+   ----------------------
+
+   procedure Use_Capabilities
+     (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
+      := Rose.Capabilities.Null_Capability)
+   is
+
+      procedure Use_Cap
+        (Cap : Rose.Capabilities.Capability;
+         Cap_Type : Local_Cap_Type);
+
+      -------------
+      -- Use_Cap --
+      -------------
+
+      procedure Use_Cap
+        (Cap      : Rose.Capabilities.Capability;
+         Cap_Type : Local_Cap_Type)
+      is
+         use type Rose.Capabilities.Capability;
+      begin
+         if Cap /= 0 then
+            Local_Cap (Cap_Type) := Cap;
+            Cap_Loaded (Cap_Type) := True;
+         end if;
+      end Use_Cap;
+
+   begin
+      Use_Cap (Create_Endpoint, Rose.System_Calls.Create_Endpoint);
+      Use_Cap (Delete_Cap, Rose.System_Calls.Delete_Cap);
+      Use_Cap (Rescind_Cap, Rose.System_Calls.Rescind_Cap);
+   end Use_Capabilities;
 
 end Rose.System_Calls;

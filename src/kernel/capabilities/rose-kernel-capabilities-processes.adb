@@ -1,5 +1,6 @@
 with Rose.Boot.Console;
 
+with Rose.Kernel.Debug;
 with Rose.Kernel.Processes;
 with Rose.Kernel.Capabilities.Meta;
 
@@ -154,6 +155,9 @@ package body Rose.Kernel.Capabilities.Processes is
                   begin
                      Rose.Kernel.Processes.Get_Cap
                        (Current_Pid, Params.Caps (Cap_Index), Layout);
+
+                     Rose.Kernel.Debug.Put_Cap_Layout
+                       ("initial-cap", Params.Caps (Cap_Index), Layout);
 
                      Rose.Kernel.Processes.Set_Cap
                        (Pid, Cap, Layout);

@@ -242,7 +242,7 @@ package body Init.Calls is
 
    function Launch
      (Launch_Cap  : Rose.Capabilities.Capability;
-      Caps        : Array_Of_Capabilities)
+      Cap_Set     : Rose.Capabilities.Capability)
       return Rose.Objects.Object_Id
    is
       use Rose.Invocation;
@@ -256,11 +256,7 @@ package body Init.Calls is
                                Block            => True,
                                Create_Reply_Cap => True,
                                others           => False);
-
-      for Cap of Caps loop
-         Rose.System_Calls.Send_Cap (Params, Cap);
-      end loop;
-
+      Rose.System_Calls.Send_Cap (Params, Cap_Set);
       Rose.System_Calls.Invoke_Capability (Params);
 
       declare

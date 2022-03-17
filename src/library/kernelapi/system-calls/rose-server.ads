@@ -49,9 +49,6 @@ package Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
 
-   procedure Set_Create_Endpoint_Cap
-     (Cap      : Rose.Capabilities.Capability);
-
    function Create_Endpoint
      (Endpoint_Id  : Rose.Objects.Endpoint_Id;
       Identifier   : Rose.Objects.Capability_Identifier := 0)
