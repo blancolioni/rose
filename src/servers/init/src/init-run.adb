@@ -662,7 +662,8 @@ package body Init.Run is
               (Console_Interface_Cap,
                Timer_Cap,
                Enter_Checkpoint_Cap,
-               Leave_Checkpoint_Cap));
+               Leave_Checkpoint_Cap,
+               Delete_Cap));
          pragma Unreferenced (Checkpoint_Id);
       begin
          null;

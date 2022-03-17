@@ -37,7 +37,7 @@ package body Checkpoint.Server is
 
       Console_Cap : constant Rose.Capabilities.Capability := Get_Cap (1);
       Timer_Cap   : constant Rose.Capabilities.Capability := Get_Cap (2);
-
+      Delete_Cap  : constant Rose.Capabilities.Capability := Get_Cap (5);
    begin
 
       Enter_Checkpoint_Cap := Get_Cap (3);
@@ -45,7 +45,8 @@ package body Checkpoint.Server is
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap);
+        (Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap => Delete_Cap);
 
       Rose.Interfaces.Timer.Client.Open_Cap_Set
         (Client    => Timer,
@@ -104,6 +105,7 @@ package body Checkpoint.Server is
       pragma Unreferenced (Id);
    begin
       Rose.Interfaces.Cap.Client.Destroy (Timeout_Cap);
+      Rose.Interfaces.Cap.Client.Close (Timeout_Cap);
 
       Enter_Checkpoint;
       Execute_Checkpoint;
