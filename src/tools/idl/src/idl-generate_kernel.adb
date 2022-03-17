@@ -1861,7 +1861,7 @@ package body IDL.Generate_Kernel is
                Block.Add_Statement
                  (Syn.Statements.New_Procedure_Call_Statement
                     (Procedure_Name => "Rose.Server.Publish_Interface",
-                     Argument_1     => Syn.Literal (3),
+                     Argument_1     => Syn.Literal (1),
                      Argument_2     => Syn.Object ("Published_Cap")));
             end if;
 

@@ -85,10 +85,14 @@ package body Elf.Server is
 
    begin
 
-      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
-
       Next (Delete_Endpoint_Cap);
       Next (Rescind_Endpoint_Cap);
+
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Endpoint_Cap,
+         Rescind_Cap     => Rescind_Endpoint_Cap);
+
       Next (Console_Cap);
       Next (Memory_Cap);
       Next (Create_Process_Cap);
@@ -138,10 +142,10 @@ package body Elf.Server is
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
          Rose.System_Calls.Initialize_Send (Params, Initial_Cap);
-         Rose.System_Calls.Send_Cap (Params,
-                                     Get_Exit_Process_Cap (Process_Client));
-         Rose.System_Calls.Send_Cap (Params,
-                                     Get_Heap_Interface_Cap (Process_Client));
+         --  Rose.System_Calls.Send_Cap (Params,
+         --                          Get_Exit_Process_Cap (Process_Client));
+         --  Rose.System_Calls.Send_Cap (Params,
+         --                          Get_Heap_Interface_Cap (Process_Client));
          Rose.System_Calls.Send_Cap
            (Params,
             Get_Interface_Cap (Process_Client));

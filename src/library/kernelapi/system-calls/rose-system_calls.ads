@@ -9,10 +9,6 @@ with Rose.Words;
 
 package Rose.System_Calls is
 
-   Standard_Create_Endpoint : constant Rose.Capabilities.Capability := 1;
-   Standard_Delete_Cap      : constant Rose.Capabilities.Capability := 2;
-   Standard_Rescind_Cap     : constant Rose.Capabilities.Capability := 3;
-
    type Sent_Words_Array is array (Positive range <>) of Rose.Words.Word;
    No_Sent_Words : Sent_Words_Array (1 .. 0);
 
@@ -159,5 +155,17 @@ package Rose.System_Calls is
    procedure Receive_Caps
      (Params : in out Rose.Invocation.Invocation_Record;
       Count  : Natural);
+
+   function Create_Endpoint_Capability return Rose.Capabilities.Capability;
+   function Delete_Cap_Capability return Rose.Capabilities.Capability;
+   function Rescind_Cap_Capability return Rose.Capabilities.Capability;
+
+   procedure Use_Capabilities
+     (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
+      := Rose.Capabilities.Null_Capability);
+
+   --  Standard_Create_Endpoint : constant Rose.Capabilities.Capability := 1;
+   --  Standard_Delete_Cap      : constant Rose.Capabilities.Capability := 2;
+   --  Standard_Rescind_Cap     : constant Rose.Capabilities.Capability := 3;
 
 end Rose.System_Calls;

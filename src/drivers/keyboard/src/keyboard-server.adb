@@ -54,7 +54,7 @@ package body Keyboard.Server is
 
       Register_IRQ;
 
-      Rose.Server.Publish_Interface (3, Event_Source_Cap);
+      Rose.Server.Publish_Interface (1, Event_Source_Cap);
 
    end Create_Server;
 
