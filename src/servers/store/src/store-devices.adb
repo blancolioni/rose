@@ -157,15 +157,73 @@ package body Store.Devices is
       use Rose.Objects;
       Parent : Region_Record renames Regions (Positive (Id));
    begin
-      if Id < 1 or else Natural (Id) > Region_Count
-        or else Region_Count >= Max_Regions
-        or else Base < Parent.Base
-        or else Base >= Parent.Bound
-        or else Bound <= Parent.Base
-        or else Bound > Parent.Bound
-        or else Base > Bound
-      then
-         return 0;
+
+      if Natural (Id) > Region_Count then
+         Rose.Console_IO.Put ("storage: id ");
+         Rose.Console_IO.Put (Natural (Id));
+         Rose.Console_IO.Put (" too large (max is ");
+         Rose.Console_IO.Put (Region_Count);
+         Rose.Console_IO.Put (")");
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Region_Count >= Max_Regions then
+         Rose.Console_IO.Put ("storage: out of regions (max is ");
+         Rose.Console_IO.Put (Natural'(Max_Regions));
+         Rose.Console_IO.Put (")");
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Base < Parent.Base then
+         Rose.Console_IO.Put_Line ("storage: invalid request: base too small");
+         Rose.Console_IO.Put ("storage: requested base: ");
+         Rose.Console_IO.Put (Base);
+         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put ("storage: parent base: ");
+         Rose.Console_IO.Put (Parent.Base);
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Base >= Parent.Bound then
+         Rose.Console_IO.Put_Line ("storage: invalid request: base too large");
+         Rose.Console_IO.Put ("storage: requested base: ");
+         Rose.Console_IO.Put (Base);
+         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put ("storage: parent bound: ");
+         Rose.Console_IO.Put (Parent.Bound);
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Bound <= Parent.Base then
+         Rose.Console_IO.Put_Line
+           ("storage: invalid request: bound too small");
+         Rose.Console_IO.Put ("storage: requested bound: ");
+         Rose.Console_IO.Put (Bound);
+         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put ("storage: parent base: ");
+         Rose.Console_IO.Put (Parent.Base);
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Bound > Parent.Bound then
+         Rose.Console_IO.Put_Line
+           ("storage: invalid request: bound too large");
+         Rose.Console_IO.Put ("storage: requested bound: ");
+         Rose.Console_IO.Put (Bound);
+         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put ("storage: parent bound: ");
+         Rose.Console_IO.Put (Parent.Bound);
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Base > Bound then
+         Rose.Console_IO.Put_Line ("storage: invalid request: base > bound");
+         Rose.Console_IO.Put ("storage: requested base: ");
+         Rose.Console_IO.Put (Base);
+         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put ("storage: requested bound: ");
+         Rose.Console_IO.Put (Bound);
+         Rose.Console_IO.New_Line;
       end if;
 
       Region_Count := Region_Count + 1;
@@ -180,6 +238,7 @@ package body Store.Devices is
                        (Create_Endpoint_Cap,
                         Rose.Interfaces.Region.Region_Interface,
                         Capability_Identifier (Region_Count)));
+
          return Child.Access_Cap;
       end;
 
@@ -518,6 +577,7 @@ package body Store.Devices is
       end if;
 
       Region_Count := Region_Count + 1;
+
       declare
          use Rose.Objects;
          New_Bank : Region_Record renames
