@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
-* text=lf
+* text eol=lf
+images/floppy/* binary
+images/floppy/grub/* binary
+*.gz binary
+*.png binary
+*.bat text eol=crlf
