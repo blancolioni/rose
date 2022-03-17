@@ -14,6 +14,8 @@ package body System.Caps is
    --  Current_Directory_Cap : Rose.Capabilities.Capability := 0;
    --  Clock_Cap             : Rose.Capabilities.Capability := 0;
 
+   Exit_Process_Cap      : Rose.Capabilities.Capability := 0;
+
    Get_Cap               : Rose.Capabilities.Capability := 0;
 
    procedure Exit_Process (Status : Integer);
@@ -24,10 +26,18 @@ package body System.Caps is
    ------------------
 
    procedure Exit_Process (Status : Integer) is
+      use Rose.Capabilities;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+      if Exit_Process_Cap = 0 then
+         Rose.System_Calls.Initialize_Send
+           (Params, System.Standard_Caps.Process_Interface_Cap);
+         Rose.System_Calls.Receive_Caps (Params, 7);
+         Rose.System_Calls.Invoke_Capability (Params);
+         Exit_Process_Cap := Params.Caps (1);
+      end if;
       Rose.System_Calls.Initialize_Send
-        (Params, System.Standard_Caps.Exit_Cap);
+        (Params, Exit_Process_Cap);
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Status));
       Rose.System_Calls.Invoke_Capability (Params);
    end Exit_Process;

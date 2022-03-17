@@ -2,8 +2,6 @@ with Rose.System_Calls.Server;
 
 package body Rose.Server is
 
-   Create_Endpoint_Cap : Rose.Capabilities.Capability := 4;
-
    ---------------------------
    -- Block_Current_Request --
    ---------------------------
@@ -24,7 +22,7 @@ package body Rose.Server is
    is
    begin
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
-        (Create_Endpoint_Cap, Endpoint_Id);
+        (Rose.System_Calls.Create_Endpoint_Capability, Endpoint_Id);
    end Create_Anonymous_Endpoint;
 
    ---------------------
@@ -38,7 +36,8 @@ package body Rose.Server is
    is
    begin
       return Rose.System_Calls.Server.Create_Endpoint
-        (Create_Endpoint_Cap, Endpoint_Id, Identifier);
+        (Rose.System_Calls.Create_Endpoint_Capability,
+         Endpoint_Id, Identifier);
    end Create_Endpoint;
 
    ----------------------
@@ -129,7 +128,8 @@ package body Rose.Server is
    begin
       if Context.Receive_Cap = Rose.Capabilities.Null_Capability then
          Context.Receive_Cap :=
-           Rose.System_Calls.Server.Create_Receive_Cap (Create_Endpoint_Cap);
+           Rose.System_Calls.Server.Create_Receive_Cap
+             (Rose.System_Calls.Create_Endpoint_Capability);
       end if;
 
       Rose.System_Calls.Initialize_Receive (Params, Context.Receive_Cap);
@@ -201,17 +201,6 @@ package body Rose.Server is
            Blocked  => False,
            Params   => <>);
    end Register_Handler;
-
-   -----------------------------
-   -- Set_Create_Endpoint_Cap --
-   -----------------------------
-
-   procedure Set_Create_Endpoint_Cap
-     (Cap      : Rose.Capabilities.Capability)
-   is
-   begin
-      Create_Endpoint_Cap := Cap;
-   end Set_Create_Endpoint_Cap;
 
    ----------------------
    -- Set_Instance_Cap --

@@ -838,31 +838,6 @@ package body Init.Run is
          "completed initial install" & NL);
 
       declare
-         Launch_Echo_Cap : constant Rose.Capabilities.Capability :=
-                             Init.Calls.Find_In_Map
-                               (Find_Cap => Find_Cap,
-                                Key      => "echo");
-         Standard_Caps : constant Rose.Capabilities.Capability :=
-                           Init.Calls.Create_Cap_Set_With
-                             (Create_Cap_Set => Cap_Set_Cap,
-                              Caps           =>
-                                (Console_Input_Stream_Cap,
-                                 Console_Stream_Cap));
-         Echo_Object     : Rose.Objects.Object_Id with Unreferenced;
-      begin
-         if Launch_Echo_Cap = Rose.Capabilities.Null_Capability then
-            Init.Calls.Send_String
-              (Console_Stream_Cap, "init: unable to find 'echo'" & NL);
-         else
-            Echo_Object :=
-              Init.Calls.Launch
-                (Launch_Echo_Cap,
-                 (Create_Cap, Cap_Set_Cap, Standard_Caps));
-            Wait (1000);
-         end if;
-      end;
-
-      declare
          Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
                              Init.Calls.Find_In_Map
                                (Find_Cap => Find_Cap,
@@ -871,8 +846,33 @@ package body Init.Run is
                              Init.Calls.Create_Cap_Set_With
                                (Create_Cap_Set => Cap_Set_Cap,
                                 Caps           =>
+                                   --  standard_input
                                   (Console_Input_Stream_Cap,
-                                   Console_Stream_Cap));
+
+                                   --  standard_output
+                                   Console_Stream_Cap,
+
+                                   --  standard_error
+                                   Console_Stream_Cap,
+
+                                   --  current_directory
+                                   Null_Capability,
+
+                                   --  clock
+                                   Null_Capability,
+
+                                   --  delete_cap
+                                   Delete_Cap,
+
+                                   --  rescind_cap
+                                   Rescind_Cap,
+
+                                   --  create_endpoint
+                                   Create_Endpoint_Cap,
+
+                                   --  create_cap_set
+                                   Cap_Set_Cap
+                                  ));
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
          if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
@@ -881,8 +881,7 @@ package body Init.Run is
          else
             Petal_Object :=
               Init.Calls.Launch
-                (Launch_Petal_Cap,
-                 (Create_Cap, Cap_Set_Cap, Standard_Caps));
+                (Launch_Petal_Cap, Standard_Caps);
          end if;
       end;
 

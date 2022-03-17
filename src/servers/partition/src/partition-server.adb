@@ -63,7 +63,8 @@ package body Partition.Server is
 
    begin
 
-      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap);
 
       Console_Cap := Get_Cap (1);
       Block_Device_Cap := Get_Cap (2);

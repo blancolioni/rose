@@ -123,7 +123,7 @@ package body Rose.System_Calls.Server is
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Initialize_Send (Params, Standard_Delete_Cap);
+      Initialize_Send (Params, Delete_Cap_Capability);
       Send_Cap (Params, Cap);
       Invoke_Capability (Params);
    end Delete_Cap;
@@ -137,7 +137,7 @@ package body Rose.System_Calls.Server is
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Initialize_Send (Params, Standard_Rescind_Cap);
+      Initialize_Send (Params, Rescind_Cap_Capability);
       Send_Cap (Params, Cap);
       Invoke_Capability (Params);
    end Rescind_Cap;

@@ -285,7 +285,8 @@ package body IsoFS.Server is
 
    begin
 
-      Rose.Server.Set_Create_Endpoint_Cap (Create_Endpoint_Cap);
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap);
 
       Next (Console_Cap);
       Next (Device_Cap);

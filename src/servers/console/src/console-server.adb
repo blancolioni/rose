@@ -3,6 +3,7 @@ with System.Storage_Elements;
 with Rose.Objects;
 
 with Rose.Server;
+with Rose.System_Calls;
 
 with Rose.Interfaces.Stream_Writer.Server;
 
@@ -22,7 +23,8 @@ package body Console.Server is
 
    procedure Create_Console_Server is
    begin
-      Rose.Server.Set_Create_Endpoint_Cap (1);
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => 1);
       Rose.Interfaces.Stream_Writer.Server.Create_Server
         (Server_Context => Server_Context,
          Write          => Handle_Write'Access);
