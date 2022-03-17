@@ -157,12 +157,10 @@ Interface to processes.
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Launch} Launches the process named by this capability.  Sent caps are copied to the process.
+    \item \textbf{Suspend} Suspend the process 
 
     \begin{verbatim}
-     function Launch
-       (Caps : Array_Of_Capabilities)
-       return Capability;    
+     procedure Suspend;
     \end{verbatim}
     
 \end{itemize}

@@ -6,6 +6,24 @@ The boot process initialises the kernel and starts the first process, {\tt init}
 
 \section{Initial Processes}
 
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Name & Interface & Effect \\
+\hline
+{\tt init} & -- & -- \\
+{\tt console} & Stream\_Writer & Non-kernel processes can now write to console \\
+{\tt cap set} & Cap\_Set & Can now send more than 4 capabilities \\
+{\tt timer} & Timer & Can now create time outs \\
+{\tt mem} & Memory\_Manager & No longer need to load all pages in advance \\
+{\tt pci} & PCI & Can now look for available devices \\
+{\tt ata} & Storage & \\
+\end{tabular}
+\caption{Boot module summary (x86)}
+\label{table:boot_module_summary}
+\end{table}
+
+
 \subsection{{\tt init}}
 
 The kernel gives the init process a single {\tt create} capability, which is used to create launch and copy capabilities for the boot modules.
@@ -32,7 +50,7 @@ Scans the PCI bus.
 
 \subsection{ata}
 
-Drive for ATA/ATAPI storage.
+Driver for ATA/ATAPI storage.
 
 \section{First Boot}
 

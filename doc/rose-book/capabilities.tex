@@ -34,25 +34,27 @@ Kernel          &  \\
 A capability structure is 16 bytes long.  The particular layout depends on the capability type.  Common fields are as follows.
 
 \begin{bytefield}{32}
-\bitheader[endianness=big]{0,3,4,6,7,8,11,12,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
-\bitbox{1}{I}
-\bitbox{3}{Flags}
+\bitheader[endianness=big]{0,3,4,6,7,8,15,16,31} \\
+\bitbox{24}{Rescinded Count}
+\bitboxes*{1}{SRWX}
 \bitbox{4}{Type} \\
-\wordbox{1}{Endpoint} \\
+\bitbox{16}{Identifier}
+\bitbox{16}{Endpoint}
+\\
 \wordbox{2}{Payload}
 \end{bytefield}
 
-The {\tt Identifier} is an identifier which must be matched when using a capability.  It is ignored unless the {\tt I} flag is set.
-
-{\tt Use} is the remaining use count.  If this is zero, the capability can be used any number of times.  Otherwise, each use of the capability decrements {\tt Use} by 1, and when it reaches zero, the capability is overwritten with the null capability.
-
-{\tt Flags} are capability-specific flags.
-
-The {\tt Endpoint}, if non zero, is an index into the kernel-private endpoint array.
-
-The {\tt Payload} is a type-specific payload.
+\begin{itemize}
+    \item {\tt Rescinded Count} is the number of times a capability has been rescinded.  Any time the capability is invoked, the rescinded counts must match.
+    \item {\tt S} is set for single-use capabilities.
+    \item {\tt R} requests read-only access to some resource.
+    \item {\tt W} requests write access to some resource.
+    \item {\tt X} requests execution access to some resource.
+    \item {\tt Type} is the capability type.
+    \item {\tt Identifier} is provided to the receiving object.
+    \item {\tt Endpoint} is an index into the receiving objects endpoint list, which is translated by the kernel into an endpoint id.
+    \item {\tt Payload} is a type-specific payload, often an object id.
+\end{itemize}
 
 \subsection{Endpoint Capabilities}
 
@@ -61,13 +63,12 @@ An endpoint capability is used to invoke an endpoint on the remote object.  If t
 \subsubsection{Endpoint Capability Layout}
 
 \begin{bytefield}{32}
-\bitheader[endianness=big]{0,3,4,7,8,15,16,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
-\bitbox{1}{I}
-\bitbox{3}{0}
-\bitboxes*{1}{0101} \\
-\wordbox{1}{Endpoint} \\
+\bitheader[endianness=big]{0,3,4,6,7,8,15,16,31} \\
+\bitbox{24}{Rescinded Count}
+\bitboxes*{1}{SRWX}
+\bitbox{4}{Type} \\
+\bitbox{16}{Identifier}
+\bitbox{16}{Endpoint} \\
 \wordbox{2}{Object Id}
 \end{bytefield}
 
@@ -78,21 +79,21 @@ A page object gives access to a shared buffer.  Three endpoints are implemented:
 \subsubsection{Page Object Capability Layout}
 
 \begin{bytefield}{32}
-\bitheader[endianness=big]{0,3,4,7,8,15,16,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
+\bitheader[endianness=big]{0,3,4,6,7,8,15,16,31} \\
+\bitbox{24}{Rescinded Count}
 \bitbox{1}{I}
 \bitbox{1}{0}
 \bitbox{1}{R}
 \bitbox{1}{W}
 \bitboxes*{1}{0100} \\
-\wordbox{1}{Endpoint} \\
+\bitbox{16}{Identifier}
+\bitbox{16}{Endpoint} \\
 \wordbox{2}{Page Object Id}
 \end{bytefield}
 
 \subsection{Process Capabilities}
 
-A process capability is used to communicate with a running process.  Two actions are possible, depending on the value of the {\tt Op} field.  If Op is zero, the capability returns the process's default interface.  If Op in one, the capability sends the capabilities in the invocation to the process.
+A process capability is used to communicate with a running process.  Two actions are possible, depending on the value of the {\tt Op} field.  If Op is zero, the capability returns the process's default interface.  If Op is one, the capability sends the capabilities in the invocation to the process.
 
 Process capabilities are normally given to the parent process by the kernel when the child is launched.  The parent can then query the child, or send it capabilities.  For example, when the Petal shell executes a program, it uses the process capability to send the default input, output, and error streams (amongst other interfaces).
 
@@ -100,12 +101,12 @@ Process capabilities are normally given to the parent process by the kernel when
 
 \begin{bytefield}{32}
 \bitheader[endianness=big]{0,3,4,7,8,15,16,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
+\bitbox{24}{Rescinded Count}
 \bitbox{2}{0}
 \bitbox{2}{Op}
 \bitboxes*{1}{0100} \\
-\wordbox{1}{0} \\
+\bitbox{16}{Identifier}
+\bitbox{16}{Endpoint} \\
 \wordbox{2}{Process Object Id}
 \end{bytefield}
 
@@ -132,8 +133,7 @@ Launch Boot Module & Module index, caps \\
 
 \begin{bytefield}{32}
 \bitheader[endianness=big]{0,3,4,7,8,15,16,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
+\bitbox{24}{Rescinded Count}
 \bitbox{4}{0}
 \bitboxes*{1}{1000} \\
 \wordbox{1}{0} \\
@@ -150,18 +150,15 @@ These are capabilities which allow device drivers to talk to hardware.  The are 
 This capability allows a process to execute the equivalent of {\tt out addr, reg} and {\tt in addr } instructions.
 
 \begin{bytefield}{32}
-\bitheader[endianness=big]{0,3,4,7,8,15,16,31} \\
-\bitbox{20}{Identifier}
-\bitbox{4}{Use$_{(4)}$}
-\bitbox{2}{0}
-\bitbox{2}{Sz}
+\bitheader[endianness=big]{0,3,4,7,8,11,12,31} \\
+\bitbox{24}{Rescinded Count}
+\bitbox{4}{0}
 \bitboxes*{1}{1110} \\
-\wordbox{1}{Endpoint} \\
+\bitbox{16}{Identifier ($log_2 size$)}
+\bitbox{16}{Endpoint} \\
 \bitbox{32}{First Port} \\
 \bitbox{32}{Last Port} 
 \end{bytefield}
-
-The Sz field specifies 1-, 2-, 4- or 8- byte data for port in/out instructions (i.e. number of bytes per instruction is $2^{Sz}$).
 
 The possible endpoints are as follows.
 
@@ -213,7 +210,7 @@ The {\tt RWC} field is the number of words which the sender is prepared to recei
 
 The {\tt SWC} field is the number of sent words.
 
-The {\tt CC} field is the number of sent words.
+The {\tt CC} field is the number of sent capabilities.
 
 The {\tt Capability} field contains the capability being invoked.  The {\tt Reply Capability} field is set by the kernel, and gives the target of an invocation a capability on which to send a reply.
 
@@ -234,7 +231,7 @@ B & Block & The sender will block until the next message \\
 C & Cap Construct & Create a reply cap for the message response \\
 SWC & Sent Word Count & SWC contains the number of sent words \\
 RWC & Receive Word Count & RWC contains the maximum received words \\
-CC & Capability Count & Number of sent words which are capabilities \\
+CC & Capability Count & Number of sent capabilities \\
 \end{tabular}
 \caption{Invocation Flags}
 \label{table:invocation_flags}

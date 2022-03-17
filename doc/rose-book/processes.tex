@@ -2,7 +2,7 @@
 
 A process is named by a launch capability.  Invoking the capability executes the process.
 
-Object ids in the range $0$ to $2^{24} - 1$ represent processes.
+Object ids in the range $1$ to $2^{24} - 1$ represent processes.
 
 Process id 1 is used to refer to the Kernel.
 
@@ -49,6 +49,14 @@ The environment accessed by the Ada\.Environment\_Variables package contains an 
 \caption{Standard capability environment}
 \label{table:standard-cap-env}
 \end{table}
+
+\section{Standard Launch Sequence}
+
+The {\em launch} capability invokes the {\em exec} server, which holds an {\em Executable} capability.  
+The {\em Launch} method on this capability invokes the {\em elf} server,
+which invokes a kernel capability for creating a new process, returning a {\em Process} and a start capability.
+The {\em mem} server is invoked, which returns a {\em Process\_Memory} capability.
+This is used to load the ELF image from storage.
 
 \section{Example}
 
