@@ -838,47 +838,103 @@ package body Init.Run is
          "completed initial install" & NL);
 
       declare
+         Launch_Tests_Cap : constant Rose.Capabilities.Capability :=
+                              Init.Calls.Find_In_Map
+                                (Find_Cap => Find_Cap,
+                                 Key      => "tests");
+         Standard_Caps    : constant Rose.Capabilities.Capability :=
+                              Init.Calls.Create_Cap_Set_With
+                                (Create_Cap_Set => Cap_Set_Cap,
+                                 Caps           =>
+                                 --  standard_input
+                                   (Console_Input_Stream_Cap,
+
+                                    --  standard_output
+                                    Console_Stream_Cap,
+
+                                    --  standard_error
+                                    Console_Stream_Cap,
+
+                                    --  current_directory
+                                    Null_Capability,
+
+                                    --  clock
+                                    Null_Capability,
+
+                                    --  delete_cap
+                                    Delete_Cap,
+
+                                    --  rescind_cap
+                                    Rescind_Cap,
+
+                                    --  create_endpoint
+                                    Create_Endpoint_Cap,
+
+                                    --  create_cap_set
+                                    Cap_Set_Cap
+                                   ));
+         Tests_Object     : Rose.Objects.Object_Id with Unreferenced;
+      begin
+         if Launch_Tests_Cap = Rose.Capabilities.Null_Capability then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: unable to find 'tests'" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap,
+               "launching tests" & NL);
+            Tests_Object :=
+              Init.Calls.Launch
+                (Launch_Tests_Cap, Standard_Caps);
+         end if;
+      end;
+
+      Wait (2000);
+
+      declare
          Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
-                             Init.Calls.Find_In_Map
-                               (Find_Cap => Find_Cap,
-                                Key      => "petal");
-         Standard_Caps   : constant Rose.Capabilities.Capability :=
-                             Init.Calls.Create_Cap_Set_With
-                               (Create_Cap_Set => Cap_Set_Cap,
-                                Caps           =>
-                                   --  standard_input
-                                  (Console_Input_Stream_Cap,
+                              Init.Calls.Find_In_Map
+                                (Find_Cap => Find_Cap,
+                                 Key      => "petal");
+         Standard_Caps    : constant Rose.Capabilities.Capability :=
+                              Init.Calls.Create_Cap_Set_With
+                                (Create_Cap_Set => Cap_Set_Cap,
+                                 Caps           =>
+                                 --  standard_input
+                                   (Console_Input_Stream_Cap,
 
-                                   --  standard_output
-                                   Console_Stream_Cap,
+                                    --  standard_output
+                                    Console_Stream_Cap,
 
-                                   --  standard_error
-                                   Console_Stream_Cap,
+                                    --  standard_error
+                                    Console_Stream_Cap,
 
-                                   --  current_directory
-                                   Null_Capability,
+                                    --  current_directory
+                                    Null_Capability,
 
-                                   --  clock
-                                   Null_Capability,
+                                    --  clock
+                                    Null_Capability,
 
-                                   --  delete_cap
-                                   Delete_Cap,
+                                    --  delete_cap
+                                    Delete_Cap,
 
-                                   --  rescind_cap
-                                   Rescind_Cap,
+                                    --  rescind_cap
+                                    Rescind_Cap,
 
-                                   --  create_endpoint
-                                   Create_Endpoint_Cap,
+                                    --  create_endpoint
+                                    Create_Endpoint_Cap,
 
-                                   --  create_cap_set
-                                   Cap_Set_Cap
-                                  ));
+                                    --  create_cap_set
+                                    Cap_Set_Cap
+                                   ));
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
          if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
             Init.Calls.Send_String
               (Console_Stream_Cap, "init: unable to find 'petal'" & NL);
          else
+            Init.Calls.Send_String
+              (Console_Stream_Cap,
+               "launching petal" & NL);
             Petal_Object :=
               Init.Calls.Launch
                 (Launch_Petal_Cap, Standard_Caps);

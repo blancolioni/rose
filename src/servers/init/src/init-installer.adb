@@ -11,7 +11,7 @@ with Rose.System_Calls;
 
 package body Init.Installer is
 
-   Exec_Region_Length : constant := 2 ** 20;
+   Exec_Region_Length : constant := 8 * 2 ** 20;
 
    Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
 

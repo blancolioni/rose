@@ -22,6 +22,7 @@ package body Restore.Installer.Default is
                 Provides_Input_Stream       => True,
                 others                      => False));
       Process ("echo", "bin", Save, Default_Flags);
+      Process ("tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,
                (Requires_Input_Stream => True,
                 others => False));
