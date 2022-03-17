@@ -160,12 +160,11 @@ package Rose.System_Calls is
    function Delete_Cap_Capability return Rose.Capabilities.Capability;
    function Rescind_Cap_Capability return Rose.Capabilities.Capability;
 
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+   procedure Rescind_Cap (Cap : Rose.Capabilities.Capability);
+
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability);
-
-   --  Standard_Create_Endpoint : constant Rose.Capabilities.Capability := 1;
-   --  Standard_Delete_Cap      : constant Rose.Capabilities.Capability := 2;
-   --  Standard_Rescind_Cap     : constant Rose.Capabilities.Capability := 3;
 
 end Rose.System_Calls;

@@ -1031,6 +1031,53 @@ package body IDL.Generate_Kernel is
 
          Generate_Open_Interface (Client, Item);
 
+         declare
+            Block : Syn.Blocks.Block_Type;
+
+            procedure Add_Delete_Call
+              (Interface_Subprogram : IDL.Syntax.IDL_Subprogram);
+
+            ---------------------
+            -- Add_Delete_Call --
+            ---------------------
+
+            procedure Add_Delete_Call
+              (Interface_Subprogram : IDL.Syntax.IDL_Subprogram)
+            is
+            begin
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    (Procedure_Name => "Rose.System_Calls.Delete_Cap",
+                     Argument       =>
+                       Syn.Object
+                         ("Client." & Get_Ada_Name (Interface_Subprogram))));
+            end Add_Delete_Call;
+
+         begin
+
+            Block.Append
+              (Syn.Statements.New_Assignment_Statement
+                 (Target => "Client.Is_Open",
+                  Value  => Syn.Literal (False)));
+
+            Scan_Subprograms (Item, True, Add_Delete_Call'Access);
+
+            declare
+               use Syn.Declarations;
+               Close_Procedure : constant Subprogram_Declaration'Class :=
+                                   New_Procedure
+                                     ("Close",
+                                      New_Formal_Argument
+                                        ("Client", Inout_Argument,
+                                         Syn.Named_Subtype
+                                           (Interface_Name & "_Client")),
+                                      Block);
+
+            begin
+               Client.Add_Separator;
+               Client.Append (Close_Procedure);
+            end;
+         end;
       end;
 
       for I in 1 .. Get_Num_Inherited (Item) loop
