@@ -238,19 +238,7 @@ package body Rose.Kernel.Page_Table is
 
    procedure Init_Page_Entry (P : in out Page_Entry) is
    begin
-      P.PFA               := 0;
-      P.Available_11      := False;
-      P.Available_10      := False;
-      P.Available_9       := False;
-      P.Global            := False;
-      P.Zero              := False;
-      P.Dirty             := False;
-      P.Accessed          := False;
-      P.Cache_Disable     := False;
-      P.Transparent_Write := False;
-      P.User              := True;
-      P.Writable          := False;
-      P.Present           := True;
+      P := (PFA => 0, User => True, Present => True, others => False);
    end Init_Page_Entry;
 
    ---------------------
