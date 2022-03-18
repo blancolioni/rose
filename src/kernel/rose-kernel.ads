@@ -54,6 +54,7 @@ private
 
    System_Call_Entry        : Physical_Address;
    pragma Import (C, System_Call_Entry, "system_call_entry");
+   Log_Checkpoint_Pages     : Boolean := False;
    Log_Invocation           : Boolean := False;
    Log_Reply                : Boolean := False;
    Log_Port_IO              : Boolean := False;
