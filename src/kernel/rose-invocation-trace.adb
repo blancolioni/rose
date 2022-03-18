@@ -77,7 +77,7 @@ package body Rose.Invocation.Trace is
 
       if Rose.Objects."/=" (Invocation.Endpoint, 0) then
          Rose.Boot.Console.Put (" ep=");
-         Rose.Boot.Console.Put (Rose.Words.Word_32 (Invocation.Endpoint));
+         Rose.Boot.Console.Put (Rose.Words.Word_64 (Invocation.Endpoint));
       end if;
 
       if Invocation.Control.Flags (Rose.Invocation.Send_Buffer) then
