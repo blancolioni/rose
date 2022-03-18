@@ -34,7 +34,7 @@ package body System.Caps is
            (Params, System.Standard_Caps.Process_Interface_Cap);
          Rose.System_Calls.Receive_Caps (Params, 7);
          Rose.System_Calls.Invoke_Capability (Params);
-         Exit_Process_Cap := Params.Caps (1);
+         Exit_Process_Cap := Params.Caps (6);
       end if;
       Rose.System_Calls.Initialize_Send
         (Params, Exit_Process_Cap);
