@@ -14,6 +14,8 @@ with Rose.Kernel.Capabilities.Processes;
 with Rose.Kernel.Clock;
 with Rose.Kernel.Heap;
 
+with Rose.Kernel.Checkpoint;
+
 with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Kernel_Caps is
@@ -217,6 +219,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
               (Params.all,
                Rose.Kernel.Clock.Current_Ticks);
 
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
+         when Enter_Checkpoint_Endpoint =>
+            Rose.Kernel.Checkpoint.Enter_Checkpoint;
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
+         when Leave_Checkpoint_Endpoint =>
+            Rose.Kernel.Checkpoint.Leave_Checkpoint;
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
