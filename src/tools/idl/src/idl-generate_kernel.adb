@@ -1034,6 +1034,8 @@ package body IDL.Generate_Kernel is
          declare
             Block : Syn.Blocks.Block_Type;
 
+            procedure Send_Delete_Cap (Name : String);
+
             procedure Add_Delete_Call
               (Interface_Subprogram : IDL.Syntax.IDL_Subprogram);
 
@@ -1045,15 +1047,45 @@ package body IDL.Generate_Kernel is
               (Interface_Subprogram : IDL.Syntax.IDL_Subprogram)
             is
             begin
-               Block.Append
-                 (Syn.Statements.New_Procedure_Call_Statement
-                    (Procedure_Name => "Rose.System_Calls.Delete_Cap",
-                     Argument       =>
-                       Syn.Object
-                         ("Client." & Get_Ada_Name (Interface_Subprogram))));
+               Send_Delete_Cap
+                 ("Client." & Get_Ada_Name (Interface_Subprogram));
             end Add_Delete_Call;
 
+            ---------------------
+            -- Send_Delete_Cap --
+            ---------------------
+
+            procedure Send_Delete_Cap (Name : String) is
+               Params : constant Syn.Expression'Class := Syn.Object ("Params");
+            begin
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    (Procedure_Name => "Initialize_Send",
+                     Argument_1     => Params,
+                     Argument_2     => Syn.Object ("Delete_Cap_Capability")));
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    (Procedure_Name => "Send_Cap",
+                     Argument_1     => Params,
+                     Argument_2     => Syn.Object (Name)));
+               Block.Append
+                 (Syn.Statements.New_Procedure_Call_Statement
+                    (Procedure_Name => "Invoke_Capability",
+                     Argument       => Params));
+            end Send_Delete_Cap;
+
          begin
+
+            Block.Add_Declaration
+              (Syn.Declarations.Use_Package ("Rose.System_Calls"));
+            Block.Add_Declaration
+              (Syn.Declarations.New_Object_Declaration
+                 (Identifiers => Syn.Declarations.Identifier ("Params"),
+                  Is_Aliased  => True,
+                  Is_Constant => False,
+                  Is_Deferred => False,
+                  Object_Type =>
+                    Syn.Named_Subtype ("Rose.Invocation.Invocation_Record")));
 
             Block.Append
               (Syn.Statements.New_Assignment_Statement
@@ -1061,6 +1093,7 @@ package body IDL.Generate_Kernel is
                   Value  => Syn.Literal (False)));
 
             Scan_Subprograms (Item, True, Add_Delete_Call'Access);
+            Send_Delete_Cap ("Client.Interface_Cap");
 
             declare
                use Syn.Declarations;
