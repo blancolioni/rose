@@ -43,6 +43,10 @@ package Rose.System_Calls is
       Out_Words : out Sent_Words_Array;
       Out_Caps  : out Sent_Caps_Array);
 
+   procedure Invoke_Blocking_Send
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability);
+
    procedure Send_Text
      (Params : in out Rose.Invocation.Invocation_Record;
       Text   : String);

@@ -383,6 +383,21 @@ package body Rose.System_Calls is
               In_Words, In_Caps, Out_Words, Out_Caps);
    end Invoke_Blocking_Send;
 
+   --------------------------
+   -- Invoke_Blocking_Send --
+   --------------------------
+
+   procedure Invoke_Blocking_Send
+     (Cap      : Rose.Capabilities.Capability;
+      Sent_Cap : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Initialize_Send (Params, Cap);
+      Send_Cap (Params, Sent_Cap);
+      Invoke_Capability (Params);
+   end Invoke_Blocking_Send;
+
    -----------------------
    -- Invoke_Capability --
    -----------------------
