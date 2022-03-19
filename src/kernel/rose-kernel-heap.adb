@@ -7,6 +7,8 @@ with Rose.Kernel.Page_Table;
 with Rose.Kernel.Panic;
 with Rose.Kernel.Physical_Memory;
 
+with Rose.Kernel.Processes.Debug;
+
 package body Rose.Kernel.Heap is
 
    Log_Heap : constant Boolean := False;
@@ -261,6 +263,14 @@ package body Rose.Kernel.Heap is
                              Physical_Address_To_Page (Start);
       Region_Index       : constant Heap_Region_Index := Next_Region;
    begin
+
+      if Amount = 0 then
+         Rose.Boot.Console.Put_Line ("request to increase heap bound by 0");
+         Rose.Kernel.Processes.Debug.Report_Process
+           (Rose.Kernel.Processes.Current_Process_Id);
+         return;
+      end if;
+
       Next_Region := Next_Region + 1;
 
       Heap_Regions (Region_Index) :=
