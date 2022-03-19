@@ -1,5 +1,4 @@
 with Rose.Boot.Console;
-with Rose.Capabilities.Layout;
 with Rose.Invocation;
 
 with Rose.Kernel.Processes;
@@ -63,18 +62,7 @@ package body Rose.Kernel.Checkpoint is
       Params.Cap := Cap;
       Params.Endpoint := Endpoint;
       Params.Identifier := 0;
-
-      Params.Reply_Cap :=
-        Rose.Kernel.Processes.New_Cap
-          (Log_Process,
-           Rose.Capabilities.Layout.Capability_Layout'
-             (Header  => Rose.Capabilities.Layout.Capability_Header'
-                (Cap_Type         => Rose.Capabilities.Layout.Kernel_Cap,
-                 Single_Use       => True,
-                 Endpoint         => 5,
-                 Identifier       => 0,
-                 others           => <>),
-              Payload => 0));
+      Params.Reply_Cap := 0;
 
       Rose.Kernel.Processes.Send_Cap
         (From_Process_Id => Rose.Kernel.Processes.To_Process_Id (1),
