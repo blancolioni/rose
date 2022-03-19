@@ -426,9 +426,6 @@ package body Log.Server is
       Addr     : System.Address)
    is
    begin
-      Rose.Console_IO.Put ("write: ");
-      Rose.Console_IO.Put (Natural (Location));
-      Rose.Console_IO.New_Line;
       Operate (Location, Addr, Write);
    end Write;
 
