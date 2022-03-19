@@ -627,6 +627,7 @@ package body Rose.Kernel.Processes is
          Debug.Put (Current_Process_Id);
          Rose.Boot.Console.Put (": checkpoint write blocked");
          Rose.Boot.Console.New_Line;
+         Debug.Report_Process (Current_Process_Id);
 
          declare
             Proc : Kernel_Process_Entry renames

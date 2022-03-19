@@ -64,6 +64,15 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
+         when Start_Log_Endpoint =>
+            Rose.Kernel.Checkpoint.Set_Log_Handlers
+              (Create => Params.Caps (0),
+               Append => Params.Caps (1),
+               Commit => Params.Caps (2));
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when Start_Image_Write_Endpoint =>
             if not Params.Control.Flags (Rose.Invocation.Send_Buffer) then
                Rose.Boot.Console.Put_Line

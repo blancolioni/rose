@@ -11,6 +11,8 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    Enter_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 8;
    Leave_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 9;
 
+   Start_Log_Endpoint         : constant Rose.Objects.Endpoint_Index := 10;
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

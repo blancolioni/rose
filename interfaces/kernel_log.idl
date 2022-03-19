@@ -1,0 +1,9 @@
+interface Kernel_Log is
+
+   procedure Create;
+   procedure Append (Page : Storage_Array);
+   procedure Commit;
+   
+   procedure Add_Log_Device (Device : interface Block_Device);
+   
+end Kernel_Log;

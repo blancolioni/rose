@@ -7,6 +7,7 @@ with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.Constructor;
 with Rose.Interfaces.Exec;
 with Rose.Interfaces.File_System;
+with Rose.Interfaces.Kernel_Log;
 with Rose.Interfaces.Storage;
 with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
@@ -27,9 +28,10 @@ package body Init.Run is
 
    NL : constant Character := Character'Val (10);
 
-   Checkpoint_Priority    : constant := 2;
-   Memory_Priority        : constant := 3;
-   Device_Driver_Priority : constant := 4;
+   Memory_Priority        : constant := 2;
+   Log_Priority           : constant := 13;
+   Checkpoint_Priority    : constant := 14;
+   Device_Driver_Priority : constant := 5;
    File_System_Priority   : constant := 10;
    Low_Priority           : constant := 12;
 
@@ -46,6 +48,7 @@ package body Init.Run is
    Timer_Module      : constant := 12;
    Cap_Set_Module    : constant := 13;
    Checkpoint_Module : constant := 14;
+   Log_Module        : constant := 15;
 
    --------------
    -- Run_Init --
@@ -99,7 +102,9 @@ package body Init.Run is
       Page_On_Cap          : constant Rose.Capabilities.Capability :=
                                Init.Calls.Call
                                  (Create_Cap, (7, 1, 0, 0));
-
+      Start_Log_Cap            : constant Rose.Capabilities.Capability :=
+                                   Init.Calls.Call
+                                     (Create_Cap, (7, 10, 0, 0));
       Mem_Cap              : Rose.Capabilities.Capability;
       Timer_Cap            : Rose.Capabilities.Capability := Null_Capability;
       PCI_Cap              : Rose.Capabilities.Capability;
@@ -121,6 +126,8 @@ package body Init.Run is
       Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
+
+      Add_Log_Device_Cap    : Rose.Capabilities.Capability;
 
       Receive_Timeout  : Rose.Capabilities.Capability;
       Send_Timeout     : Rose.Capabilities.Capability;
@@ -372,6 +379,25 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Cap_Set_Cap,
               Rose.Interfaces.Constructor.Create_Endpoint);
+      end;
+
+      declare
+         use Rose.Interfaces.Kernel_Log;
+         Log_Id   : constant Rose.Objects.Object_Id :=
+                      Init.Calls.Launch_Boot_Module
+                        (Boot_Cap, Log_Module, Log_Priority,
+                         Create_Endpoint_Cap, Cap_Set_Cap,
+                         (Console_Interface_Cap, Start_Log_Cap));
+         Copy_Cap : constant Rose.Capabilities.Capability :=
+                      Init.Calls.Call
+                        (Create_Cap,
+                         (9, 1,
+                          Word (Log_Id mod 2 ** 32),
+                          Word (Log_Id / 2 ** 32)));
+      begin
+         Add_Log_Device_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Add_Log_Device_Endpoint);
       end;
 
       declare
@@ -724,7 +750,8 @@ package body Init.Run is
                             Reserve_Storage_Cap,
                             Write_System_Image_Cap,
                             Install_Media_FS,
-                            Install_Endpoint));
+                            Install_Endpoint,
+                            Add_Log_Device_Cap));
 
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -950,7 +977,7 @@ package body Init.Run is
                                     Cap_Set_Cap
                                    ));
 
-Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
+         Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
          if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
             Init.Calls.Send_String
