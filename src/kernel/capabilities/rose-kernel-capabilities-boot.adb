@@ -110,7 +110,7 @@ package body Rose.Kernel.Capabilities.Boot is
       New_Pid :=
         Rose.Kernel.Processes.Init.Load_Boot_Module
           (Priority => Rose.Kernel.Processes.Process_Priority
-             (Params.Data (0)),
+             (Params.Data (1)),
            Module   =>
              Rose.Kernel.Modules.Module_Index
                (Params.Data (0)),
