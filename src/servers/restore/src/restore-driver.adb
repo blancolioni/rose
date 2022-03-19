@@ -47,6 +47,7 @@ begin
    Next (Write_System_Image);
    Next (Install_Media_Cap);
    Next (Install_Exec_Cap);
+   Next (Add_Log_Device_Cap);
 
    Rose.Console_IO.Open (Console_Cap);
 
@@ -84,6 +85,16 @@ begin
             Source => Restore.Installer.Default.Iterate_Steps'Access);
       end;
    end if;
+
+   Rose.Console_IO.Put_Line ("restore: adding log device");
+
+   declare
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Add_Log_Device_Cap);
+      Rose.System_Calls.Send_Cap (Params, Log_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end;
 
    Rose.Console_IO.Put_Line ("restore: done");
 
