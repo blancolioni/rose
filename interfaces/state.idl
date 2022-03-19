@@ -1,0 +1,5 @@
+interface State is
+
+   procedure Reset;
+     
+end State;
