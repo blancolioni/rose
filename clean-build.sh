@@ -4,3 +4,4 @@ make clean
 (cd src/rts; make)
 make idl
 make
+make doc
