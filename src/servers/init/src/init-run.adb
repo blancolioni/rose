@@ -105,9 +105,11 @@ package body Init.Run is
       Start_Log_Cap            : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Call
                                      (Create_Cap, (7, 10, 0, 0));
-      Mem_Cap              : Rose.Capabilities.Capability;
-      Timer_Cap            : Rose.Capabilities.Capability := Null_Capability;
-      PCI_Cap              : Rose.Capabilities.Capability;
+      Mem_Cap                  : Rose.Capabilities.Capability;
+      Memory_Checkpoint_Cap    : Rose.Capabilities.Capability;
+      Timer_Cap                : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      PCI_Cap                  : Rose.Capabilities.Capability;
 
       Cap_Set_Cap          : Rose.Capabilities.Capability;
 
@@ -127,10 +129,10 @@ package body Init.Run is
       Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
 
-      Add_Log_Device_Cap    : Rose.Capabilities.Capability;
-
-      Receive_Timeout  : Rose.Capabilities.Capability;
-      Send_Timeout     : Rose.Capabilities.Capability;
+      Add_Log_Device_Cap : Rose.Capabilities.Capability;
+      Append_To_Log_Cap  : Rose.Capabilities.Capability;
+      Receive_Timeout    : Rose.Capabilities.Capability;
+      Send_Timeout       : Rose.Capabilities.Capability;
 
       Find_Cap    : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
@@ -398,6 +400,9 @@ package body Init.Run is
          Add_Log_Device_Cap :=
            Copy_Cap_From_Process
              (Copy_Cap, Add_Log_Device_Endpoint);
+         Append_To_Log_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Append_Endpoint);
       end;
 
       declare
@@ -419,6 +424,9 @@ package body Init.Run is
          Mem_Cap :=
            Copy_Cap_From_Process
              (Copy_Mem_Cap, Rose.Interfaces.Memory.Memory_Interface);
+         Memory_Checkpoint_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Mem_Cap, Rose.Interfaces.Memory.Checkpoint_Endpoint);
       end;
 
       declare
@@ -689,7 +697,9 @@ package body Init.Run is
                Timer_Cap,
                Enter_Checkpoint_Cap,
                Leave_Checkpoint_Cap,
-               Delete_Cap));
+               Delete_Cap,
+               Memory_Checkpoint_Cap,
+               Append_To_Log_Cap));
          pragma Unreferenced (Checkpoint_Id);
       begin
          null;
