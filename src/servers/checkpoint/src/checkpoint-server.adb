@@ -14,9 +14,11 @@ package body Checkpoint.Server is
 
    Timer : Rose.Interfaces.Timer.Client.Timer_Client;
 
-   Timeout_Cap : Rose.Interfaces.Cap.Client.Cap_Client;
-   Enter_Checkpoint_Cap : Rose.Capabilities.Capability;
-   Leave_Checkpoint_Cap : Rose.Capabilities.Capability;
+   Timeout_Cap           : Rose.Interfaces.Cap.Client.Cap_Client;
+   Enter_Checkpoint_Cap  : Rose.Capabilities.Capability;
+   Leave_Checkpoint_Cap  : Rose.Capabilities.Capability;
+   Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
+   Append_Log_Cap        : Rose.Capabilities.Capability;
 
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier);
@@ -42,6 +44,8 @@ package body Checkpoint.Server is
 
       Enter_Checkpoint_Cap := Get_Cap (3);
       Leave_Checkpoint_Cap := Get_Cap (4);
+      Memory_Checkpoint_Cap := Get_Cap (6);
+      Append_Log_Cap := Get_Cap (7);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
@@ -80,8 +84,11 @@ package body Checkpoint.Server is
    ------------------------
 
    procedure Execute_Checkpoint is
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      null;
+      Rose.System_Calls.Initialize_Send (Params, Memory_Checkpoint_Cap);
+      Rose.System_Calls.Send_Cap (Params, Append_Log_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
    end Execute_Checkpoint;
 
    ----------------------
