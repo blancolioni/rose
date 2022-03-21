@@ -3,8 +3,6 @@ with Rose.Objects;
 
 package Rose.Kernel is
 
-   Max_Modules       : constant := 8;
-
    Max_Processes         : constant := 64;
    Max_Virtual_Pages     : constant := 2_000_000;
 

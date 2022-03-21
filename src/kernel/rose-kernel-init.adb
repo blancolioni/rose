@@ -28,13 +28,16 @@ package body Rose.Kernel.Init is
         + 64 * Physical_Page_Bytes;   --  initial page tables
       Process_Table_Size : constant Physical_Bytes :=
                              Processes.Process_Table_Heap_Size;
-      --  first three boot modules (init, console, mem) require
-      --  three pages each: page directory, first data page,
-      --  top of stack page.
-      --  other boot modules can be entirely allocated from heap
-      --  once the mem process is running.
+      --  Guarantee space for up to 5 boot modules before a
+      --  memory manager is launched.  Each requires three pages:
+      --  page directory, first data page, top of stack page.
+      --  Boot will probably fail if these constraints are
+      --  exceeded.
+      --
+      --  Once memory manager is running, we can allocate more heap.
+
       Boot_Module_Heap   : constant Physical_Bytes :=
-                             3 * 3 * 16#1000#;
+                             6 * 3 * 16#1000#;
 
       --  Module_Size : constant Virtual_Bytes :=
       --    Modules.Module_Heap_Size;
