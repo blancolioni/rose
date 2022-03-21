@@ -27,4 +27,14 @@ private package Mem.Calls is
      (Physical   : Rose.Addresses.Physical_Page_Address;
       Address    : System.Address);
 
+   procedure Get_Process_Page
+     (From    : Rose.Objects.Page_Object_Id;
+      Process : out Rose.Objects.Object_Id;
+      Address : out Rose.Addresses.Virtual_Page_Address);
+
+   function Get_Page_Object
+     (Process : Rose.Objects.Object_Id;
+      Address : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Page_Object_Id;
+
 end Mem.Calls;

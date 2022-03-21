@@ -9,6 +9,7 @@ CFILES=$(UTIL)
 OBJECTS= \
 	$(BUILDDIR)/mem.o \
 	$(BUILDDIR)/mem-calls.o \
+	$(BUILDDIR)/mem-checkpoints.o \
 	$(BUILDDIR)/mem-driver.o \
 	$(BUILDDIR)/mem-physical_map.o \
 	$(BUILDDIR)/mem-processes.o \

@@ -29,4 +29,7 @@ interface Memory is
       Start  : out Word;
       Amount : out Word);
      
+   procedure Checkpoint
+     (Append_Page : Capability);
+	 
 end Memory;

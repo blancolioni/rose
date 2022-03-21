@@ -67,6 +67,17 @@ package body Mem.Processes is
    Process_Table : Memory_Process_Table;
    Next_Pid      : Real_Process_Id := 1;
 
+   Max_Dirty_Page_Count : constant := 2 ** 12;
+   Dirty_Page_Count     : Natural := 0;
+
+   type Dirty_Page_Record is
+      record
+         Oid : Rose.Objects.Object_Id;
+         Phys : Rose.Addresses.Physical_Page_Address;
+      end record;
+
+   Dirty_Page_Ids : array (1 .. Max_Dirty_Page_Count) of Dirty_Page_Record;
+
    ---------------------
    -- Add_Environment --
    ---------------------
@@ -280,6 +291,15 @@ package body Mem.Processes is
       end if;
    end Allocate_Physical_Page;
 
+   -----------------------
+   -- Clear_Dirty_Pages --
+   -----------------------
+
+   procedure Clear_Dirty_Pages is
+   begin
+      Dirty_Page_Count := 0;
+   end Clear_Dirty_Pages;
+
    -------------------
    -- Fault_Process --
    -------------------
@@ -466,6 +486,34 @@ package body Mem.Processes is
         and then Process_Table (Process).State = Active;
    end Is_Valid_Process_Id;
 
+   ----------------------------
+   -- Iterate_Dirty_Page_Ids --
+   ----------------------------
+
+   procedure Iterate_Dirty_Page_Ids
+     (Process : not null access
+        procedure (Page : Rose.Objects.Page_Object_Id))
+   is
+   begin
+      for I in 1 .. Dirty_Page_Count loop
+         Process (Dirty_Page_Ids (I).Oid);
+      end loop;
+   end Iterate_Dirty_Page_Ids;
+
+   -------------------------
+   -- Iterate_Dirty_Pages --
+   -------------------------
+
+   procedure Iterate_Dirty_Pages
+     (Process : not null access
+        procedure (Physical : Rose.Addresses.Physical_Page_Address))
+   is
+   begin
+      for I in 1 .. Dirty_Page_Count loop
+         Process (Dirty_Page_Ids (I).Phys);
+      end loop;
+   end Iterate_Dirty_Pages;
+
    ------------------
    -- Kill_Process --
    ------------------
@@ -599,6 +647,23 @@ package body Mem.Processes is
    begin
       Rose.Interfaces.Kernel_Process.Client.Resume (P.Process);
    end Resume_Process;
+
+   ---------------
+   -- Set_Dirty --
+   ---------------
+
+   procedure Set_Dirty
+     (Process : Rose.Objects.Process_Object_Id;
+      Page    : Rose.Addresses.Virtual_Page_Address;
+      Phys    : Rose.Addresses.Physical_Page_Address)
+   is
+   begin
+      Dirty_Page_Count := Dirty_Page_Count + 1;
+      Dirty_Page_Ids (Dirty_Page_Count) :=
+        Dirty_Page_Record'
+          (Oid  => Mem.Calls.Get_Page_Object (Process, Page),
+           Phys => Phys);
+   end Set_Dirty;
 
    ---------------------------------
    -- Set_Published_Interface_Cap --

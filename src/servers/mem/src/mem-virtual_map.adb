@@ -1,6 +1,14 @@
+with System.Storage_Elements;
+
+with Rose.Limits;
+
 with Mem.Calls;
 
 package body Mem.Virtual_Map is
+
+   Page_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size)
+     with Alignment => Rose.Limits.Page_Size;
 
    ---------
    -- Get --
@@ -69,5 +77,20 @@ package body Mem.Virtual_Map is
    procedure Remove_All
      (Process : Rose.Objects.Capability_Identifier)
    is null;
+
+   ---------------
+   -- With_Page --
+   ---------------
+
+   procedure With_Page
+     (Page    : Rose.Addresses.Physical_Page_Address;
+      Process : not null access
+        procedure (Address : System.Address))
+   is
+   begin
+      Mem.Calls.Load_Page (Page, Page_Buffer'Address);
+      Process (Page_Buffer'Address);
+      Mem.Calls.Unload_Page (Page, Page_Buffer'Address);
+   end With_Page;
 
 end Mem.Virtual_Map;
