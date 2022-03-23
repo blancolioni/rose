@@ -95,6 +95,8 @@ package body Rose.Kernel.Capabilities.Page_Table is
                           Params.Data (Page_Index + 3);
       Allocated_Pages : constant Rose.Words.Word :=
                           Params.Data (Page_Index + 4);
+      Dirty_Pages     : constant Rose.Words.Word :=
+                          Params.Data (Page_Index + 5);
       Readable        : constant Boolean :=
                           (Permissions and 1) /= 0;
       Writable        : constant Boolean :=
@@ -117,7 +119,8 @@ package body Rose.Kernel.Capabilities.Page_Table is
            (Allocated =>
               Physical_Bytes (Allocated_Pages * Rose.Limits.Page_Size),
             Available =>
-              Physical_Bytes (Available_Pages * Rose.Limits.Page_Size));
+              Physical_Bytes (Available_Pages * Rose.Limits.Page_Size),
+            Dirty_Pages => Natural (Dirty_Pages));
       end if;
 
       Params.Control :=

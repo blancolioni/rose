@@ -62,6 +62,15 @@ package body Mem.Page_Table is
       end loop;
    end Delete_All;
 
+   ----------------------
+   -- Dirty_Page_Count --
+   ----------------------
+
+   function Dirty_Page_Count return Natural is
+   begin
+      return Dirty_Page_Last;
+   end Dirty_Page_Count;
+
    ----------
    -- Find --
    ----------
