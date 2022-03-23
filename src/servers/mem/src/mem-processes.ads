@@ -10,7 +10,7 @@ with Rose.Interfaces.Region.Client;
 package Mem.Processes is
 
    function Is_Valid_Process_Id
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Boolean;
 
    function Get_Object_Id
@@ -19,14 +19,24 @@ package Mem.Processes is
 
    function Get_Process_Id
      (Process : Rose.Objects.Object_Id)
-      return Rose.Objects.Capability_Identifier;
+      return Process_Id;
 
    function Get_Process_Heap_Bound
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Rose.Addresses.Virtual_Page_Address;
 
+   function Get_Page_Object_Id
+     (Process         : Process_Id;
+      Virtual_Page    : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id;
+
+   function Get_Virtual_Address
+     (Process : Process_Id;
+      Page    : Rose.Objects.Page_Object_Id)
+     return Rose.Addresses.Virtual_Page_Address;
+
    procedure Get_Process_Segment
-     (Process         : Rose.Objects.Capability_Identifier;
+     (Process         : Process_Id;
       Virtual_Page    : Rose.Addresses.Virtual_Page_Address;
       Page_Object     : out Rose.Objects.Object_Id;
       Valid           : out Boolean;
@@ -35,13 +45,13 @@ package Mem.Processes is
       Executable      : out Boolean);
 
    procedure Resume_Process
-     (Process         : Rose.Objects.Capability_Identifier);
+     (Process         : Process_Id);
 
    procedure Kill_Process
-     (Process         : Rose.Objects.Capability_Identifier);
+     (Process         : Process_Id);
 
    procedure Fault_Process
-     (Process         : Rose.Objects.Capability_Identifier);
+     (Process         : Process_Id);
 
    function New_Process
      (Process_Cap : Rose.Capabilities.Capability)
@@ -49,27 +59,27 @@ package Mem.Processes is
 
    function Register_Process
      (Process_Cap : Rose.Capabilities.Capability)
-      return Rose.Objects.Capability_Identifier;
+      return Process_Id;
 
    function Get_Heap_Cap
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Rose.Capabilities.Capability;
 
    procedure Set_Published_Interface_Cap
-     (Process : Rose.Objects.Capability_Identifier;
+     (Process : Process_Id;
       Cap     : Rose.Capabilities.Capability);
 
    function Published_Interface_Cap
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Rose.Capabilities.Capability;
 
    procedure Initialize_Page
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address);
 
    procedure Add_Segment
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
@@ -80,7 +90,7 @@ package Mem.Processes is
       Resizable     : Boolean);
 
    procedure Add_Nonpersistent_Segment
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Readable      : Boolean;
@@ -89,15 +99,15 @@ package Mem.Processes is
       Resizable     : Boolean);
 
    procedure Add_Environment
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Environment   : System.Storage_Elements.Storage_Array);
 
    procedure Resize_Segment
-     (Process           : Rose.Objects.Capability_Identifier;
+     (Process           : Process_Id;
       New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address);
 
    procedure Allocate_Physical_Page
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       R, W, X       : Boolean := False);
 

@@ -3,36 +3,14 @@ with System.Storage_Elements;
 with Rose.Limits;
 
 with Mem.Calls;
+with Mem.Page_Table;
+with Mem.Processes;
 
 package body Mem.Virtual_Map is
 
    Page_Buffer : System.Storage_Elements.Storage_Array
      (1 .. Rose.Limits.Page_Size)
      with Alignment => Rose.Limits.Page_Size;
-
-   ---------
-   -- Get --
-   ---------
-
-   function Get
-     (Process : Rose.Objects.Capability_Identifier;
-      Page    : Rose.Addresses.Virtual_Page_Address)
-      return Virtual_Page_Mapping
-   is (Virtual_Page_Mapping'
-         (Valid         => True,
-          Mapped        => True,
-          Readable      => True,
-          Writable      => True,
-          Executable    => True,
-          Write_Through => False,
-          Disable_Cache => False,
-          Unused        => False));
-
-   ------------
-   -- Create --
-   ------------
-
-   procedure Create (Mapping : Virtual_Page_Mapping) is null;
 
    ---------
    -- Map --
@@ -45,21 +23,24 @@ package body Mem.Virtual_Map is
                   Writable      : Boolean;
                   Executable    : Boolean)
    is
+      pragma Unreferenced (Writable);
    begin
       Mem.Calls.Map
         (Process    => Process,
          Physical   => Physical_Page,
          Virtual    => Virtual_Page,
          Readable   => Readable,
-         Writeable  => Writable,
+         Writeable  => False,
+         Executable => Executable);
+      Mem.Page_Table.Insert
+        (Process    => Mem.Processes.Get_Process_Id (Process),
+         Physical   => Physical_Page,
+         Virtual    => Virtual_Page,
+         Mapped     => True,
+         Readable   => True,
+         Writable   => False,
          Executable => Executable);
    end Map;
-
-   ------------
-   -- Remove --
-   ------------
-
-   procedure Remove (Mapping : Virtual_Page_Mapping) is null;
 
    -------------
    -- Reclaim --
@@ -68,7 +49,11 @@ package body Mem.Virtual_Map is
    procedure Reclaim
      (Physical_Page : out Rose.Addresses.Physical_Page_Address;
       Success       : out Boolean)
-   is null;
+   is
+   begin
+      Physical_Page := 0;
+      Success := False;
+   end Reclaim;
 
    ----------------
    -- Remove_All --
