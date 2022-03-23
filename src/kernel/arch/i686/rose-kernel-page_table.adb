@@ -220,7 +220,6 @@ package body Rose.Kernel.Page_Table is
                   if Table_Entry.Present
                     and then Table_Entry.Checkpoint_Read_Only
                   then
-                     Table_Entry.Writable := True;
                      Table_Entry.Checkpoint_Read_Only := False;
                      if Log_Checkpoint_Pages then
                         Show_Page_Entry (Table_Entry);
