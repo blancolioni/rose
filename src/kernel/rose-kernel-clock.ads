@@ -8,7 +8,8 @@ package Rose.Kernel.Clock is
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
 
    procedure Update_Mem
-     (Allocated, Available : Rose.Addresses.Physical_Bytes);
+     (Allocated, Available : Rose.Addresses.Physical_Bytes;
+      Dirty_Pages          : Natural);
 
    procedure Set_Timeout
      (Timeout : Rose.Words.Word;

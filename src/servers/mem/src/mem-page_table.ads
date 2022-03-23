@@ -63,6 +63,8 @@ package Mem.Page_Table is
 
    procedure Clear_Dirty_Pages;
 
+   function Dirty_Page_Count return Natural;
+
 private
 
    type Cursor is new Natural;
