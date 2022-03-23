@@ -39,9 +39,6 @@ package body Mem.Page_Table is
 
    procedure Clear_Dirty_Pages is
    begin
-      for I in 1 .. Dirty_Page_Last loop
-         Mapped_Pages (Dirty_Pages (I)).Dirty := False;
-      end loop;
       Dirty_Page_Last := 0;
    end Clear_Dirty_Pages;
 
@@ -208,6 +205,18 @@ package body Mem.Page_Table is
       return Mapped_Pages (Position).Phys;
    end Physical_Address;
 
+   -------------
+   -- Process --
+   -------------
+
+   function Process
+     (Position : Cursor)
+      return Process_Id
+   is
+   begin
+      return Mapped_Pages (Position).Process;
+   end Process;
+
    --------------------------
    -- Set_Physical_Address --
    --------------------------
@@ -218,6 +227,17 @@ package body Mem.Page_Table is
    begin
       Mapped_Pages (Position).Phys := Phys;
    end Set_Physical_Address;
+
+   -------------------
+   -- Set_Read_Only --
+   -------------------
+
+   procedure Set_Read_Only (Position : Cursor) is
+      Page : Mapped_Page_Record renames Mapped_Pages (Position);
+   begin
+      Page.Writable := False;
+      Page.Dirty := False;
+   end Set_Read_Only;
 
    ------------------
    -- Set_Writable --
@@ -239,5 +259,17 @@ package body Mem.Page_Table is
          Writeable  => Page.Writable,
          Executable => Page.Executable);
    end Set_Writable;
+
+   ---------------------
+   -- Virtual_Address --
+   ---------------------
+
+   function Virtual_Address
+     (Position : Cursor)
+      return Rose.Addresses.Virtual_Page_Address
+   is
+   begin
+      return Mapped_Pages (Position).Virt;
+   end Virtual_Address;
 
 end Mem.Page_Table;

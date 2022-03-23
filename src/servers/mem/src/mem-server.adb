@@ -2,6 +2,7 @@ with System.Storage_Elements;
 
 with Rose.Addresses;
 with Rose.Capabilities;
+with Rose.Limits;
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
@@ -21,6 +22,7 @@ with Rose.System_Calls;
 with Rose.System_Calls.Client;
 
 with Mem.Calls;
+with Mem.Checkpoints;
 with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Processes;
@@ -71,6 +73,10 @@ package body Mem.Server is
       Virtual_Base  : in     Rose.Words.Word;
       Virtual_Bound : in     Rose.Words.Word;
       Flags         : in     Rose.Words.Word);
+
+   procedure Checkpoint
+     (Id          : Rose.Objects.Capability_Identifier;
+      Append_Page : Rose.Capabilities.Capability);
 
    function Published_Interface
      (Id : Rose.Objects.Capability_Identifier)
@@ -167,6 +173,34 @@ package body Mem.Server is
          Resizable    => (Flags and Segment_Resizable) /= 0);
    end Add_Segment;
 
+   ----------------
+   -- Checkpoint --
+   ----------------
+
+   procedure Checkpoint
+     (Id          : Rose.Objects.Capability_Identifier;
+      Append_Page : Rose.Capabilities.Capability)
+   is
+      pragma Unreferenced (Id);
+      procedure Append (Buffer : System.Address);
+
+      ------------
+      -- Append --
+      ------------
+
+      procedure Append (Buffer : System.Address) is
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Append_Page);
+         Rose.System_Calls.Send_Buffer (Params, Rose.Limits.Page_Size,
+                                        Buffer, False);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end Append;
+
+   begin
+      Mem.Checkpoints.Checkpoint (Append'Access);
+   end Checkpoint;
+
    -------------------
    -- Create_Server --
    -------------------
@@ -196,7 +230,8 @@ package body Mem.Server is
          New_Process    => New_Process'Access,
          Register_Process => Register_Process'Access,
          Page_Fault     => Page_Fault'Access,
-         Take_Physical_Memory => Take_Physical_Memory'Access);
+         Take_Physical_Memory => Take_Physical_Memory'Access,
+         Checkpoint => Checkpoint'Access);
 
       Rose.Interfaces.Process.Server.Attach_Interface
         (Server_Context => Server,

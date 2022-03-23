@@ -12,6 +12,14 @@ package Mem.Page_Table is
    function Is_Executable (Position : Cursor) return Boolean;
    function Is_Dirty (Position : Cursor) return Boolean;
 
+   function Process
+     (Position : Cursor)
+      return Process_Id;
+
+   function Virtual_Address
+     (Position : Cursor)
+      return Rose.Addresses.Virtual_Page_Address;
+
    function Physical_Address
      (Position : Cursor)
       return Rose.Addresses.Physical_Page_Address;
@@ -25,6 +33,12 @@ package Mem.Page_Table is
    --  Is_Writable (Position) must be False.
    --  Adds the referenced page to the dirty page list.
    --  Makes the page writable
+
+   procedure Set_Read_Only (Position : Cursor);
+   --  Has_Element (Position) must be True.
+   --  Is_Writable (Position) must be True.
+   --  Is_Dirty (Position) must be True
+   --  Makes the page read only and clears dirty flag
 
    procedure Insert
      (Process    : Process_Id;

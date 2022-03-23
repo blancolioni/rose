@@ -11,6 +11,37 @@ package body Mem.Calls is
    Log_Calls : constant Boolean := False;
 
    ---------------------
+   -- Get_Page_Object --
+   ---------------------
+
+   function Get_Page_Object
+     (Process : Rose.Objects.Object_Id;
+      Address : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Page_Object_Id
+   is
+      use Rose.Objects;
+   begin
+      return Page_Object_Id'First
+        + Process * 2 ** 36
+        + Object_Id (Address);
+   end Get_Page_Object;
+
+   ----------------------
+   -- Get_Process_Page --
+   ----------------------
+
+   procedure Get_Process_Page
+     (From    : Rose.Objects.Page_Object_Id;
+      Process : out Rose.Objects.Object_Id;
+      Address : out Rose.Addresses.Virtual_Page_Address)
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      Process := From / 2 ** 36 mod 2 ** 16;
+      Address := Rose.Addresses.Virtual_Page_Address (From mod 2 ** 36);
+   end Get_Process_Page;
+
+   ---------------------
    -- Load_Memory_Map --
    ---------------------
 
