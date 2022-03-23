@@ -683,29 +683,6 @@ package body Init.Run is
       end;
 
       declare
-         Enter_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
-                                  Init.Calls.Call
-                                    (Create_Cap, (7, 8, 0, 0));
-         Leave_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
-                                  Init.Calls.Call
-                                    (Create_Cap, (7, 9, 0, 0));
-         Checkpoint_Id        : constant Rose.Objects.Object_Id :=
-           Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Checkpoint_Module, Checkpoint_Priority,
-              Create_Endpoint_Cap, Cap_Set_Cap,
-              (Console_Interface_Cap,
-               Timer_Cap,
-               Enter_Checkpoint_Cap,
-               Leave_Checkpoint_Cap,
-               Delete_Cap,
-               Memory_Checkpoint_Cap,
-               Append_To_Log_Cap));
-         pragma Unreferenced (Checkpoint_Id);
-      begin
-         null;
-      end;
-
-      declare
          Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
       begin
          Init.Calls.Call
@@ -891,6 +868,30 @@ package body Init.Run is
 
             Rose.System_Calls.Invoke_Capability (Reply);
          end loop;
+      end;
+
+      declare
+         Enter_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
+                                  Init.Calls.Call
+                                    (Create_Cap, (7, 8, 0, 0));
+         Leave_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
+                                  Init.Calls.Call
+                                    (Create_Cap, (7, 9, 0, 0));
+         Checkpoint_Id        : constant Rose.Objects.Object_Id :=
+                                  Init.Calls.Launch_Boot_Module
+                                    (Boot_Cap, Checkpoint_Module,
+                                     Checkpoint_Priority,
+                                     Create_Endpoint_Cap, Cap_Set_Cap,
+                                     (Console_Interface_Cap,
+                                      Timer_Cap,
+                                      Enter_Checkpoint_Cap,
+                                      Leave_Checkpoint_Cap,
+                                      Delete_Cap,
+                                      Memory_Checkpoint_Cap,
+                                      Append_To_Log_Cap));
+         pragma Unreferenced (Checkpoint_Id);
+      begin
+         null;
       end;
 
       Init.Calls.Send_String
