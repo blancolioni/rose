@@ -10,6 +10,7 @@ OBJECTS= \
 	$(BUILDDIR)/mem.o \
 	$(BUILDDIR)/mem-calls.o \
 	$(BUILDDIR)/mem-driver.o \
+	$(BUILDDIR)/mem-page_table.o \
 	$(BUILDDIR)/mem-physical_map.o \
 	$(BUILDDIR)/mem-processes.o \
 	$(BUILDDIR)/mem-server.o \
