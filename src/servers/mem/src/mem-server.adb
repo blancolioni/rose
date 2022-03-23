@@ -21,6 +21,7 @@ with Rose.System_Calls;
 with Rose.System_Calls.Client;
 
 with Mem.Calls;
+with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Processes;
 with Mem.Virtual_Map;
@@ -125,7 +126,7 @@ package body Mem.Server is
 
    begin
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process      => Id,
+        (Process      => Process_Id (Id),
          Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Readable     => (Flags and Segment_Readable) /= 0,
@@ -155,7 +156,7 @@ package body Mem.Server is
 
       Open (Client, Region);
       Mem.Processes.Add_Segment
-        (Process       => Id,
+        (Process       => Process_Id (Id),
          Virtual_Base  => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Region        => Client,
@@ -233,7 +234,7 @@ package body Mem.Server is
    begin
       return Rose.Words.Word
         (Mem.Processes.Get_Process_Heap_Bound
-           (Process => Id));
+           (Process => Process_Id (Id)));
    end Current_Bound;
 
    -------------
@@ -242,7 +243,7 @@ package body Mem.Server is
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier) is
    begin
-      Mem.Processes.Kill_Process (Id);
+      Mem.Processes.Kill_Process (Process_Id (Id));
    end Destroy;
 
    ------------------
@@ -255,7 +256,8 @@ package body Mem.Server is
    is
       pragma Unreferenced (Exit_Status);
    begin
-      Mem.Processes.Kill_Process (Id);
+      Mem.Page_Table.Delete_All (Process_Id (Id));
+      Mem.Processes.Kill_Process (Process_Id (Id));
    end Exit_Process;
 
    --------------------
@@ -267,7 +269,7 @@ package body Mem.Server is
       return Rose.Capabilities.Capability
    is
    begin
-      return Mem.Processes.Get_Heap_Cap (Id);
+      return Mem.Processes.Get_Heap_Cap (Process_Id (Id));
    end Heap_Interface;
 
    -----------------
@@ -306,17 +308,18 @@ package body Mem.Server is
                        Virtual_Page_Address (Virtual);
       Physical_Page : constant Physical_Page_Address :=
                         Physical_Page_Address (Physical);
-      Process_Id    : constant Rose.Objects.Capability_Identifier :=
+      Pid    : constant Process_Id :=
                         Mem.Processes.Get_Process_Id (Object);
       Page_Object : Rose.Objects.Object_Id;
    begin
-      if not Mem.Processes.Is_Valid_Process_Id (Process_Id) then
+
+      if not Mem.Processes.Is_Valid_Process_Id (Pid) then
          Protection_Fault (Object, Virtual_Page, "invalid process id");
          return;
       end if;
 
       Mem.Processes.Get_Process_Segment
-        (Process_Id, Virtual_Page, Page_Object,
+        (Pid, Virtual_Page, Page_Object,
          Valid, Readable, Writable, Executable);
 
       if not Valid then
@@ -358,11 +361,11 @@ package body Mem.Server is
 
             if not Have_Page then
                Rose.Console_IO.Put_Line ("no page");
-               Mem.Processes.Fault_Process (Process_Id);
+               Mem.Processes.Fault_Process (Pid);
             else
 
                Mem.Processes.Initialize_Page
-                 (Process       => Process_Id,
+                 (Process       => Pid,
                   Physical_Page => Page,
                   Virtual_Page  => Virtual_Page);
 
@@ -370,33 +373,59 @@ package body Mem.Server is
                  (Process       => Object,
                   Virtual_Page  => Virtual_Page,
                   Physical_Page => Page,
-                  Readable      => True,
-                  Writable      => Action = Write,
-                  Executable    => Action = Execute);
+                  Readable      => Readable,
+                  Writable      => Writable,
+                  Executable    => Executable);
 
-
-               Mem.Processes.Resume_Process (Process_Id);
+               Mem.Processes.Resume_Process (Pid);
 
             end if;
          end;
       else
          declare
-            Mapping   : constant Mem.Virtual_Map.Virtual_Page_Mapping :=
-                          Mem.Virtual_Map.Get (Process_Id, Virtual_Page);
+            Position : constant Mem.Page_Table.Cursor :=
+              Mem.Page_Table.Find (Pid, Virtual_Page);
          begin
-            case Action is
-               when Read =>
-                  Mem.Processes.Fault_Process (Process_Id);
-               when Execute =>
-                  Mem.Processes.Fault_Process (Process_Id);
-               when Write =>
-                  if Mem.Virtual_Map.Writable (Mapping) then
-                     Mem.Processes.Fault_Process (Process_Id);
-                  else
-                     Mem.Virtual_Map.Set_Read_Write (Mapping);
-                     Mem.Processes.Resume_Process (Process_Id);
-                  end if;
-            end case;
+            if not Mem.Page_Table.Has_Element (Position) then
+               Mem.Processes.Fault_Process (Pid);
+            else
+
+               case Action is
+                  when Read =>
+                     Mem.Processes.Fault_Process (Pid);
+                  when Execute =>
+                     Mem.Processes.Fault_Process (Pid);
+                  when Write =>
+                     if Mem.Page_Table.Is_Writable (Position) then
+                        --  page was already writable
+                        Rose.Console_IO.Put_Line
+                          ("mem: second fault on writable page");
+                        Rose.Console_IO.Put (Object);
+                        Rose.Console_IO.New_Line;
+
+                        Rose.Console_IO.Put ("mem: page fault: pid=");
+                        Rose.Console_IO.Put (Natural (Pid));
+                        Rose.Console_IO.Put ("; virtual=");
+                        Rose.Console_IO.Put (Virtual);
+                        Rose.Console_IO.Put ("; physical=");
+                        Rose.Console_IO.Put (Physical);
+                        Rose.Console_IO.Put ("; action=");
+                        Rose.Console_IO.Put (case Action is
+                                                when Read    => "read",
+                                                when Write   => "write",
+                                                when Execute => "execute");
+                        Rose.Console_IO.New_Line;
+
+                        Mem.Processes.Fault_Process (Pid);
+                     else
+                        --  page should be made writable, and dirty
+                        --  flag should be set (since this is the
+                        --  first write)
+                        Mem.Page_Table.Set_Writable (Position);
+                        Mem.Processes.Resume_Process (Pid);
+                     end if;
+               end case;
+            end if;
          end;
       end if;
 
@@ -432,7 +461,8 @@ package body Mem.Server is
       Interface_Cap : Rose.Capabilities.Capability)
    is
    begin
-      Mem.Processes.Set_Published_Interface_Cap (Id, Interface_Cap);
+      Mem.Processes.Set_Published_Interface_Cap
+        (Process_Id (Id), Interface_Cap);
       Rose.Server.Unblock_Endpoint
         (Server, Rose.Interfaces.Process.Published_Interface_Endpoint);
    end Publish_Interface;
@@ -455,7 +485,7 @@ package body Mem.Server is
       end if;
 
       return Cap : constant Rose.Capabilities.Capability :=
-        Mem.Processes.Published_Interface_Cap (Id)
+        Mem.Processes.Published_Interface_Cap (Process_Id (Id))
       do
          if Cap = Rose.Capabilities.Null_Capability then
             Rose.Server.Block_Current_Request (Server);
@@ -481,7 +511,7 @@ package body Mem.Server is
       Environment : System.Storage_Elements.Storage_Array)
    is
       pragma Unreferenced (Id);
-      Process_Id : constant Rose.Objects.Capability_Identifier :=
+      Pid : constant Process_Id :=
                      Mem.Processes.Register_Process (Process);
       function A
         (Value : Rose.Words.Word)
@@ -490,7 +520,7 @@ package body Mem.Server is
 
    begin
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process       => Process_Id,
+        (Process       => Pid,
          Virtual_Base  => A (Exec_Base),
          Virtual_Bound => A (Exec_Bound),
          Readable      => True,
@@ -498,7 +528,7 @@ package body Mem.Server is
          Executable    => True,
          Resizable     => False);
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process       => Process_Id,
+        (Process       => Pid,
          Virtual_Base  => A (Text_Base),
          Virtual_Bound => A (Text_Bound),
          Readable      => True,
@@ -506,7 +536,7 @@ package body Mem.Server is
          Executable    => False,
          Resizable     => False);
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process       => Process_Id,
+        (Process       => Pid,
          Virtual_Base  => A (Data_Base),
          Virtual_Bound => A (Data_Bound),
          Readable      => True,
@@ -514,7 +544,7 @@ package body Mem.Server is
          Executable    => False,
          Resizable     => False);
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process       => Process_Id,
+        (Process       => Pid,
          Virtual_Base  => A (Data_Bound),
          Virtual_Bound => A (Data_Bound),
          Readable      => True,
@@ -522,14 +552,14 @@ package body Mem.Server is
          Executable    => False,
          Resizable     => True);
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process       => Process_Id,
+        (Process       => Pid,
          Virtual_Base  => A (Stack_Base),
          Virtual_Bound => A (Stack_Bound),
          Readable      => True,
          Writable      => True,
          Executable    => False,
          Resizable     => False);
-      Mem.Processes.Add_Environment (Process_Id, Environment);
+      Mem.Processes.Add_Environment (Pid, Environment);
    end Register_Process;
 
    ----------------------
@@ -542,7 +572,7 @@ package body Mem.Server is
    is
    begin
       Mem.Processes.Resize_Segment
-        (Process      => Id,
+        (Process      => Process_Id (Id),
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;

@@ -12,4 +12,7 @@ package Mem is
    Region_Range_Cap    : Rose.Capabilities.Capability;
    Start_Paging_Cap    : Rose.Capabilities.Capability;
 
+   type Process_Id is mod 2 ** 16;
+   Null_Process_Id : constant Process_Id := 0;
+
 end Mem;

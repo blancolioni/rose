@@ -59,7 +59,7 @@ package body Mem.Processes is
       end record;
 
    subtype Real_Process_Id is
-     Rose.Objects.Capability_Identifier range 1 .. Rose.Limits.Max_Processes;
+     Process_Id range 1 .. Rose.Limits.Max_Processes;
 
    type Memory_Process_Table is
      array (Real_Process_Id) of aliased Memory_Process_Record;
@@ -72,7 +72,7 @@ package body Mem.Processes is
    ---------------------
 
    procedure Add_Environment
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Environment   : System.Storage_Elements.Storage_Array)
    is
       use System.Storage_Elements;
@@ -155,7 +155,7 @@ package body Mem.Processes is
    -------------------------------
 
    procedure Add_Nonpersistent_Segment
-     (Process        : Rose.Objects.Capability_Identifier;
+     (Process        : Process_Id;
       Virtual_Base   : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound  : Rose.Addresses.Virtual_Page_Address;
       Readable       : Boolean;
@@ -191,7 +191,7 @@ package body Mem.Processes is
    -----------------
 
    procedure Add_Segment
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
       Region        : Rose.Interfaces.Region.Client.Region_Client;
@@ -236,7 +236,7 @@ package body Mem.Processes is
    ----------------------------
 
    procedure Allocate_Physical_Page
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       R, W, X       : Boolean := False)
    is
@@ -285,7 +285,7 @@ package body Mem.Processes is
    -------------------
 
    procedure Fault_Process
-     (Process         : Rose.Objects.Capability_Identifier)
+     (Process         : Process_Id)
    is
       use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -299,7 +299,7 @@ package body Mem.Processes is
    ------------------
 
    function Get_Heap_Cap
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Rose.Capabilities.Capability
    is
    begin
@@ -314,22 +314,49 @@ package body Mem.Processes is
      (Process : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Object_Id
    is
+      Pid : constant Process_Id := Process_Id (Process);
    begin
-      if Process not in Real_Process_Id
-        or else Process_Table (Process).State = Available
+      if Pid not in Real_Process_Id
+        or else Process_Table (Pid).State = Available
       then
          return Rose.Objects.Null_Object_Id;
       else
-         return Process_Table (Process).Oid;
+         return Process_Table (Pid).Oid;
       end if;
    end Get_Object_Id;
+
+   ------------------------
+   -- Get_Page_Object_Id --
+   ------------------------
+
+   function Get_Page_Object_Id
+     (Process         : Process_Id;
+      Virtual_Page    : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id
+   is
+      use Rose.Addresses;
+      use type Rose.Objects.Object_Id;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments loop
+         if Virtual_Page >= Segment.Base
+           and then Virtual_Page < Segment.Bound
+           and then Segment.Region_Base /= 0
+         then
+            return Segment.Region_Base
+              + Rose.Objects.Object_Id (Virtual_Page - Segment.Base);
+         end if;
+      end loop;
+
+      return 0;
+   end Get_Page_Object_Id;
 
    ----------------------------
    -- Get_Process_Heap_Bound --
    ----------------------------
 
    function Get_Process_Heap_Bound
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
      return Rose.Addresses.Virtual_Page_Address
    is
       P : Memory_Process_Record renames Process_Table (Process);
@@ -348,7 +375,7 @@ package body Mem.Processes is
 
    function Get_Process_Id
      (Process : Rose.Objects.Object_Id)
-      return Rose.Objects.Capability_Identifier
+      return Process_Id
    is
       use type Rose.Objects.Object_Id;
    begin
@@ -367,7 +394,7 @@ package body Mem.Processes is
    -------------------------
 
    procedure Get_Process_Segment
-     (Process         : Rose.Objects.Capability_Identifier;
+     (Process         : Process_Id;
       Virtual_Page    : Rose.Addresses.Virtual_Page_Address;
       Page_Object     : out Rose.Objects.Object_Id;
       Valid           : out Boolean;
@@ -400,12 +427,38 @@ package body Mem.Processes is
       Valid := False;
    end Get_Process_Segment;
 
+   -------------------------
+   -- Get_Virtual_Address --
+   -------------------------
+
+   function Get_Virtual_Address
+     (Process : Process_Id;
+      Page    : Rose.Objects.Page_Object_Id)
+      return Rose.Addresses.Virtual_Page_Address
+   is
+      use Rose.Objects;
+      use type Rose.Addresses.Virtual_Page_Address;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments loop
+         if Page >= Segment.Region_Base
+           and then Page < Segment.Region_Bound
+         then
+            return Segment.Base
+              + Rose.Addresses.Virtual_Page_Address
+              (Page - Segment.Region_Base);
+         end if;
+      end loop;
+
+      return 0;
+   end Get_Virtual_Address;
+
    ---------------------
    -- Initialize_Page --
    ---------------------
 
    procedure Initialize_Page
-     (Process       : Rose.Objects.Capability_Identifier;
+     (Process       : Process_Id;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address)
    is
@@ -458,7 +511,7 @@ package body Mem.Processes is
    -------------------------
 
    function Is_Valid_Process_Id
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Boolean
    is
    begin
@@ -470,7 +523,7 @@ package body Mem.Processes is
    -- Kill_Process --
    ------------------
 
-   procedure Kill_Process (Process : Rose.Objects.Capability_Identifier) is
+   procedure Kill_Process (Process : Process_Id) is
       use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
    begin
@@ -492,7 +545,8 @@ package body Mem.Processes is
          Endpoint_Id  =>
            Rose.Interfaces.Process.Process_Interface,
          Identifier   =>
-           Register_Process (Process_Cap));
+           Rose.Objects.Capability_Identifier
+             (Register_Process (Process_Cap)));
    end New_Process;
 
    -----------------------------
@@ -500,7 +554,7 @@ package body Mem.Processes is
    -----------------------------
 
    function Published_Interface_Cap
-     (Process : Rose.Objects.Capability_Identifier)
+     (Process : Process_Id)
       return Rose.Capabilities.Capability
    is
    begin
@@ -513,10 +567,9 @@ package body Mem.Processes is
 
    function Register_Process
      (Process_Cap : Rose.Capabilities.Capability)
-      return Rose.Objects.Capability_Identifier
+      return Process_Id
    is
-      use Rose.Objects;
-      Start  : constant Capability_Identifier := Next_Pid;
+      Start  : constant Process_Id := Next_Pid;
       Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
    begin
       while Process_Table (Next_Pid).State /= Available loop
@@ -541,7 +594,8 @@ package body Mem.Processes is
                         (Create_Cap   => Create_Endpoint_Cap,
                          Endpoint_Id  =>
                            Rose.Interfaces.Heap.Heap_Interface,
-                         Identifier   => Next_Pid);
+                         Identifier   =>
+                           Rose.Objects.Capability_Identifier (Next_Pid));
       begin
          Process_Table (Next_Pid) :=
            Memory_Process_Record'
@@ -562,7 +616,7 @@ package body Mem.Processes is
    --------------------
 
    procedure Resize_Segment
-     (Process           : Rose.Objects.Capability_Identifier;
+     (Process           : Process_Id;
       New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address)
    is
    begin
@@ -593,7 +647,7 @@ package body Mem.Processes is
    --------------------
 
    procedure Resume_Process
-     (Process         : Rose.Objects.Capability_Identifier)
+     (Process         : Process_Id)
    is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
@@ -605,7 +659,7 @@ package body Mem.Processes is
    ---------------------------------
 
    procedure Set_Published_Interface_Cap
-     (Process : Rose.Objects.Capability_Identifier;
+     (Process : Process_Id;
       Cap     : Rose.Capabilities.Capability)
    is
    begin
