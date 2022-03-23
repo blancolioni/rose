@@ -208,6 +208,18 @@ package body Mem.Page_Table is
       return Mapped_Pages (Position).Phys;
    end Physical_Address;
 
+   -------------
+   -- Process --
+   -------------
+
+   function Process
+     (Position : Cursor)
+      return Process_Id
+   is
+   begin
+      return Mapped_Pages (Position).Process;
+   end Process;
+
    --------------------------
    -- Set_Physical_Address --
    --------------------------
@@ -239,5 +251,17 @@ package body Mem.Page_Table is
          Writeable  => Page.Writable,
          Executable => Page.Executable);
    end Set_Writable;
+
+   ---------------------
+   -- Virtual_Address --
+   ---------------------
+
+   function Virtual_Address
+     (Position : Cursor)
+      return Rose.Addresses.Virtual_Page_Address
+   is
+   begin
+      return Mapped_Pages (Position).Virt;
+   end Virtual_Address;
 
 end Mem.Page_Table;

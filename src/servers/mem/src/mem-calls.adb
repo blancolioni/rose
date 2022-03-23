@@ -1,5 +1,3 @@
-with System.Storage_Elements;
-
 with Rose.Console_IO;
 with Rose.Words;
 
@@ -11,9 +9,6 @@ with Mem.Physical_Map;
 package body Mem.Calls is
 
    Log_Calls : constant Boolean := False;
-
-   Local_Page_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
-     with Alignment => 4096, Unreferenced;
 
    ---------------------
    -- Get_Page_Object --

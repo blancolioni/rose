@@ -19,4 +19,9 @@ package Mem.Virtual_Map is
    procedure Remove_All
      (Process : Rose.Objects.Capability_Identifier);
 
+   procedure With_Page
+     (Page    : Rose.Addresses.Physical_Page_Address;
+      Process : not null access
+        procedure (Address : System.Address));
+
 end Mem.Virtual_Map;

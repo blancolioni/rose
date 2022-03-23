@@ -111,19 +111,4 @@ package Mem.Processes is
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       R, W, X       : Boolean := False);
 
-   procedure Set_Dirty
-     (Process : Rose.Objects.Process_Object_Id;
-      Page    : Rose.Addresses.Virtual_Page_Address;
-      Phys    : Rose.Addresses.Physical_Page_Address);
-
-   procedure Iterate_Dirty_Page_Ids
-     (Process : not null access
-        procedure (Page : Rose.Objects.Page_Object_Id));
-
-   procedure Iterate_Dirty_Pages
-     (Process : not null access
-        procedure (Physical : Rose.Addresses.Physical_Page_Address));
-
-   procedure Clear_Dirty_Pages;
-
 end Mem.Processes;

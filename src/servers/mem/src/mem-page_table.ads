@@ -12,6 +12,14 @@ package Mem.Page_Table is
    function Is_Executable (Position : Cursor) return Boolean;
    function Is_Dirty (Position : Cursor) return Boolean;
 
+   function Process
+     (Position : Cursor)
+      return Process_Id;
+
+   function Virtual_Address
+     (Position : Cursor)
+      return Rose.Addresses.Virtual_Page_Address;
+
    function Physical_Address
      (Position : Cursor)
       return Rose.Addresses.Physical_Page_Address;
