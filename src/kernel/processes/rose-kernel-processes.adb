@@ -592,7 +592,7 @@ package body Rose.Kernel.Processes is
 
       Handle_Page_Fault
         (Virtual_Page      => Virtual_Page,
-         Is_Mapped         => not Protection_Violation,
+         Is_Mapped         => Protection_Violation,
          Read_Attempt      => not Write_Attempt and then not Execution_Attempt,
          Write_Attempt     => Write_Attempt,
          Execution_Attempt => Execution_Attempt);
