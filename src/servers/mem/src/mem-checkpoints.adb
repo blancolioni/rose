@@ -1,5 +1,4 @@
 with Rose.Addresses;
-with Rose.Console_IO;
 with Rose.Limits;
 with Rose.Words;
 
@@ -104,15 +103,8 @@ package body Mem.Checkpoints is
       Checkpoint_Header.Flags :=
         Checkpoint_Header.Flags or Is_Last_Header_Page;
       Append (Checkpoint_Header'Address);
-      Rose.Console_IO.Put ("mem: writing ");
-      Rose.Console_IO.Put (Natural (Checkpoint_Header.Count));
-      Rose.Console_IO.Put (" dirty pages");
-      Rose.Console_IO.New_Line;
-
       Mem.Page_Table.Iterate_Dirty_Pages (Write_Page'Access);
-
       Mem.Page_Table.Clear_Dirty_Pages;
-      Rose.Console_IO.Put_Line ("done");
    end Checkpoint;
 
 end Mem.Checkpoints;
