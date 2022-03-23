@@ -749,6 +749,8 @@ package body Rose.Boot.Console is
       Put_Status (Current_Process, 12);
 
       Put_Status (Page_Faults);
+      Put_Status (" ");
+      Put_Status (Dirty_Pages);
 
       Status_Chars (Status_Chars'Last - Time_Image'Length
                     .. Status_Chars'Last - 1)
