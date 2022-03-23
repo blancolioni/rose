@@ -55,3 +55,6 @@ void
 gnat_last_chance_handler(void)
 {
 }
+
+int heap_base;
+
