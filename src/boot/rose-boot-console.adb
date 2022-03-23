@@ -11,10 +11,17 @@ package body Rose.Boot.Console is
    Status_Background            : constant := 16#7000#;
    Status_Foreground            : constant := 16#0800#;
 
+   Checkpoint_Foreground        : constant := 16#0600#;
+
    Serial_Port                  : constant := 16#03F8#;
 
    Current_Colour               : constant Word_16 := 16#700#;
    Status_Chars                 : String (1 .. 80);
+   Base_Status_Chars            : constant String :=
+                                    "Rose -'-,-{@        "
+                                    & "                    "
+                                    & "                    "
+                                    & "                    ";
    Status_Colours               : array (1 .. 80) of Word_16 :=
                                     (others => 16#0700#);
    Status_Memory                : array (1 .. 80) of Word_16;
@@ -73,11 +80,13 @@ package body Rose.Boot.Console is
       end if;
 
       if On then
-         Status_Memory (14) :=
-           Status_Background + Status_Foreground + 12;
+         Status_Memory (12) :=
+           Status_Background + Checkpoint_Foreground
+             + Character'Pos ('@');
       else
-         Status_Memory (14) :=
-           Status_Background + Status_Foreground + 32;
+         Status_Memory (12) :=
+           Status_Background + 16#0400#
+             + Character'Pos ('@');
       end if;
    end Checkpoint_Status;
 
@@ -622,50 +631,95 @@ package body Rose.Boot.Console is
       Heap_Allocated  : Rose.Addresses.Physical_Bytes;
       Heap_Available  : Rose.Addresses.Physical_Bytes)
    is
-      Time_Image  : String (1 .. 8);
+
+      Last : Positive := 14;
+
       Acc         : Word_32 := Current_Ticks / 100;
-      Fault_Acc   : Natural := Page_Faults;
-      Heap        : String (1 .. 30) := (others => ' ');
-      Heap_Count  : Natural := 0;
+      Time_Image  : String (1 .. 8);
 
-      procedure Heap_Add (Text : String);
-      procedure Heap_Add (Num  : Natural);
+      procedure Put_Status (Ch : Character);
 
-      --------------
-      -- Heap_Add --
-      --------------
+      procedure Put_Status (S : String; Width : Positive := 1);
+      procedure Put_Status (X : Natural);
+      procedure Put_Status (X : Rose.Addresses.Physical_Bytes);
 
-      procedure Heap_Add (Text : String) is
+      ----------------
+      -- Put_Status --
+      ----------------
+
+      procedure Put_Status (Ch : Character) is
       begin
-         for Ch of Text loop
-            Heap_Count := Heap_Count + 1;
-            exit when Heap_Count > Heap'Last;
-            Heap (Heap_Count) := Ch;
+         if Last <= Status_Chars'Last then
+            Status_Chars (Last) := Ch;
+            Last := Last + 1;
+         end if;
+      end Put_Status;
+
+      ----------------
+      -- Put_Status --
+      ----------------
+
+      procedure Put_Status (S : String; Width : Positive := 1) is
+      begin
+         for Ch of S loop
+            Put_Status (Ch);
          end loop;
-      end Heap_Add;
 
-      --------------
-      -- Heap_Add --
-      --------------
+         for I in 1 .. Width - S'Length loop
+            Put_Status (' ');
+         end loop;
+      end Put_Status;
 
-      procedure Heap_Add (Num  : Natural) is
+      ----------------
+      -- Put_Status --
+      ----------------
+
+      procedure Put_Status (X : Natural) is
          Image : String (1 .. 10);
          Start : Natural := Image'Last + 1;
-         It    : Natural := Num;
+         It    : Natural := X;
+         Scale : Character := ' ';
       begin
-         if Num = 0 then
-            Heap_Add ("0");
-         else
-            while It /= 0 loop
-               Start := Start - 1;
-               Image (Start) := Character'Val (It mod 10 + 48);
-               It := It / 10;
-            end loop;
-            Heap_Add (Image (Start .. Image'Last));
+
+         if X = 0 then
+            Put_Status ('0');
+            return;
          end if;
-      end Heap_Add;
+
+         if It > 2 ** 26 then
+            It := It / 2 ** 20;
+            Scale := 'M';
+         elsif It > 2 ** 16 then
+            It := It / 2 ** 10;
+            Scale := 'K';
+         end if;
+
+         while It > 0 loop
+            Start := Start - 1;
+            Image (Start) := Character'Val (It mod 10 + 48);
+            It := It / 10;
+         end loop;
+
+         Put_Status (Image (Start .. Image'Last));
+         if Scale /= ' ' then
+            Put_Status (Scale);
+         end if;
+
+      end Put_Status;
+
+      ----------------
+      -- Put_Status --
+      ----------------
+
+      procedure Put_Status (X : Rose.Addresses.Physical_Bytes) is
+      begin
+         Put_Status (Natural (X));
+      end Put_Status;
 
    begin
+
+      Status_Chars := Base_Status_Chars;
+
       Time_Image (8) := Character'Val (Acc mod 10 + 48);
       Acc := Acc / 10;
       Time_Image (7) := Character'Val (Acc mod 6 + 48);
@@ -680,56 +734,29 @@ package body Rose.Boot.Console is
       Acc := Acc / 10;
       Time_Image (1) := Character'Val (Acc mod 10 + 48);
 
-      Status_Chars (72 .. 79) := Time_Image;
+      Put_Status ("kmem: ");
+      Put_Status (Natural (Heap_Allocated));
+      Put_Status ("/");
+      Put_Status (Heap_Allocated + Heap_Available);
 
-      declare
-         Name_Index : Positive := 48;
-      begin
-         for Ch of Current_Process loop
-            Name_Index := Name_Index + 1;
-            exit when Name_Index > 62;
-            Status_Chars (Name_Index) := Ch;
-         end loop;
-         while Name_Index < 62 loop
-            Name_Index := Name_Index + 1;
-            Status_Chars (Name_Index) := ' ';
-         end loop;
-      end;
+      Put_Status (" mem: ");
+      Put_Status (Mem_Allocated);
+      Put_Status ("/");
+      Put_Status (Mem_Allocated + Mem_Available);
 
-      for Index in reverse 64 .. 70 loop
-         if Fault_Acc = 0 and then Index < 70 then
-            Status_Chars (Index) := ' ';
-         else
-            Status_Chars (Index) := Character'Val (48 + Fault_Acc mod 10);
-            Fault_Acc := Fault_Acc / 10;
-         end if;
-      end loop;
+      Put_Status (" ");
+      Put_Status (Current_Process, 12);
 
-      Heap_Add ("kmem: ");
-      Heap_Add (Natural (Heap_Allocated) / 1024);
-      Heap_Add ("K");
-      Heap_Add ("/");
-      Heap_Add (Natural (Heap_Allocated + Heap_Available) / 1024);
-      Heap_Add ("K");
+      Put_Status (Page_Faults);
 
-      Heap_Add (" mem: ");
-      Heap_Add (Natural (Mem_Allocated) / 1024);
-      Heap_Add ("K");
-      Heap_Add ("/");
-      Heap_Add (Natural (Mem_Allocated + Mem_Available) / 1024 / 1024);
-      Heap_Add ("M");
-
-      Status_Chars (17 .. 16 + Heap'Length) := Heap;
+      Status_Chars (Status_Chars'Last - Time_Image'Length
+                    .. Status_Chars'Last - 1)
+        := Time_Image;
 
       for I in Status_Chars'Range loop
          Status_Memory (I) :=
            Status_Colours (I) + Character'Pos (Status_Chars (I));
       end loop;
-
-      --  if Active_Checkpoint then
-      --     Status_Memory (14) :=
-      --       Status_Background + Status_Foreground + 12;
-      --  end if;
 
    end Status_Line;
 
