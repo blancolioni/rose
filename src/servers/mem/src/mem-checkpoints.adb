@@ -90,6 +90,7 @@ package body Mem.Checkpoints is
 
       procedure Write_Page (Position : Mem.Page_Table.Cursor) is
       begin
+         Mem.Page_Table.Set_Read_Only (Position);
          Mem.Virtual_Map.With_Page
            (Mem.Page_Table.Physical_Address (Position), Append);
       end Write_Page;

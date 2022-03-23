@@ -34,6 +34,12 @@ package Mem.Page_Table is
    --  Adds the referenced page to the dirty page list.
    --  Makes the page writable
 
+   procedure Set_Read_Only (Position : Cursor);
+   --  Has_Element (Position) must be True.
+   --  Is_Writable (Position) must be True.
+   --  Is_Dirty (Position) must be True
+   --  Makes the page read only and clears dirty flag
+
    procedure Insert
      (Process    : Process_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address;
