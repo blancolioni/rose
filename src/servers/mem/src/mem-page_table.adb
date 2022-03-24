@@ -1,8 +1,8 @@
 with Rose.Console_IO;
 with Rose.Objects;
---  with Rose.Words;
 
 with Mem.Calls;
+with Mem.Physical_Map;
 with Mem.Processes;
 
 package body Mem.Page_Table is
@@ -55,6 +55,7 @@ package body Mem.Page_Table is
             Element : Mapped_Page_Record renames Mapped_Pages (I);
          begin
             if Element.Process = Process then
+               Mem.Physical_Map.Deallocate_Page (Element.Phys);
                Element.Process := 0;
                Free_Count := Free_Count + 1;
             end if;
