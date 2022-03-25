@@ -338,7 +338,8 @@ package body Mem.Server is
       Valid,
       Readable,
       Writable,
-      Executable : Boolean := False;
+      Executable,
+      Persistent : Boolean := False;
       Virtual_Page : constant Virtual_Page_Address :=
                        Virtual_Page_Address (Virtual);
       Physical_Page : constant Physical_Page_Address :=
@@ -355,7 +356,7 @@ package body Mem.Server is
 
       Mem.Processes.Get_Process_Segment
         (Pid, Virtual_Page, Page_Object,
-         Valid, Readable, Writable, Executable);
+         Valid, Readable, Writable, Executable, Persistent);
 
       if not Valid then
          Protection_Fault (Object, Virtual_Page, "invalid page reference");
@@ -410,7 +411,8 @@ package body Mem.Server is
                   Physical_Page => Page,
                   Readable      => Readable,
                   Writable      => Writable,
-                  Executable    => Executable);
+                  Executable    => Executable,
+                  Persistent    => Persistent);
 
                Mem.Processes.Resume_Process (Pid);
 

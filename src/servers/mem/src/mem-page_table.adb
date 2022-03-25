@@ -19,6 +19,7 @@ package body Mem.Page_Table is
          Readable   : Boolean;
          Writable   : Boolean;
          Executable : Boolean;
+         Persistent : Boolean;
       end record
    with Pack, Size => 64;
 
@@ -108,7 +109,8 @@ package body Mem.Page_Table is
       Mapped     : Boolean;
       Readable   : Boolean;
       Writable   : Boolean;
-      Executable : Boolean)
+      Executable : Boolean;
+      Persistent : Boolean)
    is
       Position : Cursor := 0;
    begin
@@ -142,6 +144,7 @@ package body Mem.Page_Table is
            Readable   => Readable,
            Writable   => Writable,
            Executable => Executable,
+           Persistent => Persistent,
            Dirty      => False);
 
    end Insert;
@@ -257,8 +260,11 @@ package body Mem.Page_Table is
       Page : Mapped_Page_Record renames Mapped_Pages (Position);
    begin
       Page.Writable := True;
-      Dirty_Page_Last := Dirty_Page_Last + 1;
-      Dirty_Pages (Dirty_Page_Last) := Position;
+      if Page.Persistent then
+         Dirty_Page_Last := Dirty_Page_Last + 1;
+         Dirty_Pages (Dirty_Page_Last) := Position;
+      end if;
+
       Mem.Calls.Map
         (Process    =>
            Mem.Processes.Get_Object_Id

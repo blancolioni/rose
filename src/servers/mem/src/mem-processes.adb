@@ -13,6 +13,8 @@ with Mem.Virtual_Map;
 
 package body Mem.Processes is
 
+   Log_Segments : constant Boolean := False;
+
    Environment_Base              : constant := 16#E000_0000#;
    Environment_Bound             : constant := 16#E100_0000#;
 
@@ -66,6 +68,8 @@ package body Mem.Processes is
 
    Process_Table : Memory_Process_Table;
    Next_Pid      : Real_Process_Id := 1;
+
+   procedure Report_Segment (Segment : Segment_Record);
 
    ---------------------
    -- Add_Environment --
@@ -130,7 +134,8 @@ package body Mem.Processes is
                Physical_Page => Phys_Page,
                Readable      => True,
                Writable      => True,
-               Executable    => False);
+               Executable    => False,
+               Persistent    => True);
 
             Index := Bound;
             Virt_Page := Virt_Page + 1;
@@ -184,6 +189,7 @@ package body Mem.Processes is
             Execute    => Executable,
             Extensible => Resizable,
             Persistent => False));
+
    end Add_Nonpersistent_Segment;
 
    -----------------
@@ -229,6 +235,11 @@ package body Mem.Processes is
             Execute => Executable,
             Extensible => Resizable,
             Persistent => True));
+
+      if Log_Segments then
+         Report_Segment (P.Segments (P.Num_Segments));
+      end if;
+
    end Add_Segment;
 
    ----------------------------
@@ -238,11 +249,11 @@ package body Mem.Processes is
    procedure Allocate_Physical_Page
      (Process       : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
-      R, W, X       : Boolean := False)
+      R, W, X, P    : Boolean := False)
    is
       Have_Page : Boolean;
       Page      : Rose.Addresses.Physical_Page_Address;
-      P         : Memory_Process_Record renames Process_Table (Process);
+      Rec       : Memory_Process_Record renames Process_Table (Process);
    begin
       Mem.Physical_Map.Allocate_Page
         (Page, Have_Page);
@@ -261,12 +272,13 @@ package body Mem.Processes is
             Virtual_Page  => Virtual_Page);
 
          Mem.Virtual_Map.Map
-           (Process       => P.Oid,
+           (Process       => Rec.Oid,
             Virtual_Page  => Virtual_Page,
             Physical_Page => Page,
             Readable      => R,
             Writable      => W,
-            Executable    => X);
+            Executable    => X,
+            Persistent    => P);
 
          declare
             use Rose.Words;
@@ -400,7 +412,8 @@ package body Mem.Processes is
       Valid           : out Boolean;
       Readable        : out Boolean;
       Writable        : out Boolean;
-      Executable      : out Boolean)
+      Executable      : out Boolean;
+      Persistent      : out Boolean)
    is
       use Rose.Addresses;
       use type Rose.Objects.Object_Id;
@@ -414,6 +427,7 @@ package body Mem.Processes is
             Readable := Segment.Flags (Read);
             Writable := Segment.Flags (Write);
             Executable := Segment.Flags (Execute);
+            Persistent := Segment.Flags (Mem.Processes.Persistent);
             if Segment.Region_Base /= 0 then
                Page_Object := Segment.Region_Base
                  + Rose.Objects.Object_Id (Virtual_Page - Segment.Base);
@@ -610,6 +624,55 @@ package body Mem.Processes is
 
       return Next_Pid;
    end Register_Process;
+
+   --------------------
+   -- Report_Segment --
+   --------------------
+
+   procedure Report_Segment (Segment : Segment_Record) is
+
+      use type Rose.Words.Word;
+      use type Rose.Objects.Object_Id;
+
+      procedure Put (Flag : Segment_Flag;
+                     Char : Character);
+
+      ---------
+      -- Put --
+      ---------
+
+      procedure Put (Flag : Segment_Flag;
+                     Char : Character)
+      is
+      begin
+         if Segment.Flags (Flag) then
+            Rose.Console_IO.Put (Char);
+         else
+            Rose.Console_IO.Put ('-');
+         end if;
+      end Put;
+
+      Base : constant Rose.Words.Word :=
+               Rose.Words.Word (Segment.Region_Base + Segment.Region_Offset)
+               * 4096;
+      Bound : constant Rose.Words.Word :=
+                Base + (Rose.Words.Word (Segment.Bound)
+                        - Rose.Words.Word (Segment.Base)) * 4096;
+
+   begin
+      Rose.Console_IO.Put ("mem: region ");
+      Rose.Console_IO.Put (Base);
+      Rose.Console_IO.Put (" - ");
+      Rose.Console_IO.Put (Bound);
+
+      Rose.Console_IO.Put ("; flags ");
+      Put (Read, 'r');
+      Put (Write, 'w');
+      Put (Execute, 'x');
+      Put (Extensible, 's');
+      Put (Persistent, 'p');
+      Rose.Console_IO.New_Line;
+   end Report_Segment;
 
    --------------------
    -- Resize_Segment --
