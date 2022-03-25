@@ -14,7 +14,8 @@ package Mem.Virtual_Map is
                   Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
                   Readable      : Boolean;
                   Writable      : Boolean;
-                  Executable    : Boolean);
+                  Executable    : Boolean;
+                  Persistent    : Boolean);
 
    procedure Remove_All
      (Process : Rose.Objects.Capability_Identifier);

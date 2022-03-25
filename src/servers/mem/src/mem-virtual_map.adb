@@ -21,7 +21,8 @@ package body Mem.Virtual_Map is
                   Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
                   Readable      : Boolean;
                   Writable      : Boolean;
-                  Executable    : Boolean)
+                  Executable    : Boolean;
+                  Persistent    : Boolean)
    is
       pragma Unreferenced (Writable);
    begin
@@ -39,7 +40,8 @@ package body Mem.Virtual_Map is
          Mapped     => True,
          Readable   => True,
          Writable   => False,
-         Executable => Executable);
+         Executable => Executable,
+         Persistent => Persistent);
    end Map;
 
    -------------

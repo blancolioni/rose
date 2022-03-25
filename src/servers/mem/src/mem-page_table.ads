@@ -47,7 +47,8 @@ package Mem.Page_Table is
       Mapped     : Boolean;
       Readable   : Boolean;
       Writable   : Boolean;
-      Executable : Boolean);
+      Executable : Boolean;
+      Persistent : Boolean);
 
    procedure Delete_All
      (Process : Process_Id);

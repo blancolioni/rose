@@ -42,7 +42,8 @@ package Mem.Processes is
       Valid           : out Boolean;
       Readable        : out Boolean;
       Writable        : out Boolean;
-      Executable      : out Boolean);
+      Executable      : out Boolean;
+      Persistent      : out Boolean);
 
    procedure Resume_Process
      (Process         : Process_Id);
@@ -109,6 +110,6 @@ package Mem.Processes is
    procedure Allocate_Physical_Page
      (Process       : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
-      R, W, X       : Boolean := False);
+      R, W, X, P    : Boolean := False);
 
 end Mem.Processes;
