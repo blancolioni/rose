@@ -395,8 +395,7 @@ package body Mem.Server is
             end if;
 
             if not Have_Page then
-               Rose.Console_IO.Put_Line ("no page");
-               Mem.Processes.Fault_Process (Pid);
+               Mem.Processes.Fault_Process (Pid, "out of memory");
             else
 
                Mem.Processes.Initialize_Page
@@ -422,14 +421,15 @@ package body Mem.Server is
               Mem.Page_Table.Find (Pid, Virtual_Page);
          begin
             if not Mem.Page_Table.Has_Element (Position) then
-               Mem.Processes.Fault_Process (Pid);
+               Protection_Fault (Object, Virtual_Page,
+                                 "virtual address not found");
             else
 
                case Action is
                   when Read =>
-                     Mem.Processes.Fault_Process (Pid);
+                     Mem.Processes.Fault_Process (Pid, "read not allowed");
                   when Execute =>
-                     Mem.Processes.Fault_Process (Pid);
+                     Mem.Processes.Fault_Process (Pid, "execute not allowed");
                   when Write =>
                      if Mem.Page_Table.Is_Writable (Position) then
                         --  page was already writable
@@ -451,7 +451,8 @@ package body Mem.Server is
                                                 when Execute => "execute");
                         Rose.Console_IO.New_Line;
 
-                        Mem.Processes.Fault_Process (Pid);
+                        Mem.Processes.Fault_Process
+                          (Pid, "second fault on writable page");
                      else
                         --  page should be made writable, and dirty
                         --  flag should be set (since this is the
@@ -484,7 +485,8 @@ package body Mem.Server is
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Put (Message);
       Rose.Console_IO.New_Line;
-      Mem.Processes.Fault_Process (Mem.Processes.Get_Process_Id (Process));
+      Mem.Processes.Fault_Process
+        (Mem.Processes.Get_Process_Id (Process), "protection fault");
    end Protection_Fault;
 
    -----------------------

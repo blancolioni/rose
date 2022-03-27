@@ -51,7 +51,8 @@ package Mem.Processes is
      (Process         : Process_Id);
 
    procedure Fault_Process
-     (Process         : Process_Id);
+     (Process : Process_Id;
+      Message : String);
 
    function New_Process
      (Process_Cap : Rose.Capabilities.Capability)
