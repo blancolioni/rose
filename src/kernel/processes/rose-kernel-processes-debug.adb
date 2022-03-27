@@ -56,7 +56,7 @@ package body Rose.Kernel.Processes.Debug is
       Put ("Name:   ");
       Put (Proc.Name);
       Put ("     pid ");
-      Put (Natural (Pid));
+      Put (Pid);
       New_Line;
       Put ("  gs:");
       Put (Word_8 (Proc.Stack.GS));

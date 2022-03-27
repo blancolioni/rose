@@ -317,7 +317,8 @@ package Rose.Kernel.Processes is
    function Have_Process_Handlers return Boolean;
 
    procedure Handle_Page_Fault
-     (Virtual_Page      : Rose.Addresses.Virtual_Page_Address;
+     (Pid               : Process_Id;
+      Virtual_Page      : Rose.Addresses.Virtual_Page_Address;
       Is_Mapped         : Boolean;
       Read_Attempt      : Boolean;
       Write_Attempt     : Boolean;

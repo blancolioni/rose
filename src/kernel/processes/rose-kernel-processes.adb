@@ -591,7 +591,8 @@ package body Rose.Kernel.Processes is
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
 
       Handle_Page_Fault
-        (Virtual_Page      => Virtual_Page,
+        (Pid               => Current_Process_Id,
+         Virtual_Page      => Virtual_Page,
          Is_Mapped         => Protection_Violation,
          Read_Attempt      => not Write_Attempt and then not Execution_Attempt,
          Write_Attempt     => Write_Attempt,
@@ -605,7 +606,8 @@ package body Rose.Kernel.Processes is
    -----------------------
 
    procedure Handle_Page_Fault
-     (Virtual_Page      : Rose.Addresses.Virtual_Page_Address;
+     (Pid               : Process_Id;
+      Virtual_Page      : Rose.Addresses.Virtual_Page_Address;
       Is_Mapped         : Boolean;
       Read_Attempt      : Boolean;
       Write_Attempt     : Boolean;
@@ -624,14 +626,17 @@ package body Rose.Kernel.Processes is
          --  write attempt failed because of active checkpoint.
          --  record situation and return
 
-         Debug.Put (Current_Process_Id);
+         Debug.Put (Pid);
          Rose.Boot.Console.Put (": checkpoint write blocked");
          Rose.Boot.Console.New_Line;
-         Debug.Report_Process (Current_Process_Id);
+         Rose.Boot.Console.Put ("virtual: ");
+         Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page));
+         Rose.Boot.Console.New_Line;
+         Debug.Report_Process (Pid);
 
          declare
             Proc : Kernel_Process_Entry renames
-                     Process_Table (Current_Process_Id);
+                     Process_Table (Pid);
          begin
             Proc.Flags (Checkpoint_Page_Fault) := True;
             Proc.Checkpoint_Fault := Virtual_Page;
@@ -640,12 +645,11 @@ package body Rose.Kernel.Processes is
          return;
       end if;
 
-      if Current_Process_Id = Mem_Process then
+      if Pid = Mem_Process then
          Rose.Boot.Console.Put ("virtual ");
          Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
          Rose.Boot.Console.New_Line;
-         Rose.Kernel.Processes.Debug.Report_Process
-           (Rose.Kernel.Processes.Current_Process_Id);
+         Rose.Kernel.Processes.Debug.Report_Process (Pid);
          Rose.Kernel.Panic.Panic
            ("page fault in page fault handler process");
          loop
@@ -660,14 +664,14 @@ package body Rose.Kernel.Processes is
       Params.Endpoint := 16#C6FF_984F_29F6#;
       Params.Identifier := 0;
 
-      Send_Object_Id (Params, Current_Process.Oid);
+      Send_Object_Id (Params, To_Object_Id (Pid));
       Send_Word (Params, Rose.Words.Word (Virtual_Page));
 
       if Is_Mapped then
          Send_Word (Params,
                     Rose.Words.Word
                       (Mapped_Physical_Page
-                         (Current_Process_Id, Virtual_Page)));
+                         (Pid, Virtual_Page)));
       else
          Send_Word (Params, 0);
       end if;
@@ -681,7 +685,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       Send_Cap
-        (From_Process_Id => Current_Process_Id,
+        (From_Process_Id => Pid,
          To_Process_Id   => Mem_Process,
          Sender_Cap      => 0,
          Receiver_Cap    => Mem_Page_Fault_Cap,
@@ -881,14 +885,28 @@ package body Rose.Kernel.Processes is
 
    procedure Leave_Checkpoint is
    begin
+      Active_Checkpoint := False;
       for P of Process_Table.all loop
          if P.State /= Available
            and then P.Flags (Persistent)
          then
             Enable_Write_Pages (P);
+            if P.State = Interrupted
+              and then P.Flags (Checkpoint_Page_Fault)
+            then
+               Debug.Put (To_Process_Id (P.Oid));
+               Rose.Boot.Console.Put_Line (": resuming after checkpoint");
+               P.Flags (Checkpoint_Page_Fault) := False;
+               Handle_Page_Fault
+                 (Pid               => P.Pid,
+                  Virtual_Page      => P.Checkpoint_Fault,
+                  Is_Mapped         => True,
+                  Read_Attempt      => False,
+                  Write_Attempt     => True,
+                  Execution_Attempt => False);
+            end if;
          end if;
       end loop;
-      Active_Checkpoint := False;
    end Leave_Checkpoint;
 
    --------------
@@ -1354,7 +1372,11 @@ package body Rose.Kernel.Processes is
 
       end if;
 
+      Set_Current_State (To_Process_Id, Ready);
+
       if Trace (To_Process_Id) then
+         Debug.Put (From_Process_Id);
+         Rose.Boot.Console.Put (" -> ");
          Debug.Put (To_Process_Id);
          Rose.Boot.Console.Put (": sending message");
          Rose.Boot.Console.Put (": cap=");
@@ -1362,8 +1384,6 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (To.Current_Params, True);
       end if;
-
-      Set_Current_State (To_Process_Id, Ready);
 
    end Send_Cap;
 

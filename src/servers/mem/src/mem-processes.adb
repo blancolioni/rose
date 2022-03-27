@@ -297,11 +297,13 @@ package body Mem.Processes is
    -------------------
 
    procedure Fault_Process
-     (Process         : Process_Id)
+     (Process : Process_Id;
+      Message : String)
    is
       use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
    begin
+      Rose.Console_IO.Put_Line (Message);
       Fault (P.Process);
       P.State := Faulted;
    end Fault_Process;
