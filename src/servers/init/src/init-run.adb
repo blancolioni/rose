@@ -1,3 +1,6 @@
+with System.Storage_Elements;
+
+with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
@@ -49,6 +52,10 @@ package body Init.Run is
    Cap_Set_Module    : constant := 13;
    Checkpoint_Module : constant := 14;
    Log_Module        : constant := 15;
+
+   Invoke_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size)
+     with Alignment => 4096;
 
    --------------
    -- Run_Init --
@@ -339,6 +346,10 @@ package body Init.Run is
       end Wait;
 
    begin
+
+      Rose.System_Calls.Use_Buffer
+        (Invoke_Buffer'Address, Invoke_Buffer'Last);
+
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Console_Id :=
         Init.Calls.Launch_Boot_Module
