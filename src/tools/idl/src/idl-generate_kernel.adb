@@ -2311,14 +2311,19 @@ package body IDL.Generate_Kernel is
       end if;
 
       if Recv_Buffer then
-         Block.Append
-           (Syn.Statements.New_Procedure_Call_Statement
-              ("Rose.System_Calls.Receive_Buffer",
-               Syn.Object ("Params"),
-               Syn.Object
-                 ((if Buffer_Arg = 0 then "Result"
-                  else Get_Ada_Name (Args (Buffer_Arg)))
+         if Buffer_Arg = 0 then
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Receive_Buffer",
+                  Syn.Object ("Params")));
+         else
+            Block.Append
+              (Syn.Statements.New_Procedure_Call_Statement
+                 ("Rose.System_Calls.Receive_Buffer",
+                  Syn.Object ("Params"),
+                  Syn.Object (IDL.Syntax.Get_Ada_Name (Args (Buffer_Arg))
                     & "'Length")));
+         end if;
       end if;
 
    end Initialise_Invocation;

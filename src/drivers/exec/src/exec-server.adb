@@ -29,12 +29,19 @@ package body Exec.Server is
    Context : Rose.Server.Server_Context;
    Region : Rose.Interfaces.Region.Client.Region_Client;
 
+   Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
+     with Alignment => 4096;
+
    -------------------
    -- Create_Server --
    -------------------
 
    procedure Create_Server is
    begin
+
+      Rose.System_Calls.Use_Buffer
+        (Invoke_Buffer'Address, Invoke_Buffer'Last);
+
       Rose.Interfaces.Region.Client.Open (Region, Region_Cap);
       Exec.Library.Set_Region (Region);
 

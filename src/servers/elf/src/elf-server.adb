@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Server;
@@ -21,6 +23,9 @@ package body Elf.Server is
 
    Server_Context : Rose.Server.Server_Context;
    Memory_Client  : Rose.Interfaces.Memory.Client.Memory_Client;
+
+   Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
+     with Alignment => 4096;
 
    function Launch
      (Id    : Rose.Objects.Capability_Identifier;
@@ -84,6 +89,9 @@ package body Elf.Server is
       end Next;
 
    begin
+
+      Rose.System_Calls.Use_Buffer
+        (Invoke_Buffer'Address, Invoke_Buffer'Last);
 
       Next (Delete_Endpoint_Cap);
       Next (Rescind_Endpoint_Cap);

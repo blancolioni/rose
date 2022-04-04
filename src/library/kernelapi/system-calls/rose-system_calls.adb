@@ -3,9 +3,6 @@ package body Rose.System_Calls is
    Default_32_Bit : constant Boolean :=
                       Rose.Words.Word'Size = 32;
 
-   Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
-     with Alignment => 4096;
-
    Argument_Cap_Set : constant Rose.Capabilities.Capability := 3;
 
    type Local_Cap_Type is
@@ -20,6 +17,10 @@ package body Rose.System_Calls is
                          Rescind_Cap     => 7);
 
    Get_Environment_Cap       : Rose.Capabilities.Capability := 0;
+
+   Have_Invoke_Buffer : Boolean := False;
+   Invoke_Buffer_Addr : System.Address := System.Null_Address;
+   Invoke_Buffer_Len  : System.Storage_Elements.Storage_Count := 0;
 
    procedure Send_Native_Word
      (Params : in out Rose.Invocation.Invocation_Record;
@@ -46,14 +47,24 @@ package body Rose.System_Calls is
      (Max_Bytes : System.Storage_Elements.Storage_Count;
       To        : System.Address)
    is
-      use System.Storage_Elements;
-      Last   : constant Storage_Count :=
-                 Storage_Count'Min (Max_Bytes, Local_Buffer'Length);
-      Dest   : System.Storage_Elements.Storage_Array (1 .. Last);
-      pragma Import (Ada, Dest);
-      for Dest'Address use To;
    begin
-      Dest := Local_Buffer (1 .. Last);
+      if Have_Invoke_Buffer then
+         declare
+            use System.Storage_Elements;
+            Last   : constant Storage_Count :=
+              Storage_Count'Min (Max_Bytes, Invoke_Buffer_Len);
+            Dest   : System.Storage_Elements.Storage_Array (1 .. Last);
+            pragma Import (Ada, Dest);
+            for Dest'Address use To;
+
+            Src    : System.Storage_Elements.Storage_Array
+              (1 .. Invoke_Buffer_Len);
+            pragma Import (Ada, Src);
+            for Src'Address use Invoke_Buffer_Addr;
+         begin
+            Dest := Src (1 .. Last);
+         end;
+      end if;
    end Copy_Received_Buffer;
 
    ------------------------
@@ -113,6 +124,10 @@ package body Rose.System_Calls is
       To       : out String;
       Last     : out Natural)
    is
+      Local_Buffer : System.Storage_Elements.Storage_Array
+        (1 .. Invoke_Buffer_Len);
+      pragma Import (Ada, Local_Buffer);
+      for Local_Buffer'Address use Invoke_Buffer_Addr;
    begin
       if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
          declare
@@ -134,7 +149,7 @@ package body Rose.System_Calls is
          begin
             Last := To'First - 1;
             for I in 1 .. Count loop
-               exit when Index >= Local_Buffer'Last;
+               exit when Index >= Invoke_Buffer_Len;
                exit when Last >= To'Last;
                Index := Index + 1;
                Last := Last + 1;
@@ -228,6 +243,15 @@ package body Rose.System_Calls is
          return Word_64 (Params.Data (Index));
       end if;
    end Get_Word_64;
+
+   -----------------
+   -- Have_Buffer --
+   -----------------
+
+   function Have_Buffer return Boolean is
+   begin
+      return Have_Invoke_Buffer;
+   end Have_Buffer;
 
    ------------------------
    -- Initialize_Receive --
@@ -412,17 +436,40 @@ package body Rose.System_Calls is
    --------------------
 
    procedure Receive_Buffer
-     (Params            : in out Rose.Invocation.Invocation_Record;
-      Max_Storage_Units : System.Storage_Elements.Storage_Count)
+     (Params : in out Rose.Invocation.Invocation_Record)
    is
    begin
-      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
-      Params.Control.Flags (Rose.Invocation.Writable_Buffer) := True;
-      Params.Buffer_Address := Local_Buffer'Address;
-      Params.Buffer_Length :=
-        System.Storage_Elements.Storage_Count'Min
-          (Local_Buffer'Last, Max_Storage_Units);
-      Local_Buffer := (others => 0);
+      Receive_Buffer (Params, Invoke_Buffer_Len);
+   end Receive_Buffer;
+
+   --------------------
+   -- Receive_Buffer --
+   --------------------
+
+   procedure Receive_Buffer
+     (Params     : in out Rose.Invocation.Invocation_Record;
+      Max_Length : System.Storage_Elements.Storage_Count)
+   is
+   begin
+      if Have_Invoke_Buffer then
+         Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+         Params.Control.Flags (Rose.Invocation.Writable_Buffer) := True;
+         Params.Buffer_Address := Invoke_Buffer_Addr;
+         Params.Buffer_Length :=
+           System.Storage_Elements.Storage_Count'Min
+             (Invoke_Buffer_Len, Max_Length);
+
+         declare
+            Local_Buffer : System.Storage_Elements.Storage_Array
+              (1 .. Invoke_Buffer_Len);
+            pragma Import (Ada, Local_Buffer);
+            for Local_Buffer'Address use Invoke_Buffer_Addr;
+         begin
+            Local_Buffer := (others => 0);
+         end;
+      else
+         Params.Cap := 0;
+      end if;
    end Receive_Buffer;
 
    ------------------
@@ -483,10 +530,14 @@ package body Rose.System_Calls is
       Writable : Boolean)
    is
    begin
-      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
-      Params.Control.Flags (Rose.Invocation.Writable_Buffer) := Writable;
-      Params.Buffer_Address := Buffer;
-      Params.Buffer_Length := Bytes;
+      if Have_Invoke_Buffer then
+         Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+         Params.Control.Flags (Rose.Invocation.Writable_Buffer) := Writable;
+         Params.Buffer_Address := Buffer;
+         Params.Buffer_Length := Bytes;
+      else
+         Params.Cap := 0;
+      end if;
    end Send_Buffer;
 
    --------------
@@ -578,9 +629,21 @@ package body Rose.System_Calls is
       Writable : Boolean)
    is
    begin
-      Local_Buffer := (others => 0);
-      Local_Buffer (1 .. Storage'Length) := Storage;
-      Send_Buffer (Params, Storage'Length, Local_Buffer'Address, Writable);
+      if Have_Invoke_Buffer then
+         declare
+            Local_Buffer : System.Storage_Elements.Storage_Array
+              (1 .. Invoke_Buffer_Len);
+            pragma Import (Ada, Local_Buffer);
+            for Local_Buffer'Address use Invoke_Buffer_Addr;
+         begin
+            Local_Buffer := (others => 0);
+            Local_Buffer (1 .. Storage'Length) := Storage;
+            Send_Buffer (Params, Storage'Length,
+                         Local_Buffer'Address, Writable);
+         end;
+      else
+         Params.Cap := 0;
+      end if;
    end Send_Storage_Array;
 
    -------------------------
@@ -604,22 +667,29 @@ package body Rose.System_Calls is
       Text   : String)
    is
    begin
-      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
-      Params.Buffer_Address := Local_Buffer'Address;
-      Params.Buffer_Length :=
-        System.Storage_Elements.Storage_Count (Text'Length);
+      if Have_Invoke_Buffer then
+         Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+         Params.Buffer_Address := Invoke_Buffer_Addr;
+         Params.Buffer_Length :=
+           System.Storage_Elements.Storage_Count (Text'Length);
 
-      Local_Buffer := (others => 0);
-
-      declare
-         use System.Storage_Elements;
-         Last : Storage_Count := Local_Buffer'First - 1;
-      begin
-         for Ch of Text loop
-            Last := Last + 1;
-            Local_Buffer (Last) := Character'Pos (Ch);
-         end loop;
-      end;
+         declare
+            use System.Storage_Elements;
+            Last         : Storage_Count := 0;
+            Local_Buffer : System.Storage_Elements.Storage_Array
+              (1 .. Invoke_Buffer_Len);
+            pragma Import (Ada, Local_Buffer);
+            for Local_Buffer'Address use Invoke_Buffer_Addr;
+         begin
+            Local_Buffer := (others => 0);
+            for Ch of Text loop
+               Last := Last + 1;
+               Local_Buffer (Last) := Character'Pos (Ch);
+            end loop;
+         end;
+      else
+         Params.Cap := 0;
+      end if;
    end Send_Text;
 
    ---------------
@@ -676,6 +746,23 @@ package body Rose.System_Calls is
          Send_Word (Params, Rose.Words.Word_64 (Value));
       end if;
    end Send_Word;
+
+   ----------------
+   -- Use_Buffer --
+   ----------------
+
+   procedure Use_Buffer
+     (Buffer_Address : System.Address;
+      Buffer_Size    : System.Storage_Elements.Storage_Count)
+   is
+      use type System.Address;
+      use type System.Storage_Elements.Storage_Count;
+   begin
+      Invoke_Buffer_Addr := Buffer_Address;
+      Invoke_Buffer_Len := Buffer_Size;
+      Have_Invoke_Buffer := Buffer_Address /= System.Null_Address
+        and then Buffer_Size > 0;
+   end Use_Buffer;
 
    ----------------------
    -- Use_Capabilities --

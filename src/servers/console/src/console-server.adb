@@ -17,6 +17,12 @@ package body Console.Server is
      (Id     : Rose.Objects.Capability_Identifier;
       Buffer : System.Storage_Elements.Storage_Array);
 
+   Console_Buffer_Size : constant := 4096;
+
+   Console_Buffer      : System.Storage_Elements.Storage_Array
+     (1 .. Console_Buffer_Size)
+     with Alignment => 4096;
+
    ---------------------------
    -- Create_Console_Server --
    ---------------------------
@@ -25,6 +31,9 @@ package body Console.Server is
    begin
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => 1);
+      Rose.System_Calls.Use_Buffer
+        (Console_Buffer'Address, Console_Buffer_Size);
+
       Rose.Interfaces.Stream_Writer.Server.Create_Server
         (Server_Context => Server_Context,
          Write          => Handle_Write'Access);
