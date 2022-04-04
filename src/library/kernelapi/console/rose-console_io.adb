@@ -1,10 +1,14 @@
 with Rose.Interfaces.Stream_Writer.Client;
+with Rose.System_Calls;
 
 package body Rose.Console_IO is
 
    Client : Rose.Interfaces.Stream_Writer.Client.Stream_Writer_Client;
 
    Text_Buffer   : String (1 .. 4096)
+     with Alignment => 4096;
+
+   Invoke_Buffer : String (1 .. 4096)
      with Alignment => 4096;
 
    Buffer_Length : Natural := 0;
@@ -267,6 +271,12 @@ package body Rose.Console_IO is
       for Storage_Buffer'Address use Text_Buffer'Address;
       pragma Import (Ada, Storage_Buffer);
    begin
+      if not Rose.System_Calls.Have_Buffer then
+         Rose.System_Calls.Use_Buffer
+           (Buffer_Address => Invoke_Buffer'Address,
+            Buffer_Size  => 4096);
+      end if;
+
       Rose.Interfaces.Stream_Writer.Client.Write
         (Item   => Client,
          Buffer => Storage_Buffer);

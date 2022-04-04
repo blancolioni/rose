@@ -68,8 +68,11 @@ package Rose.System_Calls is
 --        Writable : Boolean);
 
    procedure Receive_Buffer
-     (Params            : in out Rose.Invocation.Invocation_Record;
-      Max_Storage_Units : System.Storage_Elements.Storage_Count);
+     (Params : in out Rose.Invocation.Invocation_Record);
+
+   procedure Receive_Buffer
+     (Params     : in out Rose.Invocation.Invocation_Record;
+      Max_Length : System.Storage_Elements.Storage_Count);
 
    procedure Copy_Received_Buffer
      (Max_Bytes : System.Storage_Elements.Storage_Count;
@@ -166,5 +169,11 @@ package Rose.System_Calls is
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability);
+
+   procedure Use_Buffer
+     (Buffer_Address : System.Address;
+      Buffer_Size    : System.Storage_Elements.Storage_Count);
+
+   function Have_Buffer return Boolean;
 
 end Rose.System_Calls;
