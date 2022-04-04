@@ -51,6 +51,9 @@ package Init.Calls is
      (Cap     : Rose.Capabilities.Capability;
       Message : String);
 
+   procedure Send_String
+     (Message : String);
+
    function Find_In_Map
      (Find_Cap : Rose.Capabilities.Capability;
       Key      : String)
