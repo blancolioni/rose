@@ -20,7 +20,7 @@ package body Log.Server is
    subtype Block_Device_Client is
      Rose.Interfaces.Block_Device.Client.Block_Device_Client;
 
-   Max_Log_Devices : constant := 16;
+   Max_Log_Devices : constant := 4;
 
    type Log_Device_Count is range 0 .. Max_Log_Devices;
    subtype Log_Device_Index is
@@ -48,6 +48,20 @@ package body Log.Server is
    Header             : Log.Header.Log_Header_Type;
    Next_Log_Location  : Log_Location_Id;
 
+   Log_Page_Buffer_Count : constant := 16;
+   type Page_Buffer_Count is range 0 .. Log_Page_Buffer_Count;
+   subtype Page_Buffer_Index is
+     Page_Buffer_Count range 1 .. Page_Buffer_Count'Last;
+
+   subtype Log_Page is
+     System.Storage_Elements.Storage_Array (1 .. Log_Page_Size);
+
+   Page_Buffer           : array (Page_Buffer_Index) of Log_Page;
+   Page_Buffer_Last      : Page_Buffer_Count := 0;
+   Page_Buffer_Loc       : Log_Location_Id;
+
+   procedure Flush;
+
    procedure Reset
      (Id          : in     Rose.Objects.Capability_Identifier);
 
@@ -72,9 +86,10 @@ package body Log.Server is
    type Device_Operation is (Read, Write);
 
    procedure Operate
-     (Location  : Log_Location_Id;
-      Addr      : System.Address;
-      Operation : Device_Operation);
+     (Location   : Log_Location_Id;
+      Addr       : System.Address;
+      Operation  : Device_Operation;
+      Page_Count : Natural);
 
    procedure Read
      (Location : Log_Location_Id;
@@ -242,6 +257,8 @@ package body Log.Server is
          return;
       end if;
 
+      Flush;
+
       Write (Next_Log_Location, Current_Log_Header'Address);
       Next_Log_Location := Current_Log_Header.Log_Last + 1;
       Writing := False;
@@ -272,7 +289,8 @@ package body Log.Server is
       Current_Log_Header.Flags := Log.Header.Is_Active_Entry;
       Current_Log_Header.Log_First := Next_Log_Location + 1;
       Current_Log_Header.Log_Last := Next_Log_Location;
-
+      Page_Buffer_Loc := Current_Log_Header.Log_First;
+      Page_Buffer_Last := 0;
    end Create;
 
    -------------------
@@ -311,6 +329,35 @@ package body Log.Server is
 
    end Create_Server;
 
+   -----------
+   -- Flush --
+   -----------
+
+   procedure Flush is
+   begin
+      if Page_Buffer_Last > 0 then
+         --  Rose.Console_IO.Put ("log: writing ");
+         --  Rose.Console_IO.Put (Natural (Page_Buffer_Last));
+         --  Rose.Console_IO.Put (" page");
+         --  if Page_Buffer_Last /= 1 then
+         --     Rose.Console_IO.Put ("s");
+         --  end if;
+         --  Rose.Console_IO.Put (": location ");
+         --  Rose.Console_IO.Put (Natural (Page_Buffer_Loc));
+         --  Rose.Console_IO.New_Line;
+
+         Operate
+           (Location   => Page_Buffer_Loc,
+            Addr       => Page_Buffer'Address,
+            Operation  => Write,
+            Page_Count => Natural (Page_Buffer_Last));
+         Page_Buffer_Last := 0;
+
+         --  Rose.Console_IO.Put_Line ("done");
+
+      end if;
+   end Flush;
+
    ----------------------
    -- Get_Device_Index --
    ----------------------
@@ -337,9 +384,10 @@ package body Log.Server is
    -------------
 
    procedure Operate
-     (Location  : Log_Location_Id;
-      Addr      : System.Address;
-      Operation : Device_Operation)
+     (Location   : Log_Location_Id;
+      Addr       : System.Address;
+      Operation  : Device_Operation;
+      Page_Count : Natural)
    is
       Device_Index : constant Log_Device_Count :=
                        Get_Device_Index (Location);
@@ -349,12 +397,16 @@ package body Log.Server is
       end if;
 
       declare
+         use System.Storage_Elements;
+
          Device  : Log_Device_Record renames Log_Devices (Device_Index);
-         Count   : constant Natural := Device.Multiplier;
+         Count   : constant Natural := Device.Multiplier * Page_Count;
          Start   : constant Block_Address_Type :=
-                     Block_Address_Type (Location - Device.First_Location)
-                     * Block_Address_Type (Count);
-         Data    : System.Storage_Elements.Storage_Array (1 .. Log_Page_Size);
+           Block_Address_Type (Location - Device.First_Location)
+           * Block_Address_Type (Count);
+         Data_Last : constant Storage_Count :=
+           Log_Page_Size * Storage_Count (Page_Count);
+         Data    : System.Storage_Elements.Storage_Array (1 .. Data_Last);
          pragma Import (Ada, Data);
          for Data'Address use Addr;
       begin
@@ -366,11 +418,22 @@ package body Log.Server is
                   Count  => Count,
                   Blocks => Data);
             when Write =>
+               --  Rose.Console_IO.Put ("Write_Blocks: start=");
+               --  Rose.Console_IO.Put (Natural (Start));
+               --  Rose.Console_IO.Put ("; count=");
+               --  Rose.Console_IO.Put (Count);
+               --  Rose.Console_IO.Put ("; bytes=");
+               --  Rose.Console_IO.Put (Natural (Data_Last));
+               --  Rose.Console_IO.New_Line;
+
                Rose.Interfaces.Block_Device.Client.Write_Blocks
                  (Item   => Device.Client,
                   Start  => Start,
                   Count  => Count,
                   Blocks => Data);
+
+               --  Rose.Console_IO.Put_Line ("finished writing");
+
          end case;
       end;
    end Operate;
@@ -384,7 +447,7 @@ package body Log.Server is
       Addr     : System.Address)
    is
    begin
-      Operate (Location, Addr, Read);
+      Operate (Location, Addr, Read, 1);
    end Read;
 
    -----------
@@ -395,7 +458,7 @@ package body Log.Server is
      (Id          : in     Rose.Objects.Capability_Identifier)
    is
       pragma Unreferenced (Id);
-      Data   : System.Storage_Elements.Storage_Array (1 .. 4096);
+      Data   : System.Storage_Elements.Storage_Array (1 .. Log_Page_Size);
       pragma Import (Ada, Data);
       for Data'Address use Header'Address;
    begin
@@ -425,8 +488,16 @@ package body Log.Server is
      (Location : Log_Location_Id;
       Addr     : System.Address)
    is
+      Data   : Log_Page;
+      pragma Import (Ada, Data);
+      for Data'Address use Addr;
    begin
-      Operate (Location, Addr, Write);
+      if Page_Buffer_Last = Log_Page_Buffer_Count then
+         Flush;
+         Page_Buffer_Loc := Location;
+      end if;
+      Page_Buffer_Last := Page_Buffer_Last + 1;
+      Page_Buffer (Page_Buffer_Last) := Data;
    end Write;
 
 end Log.Server;
