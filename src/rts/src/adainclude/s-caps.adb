@@ -27,7 +27,8 @@ package body System.Caps is
 
    Invoke_Buffer_Length : constant := 4096;
    Invoke_Buffer        : System.Storage_Elements.Storage_Array
-     (1 .. Invoke_Buffer_Length);
+     (1 .. Invoke_Buffer_Length)
+     with Alignment => 4096;
 
    ------------------
    -- Exit_Process --
