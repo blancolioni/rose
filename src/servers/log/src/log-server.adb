@@ -16,6 +16,8 @@ with Log.Header;
 
 package body Log.Server is
 
+   use type System.Storage_Elements.Storage_Count;
+
    use Rose.Interfaces.Block_Device;
    subtype Block_Device_Client is
      Rose.Interfaces.Block_Device.Client.Block_Device_Client;
@@ -48,7 +50,7 @@ package body Log.Server is
    Header             : Log.Header.Log_Header_Type;
    Next_Log_Location  : Log_Location_Id;
 
-   Log_Page_Buffer_Count : constant := 16;
+   Log_Page_Buffer_Count : constant := 8;
    type Page_Buffer_Count is range 0 .. Log_Page_Buffer_Count;
    subtype Page_Buffer_Index is
      Page_Buffer_Count range 1 .. Page_Buffer_Count'Last;
@@ -59,6 +61,10 @@ package body Log.Server is
    Page_Buffer           : array (Page_Buffer_Index) of Log_Page;
    Page_Buffer_Last      : Page_Buffer_Count := 0;
    Page_Buffer_Loc       : Log_Location_Id;
+
+   Invoke_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. Log_Page_Buffer_Count * Log_Page_Size)
+     with Alignment => 4096;
 
    procedure Flush;
 
@@ -238,7 +244,13 @@ package body Log.Server is
       Current_Log_Header.Log_Last :=
         Current_Log_Header.Log_Last + 1;
 
-      Write (Current_Log_Header.Log_Last, Data'Address);
+      if Page_Buffer_Last = Log_Page_Buffer_Count then
+         Flush;
+         Page_Buffer_Loc := Current_Log_Header.Log_Last;
+      end if;
+
+      Page_Buffer_Last := Page_Buffer_Last + 1;
+      Page_Buffer (Page_Buffer_Last) := Data;
 
    end Append;
 
@@ -256,8 +268,6 @@ package body Log.Server is
          Rose.Console_IO.Put_Line ("log: commit: not writing");
          return;
       end if;
-
-      Flush;
 
       Write (Next_Log_Location, Current_Log_Header'Address);
       Next_Log_Location := Current_Log_Header.Log_Last + 1;
@@ -290,7 +300,7 @@ package body Log.Server is
       Current_Log_Header.Log_First := Next_Log_Location + 1;
       Current_Log_Header.Log_Last := Next_Log_Location;
       Page_Buffer_Loc := Current_Log_Header.Log_First;
-      Page_Buffer_Last := 0;
+
    end Create;
 
    -------------------
@@ -307,6 +317,10 @@ package body Log.Server is
 
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => Create_Endpoint_Cap);
+
+      Rose.System_Calls.Use_Buffer
+        (Buffer_Address => Invoke_Buffer'Address,
+         Buffer_Size    => Invoke_Buffer'Length);
 
       Console_Cap := Get_Cap (1);
       Start_Log_Cap := Get_Cap (2);
@@ -326,6 +340,12 @@ package body Log.Server is
       Rose.Interfaces.State.Server.Attach_Interface
         (Server_Context => Log_Server,
          Reset          => Reset'Access);
+
+      for Page of Page_Buffer loop
+         for Element of Page loop
+            Element := 0;
+         end loop;
+      end loop;
 
    end Create_Server;
 
@@ -488,16 +508,8 @@ package body Log.Server is
      (Location : Log_Location_Id;
       Addr     : System.Address)
    is
-      Data   : Log_Page;
-      pragma Import (Ada, Data);
-      for Data'Address use Addr;
    begin
-      if Page_Buffer_Last = Log_Page_Buffer_Count then
-         Flush;
-         Page_Buffer_Loc := Location;
-      end if;
-      Page_Buffer_Last := Page_Buffer_Last + 1;
-      Page_Buffer (Page_Buffer_Last) := Data;
+      Operate (Location, Addr, Write, 1);
    end Write;
 
 end Log.Server;
