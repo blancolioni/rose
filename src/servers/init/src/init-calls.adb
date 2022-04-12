@@ -8,6 +8,8 @@ package body Init.Calls is
    Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
+   Console_Cap : Rose.Capabilities.Capability := 0;
+
    ----------
    -- Call --
    ----------
@@ -485,6 +487,17 @@ package body Init.Calls is
    -----------------
 
    procedure Send_String
+     (Message : String)
+   is
+   begin
+      Send_String (Console_Cap, Message);
+   end Send_String;
+
+   -----------------
+   -- Send_String --
+   -----------------
+
+   procedure Send_String
      (Cap     : Rose.Capabilities.Capability;
       Message : String)
    is
@@ -492,6 +505,7 @@ package body Init.Calls is
       use Rose.Invocation;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+      Console_Cap := Cap;
       Params.Cap := Cap;
       Params.Control.Flags := (Send             => True,
                                Send_Buffer      => True,

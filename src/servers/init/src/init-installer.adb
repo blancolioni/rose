@@ -34,24 +34,33 @@ package body Init.Installer is
    ---------------
 
    procedure Copy_Caps
-     (From       : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
-      To         : in out Rose.Invocation.Invocation_Record;
-      Create_Cap : Rose.Capabilities.Capability)
+     (From        : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      To          : in out Rose.Invocation.Invocation_Record;
+      Create_Cap  : Rose.Capabilities.Capability)
    is
       use Rose.Interfaces.Stream_Reader.Client;
       use System.Storage_Elements;
       Last        : Storage_Count;
-      Storage     : Storage_Array (1 .. 16);
-      Layout      : Init.Calls.Array_Of_Words (1 .. 4);
+      Storage     : Storage_Array (1 .. 256);
+      Layout      : Init.Calls.Array_Of_Words (1 .. 64);
       pragma Import (Ada, Layout);
       for Layout'Address use Storage'Address;
    begin
       loop
          Read (From, Storage, Last);
          exit when Has_Error or else Last < 16;
-         Rose.System_Calls.Send_Cap
-           (To,
-            Init.Calls.Call (Create_Cap, Layout));
+         for I in 1 .. Natural (Last) / 16 loop
+            declare
+               Start : constant Positive := (I - 1) * 4 + 1;
+               Finish : constant Positive := Start + 3;
+               Defn   : constant Init.Calls.Array_Of_Words (1 .. 4) :=
+                 Layout (Start .. Finish);
+            begin
+               Rose.System_Calls.Send_Cap
+                 (To,
+                  Init.Calls.Call (Create_Cap, Defn));
+            end;
+         end loop;
       end loop;
    end Copy_Caps;
 
@@ -220,13 +229,8 @@ package body Init.Installer is
    is
       pragma Unreferenced (Binary_Length);
       use Rose.Interfaces.Stream_Reader.Client;
-      use System.Storage_Elements;
-      Client      : Stream_Reader_Client;
-      Storage     : Storage_Array (1 .. 16);
-      Layout      : Init.Calls.Array_Of_Words (1 .. 4);
-      pragma Import (Ada, Layout);
-      for Layout'Address use Storage'Address;
-      Params      : aliased Rose.Invocation.Invocation_Record;
+      Client : Stream_Reader_Client;
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Install_Cap);
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
