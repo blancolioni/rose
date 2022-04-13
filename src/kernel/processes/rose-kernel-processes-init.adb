@@ -183,7 +183,6 @@ package body Rose.Kernel.Processes.Init is
                   else
                      if Have_Process_Handlers
                        and then Enable_Paging
-                       and then False
                      then
                         --  we can page
                         Heap_Addr :=
@@ -245,7 +244,6 @@ package body Rose.Kernel.Processes.Init is
                   if not Writable
                     or else not Have_Process_Handlers
                     or else not Enable_Paging
-                    or else True
                   then
                      Prealloc := Memory_Size;
                   else
