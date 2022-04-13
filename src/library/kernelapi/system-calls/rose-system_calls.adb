@@ -530,14 +530,10 @@ package body Rose.System_Calls is
       Writable : Boolean)
    is
    begin
-      if Have_Invoke_Buffer then
-         Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
-         Params.Control.Flags (Rose.Invocation.Writable_Buffer) := Writable;
-         Params.Buffer_Address := Buffer;
-         Params.Buffer_Length := Bytes;
-      else
-         Params.Cap := 0;
-      end if;
+      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+      Params.Control.Flags (Rose.Invocation.Writable_Buffer) := Writable;
+      Params.Buffer_Address := Buffer;
+      Params.Buffer_Length := Bytes;
    end Send_Buffer;
 
    --------------
