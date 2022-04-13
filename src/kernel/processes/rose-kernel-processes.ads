@@ -443,7 +443,7 @@ private
          Pid  : Process_Id;
       end record;
 
-   Max_Shared_Pages : constant := 4;
+   Max_Shared_Pages : constant := 8;
    type Shared_Page_Count is range 0 .. Max_Shared_Pages;
    subtype Shared_Page_Index is
      Shared_Page_Count range 1 .. Shared_Page_Count'Last;

@@ -395,28 +395,6 @@ package body Init.Run is
       end;
 
       declare
-         use Rose.Interfaces.Kernel_Log;
-         Log_Id   : constant Rose.Objects.Object_Id :=
-                      Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, Log_Module, Log_Priority,
-                         Create_Endpoint_Cap, Cap_Set_Cap,
-                         (Console_Interface_Cap, Start_Log_Cap));
-         Copy_Cap : constant Rose.Capabilities.Capability :=
-                      Init.Calls.Call
-                        (Create_Cap,
-                         (9, 1,
-                          Word (Log_Id mod 2 ** 32),
-                          Word (Log_Id / 2 ** 32)));
-      begin
-         Add_Log_Device_Cap :=
-           Copy_Cap_From_Process
-             (Copy_Cap, Add_Log_Device_Endpoint);
-         Append_To_Log_Cap :=
-           Copy_Cap_From_Process
-             (Copy_Cap, Append_Endpoint);
-      end;
-
-      declare
          Mem_Id : constant Rose.Objects.Object_Id :=
                     Init.Calls.Launch_Boot_Module
                       (Boot_Cap, Mem_Module, Memory_Priority,
@@ -727,6 +705,28 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_IsoFS_Cap,
               Rose.Interfaces.File_System.Root_Directory_Endpoint);
+      end;
+
+      declare
+         use Rose.Interfaces.Kernel_Log;
+         Log_Id   : constant Rose.Objects.Object_Id :=
+           Init.Calls.Launch_Boot_Module
+             (Boot_Cap, Log_Module, Log_Priority,
+              Create_Endpoint_Cap, Cap_Set_Cap,
+              (Console_Interface_Cap, Start_Log_Cap));
+         Copy_Cap : constant Rose.Capabilities.Capability :=
+           Init.Calls.Call
+             (Create_Cap,
+              (9, 1,
+               Word (Log_Id mod 2 ** 32),
+               Word (Log_Id / 2 ** 32)));
+      begin
+         Add_Log_Device_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Add_Log_Device_Endpoint);
+         Append_To_Log_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Append_Endpoint);
       end;
 
       declare
