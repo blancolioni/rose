@@ -30,6 +30,10 @@ package body Partition.Server is
    Device_Client      : Client.Block_Device_Client;
    Partition_Server   : Rose.Server.Server_Context;
 
+   Invocation_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. 65536)
+     with Alignment => 4096;
+
    function To_Word_32
      (X : String)
       return Rose.Words.Word_32;
@@ -61,10 +65,20 @@ package body Partition.Server is
       is (Rose.System_Calls.Client.Get_Capability
           (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
 
+      Preload : Natural;
+      pragma Import (Ada, Preload);
+      for Preload'Address use System'To_Address (16#F000#);
+
    begin
+      Preload := 0;
 
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => Create_Endpoint_Cap);
+      Rose.System_Calls.Use_Buffer
+        (Invocation_Buffer'Address, Invocation_Buffer'Length);
+      for Element of Invocation_Buffer loop
+         Element := 0;
+      end loop;
 
       Console_Cap := Get_Cap (1);
       Block_Device_Cap := Get_Cap (2);
