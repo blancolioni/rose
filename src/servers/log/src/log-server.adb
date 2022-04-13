@@ -478,7 +478,7 @@ package body Log.Server is
      (Id          : in     Rose.Objects.Capability_Identifier)
    is
       pragma Unreferenced (Id);
-      Data   : System.Storage_Elements.Storage_Array (1 .. Log_Page_Size);
+      Data   : System.Storage_Elements.Storage_Array (1 .. 4096);
       pragma Import (Ada, Data);
       for Data'Address use Header'Address;
    begin
