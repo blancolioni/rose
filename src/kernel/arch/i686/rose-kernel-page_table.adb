@@ -594,9 +594,8 @@ package body Rose.Kernel.Page_Table is
       Table_Page      : Page_Table_Array;
       for Table_Page'Address use System'To_Address (Addr);
       pragma Import (Ada, Table_Page);
-      Table_Entry     : Page_Entry renames Table_Page (Table_Index);
    begin
-      Table_Entry := (others => <>);
+      Table_Page (Table_Index) := (others => <>);
    end Unmap_Page;
 
 end Rose.Kernel.Page_Table;
