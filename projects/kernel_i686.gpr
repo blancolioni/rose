@@ -1,7 +1,7 @@
 project Kernel_I686 is
 
-   for Source_Dirs use ("../src", "../src/base", "../src/kernel", "../src/devices", "../src/boot", "../src/asm/i686", "../src/arch/i686", "../src/kernel/capabilities","../src/kernel/checkpoint", "../src/kernel/processes", "../src/kernel/modules", 
-      "../src/kernel/arch/i686", "../src/library/capabilities", "../src/formats");
+   for Source_Dirs use ("../src", "../src/base", "../src/kernel", "../src/devices", "../src/boot", "../src/asm/i686", "../src/arch/i686", "../src/kernel/capabilities", "../src/kernel/checkpoint", "../src/kernel/processes", 
+      "../src/kernel/modules", "../src/kernel/arch/i686", "../src/library/capabilities", "../src/formats");
    for Object_Dir use "../build/i686/kernel/obj";
 
    package Builder is
@@ -10,7 +10,7 @@ project Kernel_I686 is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatw.f.h.wael", "-gnatyABM79OSabcdefhiklnoprstux", "-g", "-gnatp", "-gnat12", "-fno-strict-aliasing", "-m32", "-O3", "-gnat2020");
+      for Default_Switches ("ada") use ("-g", "-gnatp", "-fno-strict-aliasing", "-m32", "-O3", "-gnat2020", "-gnatVa", "-gnatw.f.h.welc.cfkm.mop.pq.tuv.vwx.xy.a.bg", "-gnatyABM79OSabcdefhiklnoprstux");
    end Compiler;
 
    package Binder is
