@@ -41,8 +41,6 @@
 --  you can remove the calls to Abort_Defer.all and Abort_Undefer.all from
 --  this unit.
 
-pragma Compiler_Unit_Warning;
-
 with System.CRTL;
 with System.Parameters;
 with System.Soft_Links;
