@@ -1272,14 +1272,13 @@ package body Rose.Kernel.Processes is
       Error  : Rose.Invocation.Invocation_Error;
       Data   : Rose.Words.Word := 0)
    is
-      Control : Rose.Invocation.Control_Word renames Params.Control;
    begin
-      Control.Flags :=
+      Params.Control.Flags :=
         (Rose.Invocation.Error      => True,
          Rose.Invocation.Reply      => True,
          Rose.Invocation.Send_Words => True,
          others                     => False);
-      Control.Last_Sent_Word := 0;
+      Params.Control.Last_Sent_Word := 0;
       Current_Process.Current_Params.Data (0) := Data;
       Current_Process.Current_Params.Error := Error;
       Current_Process.Flags (Invoke_Reply) := True;

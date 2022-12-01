@@ -817,7 +817,6 @@ package body IsoFS.Directories is
 
          declare
             Inserted : Boolean;
-            pragma Unreferenced (Inserted);
          begin
             Sector_Cache.Insert
               (Key       => Key,

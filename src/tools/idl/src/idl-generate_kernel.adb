@@ -2370,6 +2370,7 @@ package body IDL.Generate_Kernel is
          Is_Return : Boolean)
       is
          pragma Unreferenced (Is_Return);
+
       begin
          if IDL.Types.Is_Interface (Ref) then
             declare
@@ -2390,7 +2391,9 @@ package body IDL.Generate_Kernel is
                Pkg_Name : constant String :=
                             IDL.Types.Get_Ada_Package (Ref);
             begin
-               if Pkg_Name /= ""  then
+               if Pkg_Name /= ""
+                 and then not Pkg.Has_Parent_Named (Pkg_Name)
+               then
                   Pkg.With_Package (Pkg_Name);
                end if;
             end;

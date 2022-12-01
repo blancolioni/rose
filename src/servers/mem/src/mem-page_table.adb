@@ -246,10 +246,9 @@ package body Mem.Page_Table is
    -------------------
 
    procedure Set_Read_Only (Position : Cursor) is
-      Page : Mapped_Page_Record renames Mapped_Pages (Position);
    begin
-      Page.Writable := False;
-      Page.Dirty := False;
+      Mapped_Pages (Position).Writable := False;
+      Mapped_Pages (Position).Dirty := False;
    end Set_Read_Only;
 
    ------------------
