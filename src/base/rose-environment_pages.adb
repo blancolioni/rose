@@ -226,7 +226,7 @@ package body Rose.Environment_Pages is
       Name     : String;
       Value    : String)
    is
-      Inserted : Boolean with Unreferenced;
+      Inserted : Boolean;
    begin
       Insert_Environment_Value (Page, Name, Value, Inserted);
    end Set_Environment_Value;
