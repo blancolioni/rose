@@ -46,6 +46,47 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       Last     : out System.Storage_Elements.Storage_Offset;
       Complete : out Boolean);
 
+   procedure Decode_Name
+     (From : Rose.Invocation.Invocation_Access;
+      Name : out String;
+      Last : out Natural);
+
+   -----------------
+   -- Decode_Name --
+   -----------------
+
+   procedure Decode_Name
+     (From : Rose.Invocation.Invocation_Access;
+      Name : out String;
+      Last : out Natural)
+   is
+   begin
+      Last := 0;
+      if not From.Control.Flags (Rose.Invocation.Send_Words) then
+         return;
+      end if;
+      for Sent_Word_Index in 0 .. From.Control.Last_Sent_Word loop
+         declare
+            use type Rose.Words.Word;
+            Word : Rose.Words.Word :=
+                     From.Data (Sent_Word_Index);
+         begin
+            for I in 1 .. 4 loop
+               declare
+                  Ascii : constant Rose.Words.Word := Word mod 256;
+               begin
+                  if Ascii /= 0 then
+                     Last := Last + 1;
+                     Name (Last) := Character'Val (Ascii);
+                  end if;
+               end;
+               Word := Word / 256;
+               exit when Word = 0;
+            end loop;
+         end;
+      end loop;
+   end Decode_Name;
+
    ------------
    -- Handle --
    ------------
@@ -123,63 +164,79 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
          when Create_Process_Endpoint =>
             declare
-               use Rose.Kernel.Processes;
-               Pid : constant Process_Id := New_Process;
+               use type Rose.Invocation.Parameter_Word_Index;
+               Max_Name_Length : constant Natural :=
+                                   (if Params.Control.Flags
+                                      (Rose.Invocation.Send_Words)
+                                    then Natural
+                                      (Params.Control.Last_Sent_Word + 1) * 4
+                                    else 0);
+               Name : String (1 .. Max_Name_Length);
+               Name_Last : Natural := 0;
             begin
-               if Pid = Null_Process_Id then
-                  Rose.Boot.Console.Put_Line ("kernel: out of processes");
-                  Return_Error (Params,
-                                Rose.Invocation.Invalid_Operation,
-                                0);
-                  Rose.Kernel.Processes.Set_Current_State
-                    (Rose.Kernel.Processes.Current_Process_Id,
-                     Rose.Kernel.Processes.Ready);
-                  return;
+               if Max_Name_Length > 0 then
+                  Decode_Name (Params, Name, Name_Last);
                end if;
 
-               Rose.Boot.Console.Put ("kernel: create process ");
-               Rose.Kernel.Processes.Debug.Put (Pid);
-               Rose.Boot.Console.New_Line;
+               declare
+                  use Rose.Kernel.Processes;
+                  Pid : constant Process_Id :=
+                            New_Process (Name (1 .. Name_Last));
+               begin
+                  if Pid = Null_Process_Id then
+                     Rose.Boot.Console.Put_Line ("kernel: out of processes");
+                     Return_Error (Params,
+                                   Rose.Invocation.Invalid_Operation,
+                                   0);
+                     Rose.Kernel.Processes.Set_Current_State
+                       (Rose.Kernel.Processes.Current_Process_Id,
+                        Rose.Kernel.Processes.Ready);
+                     return;
+                  end if;
 
-               if Params.Control.Flags (Rose.Invocation.Send_Caps) then
-                  for Index in 0 .. Params.Control.Last_Sent_Cap loop
-                     Copy_Cap (Current_Process_Id, Pid,
-                               Params.Caps (Index));
-                  end loop;
-               end if;
+                  Rose.Boot.Console.Put ("kernel: create process ");
+                  Rose.Kernel.Processes.Debug.Put (Pid);
 
-               Params.all :=
-                 (Control =>
-                    (Flags =>
-                         (Rose.Invocation.Reply => True,
-                          others                => False),
-                     others         => <>),
-                  others  => <>);
+                  if Params.Control.Flags (Rose.Invocation.Send_Caps) then
+                     for Index in 0 .. Params.Control.Last_Sent_Cap loop
+                        Copy_Cap (Current_Process_Id, Pid,
+                                  Params.Caps (Index));
+                     end loop;
+                  end if;
 
-               Rose.Invocation.Send_Cap
-                 (Params => Params.all,
-                  Cap    =>
-                    New_Cap
-                      (Current_Process_Id,
-                       Process_Interface_Cap (Pid)));
-               Rose.Invocation.Send_Cap
-                 (Params => Params.all,
-                  Cap    =>
-                    New_Cap
-                      (Current_Process_Id,
-                       Start_Process_Cap (Pid)));
-               Rose.Invocation.Send_Cap
-                 (Params => Params.all,
-                  Cap    =>
-                    New_Cap
-                      (Current_Process_Id,
-                       Initial_Cap (Pid)));
+                  Params.all :=
+                    (Control =>
+                       (Flags          =>
+                            (Rose.Invocation.Reply => True,
+                             others                => False),
+                        others         => <>),
+                     others  => <>);
 
+                  Rose.Invocation.Send_Cap
+                    (Params => Params.all,
+                     Cap    =>
+                       New_Cap
+                         (Current_Process_Id,
+                          Process_Interface_Cap (Pid)));
+                  Rose.Invocation.Send_Cap
+                    (Params => Params.all,
+                     Cap    =>
+                       New_Cap
+                         (Current_Process_Id,
+                          Start_Process_Cap (Pid)));
+                  Rose.Invocation.Send_Cap
+                    (Params => Params.all,
+                     Cap    =>
+                       New_Cap
+                         (Current_Process_Id,
+                          Initial_Cap (Pid)));
+
+               end;
+
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
             end;
-
-            Rose.Kernel.Processes.Set_Current_State
-              (Rose.Kernel.Processes.Current_Process_Id,
-               Rose.Kernel.Processes.Ready);
 
          when Add_Heap_Memory =>
             Rose.Kernel.Heap.Increase_Heap_Bound

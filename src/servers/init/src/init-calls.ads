@@ -85,7 +85,8 @@ package Init.Calls is
 
    function Launch
      (Launch_Cap  : Rose.Capabilities.Capability;
-      Cap_Set     : Rose.Capabilities.Capability)
+      Cap_Set     : Rose.Capabilities.Capability;
+      Name        : String)
       return Rose.Objects.Object_Id;
 
    procedure Get_Interface

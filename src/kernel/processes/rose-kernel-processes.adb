@@ -42,7 +42,8 @@ package body Rose.Kernel.Processes is
       Writable     : Boolean);
 
    procedure Create_Process_Table_Entry
-     (Pid : Rose.Kernel.Processes.Process_Id);
+     (Pid : Rose.Kernel.Processes.Process_Id;
+      Name : String);
 
    procedure Disable_Write_Pages
      (Process : in out Kernel_Process_Entry);
@@ -211,7 +212,8 @@ package body Rose.Kernel.Processes is
    --------------------------------
 
    procedure Create_Process_Table_Entry
-     (Pid : Rose.Kernel.Processes.Process_Id)
+     (Pid : Rose.Kernel.Processes.Process_Id;
+      Name : String)
    is
       use Rose.Kernel.Page_Table;
       Proc : Kernel_Process_Entry renames Process_Table (Pid);
@@ -222,10 +224,19 @@ package body Rose.Kernel.Processes is
                                           (System_Call_Entry'Address)));
       Directory_VP            : Virtual_Page_Address;
       Physical_Directory_Page : Physical_Page_Address;
+      Proc_Name               : Process_Name := (others => ' ');
    begin
 
       Proc.Oid := Rose.Objects.Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
+
+      if Name'Length <= Proc_Name'Length then
+         Proc_Name (1 .. Name'Length) := Name;
+      else
+         Proc_Name := Name (Name'First .. Name'First + Proc_Name'Length - 1);
+      end if;
+
+      Proc.Name := Proc_Name;
 
       Proc.State := Starting;
       Proc.Quantum_Ticks := 10;
@@ -1111,6 +1122,7 @@ package body Rose.Kernel.Processes is
    -----------------
 
    function New_Process
+     (Name : String)
      return Process_Id
    is
       Pid               : Process_Id := Next_Pid;
@@ -1120,7 +1132,7 @@ package body Rose.Kernel.Processes is
          Pid := Pid + 1;
       end loop;
 
-      Create_Process_Table_Entry (Pid);
+      Create_Process_Table_Entry (Pid, Name);
 
       Next_Pid := Pid + 1;
       return Pid;
@@ -1671,6 +1683,7 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Interrupts.Set_Handler
         (Interrupt => Rose.Arch.Interrupts.Page_Fault,
          Handler   => Handle_Page_Fault'Access);
+
    end Set_Process_Handlers;
 
    ---------------------
@@ -1740,6 +1753,15 @@ package body Rose.Kernel.Processes is
         (Page => Virtual_Page,
          Pid  => From_Process);
 
+      Map_Page
+        (Pid           => To_Process,
+         Virtual_Page  => Virtual_Page,
+         Physical_Page => Physical_Page,
+         Readable      => True,
+         Writable      => Writable,
+         Executable    => False,
+         User          => True);
+
       if Log_Shared_Buffers
         or else (Process_Table (From_Process).Flags (Trace)
                  and then Process_Table (To_Process).Flags (Trace))
@@ -1757,15 +1779,6 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
          Rose.Boot.Console.New_Line;
       end if;
-
-      Map_Page
-        (Pid           => To_Process,
-         Virtual_Page  => Virtual_Page,
-         Physical_Page => Physical_Page,
-         Readable      => True,
-         Writable      => Writable,
-         Executable    => False,
-         User          => True);
 
    end Share_Page;
 

@@ -17,6 +17,7 @@ package body Exec.Server is
    function On_Install
      (Id        : Rose.Objects.Capability_Identifier;
       ELF_Image : Rose.Capabilities.Capability;
+      Name      : String;
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
@@ -58,6 +59,7 @@ package body Exec.Server is
    function On_Install
      (Id        : Rose.Objects.Capability_Identifier;
       ELF_Image : Rose.Capabilities.Capability;
+      Name      : String;
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
@@ -66,7 +68,7 @@ package body Exec.Server is
       Reader : Stream_Reader_Client;
    begin
       Open (Reader, ELF_Image);
-      return Exec.Library.Install (Reader, Caps);
+      return Exec.Library.Install (Reader, Name, Caps);
    end On_Install;
 
    ---------------

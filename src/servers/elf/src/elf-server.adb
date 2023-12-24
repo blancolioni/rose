@@ -29,13 +29,15 @@ package body Elf.Server is
 
    function Launch
      (Id    : Rose.Objects.Capability_Identifier;
+      Name  : String;
       Image : Rose.Capabilities.Capability;
       Store : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
    procedure Create_Process
-     (Process     : out Rose.Capabilities.Capability;
+     (Name        : String;
+      Process     : out Rose.Capabilities.Capability;
       Start_Cap   : out Rose.Capabilities.Capability;
       Initial_Cap : out Rose.Capabilities.Capability);
 
@@ -43,18 +45,25 @@ package body Elf.Server is
      (Cap   : Rose.Capabilities.Capability;
       Start : Rose.Words.Word);
 
+   procedure Encode_Name
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Name   : String);
+
    --------------------
    -- Create_Process --
    --------------------
 
    procedure Create_Process
-     (Process     : out Rose.Capabilities.Capability;
+     (Name        : String;
+      Process     : out Rose.Capabilities.Capability;
       Start_Cap   : out Rose.Capabilities.Capability;
       Initial_Cap : out Rose.Capabilities.Capability)
    is
       Params : aliased Rose.Invocation.Invocation_Record;
+
    begin
       Rose.System_Calls.Initialize_Send (Params, Create_Process_Cap);
+      Encode_Name (Params, Name);
       Rose.System_Calls.Invoke_Capability (Params);
       if not Params.Control.Flags (Rose.Invocation.Error) then
          Process := Params.Caps (0);
@@ -113,12 +122,51 @@ package body Elf.Server is
       Rose.Interfaces.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
 
+   -----------------
+   -- Encode_Name --
+   -----------------
+
+   procedure Encode_Name
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Name   : String)
+   is
+      use type Rose.Invocation.Parameter_Word_Index;
+      use type Rose.Words.Word;
+      Have_Words : constant Boolean := Name'Length > 0;
+      W          : Rose.Words.Word_32 := 0;
+      Shift      : Natural := 0;
+   begin
+      Params.Control.Flags (Rose.Invocation.Send_Words) := Have_Words;
+      if Have_Words then
+         Params.Control.Last_Sent_Word := 0;
+         for Ch of Name loop
+            W := W + Character'Pos (Ch) * 2 ** Shift;
+            Shift := Shift + 8;
+            if Shift = 32 then
+               Shift := 0;
+               Params.Data (Params.Control.Last_Sent_Word) := W;
+               Params.Control.Last_Sent_Word :=
+                 Params.Control.Last_Sent_Word + 1;
+               W := 0;
+            end if;
+         end loop;
+
+         if Shift = 0 then
+            Params.Control.Last_Sent_Word :=
+              Params.Control.Last_Sent_Word - 1;
+         else
+            Params.Data (Params.Control.Last_Sent_Word) := W;
+         end if;
+      end if;
+   end Encode_Name;
+
    ------------
    -- Launch --
    ------------
 
    function Launch
      (Id    : Rose.Objects.Capability_Identifier;
+      Name  : String;
       Image : Rose.Capabilities.Capability;
       Store : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
@@ -138,7 +186,7 @@ package body Elf.Server is
       Start          : Rose.Words.Word;
       Success        : Boolean;
    begin
-      Create_Process (Kernel_Process, Start_Cap, Initial_Cap);
+      Create_Process (Name, Kernel_Process, Start_Cap, Initial_Cap);
       Rose.Interfaces.Kernel_Process.Client.Open
         (Kernel_Client, Kernel_Process);
       Process_Client :=
@@ -150,23 +198,11 @@ package body Elf.Server is
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
          Rose.System_Calls.Initialize_Send (Params, Initial_Cap);
-         --  Rose.System_Calls.Send_Cap (Params,
-         --                          Get_Exit_Process_Cap (Process_Client));
-         --  Rose.System_Calls.Send_Cap (Params,
-         --                          Get_Heap_Interface_Cap (Process_Client));
          Rose.System_Calls.Send_Cap
            (Params,
             Get_Interface_Cap (Process_Client));
          Rose.System_Calls.Invoke_Capability (Params);
       end;
-
-      --  Rose.Console_IO.Put ("sending ");
-      --  Rose.Console_IO.Put (Natural (Caps'Length));
-      --  Rose.Console_IO.Put (" initial cap");
-      --  if Caps'Length /= 1 then
-         --  Rose.Console_IO.Put ("s");
-      --  end if;
-      --  Rose.Console_IO.New_Line;
 
       if Caps'Length > 0 then
          declare
