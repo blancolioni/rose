@@ -25,21 +25,30 @@ package body Rose.Kernel.Capabilities.Processes is
             declare
                use Rose.Capabilities, Rose.Capabilities.Layout;
                use Rose.Invocation;
-               Caps : Rose.Capabilities.Capability_Array (1 .. 5);
+               Caps : Rose.Capabilities.Capability_Array (1 .. 6);
             begin
                Rose.Kernel.Processes.Create_Caps (Current_Pid, Caps);
 
                declare
-                  Destroy_Cap       : constant Capability := Caps (1);
-                  Get_Object_Id_Cap : constant Capability := Caps (2);
-                  Resume_Cap        : constant Capability := Caps (3);
-                  Fault_Cap         : constant Capability := Caps (4);
-                  Notify_Cap        : constant Capability := Caps (5);
+                  Get_Name_Cap      : constant Capability := Caps (1);
+                  Destroy_Cap       : constant Capability := Caps (2);
+                  Get_Object_Id_Cap : constant Capability := Caps (3);
+                  Resume_Cap        : constant Capability := Caps (4);
+                  Fault_Cap         : constant Capability := Caps (5);
+                  Notify_Cap        : constant Capability := Caps (6);
                begin
-                  if Destroy_Cap = Null_Capability then
+                  if Get_Name_Cap = Null_Capability then
                      Rose.Kernel.Processes.Return_Error
                        (Params, Out_Of_Capabilities);
                   else
+                     Rose.Kernel.Processes.Set_Cap
+                       (Current_Pid, Get_Name_Cap,
+                        Capability_Layout'
+                          (Header  =>
+                               (Cap_Type => Process_Cap,
+                                Endpoint => Get_Name_Endpoint,
+                                others   => <>),
+                           Payload => Cap.Payload));
                      Rose.Kernel.Processes.Set_Cap
                        (Current_Pid, Destroy_Cap,
                         Capability_Layout'

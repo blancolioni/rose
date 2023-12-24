@@ -13,7 +13,8 @@ package body Init.Installer is
 
    Exec_Region_Length : constant := 8 * 2 ** 20;
 
-   Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
+   Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size)
+     with Alignment => 4096;
 
    function Reserve_Storage
      (Storage_Cap : Rose.Capabilities.Capability;
@@ -28,6 +29,32 @@ package body Init.Installer is
      (From       : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
       To         : in out Rose.Invocation.Invocation_Record;
       Create_Cap : Rose.Capabilities.Capability);
+
+   procedure Add_Text
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String);
+
+   --------------
+   -- Add_Text --
+   --------------
+
+   procedure Add_Text
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String)
+   is
+      use System.Storage_Elements;
+      Last : Storage_Offset := Buffer'First - 1;
+   begin
+      Buffer := (others => 0);
+      for Ch of Text loop
+         Last := Last + 1;
+         Buffer (Last) := Character'Pos (Ch);
+      end loop;
+
+      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+      Params.Buffer_Address := Buffer'Address;
+      Params.Buffer_Length := Last;
+   end Add_Text;
 
    ---------------
    -- Copy_Caps --
@@ -129,6 +156,7 @@ package body Init.Installer is
 
       Open (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
+      Add_Text (Params, "command");
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Region));
       Rose.System_Calls.Send_Cap
@@ -169,6 +197,7 @@ package body Init.Installer is
       Binary_Length   : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
+      --  use Rose.Words;
       use Rose.Interfaces.Region.Client;
       use Rose.Interfaces.Stream_Reader.Client;
       Region : constant Region_Client :=
@@ -189,6 +218,9 @@ package body Init.Installer is
 
       Open (Cap_Reader, Cap_Stream);
       Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
+
+      Add_Text (Params, "exec");
+
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Region));
       Rose.System_Calls.Send_Cap
@@ -224,6 +256,7 @@ package body Init.Installer is
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word;
+      Name          : String;
       Extra_Caps    : Init.Calls.Array_Of_Capabilities)
       return Rose.Capabilities.Capability
    is
@@ -241,6 +274,8 @@ package body Init.Installer is
       for Cap of Extra_Caps loop
          Rose.System_Calls.Send_Cap (Params, Cap);
       end loop;
+
+      Add_Text (Params, Name);
 
       Rose.System_Calls.Invoke_Capability (Params);
 

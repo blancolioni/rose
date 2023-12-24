@@ -32,6 +32,7 @@ package Init.Installer is
       Cap_Stream    : Rose.Capabilities.Capability;
       Binary_Stream : Rose.Capabilities.Capability;
       Binary_Length : Rose.Words.Word;
+      Name          : String;
       Extra_Caps    : Init.Calls.Array_Of_Capabilities)
       return Rose.Capabilities.Capability;
 

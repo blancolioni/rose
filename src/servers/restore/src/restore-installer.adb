@@ -1,3 +1,6 @@
+with System.Storage_Elements;
+
+with Rose.Limits;
 with Rose.Words;
 
 with Rose.Console_IO;
@@ -30,6 +33,10 @@ package body Restore.Installer is
                               Rose.Capabilities.Null_Capability;
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+
+   Invoke_Buffer : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size)
+     with Alignment => 4096;
 
    --  procedure Install_From_Directory
    --    (Directory_Entry : Rose.Directories.Directory_Entry_Type);
@@ -267,14 +274,23 @@ package body Restore.Installer is
       Rose.Directories.Open (Caps_Reader, Cap_Path (1 .. Cap_Path_Last));
       Rose.Directories.Open (Binary_Reader, Exec_Path (1 .. Exec_Path_Last));
 
-      Rose.Console_IO.Put ("installing: ");
-      Rose.Console_IO.Put (Exec_Path (1 .. Exec_Path_Last));
+      Rose.Console_IO.Put ("restore: installing: ");
+      Rose.Console_IO.Put (Name);
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Flush;
 
       declare
+         use System.Storage_Elements;
          Params : aliased Rose.Invocation.Invocation_Record;
+         Last   : Storage_Count := 0;
       begin
+
+         Invoke_Buffer := (others => 0);
+         for Ch of Name loop
+            Last := Last + 1;
+            Invoke_Buffer (Last) := Character'Pos (Ch);
+         end loop;
+
          Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
          Rose.System_Calls.Send_Cap
            (Params, Get_Interface_Cap (Caps_Reader));
@@ -287,6 +303,9 @@ package body Restore.Installer is
            (Params, Rose.Words.Word'(Install_Action'Pos (Action)));
          Rose.System_Calls.Send_Word
            (Params, Rose.Words.Word (Flag_Word));
+
+         Rose.System_Calls.Send_Buffer
+           (Params, Last, Invoke_Buffer'Address, False);
 
          if Flags (Requires_Keyboard_Interface) then
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
@@ -307,6 +326,7 @@ package body Restore.Installer is
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
                         Rose.System_Calls.Receive_Caps (Reply, 1);
+                        Rose.System_Calls.Send_Text (Reply, Name);
                         Rose.System_Calls.Invoke_Capability (Reply);
 
                         if Flags (Provides_Keyboard_Interface) then

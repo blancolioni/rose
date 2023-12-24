@@ -7,6 +7,7 @@ package Rose.Kernel.Capabilities.Processes is
    Start_Process_Endpoint     : constant Rose.Objects.Endpoint_Index := 5;
    Initial_Cap_Endpoint       : constant Rose.Objects.Endpoint_Index := 6;
    Kill_Process_Endpoint      : constant Rose.Objects.Endpoint_Index := 7;
+   Get_Name_Endpoint          : constant Rose.Objects.Endpoint_Index := 8;
 
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;

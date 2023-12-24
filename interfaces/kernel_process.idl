@@ -1,4 +1,4 @@
-interface Kernel_Process : Cap is
+interface Kernel_Process : Named, Cap is
 
    procedure Resume;
    procedure Fault;

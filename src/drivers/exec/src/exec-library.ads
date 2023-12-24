@@ -11,6 +11,7 @@ package Exec.Library is
 
    function Install
      (ELF_Image  : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      Name       : String;
       Caps       : Rose.Capabilities.Capability_Array)
      return Rose.Capabilities.Capability;
 

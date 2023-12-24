@@ -765,6 +765,7 @@ package body Init.Run is
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
             Rose.System_Calls.Receive_Caps (Params, 3);
             Rose.System_Calls.Receive_Words (Params, 3);
+            Rose.System_Calls.Receive_Buffer (Params, 4096);
             Rose.System_Calls.Invoke_Capability (Params);
             exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
 
@@ -855,15 +856,31 @@ package body Init.Run is
                     := (if Params.Caps (2)
                         = Null_Capability
                         then 0 else 1);
-                  Launch : constant Rose.Capabilities.Capability :=
-                             Init.Installer.Install_Executable
-                               (Create_Cap    => Create_Cap,
-                                Install_Cap   => Install_Cap,
-                                Cap_Stream    => Params.Caps (0),
-                                Binary_Stream => Params.Caps (1),
-                                Binary_Length => Params.Data (0),
-                                Extra_Caps    => Extra_Caps (1 .. Last_Cap));
+                  Name       : String (1 .. 64);
+                  Name_Last  : Natural := 0;
+                  Launch     : Capability;
+                  Buffer     : System.Storage_Elements.Storage_Array
+                    (1 .. 4096);
+                  pragma Import (Ada, Buffer);
+                  for Buffer'Address use Params.Buffer_Address;
                begin
+
+                  for I in 1 .. Params.Buffer_Length loop
+                     Name_Last := Name_Last + 1;
+                     Name (Name_Last) :=
+                       Character'Val (Buffer (I));
+                  end loop;
+
+                  Launch :=
+                    Init.Installer.Install_Executable
+                      (Create_Cap    => Create_Cap,
+                       Install_Cap   => Install_Cap,
+                       Cap_Stream    => Params.Caps (0),
+                       Binary_Stream => Params.Caps (1),
+                       Binary_Length => Params.Data (0),
+                       Name          => Name (1 .. Name_Last),
+                       Extra_Caps    => Extra_Caps (1 .. Last_Cap));
+
                   Wait (1000);
                   if Params.Data (1) = 0 then
                      Rose.System_Calls.Send_Cap (Reply, Launch);
@@ -956,7 +973,7 @@ package body Init.Run is
                "launching tests" & NL);
             Tests_Object :=
               Init.Calls.Launch
-                (Launch_Tests_Cap, Standard_Caps);
+                (Launch_Tests_Cap, Standard_Caps, "tests");
          end if;
       end;
 
@@ -1010,7 +1027,7 @@ package body Init.Run is
                "launching petal" & NL);
             Petal_Object :=
               Init.Calls.Launch
-                (Launch_Petal_Cap, Standard_Caps);
+                (Launch_Petal_Cap, Standard_Caps, "petal");
          end if;
       end;
 

@@ -1,7 +1,8 @@
 interface Executable is
 
    function Launch
-     (Image : interface Region;
+     (Name  : String;
+      Image : interface Region;
       Store : interface Storage;
       Caps  : Capability_Array)
      return interface Process;

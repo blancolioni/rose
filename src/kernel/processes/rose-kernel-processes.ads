@@ -31,6 +31,7 @@ package Rose.Kernel.Processes is
       return Rose.Objects.Object_Id;
 
    function New_Process
+     (Name : String)
      return Process_Id;
 
    procedure Start_Process

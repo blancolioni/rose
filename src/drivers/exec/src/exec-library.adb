@@ -9,11 +9,15 @@ package body Exec.Library is
 
    Max_Installed_Programs : constant := 100;
    Max_Start_Caps         : constant := 16;
+   Max_Name_Length        : constant := 16;
+
+   subtype Installed_Program_Name is String (1 .. Max_Name_Length);
 
    type Installed_Program_Record is
       record
          Installed : Boolean := False;
          Caps      : Rose.Capabilities.Capability_Array (1 .. Max_Start_Caps);
+         Name      : Installed_Program_Name;
          ELF_Base  : Rose.Objects.Page_Object_Id;
          ELF_Bound : Rose.Objects.Page_Object_Id;
       end record;
@@ -54,8 +58,9 @@ package body Exec.Library is
    -------------
 
    function Install
-     (ELF_Image    : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
-      Caps         : Rose.Capabilities.Capability_Array)
+     (ELF_Image : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      Name      : String;
+      Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       use type Rose.Objects.Capability_Identifier;
@@ -79,6 +84,15 @@ package body Exec.Library is
          Install.Installed := True;
          Install.Caps := (others => 0);
          Install.Caps (1 .. Caps'Length) := Caps;
+
+         Install.Name := (others => ' ');
+
+         if Name'Length <= Max_Name_Length then
+            Install.Name (1 .. Name'Length) := Name;
+         else
+            Install.Name :=
+              Name (Name'First .. Name'First + Max_Name_Length - 1);
+         end if;
 
          Install.ELF_Base := Next_Page;
 
