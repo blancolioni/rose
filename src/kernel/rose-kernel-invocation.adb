@@ -1,5 +1,3 @@
-with Ada.Unchecked_Conversion;
-
 with Rose.Words;
 with Rose.Boot.Console;
 
@@ -69,7 +67,7 @@ package body Rose.Kernel.Invocation is
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (Params.all, True);
          Rose.Kernel.Panic.Panic ("bad cap");
-         Return_Error (Params, Rose.Invocation.Invalid_Capability);
+         --  Return_Error (Params, Rose.Invocation.Invalid_Capability);
       else
          Get_Cap (Pid, Params.Cap, Cap);
          if Log then

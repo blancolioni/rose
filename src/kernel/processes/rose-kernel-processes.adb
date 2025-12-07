@@ -663,9 +663,6 @@ package body Rose.Kernel.Processes is
          Rose.Kernel.Processes.Debug.Report_Process (Pid);
          Rose.Kernel.Panic.Panic
            ("page fault in page fault handler process");
-         loop
-            null;
-         end loop;
       end if;
 
       Params.Control.Flags := (Send => True,

@@ -37,13 +37,13 @@ $(BOOT_MODULES): %:
 
 $(DRIVERS): %:
 	(cd src/drivers/$@; make)
-	(cd images/iso/rose/install/drivers; configure-driver ../../../../../src/drivers/$@/$@.driver)
+	(cd images/iso/rose/install/drivers; configure-driver $@ ../../../../../src/drivers/$@/$@.driver)
 
 $(UTILITIES): %:
 	mkdir -p images/iso/rose/install/bin/
 	(cd src/utilities/$@; make)
 	(cp src/utilities/$@/build/bin/$@-driver images/iso/rose/install/bin/$@)
-	(cd images/iso/rose/install/bin; configure-driver ../../../../../src/utilities/$@/$@.caps)
+	(cd images/iso/rose/install/bin; configure-driver $@ ../../../../../src/utilities/$@/$@.caps)
 
 exports:
 	sh ./scripts/export-elf-trace

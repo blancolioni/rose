@@ -1,8 +1,0 @@
-project_name = Configure
-source_dir = src
-depend = { project = WLib version = any }
-depend = { project = tropos version = any }
-main_unit = configure-driver.adb
-exec_name = configure-driver
-config_dir = config
-path_unit = { unit = Configure.Paths path = src/configure-paths.ads }

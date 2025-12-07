@@ -43,7 +43,7 @@ package body Console.IO is
 
    procedure Clear is
    begin
-      Console_Memory := (others => 16#0720#);
+      Console_Memory := (others => 16#720#);
       Current_Line := 0;
       Current_Column := 0;
       Update_Cursor;

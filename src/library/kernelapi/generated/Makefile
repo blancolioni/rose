@@ -12,6 +12,6 @@ clean:
 	rm -f *.ad[bs]
 
 rose-interfaces-%.ads: ../../../../interfaces/%.idl
-	idl $< $(INTERFACES)
+	idle $< $(INTERFACES)
 
 $(IDL): %: rose-interfaces-%.ads

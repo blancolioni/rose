@@ -19,3 +19,6 @@ doc/rose-book/*.idx
 doc/rose-book/*.lof
 doc/rose-book/*.pdf
 *~
+make.log
+qemu-port-1.txt
+rose-hd0.img

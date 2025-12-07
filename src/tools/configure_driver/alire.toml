@@ -1,0 +1,15 @@
+name = "configure_driver"
+description = "Configures initial capabilities for a driver program"
+version = "0.1.0-dev"
+
+authors = ["Fraser Wilson"]
+maintainers = ["Fraser Wilson <fraser@thewhitelion.eu>"]
+maintainers-logins = ["blancolioni"]
+licenses = "GPL-3.0-or-later"
+website = ""
+tags = ["rose", "driver", "os"]
+
+executables = ["configure-driver"]
+
+[[depends-on]]
+wl_lib = "~0.1.4"
