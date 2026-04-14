@@ -88,8 +88,11 @@ kernel_stack_top:
 .macro save_process_context displacement
     cld
     save_registers
+    mov     current_process_ptr, %edi    # destination: process Stack_Frame
+    mov     %esp, %esi                   # source: kernel stack (registers + CPU frame)
+    movl    $15, %ecx                    # 15 dwords = 60 bytes
+    rep movsd
     restore_kernel_state
-#    push $(continue)
 .endm
 
 .macro hwint_master irq
