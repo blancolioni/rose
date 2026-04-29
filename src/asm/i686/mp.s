@@ -88,8 +88,15 @@ kernel_stack_top:
 .macro save_process_context displacement
     cld
     save_registers
-    restore_kernel_state
-#    push $(continue)
+    testl   $3, Process_CS(%esp)         # CPL of saved CS: 0 = ring-0 (kernel), 3 = ring-3 (user)
+    jz      1f                            # ring-0 interrupt: skip process structure update
+
+    mov     current_process_ptr, %edi    # destination: process Stack_Frame
+    mov     %esp, %esi                   # source: kernel stack (registers + CPU frame)
+    movl    $15, %ecx                    # 15 dwords = 60 bytes
+	rep movsd
+1:
+	restore_kernel_state
 .endm
 
 .macro hwint_master irq
