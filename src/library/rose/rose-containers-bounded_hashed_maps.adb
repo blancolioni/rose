@@ -1,5 +1,9 @@
 package body Rose.Containers.Bounded_Hashed_Maps is
 
+   function Find_Bucket
+     (Index : Count_Type)
+      return Hash_Type;
+   --  Return the bucket which refers to Container.Elements (Index)
 
    --------------
    -- Contains --
@@ -20,17 +24,41 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    procedure Delete
      (Position  : in out Cursor)
    is
-      H : Hash_Type := Hash (Key (Position));
-      N : Hash_Type := (H + 1) mod Modulus;
+      Index : constant Count_Type := Count_Type (Position);
+      Last  : constant Count_Type := Container.Length;
+      Hole  : Hash_Type := Find_Bucket (Index);
+      N     : Hash_Type := (Hole + 1) mod Modulus;
    begin
+
+      --  backward shift: an entry following the hole can fill it
+      --  unless its home bucket lies cyclically in (Hole, N]
+
       while Container.Buckets (N) /= 0 loop
-         if Hash (Container.Elements (Container.Buckets (N)).Key) <= H then
-            Container.Buckets (H) := Container.Buckets (N);
-            H := N;
-         end if;
+         declare
+            Home : constant Hash_Type :=
+                     Hash (Container.Elements (Container.Buckets (N)).Key)
+                     mod Modulus;
+         begin
+            if (N + Modulus - Home) mod Modulus
+              >= (N + Modulus - Hole) mod Modulus
+            then
+               Container.Buckets (Hole) := Container.Buckets (N);
+               Hole := N;
+            end if;
+         end;
          N := (N + 1) mod Modulus;
       end loop;
-      Container.Buckets (H) := 0;
+      Container.Buckets (Hole) := 0;
+
+      --  move the last element into the freed slot
+
+      if Index /= Last then
+         Container.Buckets (Find_Bucket (Last)) := Index;
+         Container.Elements (Index) := Container.Elements (Last);
+      end if;
+
+      Container.Length := Last - 1;
+      Position := No_Element;
    end Delete;
 
    -------------
@@ -76,6 +104,22 @@ package body Rose.Containers.Bounded_Hashed_Maps is
       end loop;
       return Cursor (Container.Buckets (H));
    end Find;
+
+   -----------------
+   -- Find_Bucket --
+   -----------------
+
+   function Find_Bucket
+     (Index : Count_Type)
+      return Hash_Type
+   is
+      H : Hash_Type := Hash (Container.Elements (Index).Key) mod Modulus;
+   begin
+      while Container.Buckets (H) /= Index loop
+         H := (H + 1) mod Modulus;
+      end loop;
+      return H;
+   end Find_Bucket;
 
    -----------------
    -- Has_Element --

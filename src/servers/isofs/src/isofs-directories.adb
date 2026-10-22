@@ -45,9 +45,9 @@ package body IsoFS.Directories is
    package Sector_Cache_Queues is
      new Rose.Containers.Queues
        (Rose.Words.Word_32,
-        Sector_Cache.Cursor,
+        Rose.Words.Word_32,
         Rose.Words."<",
-        Sector_Cache."=");
+        Rose.Words."=");
 
    Sector_Queue : Sector_Cache_Queues.Queue (100);
    Next_Tick    : Word_32 := 0;
@@ -875,7 +875,7 @@ package body IsoFS.Directories is
          if Sector_Cache.Is_Full then
             declare
                Oldest : Sector_Cache.Cursor :=
-                          First_Element (Sector_Queue);
+                          Sector_Cache.Find (First_Element (Sector_Queue));
             begin
                Sector_Cache.Delete (Oldest);
                Delete_First (Sector_Queue);
@@ -906,7 +906,7 @@ package body IsoFS.Directories is
 
       end if;
 
-      Insert (Sector_Queue, Next_Tick, Position);
+      Insert (Sector_Queue, Next_Tick, Key);
 
    end Read_Sector;
 
