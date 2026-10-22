@@ -52,9 +52,15 @@ package body Rose.Containers.Queues is
             if I < Container.Length then
                Container.Vector (I) :=
                  Container.Vector (Container.Length);
+               Container.Length := Container.Length - 1;
+
+               --  the moved element may belong above or below I
+
+               Sift_Up (Container, 1, I);
+               Sift_Down (Container, I);
+            else
+               Container.Length := Container.Length - 1;
             end if;
-            Container.Length := Container.Length - 1;
-            Sift_Down (Container, I);
             return;
          end if;
       end loop;
@@ -126,7 +132,7 @@ package body Rose.Containers.Queues is
                    Element : Element_Type))
    is
    begin
-      for Item of Container.Vector loop
+      for Item of Container.Vector (1 .. Container.Length) loop
          Process (Item.Key, Item.Element);
       end loop;
    end Iterate;
@@ -202,7 +208,7 @@ package body Rose.Containers.Queues is
          declare
             P : constant Count_Type := Parent (Child);
          begin
-            if Key (Container, P) < Key (Container, Child) then
+            if Key (Container, Child) < Key (Container, P) then
                Swap_Elements (Container, P, Child);
                Child := P;
             else
