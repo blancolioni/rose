@@ -1,0 +1,105 @@
+# Bit layouts for the capabilities chapter, drawn by scripts/bitlayout.py.
+#
+# Each row is one 32-bit word.  Fields are listed from the lowest bit
+# up; the diagram puts bit 31 on the left.  Constant values must be
+# quoted, or YAML reads them as numbers.
+#
+# These are transcribed from the bytefield figures in capabilities.tex
+# as they stand, including their S/R/W/X order and type codes, which
+# have not yet been checked against the code.
+
+word: 32
+
+# Rows shared by several diagrams, reused through YAML anchors.
+rows:
+  access-header: &access-header
+    - [4, Type]
+    - [1, X]
+    - [1, W]
+    - [1, R]
+    - [1, S]
+    - [24, Rescinded Count]
+  ident: &ident
+    - [16, Endpoint]
+    - [16, Identifier]
+
+diagrams:
+  capability:
+    title: Generic capability layout
+    rows:
+      - *access-header
+      - *ident
+      - {words: 2, name: Payload}
+
+  endpoint-cap:
+    title: Endpoint capability layout
+    rows:
+      - *access-header
+      - *ident
+      - {words: 2, name: Object Id}
+
+  page-object-cap:
+    title: Page object capability layout
+    rows:
+      - - [4, "0100", const]
+        - [1, W]
+        - [1, R]
+        - [1, "0", const]
+        - [1, I]
+        - [24, Rescinded Count]
+      - *ident
+      - {words: 2, name: Page Object Id}
+
+  process-cap:
+    title: Process capability layout
+    rows:
+      - - [4, "0100", const]
+        - [2, Op]
+        - [2, "0", const]
+        - [24, Rescinded Count]
+      - *ident
+      - {words: 2, name: Process Object Id}
+
+  boot-cap:
+    title: Boot capability layout
+    rows:
+      - - [4, "1000", const]
+        - [4, "0", const]
+        - [24, Rescinded Count]
+      - - [32, "0", const]
+      - - [32, "0", const]
+      - - [32, "0", const]
+
+  port-io-cap:
+    title: Port IO capability layout (i686)
+    rows:
+      - - [4, "1110", const]
+        - [4, "0", const]
+        - [24, Rescinded Count]
+      - - [16, Endpoint]
+        - [16, Identifier (log₂ size)]
+      - - [32, First Port]
+      - - [32, Last Port]
+
+  invocation-record:
+    title: Invocation record
+    rows:
+      - - [1, C]
+        - [1, B]
+        - [1, Y]
+        - [1, R]
+        - [1, S]
+        - [1, E]
+        - [1, P]
+        - [1, W]
+        - [4, SWC]
+        - [4, RWC]
+        - [4, CC]
+        - [4, Use]
+        - [8, reserved]
+      - {words: 1, name: Capability}
+      - {words: 1, name: Reply Capability}
+      - {words: 1, name: Shared buffer length}
+      - {words: 1, name: Shared buffer address}
+      - {words: 5, name: Up to 15 capabilities}
+      - {words: 5, name: Up to 15 argument words}
