@@ -113,11 +113,9 @@ These partitions are formatted identically.  Each block in the partition corresp
 
 \subsection{Change Partition}
 
-The change partition is divided into a header block, a range of change file blocks, and a range of changed page object blocks.
+The change partition contains a rolling log of changes.  A system image contains a reference to the first checkpoint in the change partition.  Restoring the image involves loading the system image, then applying each checkpoint in turn.
 
-The change partition is cleared after a checkpoint merge.
-
-\subsubsection{Header Block}
+\subsubsection{Checkpoint Header Block}
 
 \begin{table}[ht]
 \begin{tabular}{l l}
@@ -125,20 +123,19 @@ The change partition is cleared after a checkpoint merge.
 Offset &  Description \\
 \hline
 {\tt 0000} & Magic number \\
-{\tt 0004} & Reserved \\
+{\tt 0004} & Flags \\
 {\tt 0008} & Checkpoint Identity \\
 {\tt 0010} & Checkpoint Start Timestamp \\
 {\tt 0018} & Checkpoint Finish Timestamp \\
-{\tt 0020} & First checkpoint block \\
-{\tt 0028} & Checkpoint block count \\
-{\tt 0030} & Working Checkpoint Identity \\
-{\tt 0038} & Working Checkpoint Start \\
-{\tt 0040} & Working checkpoint first block \\
-{\tt 0048} & Next free checkpoint block \\
-{\tt 0050} & Next free page block \\
+{\tt 0020} & Number of pages in this checkpoint \\
+{\tt 0024} & Reserved \\
+{\tt 0030} & Reserved \\
+{\tt 0040} & Page Id 1 \\
+{\tt 0048} & Page Id 2 \\
+{\tt ....} & Page Ids \\
 \hline
 \end{tabular}
-\caption{Change Partition Header}
+\caption{Checkpoint header}
 \label{table:change-partition-header}
 \end{table}
 

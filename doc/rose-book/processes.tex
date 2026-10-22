@@ -69,3 +69,30 @@ A launch capability for the {\tt cat} program is found in the shell's environmen
 
 The environment is supplied as a table of entries starting at a known address.
 
+\section{Segments}
+
+A process consists of several segments; generally code, text, data, stack, and heap.  The code and text segments have statically allocated continguous regions, and are shared amongst all processes which use the same image.  The data and stack segments use separate contiguous regions for each process.  The heap segment uses a dynamic non-contiguous region.
+
+\begin{table}[ht]
+\begin{tabular}{l l l l}
+\hline\hline
+Name & Flags & static & Contiguous \\
+\hline
+Code & R X & Static & Contiguous \\
+Text & R & Static & Contiguous \\
+Data & R W & Dynamic & Contiguous \\
+Stack & R W & Dynamic & Contiguous \\
+Heap & R W E & Dynamic & Non-contiguous \\
+\hline
+\end{tabular}
+\caption{Standard process segments}
+\label{table:standard-process-segments}
+\end{table}
+
+\subsection{Contiguous Regions}
+
+For segments whose size does not change over time, a contiguous region is allocated.
+
+\subsection{The Heap Segment}
+
+The mapping between heap addresses and the underlying region is similar to the page mapping of virtual memory.  The top level directory points to 512 pages, each of which contains 512 object ids, which are first object ids of a region range.  The number of objects in the range is defined at system initialisation.  A small system might use 1 region object, which leads to a total addressable heap page count of $2^{18}$, 262 144, or a gigabyte if 4K pages are used.  If the range is 4K, 4 terabytes are available to each process.

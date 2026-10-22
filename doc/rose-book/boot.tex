@@ -44,6 +44,8 @@ The kernel provides a single timeout, so there is a timer server which multiplex
 
 The standard memory manager is launched with a memory capability, which can be queried for the available physical memory layout, and invoked to map and unmap virtual addresses to physical ones.  It implements the {\tt memory manager} interface, which can add and remove processes, and handle page faults.
 
+Before {\tt mem} starts, process stack is limited to 4K.
+
 \subsection{pci}
 
 Scans the PCI bus.
