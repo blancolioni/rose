@@ -24,7 +24,9 @@ the layout GNAT actually gives the named Ada records:
         "0100": Rose.Capabilities.Layout.Endpoint_Cap
 
 Each 'values' entry says that the constant field with that label holds
-the representation of the given enumeration literal.
+the representation of the given enumeration literal.  A {words: n}
+field matches a component that starts with it and fits inside it, so
+a 31-bit count can be drawn as a whole word.
 
 Usage: bitlayout.py -o OUTDIR [--check -I DIR... --ada-arg=ARG...]
                     FILE.yaml...
@@ -161,18 +163,20 @@ def render(name, title, word, rows):
 
 
 def field_positions(word, rows):
-    """Map each label to the (first bit, size) of every field with it."""
+    """Map each label to the (first bit, size, whole words) of every
+    field with it."""
     positions = {}
     base = 0
     for row in rows:
         if row[0] == "fields":
             for lo, hi, label, _ in row[1]:
                 positions.setdefault(label, []).append(
-                    (base + lo, hi - lo + 1))
+                    (base + lo, hi - lo + 1, False))
             base += word
         else:
             _, words, label = row
-            positions.setdefault(label, []).append((base, words * word))
+            positions.setdefault(label, []).append(
+                (base, words * word, True))
             base += words * word
     return positions
 
@@ -277,8 +281,8 @@ def check_layouts(path, word, checks, args):
                     continue
                 first, size = components[component.lower()]
                 first += offset
-                if found[0] != (first, size):
-                    lo, bits = found[0]
+                lo, bits, whole = found[0]
+                if lo != first or (size > bits if whole else size != bits):
                     errors.append(
                         f"{name}: '{label}' is bits {lo}..{lo + bits - 1}"
                         f", but {component} is bits"
