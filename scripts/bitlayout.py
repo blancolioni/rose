@@ -11,13 +11,32 @@ Bit numbers are drawn above the first row, at each field boundary,
 with the highest bit on the left.  One SVG is written per diagram,
 named after its key.
 
-Usage: bitlayout.py -o OUTDIR FILE.yaml...
+With --check, diagrams that have a 'check' section are compared with
+the layout GNAT actually gives the named Ada records:
+
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          offset: 0            # bit offset in the diagram, default 0
+          fields:
+            Type: Cap_Type     # diagram label: record component
+      values:
+        "0100": Rose.Capabilities.Layout.Endpoint_Cap
+
+Each 'values' entry says that the constant field with that label holds
+the representation of the given enumeration literal.
+
+Usage: bitlayout.py -o OUTDIR [--check -I DIR... --ada-arg=ARG...]
+                    FILE.yaml...
 """
 
 import argparse
+import json
 import os
 import re
+import subprocess
 import sys
+import tempfile
 from xml.sax.saxutils import escape
 
 import yaml
@@ -141,35 +160,180 @@ def render(name, title, word, rows):
     return "\n".join(parts) + "\n"
 
 
-def process(path, outdir):
+def field_positions(word, rows):
+    """Map each label to the (first bit, size) of every field with it."""
+    positions = {}
+    base = 0
+    for row in rows:
+        if row[0] == "fields":
+            for lo, hi, label, _ in row[1]:
+                positions.setdefault(label, []).append(
+                    (base + lo, hi - lo + 1))
+            base += word
+        else:
+            _, words, label = row
+            positions.setdefault(label, []).append((base, words * word))
+            base += words * word
+    return positions
+
+
+ADA_NAME = r"[A-Za-z]\w*(\.[A-Za-z]\w*)*"
+
+
+def ada_name(where, value):
+    if not isinstance(value, str) or not re.fullmatch(ADA_NAME, value):
+        raise LayoutError(f"{where}: bad Ada name {value!r}")
+    return value
+
+
+def parse_check(name, value):
+    """Return ([(record, offset, {label: component})], [(label, literal)])."""
+    if not isinstance(value, dict) or not set(value) <= {"records",
+                                                         "values"}:
+        raise LayoutError(f"{name}: check must have records and/or values")
+    records = []
+    for index, item in enumerate(value.get("records", [])):
+        where = f"{name}, check record {index + 1}"
+        if not isinstance(item, dict) \
+                or not isinstance(item.get("fields"), dict):
+            raise LayoutError(f"{where}: expected record and fields")
+        offset = item.get("offset", 0)
+        if not isinstance(offset, int):
+            raise LayoutError(f"{where}: bad offset {offset!r}")
+        fields = {str(label): ada_name(where, component)
+                  for label, component in item["fields"].items()}
+        records.append((ada_name(where, item.get("record")), offset, fields))
+    values = []
+    for label, literal in value.get("values", {}).items():
+        if not isinstance(label, str) or not re.fullmatch(r"[01]+", label):
+            raise LayoutError(f"{name}: value label {label!r} must be "
+                              f"a quoted binary string")
+        values.append((label, ada_name(name, literal)))
+    return records, values
+
+
+def check_layouts(path, word, checks, args):
+    """Compare each diagram's checked fields with GNAT's record layout.
+
+    The records are compiled as derived types in a throwaway procedure,
+    since GNAT only reports layouts for units it generates code for.
+    """
+    records = sorted({record for _, _, (recs, _) in checks
+                      for record, _, _ in recs})
+    literals = [(name, label, literal)
+                for name, _, (_, values) in checks
+                for label, literal in values]
+    packages = sorted({n.rsplit(".", 1)[0] for n in records}
+                      | {lit.rsplit(".", 1)[0] for _, _, lit in literals})
+    source = [f"with {package};" for package in packages]
+    source.append("procedure Layout_Check is")
+    for index, record in enumerate(records):
+        source.append(f"   type T{index} is new {record};")
+    for index, (_, label, literal) in enumerate(literals):
+        source.append(f"   pragma Compile_Time_Warning\n"
+                      f"     ({literal}'Enum_Rep /= 2#{label}#,"
+                      f" \"bitlayout:{index}\");")
+    source += ["begin", "   null;", "end Layout_Check;", ""]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        with open(os.path.join(tmp, "layout_check.adb"), "w") as f:
+            f.write("\n".join(source))
+        result = subprocess.run(
+            ["gcc", "-c", "-gnatR3j", *args.ada_arg,
+             *(f"-I{os.path.abspath(d)}" for d in args.include),
+             "layout_check.adb"],
+            cwd=tmp, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise LayoutError(f"{path}: compiling the layout check failed:\n"
+                          f"{result.stderr}")
+
+    layouts = {}
+    for item in json.loads(result.stdout):
+        components = {}
+        for c in item.get("record", []):
+            if not all(isinstance(c.get(k), int)
+                       for k in ("Position", "First_Bit", "Size")):
+                raise LayoutError(f"{path}: no static layout for "
+                                  f"{item['name']}.{c['name']}")
+            components[c["name"].lower()] = \
+                (c["Position"] * 8 + c["First_Bit"], c["Size"])
+        layouts[item["name"].lower()] = components
+
+    errors = []
+    for name, rows, (recs, _) in checks:
+        positions = field_positions(word, rows)
+        for record, offset, fields in recs:
+            index = records.index(record)
+            components = layouts[f"layout_check.t{index}"]
+            for label, component in fields.items():
+                found = positions.get(label, [])
+                if len(found) != 1:
+                    errors.append(f"{name}: expected one field labelled "
+                                  f"'{label}', found {len(found)}")
+                    continue
+                if component.lower() not in components:
+                    errors.append(f"{name}: {record} has no component "
+                                  f"{component}")
+                    continue
+                first, size = components[component.lower()]
+                first += offset
+                if found[0] != (first, size):
+                    lo, bits = found[0]
+                    errors.append(
+                        f"{name}: '{label}' is bits {lo}..{lo + bits - 1}"
+                        f", but {component} is bits"
+                        f" {first}..{first + size - 1}")
+    for index, (name, label, literal) in enumerate(literals):
+        if re.search(rf"\bbitlayout:{index}\b", result.stderr):
+            errors.append(f"{name}: '{label}' is not the representation "
+                          f"of {literal}")
+    return errors
+
+
+def process(path, args):
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     if not isinstance(data, dict) or not isinstance(data.get("diagrams"),
                                                      dict):
         raise LayoutError(f"{path}: expected a 'diagrams' mapping")
     word = data.get("word", 32)
+    checks = []
     for name, value in data["diagrams"].items():
         if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", str(name)):
             raise LayoutError(f"{path}: bad diagram name {name!r}")
         rows = parse_diagram(name, word, value)
+        if args.check and "check" in value:
+            checks.append((name, rows, parse_check(name, value["check"])))
         svg = render(name, value.get("title", name), word, rows)
-        with open(os.path.join(outdir, f"{name}.svg"), "w",
+        with open(os.path.join(args.output, f"{name}.svg"), "w",
                   encoding="utf-8", newline="\n") as f:
             f.write(svg)
+    return check_layouts(path, word, checks, args) if checks else []
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-o", "--output", required=True,
                         help="directory for the SVG files")
+    parser.add_argument("--check", action="store_true",
+                        help="check diagrams against the Ada records")
+    parser.add_argument("-I", dest="include", action="append", default=[],
+                        help="Ada source directory for --check")
+    parser.add_argument("--ada-arg", action="append", default=[],
+                        help="extra compiler argument for --check")
     parser.add_argument("files", nargs="+", help="layout YAML files")
     args = parser.parse_args()
     os.makedirs(args.output, exist_ok=True)
+    errors = []
     try:
         for path in args.files:
-            process(path, args.output)
+            errors += process(path, args)
     except LayoutError as e:
         print(f"bitlayout: {e}", file=sys.stderr)
+        sys.exit(1)
+    for error in errors:
+        print(f"bitlayout: {error}", file=sys.stderr)
+    if errors:
         sys.exit(1)
 
 

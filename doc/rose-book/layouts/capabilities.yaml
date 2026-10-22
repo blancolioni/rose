@@ -23,6 +23,22 @@ rows:
     - [16, Endpoint]
     - [16, Identifier]
 
+# Check fields shared by several diagrams (see "make check-layouts").
+checks:
+  header-fields: &header-fields
+    Rescinded Count: Rescinded_Count
+    Endpoint: Endpoint
+    Identifier: Identifier
+  access-header: &access-header-check
+    record: Rose.Capabilities.Layout.Capability_Header
+    fields:
+      <<: *header-fields
+      Type: Cap_Type
+      S: Single_Use
+      R: Read_Access
+      W: Write_Access
+      X: Execution_Access
+
 diagrams:
   capability:
     title: Generic capability layout
@@ -30,6 +46,11 @@ diagrams:
       - *access-header
       - *ident
       - {words: 2, name: Payload}
+    check:
+      records:
+        - *access-header-check
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Payload: Payload}
 
   endpoint-cap:
     title: Endpoint capability layout
@@ -37,6 +58,11 @@ diagrams:
       - *access-header
       - *ident
       - {words: 2, name: Object Id}
+    check:
+      records:
+        - *access-header-check
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Object Id: Payload}
 
   page-object-cap:
     title: Page object capability layout
@@ -49,6 +75,17 @@ diagrams:
         - [24, Rescinded Count]
       - *ident
       - {words: 2, name: Page Object Id}
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields:
+            <<: *header-fields
+            R: Read_Access
+            W: Write_Access
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Page Object Id: Payload}
+      values:
+        "0100": Rose.Capabilities.Layout.Page_Object_Cap
 
   process-cap:
     title: Process capability layout
@@ -59,6 +96,14 @@ diagrams:
         - [24, Rescinded Count]
       - *ident
       - {words: 2, name: Process Object Id}
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields: *header-fields
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Process Object Id: Payload}
+      values:
+        "0100": Rose.Capabilities.Layout.Process_Cap
 
   boot-cap:
     title: Boot capability layout
@@ -69,6 +114,12 @@ diagrams:
       - - [32, "0", const]
       - - [32, "0", const]
       - - [32, "0", const]
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields: {Rescinded Count: Rescinded_Count}
+      values:
+        "1000": Rose.Capabilities.Layout.Boot_Cap
 
   port-io-cap:
     title: Port IO capability layout (i686)
@@ -80,6 +131,15 @@ diagrams:
         - [16, Identifier (log₂ size)]
       - - [32, First Port]
       - - [32, Last Port]
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields:
+            Rescinded Count: Rescinded_Count
+            Endpoint: Endpoint
+            Identifier (log₂ size): Identifier
+      values:
+        "1110": Rose.Capabilities.Layout.Arch_Cap
 
   invocation-record:
     title: Invocation record
@@ -103,3 +163,13 @@ diagrams:
       - {words: 1, name: Shared buffer address}
       - {words: 5, name: Up to 15 capabilities}
       - {words: 5, name: Up to 15 argument words}
+    check:
+      records:
+        - record: Rose.Invocation.Control_Word
+          fields:
+            SWC: Last_Sent_Word
+            RWC: Last_Recv_Word
+        - record: Rose.Invocation.Invocation_Record
+          fields:
+            Capability: Cap
+            Reply Capability: Reply_Cap
