@@ -4,9 +4,7 @@
 # up; the diagram puts bit 31 on the left.  Constant values must be
 # quoted, or YAML reads them as numbers.
 #
-# "make check-layouts" compares these with the Ada records.  The page
-# object diagram still fails: its flag bits are copied from the old
-# bytefield figure, and what its I bit means is not yet known.
+# "make check-layouts" compares these with the Ada records.
 
 word: 32
 
@@ -67,11 +65,11 @@ diagrams:
   page-object-cap:
     title: Page object capability layout
     rows:
-      - - [4, "0100", const]
-        - [1, W]
+      - - [4, "0001", const]
+        - [1, S]
         - [1, R]
-        - [1, "0", const]
-        - [1, I]
+        - [1, W]
+        - [1, X]
         - [24, Rescinded Count]
       - *ident
       - {words: 2, name: Page Object Id}
@@ -80,12 +78,14 @@ diagrams:
         - record: Rose.Capabilities.Layout.Capability_Header
           fields:
             <<: *header-fields
+            S: Single_Use
             R: Read_Access
             W: Write_Access
+            X: Execution_Access
         - record: Rose.Capabilities.Layout.Capability_Layout
           fields: {Page Object Id: Payload}
       values:
-        "0100": Rose.Capabilities.Layout.Page_Object_Cap
+        "0001": Rose.Capabilities.Layout.Page_Object_Cap
 
   process-cap:
     title: Process capability layout
