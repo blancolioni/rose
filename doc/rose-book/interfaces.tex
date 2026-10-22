@@ -1,372 +1,396 @@
 \chapter{Interfaces}
 
+Rose has two kinds of interface.
+
+\begin{itemize}
+    \item {\em IDL interfaces} are defined in the {\tt interfaces/} directory and implemented by servers.  Client and server packages are generated from the definitions.
+    \item {\em Kernel capabilities} are implemented directly by the kernel.  They have no IDL definition; their endpoints are small integers fixed in the kernel source.
+\end{itemize}
+
+\section{Interface Identities}
+
+Each IDL interface, and each operation in it, is identified by a 64-bit endpoint id.  The ids are recorded in {\tt interfaces/interfaces.txt}, as {\tt interface.{\em Name}\_Interface} for an interface and {\tt {\em Interface}.{\em Operation}} for an operation.
+
+A server publishes an operation by creating an endpoint for its id with the meta capability (see Section \ref{sec:meta-interface}).  The kernel maps the 64-bit id to a small local endpoint index in the server's endpoint table, and that index is what an endpoint capability carries.
+
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Interface & Identity & Implemented By \\ [0.5ex]
+\hline
+Cap             & {\tt 16\#BF0F\_45C4\_4F4A\#} & {\tt caps}, {\tt timer} \\
+Cap\_Set        & {\tt 16\#DBA4\_F03D\_46D6\#} & {\tt caps} \\
+Stream          & {\tt 16\#06FC\_CA7F\_A17F\#} & \\
+Stream\_Reader  & {\tt 16\#108B\_3304\_14EF\#} & {\tt isofs}, {\tt store}, {\tt event-input-stream} \\
+Stream\_Writer  & {\tt 16\#50CB\_136A\_60B4\#} & {\tt console} \\
+Launch          & {\tt 16\#60A8\_2B69\_97DC\#} & {\tt exec} (through Exec) \\
+Exec            & {\tt 16\#AB32\_3151\_FC8F\#} & {\tt exec} \\
+Executable      & {\tt 16\#C3A5\_30DA\_EE57\#} & {\tt elf} \\
+Process         & {\tt 16\#5E43\_3170\_8583\#} & {\tt mem} \\
+Memory          & {\tt 16\#C027\_8DBF\_A2DF\#} & {\tt mem} \\
+\hline
+\end{tabular}
+\caption{Standard interfaces}
+\label{table:system_interfaces}
+\end{table}
+
 \section{Standard Interfaces}
 
-\subsection{Rose}
+\subsection{Rose\_Interface}
 
-The {\em Rose} interface provides operations common to all other interfaces.  It is implicitly inherited by every interface.
+Operations common to all interfaces.
 
 \subsubsection{Operations}
 
 \begin{itemize}
     \item \textbf{Destroy} Destroys the object associated with the capability.
-    
+
+    \begin{verbatim}
+     procedure Destroy;
+    \end{verbatim}
 \end{itemize}
 
-\subsection{Rose.Capability}
+\subsection{Cap}
 
-Operations on capabilities.
-
-\subsubsection{Inherits}
-
-Rose
+Operations on the object behind a capability.
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Create Entry} Manufactures a capability which can call the given endpoint
-    
+    \item \textbf{Destroy} Destroys the object associated with the capability.
+
     \begin{verbatim}
-     function Create_Entry 
-       (Endpoint : Rose.Objects.Endpoint_Id) 
-       return Capability;    
-    \end{verbatim}
-    
-    \item \textbf{Create Endpoint} Creates a new endpoint and returns its identity.
-    
-    \begin{verbatim}
-     function Create_Endpoint
-       return Endpoint_Id;    
-    \end{verbatim}
-    
-    \item \textbf{Receive Any} Respond to an invocation of any known capability.
-    
-    \begin{verbatim}
-        procedure Receive_Any
-          (Called_Endpoint : out Endpoint_Id;
-           Reply_Cap       : Capability;
-           Parameters      : Invocation_Record);
-           
+     procedure Destroy;
     \end{verbatim}
 
-    \item \textbf{Create Set} Manufactures a capability which represents a set of capabilities.
-    
+    \item \textbf{Get Object Id} Returns the object id of the object.
+
     \begin{verbatim}
-     function Create_Set
-       return interface Rose.Capability_Set;    
+     function Get_Object_Id return Object_Id;
     \end{verbatim}
-    
 \end{itemize}
 
-\subsection{Rose.Capability\_Set}
+\subsection{Cap\_Set}
 
-Operations on capability sets.
-
-\subsubsection{Inherits}
-
-Rose
+A set of capabilities which can be referenced through a single capability.  Implemented by the {\tt caps} server.  A process's standard capabilities are supplied as a cap set (see Table \ref{table:standard-cap-env}).
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Insert} Adds a capability to the set
-    
+    \item \textbf{Append} Adds capabilities to the end of the set.
+
     \begin{verbatim}
-     function Insert
-       (Cap : Capability);    
-    \end{verbatim}
-    
-    \item \textbf{Delete} Delete a capability from the set.
-    
-    \begin{verbatim}
-        procedure Delete
-          (Cap : Capability);
+     procedure Append
+       (Caps : Capability_Array);
     \end{verbatim}
 
+    \item \textbf{Get Cap} Returns the capability at the given index.
+
+    \begin{verbatim}
+     function Get_Cap
+       (Index : Positive)
+       return Capability;
+    \end{verbatim}
+
+    \item \textbf{Length} Returns the number of capabilities in the set.
+
+    \begin{verbatim}
+     function Length
+       return Natural;
+    \end{verbatim}
 \end{itemize}
 
-\subsection{Rose.Streams}
+\subsection{Stream\_Reader}
 
-Operations on streams.
-
-\subsubsection{Inherits}
-
-Rose
-
-\subsection{Rose.Streams.Read}
-
-Operations for reading from streams
-
-\subsubsection{Inherits}
-
-Rose.Streams
+Reading from a stream.
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Read} Reads a buffer from the stream
-    
+    \item \textbf{Read} Reads into a buffer.  {\tt Last} is set to the index of the last element read.
+
     \begin{verbatim}
      procedure Read
        (Buffer : out Storage_Array;
-        Length : in out Storage_Count)
+        Last   : out Storage_Count);
     \end{verbatim}
 \end{itemize}
 
-\subsection{Rose.Streams.Write}
+\subsection{Stream\_Writer}
 
-Operations for writing to streams
-
-\subsubsection{Inherits}
-
-Rose.Streams
+Writing to a stream.
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Write} Writes a buffer to the stream
-    
+    \item \textbf{Write} Writes a buffer to the stream.
+
     \begin{verbatim}
      procedure Write
-       (Buffer : Storage_Array;
-        Length : Storage_Count)
+       (Buffer : Stream_Element_Array);
     \end{verbatim}
 \end{itemize}
 
-\subsection{Rose.Launch}
+\subsection{Stream}
+
+A stream which can be both read and written.
+
+\subsubsection{Inherits}
+
+Stream\_Reader, Stream\_Writer
+
+\subsection{Launch}
 
 Launching processes.
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Launch} Launches the process named by this capability.  Sent caps are copied to the process.  Returns a capability which implements the Processes interface for this process.
+    \item \textbf{Launch} Launches the process named by this capability.  The capabilities are copied to the new process, and the environment is placed in its environment page.  Arguments are passed as environment values {\tt @arg-count} and {\tt @arg01}, {\tt @arg02}, and so on.  Returns a capability for the Process interface of the new process.
 
     \begin{verbatim}
      function Launch
-       (Caps : Array_Of_Capabilities)
-       return interface Rose.Process;    
+       (Caps        : Capability_Array;
+        Environment : Storage_Array)
+       return interface Process;
     \end{verbatim}
-    
 \end{itemize}
 
-\subsection{Rose.Process}
+\subsection{Exec}
 
-Interface to processes.
+Installing executables.  Implemented by the {\tt exec} server.
+
+\subsubsection{Inherits}
+
+Launch
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Suspend} Suspend the process 
+    \item \textbf{Install} Installs an executable image read from a stream, and returns a launch capability for it.  {\tt Install\_Caps} are given to every process launched from the image.
 
     \begin{verbatim}
-     procedure Suspend;
+     function Install
+       (Executable   : interface Stream_Reader;
+        Name         : String;
+        Install_Caps : Capability_Array)
+       return interface Launch;
     \end{verbatim}
-    
 \end{itemize}
 
-\subsection{Rose.System.Create}
+\subsection{Process}
 
-Interface for creating capabilities.
+A running process.  Implemented by the {\tt mem} server.
+
+\subsubsection{Inherits}
+
+Segment, Server, Cap
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Create Capability} Manufactures a capability based on the representation given
-    in the sent words.
-    
+    \item \textbf{Heap Interface} Returns the process's heap.
+
     \begin{verbatim}
-     function Create_Capability
-       (Header : Word_32;
-        Payload_1, Payload_2, Payload_3 : Word_32)
-       return Capability;    
+     function Heap_Interface return interface Heap;
     \end{verbatim}
-    
+
+    \item \textbf{Exit Process} Ends the process.
+
+    \begin{verbatim}
+     procedure Exit_Process
+       (Exit_Status : Natural);
+    \end{verbatim}
+
+    \item \textbf{Publish Interface} Sets the interface returned when the process is asked for its public interface.
+
+    \begin{verbatim}
+     procedure Publish_Interface
+       (Interface_Cap : Capability);
+    \end{verbatim}
 \end{itemize}
 
-\subsubsection{Derived Operations}
+\subsection{Memory}
 
-\begin{itemize}
-    \item \textbf{Create Interface Capability} Manufactures an interface capability for the given endpoint and object.
-    
-    \begin{verbatim}
-     function Create_Interface_Capability
-       (Endpoint : Endpoint_Id;
-        Object   : Object_Id)
-       return Capability
-     is (Create_Capability 
-          (16#0000_0005#, Endpoint, 
-           Low_Word (Object), High_Word (Object0)));
-     
-    \end{verbatim}
-    
-\end{itemize}
-
-\subsection{Rose.System.Cap\_Copy}
-
-Interface for copying capabilities from other objects.
+The memory manager interface, implemented by the {\tt mem} server.  The memory manager is told when a process is created, registers its segments, handles its page faults, and writes changed pages during a checkpoint.
 
 \subsubsection{Operations}
 
 \begin{itemize}
-    \item \textbf{Copy Capability} Manufactures a capability which is a copy of an existing capability in the given object.
-    
-    \begin{verbatim}
-     function Copy_Capability
-       (Header : Word_32;
-        Payload_1, Payload_2, Payload_3 : Word_32)
-       return Capability;    
-    \end{verbatim}
-    
-\end{itemize}
-
-\subsection{Rose.System.Boot}
-
-Boot module interface
-
-\subsubsection{Operations}
-
-\begin{itemize}
-    \item \textbf{Launch} Starts a boot module.
+    \item \textbf{New Process} Creates the memory manager's record of a new process.
 
     \begin{verbatim}
-     function Launch
-       (Module_Index : Positive;
-        Caps         : Capability_Array)
-       return Object_Id;
+     function New_Process
+       (Process : interface Kernel_Process)
+       return interface Process;
     \end{verbatim}
-    
-\end{itemize}
 
-\subsection{Rose.System.Device\_Memory}
-
-Interface for setting up memory-mapped devices.
-
-\subsubsection{Operations}
-
-\begin{itemize}
-    \item \textbf{Reserve} Reserves an area of memory for devices.  Pages within this area can be acquired by device drivers using a page object cap.
+    \item \textbf{Register Process} Records the exec, text, data and stack ranges of a process, and its environment.
 
     \begin{verbatim}
-     procedure Reserve
-       (Base  : Physical_Address;
-        Bound : Physical_Address);
+     procedure Register_Process
+       (Process     : interface Process;
+        Exec_Base   : Word;
+        Exec_Bound  : Word;
+        Text_Base   : Word;
+        Text_Bound  : Word;
+        Data_Base   : Word;
+        Data_Bound  : Word;
+        Stack_Base  : Word;
+        Stack_Bound : Word;
+        Environment : Storage_Array);
     \end{verbatim}
-    
+
+    \item \textbf{Page Fault} Handles a page fault on behalf of the kernel.
+
+    \begin{verbatim}
+     procedure Page_Fault
+       (Faulting_Object : Object_Id;
+        Virtual_Page    : Word;
+        Physical_Page   : Word;
+        Action          : Page_Access_Type);
+    \end{verbatim}
+
+    \item \textbf{Take Physical Memory} Hands a range of physical memory to the caller.
+
+    \begin{verbatim}
+     procedure Take_Physical_Memory
+       (Size   : Word;
+        Start  : out Word;
+        Amount : out Word);
+    \end{verbatim}
+
+    \item \textbf{Checkpoint} Writes every page changed since the last checkpoint, using the given capability to append each page to the log.
+
+    \begin{verbatim}
+     procedure Checkpoint
+       (Append_Page : Capability);
+    \end{verbatim}
 \end{itemize}
-
-\begin{table}[ht]
-\begin{tabular}{l r l l}
-\hline\hline
-Name & Identity & Implemented By & Notes \\ [0.5ex]
-\hline
-Meta            & 1 & All & A process usually has this as capability 1 \\
-Cap Copy        & 2 & Kernel & Used during installation to subvert security \\
-Kernel          & 3 & Kernel & \\
-Procmem         & 4 & {\tt mm} & Paged process memory management \\
-Registry        & 5 & registry & Registry of interface identifiers\\
-Signal          & 6 & any & Send and receive signals \\
-Authentication  & 7 & passwd & \\
-Account         & 8 & passwd & \\
-Make Executable & 9 & exec & \\
-Executable      & 10 & ELF binaries & \\
-Process         & 11 & running processes & \\
-Login           & 12 & login & \\
-User            & 13 & user & \\
-\hline %inserts single line
-\end{tabular}
-\caption{Standard System Interfaces} % title of Table
-\label{table:system_interfaces} % is used to refer this table in the text
-\end{table}
-
-\subsubsection{Meta Interface}
-
-The {\em meta} interface is used for managing capabilities.  Sending to this interface creates new capabilities, or sends existing capabilities to other objects.  It can also be used to get a capability for an object's default interface.
-
-\begin{figure}
-\begin{bytefield}{32}
-\bitheader[endianness=big]{0,7,8,11,12,15,16,21,22,25,26,31} \\
-{\tiny
-\bitbox{6}{Endpoint (1)}
-\bitbox{4}{Alloc (0)}
-\bitbox{6}{Caps (0)}
-\bitbox{4}{SW (1)}
-\bitbox{4}{RW (2)}
-\bitboxes{1}{-SR-B{-}{-}{-}}} \\
-\wordbox{1}{Capability (1)} \\
-\wordbox{1}{Interface Id} \\
-\bitbox{8}{Major Version}
-\bitbox{8}{Minor Version}
-\bitbox{8}{Release}
-\bitbox{8}{} \\
-\end{bytefield}
-\caption{Interface capability request}
-\end{figure}
-
-\begin{table}[ht]
-\begin{tabular}{l l l l}
-\hline\hline
-Endpoint & Name & Operations & Description \\ [0.5ex]
-\hline
-1 & Create Interface Cap & Send & Creates and returns a \\
-  &                      &      & new interface capability \\
-  &                      &      & for the sending object \\
-2 & Create Endpoint Cap & Send & Creates and returns a \\
-  &                     &       & new endpoint capability \\
-  &                    &        & for the sending object \\
-3 & Create Page Object Cap & Send & $data_0$ contains page address \\
- & & & $data_1$ contains the readable \\
- & & & and writable flags \\
-5 & Create Singleton Receive & Send & \\
-6 & Create Cap Set & Send & \\
-16 & Receive on provided caps & Receive & Maximum receive caps is 6 \\
-17 & Receive on any known cap & Receive & \\
-31 & Exit & Send & End the sending process. \\
-\hline
-\end{tabular}
-\caption{The meta interface}
-\label{table:meta_interface}
-\end{table}
-
-
-\subsubsection{The process memory manager interface}
-
-A server implementing the {\tt procmem} interface can be notified when a process starts, when it ends, and when it requests access to virtual addresses which it does not currently have.
-
-It is expected that the server will have access to a page mapper interface, which will allow it to map and unmap pages as required.
-
-\subsection{Authentication Interfaces}
-
-\begin{table}[ht]
-\begin{tabular}{l r l l}
-\hline\hline
-Name & Identity & Implemented By & Notes \\ [0.5ex]
-\hline
-Login           & 12 & login & \\
-User            & 13 & user & \\
-\hline %inserts single line
-\end{tabular}
-\caption{Standard Authentication Interfaces} % title of Table
-\label{table:auth_interfaces}
-\end{table}
 
 \subsection{File Interfaces}
 
 \begin{table}[ht]
-\begin{tabular}{l r l l}
+\begin{tabular}{l l l}
 \hline\hline
-Name & Identity & Implemented By & Notes \\ [0.5ex]
+Interface & Identity & Implemented By \\ [0.5ex]
 \hline
-
-File System           & 100 & rfs, xmlfs, isofs & \\
-Directory             & 101 & rfs, xmlfs, isofs & \\
-File                  & 102 &  & \\
-\hline %inserts single line
+File\_System  & {\tt 16\#1B66\_CCBF\_3B7C\#} & {\tt isofs} \\
+Directory     & {\tt 16\#73CB\_EA92\_6209\#} & {\tt isofs} \\
+File          & {\tt 16\#308E\_297C\_64BB\#} & \\
+\hline
 \end{tabular}
-\caption{Standard File Interfaces} % title of Table
+\caption{Standard file interfaces}
 \label{table:file_interfaces}
 \end{table}
 
+\section{Kernel Capabilities}
+
+These capabilities are implemented by the kernel.  The endpoint is the {\tt Endpoint} field of the capability layout, and parameters are passed in the invocation's data words.
+
+\subsection{Meta}
+\label{sec:meta-interface}
+
+Every process has a meta capability.  It acts on the calling process: creating endpoints, receiving, deleting and rescinding the process's own capabilities, and exiting.
+
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Endpoint & Name & Description \\ [0.5ex]
+\hline
+1  & Create Endpoint & $data_0$, $data_1$: 64-bit endpoint id; \\
+   &                 & $data_2$ (optional): identifier. \\
+   &                 & Returns a receive cap and/or an endpoint cap \\
+9  & Get Object Id   & Returns the object id in the cap's payload \\
+17 & Receive on any  & Wait for a message on any endpoint \\
+28 & Kernel debug    & $data_1 \neq 0$ enables invocation logging \\
+29 & Rescind         & Rescinds each sent cap \\
+30 & Delete          & Deletes each sent cap from the caller's table \\
+31 & Exit            & Ends the calling process \\
+\hline
+\end{tabular}
+\caption{Meta capability endpoints}
+\label{table:meta_interface}
+\end{table}
+
+Endpoint 1 returns a receive capability if the endpoint id is zero, or if the caller asks to receive more than one capability.  It returns an endpoint capability if the endpoint id is not zero.  The identifier is stored in the endpoint capability and passed to the server with every invocation, which lets one endpoint serve many objects.
+
+The kernel source also reserves endpoints 2 (create entry cap), 3 (create page object cap), 4 (create send cap), 5 (create singleton receive), 6 (create cap set), 7 (add cap to set), 8 (remove cap from set) and 16 (receive on caps), but these are not implemented.  Invoking them returns {\tt Invalid\_Endpoint}.  Cap sets are provided by the {\tt caps} server instead.
+
+\subsection{Create}
+
+Turns four data words into a capability layout and returns a new capability with that layout.  The kernel gives this capability to {\em init} only.  It can forge any capability, and is due to be removed (issue \#115).
+
+\begin{verbatim}
+     function Create_Capability
+       (Header_1, Header_2, Payload_Low, Payload_High : Word_32)
+       return Capability;
+\end{verbatim}
+
+\subsection{Copy}
+
+The payload is a process object id.  Copies one of that process's endpoint capabilities into the caller's table.
+
+\begin{itemize}
+    \item $data_0$, $data_1$: the 64-bit endpoint id to copy.
+    \item $data_2$ (optional): a new identifier for the copied capability.
+\end{itemize}
+
+Returns the copied capability, or {\tt Invalid\_Endpoint} if the process has no such endpoint.
+
+\subsection{Boot}
+
+Launches a boot module.  Used only by {\em init}.
+
+\begin{itemize}
+    \item $data_0$: the module index.
+    \item $data_1$: the process priority.
+    \item $data_2$ onwards (optional): arguments, set in the new process's environment as {\tt @arg-count} and {\tt @arg01}, {\tt @arg02}, and so on.
+    \item Sent capabilities are copied to the new process.
+\end{itemize}
+
+Returns the object id of the new process.
+
+\subsection{Physical Memory}
+
+\begin{table}[ht]
+\begin{tabular}{l l l}
+\hline\hline
+Endpoint & Name & Description \\ [0.5ex]
+\hline
+1 & Reserve Device Memory & $data_0$, $data_1$: base and bound of a \\
+  &                       & physical range reserved for devices \\
+2 & Get Region Count      & Returns the number of user memory regions \\
+3 & Get Region            & $data_0$: region index.  Returns page table \\
+  &                       & capabilities for mapping the region \\
+\hline
+\end{tabular}
+\caption{Physical memory capability endpoints}
+\label{table:physical_memory_caps}
+\end{table}
+
+\subsection{Kernel}
+
+\begin{table}[ht]
+\begin{tabular}{l l}
+\hline\hline
+Endpoint & Name \\ [0.5ex]
+\hline
+1  & Enable paging \\
+2  & Start checkpoint \\
+3  & Start image write \\
+4  & Create process \\
+5  & Add heap memory \\
+6  & Set timeout \\
+7  & Get current ticks \\
+8  & Enter checkpoint \\
+9  & Leave checkpoint \\
+10 & Start log \\
+\hline
+\end{tabular}
+\caption{Kernel capability endpoints}
+\label{table:kernel_caps}
+\end{table}
 
 \section{Interface Definition Language}
 
