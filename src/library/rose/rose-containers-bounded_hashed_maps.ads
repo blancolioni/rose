@@ -60,7 +60,7 @@ private
       record
          Length   : Count_Type                    := 0;
          Elements : Elements_Type (1 .. Capacity);
-         Buckets  : Buckets_Type (1 .. Modulus)   := (others => 0);
+         Buckets  : Buckets_Type (0 .. Modulus - 1) := (others => 0);
       end record;
 
    type Cursor is new Count_Type;
