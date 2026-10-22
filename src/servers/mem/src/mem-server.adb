@@ -480,6 +480,8 @@ package body Mem.Server is
    is
       use Rose.Words;
    begin
+      Rose.Console_IO.New_Line;
+      Rose.Console_IO.Put_Line ("*** mem: protection fault ***");
       Rose.Console_IO.Put ("mem: error pid ");
       Rose.Console_IO.Put (Rose.Words.Word_64 (Process));
       Rose.Console_IO.Put ("; page ");

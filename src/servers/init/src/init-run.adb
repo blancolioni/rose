@@ -834,6 +834,11 @@ package body Init.Run is
                        (Console_Stream_Cap,
                         "unable to find command interface" & NL);
                   end if;
+                  if Find_Cap = Null_Capability then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "find cap was null" & NL);
+                  end if;
                end;
             elsif Params.Data (1) = 99 then
                Keyboard_Interface_Cap := Params.Caps (0);
@@ -925,6 +930,16 @@ package body Init.Run is
       Init.Calls.Send_String
         (Console_Stream_Cap,
          "completed initial install" & NL);
+
+      if Find_Cap = Rose.Capabilities.Null_Capability then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: unable to find 'find'" & NL);
+      end if;
+
+      if Cap_Set_Cap = Rose.Capabilities.Null_Capability then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: unable to find 'cap_set'" & NL);
+      end if;
 
       declare
          Launch_Tests_Cap : constant Rose.Capabilities.Capability :=

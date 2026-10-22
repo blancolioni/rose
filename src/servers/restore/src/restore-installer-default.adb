@@ -17,7 +17,7 @@ package body Restore.Installer.Default is
       Process ("command", "drivers", Launch, Default_Flags);
       Process ("keyboard", "drivers", Launch,
                (Provides_Keyboard_Interface => True, others => False));
-      Process ("event-in", "drivers", Launch,
+      Process ("event-input-stream", "drivers", Launch,
                (Requires_Keyboard_Interface => True,
                 Provides_Input_Stream       => True,
                 others                      => False));

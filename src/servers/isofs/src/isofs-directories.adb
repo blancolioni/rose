@@ -182,6 +182,16 @@ package body IsoFS.Directories is
       Child_Index : Positive;
       Child_Entry : out Directory_Entry);
 
+   procedure Get_Rock_Ridge_Name
+     (Sector        : ISO_Sector;
+      Start         : System.Storage_Elements.Storage_Offset;
+      Record_Length : System.Storage_Elements.Storage_Count;
+      Name          : out String;
+      Last          : out Natural);
+   --  Look for a Rock Ridge NM entry in the system use area of the
+   --  directory record at Sector (Start).  If found, Name (1 .. Last)
+   --  contains the alternate name; otherwise Last is zero.
+
 --     function Get_Directory_From_Address
 --       (Address : Rose.Devices.Block.Block_Address_Type)
 --        return Directory_Type;
@@ -606,6 +616,68 @@ package body IsoFS.Directories is
       return Result;
    end Get_Index_By_Name;
 
+   -------------------------
+   -- Get_Rock_Ridge_Name --
+   -------------------------
+
+   procedure Get_Rock_Ridge_Name
+     (Sector        : ISO_Sector;
+      Start         : System.Storage_Elements.Storage_Offset;
+      Record_Length : System.Storage_Elements.Storage_Count;
+      Name          : out String;
+      Last          : out Natural)
+   is
+      use System.Storage_Elements;
+      Identifier_Length : constant Storage_Count :=
+                            Storage_Count (Sector (Start + 32));
+      Record_End        : constant Storage_Offset :=
+                            Start + Record_Length - 1;
+      Position          : Storage_Offset :=
+                            Start + 33 + Identifier_Length;
+   begin
+      Last := 0;
+
+      --  the identifier is padded to an even length
+      if Identifier_Length mod 2 = 0 then
+         Position := Position + 1;
+      end if;
+
+      while Position + 3 <= Record_End loop
+         declare
+            Sig_1        : constant Character :=
+                             Character'Val (Sector (Position));
+            Sig_2        : constant Character :=
+                             Character'Val (Sector (Position + 1));
+            Entry_Length : constant Storage_Count :=
+                             Storage_Count (Sector (Position + 2));
+         begin
+            exit when Entry_Length < 4
+              or else Position + Entry_Length - 1 > Record_End;
+
+            if Sig_1 = 'N' and then Sig_2 = 'M'
+              and then Entry_Length >= 5
+            then
+               declare
+                  Flags : constant Word_8 := Word_8 (Sector (Position + 4));
+               begin
+                  --  ignore CURRENT and PARENT entries; CONTINUE entries
+                  --  are concatenated
+                  if (Flags and 6) = 0 then
+                     for I in Position + 5 .. Position + Entry_Length - 1 loop
+                        exit when Last >= Name'Length;
+                        Last := Last + 1;
+                        Name (Name'First + Last - 1) :=
+                          Character'Val (Sector (I));
+                     end loop;
+                  end if;
+               end;
+            end if;
+
+            Position := Position + Entry_Length;
+         end;
+      end loop;
+   end Get_Rock_Ridge_Name;
+
    ------------------------
    -- Get_Root_Directory --
    ------------------------
@@ -877,6 +949,9 @@ package body IsoFS.Directories is
 
             Name : String (1 .. Natural (Rec.File_Identifier_Length));
             Last : Natural := Name'Last;
+
+            RR_Name : String (1 .. 255);
+            RR_Last : Natural;
          begin
 
             for I in Name'Range loop
@@ -896,7 +971,14 @@ package body IsoFS.Directories is
                Last := Last - 1;
             end if;
 
-            Process (Rec, Name (1 .. Last));
+            Get_Rock_Ridge_Name
+              (Sector, Start, Record_Length, RR_Name, RR_Last);
+
+            if RR_Last > 0 then
+               Process (Rec, RR_Name (1 .. RR_Last));
+            else
+               Process (Rec, Name (1 .. Last));
+            end if;
 
             Position := Position + Record_Length;
             if Position - Sector_Start >= Sector'Last then
