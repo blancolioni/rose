@@ -26,7 +26,7 @@ interface Block_Device is
 
    Max_Block_Size : constant := 4096;
 
-   type Block_Size_Type is range 0 .. 4096;
+   type Block_Size_Type is range 0 .. Max_Block_Size;
    type Block_Address_Type is new Word_64;
 
    procedure Get_Parameters
@@ -79,7 +79,9 @@ sub_aspect     ::= Name [ ''' Name ] '=>' Name
 param          ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
 
 type_decl      ::= 'type' Name 'is'
-                   ( 'range' Integer '..' Integer | [ 'new' ] type ) ';'
+                   ( 'range' bound '..' bound | [ 'new' ] type ) ';'
+
+bound          ::= Integer | Name
 
 type           ::= 'record' { Name ':' type ';' } 'end' 'record'
                  | '(' Name { ',' Name } ')'
@@ -119,8 +121,9 @@ Methods are declared as Ada procedures and functions.
 
 An interface can declare types for its methods to use.
 
-* *Range types:* `type Block_Size_Type is range 0 .. 4096;`.
-  The bounds must be integer literals.
+* *Range types:* `type Block_Size_Type is range 0 .. Max_Block_Size;`.
+  Each bound is an integer literal or the name of an integer constant declared earlier in the interface or inherited from a parent.
+  Named bounds are planned (#153): the current compiler accepts only integer literals, so `block_device.idl` writes `4096` for now.
 * *Derived types:* `type Block_Address_Type is new Word_64;`.
 * *Enumerations:* `type File_Kind is (Directory, Ordinary_File, Special_File);`.
 * *Records:* `+type T is record ... end record;+`.
@@ -530,6 +533,7 @@ package_decl ::= 'package' Name
 These are differences between this chapter and the current compiler, or problems in it.
 
 * The name after `end` is not checked against the interface name.
+* Range bounds must be integer literals; names of constants are not yet accepted (#153).
 * An `interface X` type is not checked: an unknown interface is only found when the generated Ada fails to compile.
 * If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
 * An enumeration type takes its name from its interface, not from its type declaration.
