@@ -16,7 +16,7 @@ check-layouts:
 # AsciiDoc trial: the chapters converted so far, as HTML, PDF and EPUB.
 # asciidoctor-epub3 is not packaged by Fedora; install it with
 # "gem install --user-install asciidoctor-epub3".
-ADOC := capabilities.adoc
+ADOC := capabilities.adoc idl.adoc
 ADOC_ATTRS := -a imagesdir=build/layouts
 
 adoc: layouts

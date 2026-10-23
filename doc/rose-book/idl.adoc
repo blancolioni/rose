@@ -1,0 +1,300 @@
+= The Interface Definition Language
+
+[NOTE]
+====
+This chapter is a draft (#146).
+It describes the language and code generation as the current compiler (`src/tools/idl`) implements them, and marks the planned changes: the compiler rewrite (#136), command declarations (#137), endpoint ids (#148 to #151) and ADR 0002.
+====
+
+== Overview
+
+Every interface between Rose processes is declared in the interface definition language (IDL).
+An IDL file declares one interface: its methods, their parameters, and any types and constants they use.
+The IDL compiler turns each interface into Ada packages that a client uses to call the interface and a server uses to implement it.
+
+* Interface files live in `interfaces/`, one interface per file.
+* The file name is the interface name in lower case, with the extension `.idl`: `Block_Device` is declared in `block_device.idl`.
+  The compiler relies on this to find parent interfaces.
+* The compiler is run once per file, as `idl <file> <endpoint-table>`.
+  The build in `src/library/kernelapi/generated` runs it over a fixed list of interfaces and writes the generated packages there.
+
+The syntax is a small subset of Ada, so an IDL file reads like an Ada package specification:
+
+[source,ada]
+----
+interface Block_Device is
+
+   Max_Block_Size : constant := 4096;
+
+   type Block_Size_Type is range 0 .. 4096;
+   type Block_Address_Type is new Word_64;
+
+   procedure Get_Parameters
+     (Block_Count : out Block_Address_Type;
+      Block_Size  : out Block_Size_Type);
+
+   procedure Read_Blocks
+     (Start   : Block_Address_Type;
+      Count   : Natural;
+      Blocks  : out Storage_Array);
+
+end Block_Device;
+----
+
+== Lexical elements
+
+The lexical rules follow Ada.
+
+* *Identifiers* start with a letter or underscore, followed by letters, digits and underscores.
+  Identifiers and keywords are not case sensitive.
+* *Comments* start with `--` and run to the end of the line.
+* *Integer literals* follow Ada, including based literals such as `16#0C71_18A7_C791#`.
+  There are no negative literals, since `-` is not a token.
+* *String literals* are enclosed in double quotes.
+  They are recognised by the lexer, but no interface declaration uses them.
+* *Keywords:* `begin`, `constant`, `end`, `function`, `in`, `interface`, `invoke`, `is`, `new`, `out`, `procedure`, `range`, `record`, `return`, `type`, `with`.
+  `begin` and `invoke` are only used by the init-script generator (see <<known-issues>>).
+* *Symbols:* `+:+` `+;+` `+(+` `+)+` `+,+` `+.+` `+..+` `+=>+` `+:=+` `+'+` `+&+` `+/+`.
+
+== Grammar
+
+[source,ebnf]
+----
+interface_decl ::= 'interface' Name [ constraints ]
+                   [ ':' Name { ',' Name } ]
+                   [ 'with' Name '=>' Integer { ',' Name '=>' Integer } ]
+                   'is' { declaration } 'end' Name ';'
+
+constraints    ::= '(' Name ':' type { ',' Name ':' type } ')'
+
+declaration    ::= subprogram | type_decl | constant_decl
+
+subprogram     ::= ( 'procedure' | 'function' ) Name
+                   [ '(' param { ';' param } ')' ]
+                   [ 'return' type ]
+                   [ 'with' sub_aspect { ',' sub_aspect } ] ';'
+
+sub_aspect     ::= Name [ ''' Name ] '=>' Name
+
+param          ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
+
+type_decl      ::= 'type' Name 'is'
+                   ( 'range' Integer '..' Integer | [ 'new' ] type ) ';'
+
+type           ::= 'record' { Name ':' type ';' } 'end' 'record'
+                 | '(' Name { ',' Name } ')'
+                 | [ 'interface' ] Name
+
+constant_decl  ::= Name ':' [ 'constant' ] [ type ] ':=' ( Integer | Name ) ';'
+----
+
+== Declarations
+
+=== Interfaces and inheritance
+
+An interface declaration gives the interface a name and, optionally, a list of parent interfaces:
+
+[source,ada]
+----
+interface File : Stream, Seekable is
+end File;
+----
+
+* An interface inherits every method of every parent, recursively.
+  `File` has `Read` from `Stream_Reader`, `Write` from `Stream_Writer` and `Seek` from `Seekable`.
+* Each parent is found by parsing `<parent>.idl`, in the same directory as the first file the compiler was given.
+* An interface may have no declarations of its own, as `File` does.
+
+=== Subprograms and parameters
+
+Methods are declared as Ada procedures and functions.
+
+* A *procedure* returns nothing; a *function* must have a `return` type.
+* Each parameter has a mode: `in` (the default), `out` or `in out`.
+  No interface currently uses `in out`.
+* Parameters cannot have default values.
+* A method with no parameters omits the parentheses: `function Length return Natural;`.
+
+=== Types
+
+An interface can declare types for its methods to use.
+
+* *Range types:* `type Block_Size_Type is range 0 .. 4096;`.
+  The bounds must be integer literals.
+* *Derived types:* `type Block_Address_Type is new Word_64;`.
+* *Enumerations:* `type File_Kind is (Directory, Ordinary_File, Special_File);`.
+* *Records:* `+type T is record ... end record;+`.
+  These are parsed but no interface uses them.
+* *Interface types:* `interface X` as a parameter or result type means a value of interface `X`, such as `function Get_Device return interface Block_Device;`.
+
+=== Constants
+
+`Name : constant := Value;` declares a constant.
+The value must be an integer literal or an identifier, and only one name can be declared at a time.
+For example, `Segment` declares its flag values this way:
+
+[source,ada]
+----
+Segment_Readable : constant := 1;
+Segment_Writable : constant := 2;
+----
+
+=== Aspects and constraints
+
+The grammar allows aspects on interfaces (`+with Name => Integer+`) and on subprograms (`+with Name => Name+` or `+with Name'Attribute => Name+`), and a list of constraints after an interface name.
+The parser records them, but no interface uses them, and their meaning is not yet defined.
+Pinned endpoint ids (#150) will be the first use of subprogram aspects.
+
+== Predefined types
+
+[cols="2,3,3",options="header"]
+|===
+| IDL type | Ada type | How it is passed
+
+| `Word` | `Rose.Words.Word` | One data word
+| `Word_32` | `Rose.Words.Word_32` | One data word
+| `Word_64` | `Rose.Words.Word_64` | One data word
+| `Natural`, `Positive`, `Integer` | Standard Ada types | One data word
+| `Endpoint` | `Rose.Objects.Endpoint_Id` | One data word
+| `Object_Id` | `Rose.Objects.Object_Id` | One data word
+| `Storage_Count` | `System.Storage_Elements.Storage_Count` | One data word
+| `Stream_Element_Count`, `Stream_Element_Offset` | `System.Storage_Elements.Storage_Count`, `Storage_Offset` | One data word
+| `Address` | `System.Address` | One data word
+| `Capability` | `Rose.Capabilities.Capability` | One capability
+| `Capability_Array` | `Rose.Capabilities.Capability_Array` | Capabilities
+| `String` | `String` | Text in the shared buffer
+| `Storage_Array`, `Stream_Element_Array` | `System.Storage_Elements.Storage_Array` | The shared buffer
+| `Page` | `Storage_Array (1 .. 4096)`, page aligned | The shared buffer
+| `Rose_Interface` | `Rose.Interfaces.Rose_Interface` | Capabilities
+| `interface X` | `Rose.Interfaces.X.Client.X_Client` | Capabilities (see <<kernel-target>>)
+|===
+
+The compiler can map the stream element types to `Ada.Streams` instead, but that option is turned off, since `Ada.Streams` isn't available to kernel-level code.
+
+== Endpoint ids
+
+Every method, and every interface, has a 64-bit endpoint id.
+A server registers each method under its id, and a client's capability for a method carries the id.
+The generated package for an interface declares the ids as constants: `<Interface>_Interface` for the interface, and `<Method>_Endpoint` for each method, including inherited ones.
+
+=== Current mechanism
+
+The compiler keeps every id in `interfaces/interfaces.txt`, one `+Interface.method = 16#...#+` line per id.
+
+* The first time it sees a method or interface, it picks a random 48-bit value, adds it to the table and rewrites the whole file.
+* Inherited methods use the key of the interface that declares them, so a parent and its children agree, as long as the table entry exists when both are compiled.
+* Entries are never removed.
+
+This is fragile.
+The ids exist only in that file, so losing an entry silently assigns a new random value; parallel builds can lose entries; the kernel copies five of the values as literals; and the build writes to the source tree.
+
+=== Planned mechanism
+
+* *Ids derived from the source* (#149).
+  An endpoint id is a hash (SHA-256, truncated to 64 bits) of a canonical form of the method's qualified name, parameter modes and types, and result type, for example `rose.interfaces.directory.find_entry(in string) return natural`.
+  An interface id is the hash of `interface rose.interfaces.<name>`.
+  An incompatible change to a signature changes the id, so old callers fail with an invalid endpoint instead of decoding the wrong arguments.
+  `interfaces.txt` is removed.
+* *Pinned ids* (#150).
+  `+with Endpoint_Id => 16#...#+` on a method or interface keeps a specific id, for example when a method is renamed but persisted processes still use the old id.
+* *A whole-set check* (#151).
+  `idl --check` reads every interface and rejects duplicate ids, clashing inherited names, unknown interfaces and mismatched names.
+* *Generated kernel constants* (#148).
+  The kernel uses generated constants instead of copying ids as literals.
+
+== Generation targets
+
+[#kernel-target]
+=== Kernel target (current)
+
+This is the only target the current compiler generates.
+Its output uses the subset of Ada available to kernel-level code: no tagged types, no interfaces and no `Ada.Streams`.
+For an interface `X` declared in `x.idl`, it writes three packages:
+
+[cols="2,2,4",options="header"]
+|===
+| Package | File | Contents
+
+| `Rose.Interfaces.X`
+| `rose-interfaces-x.ads`
+| The interface's types and constants, `X_Interface`, and a `<Method>_Endpoint` constant for each method, including inherited ones.
+
+| `Rose.Interfaces.X.Client`
+| `rose-interfaces-x-client.ad[sb]`
+| The private record type `X_Client` and one subprogram per method, for calling the interface.
+
+| `Rose.Interfaces.X.Server`
+| `rose-interfaces-x-server.ad[sb]`
+| One handler access type per method, and procedures to register handlers with a `Rose.Server` context.
+|===
+
+==== Client packages
+
+`X_Client` holds the interface capability and one capability for each method.
+
+* `Open (Client, Interface_Cap)` invokes the interface capability, which replies with the method capabilities, and stores them.
+* `Open_Cap_Set` builds a client from method capabilities the caller already has.
+* `Close` releases the client.
+* Each method becomes a subprogram that takes the client as its first parameter.
+  It builds an invocation on that method's capability, calls `Invoke_Capability`, and records any error, which `Has_Error` and `Get_Last_Error` report.
+* `Get_Interface_Cap` and `Get_<Method>_Cap` return the stored capabilities.
+
+Parameters and results are encoded as follows.
+
+* `in` scalars are sent as data words (`Send_Word`); capabilities are sent with `Send_Cap`.
+* `in` strings are sent as text (`Send_Text`), and `in` storage arrays in the shared buffer (`Send_Storage_Array`).
+* `out` storage arrays are received into the shared buffer (`Receive_Buffer`), then copied out.
+* A function whose result is an interface receives capabilities and returns a client opened on the first of them.
+* A function that returns a `String` becomes a procedure with `Result : out String; Last : out Natural` parameters, since a kernel-level caller has to supply the buffer.
+
+==== Server packages
+
+* Each method has a handler access type, with an extra first parameter `Id : Rose.Objects.Capability_Identifier`, the identifier of the capability that was invoked.
+  A server that serves many instances through one endpoint, such as one per device or per timer, uses `Id` to tell them apart.
+* A handler for a method that returns an interface returns a plain `Capability`.
+* `Create_Server` creates the endpoints for the interface's methods and registers the handlers in a `Rose.Server.Server_Context`.
+  `Attach_Interface` adds the interface to an existing context, and `Publish_Interface` also publishes it as the server's public interface.
+* The `Instanced` parameter selects a per-instance server.
+  Its exact behaviour is still to be documented.
+
+=== Ada 2022 target (planned)
+
+The rewritten compiler (#136) adds a target for user-mode code that uses the full Ada 2022 language.
+
+* An IDL interface becomes an Ada interface type, and its implementations become tagged types, so a parameter of type `interface File` accepts any object that implements `File`.
+* Inheritance between IDL interfaces maps to inheritance between Ada interface types.
+* Typed streams can be generic over their element type.
+* Every IDL type gets a text rendering, so typed values can be shown or passed to untyped tools.
+* Command declarations generate the procedure spec, the main program and the embedded metadata (see <<commands>>).
+
+=== Ada 2022 with SPARK (possible)
+
+A further target could generate the Ada 2022 packages with `SPARK_Mode` and contracts derived from the IDL, such as preconditions that check a client is open and postconditions on results.
+Whether to have this target is still open; it would tie in with the "Rose: SPARK annotations" project.
+
+[#commands]
+== Commands and packages (planned)
+
+ADR 0002 (#135) adds two declarations to the language (#137).
+
+* A `command` declaration declares a program's entry point as an Ada-style procedure, with parameter modes, defaults, short flags, a final list parameter that takes the remaining words, and help text.
+  The compiler generates the procedure spec, a one-shot server main that receives the shell's invocation and calls the author's procedure body, and metadata embedded in the executable.
+  Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
+* A `package` declaration gives the name, version and copyright that a group of commands share.
+
+Their grammar will be added to this chapter when the syntax is settled.
+
+[#known-issues]
+== Known issues
+
+These are differences between this chapter and the current compiler, or problems in it.
+
+* The name after `end` is not checked against the interface name.
+* An `interface X` type is not checked: an unknown interface is only found when the generated Ada fails to compile.
+* If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
+* An enumeration type takes its name from its interface, not from its type declaration.
+* The count type of `Storage_Array` refers to an undefined type, `Storage_Offset`.
+* `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build.
+  `Named` is still used through `Kernel_Process`, which inherits it.
+* The compiler is built with alix and depends on libraries outside the repository (WLib, GCS, syn and tropos); the build runs a prebuilt binary called `idle`.
+* The compiler also contains an unused generator for a non-kernel target, and an init-script generator for a `+procedure ... begin invoke ... end+` script language that nothing uses.
