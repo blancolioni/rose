@@ -1,0 +1,743 @@
+= The Interface Definition Language
+
+[NOTE]
+====
+This chapter is a draft (#146).
+It describes the language and code generation as the current compiler (`src/tools/idl`) implements them, and marks the planned changes: the compiler rewrite (#136), command declarations (#137), endpoint ids (#148 to #151) and ADR 0002.
+====
+
+== Overview
+
+Every interface between Rose processes is declared in the interface definition language (IDL).
+An IDL file declares one interface: its methods, their parameters, and any types and constants they use.
+The IDL compiler turns each interface into Ada packages that a client uses to call the interface and a server uses to implement it.
+
+* Interface files live in `interfaces/`, one interface per file.
+* The file name is the interface name in lower case, with the extension `.idl`: `Block_Device` is declared in `block_device.idl`.
+  The compiler relies on this to find parent interfaces.
+* The compiler is run once per file, as `idl <file> <endpoint-table>`.
+  The build in `src/library/kernelapi/generated` runs it over a fixed list of interfaces and writes the generated packages there.
+
+The syntax is a small subset of Ada, so an IDL file reads like an Ada package specification:
+
+[source,ada]
+----
+interface Block_Device is
+
+   Max_Block_Size : constant := 4096;
+
+   type Block_Size_Type is range 0 .. Max_Block_Size;
+   type Block_Address_Type is new Word_64;
+
+   procedure Get_Parameters
+     (Block_Count : out Block_Address_Type;
+      Block_Size  : out Block_Size_Type);
+
+   procedure Read_Blocks
+     (Start   : Block_Address_Type;
+      Count   : Natural;
+      Blocks  : out Storage_Array);
+
+end Block_Device;
+----
+
+== Lexical elements
+
+The lexical rules follow Ada.
+
+* *Identifiers* start with a letter or underscore, followed by letters, digits and underscores.
+  Identifiers and keywords are not case sensitive.
+* *Comments* start with `--` and run to the end of the line.
+* *Integer literals* follow Ada, including based literals such as `16#0C71_18A7_C791#`.
+  There are no negative literals, since `-` is not a token.
+* *String literals* are enclosed in double quotes.
+  They are recognised by the lexer, but no interface declaration uses them.
+* *Keywords:* `begin`, `constant`, `end`, `function`, `in`, `interface`, `invoke`, `is`, `new`, `out`, `procedure`, `range`, `record`, `return`, `type`, `with`.
+  `begin` and `invoke` are only used by the init-script generator (see <<known-issues>>).
+* *Symbols:* `+:+` `+;+` `+(+` `+)+` `+,+` `+.+` `+..+` `+=>+` `+:=+` `+'+` `+&+` `+/+`.
+
+== Grammar
+
+[source,ebnf]
+----
+interface_decl ::= 'interface' Name [ constraints ]
+                   [ ':' Name { ',' Name } ]
+                   [ 'with' Name '=>' Integer { ',' Name '=>' Integer } ]
+                   'is' { declaration } 'end' Name ';'
+
+constraints    ::= '(' Name ':' type { ',' Name ':' type } ')'
+
+declaration    ::= subprogram | type_decl | constant_decl
+
+subprogram     ::= ( 'procedure' | 'function' ) Name
+                   [ '(' param { ';' param } ')' ]
+                   [ 'return' type ]
+                   [ 'with' sub_aspect { ',' sub_aspect } ] ';'
+
+sub_aspect     ::= Name [ ''' Name ] '=>' Name
+
+param          ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
+
+type_decl      ::= 'type' Name 'is'
+                   ( 'range' bound '..' bound | [ 'new' ] type ) ';'
+
+bound          ::= Integer | Name
+
+type           ::= 'record' { Name ':' type ';' } 'end' 'record'
+                 | '(' Name { ',' Name } ')'
+                 | [ 'interface' ] Name
+
+constant_decl  ::= Name ':' [ 'constant' ] [ type ] ':=' ( Integer | Name ) ';'
+----
+
+== Declarations
+
+=== Interfaces and inheritance
+
+An interface declaration gives the interface a name and, optionally, a list of parent interfaces:
+
+[source,ada]
+----
+interface File : Stream, Seekable is
+end File;
+----
+
+* An interface inherits every method of every parent, recursively.
+  `File` has `Read` from `Stream_Reader`, `Write` from `Stream_Writer` and `Seek` from `Seekable`.
+* Each parent is found by parsing `<parent>.idl`, in the same directory as the first file the compiler was given.
+  The rewritten compiler will search a list of directories instead (see <<search-paths>>).
+* An interface may have no declarations of its own, as `File` does.
+
+=== Subprograms and parameters
+
+Methods are declared as Ada procedures and functions.
+
+* A *procedure* returns nothing; a *function* must have a `return` type.
+* Each parameter has a mode: `in` (the default), `out` or `in out`.
+  No interface currently uses `in out`.
+* Parameters cannot have default values.
+* A method with no parameters omits the parentheses: `function Length return Natural;`.
+
+=== Types
+
+An interface can declare types for its methods to use.
+
+* *Range types:* `type Block_Size_Type is range 0 .. Max_Block_Size;`.
+  Each bound is an integer literal or the name of an integer constant declared earlier in the interface or inherited from a parent.
+  Named bounds are planned (#153): the current compiler accepts only integer literals, so `block_device.idl` writes `4096` for now.
+* *Derived types:* `type Block_Address_Type is new Word_64;`.
+* *Enumerations:* `type File_Kind is (Directory, Ordinary_File, Special_File);`.
+* *Records:* `+type T is record ... end record;+`.
+  These are parsed but no interface uses them.
+* *Interface types:* `interface X` as a parameter or result type means a value of interface `X`, such as `function Get_Device return interface Block_Device;`.
+
+=== Constants
+
+`Name : constant := Value;` declares a constant.
+The value must be an integer literal or an identifier, and only one name can be declared at a time.
+For example, `Segment` declares its flag values this way:
+
+[source,ada]
+----
+Segment_Readable : constant := 1;
+Segment_Writable : constant := 2;
+----
+
+=== Aspects and constraints
+
+The grammar allows aspects on interfaces (`+with Name => Integer+`) and on subprograms (`+with Name => Name+` or `+with Name'Attribute => Name+`), and a list of constraints after an interface name.
+The parser records them, but no interface uses them, and their meaning is not yet defined.
+Pinned endpoint ids (#150) will be the first use of subprogram aspects.
+
+== Predefined types
+
+[cols="2,3,3",options="header"]
+|===
+| IDL type | Ada type | How it is passed
+
+| `Word` | `Rose.Words.Word` | One data word
+| `Word_32` | `Rose.Words.Word_32` | One data word
+| `Word_64` | `Rose.Words.Word_64` | Two data words on i686, low half first; one on a 64-bit target
+| `Natural`, `Positive`, `Integer` | Standard Ada types | One data word
+| `Endpoint` | `Rose.Objects.Endpoint_Id` | As `Word_64`
+| `Object_Id` | `Rose.Objects.Object_Id` | As `Word_64`
+| `Storage_Count` | `System.Storage_Elements.Storage_Count` | One data word
+| `Stream_Element_Count`, `Stream_Element_Offset` | `System.Storage_Elements.Storage_Count`, `Storage_Offset` | One data word
+| `Address` | `System.Address` | One data word
+| `Capability` | `Rose.Capabilities.Capability` | One capability
+| `Capability_Array` | `Rose.Capabilities.Capability_Array` | All the remaining capabilities
+| `String` | `String` | The shared buffer
+| `Storage_Array`, `Stream_Element_Array` | `System.Storage_Elements.Storage_Array` | The shared buffer
+| `Page` | `Storage_Array (1 .. 4096)`, page aligned | The shared buffer
+| `Rose_Interface` | `Rose.Interfaces.Rose_Interface` | One capability
+| `interface X` | `Rose.Interfaces.X.Client.X_Client` | One capability, the interface capability (see <<kernel-target>>)
+|===
+
+Types derived from these, such as `type Block_Address_Type is new Word_64`, are passed in the same way.
+How the words, capabilities and buffer of an invocation are filled is described under <<encoding>>.
+
+The compiler can map the stream element types to `Ada.Streams` instead, but that option is turned off, since `Ada.Streams` isn't available to kernel-level code.
+
+== Endpoint ids
+
+Every method, and every interface, has a 64-bit endpoint id.
+A server registers each method under its id, and a client's capability for a method carries the id.
+The generated package for an interface declares the ids as constants: `<Interface>_Interface` for the interface, and `<Method>_Endpoint` for each method, including inherited ones.
+
+=== Current mechanism
+
+The compiler keeps every id in `interfaces/interfaces.txt`, one `+Interface.method = 16#...#+` line per id.
+
+* The first time it sees a method or interface, it picks a random 48-bit value, adds it to the table and rewrites the whole file.
+* Inherited methods use the key of the interface that declares them, so a parent and its children agree, as long as the table entry exists when both are compiled.
+* Entries are never removed.
+
+This is fragile.
+The ids exist only in that file, so losing an entry silently assigns a new random value; parallel builds can lose entries; the kernel copies five of the values as literals; and the build writes to the source tree.
+
+=== Planned mechanism
+
+* *Ids derived from the source* (#149).
+  An endpoint id is a hash (SHA-256, truncated to 64 bits) of a canonical form of the method's qualified name, parameter modes and types, and result type, for example `rose.interfaces.directory.find_entry(in string) return natural`.
+  An interface id is the hash of `interface rose.interfaces.<name>`.
+  An incompatible change to a signature changes the id, so old callers fail with an invalid endpoint instead of decoding the wrong arguments.
+  `interfaces.txt` is removed.
+* *Pinned ids* (#150).
+  `+with Endpoint_Id => 16#...#+` on a method or interface keeps a specific id, for example when a method is renamed but persisted processes still use the old id.
+* *A whole-set check* (#151).
+  `idl --check` reads every interface and rejects duplicate ids, clashing inherited names, unknown interfaces and mismatched names.
+* *Generated kernel constants* (#148).
+  The kernel uses generated constants instead of copying ids as literals.
+
+== Generation targets
+
+[#kernel-target]
+=== Kernel target (current)
+
+This is the only target the current compiler generates.
+Its output uses the subset of Ada available to kernel-level code: no tagged types, no interfaces and no `Ada.Streams`.
+For an interface `X` declared in `x.idl`, it writes three packages:
+
+[cols="2,2,4",options="header"]
+|===
+| Package | File | Contents
+
+| `Rose.Interfaces.X`
+| `rose-interfaces-x.ads`
+| The interface's types and constants, `X_Interface`, and a `<Method>_Endpoint` constant for each method, including inherited ones.
+
+| `Rose.Interfaces.X.Client`
+| `rose-interfaces-x-client.ad[sb]`
+| The private record type `X_Client` and one subprogram per method, for calling the interface.
+
+| `Rose.Interfaces.X.Server`
+| `rose-interfaces-x-server.ad[sb]`
+| One handler access type per method, and procedures to register handlers with a `Rose.Server` context.
+|===
+
+==== Client packages
+
+`X_Client` holds the interface capability and one capability for each method.
+
+* `Open (Client, Interface_Cap)` invokes the interface capability, which replies with the method capabilities, and stores them.
+* `Open_Cap_Set` builds a client from method capabilities the caller already has.
+* `Close` releases the client.
+* Each method becomes a subprogram that takes the client as its first parameter.
+  It builds an invocation on that method's capability, calls `Invoke_Capability`, and records any error, which `Has_Error` and `Get_Last_Error` report.
+* `Get_Interface_Cap` and `Get_<Method>_Cap` return the stored capabilities.
+
+* A function that returns a `String` becomes a procedure with `Result : out String; Last : out Natural` parameters, since a kernel-level caller has to supply the buffer.
+
+[#encoding]
+==== How arguments are encoded
+
+An invocation carries up to 16 data words, up to 16 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
+The generated client fills them in the order the parameters are declared, and the generated server reads them back in the same order.
+
+* *Scalars* go in the data words, one after another.
+  On i686, a 64-bit value (`Word_64`, `Object_Id`, `Endpoint`, and types derived from them) takes two words, low half first; the server's `Get_Word_64` reads both.
+  So in `+Read_Blocks (Start : Block_Address_Type; Count : Natural; ...)+`, `Start` is in words 0 and 1 and `Count` in word 2.
+* *Capabilities* go in the capability slots, one after another.
+  An `interface X` argument is sent as the client's interface capability, and the server's handler receives it as a plain `Capability`.
+* *A `Capability_Array`* is sent one capability at a time, and the server copies every remaining capability into it.
+  It must therefore be the last parameter that carries capabilities.
+* *A `String` or `Storage_Array`* goes in the shared buffer.
+  The server does not copy it: its handler sees the client's buffer in place, through `Buffer_Address` and `Buffer_Length`.
+  For an `out` parameter the server writes into that buffer directly.
+  Since there is one buffer, a method can have at most one such parameter; all current interfaces keep to this.
+* *Results.* A scalar result is returned in the reply's data words.
+  A `String` result is written into the buffer, and its last index (`Last`) is returned in word 0.
+  An interface result is returned as one capability, which the client opens with `Open`.
+
+The client and the server agree on all of these, which is checked by Rose booting with the generated packages, at least on i686.
+
+==== Server packages
+
+* Each method has a handler access type, with an extra first parameter `Id : Rose.Objects.Capability_Identifier`, the identifier of the capability that was invoked.
+  A server that serves many instances through one endpoint, such as one per device or per timer, uses `Id` to tell them apart.
+* Interface arguments and results are plain `Capability` values in a handler: a handler receives an interface argument as a `Capability`, and returns an interface result as one.
+* `Create_Server` creates the endpoints for the interface's methods and registers the handlers in a `Rose.Server.Server_Context`.
+  `Attach_Interface` adds the interface to an existing context, and `Publish_Interface` also publishes it as the server's public interface.
+* The `Instanced` parameter, described next, selects whether one set of method capabilities is shared by every client, or each resource the server manages gets its own.
+
+==== Instanced servers
+
+Many servers manage several resources of the same kind: the timer server manages many timers, the memory server many processes, and the ATA server up to four drives.
+Each resource is an _instance_ of the interface, and is identified by a `Capability_Identifier` that the server chooses.
+
+* *Not instanced* (the default).
+  `Create_Server` or `Attach_Interface` creates one capability for each method, with identifier 0, and every client shares them.
+  Every call reaches its handler with `Id` = 0.
+* *Instanced* (`+Instanced => True+`).
+  No method capabilities are created up front.
+  Instead, for each resource the server creates an interface capability carrying that resource's identifier, with `Rose.Server.Create_Endpoint (X_Interface, Identifier)`, and hands it out.
+  When a client opens it, the generated interface handler creates one capability for each method, carrying the same identifier, the first time that identifier is seen.
+  It caches them in the package's `Rose.Server.Server_Instance` table and returns them.
+  Every call then reaches its handler with `Id` set to the resource's identifier, which the handler uses to find the resource.
+
+For example, the timer server attaches `Timeout` and `Cap` as instanced interfaces, so each timer it creates has its own `On_Timeout` and `Destroy` capabilities, and `Destroy_Timer (Id)` knows which timer to remove.
+The caps, isofs, mem and store servers use instanced interfaces in the same way.
+
+The instance table holds up to 160 (endpoint, identifier) pairs for each interface (`Rose.Server.Max_Endpoint_Instances`).
+
+The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
+
+=== Ada 2022 target (planned)
+
+The rewritten compiler (#136) adds a target for user-mode code that uses the full Ada 2022 language.
+
+* An IDL interface becomes an Ada interface type, and its implementations become tagged types, so a parameter of type `interface File` accepts any object that implements `File`.
+* Inheritance between IDL interfaces maps to inheritance between Ada interface types.
+* Typed streams can be generic over their element type.
+* Every IDL type gets a text rendering, so typed values can be shown or passed to untyped tools.
+* Command declarations generate the procedure spec, the main program and the embedded metadata (see <<commands>>).
+
+=== Ada 2022 with SPARK (possible)
+
+A further target could generate the Ada 2022 packages with `SPARK_Mode` and contracts derived from the IDL, such as preconditions that check a client is open and postconditions on results.
+Whether to have this target is still open; it would tie in with the "Rose: SPARK annotations" project.
+
+[#commands]
+== Commands and packages (planned)
+
+ADR 0002 (#135) adds two declarations to the language (#137).
+
+* A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
+  A command is named as a child of the package it belongs to, such as `Core_Utilities.Echo`.
+  The compiler generates the procedure spec, a one-shot server main that receives the shell's invocation and calls the author's procedure body, and metadata embedded in the executable.
+  Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
+* A `package` declaration gives the name, version and copyright that a group of commands share.
+
+[#search-paths]
+=== Finding declarations
+
+The compiler is given a list of directories to search, much like the include paths of a C compiler:
+
+----
+idl -I interfaces -I src/commands/core_utilities core_utilities-echo.idl
+----
+
+* Whenever a declaration names another one, as a parent interface, an `interface X` type, or a command's package, the compiler looks for its file in each directory in turn and uses the first it finds.
+* The file name is the declaration's name in lower case, with each `.` replaced by `-`, as GNAT names Ada units: `Core_Utilities` is in `core_utilities.idl`, and `Core_Utilities.Echo` is in `core_utilities-echo.idl`.
+* A name that is not found in any directory is an error.
+
+The build passes `interfaces/` and the directories that hold packages and commands.
+
+=== Commands
+
+A command declaration describes a program that the shell can run: its arguments, how they are given on the command line, and its help text.
+From it, the compiler generates the procedure spec the author implements, the program's main, and the metadata the shell's registry reads.
+
+[NOTE]
+====
+The syntax below is proposed in #137.
+Its main choices are settled (see <<command-decisions>>); the remaining open questions are listed at the end of this section.
+====
+
+==== Declaring a command
+
+A command is named as a child of the package it belongs to, like an Ada child unit: `Core_Utilities.Echo` is the command `Echo` in the package `Core_Utilities`.
+It is declared in its own file, named as GNAT names child units (`core_utilities-echo.idl`), and kept with the command's source rather than in `interfaces/`.
+The declaration has the same shape as an interface or package: aspects for the command as a whole, then `is`, then one declaration for each argument, then `end`.
+
+[source,ada]
+----
+command Core_Utilities.Echo
+  with Summary     => "Write arguments to standard output",
+       Description => "Writes each argument to standard output, " &
+                      "separated by single spaces."
+is
+
+   New_Line : Boolean := True
+     with Short_Name  => 'n',
+          Short_Value => False,
+          Help        => "End the output with a new line";
+
+   Arguments : String_List
+     with Help => "Words to write, separated by spaces";
+
+end Core_Utilities.Echo;
+----
+
+A command that takes and produces files gives its arguments modes and interface types:
+
+[source,ada]
+----
+command Core_Utilities.Copy
+  with Summary => "Copy a file"
+is
+
+   Source : in interface File
+     with Help => "The file to copy";
+
+   Target : out interface File
+     with Help => "The new file";
+
+end Core_Utilities.Copy;
+----
+
+* Each argument is declared like an Ada object: a name, an optional mode, a type, an optional default, and aspects, ending with `;`.
+  Because each declaration ends with its own `;`, an argument's aspects cannot be confused with the next argument's or with the command's.
+* The compiler generates the Ada procedure spec from the argument declarations, in declaration order.
+* Standard input, output and error are supplied by the shell and are not declared.
+
+==== Command aspects
+
+No aspect is required: anything a declaration must have is part of its syntax, and every aspect has a default.
+
+[cols="1,4",options="header"]
+|===
+| Aspect | Meaning
+
+| `Name` | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Core_Utilities.Echo`. For example, `+Name => "myecho"+`.
+| `Summary` | A one-line description, shown by `--help` and in command listings. Without it, the command's qualified name followed by "(no summary)" is used: `Core_Utilities.Echo (no summary)`.
+| `Description` | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>). Without it, there is no description.
+| `Authors` | Who wrote the command, printed by `--version` as "Written by ...". Without it, the package's `Authors` is used.
+| `Version`, `Copyright` | Override the package's version or copyright for this command. Without them, the package's values are used.
+|===
+
+==== Arguments
+
+* *Modes* map to the capabilities the program receives, as in ADR 0002: `in` (the default) and `in out` for existing objects, `out` for new ones.
+  An `out` argument of a non-file type is a result that the shell binds to a variable.
+  Modes are written as in Ada parameters, although Ada object declarations have none, since an argument's mode is the most important thing about it.
+* *Defaults* are written `:= Value`.
+  An argument without a default must be given on the command line.
+* *List arguments.* The last positional argument may have the type `String_List`, which takes all remaining positional words, and can be none.
+  At most one argument may do this.
+  `String_List` is a predefined type in command declarations, generated as `Rose.Command_Line.String_List`.
+* *Reserved names.* No argument may be called `Help` or `Version`, since the shell handles `--help` and `--version` itself.
+
+[cols="1,4",options="header"]
+|===
+| Argument aspect | Meaning
+
+| `Help` | A one-line description of the argument itself, shown by `--help`. It describes the argument, not its short option: the shell shows the options that set it. Without it, the argument's name followed by "(no help)" is used: `New_Line (no help)`.
+| `Short_Name` | A character that gives a short option, such as `+'n'+` for `-n`.
+| `Short_Value` | The value a short option gives a `Boolean` argument. Without it, the short option sets `True`.
+|===
+
+==== How arguments are given
+
+* *By position*, in declaration order, for arguments without a `Short_Name`.
+* *By name*, as `--name=value` or `--name value`, where the name is the argument name in lower case with `_` replaced by `-`, prefixed with `--`: `New_Line` is given as `--new-line`.
+  Any argument can be given by name.
+  A `Boolean` argument can also be given as `--name`, which sets it to `True`, or `--no-name`, which sets it to `False`: `--no-new-line` is the same as `--new-line=false`.
+* *By short name*, for arguments with a `Short_Name`.
+  A `Boolean` short option takes no value: `-n` sets `New_Line` to `False` in the example above.
+  A short option for any other type takes the next word as its value.
+* `--` ends option processing, so later words are always positional.
+
+So `echo -n Welcome to Rose` binds `+New_Line => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
+
+[#string-values]
+==== String values
+
+Any aspect that takes a string, on a command, an argument or a package, can be written in three ways:
+
+* *A string literal*, `+"..."+`, optionally joined with others by `&`.
+  This suits one-line values such as `Summary` and `Help`.
+* *A text block*, which can span several lines:
++
+[source,ada]
+----
+Description => """
+   Writes each argument to standard output, separated by single
+   spaces.
+
+   With -n, no new line is written after the last argument.
+   """
+----
++
+The text starts on the line after the opening `"""` and ends before the closing `"""`.
+The indentation common to every non-blank line is removed, so the block can be indented with the declaration, and line breaks and blank lines are kept.
+* *A text file*, `Text_File ("echo-description.txt")`.
+  The compiler reads the file when it compiles the declaration, with its path relative to the `.idl` file, and uses its contents as written, without its final line break.
+  This suits long descriptions with several paragraphs or tables.
+  The function is called `Text_File`, not `File`, since `File` is already an interface.
+
+In every case the value ends up in the command's embedded metadata, so the shell never reads the source files.
+
+==== Help
+
+`--help` is answered by the shell from the command's metadata, without running the command.
+It follows the layout of GNU tools such as `cp --help`:
+
+. *Usage line*, a single line generated from the argument declarations.
+. *Summary*, the command's `Summary`.
+. *Options*, generated from each argument's `Help`, `Short_Name` and default, followed by `--help` and `--version`, which the shell adds.
+  If any option takes a value, the list starts with "Mandatory arguments to long options are mandatory for short options too."
+. *Description*, the command's `Description`, if it has one.
+. *Package footer*, the `Help_Footer` of the command's package (see <<packages>>), with the command's registered name filled in.
+
+For example:
+
+----
+Usage: echo [OPTION]... [ARGUMENTS]...
+Write arguments to standard output
+
+  -n, --no-new-line   do not end the output with a new line
+      --new-line      end the output with a new line (default)
+      --help          display this help and exit
+      --version       output version information and exit
+
+Writes each argument to standard output, separated by single
+spaces.
+
+With -n, no new line is written after the last argument.
+
+Rose core utilities: <https://rose-os.org/rose-book/>
+Full documentation: <https://rose-os.org/rose-book/echo.html>
+----
+
+The exact layout of the options list is still to be fixed; the order of the parts is settled.
+
+==== What the compiler generates
+
+For `core_utilities-echo.idl`, the compiler writes:
+
+* `core_utilities-echo.ads`, the procedure spec, a child of the package's generated Ada package (see <<packages>>), which the author implements in `core_utilities-echo.adb`:
++
+[source,ada]
+----
+with Rose.Command_Line;
+procedure Core_Utilities.Echo
+  (New_Line  : Boolean := True;
+   Arguments : Rose.Command_Line.String_List);
+----
+* `core_utilities-echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Core_Utilities.Echo`, and reports success or failure (ADR 0002).
+* The command's metadata, embedded in the executable: its registered name, the argument declarations, the help text, and the details of its package.
+
+==== Grammar changes
+
+[source,ebnf]
+----
+command_decl  ::= 'command' Name '.' Name
+                  'with' aspect { ',' aspect }
+                  'is' { argument_decl } 'end' Name '.' Name ';'
+
+argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
+                  [ ':=' value ]
+                  [ 'with' aspect { ',' aspect } ] ';'
+
+aspect        ::= Name '=>' value
+value         ::= Integer | Character | Name | string_value
+string_value  ::= String { '&' String }
+                | Text_Block
+                | 'Text_File' '(' String ')'
+----
+
+`Text_Block` is a new lexical element: `"""`, a line break, any number of lines, and a closing `"""` on a line of its own.
+The lexer also needs character literals, which it does not yet produce, and the parser needs string concatenation with `&`.
+
+[#command-decisions]
+==== Decisions
+
+* *Arguments are declarations in a block*, like objects in an Ada package, rather than a parameter list.
+  A bare parameter list was proposed first, but when the last parameter had aspects, its aspect list and the command's sat side by side and read as one.
+  A `procedure` inside the block was also considered; it would match the generated Ada exactly, but repeats the name, and the compiler can generate the spec from the declarations.
+* *Help text goes in `Help` aspects.*
+  Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled aspect is an error, while a malformed comment would be silently ignored.
+* *No aspect is required.* Anything a declaration must have is part of its syntax, and every aspect has a default.
+  A missing `Summary` or `Help` shows clearly in `--help`, as "(no summary)" or "(no help)".
+* *`Summary` and `Description` on the command, `Help` on arguments.*
+* *`--help` follows the GNU layout*: usage, summary, options, description, then a footer from the package.
+  An earlier draft left `Description` out of `--help`.
+  As in GNU tools, `--help` does not print the version; that is left to `--version`.
+* *One usage line*, generated from the argument declarations.
+  Commands do not have several usage forms: the aim is a consistent shell, not a copy of GNU tools or POSIX.
+* *`--version` follows the GNU layout* (see <<packages>>).
+* *Any string aspect can be a literal, a text block or a text file.*
+* *Short options are `Short_Name` and `Short_Value`.*
+* *`Boolean` arguments take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
+* *Command files live with the command's source*, so each command is self-contained.
+  Keeping them all in one directory, like `interfaces/`, was considered; it makes them easy to check together, but separates each declaration from its code.
+* *The compiler searches a list of directories* for the declarations a file names (see <<search-paths>>).
+* *A command is a child of its package*, `Core_Utilities.Echo`, in `core_utilities-echo.idl`.
+  An earlier draft named the package with a `Part_Of` aspect instead; the child name says the same thing in the way Ada does, and needs no extra aspect.
+* *The shell registers a command under the last part of its name*, in lower case, unless a `Name` aspect overrides it.
+
+* *An ambiguous name is resolved by asking the user* (see <<command-visibility>>).
+
+==== Open questions
+
+None at present.
+
+[#packages]
+=== Packages
+
+A package is a named, versioned group of commands that are built, installed and versioned together, such as the core utilities that `init` installs at boot.
+Its declaration holds the information `--version` reports, so that no command has to repeat it.
+
+[NOTE]
+====
+The syntax below is a proposal, to be settled in #137.
+====
+
+==== Declaring a package
+
+A package is declared in its own file, named after the package like any other IDL file:
+
+[source,ada]
+----
+--  core_utilities.idl
+package Core_Utilities
+  with Title       => "Rose core utilities",
+       Version     => "1.0.0",
+       Copyright   => "Copyright (C) 2026 Fraser Wilson",
+       Authors     => "Fraser Wilson",
+       Summary     => "Commands available when Rose boots",
+       License     => """
+          License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+          This is free software: you are free to change and redistribute it.
+          There is NO WARRANTY, to the extent permitted by law.
+          """,
+       Help_Footer => """
+          Rose core utilities: <https://rose-os.org/rose-book/>
+          Full documentation: <https://rose-os.org/rose-book/{command}.html>
+          """
+is
+end Core_Utilities;
+----
+
+As for commands, no aspect is required, and each has a default:
+
+* `Title` is the package's name as shown to users, in parentheses on the first line of `--version`. Without it, the package name is used.
+* `Version` is a version string of the form `major.minor.patch`. Without it, the version is `0.0.0`.
+* `Copyright` is a single line of text. Without it, `--version` prints no copyright line.
+* `Authors` is the default for each command's `Authors`. Without it, `--version` prints no "Written by" line, unless the command has its own.
+* `License` is printed by `--version` after the copyright line. Without it, nothing is printed there.
+* `Summary` is a one-line description, shown when listing packages. Without it, the package name followed by "(no summary)" is used, as for commands.
+* `Help_Footer` is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines. Without it, `--help` ends after the description.
+* `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
+* The body is empty. A package does not list its commands; each command is declared as a child of its package, so adding a command does not mean editing the package.
+* A package declares no methods and has no endpoint ids.
+
+==== Commands in a package
+
+A command belongs to the package it is a child of:
+
+[source,ada]
+----
+command Core_Utilities.Echo
+  with Summary => "Write arguments to standard output"
+is
+   ...
+end Core_Utilities.Echo;
+----
+
+* Every command belongs to exactly one package, the parent in its name, and that package must be found on the search path.
+* A command can override the package's version, copyright or authors with its own `Version`, `Copyright` or `Authors` aspect, for example a command that is updated more often than the rest of its package.
+  Without an override, it uses the package's values.
+* Moving a command to another package means renaming it, and its file.
+
+==== What the compiler does with a package
+
+* When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`) from the search path.
+  It reports an error if the package does not exist.
+* It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's registered name.
+  The registry can then answer `--version` from the executable alone, without reading the package file.
+* A package generates a small Ada package, the parent of its commands' procedures, holding its details as constants:
++
+[source,ada]
+----
+package Core_Utilities is
+   Title     : constant String := "Rose core utilities";
+   Version   : constant String := "1.0.0";
+   Copyright : constant String := "Copyright (C) 2026 Fraser Wilson";
+   Authors   : constant String := "Fraser Wilson";
+   License   : constant String := "...";
+end Core_Utilities;
+----
+
+==== What the shell does with packages
+
+* `--version` follows the GNU layout: the command name, the package's `Title` in parentheses and the effective version; the copyright, if any; the package's `License`, if any; a blank line; and "Written by" with the command's authors, if any:
++
+----
+echo (Rose core utilities) 1.0.0
+Copyright (C) 2026 Fraser Wilson
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Fraser Wilson.
+----
+* `--help` ends with the package's help footer (see <<commands>>).
+* The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
+* The build collects every command that is a child of a package to form that package's set of executables.
+  `init` installs the `Core_Utilities` package from the boot image, so its commands are registered before petal's first prompt.
+
+[#command-visibility]
+==== Which commands are visible
+
+The shell treats packages much as Ada treats a `use` clause:
+
+* The commands of a used package can be run by their registered names alone.
+  There is an implicit `use Core_Utilities;`, so `echo` runs `Core_Utilities.Echo`.
+* Any command can be run by its qualified name, in Ada syntax: `core_utilities.echo`.
+  Names are not case sensitive, so `Core_Utilities.Echo` and `Debug.Echo` work too.
+* Arguments follow the name as words, as in any shell; a command is not written as a procedure call with parentheses.
+* Installing a command whose name is already visible from another package is not an error.
+  The shell warns, for example `echo already visible from package core_utilities. This command will be available with debug.echo`, and the new command can then be run by its qualified name.
+* If a `use` makes the same name visible from two packages, the name alone is ambiguous, as in Ada.
+  Petal asks the user which command was meant, listing the qualified names.
+  When it is not interactive, for example when running a script, it reports the ambiguity as an error instead.
+* A command can be given another name with a renaming, in Ada style:
++
+----
+command debug_echo renames Debug.Echo;
+----
++
+After this, `debug_echo` runs `Debug.Echo`.
+
+==== Grammar changes
+
+This proposal needs two changes to the grammar:
+
+* A new kind of file:
++
+[source,ebnf]
+----
+package_decl ::= 'package' Name
+                 'with' aspect { ',' aspect }
+                 'is' 'end' Name ';'
+----
+* Aspect values can be strings in any of the forms in <<string-values>>, as well as integers and names.
+
+[#known-issues]
+== Known issues
+
+These are differences between this chapter and the current compiler, or problems in it.
+
+* The name after `end` is not checked against the interface name.
+* Range bounds must be integer literals; names of constants are not yet accepted (#153).
+* An `interface X` type is not checked: an unknown interface is only found when the generated Ada fails to compile.
+* If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
+* An enumeration type takes its name from its interface, not from its type declaration.
+* The count type of `Storage_Array` refers to an undefined type, `Storage_Offset`.
+* The ATA server does not use the generated `Block_Device` server package; it builds its capabilities by hand with endpoint ids from `Rose.Devices.Block`.
+* `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build.
+  `Named` is still used through `Kernel_Process`, which inherits it.
+* The compiler is built with alix and depends on libraries outside the repository (WLib, GCS, syn and tropos); the build runs a prebuilt binary called `idle`.
+* The compiler also contains an unused generator for a non-kernel target, and an init-script generator for a `+procedure ... begin invoke ... end+` script language that nothing uses.
