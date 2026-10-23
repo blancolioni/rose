@@ -440,6 +440,11 @@ This needs character literals, which the lexer does not yet produce, and string 
 * *Help in comments.*
   The alternative to `Help` aspects is structured comments, such as `--  Words to write`, which read better.
   Aspects are proposed because the compiler can check them: a misspelled aspect is an error, but a malformed comment is silently ignored.
+* *Parameter aspects next to command aspects.*
+  A parameter's aspect list ends at the `;` or `)` after it, and the command's list starts with the `with` after the closing `)`.
+  When the last parameter has aspects, the two lists sit next to each other and are easy to misread as one.
+  Moving parameter aspects into the command's list was considered and rejected, since it means repeating parameter names and separates help text from its parameter.
+  A clearer layout or syntax is still wanted.
 * *Boolean options by name.* Whether `--newline=false` is enough, or `--no-newline` should also be accepted.
 * *Where command files live.* Next to each command's source, as proposed, or together in one directory like `interfaces/`.
 
