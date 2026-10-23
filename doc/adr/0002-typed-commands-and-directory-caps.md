@@ -87,6 +87,14 @@ A command is declared once, in IDL, together with its help text. The IDL compile
   - **`out` parameters** are locals in the main. Their values are returned in `Complete`.
   - **`Complete` and `Fail`** tell the shell whether to commit (section 4). An unhandled exception becomes a structured error the shell can display, not a crash with an exit code. Standard error is for diagnostic text.
 
+- **A command receives its arguments by invocation, not at process start.** This is a deliberate choice.
+  - **At start**, a command process holds only a receive cap for its command endpoint. The launcher gives the shell the matching endpoint cap.
+  - **The shell then calls that endpoint** with a reply cap, sending the arguments, their caps and the standard streams. The generated main's `Receive` waits for that call, and `Complete` or `Fail` is the reply.
+  - **Why:** arguments use the same encoding as every other IDL method call, decoded by the same generated server code, so there is one encoding and not two. The reply cap gives the shell its completion signal without a separate result cap. Starting a command is calling a method on it.
+  - **Alternatives considered.** Passing everything at process start, as `Launch` does today with a `Capability_Array` and `Environment` bytes, saves a step. But it needs a second encoding for arguments and a separate cap for the result. Creating the process with the invocation already pending would avoid the extra step too, but it adds a special case to process creation for little gain.
+  - **Cost:** one extra round trip per launch, and a short period when the process exists without its arguments. A blocking send from the shell waits until the process is ready, so there is no race.
+  - **Compatibility is not a constraint.** `Launch` and the exec server change to fit this model; the current `Capability_Array` and `Environment` convention is not kept for commands.
+
 - **The metadata goes in the executable.** The compiler also emits the signature, help text and package details as a constant in the executable, for example in a dedicated ELF section. Installing a command reads them from the executable without running it. This replaces the separate formal-arguments file that petal's `install` command takes today.
 
 - **`Rose.Command_Line`** is a core IDL package for command-line types, starting with `String_List`. It also holds the launch support (`Rose.Command_Line.Launch`) that generated mains call.
@@ -186,6 +194,7 @@ The language features above need the IDL compiler to do more than it does now, s
 
 - Rewrite the IDL compiler with kernel and user-mode targets, built with Alire.
 - Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and add the `Rose.Command_Line` package with `String_List` and the launch support (#137).
+- Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell.
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command.
 - Split the `Directory` interface into lookup and create-and-modify parts.
 - Define the core stream interfaces (`core.File_Info` and similar) and unit types.
