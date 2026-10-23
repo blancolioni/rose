@@ -104,12 +104,12 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 - **Registry entries.** The shell's command registry maps each command name to:
   - its signature: each argument's name, type, mode, default, optional short option and help text;
   - the command's summary and extended description;
-  - its package: name, version, copyright and help footer;
+  - its package: name, display name, version, copyright, licence, authors and help footer;
   - the launch cap.
 - **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare arguments with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
 - **Help is generated**, in the layout of GNU tools: a usage line built from the signature, the command's summary, the options with each argument's help, the command's extended description, and a footer from its package with the command's name filled in.
-- **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` prints the command's effective version and copyright.
-- **Packages are declared in IDL.** A `package` declaration gives a package's name, version and copyright, and each command declaration names the package it belongs to. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
+- **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` follows the GNU layout: the command with its package's display name and version, the copyright, the package's licence text, and who wrote the command.
+- **Packages are declared in IDL.** A `package` declaration gives a package's name, display name, version, copyright, licence text and default authors, and each command declaration names the package it belongs to. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
 - **Core commands are installed at boot.** `init` installs the core-utilities package from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
 - **`--` ends option processing**, so `echo -- --help` prints `--help`. Quoting makes no difference, since `"--help"` is the same word once the quotes are removed.
 
