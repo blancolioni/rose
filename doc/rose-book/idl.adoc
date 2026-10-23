@@ -282,7 +282,90 @@ ADR 0002 (#135) adds two declarations to the language (#137).
   Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
 * A `package` declaration gives the name, version and copyright that a group of commands share.
 
-Their grammar will be added to this chapter when the syntax is settled.
+The grammar for commands will be added to this chapter when their syntax is settled.
+
+=== Packages
+
+A package is a named, versioned group of commands that are built, installed and versioned together, such as the core utilities that `init` installs at boot.
+Its declaration holds the information `--version` reports, so that no command has to repeat it.
+
+[NOTE]
+====
+The syntax below is a proposal, to be settled in #137.
+====
+
+==== Declaring a package
+
+A package is declared in its own file, named after the package like any other IDL file:
+
+[source,ada]
+----
+--  core_utilities.idl
+package Core_Utilities
+  with Version   => "1.0.0",
+       Copyright => "Copyright (C) 2026 Fraser Wilson",
+       Summary   => "Commands available when Rose boots"
+is
+end Core_Utilities;
+----
+
+* `Version` is required. It is a version string of the form `major.minor.patch`.
+* `Copyright` is required. It is a single line of text.
+* `Summary` is optional. It is a one-line description, shown when listing packages.
+* The body is empty. A package does not list its commands; each command names its package instead, so adding a command does not mean editing the package.
+* A package declares no methods and has no endpoint ids.
+
+==== Commands in a package
+
+A command names the package it belongs to with the `Part_Of` aspect:
+
+[source,ada]
+----
+command Echo
+  with Part_Of => Core_Utilities
+is
+   ...
+end Echo;
+----
+
+* Every command must belong to exactly one package.
+* A command can override the package's version or copyright with its own `Version` or `Copyright` aspect, for example a command that is updated more often than the rest of its package.
+  Without an override, it uses the package's values.
+* `Part_Of` is used rather than `Package`, since `package` is a reserved word, and `Part_Of` has a similar meaning in SPARK.
+
+==== What the compiler does with a package
+
+* When it compiles a command, the compiler reads the package's file, using the same file-name rule as for parent interfaces.
+  It reports an error if the package does not exist or is missing `Version` or `Copyright`.
+* It copies the package's name, version, copyright and summary, with any overrides from the command, into the command's embedded metadata.
+  The registry can then answer `--version` from the executable alone, without reading the package file.
+* A package itself generates no Ada code.
+
+==== What the shell does with packages
+
+* `--version` prints the command, its package and its effective version on one line, and the copyright on the next:
++
+----
+echo (Core_Utilities) 1.0.0
+Copyright (C) 2026 Fraser Wilson
+----
+* The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
+* The build collects every command whose `Part_Of` names a package to form that package's set of executables.
+  `init` installs the `Core_Utilities` package from the boot image, so its commands are registered before petal's first prompt.
+
+==== Grammar changes
+
+This proposal needs two changes to the grammar:
+
+* A new kind of file:
++
+[source,ebnf]
+----
+package_decl ::= 'package' Name
+                 'with' Name '=>' String { ',' Name '=>' String }
+                 'is' 'end' Name ';'
+----
+* Aspect values can be string literals, as well as integers and names.
 
 [#known-issues]
 == Known issues
