@@ -3,7 +3,8 @@
 [NOTE]
 ====
 This chapter is a draft (#146).
-It describes the language and code generation as the current compiler (`src/tools/idl`) implements them, and marks the planned changes: the compiler rewrite (#136), command declarations (#137), endpoint ids (#148 to #151) and ADR 0002.
+It describes the language and code generation as the current compiler (`src/tools/idl`) implements them, and marks the planned changes: the compiler rewrite (idle#1), command declarations (idle#2), endpoint ids (#148, and idle#3 to idle#5) and ADR 0002.
+References written idle#N are to issues in the compiler's own repository, https://github.com/blancolioni/idle[blancolioni/idle].
 ====
 
 == Overview
@@ -124,7 +125,7 @@ An interface can declare types for its methods to use.
 
 * *Range types:* `type Block_Size_Type is range 0 .. Max_Block_Size;`.
   Each bound is an integer literal or the name of an integer constant declared earlier in the interface or inherited from a parent.
-  Named bounds are planned (#153): the current compiler accepts only integer literals, so `block_device.idl` writes `4096` for now.
+  Named bounds are planned (idle#6): the current compiler accepts only integer literals, so `block_device.idl` writes `4096` for now.
 * *Derived types:* `type Block_Address_Type is new Word_64;`.
 * *Enumerations:* `type File_Kind is (Directory, Ordinary_File, Special_File);`.
 * *Records:* `+type T is record ... end record;+`.
@@ -147,7 +148,7 @@ Segment_Writable : constant := 2;
 
 The grammar allows aspects on interfaces (`+with Name => Integer+`) and on subprograms (`+with Name => Name+` or `+with Name'Attribute => Name+`), and a list of constraints after an interface name.
 The parser records them, but no interface uses them, and their meaning is not yet defined.
-Pinned endpoint ids (#150) will be the first use of subprogram aspects.
+Pinned endpoint ids (idle#4) will be the first use of subprogram aspects.
 
 == Predefined types
 
@@ -197,14 +198,14 @@ The ids exist only in that file, so losing an entry silently assigns a new rando
 
 === Planned mechanism
 
-* *Ids derived from the source* (#149).
+* *Ids derived from the source* (idle#3).
   An endpoint id is a hash (SHA-256, truncated to 64 bits) of a canonical form of the method's qualified name, parameter modes and types, and result type, for example `rose.interfaces.directory.find_entry(in string) return natural`.
   An interface id is the hash of `interface rose.interfaces.<name>`.
   An incompatible change to a signature changes the id, so old callers fail with an invalid endpoint instead of decoding the wrong arguments.
   `interfaces.txt` is removed.
-* *Pinned ids* (#150).
+* *Pinned ids* (idle#4).
   `+with Endpoint_Id => 16#...#+` on a method or interface keeps a specific id, for example when a method is renamed but persisted processes still use the old id.
-* *A whole-set check* (#151).
+* *A whole-set check* (idle#5).
   `idl --check` reads every interface and rejects duplicate ids, clashing inherited names, unknown interfaces and mismatched names.
 * *Generated kernel constants* (#148).
   The kernel uses generated constants instead of copying ids as literals.
@@ -304,7 +305,7 @@ The ATA server follows the same pattern for its drives, using the drive index as
 
 === Ada 2022 target (planned)
 
-The rewritten compiler (#136) adds a target for user-mode code that uses the full Ada 2022 language.
+The rewritten compiler (idle#1) adds a target for user-mode code that uses the full Ada 2022 language.
 
 * An IDL interface becomes an Ada interface type, and its implementations become tagged types, so a parameter of type `interface File` accepts any object that implements `File`.
 * Inheritance between IDL interfaces maps to inheritance between Ada interface types.
@@ -320,7 +321,7 @@ Whether to have this target is still open; it would tie in with the "Rose: SPARK
 [#commands]
 == Commands and packages (planned)
 
-ADR 0002 (#135) adds two declarations to the language (#137).
+ADR 0002 (#135) adds two declarations to the language (idle#2).
 
 * A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
   A command is named as a child of the package it belongs to, such as `Core_Utilities.Echo`.
@@ -350,7 +351,7 @@ From it, the compiler generates the procedure spec the author implements, the pr
 
 [NOTE]
 ====
-The syntax below is proposed in #137.
+The syntax below is proposed in idle#2.
 Its main choices are settled (see <<command-decisions>>); the remaining open questions are listed at the end of this section.
 ====
 
@@ -591,7 +592,7 @@ Its declaration holds the information `--version` reports, so that no command ha
 
 [NOTE]
 ====
-The syntax below is a proposal, to be settled in #137.
+The syntax below is a proposal, to be settled in idle#2.
 ====
 
 ==== Declaring a package
@@ -731,7 +732,7 @@ package_decl ::= 'package' Name
 These are differences between this chapter and the current compiler, or problems in it.
 
 * The name after `end` is not checked against the interface name.
-* Range bounds must be integer literals; names of constants are not yet accepted (#153).
+* Range bounds must be integer literals; names of constants are not yet accepted (idle#6).
 * An `interface X` type is not checked: an unknown interface is only found when the generated Ada fails to compile.
 * If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
 * An enumeration type takes its name from its interface, not from its type declaration.
