@@ -50,7 +50,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 ### 2. Commands are declared in IDL, and the main program is generated
 
-A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. The syntax is proposed in the IDL chapter of the book (#146) and in #137. The IDL compiler generates everything except the command's own logic.
+A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. A command is named as a child of its package, such as `Core_Utilities.Echo`, and the compiler finds the declarations it names on a list of search directories. The syntax is proposed in the IDL chapter of the book (#146) and in #137. The IDL compiler generates everything except the command's own logic.
 
 - **The spec is generated.** For `command Echo`, the compiler writes `echo.ads`:
 
@@ -101,7 +101,7 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 
 ### 3. The registry, and options the shell handles itself
 
-- **Registry entries.** The shell's command registry maps each command name to:
+- **Registry entries.** The shell's command registry maps each command, by its name and its package, to:
   - its signature: each argument's name, type, mode, default, optional short option and help text;
   - the command's summary and extended description;
   - its package: name, display name, version, copyright, licence, authors and help footer;
@@ -109,7 +109,8 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 - **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare arguments with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
 - **Help is generated**, in the layout of GNU tools: a usage line built from the signature, the command's summary, the options with each argument's help, the command's extended description, and a footer from its package with the command's name filled in.
 - **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` follows the GNU layout: the command with its package's display name and version, the copyright, the package's licence text, and who wrote the command.
-- **Packages are declared in IDL.** A `package` declaration gives a package's name, display name, version, copyright, licence text and default authors, and each command declaration names the package it belongs to. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
+- **Packages are declared in IDL.** A `package` declaration gives a package's name, display name, version, copyright, licence text and default authors, and each command is declared as a child of its package. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
+- **Command names and visibility.** A command is registered under the last part of its name in lower case (`echo` for `Core_Utilities.Echo`), unless its declaration gives another. The shell treats packages like Ada `use` clauses: with an implicit `use Core_Utilities;`, the core commands can be run by name alone, and any command can be run by its qualified name, such as `core_utilities.echo`, without regard to case. Installing a command whose name is already visible from another package gives a warning, and the new command is then run by its qualified name.
 - **Core commands are installed at boot.** `init` installs the core-utilities package from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
 - **`--` ends option processing**, so `echo -- --help` prints `--help`. Quoting makes no difference, since `"--help"` is the same word once the quotes are removed.
 
