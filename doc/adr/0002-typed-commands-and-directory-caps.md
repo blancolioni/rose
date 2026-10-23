@@ -192,11 +192,11 @@ The language features above need the IDL compiler to do more than it does now, s
 
 ## Follow-up work
 
-- Rewrite the IDL compiler with kernel and user-mode targets, built with Alire.
+- Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (#136).
 - Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and add the `Rose.Command_Line` package with `String_List` and the launch support (#137).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command.
-- Split the `Directory` interface into lookup and create-and-modify parts.
-- Define the core stream interfaces (`core.File_Info` and similar) and unit types.
-- Shell-owned commit for `out` and `in out` files, with the file system and persistence layers.
-- Background job handles in petal.
+- Split the `Directory` interface into lookup and create-and-modify parts (#139).
+- Define the core stream interfaces (`core.File_Info` and similar) and unit types (#140).
+- Shell-owned commit for `out` and `in out` files, with the file system and persistence layers (#141).
+- Background job handles in petal (#142).
