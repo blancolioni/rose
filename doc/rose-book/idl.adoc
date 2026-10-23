@@ -255,7 +255,7 @@ The generated client fills them in the order the parameters are declared, and th
 
 * *Scalars* go in the data words, one after another.
   On i686, a 64-bit value (`Word_64`, `Object_Id`, `Endpoint`, and types derived from them) takes two words, low half first; the server's `Get_Word_64` reads both.
-  So in `Read_Blocks (Start : Block_Address_Type; Count : Natural; ...)`, `Start` is in words 0 and 1 and `Count` in word 2.
+  So in `+Read_Blocks (Start : Block_Address_Type; Count : Natural; ...)+`, `Start` is in words 0 and 1 and `Count` in word 2.
 * *Capabilities* go in the capability slots, one after another.
   An `interface X` argument is sent as the client's interface capability, and the server's handler receives it as a plain `Capability`.
 * *A `Capability_Array`* is sent one capability at a time, and the server copies every remaining capability into it.
