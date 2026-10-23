@@ -105,6 +105,7 @@ end File;
 * An interface inherits every method of every parent, recursively.
   `File` has `Read` from `Stream_Reader`, `Write` from `Stream_Writer` and `Seek` from `Seekable`.
 * Each parent is found by parsing `<parent>.idl`, in the same directory as the first file the compiler was given.
+  The rewritten compiler will search a list of directories instead (see <<search-paths>>).
 * An interface may have no declarations of its own, as `File` does.
 
 === Subprograms and parameters
@@ -322,9 +323,25 @@ Whether to have this target is still open; it would tie in with the "Rose: SPARK
 ADR 0002 (#135) adds two declarations to the language (#137).
 
 * A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
+  A command is named as a child of the package it belongs to, such as `Core_Utilities.Echo`.
   The compiler generates the procedure spec, a one-shot server main that receives the shell's invocation and calls the author's procedure body, and metadata embedded in the executable.
   Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
 * A `package` declaration gives the name, version and copyright that a group of commands share.
+
+[#search-paths]
+=== Finding declarations
+
+The compiler is given a list of directories to search, much like the include paths of a C compiler:
+
+----
+idl -I interfaces -I src/commands/core_utilities core_utilities-echo.idl
+----
+
+* Whenever a declaration names another one, as a parent interface, an `interface X` type, or a command's package, the compiler looks for its file in each directory in turn and uses the first it finds.
+* The file name is the declaration's name in lower case, with each `.` replaced by `-`, as GNAT names Ada units: `Core_Utilities` is in `core_utilities.idl`, and `Core_Utilities.Echo` is in `core_utilities-echo.idl`.
+* A name that is not found in any directory is an error.
+
+The build passes `interfaces/` and the directories that hold packages and commands.
 
 === Commands
 
@@ -339,14 +356,14 @@ Its main choices are settled (see <<command-decisions>>); the remaining open que
 
 ==== Declaring a command
 
-A command is declared in its own file, named after the command (`echo.idl`), kept with the command's source rather than in `interfaces/`.
+A command is named as a child of the package it belongs to, like an Ada child unit: `Core_Utilities.Echo` is the command `Echo` in the package `Core_Utilities`.
+It is declared in its own file, named as GNAT names child units (`core_utilities-echo.idl`), and kept with the command's source rather than in `interfaces/`.
 The declaration has the same shape as an interface or package: aspects for the command as a whole, then `is`, then one declaration for each argument, then `end`.
 
 [source,ada]
 ----
-command Echo
-  with Part_Of     => Core_Utilities,
-       Summary     => "Write arguments to standard output",
+command Core_Utilities.Echo
+  with Summary     => "Write arguments to standard output",
        Description => "Writes each argument to standard output, " &
                       "separated by single spaces."
 is
@@ -359,16 +376,15 @@ is
    Arguments : String_List
      with Help => "Words to write, separated by spaces";
 
-end Echo;
+end Core_Utilities.Echo;
 ----
 
 A command that takes and produces files gives its arguments modes and interface types:
 
 [source,ada]
 ----
-command Copy
-  with Part_Of => Core_Utilities,
-       Summary => "Copy a file"
+command Core_Utilities.Copy
+  with Summary => "Copy a file"
 is
 
    Source : in interface File
@@ -377,7 +393,7 @@ is
    Target : out interface File
      with Help => "The new file";
 
-end Copy;
+end Core_Utilities.Copy;
 ----
 
 * Each argument is declared like an Ada object: a name, an optional mode, a type, an optional default, and aspects, ending with `;`.
@@ -391,7 +407,7 @@ end Copy;
 |===
 | Aspect | Required | Meaning
 
-| `Part_Of` | Yes | The package the command belongs to (see <<packages>>).
+| `Name` | No | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Core_Utilities.Echo`. For example, `+Name => "myecho"+`.
 | `Summary` | Yes | A one-line description, shown by `--help` and in command listings.
 | `Description` | No | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>).
 | `Authors` | No | Who wrote the command, printed by `--version` as "Written by ...". Defaults to the package's `Authors`.
@@ -470,7 +486,7 @@ It follows the layout of GNU tools such as `cp --help`:
 . *Options*, generated from each argument's `Help`, `Short_Name` and default, followed by `--help` and `--version`, which the shell adds.
   If any option takes a value, the list starts with "Mandatory arguments to long options are mandatory for short options too."
 . *Description*, the command's `Description`, if it has one.
-. *Package footer*, the `Help_Footer` of the command's package (see <<packages>>), with the command's name filled in.
+. *Package footer*, the `Help_Footer` of the command's package (see <<packages>>), with the command's registered name filled in.
 
 For example:
 
@@ -496,27 +512,27 @@ The exact layout of the options list is still to be fixed; the order of the part
 
 ==== What the compiler generates
 
-For `echo.idl`, the compiler writes:
+For `core_utilities-echo.idl`, the compiler writes:
 
-* `echo.ads`, the procedure spec, which the author implements in `echo.adb`:
+* `core_utilities-echo.ads`, the procedure spec, a child of the package's generated Ada package (see <<packages>>), which the author implements in `core_utilities-echo.adb`:
 +
 [source,ada]
 ----
 with Rose.Command_Line;
-procedure Echo
+procedure Core_Utilities.Echo
   (New_Line  : Boolean := True;
    Arguments : Rose.Command_Line.String_List);
 ----
-* `echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Echo`, and reports success or failure (ADR 0002).
-* The command's metadata, embedded in the executable: the argument declarations, the help text, and the package details copied from its `Part_Of` package.
+* `core_utilities-echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Core_Utilities.Echo`, and reports success or failure (ADR 0002).
+* The command's metadata, embedded in the executable: its registered name, the argument declarations, the help text, and the details of its package.
 
 ==== Grammar changes
 
 [source,ebnf]
 ----
-command_decl  ::= 'command' Name
+command_decl  ::= 'command' Name '.' Name
                   'with' aspect { ',' aspect }
-                  'is' { argument_decl } 'end' Name ';'
+                  'is' { argument_decl } 'end' Name '.' Name ';'
 
 argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
                   [ ':=' value ]
@@ -552,12 +568,15 @@ The lexer also needs character literals, which it does not yet produce, and the 
 * *`Boolean` arguments take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
 * *Command files live with the command's source*, so each command is self-contained.
   Keeping them all in one directory, like `interfaces/`, was considered; it makes them easy to check together, but separates each declaration from its code.
+* *The compiler searches a list of directories* for the declarations a file names (see <<search-paths>>).
+* *A command is a child of its package*, `Core_Utilities.Echo`, in `core_utilities-echo.idl`.
+  An earlier draft named the package with a `Part_Of` aspect instead; the child name says the same thing in the way Ada does, and needs no extra aspect.
+* *The shell registers a command under the last part of its name*, in lower case, unless a `Name` aspect overrides it.
 
 ==== Open questions
 
-* *Finding package files.*
-  Since command files live with their source, a command's `Part_Of` package is not in the same directory.
-  Where package files live, and how the compiler finds them (for example, a search path that includes `interfaces/`), is still to be decided.
+* *Ambiguous names after `use`.*
+  If two used packages both provide `echo` (see <<command-visibility>>), the proposal is to follow Ada: `echo` alone is ambiguous, and the shell lists the qualified names to choose from.
 
 [#packages]
 === Packages
@@ -604,36 +623,45 @@ end Core_Utilities;
 * `Summary` is optional. It is a one-line description, shown when listing packages.
 * `Help_Footer` is optional. It is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines.
 * `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
-* The body is empty. A package does not list its commands; each command names its package instead, so adding a command does not mean editing the package.
+* The body is empty. A package does not list its commands; each command is declared as a child of its package, so adding a command does not mean editing the package.
 * A package declares no methods and has no endpoint ids.
 
 ==== Commands in a package
 
-A command names the package it belongs to with the `Part_Of` aspect:
+A command belongs to the package it is a child of:
 
 [source,ada]
 ----
-command Echo
-  with Part_Of => Core_Utilities,
-       Summary => "Write arguments to standard output"
+command Core_Utilities.Echo
+  with Summary => "Write arguments to standard output"
 is
    ...
-end Echo;
+end Core_Utilities.Echo;
 ----
 
-* Every command must belong to exactly one package.
+* Every command belongs to exactly one package, the parent in its name, and that package must be found on the search path.
 * A command can override the package's version, copyright or authors with its own `Version`, `Copyright` or `Authors` aspect, for example a command that is updated more often than the rest of its package.
   Without an override, it uses the package's values.
-* `Part_Of` is used rather than `Package`, since `package` is a reserved word, and `Part_Of` has a similar meaning in SPARK.
+* Moving a command to another package means renaming it, and its file.
 
 ==== What the compiler does with a package
 
-* When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`).
-  How it finds that file from the command's directory is an open question (see <<commands>>).
+* When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`) from the search path.
   It reports an error if the package does not exist or is missing `Version` or `Copyright`.
-* It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's name.
+* It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's registered name.
   The registry can then answer `--version` from the executable alone, without reading the package file.
-* A package itself generates no Ada code.
+* A package generates a small Ada package, the parent of its commands' procedures, holding its details as constants:
++
+[source,ada]
+----
+package Core_Utilities is
+   Title     : constant String := "Rose core utilities";
+   Version   : constant String := "1.0.0";
+   Copyright : constant String := "Copyright (C) 2026 Fraser Wilson";
+   Authors   : constant String := "Fraser Wilson";
+   License   : constant String := "...";
+end Core_Utilities;
+----
 
 ==== What the shell does with packages
 
@@ -650,8 +678,21 @@ Written by Fraser Wilson.
 ----
 * `--help` ends with the package's help footer (see <<commands>>).
 * The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
-* The build collects every command whose `Part_Of` names a package to form that package's set of executables.
+* The build collects every command that is a child of a package to form that package's set of executables.
   `init` installs the `Core_Utilities` package from the boot image, so its commands are registered before petal's first prompt.
+
+[#command-visibility]
+==== Which commands are visible
+
+The shell treats packages much as Ada treats a `use` clause:
+
+* The commands of a used package can be run by their registered names alone.
+  There is an implicit `use Core_Utilities;`, so `echo` runs `Core_Utilities.Echo`.
+* Any command can be run by its qualified name, in Ada syntax: `core_utilities.echo`.
+  Names are not case sensitive, so `Core_Utilities.Echo` and `Debug.Echo` work too.
+* Arguments follow the name as words, as in any shell; a command is not written as a procedure call with parentheses.
+* Installing a command whose name is already visible from another package is not an error.
+  The shell warns, for example `echo already visible from package core_utilities. This command will be available with debug.echo`, and the new command can then be run by its qualified name.
 
 ==== Grammar changes
 
