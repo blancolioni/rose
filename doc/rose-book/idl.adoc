@@ -373,7 +373,7 @@ end Copy;
 
 | `Part_Of` | Yes | The package the command belongs to (see <<packages>>).
 | `Summary` | Yes | A one-line description, shown by `--help` and in command listings.
-| `Description` | No | An extended description, for fuller documentation. Strings can be joined with `&` to span lines.
+| `Description` | No | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>).
 | `Version`, `Copyright` | No | Override the package's version or copyright for this command.
 |===
 
@@ -411,23 +411,67 @@ end Copy;
 
 So `echo -n Welcome to Rose` binds `+New_Line => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
 
+[#string-values]
+==== String values
+
+Any aspect that takes a string, on a command, an argument or a package, can be written in three ways:
+
+* *A string literal*, `+"..."+`, optionally joined with others by `&`.
+  This suits one-line values such as `Summary` and `Help`.
+* *A text block*, which can span several lines:
++
+[source,ada]
+----
+Description => """
+   Writes each argument to standard output, separated by single
+   spaces.
+
+   With -n, no new line is written after the last argument.
+   """
+----
++
+The text starts on the line after the opening `"""` and ends before the closing `"""`.
+The indentation common to every non-blank line is removed, so the block can be indented with the declaration, and line breaks and blank lines are kept.
+* *A text file*, `Text_File ("echo-description.txt")`.
+  The compiler reads the file when it compiles the declaration, with its path relative to the `.idl` file, and uses its contents as written, without its final line break.
+  This suits long descriptions with several paragraphs or tables.
+  The function is called `Text_File`, not `File`, since `File` is already an interface.
+
+In every case the value ends up in the command's embedded metadata, so the shell never reads the source files.
+
 ==== Help
 
 `--help` is answered by the shell from the command's metadata, without running the command.
-It prints a usage line generated from the argument declarations, the command's `Summary`, and each argument's `Help` with the options that set it and its default.
-The layout below is only an illustration:
+It follows the layout of GNU tools such as `cp --help`:
+
+. *Usage line*, generated from the argument declarations.
+. *Summary*, the command's `Summary`.
+. *Options*, generated from each argument's `Help`, `Short_Name` and default, followed by `--help` and `--version`, which the shell adds.
+  If any option takes a value, the list starts with "Mandatory arguments to long options are mandatory for short options too."
+. *Description*, the command's `Description`, if it has one.
+. *Package footer*, the `Help_Footer` of the command's package (see <<packages>>), with the command's name filled in.
+
+For example:
 
 ----
-Usage: echo [OPTIONS] [ARGUMENTS...]
+Usage: echo [OPTION]... [ARGUMENTS]...
 Write arguments to standard output
 
-  --new-line, --no-new-line, -n
-        End the output with a new line (default: True; -n gives False)
-  ARGUMENTS
-        Words to write, separated by spaces
+  -n, --no-new-line   do not end the output with a new line
+      --new-line      end the output with a new line (default)
+      --help          display this help and exit
+      --version       output version information and exit
+
+Writes each argument to standard output, separated by single
+spaces.
+
+With -n, no new line is written after the last argument.
+
+Rose core utilities: <https://rose-os.org/rose-book/>
+Full documentation: <https://rose-os.org/rose-book/echo.html>
 ----
 
-`Description` is not printed by `--help`; it is for fuller documentation of the command.
+The exact layout of the options list is still to be fixed; the order of the parts is settled.
 
 ==== What the compiler generates
 
@@ -458,10 +502,14 @@ argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
                   [ 'with' aspect { ',' aspect } ] ';'
 
 aspect        ::= Name '=>' value
-value         ::= Integer | String { '&' String } | Character | Name
+value         ::= Integer | Character | Name | string_value
+string_value  ::= String { '&' String }
+                | Text_Block
+                | 'Text_File' '(' String ')'
 ----
 
-This needs character literals, which the lexer does not yet produce, and string concatenation with `&`.
+`Text_Block` is a new lexical element: `"""`, a line break, any number of lines, and a closing `"""` on a line of its own.
+The lexer also needs character literals, which it does not yet produce, and the parser needs string concatenation with `&`.
 
 [#command-decisions]
 ==== Decisions
@@ -472,7 +520,9 @@ This needs character literals, which the lexer does not yet produce, and string 
 * *Help text goes in `Help` aspects.*
   Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled or missing aspect is an error, while a malformed or missing comment would be silently ignored.
 * *`Summary` and `Description` on the command, `Help` on arguments.*
-  `--help` combines the `Summary` with each argument's `Help`; `Description` holds an extended description.
+* *`--help` follows the GNU layout*: usage, summary, options, description, then a footer from the package.
+  An earlier draft left `Description` out of `--help`.
+* *Any string aspect can be a literal, a text block or a text file.*
 * *Short options are `Short_Name` and `Short_Value`.*
 * *`Boolean` arguments take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
 * *Command files live with the command's source*, so each command is self-contained.
@@ -480,7 +530,9 @@ This needs character literals, which the lexer does not yet produce, and string 
 
 ==== Open questions
 
-* *Version text in help.* Whether `--help` also prints the command's version line.
+* *Version text in help.* Whether `--help` also prints the command's version line. GNU tools leave it to `--version`.
+* *Several usage forms.* `cp` shows three usage lines because it accepts different sets of arguments.
+  One declaration generates one usage line; more would need several signatures for one command, which is the overloading question in ADR 0002.
 * *Finding package files.*
   Since command files live with their source, a command's `Part_Of` package is not in the same directory.
   Where package files live, and how the compiler finds them (for example, a search path that includes `interfaces/`), is still to be decided.
@@ -504,9 +556,13 @@ A package is declared in its own file, named after the package like any other ID
 ----
 --  core_utilities.idl
 package Core_Utilities
-  with Version   => "1.0.0",
-       Copyright => "Copyright (C) 2026 Fraser Wilson",
-       Summary   => "Commands available when Rose boots"
+  with Version     => "1.0.0",
+       Copyright   => "Copyright (C) 2026 Fraser Wilson",
+       Summary     => "Commands available when Rose boots",
+       Help_Footer => """
+          Rose core utilities: <https://rose-os.org/rose-book/>
+          Full documentation: <https://rose-os.org/rose-book/{command}.html>
+          """
 is
 end Core_Utilities;
 ----
@@ -514,6 +570,8 @@ end Core_Utilities;
 * `Version` is required. It is a version string of the form `major.minor.patch`.
 * `Copyright` is required. It is a single line of text.
 * `Summary` is optional. It is a one-line description, shown when listing packages.
+* `Help_Footer` is optional. It is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines.
+* `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
 * The body is empty. A package does not list its commands; each command names its package instead, so adding a command does not mean editing the package.
 * A package declares no methods and has no endpoint ids.
 
@@ -541,7 +599,7 @@ end Echo;
 * When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`).
   How it finds that file from the command's directory is an open question (see <<commands>>).
   It reports an error if the package does not exist or is missing `Version` or `Copyright`.
-* It copies the package's name, version, copyright and summary, with any overrides from the command, into the command's embedded metadata.
+* It copies the package's name, version, copyright, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's name.
   The registry can then answer `--version` from the executable alone, without reading the package file.
 * A package itself generates no Ada code.
 
@@ -553,6 +611,7 @@ end Echo;
 echo (Core_Utilities) 1.0.0
 Copyright (C) 2026 Fraser Wilson
 ----
+* `--help` ends with the package's help footer (see <<commands>>).
 * The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
 * The build collects every command whose `Part_Of` names a package to form that package's set of executables.
   `init` installs the `Core_Utilities` package from the boot image, so its commands are registered before petal's first prompt.
@@ -566,10 +625,10 @@ This proposal needs two changes to the grammar:
 [source,ebnf]
 ----
 package_decl ::= 'package' Name
-                 'with' Name '=>' String { ',' Name '=>' String }
+                 'with' aspect { ',' aspect }
                  'is' 'end' Name ';'
 ----
-* Aspect values can be string literals, as well as integers and names.
+* Aspect values can be strings in any of the forms in <<string-values>>, as well as integers and names.
 
 [#known-issues]
 == Known issues
