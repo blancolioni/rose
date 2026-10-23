@@ -156,21 +156,24 @@ Pinned endpoint ids (#150) will be the first use of subprogram aspects.
 
 | `Word` | `Rose.Words.Word` | One data word
 | `Word_32` | `Rose.Words.Word_32` | One data word
-| `Word_64` | `Rose.Words.Word_64` | One data word
+| `Word_64` | `Rose.Words.Word_64` | Two data words on i686, low half first; one on a 64-bit target
 | `Natural`, `Positive`, `Integer` | Standard Ada types | One data word
-| `Endpoint` | `Rose.Objects.Endpoint_Id` | One data word
-| `Object_Id` | `Rose.Objects.Object_Id` | One data word
+| `Endpoint` | `Rose.Objects.Endpoint_Id` | As `Word_64`
+| `Object_Id` | `Rose.Objects.Object_Id` | As `Word_64`
 | `Storage_Count` | `System.Storage_Elements.Storage_Count` | One data word
 | `Stream_Element_Count`, `Stream_Element_Offset` | `System.Storage_Elements.Storage_Count`, `Storage_Offset` | One data word
 | `Address` | `System.Address` | One data word
 | `Capability` | `Rose.Capabilities.Capability` | One capability
-| `Capability_Array` | `Rose.Capabilities.Capability_Array` | Capabilities
-| `String` | `String` | Text in the shared buffer
+| `Capability_Array` | `Rose.Capabilities.Capability_Array` | All the remaining capabilities
+| `String` | `String` | The shared buffer
 | `Storage_Array`, `Stream_Element_Array` | `System.Storage_Elements.Storage_Array` | The shared buffer
 | `Page` | `Storage_Array (1 .. 4096)`, page aligned | The shared buffer
-| `Rose_Interface` | `Rose.Interfaces.Rose_Interface` | Capabilities
-| `interface X` | `Rose.Interfaces.X.Client.X_Client` | Capabilities (see <<kernel-target>>)
+| `Rose_Interface` | `Rose.Interfaces.Rose_Interface` | One capability
+| `interface X` | `Rose.Interfaces.X.Client.X_Client` | One capability, the interface capability (see <<kernel-target>>)
 |===
+
+Types derived from these, such as `type Block_Address_Type is new Word_64`, are passed in the same way.
+How the words, capabilities and buffer of an invocation are filled is described under <<encoding>>.
 
 The compiler can map the stream element types to `Ada.Streams` instead, but that option is turned off, since `Ada.Streams` isn't available to kernel-level code.
 
@@ -242,19 +245,36 @@ For an interface `X` declared in `x.idl`, it writes three packages:
   It builds an invocation on that method's capability, calls `Invoke_Capability`, and records any error, which `Has_Error` and `Get_Last_Error` report.
 * `Get_Interface_Cap` and `Get_<Method>_Cap` return the stored capabilities.
 
-Parameters and results are encoded as follows.
-
-* `in` scalars are sent as data words (`Send_Word`); capabilities are sent with `Send_Cap`.
-* `in` strings are sent as text (`Send_Text`), and `in` storage arrays in the shared buffer (`Send_Storage_Array`).
-* `out` storage arrays are received into the shared buffer (`Receive_Buffer`), then copied out.
-* A function whose result is an interface receives capabilities and returns a client opened on the first of them.
 * A function that returns a `String` becomes a procedure with `Result : out String; Last : out Natural` parameters, since a kernel-level caller has to supply the buffer.
+
+[#encoding]
+==== How arguments are encoded
+
+An invocation carries up to 16 data words, up to 16 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
+The generated client fills them in the order the parameters are declared, and the generated server reads them back in the same order.
+
+* *Scalars* go in the data words, one after another.
+  On i686, a 64-bit value (`Word_64`, `Object_Id`, `Endpoint`, and types derived from them) takes two words, low half first; the server's `Get_Word_64` reads both.
+  So in `Read_Blocks (Start : Block_Address_Type; Count : Natural; ...)`, `Start` is in words 0 and 1 and `Count` in word 2.
+* *Capabilities* go in the capability slots, one after another.
+  An `interface X` argument is sent as the client's interface capability, and the server's handler receives it as a plain `Capability`.
+* *A `Capability_Array`* is sent one capability at a time, and the server copies every remaining capability into it.
+  It must therefore be the last parameter that carries capabilities.
+* *A `String` or `Storage_Array`* goes in the shared buffer.
+  The server does not copy it: its handler sees the client's buffer in place, through `Buffer_Address` and `Buffer_Length`.
+  For an `out` parameter the server writes into that buffer directly.
+  Since there is one buffer, a method can have at most one such parameter; all current interfaces keep to this.
+* *Results.* A scalar result is returned in the reply's data words.
+  A `String` result is written into the buffer, and its last index (`Last`) is returned in word 0.
+  An interface result is returned as one capability, which the client opens with `Open`.
+
+The client and the server agree on all of these, which is checked by Rose booting with the generated packages, at least on i686.
 
 ==== Server packages
 
 * Each method has a handler access type, with an extra first parameter `Id : Rose.Objects.Capability_Identifier`, the identifier of the capability that was invoked.
   A server that serves many instances through one endpoint, such as one per device or per timer, uses `Id` to tell them apart.
-* A handler for a method that returns an interface returns a plain `Capability`.
+* Interface arguments and results are plain `Capability` values in a handler: a handler receives an interface argument as a `Capability`, and returns an interface result as one.
 * `Create_Server` creates the endpoints for the interface's methods and registers the handlers in a `Rose.Server.Server_Context`.
   `Attach_Interface` adds the interface to an existing context, and `Publish_Interface` also publishes it as the server's public interface.
 * The `Instanced` parameter, described next, selects whether one set of method capabilities is shared by every client, or each resource the server manages gets its own.
