@@ -109,6 +109,8 @@ A command is declared once, in IDL, together with its help text. The IDL compile
 - **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare parameters with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
 - **Help is generated.** The shell prints a usage line built from the signature, then the summary, the description, and one line per parameter.
 - **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` prints the command's effective version and copyright.
+- **Packages are declared in IDL.** A `package` declaration gives a package's name, version and copyright, and each command declaration names the package it belongs to. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
+- **Core commands are installed at boot.** `init` installs the core-utilities package from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
 - **`--` ends option processing**, so `echo -- --help` prints `--help`. Quoting makes no difference, since `"--help"` is the same word once the quotes are removed.
 
 ### 4. The shell owns the commit
@@ -193,9 +195,9 @@ The language features above need the IDL compiler to do more than it does now, s
 ## Follow-up work
 
 - Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (#136).
-- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and add the `Rose.Command_Line` package with `String_List` and the launch support (#137).
+- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and add the `Rose.Command_Line` package with `String_List` and the launch support, and `package` declarations whose details are copied into each command's metadata (#137).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
-- Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command.
+- Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
 - Split the `Directory` interface into lookup and create-and-modify parts (#139).
 - Define the core stream interfaces (`core.File_Info` and similar) and unit types (#140).
 - Shell-owned commit for `out` and `in out` files, with the file system and persistence layers (#141).
