@@ -403,15 +403,17 @@ end Core_Utilities.Copy;
 
 ==== Command aspects
 
-[cols="1,1,4",options="header"]
-|===
-| Aspect | Required | Meaning
+No aspect is required: anything a declaration must have is part of its syntax, and every aspect has a default.
 
-| `Name` | No | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Core_Utilities.Echo`. For example, `+Name => "myecho"+`.
-| `Summary` | Yes | A one-line description, shown by `--help` and in command listings.
-| `Description` | No | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>).
-| `Authors` | No | Who wrote the command, printed by `--version` as "Written by ...". Defaults to the package's `Authors`.
-| `Version`, `Copyright` | No | Override the package's version or copyright for this command.
+[cols="1,4",options="header"]
+|===
+| Aspect | Meaning
+
+| `Name` | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Core_Utilities.Echo`. For example, `+Name => "myecho"+`.
+| `Summary` | A one-line description, shown by `--help` and in command listings. Without it, the command's qualified name followed by "(no summary)" is used: `Core_Utilities.Echo (no summary)`.
+| `Description` | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>). Without it, there is no description.
+| `Authors` | Who wrote the command, printed by `--version` as "Written by ...". Without it, the package's `Authors` is used.
+| `Version`, `Copyright` | Override the package's version or copyright for this command. Without them, the package's values are used.
 |===
 
 ==== Arguments
@@ -430,7 +432,7 @@ end Core_Utilities.Copy;
 |===
 | Argument aspect | Meaning
 
-| `Help` | Required. A one-line description of the argument itself, shown by `--help`. It describes the argument, not its short option: the shell shows the options that set it.
+| `Help` | A one-line description of the argument itself, shown by `--help`. It describes the argument, not its short option: the shell shows the options that set it. Without it, the argument's name followed by "(no help)" is used: `New_Line (no help)`.
 | `Short_Name` | A character that gives a short option, such as `+'n'+` for `-n`.
 | `Short_Value` | The value a short option gives a `Boolean` argument. Without it, the short option sets `True`.
 |===
@@ -438,7 +440,7 @@ end Core_Utilities.Copy;
 ==== How arguments are given
 
 * *By position*, in declaration order, for arguments without a `Short_Name`.
-* *By name*, as `--name=value` or `--name value`, where the name is the argument name in lower case with `_` replaced by `-`.
+* *By name*, as `--name=value` or `--name value`, where the name is the argument name in lower case with `_` replaced by `-`, prefixed with `--`: `New_Line` is given as `--new-line`.
   Any argument can be given by name.
   A `Boolean` argument can also be given as `--name`, which sets it to `True`, or `--no-name`, which sets it to `False`: `--no-new-line` is the same as `--new-line=false`.
 * *By short name*, for arguments with a `Short_Name`.
@@ -555,7 +557,9 @@ The lexer also needs character literals, which it does not yet produce, and the 
   A bare parameter list was proposed first, but when the last parameter had aspects, its aspect list and the command's sat side by side and read as one.
   A `procedure` inside the block was also considered; it would match the generated Ada exactly, but repeats the name, and the compiler can generate the spec from the declarations.
 * *Help text goes in `Help` aspects.*
-  Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled or missing aspect is an error, while a malformed or missing comment would be silently ignored.
+  Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled aspect is an error, while a malformed comment would be silently ignored.
+* *No aspect is required.* Anything a declaration must have is part of its syntax, and every aspect has a default.
+  A missing `Summary` or `Help` shows clearly in `--help`, as "(no summary)" or "(no help)".
 * *`Summary` and `Description` on the command, `Help` on arguments.*
 * *`--help` follows the GNU layout*: usage, summary, options, description, then a footer from the package.
   An earlier draft left `Description` out of `--help`.
