@@ -27,7 +27,7 @@ Rose is a persistent capability system. A process can only act through the capab
 
 ### 1. A command is a procedure with a typed signature
 
-A program's entry point is declared like an Ada procedure: typed parameters with modes, binding by name or position, and default values. The signature is visible to the caller without running the program.
+A program's arguments are declared in IDL (section 2), and its entry point is the Ada procedure generated from them: typed arguments with modes, binding by name or position, and default values. The signature is visible to the caller without running the program.
 
 - **The shell does the binding.** Petal resolves each actual argument against the signature, applies defaults, and reports type errors, missing files or missing permissions before the program starts, naming the argument that failed. Help text and completion come from the same signature.
 - **The signature is the sandbox manifest.** The program receives exactly the capabilities its arguments resolve to and nothing else. Anything else, such as network access or launching other programs, must appear in the signature as a parameter. There is no ambient authority to fall back on.
@@ -45,20 +45,20 @@ A program's entry point is declared like an Ada procedure: typed parameters with
 - **Parameter types are IDL interfaces.** `in File` means "any object that implements `File`", so a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 - **Typed results.** A command returns structured values through `out` parameters, such as `stat (path => "x", size => s, modified => m)`, instead of text that the caller has to parse.
 - **Standard streams are supplied by the shell.** Every command receives standard input, standard output and standard error without declaring them, and uses them through `Ada.Text_IO` as now. They are not ambient authority: the shell grants them for each launch, and they cross the job's membrane like any other cap. Everything else must be in the signature.
-- **List parameters.** A command's last positional parameter may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one parameter in a signature may do this. Named parameters and flags can appear anywhere among the words, so `echo -n Welcome to Rose` binds `Newline => False` and `Arguments => ("Welcome", "to", "Rose")`.
-- **Flags.** A parameter can have a short flag, along with the value the flag gives it. For example, `-n` sets `Newline` to `False`.
+- **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ("Welcome", "to", "Rose")`.
+- **Short options.** An argument can have a short option (`Short_Name`) and, for a `Boolean`, the value the option gives it (`Short_Value`). For example, `-n` sets `New_Line` to `False`. A `Boolean` argument can also be given by name as `--name` or `--no-name`.
 
 ### 2. Commands are declared in IDL, and the main program is generated
 
-A command is declared once, in IDL, together with its help text. The IDL compiler generates everything except the command's own logic.
+A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. The syntax is proposed in the IDL chapter of the book (#146) and in #137. The IDL compiler generates everything except the command's own logic.
 
 - **The spec is generated.** For `command Echo`, the compiler writes `echo.ads`:
 
   ```ada
   with Rose.Command_Line;
   procedure Echo
-    (Arguments : Rose.Command_Line.String_List;
-     Newline   : Boolean := True);
+    (New_Line  : Boolean := True;
+     Arguments : Rose.Command_Line.String_List);
   ```
 
   The author writes only the body, `echo.adb`, in plain Ada with no argument parsing or capability handling. A body that doesn't match the IDL fails to compile, so the program and its signature can't drift apart.
@@ -72,8 +72,8 @@ A command is declared once, in IDL, together with its help text. The IDL compile
      use Rose.Command_Line.Launch;
      Call : Launch_Call := Receive;   --  the one invocation the shell sends
   begin
-     Echo (Arguments => String_List_Argument (Call, 1),
-           Newline   => Boolean_Argument (Call, 2));
+     Echo (New_Line  => Boolean_Argument (Call, 1),
+           Arguments => String_List_Argument (Call, 2));
      Complete (Call);                 --  success: the shell commits out files
   exception
      when E : others =>
@@ -82,7 +82,7 @@ A command is declared once, in IDL, together with its help text. The IDL compile
   ```
 
   - **`Receive`** waits for the shell's single invocation. Arguments are encoded as for any IDL method call: scalars in words, strings and lists in the shared buffer, and files and directories as caps. Launching a command is calling a method, so decoding uses the same generated server-side code.
-  - **The `*_Argument` functions** turn each argument into an Ada value. A cap becomes a client object of the parameter's interface type, so an `in File` argument is an object implementing the Ada `File` interface (user-mode target, section 10).
+  - **The `*_Argument` functions** turn each argument into an Ada value. A cap becomes a client object of the argument's interface type, so an `in File` argument is an object implementing the Ada `File` interface (user-mode target, section 10).
   - **The shell applies defaults**, since it has the signature, so the main always receives every argument. The defaults in the generated spec only matter for Ada code that calls the procedure directly.
   - **`out` parameters** are locals in the main. Their values are returned in `Complete`.
   - **`Complete` and `Fail`** tell the shell whether to commit (section 4). An unhandled exception becomes a structured error the shell can display, not a crash with an exit code. Standard error is for diagnostic text.
@@ -102,12 +102,12 @@ A command is declared once, in IDL, together with its help text. The IDL compile
 ### 3. The registry, and options the shell handles itself
 
 - **Registry entries.** The shell's command registry maps each command name to:
-  - its signature: each parameter's name, type, mode, default, optional short flag and a one-line description;
-  - a summary line and a longer description;
+  - its signature: each argument's name, type, mode, default, optional short option and help text;
+  - the command's summary and extended description;
   - its package: name, version and copyright;
   - the launch cap.
-- **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare parameters with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
-- **Help is generated.** The shell prints a usage line built from the signature, then the summary, the description, and one line per parameter.
+- **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare arguments with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
+- **Help is generated.** The shell prints a usage line built from the signature, the command's summary, and each argument's help with the options that set it. The extended description is not part of `--help`; it is for fuller documentation.
 - **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` prints the command's effective version and copyright.
 - **Packages are declared in IDL.** A `package` declaration gives a package's name, version and copyright, and each command declaration names the package it belongs to. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
 - **Core commands are installed at boot.** `init` installs the core-utilities package from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
@@ -158,7 +158,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - **Kernel target.** This produces the current style of output: client and server packages in the restricted Ada subset, with no tagged types or interfaces. Kernel-level code keeps using it.
 - **User-mode target.** This uses the full Ada language. An IDL interface becomes an Ada interface type, and its implementations become tagged types, so `in File` accepts any object that implements `File`, and typed streams can be generic over their element type.
 - **Language additions:**
-  - command declarations: signatures with parameter modes, flags and list parameters, help text and package details, generating the spec, the main program and the embedded metadata (section 2)
+  - command declarations: argument declarations with modes, defaults, short options and list arguments, help text and package details, generating the spec, the main program and the embedded metadata (section 2)
   - record types for stream elements
   - namespaces and versions
   - unit types
