@@ -301,14 +301,14 @@ Whether to have this target is still open; it would tie in with the "Rose: SPARK
 
 ADR 0002 (#135) adds two declarations to the language (#137).
 
-* A `command` declaration declares a program's entry point as an Ada-style procedure, with parameter modes, defaults, short flags, a final list parameter that takes the remaining words, and help text.
+* A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
   The compiler generates the procedure spec, a one-shot server main that receives the shell's invocation and calls the author's procedure body, and metadata embedded in the executable.
   Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
 * A `package` declaration gives the name, version and copyright that a group of commands share.
 
 === Commands
 
-A command declaration describes a program that the shell can run: its parameters, how they are given on the command line, and its help text.
+A command declaration describes a program that the shell can run: its arguments, how they are given on the command line, and its help text.
 From it, the compiler generates the procedure spec the author implements, the program's main, and the metadata the shell's registry reads.
 
 [NOTE]
@@ -319,39 +319,50 @@ Its main choices are settled (see <<command-decisions>>); the remaining open que
 
 ==== Declaring a command
 
-A command is declared in its own file, named after the command (`echo.idl`), kept with the command's source rather than in `interfaces/`:
+A command is declared in its own file, named after the command (`echo.idl`), kept with the command's source rather than in `interfaces/`.
+The declaration has the same shape as an interface or package: aspects for the command as a whole, then `is`, then one declaration for each argument, then `end`.
 
 [source,ada]
 ----
 command Echo
-  (Arguments : String_List
-     with Help => "Words to write, separated by spaces";
-   Newline   : Boolean := True
-     with Flag       => 'n',
-          Flag_Value => False,
-          Help       => "End the output with a newline")
   with Part_Of     => Core_Utilities,
        Summary     => "Write arguments to standard output",
        Description => "Writes each argument to standard output, " &
-                      "separated by single spaces.";
+                      "separated by single spaces."
+is
+
+   New_Line : Boolean := True
+     with Short_Name  => 'n',
+          Short_Value => False,
+          Help        => "End the output with a new line";
+
+   Arguments : String_List
+     with Help => "Words to write, separated by spaces";
+
+end Echo;
 ----
 
-A command that takes and produces files uses parameter modes and interface types, as in the rest of the IDL:
+A command that takes and produces files gives its arguments modes and interface types:
 
 [source,ada]
 ----
 command Copy
-  (Source : interface File
-     with Help => "The file to copy";
-   Target : out interface File
-     with Help => "The new file")
   with Part_Of => Core_Utilities,
-       Summary => "Copy a file";
+       Summary => "Copy a file"
+is
+
+   Source : in interface File
+     with Help => "The file to copy";
+
+   Target : out interface File
+     with Help => "The new file";
+
+end Copy;
 ----
 
-* The parameter list is the command's signature.
-  The compiler generates the matching Ada procedure spec from it, so there is no separate `procedure` inside the declaration.
-* The declaration ends with `;`. It has no body.
+* Each argument is declared like an Ada object: a name, an optional mode, a type, an optional default, and aspects, ending with `;`.
+  Because each declaration ends with its own `;`, an argument's aspects cannot be confused with the next argument's or with the command's.
+* The compiler generates the Ada procedure spec from the argument declarations, in declaration order.
 * Standard input, output and error are supplied by the shell and are not declared.
 
 ==== Command aspects
@@ -361,45 +372,62 @@ command Copy
 | Aspect | Required | Meaning
 
 | `Part_Of` | Yes | The package the command belongs to (see <<packages>>).
-| `Summary` | Yes | A one-line description, shown in help and in command listings.
-| `Description` | No | A longer description, shown by `--help`. Strings can be joined with `&` to span lines.
+| `Summary` | Yes | A one-line description, shown by `--help` and in command listings.
+| `Description` | No | An extended description, for fuller documentation. Strings can be joined with `&` to span lines.
 | `Version`, `Copyright` | No | Override the package's version or copyright for this command.
 |===
 
-==== Parameters
-
-Each parameter has a name, an optional mode, a type, an optional default, and aspects.
+==== Arguments
 
 * *Modes* map to the capabilities the program receives, as in ADR 0002: `in` (the default) and `in out` for existing objects, `out` for new ones.
-  An `out` parameter of a non-file type is a result that the shell binds to a variable.
+  An `out` argument of a non-file type is a result that the shell binds to a variable.
+  Modes are written as in Ada parameters, although Ada object declarations have none, since an argument's mode is the most important thing about it.
 * *Defaults* are written `:= Value`.
-  A parameter without a default must be given on the command line.
-* *List parameters.* The last parameter may have the type `String_List`, which takes all remaining positional words, and can be none.
-  At most one parameter may do this.
+  An argument without a default must be given on the command line.
+* *List arguments.* The last positional argument may have the type `String_List`, which takes all remaining positional words, and can be none.
+  At most one argument may do this.
   `String_List` is a predefined type in command declarations, generated as `Rose.Command_Line.String_List`.
-* *Reserved names.* No parameter may be called `Help` or `Version`, since the shell handles `--help` and `--version` itself.
+* *Reserved names.* No argument may be called `Help` or `Version`, since the shell handles `--help` and `--version` itself.
 
 [cols="1,4",options="header"]
 |===
-| Parameter aspect | Meaning
+| Argument aspect | Meaning
 
-| `Help` | Required. A one-line description, shown by `--help`.
-| `Flag` | A character that gives a short option, such as `+'n'+` for `-n`.
-| `Flag_Value` | The value a short option gives a `Boolean` parameter. Without it, the flag sets `True`.
+| `Help` | Required. A one-line description of the argument itself, shown by `--help`. It describes the argument, not its short option: the shell shows the options that set it.
+| `Short_Name` | A character that gives a short option, such as `+'n'+` for `-n`.
+| `Short_Value` | The value a short option gives a `Boolean` argument. Without it, the short option sets `True`.
 |===
 
-==== How parameters are given
+==== How arguments are given
 
-* *By position*, in declaration order, for parameters without a `Flag`.
-* *By name*, as `--name=value` or `--name value`, where the name is the parameter name in lower case with `_` replaced by `-`.
-  Any parameter can be given by name.
-  A `Boolean` parameter can also be given as `--name`, which sets it to `True`, or `--no-name`, which sets it to `False`: `--no-newline` is the same as `--newline=false`.
-* *By short flag*, for parameters with a `Flag`.
-  A `Boolean` flag takes no value: `-n` sets `Newline` to `False` in the example above.
-  A flag for any other type takes the next word as its value.
+* *By position*, in declaration order, for arguments without a `Short_Name`.
+* *By name*, as `--name=value` or `--name value`, where the name is the argument name in lower case with `_` replaced by `-`.
+  Any argument can be given by name.
+  A `Boolean` argument can also be given as `--name`, which sets it to `True`, or `--no-name`, which sets it to `False`: `--no-new-line` is the same as `--new-line=false`.
+* *By short name*, for arguments with a `Short_Name`.
+  A `Boolean` short option takes no value: `-n` sets `New_Line` to `False` in the example above.
+  A short option for any other type takes the next word as its value.
 * `--` ends option processing, so later words are always positional.
 
-So `echo -n Welcome to Rose` binds `+Newline => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
+So `echo -n Welcome to Rose` binds `+New_Line => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
+
+==== Help
+
+`--help` is answered by the shell from the command's metadata, without running the command.
+It prints a usage line generated from the argument declarations, the command's `Summary`, and each argument's `Help` with the options that set it and its default.
+The layout below is only an illustration:
+
+----
+Usage: echo [OPTIONS] [ARGUMENTS...]
+Write arguments to standard output
+
+  --new-line, --no-new-line, -n
+        End the output with a new line (default: True; -n gives False)
+  ARGUMENTS
+        Words to write, separated by spaces
+----
+
+`Description` is not printed by `--help`; it is for fuller documentation of the command.
 
 ==== What the compiler generates
 
@@ -411,26 +439,26 @@ For `echo.idl`, the compiler writes:
 ----
 with Rose.Command_Line;
 procedure Echo
-  (Arguments : Rose.Command_Line.String_List;
-   Newline   : Boolean := True);
+  (New_Line  : Boolean := True;
+   Arguments : Rose.Command_Line.String_List);
 ----
 * `echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Echo`, and reports success or failure (ADR 0002).
-* The command's metadata, embedded in the executable: the signature, the help text, and the package details copied from its `Part_Of` package.
+* The command's metadata, embedded in the executable: the argument declarations, the help text, and the package details copied from its `Part_Of` package.
 
 ==== Grammar changes
 
 [source,ebnf]
 ----
-command_decl ::= 'command' Name
-                 [ '(' command_param { ';' command_param } ')' ]
-                 'with' aspect { ',' aspect } ';'
+command_decl  ::= 'command' Name
+                  'with' aspect { ',' aspect }
+                  'is' { argument_decl } 'end' Name ';'
 
-command_param ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
+argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
                   [ ':=' value ]
-                  [ 'with' aspect { ',' aspect } ]
+                  [ 'with' aspect { ',' aspect } ] ';'
 
-aspect       ::= Name '=>' value
-value        ::= Integer | String { '&' String } | Character | Name
+aspect        ::= Name '=>' value
+value         ::= Integer | String { '&' String } | Character | Name
 ----
 
 This needs character literals, which the lexer does not yet produce, and string concatenation with `&`.
@@ -438,22 +466,21 @@ This needs character literals, which the lexer does not yet produce, and string 
 [#command-decisions]
 ==== Decisions
 
-* *The parameter list is the signature.*
-  A `procedure` inside a `command ... is ... end` block was considered.
-  It would match the generated Ada exactly, but repeats the name, and the compiler can generate the spec from the bare list.
+* *Arguments are declarations in a block*, like objects in an Ada package, rather than a parameter list.
+  A bare parameter list was proposed first, but when the last parameter had aspects, its aspect list and the command's sat side by side and read as one.
+  A `procedure` inside the block was also considered; it would match the generated Ada exactly, but repeats the name, and the compiler can generate the spec from the declarations.
 * *Help text goes in `Help` aspects.*
   Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled or missing aspect is an error, while a malformed or missing comment would be silently ignored.
-* *`Boolean` parameters take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
+* *`Summary` and `Description` on the command, `Help` on arguments.*
+  `--help` combines the `Summary` with each argument's `Help`; `Description` holds an extended description.
+* *Short options are `Short_Name` and `Short_Value`.*
+* *`Boolean` arguments take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
 * *Command files live with the command's source*, so each command is self-contained.
   Keeping them all in one directory, like `interfaces/`, was considered; it makes them easy to check together, but separates each declaration from its code.
 
 ==== Open questions
 
-* *Parameter aspects next to command aspects.*
-  A parameter's aspect list ends at the `;` or `)` after it, and the command's list starts with the `with` after the closing `)`.
-  When the last parameter has aspects, the two lists sit next to each other and are easy to misread as one.
-  Moving parameter aspects into the command's list was considered and rejected, since it means repeating parameter names and separates help text from its parameter.
-  A clearer layout or syntax is still wanted.
+* *Version text in help.* Whether `--help` also prints the command's version line.
 * *Finding package files.*
   Since command files live with their source, a command's `Part_Of` package is not in the same directory.
   Where package files live, and how the compiler finds them (for example, a search path that includes `interfaces/`), is still to be decided.
@@ -497,10 +524,11 @@ A command names the package it belongs to with the `Part_Of` aspect:
 [source,ada]
 ----
 command Echo
-  (Arguments : String_List
-     with Help => "Words to write, separated by spaces")
   with Part_Of => Core_Utilities,
-       Summary => "Write arguments to standard output";
+       Summary => "Write arguments to standard output"
+is
+   ...
+end Echo;
 ----
 
 * Every command must belong to exactly one package.
