@@ -50,7 +50,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 ### 2. Commands are declared in IDL, and the main program is generated
 
-A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. A command is named as a child of its package, such as `Core_Utilities.Echo`, and the compiler finds the declarations it names on a list of search directories. The syntax is proposed in the IDL chapter of the book (#146) and in #137. The IDL compiler generates everything except the command's own logic.
+A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. A command is named as a child of its package, such as `Core_Utilities.Echo`, and the compiler finds the declarations it names on a list of search directories. The syntax is proposed in the IDL chapter of the book (#146) and in blancolioni/idle#2. The IDL compiler generates everything except the command's own logic.
 
 - **The spec is generated.** For `command Echo`, the compiler writes `echo.ads`:
 
@@ -195,8 +195,9 @@ The language features above need the IDL compiler to do more than it does now, s
 
 ## Follow-up work
 
-- Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (#136).
-- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and add the `Rose.Command_Line` package with `String_List` and the launch support, and `package` declarations whose details are copied into each command's metadata (#137).
+- Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (blancolioni/idle#1).
+- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and `package` declarations whose details are copied into each command's metadata (blancolioni/idle#2).
+- Add the `Rose.Command_Line` package, with `String_List` and the launch support that generated mains call (#156).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
 - Split the `Directory` interface into lookup and create-and-modify parts (#139).
