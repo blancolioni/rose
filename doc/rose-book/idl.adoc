@@ -374,6 +374,7 @@ end Copy;
 | `Part_Of` | Yes | The package the command belongs to (see <<packages>>).
 | `Summary` | Yes | A one-line description, shown by `--help` and in command listings.
 | `Description` | No | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>).
+| `Authors` | No | Who wrote the command, printed by `--version` as "Written by ...". Defaults to the package's `Authors`.
 | `Version`, `Copyright` | No | Override the package's version or copyright for this command.
 |===
 
@@ -444,7 +445,7 @@ In every case the value ends up in the command's embedded metadata, so the shell
 `--help` is answered by the shell from the command's metadata, without running the command.
 It follows the layout of GNU tools such as `cp --help`:
 
-. *Usage line*, generated from the argument declarations.
+. *Usage line*, a single line generated from the argument declarations.
 . *Summary*, the command's `Summary`.
 . *Options*, generated from each argument's `Help`, `Short_Name` and default, followed by `--help` and `--version`, which the shell adds.
   If any option takes a value, the list starts with "Mandatory arguments to long options are mandatory for short options too."
@@ -522,6 +523,10 @@ The lexer also needs character literals, which it does not yet produce, and the 
 * *`Summary` and `Description` on the command, `Help` on arguments.*
 * *`--help` follows the GNU layout*: usage, summary, options, description, then a footer from the package.
   An earlier draft left `Description` out of `--help`.
+  As in GNU tools, `--help` does not print the version; that is left to `--version`.
+* *One usage line*, generated from the argument declarations.
+  Commands do not have several usage forms: the aim is a consistent shell, not a copy of GNU tools or POSIX.
+* *`--version` follows the GNU layout* (see <<packages>>).
 * *Any string aspect can be a literal, a text block or a text file.*
 * *Short options are `Short_Name` and `Short_Value`.*
 * *`Boolean` arguments take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
@@ -530,9 +535,6 @@ The lexer also needs character literals, which it does not yet produce, and the 
 
 ==== Open questions
 
-* *Version text in help.* Whether `--help` also prints the command's version line. GNU tools leave it to `--version`.
-* *Several usage forms.* `cp` shows three usage lines because it accepts different sets of arguments.
-  One declaration generates one usage line; more would need several signatures for one command, which is the overloading question in ADR 0002.
 * *Finding package files.*
   Since command files live with their source, a command's `Part_Of` package is not in the same directory.
   Where package files live, and how the compiler finds them (for example, a search path that includes `interfaces/`), is still to be decided.
@@ -556,9 +558,16 @@ A package is declared in its own file, named after the package like any other ID
 ----
 --  core_utilities.idl
 package Core_Utilities
-  with Version     => "1.0.0",
+  with Title       => "Rose core utilities",
+       Version     => "1.0.0",
        Copyright   => "Copyright (C) 2026 Fraser Wilson",
+       Authors     => "Fraser Wilson",
        Summary     => "Commands available when Rose boots",
+       License     => """
+          License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+          This is free software: you are free to change and redistribute it.
+          There is NO WARRANTY, to the extent permitted by law.
+          """,
        Help_Footer => """
           Rose core utilities: <https://rose-os.org/rose-book/>
           Full documentation: <https://rose-os.org/rose-book/{command}.html>
@@ -567,8 +576,11 @@ is
 end Core_Utilities;
 ----
 
+* `Title` is optional. It is the package's name as shown to users, in parentheses on the first line of `--version`. Without it, the package name is used.
 * `Version` is required. It is a version string of the form `major.minor.patch`.
 * `Copyright` is required. It is a single line of text.
+* `Authors` is optional. It is the default for each command's `Authors`.
+* `License` is optional. It is printed by `--version` after the copyright line.
 * `Summary` is optional. It is a one-line description, shown when listing packages.
 * `Help_Footer` is optional. It is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines.
 * `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
@@ -590,7 +602,7 @@ end Echo;
 ----
 
 * Every command must belong to exactly one package.
-* A command can override the package's version or copyright with its own `Version` or `Copyright` aspect, for example a command that is updated more often than the rest of its package.
+* A command can override the package's version, copyright or authors with its own `Version`, `Copyright` or `Authors` aspect, for example a command that is updated more often than the rest of its package.
   Without an override, it uses the package's values.
 * `Part_Of` is used rather than `Package`, since `package` is a reserved word, and `Part_Of` has a similar meaning in SPARK.
 
@@ -599,17 +611,22 @@ end Echo;
 * When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`).
   How it finds that file from the command's directory is an open question (see <<commands>>).
   It reports an error if the package does not exist or is missing `Version` or `Copyright`.
-* It copies the package's name, version, copyright, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's name.
+* It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's name.
   The registry can then answer `--version` from the executable alone, without reading the package file.
 * A package itself generates no Ada code.
 
 ==== What the shell does with packages
 
-* `--version` prints the command, its package and its effective version on one line, and the copyright on the next:
+* `--version` follows the GNU layout: the command name, the package's `Title` in parentheses and the effective version; the copyright; the package's `License`, if any; a blank line; and "Written by" with the command's authors, if any:
 +
 ----
-echo (Core_Utilities) 1.0.0
+echo (Rose core utilities) 1.0.0
 Copyright (C) 2026 Fraser Wilson
+License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Fraser Wilson.
 ----
 * `--help` ends with the package's help footer (see <<commands>>).
 * The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
