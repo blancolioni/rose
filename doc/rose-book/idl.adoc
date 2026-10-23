@@ -303,8 +303,144 @@ ADR 0002 (#135) adds two declarations to the language (#137).
   Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
 * A `package` declaration gives the name, version and copyright that a group of commands share.
 
-The grammar for commands will be added to this chapter when their syntax is settled.
+=== Commands
 
+A command declaration describes a program that the shell can run: its parameters, how they are given on the command line, and its help text.
+From it, the compiler generates the procedure spec the author implements, the program's main, and the metadata the shell's registry reads.
+
+[NOTE]
+====
+The syntax below is a proposal, to be settled in #137.
+====
+
+==== Declaring a command
+
+A command is declared in its own file, named after the command (`echo.idl`), kept with the command's source rather than in `interfaces/`:
+
+[source,ada]
+----
+command Echo
+  (Arguments : String_List
+     with Help => "Words to write, separated by spaces";
+   Newline   : Boolean := True
+     with Flag       => 'n',
+          Flag_Value => False,
+          Help       => "End the output with a newline")
+  with Part_Of     => Core_Utilities,
+       Summary     => "Write arguments to standard output",
+       Description => "Writes each argument to standard output, " &
+                      "separated by single spaces.";
+----
+
+A command that takes and produces files uses parameter modes and interface types, as in the rest of the IDL:
+
+[source,ada]
+----
+command Copy
+  (Source : interface File
+     with Help => "The file to copy";
+   Target : out interface File
+     with Help => "The new file")
+  with Part_Of => Core_Utilities,
+       Summary => "Copy a file";
+----
+
+* The parameter list is the command's signature.
+  The compiler generates the matching Ada procedure spec from it, so there is no separate `procedure` inside the declaration.
+* The declaration ends with `;`. It has no body.
+* Standard input, output and error are supplied by the shell and are not declared.
+
+==== Command aspects
+
+[cols="1,1,4",options="header"]
+|===
+| Aspect | Required | Meaning
+
+| `Part_Of` | Yes | The package the command belongs to (see <<packages>>).
+| `Summary` | Yes | A one-line description, shown in help and in command listings.
+| `Description` | No | A longer description, shown by `--help`. Strings can be joined with `&` to span lines.
+| `Version`, `Copyright` | No | Override the package's version or copyright for this command.
+|===
+
+==== Parameters
+
+Each parameter has a name, an optional mode, a type, an optional default, and aspects.
+
+* *Modes* map to the capabilities the program receives, as in ADR 0002: `in` (the default) and `in out` for existing objects, `out` for new ones.
+  An `out` parameter of a non-file type is a result that the shell binds to a variable.
+* *Defaults* are written `:= Value`.
+  A parameter without a default must be given on the command line.
+* *List parameters.* The last parameter may have the type `String_List`, which takes all remaining positional words, and can be none.
+  At most one parameter may do this.
+  `String_List` is a predefined type in command declarations, generated as `Rose.Command_Line.String_List`.
+* *Reserved names.* No parameter may be called `Help` or `Version`, since the shell handles `--help` and `--version` itself.
+
+[cols="1,4",options="header"]
+|===
+| Parameter aspect | Meaning
+
+| `Help` | Required. A one-line description, shown by `--help`.
+| `Flag` | A character that gives a short option, such as `+'n'+` for `-n`.
+| `Flag_Value` | The value a short option gives a `Boolean` parameter. Without it, the flag sets `True`.
+|===
+
+==== How parameters are given
+
+* *By position*, in declaration order, for parameters without a `Flag`.
+* *By name*, as `--name=value` or `--name value`, where the name is the parameter name in lower case with `_` replaced by `-`.
+  Any parameter can be given by name.
+* *By short flag*, for parameters with a `Flag`.
+  A `Boolean` flag takes no value: `-n` sets `Newline` to `False` in the example above.
+  A flag for any other type takes the next word as its value.
+* `--` ends option processing, so later words are always positional.
+
+So `echo -n Welcome to Rose` binds `+Newline => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
+
+==== What the compiler generates
+
+For `echo.idl`, the compiler writes:
+
+* `echo.ads`, the procedure spec, which the author implements in `echo.adb`:
++
+[source,ada]
+----
+with Rose.Command_Line;
+procedure Echo
+  (Arguments : Rose.Command_Line.String_List;
+   Newline   : Boolean := True);
+----
+* `echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Echo`, and reports success or failure (ADR 0002).
+* The command's metadata, embedded in the executable: the signature, the help text, and the package details copied from its `Part_Of` package.
+
+==== Grammar changes
+
+[source,ebnf]
+----
+command_decl ::= 'command' Name
+                 [ '(' command_param { ';' command_param } ')' ]
+                 'with' aspect { ',' aspect } ';'
+
+command_param ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
+                  [ ':=' value ]
+                  [ 'with' aspect { ',' aspect } ]
+
+aspect       ::= Name '=>' value
+value        ::= Integer | String { '&' String } | Character | Name
+----
+
+This needs character literals, which the lexer does not yet produce, and string concatenation with `&`.
+
+==== Open questions
+
+* *An inner procedure.*
+  The alternative is to declare the signature as a `procedure` inside a `command ... is ... end` block, which matches the generated Ada exactly, at the cost of repeating the name.
+* *Help in comments.*
+  The alternative to `Help` aspects is structured comments, such as `--  Words to write`, which read better.
+  Aspects are proposed because the compiler can check them: a misspelled aspect is an error, but a malformed comment is silently ignored.
+* *Boolean options by name.* Whether `--newline=false` is enough, or `--no-newline` should also be accepted.
+* *Where command files live.* Next to each command's source, as proposed, or together in one directory like `interfaces/`.
+
+[#packages]
 === Packages
 
 A package is a named, versioned group of commands that are built, installed and versioned together, such as the core utilities that `init` installs at boot.
@@ -343,10 +479,10 @@ A command names the package it belongs to with the `Part_Of` aspect:
 [source,ada]
 ----
 command Echo
-  with Part_Of => Core_Utilities
-is
-   ...
-end Echo;
+  (Arguments : String_List
+     with Help => "Words to write, separated by spaces")
+  with Part_Of => Core_Utilities,
+       Summary => "Write arguments to standard output";
 ----
 
 * Every command must belong to exactly one package.
