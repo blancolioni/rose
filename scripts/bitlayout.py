@@ -4,7 +4,9 @@
 Each input YAML file holds a set of diagrams under 'diagrams'.  A
 diagram is a list of rows, and each row is one word, given either as
 a list of fields from the lowest bit up, or as {words: n, name: ...}
-for a field that spans whole words.  A field is [bits, name] or
+for a field that spans whole words.  Adding 'height: h' draws a long
+field only h rows tall, with break marks on its edges.  A field is
+[bits, name] or
 [bits, name, const]; const fields hold a fixed value and are shaded.
 
 Bit numbers are drawn above the first row, at each field boundary,
@@ -73,15 +75,20 @@ def parse_field(where, value):
 
 
 def parse_row(where, word, value):
-    """Return ('fields', [(lo, hi, name, const)]) or ('words', n, name)."""
+    """Return ('fields', [(lo, hi, name, const)]) or
+    ('words', n, name, height)."""
     if isinstance(value, dict):
         words, name = value.get("words"), value.get("name")
-        if set(value) != {"words", "name"} \
+        height = value.get("height", words)
+        if not {"words", "name"} <= set(value) <= {"words", "name",
+                                                    "height"} \
                 or not isinstance(words, int) or words < 1 \
                 or not isinstance(name, str):
             raise LayoutError(f"{where}: expected {{words: n, name: ...}}, "
                               f"not {value!r}")
-        return ("words", words, name)
+        if not isinstance(height, int) or not 1 <= height <= words:
+            raise LayoutError(f"{where}: height must be from 1 to {words}")
+        return ("words", words, name, height)
     if not isinstance(value, list) or not value:
         raise LayoutError(f"{where}: row must be a list of fields")
     fields = []
@@ -124,10 +131,23 @@ def box(name, x, y, width, height, label, const):
             text(x + width / 2, y + height / 2, FONT_SIZE, label)]
 
 
+def break_marks(x, y, width, height):
+    """Draw a pair of slanted strokes across each side of a box, to show
+    that it is drawn shorter than it is."""
+    marks = []
+    mid = y + height / 2
+    for side in (x, x + width):
+        for dy in (-3, 3):
+            marks.append(f'<line x1="{side - 5:g}" y1="{mid + dy + 3:g}" '
+                         f'x2="{side + 5:g}" y2="{mid + dy - 3:g}" '
+                         f'stroke="#000000"/>')
+    return marks
+
+
 def render(name, title, word, rows):
     width = 2 * MARGIN + word * BIT_WIDTH
     height = 2 * MARGIN + HEADER_HEIGHT \
-        + ROW_HEIGHT * sum(row[1] if row[0] == "words" else 1
+        + ROW_HEIGHT * sum(row[3] if row[0] == "words" else 1
                            for row in rows)
     parts = [f'<svg xmlns="http://www.w3.org/2000/svg" '
              f'width="{width}" height="{height}" '
@@ -153,10 +173,13 @@ def render(name, title, word, rows):
                              label, const)
             y += ROW_HEIGHT
         else:
-            _, words, label = row
+            _, words, label, rows_drawn = row
             parts += box(name, MARGIN, y, word * BIT_WIDTH,
-                         words * ROW_HEIGHT, label, False)
-            y += words * ROW_HEIGHT
+                         rows_drawn * ROW_HEIGHT, label, False)
+            if rows_drawn < words:
+                parts += break_marks(MARGIN, y, word * BIT_WIDTH,
+                                     rows_drawn * ROW_HEIGHT)
+            y += rows_drawn * ROW_HEIGHT
 
     parts.append("</svg>")
     return "\n".join(parts) + "\n"
@@ -174,7 +197,7 @@ def field_positions(word, rows):
                     (base + lo, hi - lo + 1, False))
             base += word
         else:
-            _, words, label = row
+            _, words, label, _ = row
             positions.setdefault(label, []).append(
                 (base, words * word, True))
             base += words * word

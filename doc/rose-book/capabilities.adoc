@@ -1,0 +1,195 @@
+= Capabilities
+
+== Introduction
+
+A capability represents permission to perform one or more operations.
+The possession of a capability for an operation _O_ is both necessary and sufficient for performing _O_.
+
+For the process, a capability is a 32-bit word, with no particular structure.
+The kernel uses the process capability to index a private table of capability structures.
+Each structure defines the capability type, and the object to which it applies.
+
+Capability structures are stored in pages.
+The first 32 capabilities used by a process are stored directly in the kernel process structure; the rest are stored in private pages mapped to the process.
+
+== Capability Types
+
+[NOTE]
+====
+This table is out of date.
+The capability types are listed in `Capability_Type`, in `rose-capabilities-layout.ads` (#121).
+====
+
+[#captypes]
+.Capability Types
+[cols="1,3",options="header"]
+|===
+| Type | Description
+| Null | The null capability; produces an error if used
+| Page Object | Controls access to physical memory
+| Schedule |
+| Process |
+| Interface |
+| Endpoint |
+| Set |
+| Kernel |
+|===
+
+=== Generic Capability Layout
+
+A capability structure is 16 bytes long.
+The particular layout depends on the capability type.
+Common fields are as follows.
+
+image::capability.svg[Generic capability layout]
+
+* `Rescinded Count` is the number of times a capability has been rescinded.
+  Any time the capability is invoked, the rescinded counts must match.
+* `S` is set for single-use capabilities.
+* `R` requests read-only access to some resource.
+* `W` requests write access to some resource.
+* `X` requests execution access to some resource.
+* `Type` is the capability type.
+* `Identifier` is provided to the receiving object.
+* `Endpoint` is an index into the receiving objects endpoint list, which is translated by the kernel into an endpoint id.
+* `Payload` is a type-specific payload, often an object id.
+
+=== Endpoint Capabilities
+
+An endpoint capability is used to invoke an endpoint on the remote object.
+If the process is currently listening on the capability's endpoint, the receive invocation will return with the corresponding invocation record.
+
+==== Endpoint Capability Layout
+
+image::endpoint-cap.svg[Endpoint capability layout]
+
+=== Page Object Capabilities
+
+A page object gives access to a shared buffer.
+Three endpoints are implemented: `copy-to-buffer`, `copy-from-buffer`, and `map-device-memory`.
+
+==== Page Object Capability Layout
+
+image::page-object-cap.svg[Page object capability layout]
+
+=== Process Capabilities
+
+A process capability is used to communicate with a running process.
+Two actions are possible, depending on the value of the `Op` field.
+If Op is zero, the capability returns the process's default interface.
+If Op is one, the capability sends the capabilities in the invocation to the process.
+
+Process capabilities are normally given to the parent process by the kernel when the child is launched.
+The parent can then query the child, or send it capabilities.
+For example, when the Petal shell executes a program, it uses the process capability to send the default input, output, and error streams (amongst other interfaces).
+
+==== Process Capability Layout
+
+image::process-cap.svg[Process capability layout]
+
+=== Boot Capabilities
+
+These capabilities are only used during system initialisation.
+At boot, the kernel launches the process _init_, which is pre-configured with a script which starts the rest of the system.
+Boot capabilities are used to accomplish this.
+
+==== Boot Capability Endpoints
+
+[#boot-capability-endpoints]
+.Boot capability endpoints
+[cols="1,1",options="header"]
+|===
+| Operation | Arguments
+| Launch Boot Module | Module index, caps
+|===
+
+==== Boot Capability Layout
+
+image::boot-cap.svg[Boot capability layout]
+
+=== Low Level Capabilities
+
+These are capabilities which allow device drivers to talk to hardware.
+The are necessarily architecture-dependent.
+Some examples are shown below.
+
+==== Port IO Layout (i686)
+
+This capability allows a process to execute the equivalent of `out addr, reg` and `in addr` instructions.
+
+image::port-io-cap.svg[Port IO capability layout]
+
+The possible endpoints are as follows.
+
+[cols="1,2,5",options="header"]
+|===
+| Endpoint | Op | Description
+| 1 | port out | Each invocation word is sent to First Port
+| 2 | port in | Each receivable word is set by an in on First Port
+| 3 | port out range | Invocation data specifies (port offset, value) pair for port-out
+| 4 | port in range | Invocation data specifies port offsets, result written to received words
+|===
+
+==== Invocation word format
+
+The sent words layout for the port-out-range endpoint varies depending on the size of the data.
+For 8-bit data, each sent word consists of the value in byte 0, and the offset in byte 1.
+16-bit data is encoded into bytes 0 and 1, with the offset in byte 2.
+32-bit data is encoded in up to three groups of five sent words.
+The first word of each group has four port offsets, while the second, third, fourth and fifth words contain the corresponding data for each port.
+
+For the port-in-range endpoint, each sent word contains a port offset, and when returning the received words contain the result of the `in` instruction.
+If the received word count is larger than the sent word count, the extra offsets will all be zero.
+Extra sent words are ignored.
+
+In all cases, an offset of 255 indicates that no data should be sent.
+Any offset that is not within the port range is also ignored.
+
+== Invocation
+
+A capability is invoked by making a system call using an _invocation record_.
+
+=== Invocation Record
+
+image::invocation-record.svg[Invocation record]
+
+[WARNING]
+====
+The diagram above is generated from `Rose.Invocation.Invocation_Record` and is current.
+The text and the flags table below describe an older record, with `Use`, `CC` and eight flags, and are out of date (#121).
+
+`Flags` is a packed array indexed by `Invocation_Flag`, so flag _N_ is bit _N_:
+`Writable_Buffer` (0), `Send_Buffer`, `No_Trace`, `Error`, `Send`, `Receive`, `Reply`, `Block`, `Create_Reply_Cap`, `Send_Words`, `Recv_Words`, `Send_Caps` and `Recv_Caps` (12).
+`SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`.
+====
+
+The `RWC` field is the number of words which the sender is prepared to receive in response to the invocation.
+A reply to this message cannot contain more words than specified here, although it can contain less.
+
+The `SWC` field is the number of sent words.
+
+The `CC` field is the number of sent capabilities.
+
+The `Capability` field contains the capability being invoked.
+The `Reply Capability` field is set by the kernel, and gives the target of an invocation a capability on which to send a reply.
+
+If any capabilities are sent, the `Use` field limits the number of times they can be used.
+An allocation count of zero means there is no limit.
+
+[#invocation-flags]
+.Invocation Flags
+[cols="1,2,5",options="header"]
+|===
+| Id | Name | Description
+| W | Write | If the P flag is set, allow the receiver to write to the buffer
+| P | Pages | Send one or more shared buffers
+| E | Error | An error occurred (code is in first data word)
+| S | Send | Unprompted send on a capability
+| R | Receive | Willing to receive messages
+| Y | Reply | This is a reply to an earlier send
+| B | Block | The sender will block until the next message
+| C | Cap Construct | Create a reply cap for the message response
+| SWC | Sent Word Count | SWC contains the number of sent words
+| RWC | Receive Word Count | RWC contains the maximum received words
+| CC | Capability Count | Number of sent capabilities
+|===

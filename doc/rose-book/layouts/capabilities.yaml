@@ -128,7 +128,7 @@ diagrams:
         - [4, "0", const]
         - [24, Rescinded Count]
       - - [16, Endpoint]
-        - [16, Identifier (log₂ size)]
+        - [16, Identifier (log2 size)]
       - - [32, First Port]
       - - [32, Last Port]
     check:
@@ -137,7 +137,7 @@ diagrams:
           fields:
             Rescinded Count: Rescinded_Count
             Endpoint: Endpoint
-            Identifier (log₂ size): Identifier
+            Identifier (log2 size): Identifier
       values:
         "1110": Rose.Capabilities.Layout.Arch_Cap
 
@@ -159,8 +159,8 @@ diagrams:
         - [8, unused]
         - [4, Error]
         - [4, Extra]
-      - {words: 16, name: Parameter words}
-      - {words: 16, name: Capabilities}
+      - {words: 16, name: Parameter words (16), height: 3}
+      - {words: 16, name: Capabilities (16), height: 3}
       - {words: 1, name: Buffer address}
       - {words: 1, name: Buffer length}
     check:
@@ -182,7 +182,7 @@ diagrams:
             unused: Unused
             Error: Error
             Extra: Extra_Errors
-            Parameter words: Data
-            Capabilities: Caps
+            Parameter words (16): Data
+            Capabilities (16): Caps
             Buffer address: Buffer_Address
             Buffer length: Buffer_Length
