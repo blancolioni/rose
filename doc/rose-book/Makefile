@@ -23,10 +23,20 @@ ADOC_ATTRS := -a imagesdir=build/layouts
 # website.  Run "make adoc PUBLISH_DIR=" to skip the copy.
 PUBLISH_DIR ?= /var/www/rose-os.org/html/rose-book
 
-adoc: layouts
+# An index page linking each chapter by its title (its "= " line).
+build/index.adoc: Makefile $(ADOC)
+	mkdir -p build
+	{ echo "= The Rose Book"; echo; \
+	  for f in $(ADOC); do \
+	    title=$$(awk '/^= /{sub(/^= /, ""); print; exit}' $$f); \
+	    echo "* link:$${f%.adoc}.html[$$title]"; \
+	  done; } > $@
+
+adoc: layouts build/index.adoc
 	asciidoctor $(ADOC_ATTRS) -a data-uri -D build $(ADOC)
+	asciidoctor -D build build/index.adoc
 	if [ -n "$(PUBLISH_DIR)" ]; then \
-	  cp $(ADOC:%.adoc=build/%.html) $(PUBLISH_DIR)/; \
+	  cp build/index.html $(ADOC:%.adoc=build/%.html) $(PUBLISH_DIR)/; \
 	fi
 	asciidoctor-pdf $(ADOC_ATTRS) -D build $(ADOC)
 	asciidoctor-epub3 $(ADOC_ATTRS) -D build $(ADOC)
