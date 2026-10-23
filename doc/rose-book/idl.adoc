@@ -620,13 +620,15 @@ is
 end Core_Utilities;
 ----
 
-* `Title` is optional. It is the package's name as shown to users, in parentheses on the first line of `--version`. Without it, the package name is used.
-* `Version` is required. It is a version string of the form `major.minor.patch`.
-* `Copyright` is required. It is a single line of text.
-* `Authors` is optional. It is the default for each command's `Authors`.
-* `License` is optional. It is printed by `--version` after the copyright line.
-* `Summary` is optional. It is a one-line description, shown when listing packages.
-* `Help_Footer` is optional. It is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines.
+As for commands, no aspect is required, and each has a default:
+
+* `Title` is the package's name as shown to users, in parentheses on the first line of `--version`. Without it, the package name is used.
+* `Version` is a version string of the form `major.minor.patch`. Without it, the version is `0.0.0`.
+* `Copyright` is a single line of text. Without it, `--version` prints no copyright line.
+* `Authors` is the default for each command's `Authors`. Without it, `--version` prints no "Written by" line, unless the command has its own.
+* `License` is printed by `--version` after the copyright line. Without it, nothing is printed there.
+* `Summary` is a one-line description, shown when listing packages. Without it, the package name followed by "(no summary)" is used, as for commands.
+* `Help_Footer` is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines. Without it, `--help` ends after the description.
 * `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
 * The body is empty. A package does not list its commands; each command is declared as a child of its package, so adding a command does not mean editing the package.
 * A package declares no methods and has no endpoint ids.
@@ -652,7 +654,7 @@ end Core_Utilities.Echo;
 ==== What the compiler does with a package
 
 * When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`) from the search path.
-  It reports an error if the package does not exist or is missing `Version` or `Copyright`.
+  It reports an error if the package does not exist.
 * It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's registered name.
   The registry can then answer `--version` from the executable alone, without reading the package file.
 * A package generates a small Ada package, the parent of its commands' procedures, holding its details as constants:
@@ -670,7 +672,7 @@ end Core_Utilities;
 
 ==== What the shell does with packages
 
-* `--version` follows the GNU layout: the command name, the package's `Title` in parentheses and the effective version; the copyright; the package's `License`, if any; a blank line; and "Written by" with the command's authors, if any:
+* `--version` follows the GNU layout: the command name, the package's `Title` in parentheses and the effective version; the copyright, if any; the package's `License`, if any; a blank line; and "Written by" with the command's authors, if any:
 +
 ----
 echo (Rose core utilities) 1.0.0
