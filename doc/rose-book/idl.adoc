@@ -254,8 +254,29 @@ Parameters and results are encoded as follows.
 * A handler for a method that returns an interface returns a plain `Capability`.
 * `Create_Server` creates the endpoints for the interface's methods and registers the handlers in a `Rose.Server.Server_Context`.
   `Attach_Interface` adds the interface to an existing context, and `Publish_Interface` also publishes it as the server's public interface.
-* The `Instanced` parameter selects a per-instance server.
-  Its exact behaviour is still to be documented.
+* The `Instanced` parameter, described next, selects whether one set of method capabilities is shared by every client, or each resource the server manages gets its own.
+
+==== Instanced servers
+
+Many servers manage several resources of the same kind: the timer server manages many timers, the memory server many processes, and the ATA server up to four drives.
+Each resource is an _instance_ of the interface, and is identified by a `Capability_Identifier` that the server chooses.
+
+* *Not instanced* (the default).
+  `Create_Server` or `Attach_Interface` creates one capability for each method, with identifier 0, and every client shares them.
+  Every call reaches its handler with `Id` = 0.
+* *Instanced* (`+Instanced => True+`).
+  No method capabilities are created up front.
+  Instead, for each resource the server creates an interface capability carrying that resource's identifier, with `Rose.Server.Create_Endpoint (X_Interface, Identifier)`, and hands it out.
+  When a client opens it, the generated interface handler creates one capability for each method, carrying the same identifier, the first time that identifier is seen.
+  It caches them in the package's `Rose.Server.Server_Instance` table and returns them.
+  Every call then reaches its handler with `Id` set to the resource's identifier, which the handler uses to find the resource.
+
+For example, the timer server attaches `Timeout` and `Cap` as instanced interfaces, so each timer it creates has its own `On_Timeout` and `Destroy` capabilities, and `Destroy_Timer (Id)` knows which timer to remove.
+The caps, isofs, mem and store servers use instanced interfaces in the same way.
+
+The instance table holds up to 160 (endpoint, identifier) pairs for each interface (`Rose.Server.Max_Endpoint_Instances`).
+
+The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
 
 === Ada 2022 target (planned)
 
@@ -377,6 +398,7 @@ These are differences between this chapter and the current compiler, or problems
 * If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
 * An enumeration type takes its name from its interface, not from its type declaration.
 * The count type of `Storage_Array` refers to an undefined type, `Storage_Offset`.
+* The ATA server does not use the generated `Block_Device` server package; it builds its capabilities by hand with endpoint ids from `Rose.Devices.Block`.
 * `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build.
   `Named` is still used through `Kernel_Process`, which inherits it.
 * The compiler is built with alix and depends on libraries outside the repository (WLib, GCS, syn and tropos); the build runs a prebuilt binary called `idle`.
