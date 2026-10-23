@@ -573,10 +573,11 @@ The lexer also needs character literals, which it does not yet produce, and the 
   An earlier draft named the package with a `Part_Of` aspect instead; the child name says the same thing in the way Ada does, and needs no extra aspect.
 * *The shell registers a command under the last part of its name*, in lower case, unless a `Name` aspect overrides it.
 
+* *An ambiguous name is resolved by asking the user* (see <<command-visibility>>).
+
 ==== Open questions
 
-* *Ambiguous names after `use`.*
-  If two used packages both provide `echo` (see <<command-visibility>>), the proposal is to follow Ada: `echo` alone is ambiguous, and the shell lists the qualified names to choose from.
+None at present.
 
 [#packages]
 === Packages
@@ -693,6 +694,16 @@ The shell treats packages much as Ada treats a `use` clause:
 * Arguments follow the name as words, as in any shell; a command is not written as a procedure call with parentheses.
 * Installing a command whose name is already visible from another package is not an error.
   The shell warns, for example `echo already visible from package core_utilities. This command will be available with debug.echo`, and the new command can then be run by its qualified name.
+* If a `use` makes the same name visible from two packages, the name alone is ambiguous, as in Ada.
+  Petal asks the user which command was meant, listing the qualified names.
+  When it is not interactive, for example when running a script, it reports the ambiguity as an error instead.
+* A command can be given another name with a renaming, in Ada style:
++
+----
+command debug_echo renames Debug.Echo;
+----
++
+After this, `debug_echo` runs `Debug.Echo`.
 
 ==== Grammar changes
 
