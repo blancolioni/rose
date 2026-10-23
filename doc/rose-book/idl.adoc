@@ -313,7 +313,8 @@ From it, the compiler generates the procedure spec the author implements, the pr
 
 [NOTE]
 ====
-The syntax below is a proposal, to be settled in #137.
+The syntax below is proposed in #137.
+Its main choices are settled (see <<command-decisions>>); the remaining open questions are listed at the end of this section.
 ====
 
 ==== Declaring a command
@@ -392,6 +393,7 @@ Each parameter has a name, an optional mode, a type, an optional default, and as
 * *By position*, in declaration order, for parameters without a `Flag`.
 * *By name*, as `--name=value` or `--name value`, where the name is the parameter name in lower case with `_` replaced by `-`.
   Any parameter can be given by name.
+  A `Boolean` parameter can also be given as `--name`, which sets it to `True`, or `--no-name`, which sets it to `False`: `--no-newline` is the same as `--newline=false`.
 * *By short flag*, for parameters with a `Flag`.
   A `Boolean` flag takes no value: `-n` sets `Newline` to `False` in the example above.
   A flag for any other type takes the next word as its value.
@@ -433,20 +435,28 @@ value        ::= Integer | String { '&' String } | Character | Name
 
 This needs character literals, which the lexer does not yet produce, and string concatenation with `&`.
 
+[#command-decisions]
+==== Decisions
+
+* *The parameter list is the signature.*
+  A `procedure` inside a `command ... is ... end` block was considered.
+  It would match the generated Ada exactly, but repeats the name, and the compiler can generate the spec from the bare list.
+* *Help text goes in `Help` aspects.*
+  Structured comments, such as `--  Words to write`, read better, but the compiler can check aspects: a misspelled or missing aspect is an error, while a malformed or missing comment would be silently ignored.
+* *`Boolean` parameters take `--name` and `--no-name`*, as well as `--name=true` and `--name=false`, following GNU conventions.
+* *Command files live with the command's source*, so each command is self-contained.
+  Keeping them all in one directory, like `interfaces/`, was considered; it makes them easy to check together, but separates each declaration from its code.
+
 ==== Open questions
 
-* *An inner procedure.*
-  The alternative is to declare the signature as a `procedure` inside a `command ... is ... end` block, which matches the generated Ada exactly, at the cost of repeating the name.
-* *Help in comments.*
-  The alternative to `Help` aspects is structured comments, such as `--  Words to write`, which read better.
-  Aspects are proposed because the compiler can check them: a misspelled aspect is an error, but a malformed comment is silently ignored.
 * *Parameter aspects next to command aspects.*
   A parameter's aspect list ends at the `;` or `)` after it, and the command's list starts with the `with` after the closing `)`.
   When the last parameter has aspects, the two lists sit next to each other and are easy to misread as one.
   Moving parameter aspects into the command's list was considered and rejected, since it means repeating parameter names and separates help text from its parameter.
   A clearer layout or syntax is still wanted.
-* *Boolean options by name.* Whether `--newline=false` is enough, or `--no-newline` should also be accepted.
-* *Where command files live.* Next to each command's source, as proposed, or together in one directory like `interfaces/`.
+* *Finding package files.*
+  Since command files live with their source, a command's `Part_Of` package is not in the same directory.
+  Where package files live, and how the compiler finds them (for example, a search path that includes `interfaces/`), is still to be decided.
 
 [#packages]
 === Packages
@@ -500,7 +510,8 @@ command Echo
 
 ==== What the compiler does with a package
 
-* When it compiles a command, the compiler reads the package's file, using the same file-name rule as for parent interfaces.
+* When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`).
+  How it finds that file from the command's directory is an open question (see <<commands>>).
   It reports an error if the package does not exist or is missing `Version` or `Copyright`.
 * It copies the package's name, version, copyright and summary, with any overrides from the command, into the command's embedded metadata.
   The registry can then answer `--version` from the executable alone, without reading the package file.
