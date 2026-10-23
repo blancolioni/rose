@@ -1,0 +1,188 @@
+# Bit layouts for the capabilities chapter, drawn by scripts/bitlayout.py.
+#
+# Each row is one 32-bit word.  Fields are listed from the lowest bit
+# up; the diagram puts bit 31 on the left.  Constant values must be
+# quoted, or YAML reads them as numbers.
+#
+# "make check-layouts" compares these with the Ada records.
+
+word: 32
+
+# Rows shared by several diagrams, reused through YAML anchors.
+rows:
+  access-header: &access-header
+    - [4, Type]
+    - [1, S]
+    - [1, R]
+    - [1, W]
+    - [1, X]
+    - [24, Rescinded Count]
+  ident: &ident
+    - [16, Endpoint]
+    - [16, Identifier]
+
+# Check fields shared by several diagrams (see "make check-layouts").
+checks:
+  header-fields: &header-fields
+    Rescinded Count: Rescinded_Count
+    Endpoint: Endpoint
+    Identifier: Identifier
+  access-header: &access-header-check
+    record: Rose.Capabilities.Layout.Capability_Header
+    fields:
+      <<: *header-fields
+      Type: Cap_Type
+      S: Single_Use
+      R: Read_Access
+      W: Write_Access
+      X: Execution_Access
+
+diagrams:
+  capability:
+    title: Generic capability layout
+    rows:
+      - *access-header
+      - *ident
+      - {words: 2, name: Payload}
+    check:
+      records:
+        - *access-header-check
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Payload: Payload}
+
+  endpoint-cap:
+    title: Endpoint capability layout
+    rows:
+      - *access-header
+      - *ident
+      - {words: 2, name: Object Id}
+    check:
+      records:
+        - *access-header-check
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Object Id: Payload}
+
+  page-object-cap:
+    title: Page object capability layout
+    rows:
+      - - [4, "0001", const]
+        - [1, S]
+        - [1, R]
+        - [1, W]
+        - [1, X]
+        - [24, Rescinded Count]
+      - *ident
+      - {words: 2, name: Page Object Id}
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields:
+            <<: *header-fields
+            S: Single_Use
+            R: Read_Access
+            W: Write_Access
+            X: Execution_Access
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Page Object Id: Payload}
+      values:
+        "0001": Rose.Capabilities.Layout.Page_Object_Cap
+
+  process-cap:
+    title: Process capability layout
+    rows:
+      - - [4, "0011", const]
+        - [2, Op]
+        - [2, "0", const]
+        - [24, Rescinded Count]
+      - *ident
+      - {words: 2, name: Process Object Id}
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields: *header-fields
+        - record: Rose.Capabilities.Layout.Capability_Layout
+          fields: {Process Object Id: Payload}
+      values:
+        "0011": Rose.Capabilities.Layout.Process_Cap
+
+  boot-cap:
+    title: Boot capability layout
+    rows:
+      - - [4, "1000", const]
+        - [4, "0", const]
+        - [24, Rescinded Count]
+      - - [32, "0", const]
+      - - [32, "0", const]
+      - - [32, "0", const]
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields: {Rescinded Count: Rescinded_Count}
+      values:
+        "1000": Rose.Capabilities.Layout.Boot_Cap
+
+  port-io-cap:
+    title: Port IO capability layout (i686)
+    rows:
+      - - [4, "1110", const]
+        - [4, "0", const]
+        - [24, Rescinded Count]
+      - - [16, Endpoint]
+        - [16, Identifier (log2 size)]
+      - - [32, First Port]
+      - - [32, Last Port]
+    check:
+      records:
+        - record: Rose.Capabilities.Layout.Capability_Header
+          fields:
+            Rescinded Count: Rescinded_Count
+            Endpoint: Endpoint
+            Identifier (log2 size): Identifier
+      values:
+        "1110": Rose.Capabilities.Layout.Arch_Cap
+
+  # Flags is a packed array indexed by Rose.Invocation.Invocation_Flag,
+  # so flag N is bit N, from Writable_Buffer (0) to Recv_Caps (12).
+  invocation-record:
+    title: Invocation record
+    rows:
+      - - [13, Flags]
+        - [4, SW]
+        - [4, RW]
+        - [4, SC]
+        - [4, RC]
+        - [3, rsvd]
+      - {words: 1, name: Capability}
+      - {words: 1, name: Reply Capability}
+      - {words: 2, name: Endpoint Id}
+      - - [16, Identifier]
+        - [8, unused]
+        - [4, Error]
+        - [4, Extra]
+      - {words: 16, name: Parameter words (16), height: 3}
+      - {words: 16, name: Capabilities (16), height: 3}
+      - {words: 1, name: Buffer address}
+      - {words: 1, name: Buffer length}
+    check:
+      records:
+        - record: Rose.Invocation.Control_Word
+          fields:
+            Flags: Flags
+            SW: Last_Sent_Word
+            RW: Last_Recv_Word
+            SC: Last_Sent_Cap
+            RC: Last_Recv_Cap
+            rsvd: Reserved
+        - record: Rose.Invocation.Invocation_Record
+          fields:
+            Capability: Cap
+            Reply Capability: Reply_Cap
+            Endpoint Id: Endpoint
+            Identifier: Identifier
+            unused: Unused
+            Error: Error
+            Extra: Extra_Errors
+            Parameter words (16): Data
+            Capabilities (16): Caps
+            Buffer address: Buffer_Address
+            Buffer length: Buffer_Length
