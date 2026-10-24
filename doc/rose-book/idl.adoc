@@ -363,7 +363,7 @@ The declaration has the same shape as an interface or package: aspects for the c
 
 [source,ada]
 ----
-command Core_Utilities.Echo
+command Core_Utilities.Echo : Standard_Output
   with Summary     => "Write arguments to standard output",
        Description => "Writes each argument to standard output, " &
                       "separated by single spaces."
@@ -379,6 +379,8 @@ is
 
 end Core_Utilities.Echo;
 ----
+
+`Echo` inherits the role `Standard_Output`, which gives it standard output (see <<roles>>).
 
 A command that takes and produces files gives its arguments modes and interface types:
 
@@ -580,20 +582,41 @@ The lexer also needs character literals, which it does not yet produce, and the 
 
 * *An ambiguous name is resolved by asking the user* (see <<command-visibility>>).
 
-==== Standard streams
+[#roles]
+==== Roles
 
-A command receives standard input, standard output or standard error only if it asks for them, by inheriting the corresponding requirement group (ADR 0002, section 1).
-`Standard_Input`, `Standard_Output` and `Standard_Error` each hold one stream, and `Standard_IO` inherits all three.
-Inherited declarations come first in the signature, and the generated main gives the streams to the run-time system, so the command uses them through `Ada.Text_IO`.
-A command that inherits none of them can do no I/O: its generated configuration forbids `Ada.Text_IO`.
+A `role` declaration names a set of caps that a command can be granted (ADR 0002, section 1).
+A command inherits roles after its name, and receives their members as arguments; a command can inherit only from roles.
 
-The examples above leave the requirements out, because the syntax for groups, and the keyword that declares them, are not settled.
-`Echo` would inherit `Standard_Output`, and `Copy` none.
+[source,ada]
+----
+role Standard_Input is
+   Standard_Input : Stream_Reader;
+end Standard_Input;
+
+role Standard_Output is
+   Standard_Output : Stream_Writer;
+end Standard_Output;
+
+role Standard_Error is
+   Standard_Error : Stream_Writer;
+end Standard_Error;
+
+role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
+end Standard_IO;
+----
+
+* *Each member is a cap of an interface type*, so its type is written without the `interface` keyword, and it has no mode or default.
+  The interface type says what right the member grants.
+* *Inherited members come first* in the command's signature, each role once, as with parent interfaces.
+* *The standard streams are given to the run-time system* by the generated main, so a command uses them through `Ada.Text_IO`.
+  A command that inherits none of the stream roles can do no I/O: its generated configuration forbids `Ada.Text_IO`.
+* *A role is not an interface.* An interface provides its parents' operations; a command receives its roles' caps.
 
 ==== Open questions
 
-* The keyword for requirement groups, and how a command names the groups it inherits.
-* Whether the system caps (create-endpoint, delete, rescind, create-cap-set) also become requirement groups (ADR 0002, open questions).
+* Whether the system caps (create-endpoint, delete, rescind, create-cap-set) also become roles (ADR 0002, open questions).
+  They would need IDL interfaces of their own.
 
 [#packages]
 === Packages

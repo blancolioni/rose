@@ -45,13 +45,28 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 - **Parameter types are IDL interfaces.** `in File` means "any object that implements `File`", so a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 - **Typed results.** A command returns structured values through `out` parameters, such as `stat (path => "x", size => s, modified => m)`, instead of text that the caller has to parse.
-- **Standard streams are requirements a command declares.** A command gets standard input, standard output or standard error only if its declaration asks for it, so a command that asks for none can do no I/O at all.
-  - **Requirement groups.** Each stream is declared in a named group of argument declarations: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the groups it needs, so a filter inherits `Standard_IO`, and a command that only prints inherits `Standard_Output` and `Standard_Error`.
-  - **Groups are not interfaces.** When an interface inherits from another, it provides the parent's operations. When a command inherits a group, it receives the group's caps, which is the opposite direction. So groups are a separate kind of declaration, and a command can inherit only from groups.
-  - **Inherited declarations are arguments.** They come first in the signature, each group once, as with parent interfaces. They are passed in the launch invocation like any other argument (section 2), and the generated main gives the streams to the run-time system, so the command uses them through `Ada.Text_IO` as now.
-  - **The shell binds them by role.** When a signature includes a stream group, the shell supplies the job's corresponding stream without the user naming it. The streams cross the job's membrane like any other cap.
-  - **Typed streams fit the same model.** A command that writes typed values (section 6) inherits a group whose output stream has that element type, so the signature says what the command can be piped to.
-  - **No streams, no I/O library.** For a command that inherits none of the stream groups, the generated configuration includes `pragma Restrictions (No_Dependence => Ada.Text_IO)`, so I/O is a compile-time error, not a failure when the command runs.
+- **Standard streams are roles a command declares.** A command gets standard input, standard output or standard error only if its declaration asks for it, so a command that asks for none can do no I/O at all.
+  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and a command that only prints inherits `Standard_Output` and `Standard_Error`:
+
+    ```ada
+    role Standard_Output is
+       Standard_Output : Stream_Writer;
+    end Standard_Output;
+
+    role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
+    end Standard_IO;
+
+    command Core_Utilities.Echo : Standard_Output, Standard_Error is
+       ...
+    end Core_Utilities.Echo;
+    ```
+
+  - **Role members are caps of interface types.** A role grants authority, and authority is a cap, so every member's type is an interface. The declaration names the interface without the `interface` keyword, and has no mode or default: a member is always a granted cap, and its interface type says what right it grants (a lookup-only `Directory`, for example, as in section 5). Settings that are not authority, such as a locale, are ordinary arguments.
+  - **Roles are not interfaces.** When an interface inherits from another, it provides the parent's operations. When a command inherits a role, it receives the role's caps, which is the opposite direction. So roles are a separate kind of declaration, and a command can inherit only from roles.
+  - **Inherited members are arguments.** They come first in the signature, each role once, as with parent interfaces. They are passed in the launch invocation like any other argument (section 2), and the generated main gives the streams to the run-time system, so the command uses them through `Ada.Text_IO` as now.
+  - **The shell binds them by role.** When a signature includes a stream role, the shell supplies the job's corresponding stream without the user naming it. The streams cross the job's membrane like any other cap.
+  - **Typed streams fit the same model.** A command that writes typed values (section 6) inherits a role whose output stream has that element type, so the signature says what the command can be piped to.
+  - **No streams, no I/O library.** For a command that inherits none of the stream roles, the generated configuration includes `pragma Restrictions (No_Dependence => Ada.Text_IO)`, so I/O is a compile-time error, not a failure when the command runs.
   - **Failure needs no standard error.** `Fail` is the reply to the launch invocation (section 2), so a command without standard error can still report an error.
 - **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ("Welcome", "to", "Rose")`.
 - **Short options.** An argument can have a short option (`Short_Name`) and, for a `Boolean`, the value the option gives it (`Short_Value`). For example, `-n` sets `New_Line` to `False`. A `Boolean` argument can also be given by name as `--name` or `--no-name`.
@@ -168,7 +183,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - **User-mode target.** This uses the full Ada language. An IDL interface becomes an Ada interface type, and its implementations become tagged types, so `in File` accepts any object that implements `File`, and typed streams can be generic over their element type.
 - **Language additions:**
   - command declarations: argument declarations with modes, defaults, short options and list arguments, help text and package details, generating the spec, the main program and the embedded metadata (section 2)
-  - requirement groups: named groups of argument declarations that commands inherit, starting with the standard streams (section 1)
+  - roles: named sets of caps that commands inherit, starting with the standard streams (section 1)
   - record types for stream elements
   - namespaces and versions
   - unit types
@@ -201,13 +216,12 @@ The language features above need the IDL compiler to do more than it does now, s
 - **Attenuation.** Should narrower directory grants come mainly from separate IDL types, from derive, or from membrane filters? Each has different costs for persistence and checks.
 - **Text rendering.** What should the canonical text format be, and should it round-trip?
 - **Background jobs across restores.** How does a user find and reconnect to their jobs after a restore?
-- **The keyword for requirement groups.** Groups need their own kind of declaration (section 1), but its keyword is not chosen.
-- **System caps.** Today every launched process also receives caps to create endpoints, delete and rescind caps, and create cap sets. Should these become requirement groups too, so that a command declares them like the streams, or should the launcher grant a fixed set alongside the receive cap?
+- **System caps.** Today every launched process also receives caps to create endpoints, delete and rescind caps, and create cap sets. Should these become roles too, so that a command declares them like the streams, or should the launcher grant a fixed set alongside the receive cap? As role members they would need IDL interfaces of their own, since they are untyped kernel caps today.
 
 ## Follow-up work
 
 - Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (blancolioni/idle#1).
-- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, `package` declarations whose details are copied into each command's metadata, and requirement groups, starting with the standard streams (blancolioni/idle#2).
+- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, `package` declarations whose details are copied into each command's metadata, and roles, starting with the standard streams (blancolioni/idle#2).
 - Add the `Rose.Command_Line` package, with `String_List` and the launch support that generated mains call (#156).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
