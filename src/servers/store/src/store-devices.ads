@@ -40,6 +40,10 @@ package Store.Devices is
       Flags   : Rose.Words.Word)
       return Rose.Capabilities.Capability;
 
+   procedure Release
+     (Id : Rose.Objects.Capability_Identifier);
+   --  Free the region Id, and its storage if it has its own.
+
    procedure Read
      (Id      : in Rose.Objects.Capability_Identifier;
       Storage : out System.Storage_Elements.Storage_Array;

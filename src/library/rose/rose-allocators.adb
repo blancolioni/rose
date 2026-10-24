@@ -125,30 +125,27 @@ package body Rose.Allocators is
 
       Index := First_Free_Index (Order) + (Base - 1) / Alloc_Size;
 
-      Rose.Console_IO.Put ("allocators: deallocate ");
-      Rose.Console_IO.Put (Base);
-      Rose.Console_IO.Put ("-");
-      Rose.Console_IO.Put (Bound - 1);
-      Rose.Console_IO.Put (" order=");
-      Rose.Console_IO.Put (Order);
-      Rose.Console_IO.Put (" size=");
-      Rose.Console_IO.Put (Alloc_Size);
-      Rose.Console_IO.Put (" index=");
-      Rose.Console_IO.Put (Index);
-      Rose.Console_IO.Put (" store-size=");
-      Rose.Console_IO.Put (Natural (Allocator'Size) / 8);
-      Rose.Console_IO.New_Line;
+      --  The blocks of each order are a level of a binary tree, in which
+      --  the parent of block I is I / 2, and its buddy is I xor 1. While
+      --  the buddy is free, the two make a free block of the order
+      --  above.
 
       loop
-         Allocator.Free (Index) := True;
-         Allocator.Count (Order) := Allocator.Count (Order) + 1;
-         exit when Order = 0
-           or else not Allocator.Free (Index + 1);
-
-         Allocator.Count (Order) := Allocator.Count (Order) - 1;
-         Order := Order - 1;
-         Index := Index / 2;
+         exit when Order = 0;
+         declare
+            Buddy : constant Positive :=
+              (if Index mod 2 = 0 then Index + 1 else Index - 1);
+         begin
+            exit when not Allocator.Free (Buddy);
+            Allocator.Free (Buddy) := False;
+            Allocator.Count (Order) := Allocator.Count (Order) - 1;
+            Order := Order - 1;
+            Index := Index / 2;
+         end;
       end loop;
+
+      Allocator.Free (Index) := True;
+      Allocator.Count (Order) := Allocator.Count (Order) + 1;
 
    end Deallocate;
 

@@ -19,5 +19,11 @@ interface Region is
       Subregion_Bound : Object_Id;
       Flags           : Word)
      return interface Region;
+
+   --  The region is no longer needed: free its storage, if it has its
+   --  own, and the region itself. Neither it nor its subregions can be
+   --  used afterwards.
+
+   procedure Release;
      
 end Region;

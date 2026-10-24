@@ -174,7 +174,8 @@ package body Mem.Server is
          Readable      => (Flags and Segment_Readable) /= 0,
          Writable      => (Flags and Segment_Writable) /= 0,
          Executable    => (Flags and Segment_Executable) /= 0,
-         Resizable    => (Flags and Segment_Resizable) /= 0);
+         Resizable    => (Flags and Segment_Resizable) /= 0,
+         Private_Region => (Flags and Segment_Private) /= 0);
    end Add_Segment;
 
    ----------------

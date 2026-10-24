@@ -43,7 +43,10 @@ package body Mem.Processes is
          Region_Bound  : Rose.Objects.Object_Id := 0;
          Region_Offset : Rose.Objects.Object_Id := 0;
          Flags         : Segment_Flag_Array := (others => False);
+         Private_Region : Boolean := False;
       end record;
+   --  Private_Region is True if the region belongs to the process, and is
+   --  released when it is gone.
 
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
 
@@ -190,7 +193,8 @@ package body Mem.Processes is
             Write      => Writable,
             Execute    => Executable,
             Extensible => Resizable,
-            Persistent => False));
+            Persistent => False),
+         Private_Region => False);
 
    end Add_Nonpersistent_Segment;
 
@@ -207,7 +211,8 @@ package body Mem.Processes is
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean;
-      Resizable     : Boolean)
+      Resizable     : Boolean;
+      Private_Region : Boolean := False)
    is
       use type Rose.Objects.Object_Id;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -236,7 +241,8 @@ package body Mem.Processes is
             Write => Writable,
             Execute => Executable,
             Extensible => Resizable,
-            Persistent => True));
+            Persistent => True),
+         Private_Region => Private_Region);
 
       if Log_Segments then
          Report_Segment (P.Segments (P.Num_Segments));
@@ -563,6 +569,7 @@ package body Mem.Processes is
          end if;
       end Delete;
 
+      use type Rose.Capabilities.Capability;
    begin
       if P.State = Available then
          return;
@@ -570,6 +577,19 @@ package body Mem.Processes is
 
       Destroy (P.Process);
       Close (P.Process);
+
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Segment.Private_Region then
+            Rose.Interfaces.Region.Client.Release (Segment.Region);
+         end if;
+         if Rose.Interfaces.Region.Client.Get_Interface_Cap (Segment.Region)
+           /= 0
+         then
+            Rose.Interfaces.Region.Client.Close (Segment.Region);
+         end if;
+      end loop;
+      P.Num_Segments := 0;
+
       Delete (P.Heap);
       Delete (P.Server);
       Delete (P.Interface_Cap);

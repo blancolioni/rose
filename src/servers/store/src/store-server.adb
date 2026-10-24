@@ -27,10 +27,11 @@ package body Store.Server is
           (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
    begin
 
-      Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap);
-
       Delete_Endpoint_Cap := Get_Cap (1);
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Endpoint_Cap);
+
       Console_Cap := Get_Cap (2);
 
       Rose.Console_IO.Open (Console_Cap);
@@ -46,6 +47,7 @@ package body Store.Server is
          Store.Devices.Put'Access,
          Store.Devices.Read_Stream'Access,
          Store.Devices.Create_Subregion'Access,
+         Store.Devices.Release'Access,
          Instanced => True);
 
       Rose.Interfaces.Stream_Reader.Server.Attach_Interface

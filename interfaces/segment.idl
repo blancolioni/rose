@@ -5,6 +5,9 @@ interface Segment is
    Segment_Executable  : constant := 4;
    Segment_Resizable   : constant := 8;
    Segment_Initialized : constant := 16;
+   Segment_Private     : constant := 32;
+   --  The region belongs to the segment's process, and is released when
+   --  the process is gone.
 
    procedure Add_Segment
      (Virtual_Base  : Word;
