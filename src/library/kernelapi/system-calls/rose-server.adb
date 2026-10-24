@@ -1,3 +1,5 @@
+with Rose.Capabilities.Standard;
+with Rose.Interfaces.Process;
 with Rose.System_Calls.Server;
 
 package body Rose.Server is
@@ -97,18 +99,20 @@ package body Rose.Server is
    -----------------------
 
    procedure Publish_Interface
-     (Process_Cap   : Rose.Capabilities.Capability;
-      Interface_Cap : Rose.Capabilities.Capability)
+     (Interface_Cap : Rose.Capabilities.Capability)
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.System_Calls.Initialize_Send (Params, Process_Cap);
-      Params.Control.Last_Recv_Cap := 7;
+      Rose.System_Calls.Initialize_Send
+        (Params, Rose.Capabilities.Standard.Process_Interface_Cap);
+      Rose.System_Calls.Receive_Caps
+        (Params, Rose.Interfaces.Process.Subprogram_Count);
       Rose.System_Calls.Invoke_Capability (Params);
 
       declare
          Publish_Cap : constant Rose.Capabilities.Capability :=
-                         Params.Caps (7);
+                         Params.Caps
+                           (Rose.Interfaces.Process.Publish_Interface_Index);
       begin
          Rose.System_Calls.Initialize_Send (Params, Publish_Cap);
          Rose.System_Calls.Send_Cap (Params, Interface_Cap);

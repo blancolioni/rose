@@ -13,7 +13,8 @@ library project rts is
       "../base",
       "../library/capabilities",
       "../library/kernelapi/system-calls",
-      "../library/kernelapi/arch/" & Arch);
+      "../library/kernelapi/arch/" & Arch,
+      "build/interfaces");
    
    for Object_Dir use "build/" & Arch & "-rose/obj";
 

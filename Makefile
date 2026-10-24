@@ -18,7 +18,7 @@ BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf tim
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
 
-all: rts idl rose doc
+all: idl rts rose doc
 
 rts:
 	(cd rts; make)
@@ -77,7 +77,6 @@ boot:
 	(cd src/asm/$(ARCH); make)
 
 idl:
-	(cd src/tools/idl; make)
 	(cd src/library/kernelapi/generated; make)
 
 configure-driver:
