@@ -40,6 +40,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       return Rose.Capabilities.Layout.Capability_Layout
    is (Process_Cap (Pid, Processes.Initial_Cap_Endpoint));
 
+   function Command_Endpoint_Cap
+     (Pid : Rose.Kernel.Processes.Process_Id)
+      return Rose.Capabilities.Layout.Capability_Layout
+   is (Process_Cap (Pid, Processes.Command_Endpoint_Endpoint));
+
    procedure Write_Image
      (Current  : in out Rose.Objects.Object_Id;
       Storage  : out System.Storage_Elements.Storage_Array;
@@ -230,6 +235,12 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                        New_Cap
                          (Current_Process_Id,
                           Initial_Cap (Pid)));
+                  Rose.Invocation.Send_Cap
+                    (Params => Params.all,
+                     Cap    =>
+                       New_Cap
+                         (Current_Process_Id,
+                          Command_Endpoint_Cap (Pid)));
 
                end;
 

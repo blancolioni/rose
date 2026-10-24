@@ -19,6 +19,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
+	$(BUILDDIR)/rose-interfaces-command_endpoint.o \
 	$(BUILDDIR)/rose-interfaces-executable.o \
 	$(BUILDDIR)/rose-interfaces-executable-server.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \

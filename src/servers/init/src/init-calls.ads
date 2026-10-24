@@ -88,6 +88,8 @@ package Init.Calls is
       Cap_Set     : Rose.Capabilities.Capability;
       Name        : String)
       return Rose.Objects.Object_Id;
+   --  Launch an installed program, whose Launch interface is Launch_Cap,
+   --  with the argument cap set Cap_Set.
 
    procedure Get_Interface
      (Cap            : Rose.Capabilities.Capability;

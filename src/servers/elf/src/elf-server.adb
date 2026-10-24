@@ -9,6 +9,7 @@ with Rose.Words;
 with Rose.Console_IO;
 with Rose.System_Calls.Client;
 
+with Rose.Interfaces.Command_Endpoint;
 with Rose.Interfaces.Executable.Server;
 
 with Rose.Interfaces.Kernel_Process.Client;
@@ -35,11 +36,33 @@ package body Elf.Server is
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
+   function Launch_Command
+     (Id    : Rose.Objects.Capability_Identifier;
+      Name  : String;
+      Image : Rose.Capabilities.Capability;
+      Store : Rose.Capabilities.Capability;
+      Caps  : Rose.Capabilities.Capability_Array)
+      return Rose.Capabilities.Capability;
+
+   function Launch_Process
+     (Name    : String;
+      Image   : Rose.Capabilities.Capability;
+      Store   : Rose.Capabilities.Capability;
+      Caps    : Rose.Capabilities.Capability_Array;
+      Command : Boolean)
+      return Rose.Capabilities.Capability;
+   --  Create, load and start a process. If Command is True, it is a
+   --  command (ADR 0002): the process gets the receive cap of a command
+   --  endpoint in its second cap, after its Process interface, and the
+   --  result is the endpoint cap. Otherwise the result is the Process
+   --  interface.
+
    procedure Create_Process
-     (Name        : String;
-      Process     : out Rose.Capabilities.Capability;
-      Start_Cap   : out Rose.Capabilities.Capability;
-      Initial_Cap : out Rose.Capabilities.Capability);
+     (Name         : String;
+      Process      : out Rose.Capabilities.Capability;
+      Start_Cap    : out Rose.Capabilities.Capability;
+      Initial_Cap  : out Rose.Capabilities.Capability;
+      Endpoint_Cap : out Rose.Capabilities.Capability);
 
    procedure Start_Process
      (Cap   : Rose.Capabilities.Capability;
@@ -54,24 +77,29 @@ package body Elf.Server is
    --------------------
 
    procedure Create_Process
-     (Name        : String;
-      Process     : out Rose.Capabilities.Capability;
-      Start_Cap   : out Rose.Capabilities.Capability;
-      Initial_Cap : out Rose.Capabilities.Capability)
+     (Name         : String;
+      Process      : out Rose.Capabilities.Capability;
+      Start_Cap    : out Rose.Capabilities.Capability;
+      Initial_Cap  : out Rose.Capabilities.Capability;
+      Endpoint_Cap : out Rose.Capabilities.Capability)
    is
       Params : aliased Rose.Invocation.Invocation_Record;
 
    begin
       Rose.System_Calls.Initialize_Send (Params, Create_Process_Cap);
       Encode_Name (Params, Name);
+      Rose.System_Calls.Receive_Caps (Params, 4);
       Rose.System_Calls.Invoke_Capability (Params);
       if not Params.Control.Flags (Rose.Invocation.Error) then
          Process := Params.Caps (0);
          Start_Cap := Params.Caps (1);
          Initial_Cap := Params.Caps (2);
+         Endpoint_Cap := Params.Caps (3);
       else
          Process := 0;
          Start_Cap := 0;
+         Initial_Cap := 0;
+         Endpoint_Cap := 0;
       end if;
    end Create_Process;
 
@@ -118,7 +146,8 @@ package body Elf.Server is
 
       Rose.Interfaces.Executable.Server.Create_Server
         (Server_Context => Server_Context,
-         Launch         => Launch'Access);
+         Launch         => Launch'Access,
+         Launch_Command => Launch_Command'Access);
       Rose.Interfaces.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
 
@@ -173,11 +202,47 @@ package body Elf.Server is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
+   begin
+      return Launch_Process (Name, Image, Store, Caps, Command => False);
+   end Launch;
+
+   --------------------
+   -- Launch_Command --
+   --------------------
+
+   function Launch_Command
+     (Id    : Rose.Objects.Capability_Identifier;
+      Name  : String;
+      Image : Rose.Capabilities.Capability;
+      Store : Rose.Capabilities.Capability;
+      Caps  : Rose.Capabilities.Capability_Array)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+   begin
+      return Launch_Process (Name, Image, Store, Caps, Command => True);
+   end Launch_Command;
+
+   --------------------
+   -- Launch_Process --
+   --------------------
+
+   function Launch_Process
+     (Name    : String;
+      Image   : Rose.Capabilities.Capability;
+      Store   : Rose.Capabilities.Capability;
+      Caps    : Rose.Capabilities.Capability_Array;
+      Command : Boolean)
+      return Rose.Capabilities.Capability
+   is
       use Rose.Interfaces.Process.Client;
+      use type Rose.Capabilities.Capability;
 
       Kernel_Process : Rose.Capabilities.Capability;
       Start_Cap      : Rose.Capabilities.Capability;
       Initial_Cap    : Rose.Capabilities.Capability;
+      Endpoint_Cap   : Rose.Capabilities.Capability;
+      Command_Cap    : Rose.Capabilities.Capability := 0;
       Kernel_Client  : Rose.Interfaces.Kernel_Process
         .Client.Kernel_Process_Client;
       Process_Client : Rose.Interfaces.Process.Client.Process_Client;
@@ -186,7 +251,8 @@ package body Elf.Server is
       Start          : Rose.Words.Word;
       Success        : Boolean;
    begin
-      Create_Process (Name, Kernel_Process, Start_Cap, Initial_Cap);
+      Create_Process
+        (Name, Kernel_Process, Start_Cap, Initial_Cap, Endpoint_Cap);
       Rose.Interfaces.Kernel_Process.Client.Open
         (Kernel_Client, Kernel_Process);
       Process_Client :=
@@ -203,6 +269,31 @@ package body Elf.Server is
             Get_Interface_Cap (Process_Client));
          Rose.System_Calls.Invoke_Capability (Params);
       end;
+
+      --  The receive cap of a command endpoint follows the Process
+      --  interface (see Rose.Capabilities.Standard), so it is created
+      --  before the other caps are sent.
+
+      if Command then
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Endpoint_Cap);
+            Rose.System_Calls.Send_Endpoint
+              (Params, Rose.Interfaces.Command_Endpoint.Launch_Endpoint);
+            Rose.System_Calls.Receive_Caps (Params, 1);
+            Rose.System_Calls.Invoke_Capability (Params);
+            if not Params.Control.Flags (Rose.Invocation.Error) then
+               Command_Cap := Params.Caps (0);
+            end if;
+         end;
+
+         if Command_Cap = 0 then
+            Rose.Console_IO.Put_Line
+              ("elf: failed to create command endpoint");
+            return 0;
+         end if;
+      end if;
 
       if Caps'Length > 0 then
          declare
@@ -222,12 +313,16 @@ package body Elf.Server is
         (Process_Client, Storage, Region, Start, Success);
       if Success then
          Start_Process (Start_Cap, Start);
-         return Get_Interface_Cap (Process_Client);
+         if Command then
+            return Command_Cap;
+         else
+            return Get_Interface_Cap (Process_Client);
+         end if;
       else
          Rose.Console_IO.Put_Line ("elf: failed to load process");
          return 0;
       end if;
-   end Launch;
+   end Launch_Process;
 
    -------------------
    -- Start_Process --
