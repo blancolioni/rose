@@ -403,7 +403,7 @@ package body Init.Run is
                        Cap_Set_Cap,
                        (Console_Interface_Cap,
                         Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-                        Page_On_Cap));
+                        Page_On_Cap, Delete_Cap));
          Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
                           Init.Calls.Call
                             (Create_Cap,
