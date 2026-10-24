@@ -1048,7 +1048,11 @@ package body Init.Run is
                                     Create_Endpoint_Cap,
 
                                     --  create_cap_set
-                                    Cap_Set_Cap
+                                    Cap_Set_Cap,
+
+                                    --  the command registry's Find, for
+                                    --  running commands (ADR 0002)
+                                    Find_Cap
                                    ));
 
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;

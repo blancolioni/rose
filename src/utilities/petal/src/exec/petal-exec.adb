@@ -45,4 +45,24 @@ package body Petal.Exec is
       Installed_List (Installed_Count) := (Key, Command);
    end Install;
 
+   -----------------
+   -- Is_Built_In --
+   -----------------
+
+   function Is_Built_In (Name : String) return Boolean is
+      Key : Command_Name := (others => ' ');
+   begin
+      if Name'Length > Max_Name_Length then
+         return False;
+      end if;
+
+      Key (1 .. Name'Length) := Name;
+      for I in 1 .. Installed_Count loop
+         if Installed_List (I).Name = Key then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Is_Built_In;
+
 end Petal.Exec;
