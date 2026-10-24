@@ -46,7 +46,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 - **Parameter types are IDL interfaces.** `in File` means "any object that implements `File`", so a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 - **Typed results.** A command returns structured values through `out` parameters, such as `stat (path => "x", size => s, modified => m)`, instead of text that the caller has to parse.
 - **Standard streams are roles a command declares.** A command gets standard input, standard output or standard error only if its declaration asks for it, so a command that asks for none can do no I/O at all.
-  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and a command that only prints inherits `Standard_Output` and `Standard_Error`:
+  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and `Echo`, which only writes, inherits `Standard_Output` (it reports errors through `Fail`, below):
 
     ```ada
     role Standard_Output is
@@ -56,7 +56,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
     role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
     end Standard_IO;
 
-    command Core_Utilities.Echo : Standard_Output, Standard_Error is
+    command Core_Utilities.Echo : Standard_Output is
        ...
     end Core_Utilities.Echo;
     ```
