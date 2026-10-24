@@ -222,7 +222,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - **Attenuation.** Should narrower directory grants come mainly from separate IDL types, from derive, or from membrane filters? Each has different costs for persistence and checks.
 - **Text rendering.** What should the canonical text format be, and should it round-trip?
 - **Background jobs across restores.** How does a user find and reconnect to their jobs after a restore?
-- **Creating an endpoint returns two caps**, the endpoint cap and, when asked, a receive cap. Its IDL interface needs `out` cap parameters, or two operations, and the kernel target does not support `out` caps yet.
+- **Creating an endpoint returns two caps**, the endpoint cap and, when asked, a receive cap. Its IDL interface needs `out` cap parameters (blancolioni/idle#19), or two operations.
 
 ## Follow-up work
 
