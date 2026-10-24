@@ -56,9 +56,9 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
     role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
     end Standard_IO;
 
-    command Core_Utilities.Echo : Standard_Output is
+    command Rose.Core.Echo : Standard_Output is
        ...
-    end Core_Utilities.Echo;
+    end Rose.Core.Echo;
     ```
 
   - **Role members are caps of interface types.** A role grants authority, and authority is a cap, so every member's type is an interface. The declaration names the interface without the `interface` keyword, and has no mode or default: a member is always a granted cap, and its interface type says what right it grants (a lookup-only `Directory`, for example, as in section 5). Settings that are not authority, such as a locale, are ordinary arguments.
@@ -79,7 +79,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 ### 2. Commands are declared in IDL, and the main program is generated
 
-A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. A command is named as a child of its package, such as `Core_Utilities.Echo`, and the compiler finds the declarations it names on a list of search directories. The syntax is proposed in the IDL chapter of the book (#146) and in blancolioni/idle#2. The IDL compiler generates everything except the command's own logic.
+A command is declared once, in IDL, together with its help text: a `command ... is ... end` block with the command's aspects, and one declaration for each argument, like objects in an Ada package. A command is named as a child of its package, such as `Rose.Core.Echo`, and the compiler finds the declarations it names on a list of search directories. The syntax is proposed in the IDL chapter of the book (#146) and in blancolioni/idle#2. The IDL compiler generates everything except the command's own logic.
 
 - **The spec is generated.** For `command Echo`, the compiler writes `echo.ads`:
 
@@ -137,10 +137,10 @@ A command is declared once, in IDL, together with its help text: a `command ... 
   - the launch cap.
 - **`--help` and `--version` belong to the shell.** They are reserved, so no command may declare arguments with those names. If either appears among a command's arguments, the shell answers from the registry and launches nothing. The other arguments are ignored and not checked. Commands never see these options.
 - **Help is generated**, in the layout of GNU tools: a usage line built from the signature, the command's summary, the options with each argument's help, the command's extended description, and a footer from its package with the command's name filled in.
-- **Versions belong to packages.** Commands belong to a package, for example a set of core utilities, which has one version and copyright. A command can override them. `--version` follows the GNU layout: the command with its package's display name and version, the copyright, the package's licence text, and who wrote the command.
-- **Packages are declared in IDL.** A `package` declaration gives a package's name, display name, version, copyright, licence text and default authors, and each command is declared as a child of its package. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
-- **Command names and visibility.** A command is registered under the last part of its name in lower case (`echo` for `Core_Utilities.Echo`), unless its declaration gives another. The shell treats packages like Ada `use` clauses: with an implicit `use Core_Utilities;`, the core commands can be run by name alone, and any command can be run by its qualified name, such as `core_utilities.echo`, without regard to case. Installing a command whose name is already visible from another package gives a warning, and the new command is then run by its qualified name. If two used packages make the same name visible, petal asks the user which was meant (or reports an error when not interactive), and `command debug_echo renames Debug.Echo;` gives a command another name.
-- **Core commands are installed at boot.** `init` installs the core-utilities package from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
+- **Versions belong to packages.** Commands belong to a package, for example the core utilities in `Rose.Core`, which has one version and copyright. A command can override them. `--version` follows the GNU layout: the command with its package's display name and version, the copyright, the package's licence text, and who wrote the command.
+- **Packages are declared in IDL.** A `package` declaration gives a package's name, display name, version, copyright, licence text and default authors, and each command is declared as a child of its package. Packages nest to any depth, like Ada child packages. Only a command's own package must be declared in IDL; its ancestors can be ordinary Ada packages, such as `Rose`. A package inherits the details it leaves out from the nearest enclosing IDL package that gives them. The IDL compiler copies the package details into each command's embedded metadata, so the registry needs nothing besides the executable.
+- **Command names and visibility.** A command is registered under the last part of its name in lower case (`echo` for `Rose.Core.Echo`), unless its declaration gives another. The shell treats packages like Ada `use` clauses: with an implicit `use Rose.Core;`, the core commands can be run by name alone, any command can be run by its qualified name, such as `rose.core.echo`, without regard to case, and a name need be qualified only as far as the `use` clauses require, so `core.echo` works after `use Rose;`. Installing a command whose name is already visible from another package gives a warning, and the new command is then run by its qualified name. If two used packages make the same name visible, petal asks the user which was meant (or reports an error when not interactive), and `command debug_echo renames Debug.Echo;` gives a command another name.
+- **Core commands are installed at boot.** `init` installs the core utilities package, `Rose.Core`, from the boot image, as it installs the command library today, so `echo` and the other core commands are in the registry before petal shows its first prompt.
 - **`--` ends option processing**, so `echo -- --help` prints `--help`. Quoting makes no difference, since `"--help"` is the same word once the quotes are removed.
 
 ### 4. The shell owns the commit
@@ -230,7 +230,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - Add command declarations to IDL: generate the spec, the main program and the embedded metadata, `package` declarations whose details are copied into each command's metadata, and roles, starting with the standard streams (blancolioni/idle#2).
 - Add the `Rose.Command_Line` package, with `String_List` and the launch support that generated mains call (#156).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
-- Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
+- Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core utilities package, `Rose.Core`.
 - Define IDL interfaces for the kernel's system caps (creating endpoints, deleting and rescinding caps), implement them in the kernel, and declare the system cap roles (#162).
 - Split the `Directory` interface into lookup and create-and-modify parts (#139).
 - Define the core stream interfaces (`core.File_Info` and similar) and unit types (#140).
