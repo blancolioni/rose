@@ -1,74 +1,163 @@
 = Processes
 
-A process is named by a launch capability.
-Invoking the capability executes the process.
+[NOTE]
+====
+This chapter describes the launch model of https://github.com/blancolioni/rose/blob/main/doc/adr/0002-typed-commands-and-directory-caps.md[ADR 0002], which is proposed and not yet implemented.
+The work is tracked in #143 (launch), #156 (`Rose.Command_Line`), #162 (system caps) and #138 (Petal).
+Notes marked _Today_ say what the code does now.
+====
 
 Object ids in the range 1 to 2^24^ − 1 represent processes.
 
 Process id 1 is used to refer to the Kernel.
 
-== Launch Capability
+A process started by the shell runs a _command_: an Ada procedure whose typed signature is declared in IDL (see <<commands>>).
+The shell reads the signature before the command runs, binds the user's arguments to it, and starts the process with exactly the capabilities those arguments call for.
+
+== Capabilities as the Sandbox
+
+A command's signature is its sandbox manifest.
+The command receives exactly the capabilities its arguments resolve to, and nothing else.
+There is no ambient authority to fall back on: anything else a command needs, such as network access or the right to launch other programs, must appear in its signature as an argument.
+
+The mode of a file or directory argument decides which capability the command receives.
+
+[#argument-caps]
+.Capabilities received for each kind of argument
+[cols="2,5",options="header"]
+|===
+| Argument | The command receives
+| `in File` | A read-only file cap
+| `out File` | A write cap on a new, unnamed file, which the shell names only if the command succeeds
+| `in out File` | A read-write cap on a copy-on-write version of an existing file
+| `in Directory` | A lookup-only directory cap for that subtree
+| `in out Directory` | A directory cap that can also create and modify entries
+| `out` of any other type | Nothing; the value is a typed result that the shell binds to a variable
+|===
+
+Argument types are IDL interfaces, so `in File` accepts any object that implements `File`: a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 
 == Initial Capabilities
 
-[NOTE]
-====
-This section is out of date (#147).
-The standard process caps are defined by `Rose.Capabilities.Standard`, in `rose-capabilities-standard.ads`, and `Rose.System_Calls` finds Delete_Cap, Rescind_Cap and Create_Endpoint at indices 6, 7 and 8 of the argument cap set.
-The launch protocol of ADR 0002 replaces this convention.
-====
+A command process starts with a single capability: a receive cap for its _command endpoint_.
+Everything else, including the standard streams, arrives in the launch invocation (see <<launch-sequence>>).
 
-The generated interface libraries rely on caps 1 and 2 being the ones from <<standard-caps>>.
+Capabilities that are not arguments are granted through _roles_ (see <<roles>>).
+A command inherits the roles it needs, and receives each role's members as arguments, ahead of its own.
+A command that inherits no role gets no capability beyond its arguments.
 
-The set referenced by cap 2 is defined by <<standard-cap-env>>.
-The environment accessed by the Ada.Environment_Variables package contains an entry for each _Id_ in the table, with the index of the corresponding capability in the cap set.
-The standard libraries rely on cap 7 of the cap set being a capability for the `Cap_Set` interface, and cap 6 being the delete capability method.
-
-[#standard-caps]
-.Standard process capabilities
-[cols="1,2,2,5",options="header"]
+[#standard-roles]
+.Standard roles
+[cols="2,2,5",options="header"]
 |===
-| # | Cap | Type | Description
-| 1 | Self | Interface | Process interface to current process
-| 2 | Argument_Caps | Interface | Cap set containing supplied caps
-|===
-
-[#standard-cap-env]
-.Standard capability environment
-[cols="1,3,3,4",options="header"]
-|===
-| # | Id | Interface | Description
-| 1 | Standard_Input | Stream_Reader | Standard input stream
-| 2 | Standard_Output | Stream_Writer | Standard output stream
-| 3 | Standard_Error | Stream_Writer | Standard error stream
-| 4 | Current_Directory | Directory | Start directory
-| 5 | Clock | Clock | System clock
-| 6 | Delete_Cap | Method | Delete capability
-| 7 | Rescind_Cap | Method | Rescind capability
-| 8 | Create Endpoint | Method | Endpoint constructor
-| 9 | Create Cap_Set | Method | Cap set constructor
+| Role | Interface | Gives the command
+| `Standard_Input` | `Stream_Reader` | Standard input
+| `Standard_Output` | `Stream_Writer` | Standard output
+| `Standard_Error` | `Stream_Writer` | Standard error
+| `Standard_IO` | | All three streams
+| `Create_Endpoint` | Kernel interface (#162) | Creating further endpoints
+| `Delete_Cap` | Kernel interface (#162) | Deleting caps
+| `Rescind_Cap` | Kernel interface (#162) | Rescinding caps
+| `Create_Cap_Set` | `Constructor` | Creating cap sets
 |===
 
-== Standard Launch Sequence
+* *The generated main hands the streams to the run-time system*, so a command uses them through `Ada.Text_IO`.
+  A command that inherits none of the stream roles is compiled with `pragma Restrictions (No_Dependence => Ada.Text_IO)`, so I/O is a compile-time error.
+* *The generated main passes the system caps to `Rose.System_Calls.Use_Capabilities`*, so library code that needs them works unchanged.
+  Most commands need none of them, since the command endpoint exists before the command starts.
 
-The _launch_ capability invokes the _exec_ server, which holds an _Executable_ capability.
-The _Launch_ method on this capability invokes the _elf_ server,
-which invokes a kernel capability for creating a new process, returning a _Process_ and a start capability.
-The _mem_ server is invoked, which returns a _Process_Memory_ capability.
-This is used to load the ELF image from storage.
+_Today_, every launched process receives the same caps by position: cap 2 is a cap set whose entries hold the standard streams, followed by system caps such as delete, rescind and create endpoint, and the run-time system reads them from fixed indices.
+`Rose.Capabilities.Standard` documents the convention.
+
+[#launch-sequence]
+== Launch Sequence
+
+A command receives its arguments by invocation, not when its process is created.
+
+. *The shell binds the arguments.*
+  It finds the command in its registry, resolves each actual argument against the signature, and applies defaults.
+  Type errors, missing files and missing permissions are reported before anything starts, naming the argument that failed.
+. *The launcher starts the process.*
+  The shell invokes the command's launch capability, from the registry.
+  The new process holds only the receive cap for its command endpoint, and the launcher gives the shell the matching endpoint cap.
+. *The command waits.*
+  The generated main calls `Rose.Command_Line.Launch.Receive`, which waits for the shell's invocation.
+. *The shell calls the command endpoint* with a reply cap.
+  The invocation carries the arguments, encoded as for any IDL method call: scalars in words, strings and lists in the shared buffer, and files, directories and streams as caps (see <<encoding>>).
+  It also carries the caps of the command's roles.
+  The send blocks until the process is ready, so there is no race.
+. *The main runs the command.*
+  It decodes each argument into an Ada value, so a cap becomes a client object of the argument's interface type, then calls the command's procedure.
+. *The main replies* with `Complete` or `Fail` (see <<completion>>).
+
+For a command `Echo`, the IDL compiler generates the main program:
+
+[source,ada]
+----
+with Rose.Command_Line.Launch;
+with Echo;
+procedure Echo_Main is
+   use Rose.Command_Line.Launch;
+   Call : Launch_Call := Receive;   --  the one invocation the shell sends
+begin
+   Echo (New_Line  => Boolean_Argument (Call, 1),
+         Arguments => String_List_Argument (Call, 2));
+   Complete (Call);                 --  success: the shell commits out files
+exception
+   when E : others =>
+      Fail (Call, E);               --  structured error: the shell discards outputs
+end Echo_Main;
+----
+
+The shell applies defaults, so the main always receives every argument.
+`out` parameters are locals in the main, and their values are returned by `Complete`.
+
+Arguments arrive by invocation so that there is one encoding for them, shared with every other IDL method call and decoded by the same generated server code.
+The reply cap gives the shell its completion signal without a separate result cap.
+The cost is one extra round trip for each launch.
+
+_Today_, `Launch.Launch` takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention only.
+Petal does not launch external commands yet: its `Execute` prints `launching:` with the command's launch cap and returns.
+
+[#completion]
+== Completion and Failure
+
+`Complete` and `Fail` are the reply to the launch invocation.
+
+* *`Complete`* returns the command's `out` values.
+  The shell then commits its files: it binds each `out File` to its target name, and commits each `in out File` version.
+* *`Fail`* returns a structured error, which the shell can display.
+  An unhandled exception becomes a `Fail` rather than a crash with an exit code.
+  The shell discards the command's file outputs, so a failed command cannot leave half-written output behind.
+
+Since `Fail` is a reply, a command without standard error can still report an error.
+Standard error is for diagnostic text only.
+
+== Jobs
+
+Each command runs as a job inside its own membrane (ADR 0001, #118, #119).
+Its arguments, and every capability it obtains through them, such as a file looked up through a directory grant, cross that membrane.
+Ending or killing the job revokes the membrane, which takes away everything the job reached.
+
+* *Background jobs are explicit.*
+  A command runs in the background only when asked, and starting one returns a handle that can be awaited, piped from, queried or cancelled.
+* *Outliving the session is a capability.*
+  A job that should keep running after the session ends needs an explicit grant, so long-lived processes cannot happen by accident.
+
+Processes and their capabilities survive a restore, so anything granted to a long-running job stays granted until it is revoked.
 
 == Example
 
-Consider the following excerpt from a shell session:
+Consider the following command at the Petal prompt:
 
 ----
-user$ cat readme.txt
+echo -n Welcome to Rose
 ----
 
-A launch capability for the `cat` program is found in the shell's environment.
-A new environment is created, setting environment capabilities for input/output streams.
-The argument is interpreted as the name of a file, a `stream-reader` capability to this file is added to the environment.
+. The shell finds `echo` in its registry: it is `Rose.Core.Echo`, visible through the implicit `use Rose.Core;`.
+. It binds the words to the signature: `-n` is the short option for `New_Line`, so `New_Line => False`, and the remaining words form the list argument, `Arguments => ["Welcome", "to", "Rose"]`.
+. `Echo` inherits only the role `Standard_Output`, so the shell supplies the job's standard output, and nothing else.
+. The launcher starts the process and returns its endpoint cap, and the shell calls it with the three arguments.
+. `Echo` writes `Welcome to Rose` without a line break, and its main replies with `Complete`.
 
-== Environment
-
-The environment is supplied as a table of entries starting at a known address.
+`Echo` holds no standard input, no standard error and no directory, so it can do nothing except write to the stream it was given.
