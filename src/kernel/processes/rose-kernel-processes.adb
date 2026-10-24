@@ -1,4 +1,5 @@
 with Rose.Boot.Console;
+with Rose.Interfaces.Memory;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Page_Table;
@@ -398,7 +399,8 @@ package body Rose.Kernel.Processes is
                                   others => False);
 
          Params.Cap := Mem_Page_Fault_Cap;
-         Params.Endpoint := 16#2363_36CC_C1A7#;
+         Params.Endpoint :=
+           Rose.Interfaces.Memory.Take_Physical_Memory_Endpoint;
          Params.Identifier := 0;
 
          Send_Word (Params, Rose.Words.Word (Amount));
@@ -669,7 +671,7 @@ package body Rose.Kernel.Processes is
                                others => False);
 
       Params.Cap := Mem_Page_Fault_Cap;
-      Params.Endpoint := 16#C6FF_984F_29F6#;
+      Params.Endpoint := Rose.Interfaces.Memory.Page_Fault_Endpoint;
       Params.Identifier := 0;
 
       Send_Object_Id (Params, To_Object_Id (Pid));

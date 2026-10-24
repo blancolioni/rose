@@ -70,7 +70,16 @@ $(ROSE): $(RELOC)
 
 $(RELOC): kernel boot
 
+# The generated interface packages that the kernel uses, for their
+# endpoint ids. Only these are linked into the kernel's sources.
+
+KERNEL_INTERFACES=kernel_log memory
+
 kernel:
+	mkdir -p build/$(ARCH)/kernel/interfaces
+	for name in $(KERNEL_INTERFACES); do \
+	  ln -sf $(CURDIR)/src/library/kernelapi/generated/rose-interfaces-$$name.ads build/$(ARCH)/kernel/interfaces/; \
+	done
 	gnatmake -Pprojects/kernel_$(ARCH)
 
 boot:
