@@ -1,330 +1,203 @@
 = Interfaces
 
-== Standard Interfaces
+Every interface between Rose processes is declared in IDL (see <<idl>>), one interface to a file in `interfaces/`.
+The file name is the interface name in lower case: `Cap_Set` is declared in `cap_set.idl`.
+
+The build compiles 35 of the 38 interfaces into Ada packages in `src/library/kernelapi/generated`, listed in that directory's `Makefile`.
+`Named` is not compiled on its own; it is used only as a parent of `Kernel_Process`, which inherits its operation.
+`Data_Source` and `Rose_Interface` are declared but not compiled, and nothing uses them.
+
+Each subprogram and each interface has an endpoint id derived from its declaration, so there is no table of ids to keep (see <<endpoint-ids>>).
+
+In the tables below, _Parents_ are the interfaces an interface inherits, and _Implemented by_ names the server or driver that serves it, from `src/servers` or `src/drivers`.
+An empty _Implemented by_ means that no server in the source serves that interface on its own; it may still be served as part of an interface that inherits it.
+
+== Capabilities and Objects
+
+[#capability-interfaces]
+.Capability and object interfaces
+[cols="2,2,4,2",options="header"]
+|===
+| Interface | Parents | Operations | Implemented by
+| `Cap` | | `Destroy`, `Get_Object_Id` | `caps`, `timer`
+| `Cap_Set` | | `Append`, `Get_Cap`, `Length` | `caps`
+| `Constructor` | | `Create` | `caps`
+| `Receiver` | | `Send_Cap` | `mem`
+| `Named` | | `Name` |
+| `Server` | | `Published_Interface` |
+| `State` | | `Reset` | `log`
+|===
+
+A cap set holds a list of capabilities, so that a process can pass many capabilities as one:
+
+[source,ada]
+----
+interface Cap_Set is
+
+   procedure Append
+     (Caps : Capability_Array);
+
+   function Get_Cap
+     (Index : Positive)
+     return Capability;
+
+   function Length
+     return Natural;
+
+end Cap_Set;
+----
+
+`Constructor` creates a new object and returns a capability for it; the `caps` server uses it to create cap sets.
+
+== Processes and Memory
+
+[#process-interfaces]
+.Process and memory interfaces
+[cols="2,2,4,2",options="header"]
+|===
+| Interface | Parents | Operations | Implemented by
+| `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault`, `Notify` | The kernel
+| `Process` | `Segment`, `Server`, `Cap` | `Heap_Interface`, `Exit_Process`, `Publish_Interface` | `mem`
+| `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment` |
+| `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
+| `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint` | `mem`
+| `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion` | `store`
+| `Storage` | | `Reserve_Storage`, `Add_Backing_Store` | `store`
+|===
+
+`Memory.New_Process` takes the kernel's `Kernel_Process` capability for a new process and returns a `Process`, which describes the process's address space as segments:
+
+[source,ada]
+----
+interface Process : Segment, Server, Cap is
+
+   function Heap_Interface return interface Heap;
+
+   procedure Exit_Process
+     (Exit_Status : Natural);
+
+   procedure Publish_Interface
+     (Interface_Cap : Capability);
+
+end Process;
+----
+
+A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable` and `Segment_Initialized`.
+A nonpersistent segment has no region behind it.
+
+`Storage` reserves regions of persistent storage, backed by block devices, and a `Region` reads and writes its pages.
+
+== Launching Programs
+
+[#launch-interfaces]
+.Interfaces for launching programs
+[cols="2,2,4,2",options="header"]
+|===
+| Interface | Parents | Operations | Implemented by
+| `Launch` | | `Launch` | `exec`
+| `Exec` | `Launch` | `Install` | `exec`
+| `Executable` | | `Launch` | `elf`
+| `Map` | | `Add`, `Remove`, `Find` | `command`
+|===
+
+`Exec.Install` reads an executable from a stream and returns a `Launch` capability for it.
+`Executable.Launch` creates the process from an image in a region, and returns its `Process`.
+`Map` holds launch capabilities by name.
 
 [NOTE]
 ====
-This section is out of date (#147).
-The interfaces are declared in IDL, one per file in `interfaces/` (see <<idl>>), and most of those described here have no IDL declaration.
+`Launch.Launch` takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention.
+ADR 0002 replaces this with a command endpoint, which the shell calls with the command's arguments (see <<launch-sequence>>, #143).
 ====
 
-=== Rose
+== Streams and Files
 
-The _Rose_ interface provides operations common to all other interfaces.
-It is implicitly inherited by every interface.
-
-==== Operations
-
-* *Destroy* Destroys the object associated with the capability.
-
-=== Rose.Capability
-
-Operations on capabilities.
-
-==== Inherits
-
-Rose
-
-==== Operations
-
-* *Create Entry* Manufactures a capability which can call the given endpoint
-+
-[source,ada]
-----
-function Create_Entry
-  (Endpoint : Rose.Objects.Endpoint_Id)
-  return Capability;
-----
-
-* *Create Endpoint* Creates a new endpoint and returns its identity.
-+
-[source,ada]
-----
-function Create_Endpoint
-  return Endpoint_Id;
-----
-
-* *Receive Any* Respond to an invocation of any known capability.
-+
-[source,ada]
-----
-procedure Receive_Any
-  (Called_Endpoint : out Endpoint_Id;
-   Reply_Cap       : Capability;
-   Parameters      : Invocation_Record);
-----
-
-* *Create Set* Manufactures a capability which represents a set of capabilities.
-+
-[source,ada]
-----
-function Create_Set
-  return interface Rose.Capability_Set;
-----
-
-=== Rose.Capability_Set
-
-Operations on capability sets.
-
-==== Inherits
-
-Rose
-
-==== Operations
-
-* *Insert* Adds a capability to the set
-+
-[source,ada]
-----
-function Insert
-  (Cap : Capability);
-----
-
-* *Delete* Delete a capability from the set.
-+
-[source,ada]
-----
-procedure Delete
-  (Cap : Capability);
-----
-
-=== Rose.Streams
-
-Operations on streams.
-
-==== Inherits
-
-Rose
-
-=== Rose.Streams.Read
-
-Operations for reading from streams
-
-==== Inherits
-
-Rose.Streams
-
-==== Operations
-
-* *Read* Reads a buffer from the stream
-+
-[source,ada]
-----
-procedure Read
-  (Buffer : out Storage_Array;
-   Length : in out Storage_Count)
-----
-
-=== Rose.Streams.Write
-
-Operations for writing to streams
-
-==== Inherits
-
-Rose.Streams
-
-==== Operations
-
-* *Write* Writes a buffer to the stream
-+
-[source,ada]
-----
-procedure Write
-  (Buffer : Storage_Array;
-   Length : Storage_Count)
-----
-
-=== Rose.Launch
-
-Launching processes.
-
-==== Operations
-
-* *Launch* Launches the process named by this capability.
-Sent caps are copied to the process.
-Returns a capability which implements the Processes interface for this process.
-+
-[source,ada]
-----
-function Launch
-  (Caps : Array_Of_Capabilities)
-  return interface Rose.Process;
-----
-
-=== Rose.Process
-
-Interface to processes.
-
-==== Operations
-
-* *Suspend* Suspend the process
-+
-[source,ada]
-----
-procedure Suspend;
-----
-
-=== Rose.System.Create
-
-Interface for creating capabilities.
-
-==== Operations
-
-* *Create Capability* Manufactures a capability based on the representation given in the sent words.
-+
-[source,ada]
-----
-function Create_Capability
-  (Header : Word_32;
-   Payload_1, Payload_2, Payload_3 : Word_32)
-  return Capability;
-----
-
-==== Derived Operations
-
-* *Create Interface Capability* Manufactures an interface capability for the given endpoint and object.
-+
-[source,ada]
-----
-function Create_Interface_Capability
-  (Endpoint : Endpoint_Id;
-   Object   : Object_Id)
-  return Capability
-is (Create_Capability
-     (16#0000_0005#, Endpoint,
-      Low_Word (Object), High_Word (Object0)));
-----
-
-=== Rose.System.Cap_Copy
-
-Interface for copying capabilities from other objects.
-
-==== Operations
-
-* *Copy Capability* Manufactures a capability which is a copy of an existing capability in the given object.
-+
-[source,ada]
-----
-function Copy_Capability
-  (Header : Word_32;
-   Payload_1, Payload_2, Payload_3 : Word_32)
-  return Capability;
-----
-
-=== Rose.System.Boot
-
-Boot module interface
-
-==== Operations
-
-* *Launch* Starts a boot module.
-+
-[source,ada]
-----
-function Launch
-  (Module_Index : Positive;
-   Caps         : Capability_Array)
-  return Object_Id;
-----
-
-=== Rose.System.Device_Memory
-
-Interface for setting up memory-mapped devices.
-
-==== Operations
-
-* *Reserve* Reserves an area of memory for devices.
-Pages within this area can be acquired by device drivers using a page object cap.
-+
-[source,ada]
-----
-procedure Reserve
-  (Base  : Physical_Address;
-   Bound : Physical_Address);
-----
-
-[#system-interfaces]
-.Standard System Interfaces
-[cols="2,1,2,5",options="header"]
+[#stream-interfaces]
+.Stream and file interfaces
+[cols="2,2,4,2",options="header"]
 |===
-| Name | Identity | Implemented By | Notes
-| Meta | 1 | All | A process usually has this as capability 1
-| Cap Copy | 2 | Kernel | Used during installation to subvert security
-| Kernel | 3 | Kernel |
-| Procmem | 4 | `mm` | Paged process memory management
-| Registry | 5 | registry | Registry of interface identifiers
-| Signal | 6 | any | Send and receive signals
-| Authentication | 7 | passwd |
-| Account | 8 | passwd |
-| Make Executable | 9 | exec |
-| Executable | 10 | ELF binaries |
-| Process | 11 | running processes |
-| Login | 12 | login |
-| User | 13 | user |
+| Interface | Parents | Operations | Implemented by
+| `Stream_Reader` | | `Read` | `isofs`, `store`, `event-input-stream`
+| `Stream_Writer` | | `Write` | `console`
+| `Stream` | `Stream_Reader`, `Stream_Writer` | |
+| `Seekable` | | `Seek` |
+| `File` | `Stream`, `Seekable` | |
+| `Terminal` | `Stream` | |
+| `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File`, `Create_Directory`, `Create_File` | `isofs`
+| `File_System` | | `Root_Directory` | `isofs`
 |===
 
-==== Meta Interface
+A directory lists its entries by index, and gives a capability for each one:
+
+[source,ada]
+----
+interface Directory is
+
+   type File_Kind is (Directory, Ordinary_File, Special_File);
+
+   function Directory_Entry_Count return Natural;
+   function Directory_Entry_Name (Index : Positive) return String;
+   function Directory_Entry_Kind (Index : Positive) return File_Kind;
+   function Directory_Entry_Size (Index : Positive) return Storage_Count;
+
+   function Find_Entry (Name : String) return Natural;
+
+   function Get_Ordinary_File (Index : Positive) return interface File;
+   function Get_Directory (Index : Positive) return interface Directory;
+
+   function Read_File (Index : Positive) return interface Stream_Reader;
+
+   function Create_Directory (Name : String) return interface Directory;
+   function Create_File (Name : String) return interface File;
+
+end Directory;
+----
 
 [NOTE]
 ====
-The meta interface no longer exists (#147).
-The request below is drawn on the current invocation record, with the values of the original request.
+`Directory` combines lookup with creation, so a capability for it always grants both.
+ADR 0002 splits it into a lookup-only interface and one that adds `Create_File` and `Create_Directory` (#139).
 ====
 
-The _meta_ interface is used for managing capabilities.
-Sending to this interface creates new capabilities, or sends existing capabilities to other objects.
-It can also be used to get a capability for an object's default interface.
+== Devices
 
-[#interface-cap-request]
-image::interface-cap-request.svg[Interface capability request]
-
-The request sends two words: the interface id, and its version.
-Its flags are `Send`, `Block`, `Send_Words` and `Recv_Caps`.
-
-[#meta-interface]
-.The meta interface
-[cols="1,3,1,4",options="header"]
+[#device-interfaces]
+.Device interfaces
+[cols="2,2,4,2",options="header"]
 |===
-| Endpoint | Name | Operations | Description
-| 1 | Create Interface Cap | Send | Creates and returns a new interface capability for the sending object
-| 2 | Create Endpoint Cap | Send | Creates and returns a new endpoint capability for the sending object
-| 3 | Create Page Object Cap | Send | _data~0~_ contains page address; _data~1~_ contains the readable and writable flags
-| 5 | Create Singleton Receive | Send |
-| 6 | Create Cap Set | Send |
-| 16 | Receive on provided caps | Receive | Maximum receive caps is 6
-| 17 | Receive on any known cap | Receive |
-| 31 | Exit | Send | End the sending process.
+| Interface | Parents | Operations | Implemented by
+| `Block_Device` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
+| `ATA` | | `Get_Device` | `ata`
+| `Partitions` | | `Partition_Count`, `Get_Partition` |
+| `Interrupt_Handler` | | `Handle_Interrupt` | `keyboard`
+| `Keyboard_Handler` | | `Handle_Key` |
+| `Event_Source` | | `Add_Listener` | `keyboard`
+| `Event_Listener` | | `On_Event` | `event-input-stream`
 |===
 
-==== The process memory manager interface
+A block device has blocks of up to `Max_Block_Size` (4096) bytes, addressed by a 64-bit block number.
+The `partition` server serves each partition of a device as a block device of its own.
 
-A server implementing the `procmem` interface can be notified when a process starts, when it ends, and when it requests access to virtual addresses which it does not currently have.
+== Time and Logging
 
-It is expected that the server will have access to a page mapper interface, which will allow it to map and unmap pages as required.
-
-=== Authentication Interfaces
-
-[#auth-interfaces]
-.Standard Authentication Interfaces
-[cols="2,1,2,5",options="header"]
+[#time-interfaces]
+.Time and logging interfaces
+[cols="2,2,4,2",options="header"]
 |===
-| Name | Identity | Implemented By | Notes
-| Login | 12 | login |
-| User | 13 | user |
+| Interface | Parents | Operations | Implemented by
+| `Timer` | | `Set_Timer` | `timer`
+| `Timeout` | | `On_Timeout` | `checkpoint`, `timer`
+| `Kernel_Log` | | `Create`, `Append`, `Commit`, `Add_Log_Device` | `log`
 |===
 
-=== File Interfaces
+`Timer.Set_Timer` invokes the capability it is given after a number of milliseconds, usually a `Timeout`, and returns a `Cap` whose `Destroy` cancels the timer.
+The kernel notifies `Kernel_Log` as a checkpoint starts and commits.
 
-[#file-interfaces]
-.Standard File Interfaces
-[cols="2,1,2,5",options="header"]
-|===
-| Name | Identity | Implemented By | Notes
-| File System | 100 | rfs, xmlfs, isofs |
-| Directory | 101 | rfs, xmlfs, isofs |
-| File | 102 | |
-|===
+== Unused Interfaces
 
-== Interface Definition Language
+`Data_Source` (`Add_Sink`, `Remove_Sink`) and `Rose_Interface` (`Destroy`) are declared but not compiled, and nothing uses them.
 
-The interface definition language is described in <<idl>>.
+[NOTE]
+====
+ADR 0002 adds IDL interfaces for the kernel's system caps: creating endpoints, deleting caps and rescinding caps (#162).
+====
