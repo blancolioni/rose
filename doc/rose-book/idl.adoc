@@ -613,10 +613,12 @@ end Standard_IO;
   A command that inherits none of the stream roles can do no I/O: its generated configuration forbids `Ada.Text_IO`.
 * *A role is not an interface.* An interface provides its parents' operations; a command receives its roles' caps.
 
+The system caps are roles as well: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`, each with an IDL interface type (ADR 0002, section 1).
+The generated main passes them to `Rose.System_Calls.Use_Capabilities`.
+
 ==== Open questions
 
-* Whether the system caps (create-endpoint, delete, rescind, create-cap-set) also become roles (ADR 0002, open questions).
-  They would need IDL interfaces of their own.
+* Creating an endpoint returns two caps, so its interface needs `out` cap parameters, which the kernel target does not support yet.
 
 [#packages]
 === Packages

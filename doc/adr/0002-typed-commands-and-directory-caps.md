@@ -68,6 +68,12 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
   - **Typed streams fit the same model.** A command that writes typed values (section 6) inherits a role whose output stream has that element type, so the signature says what the command can be piped to.
   - **No streams, no I/O library.** For a command that inherits none of the stream roles, the generated configuration includes `pragma Restrictions (No_Dependence => Ada.Text_IO)`, so I/O is a compile-time error, not a failure when the command runs.
   - **Failure needs no standard error.** `Fail` is the reply to the launch invocation (section 2), so a command without standard error can still report an error.
+- **System caps are roles too.** Today every launched process receives caps to create endpoints, delete caps, rescind caps and create cap sets, found by position in its argument cap set. Instead, each becomes a role, so a command receives one only if it declares it:
+  - **One role for each cap**, as with the streams: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`.
+  - **Each has an IDL interface type.** `Create_Cap_Set` uses the existing `Constructor` interface. Creating endpoints and deleting and rescinding caps are kernel operations, untyped today, and each gets an IDL interface.
+  - **The generated main passes them to `Rose.System_Calls.Use_Capabilities`**, as it gives the streams to the run-time system, so library code that needs them works as now.
+  - **The kernel implements these interfaces.** It must decode their invocations exactly as the generated code encodes them, and serve the interface cap that opens them, as it already does for `Kernel_Process`.
+  - **Most commands need none of them.** A command's endpoint exists before it starts (section 2), so only a command that serves further endpoints, or manages caps, declares these roles.
 - **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ("Welcome", "to", "Rose")`.
 - **Short options.** An argument can have a short option (`Short_Name`) and, for a `Boolean`, the value the option gives it (`Short_Value`). For example, `-n` sets `New_Line` to `False`. A `Boolean` argument can also be given by name as `--name` or `--no-name`.
 
@@ -216,7 +222,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - **Attenuation.** Should narrower directory grants come mainly from separate IDL types, from derive, or from membrane filters? Each has different costs for persistence and checks.
 - **Text rendering.** What should the canonical text format be, and should it round-trip?
 - **Background jobs across restores.** How does a user find and reconnect to their jobs after a restore?
-- **System caps.** Today every launched process also receives caps to create endpoints, delete and rescind caps, and create cap sets. Should these become roles too, so that a command declares them like the streams, or should the launcher grant a fixed set alongside the receive cap? As role members they would need IDL interfaces of their own, since they are untyped kernel caps today.
+- **Creating an endpoint returns two caps**, the endpoint cap and, when asked, a receive cap. Its IDL interface needs `out` cap parameters, or two operations, and the kernel target does not support `out` caps yet.
 
 ## Follow-up work
 
@@ -225,6 +231,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - Add the `Rose.Command_Line` package, with `String_List` and the launch support that generated mains call (#156).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
+- Define IDL interfaces for the kernel's system caps (creating endpoints, deleting and rescinding caps), implement them in the kernel, and declare the system cap roles.
 - Split the `Directory` interface into lookup and create-and-modify parts (#139).
 - Define the core stream interfaces (`core.File_Info` and similar) and unit types (#140).
 - Shell-owned commit for `out` and `in out` files, with the file system and persistence layers (#141).
