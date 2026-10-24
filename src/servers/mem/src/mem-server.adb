@@ -112,6 +112,10 @@ package body Mem.Server is
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier);
 
+   procedure Remove_Instances (Id : Rose.Objects.Capability_Identifier);
+   --  Delete the caps that the servers made for process Id, which is
+   --  gone, so that its entries in their instance tables are free.
+
    procedure Protection_Fault
      (Process : Rose.Objects.Object_Id;
       Address : Rose.Addresses.Virtual_Page_Address;
@@ -170,7 +174,8 @@ package body Mem.Server is
          Readable      => (Flags and Segment_Readable) /= 0,
          Writable      => (Flags and Segment_Writable) /= 0,
          Executable    => (Flags and Segment_Executable) /= 0,
-         Resizable    => (Flags and Segment_Resizable) /= 0);
+         Resizable    => (Flags and Segment_Resizable) /= 0,
+         Private_Region => (Flags and Segment_Private) /= 0);
    end Add_Segment;
 
    ----------------
@@ -214,7 +219,8 @@ package body Mem.Server is
    begin
 
       Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap);
+        (Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Get_Cap (5));
 
       Console_Cap      := Get_Cap (1);
       Region_Count_Cap := Get_Cap (2);
@@ -279,6 +285,7 @@ package body Mem.Server is
    procedure Destroy (Id : Rose.Objects.Capability_Identifier) is
    begin
       Mem.Processes.Kill_Process (Process_Id (Id));
+      Remove_Instances (Id);
    end Destroy;
 
    ------------------
@@ -293,6 +300,7 @@ package body Mem.Server is
    begin
       Mem.Page_Table.Delete_All (Process_Id (Id));
       Mem.Processes.Kill_Process (Process_Id (Id));
+      Remove_Instances (Id);
    end Exit_Process;
 
    --------------------
@@ -602,6 +610,17 @@ package body Mem.Server is
          Resizable     => False);
       Mem.Processes.Add_Environment (Pid, Environment);
    end Register_Process;
+
+   ----------------------
+   -- Remove_Instances --
+   ----------------------
+
+   procedure Remove_Instances (Id : Rose.Objects.Capability_Identifier) is
+   begin
+      Rose.Interfaces.Process.Server.Remove_Instance (Id);
+      Rose.Interfaces.Heap.Server.Remove_Instance (Id);
+      Rose.Interfaces.Receiver.Server.Remove_Instance (Id);
+   end Remove_Instances;
 
    ----------------------
    -- Request_Heap_Top --

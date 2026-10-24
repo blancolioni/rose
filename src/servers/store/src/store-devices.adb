@@ -2,10 +2,12 @@ with Rose.Limits;
 with Rose.Allocators;
 
 with Rose.Console_IO;
+with Rose.Invocation;
 with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Region;
+with Rose.Interfaces.Region.Server;
 with Rose.Interfaces.Stream_Reader;
 
 package body Store.Devices is
@@ -40,16 +42,26 @@ package body Store.Devices is
 
    type Region_Record is
       record
+         In_Use         : Boolean := False;
          Backing_Device : Natural := 0;
          Base, Bound    : Rose.Objects.Object_Id := 0;
          Access_Cap     : Rose.Capabilities.Capability := 0;
+         Alloc_Index    : Natural := 0;
+         Alloc_Banks    : Natural := 0;
       end record;
+   --  A region, with the banks it was allocated, which a subregion does
+   --  not have: Alloc_Index is zero.
 
    type Region_Array is
      array (1 .. Max_Regions) of Region_Record;
 
    Regions      : Region_Array;
    Region_Count : Natural := 0;
+   --  The highest region index used. A released region's index is used
+   --  again.
+
+   function New_Region return Natural;
+   --  The index of a region that is not in use, or zero if there is none.
 
    Stream_Buffer_Length : constant := 4096;
 
@@ -167,12 +179,6 @@ package body Store.Devices is
          Rose.Console_IO.New_Line;
       end if;
 
-      if Region_Count >= Max_Regions then
-         Rose.Console_IO.Put ("storage: out of regions (max is ");
-         Rose.Console_IO.Put (Natural'(Max_Regions));
-         Rose.Console_IO.Put (")");
-         Rose.Console_IO.New_Line;
-      end if;
 
       if Base < Parent.Base then
          Rose.Console_IO.Put_Line ("storage: invalid request: base too small");
@@ -226,20 +232,31 @@ package body Store.Devices is
          Rose.Console_IO.New_Line;
       end if;
 
-      Region_Count := Region_Count + 1;
-
       declare
-         Child : Region_Record renames Regions (Region_Count);
+         Index : constant Natural := New_Region;
       begin
-         Child := (Parent with delta
-                     Base => Base, Bound => Bound,
-                     Access_Cap =>
-                       Rose.System_Calls.Server.Create_Endpoint
-                       (Create_Endpoint_Cap,
-                        Rose.Interfaces.Region.Region_Interface,
-                        Capability_Identifier (Region_Count)));
+         if Index = 0 then
+            Rose.Console_IO.Put ("storage: out of regions (max is ");
+            Rose.Console_IO.Put (Natural'(Max_Regions));
+            Rose.Console_IO.Put (")");
+            Rose.Console_IO.New_Line;
+            return 0;
+         end if;
 
-         return Child.Access_Cap;
+         declare
+            Child : Region_Record renames Regions (Index);
+         begin
+            Child := (Parent with delta
+                        Base => Base, Bound => Bound,
+                        Alloc_Index => 0, Alloc_Banks => 0,
+                        Access_Cap =>
+                          Rose.System_Calls.Server.Create_Endpoint
+                            (Create_Endpoint_Cap,
+                             Rose.Interfaces.Region.Region_Interface,
+                             Capability_Identifier (Index)));
+
+            return Child.Access_Cap;
+         end;
       end;
 
    end Create_Subregion;
@@ -309,6 +326,28 @@ package body Store.Devices is
       Bound := Regions (Region_Index).Bound;
 
    end Get_Range;
+
+   ----------------
+   -- New_Region --
+   ----------------
+
+   function New_Region return Natural is
+   begin
+      for Index in 1 .. Region_Count loop
+         if not Regions (Index).In_Use then
+            Regions (Index).In_Use := True;
+            return Index;
+         end if;
+      end loop;
+
+      if Region_Count < Max_Regions then
+         Region_Count := Region_Count + 1;
+         Regions (Region_Count).In_Use := True;
+         return Region_Count;
+      end if;
+
+      return 0;
+   end New_Region;
 
    ---------------
    -- New_Store --
@@ -541,6 +580,41 @@ package body Store.Devices is
 
    end Read_Stream;
 
+   -------------
+   -- Release --
+   -------------
+
+   procedure Release
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      Index : constant Natural := Natural (Id);
+   begin
+      if Index not in 1 .. Region_Count
+        or else not Regions (Index).In_Use
+      then
+         return;
+      end if;
+
+      declare
+         Region : Region_Record renames Regions (Index);
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         if Region.Alloc_Index > 0 then
+            Space_Allocators.Deallocate
+              (Allocator, Region.Alloc_Index,
+               Region.Alloc_Index + Region.Alloc_Banks);
+         end if;
+
+         Rose.System_Calls.Initialize_Send
+           (Params, Rose.System_Calls.Delete_Cap_Capability);
+         Rose.System_Calls.Send_Cap (Params, Region.Access_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+
+         Rose.Interfaces.Region.Server.Remove_Instance (Id);
+         Region := (others => <>);
+      end;
+   end Release;
+
    ---------------------
    -- Reserve_Storage --
    ---------------------
@@ -549,10 +623,11 @@ package body Store.Devices is
      (Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability
    is
-      Alloc_Index : Natural;
-      Alloc_Size  : Natural := Natural (Size);
+      Alloc_Index  : Natural;
+      Alloc_Size   : Natural := Natural (Size);
+      Region_Index : constant Natural := New_Region;
    begin
-      if Region_Count >= Max_Regions then
+      if Region_Index = 0 then
          Rose.Console_IO.Put_Line ("store: out of regions");
          return 0;
       end if;
@@ -576,12 +651,10 @@ package body Store.Devices is
          return 0;
       end if;
 
-      Region_Count := Region_Count + 1;
-
       declare
          use Rose.Objects;
          New_Bank : Region_Record renames
-                      Regions (Region_Count);
+                      Regions (Region_Index);
          Store    : Positive := 1;
          Base     : Object_Id;
          Bound    : Object_Id;
@@ -589,7 +662,7 @@ package body Store.Devices is
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
                  Rose.Interfaces.Region.Region_Interface,
-                 Capability_Identifier (Region_Count));
+                 Capability_Identifier (Region_Index));
 
       begin
          while Backing_Stores (Store).Allocator_Bound <= Alloc_Index loop
@@ -605,10 +678,13 @@ package body Store.Devices is
            Base + Object_Id (Alloc_Size / Rose.Limits.Page_Size);
 
          New_Bank := Region_Record'
-           (Backing_Device => Store,
+           (In_Use         => True,
+            Backing_Device => Store,
             Base           => Base,
             Bound          => Bound,
-            Access_Cap     => Cap);
+            Access_Cap     => Cap,
+            Alloc_Index    => Alloc_Index,
+            Alloc_Banks    => Alloc_Size / Minimum_Bank_Size);
 
          return Cap;
       end;

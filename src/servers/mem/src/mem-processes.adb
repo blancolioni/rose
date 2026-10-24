@@ -1,4 +1,5 @@
 with Rose.Console_IO;
+with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Limits;
 
@@ -42,7 +43,10 @@ package body Mem.Processes is
          Region_Bound  : Rose.Objects.Object_Id := 0;
          Region_Offset : Rose.Objects.Object_Id := 0;
          Flags         : Segment_Flag_Array := (others => False);
+         Private_Region : Boolean := False;
       end record;
+   --  Private_Region is True if the region belongs to the process, and is
+   --  released when it is gone.
 
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
 
@@ -58,6 +62,7 @@ package body Mem.Processes is
          Process      : Kernel_Process_Client;
          Heap         : Rose.Capabilities.Capability;
          Server       : Rose.Capabilities.Capability;
+         Interface_Cap : Rose.Capabilities.Capability := 0;
       end record;
 
    subtype Real_Process_Id is
@@ -188,7 +193,8 @@ package body Mem.Processes is
             Write      => Writable,
             Execute    => Executable,
             Extensible => Resizable,
-            Persistent => False));
+            Persistent => False),
+         Private_Region => False);
 
    end Add_Nonpersistent_Segment;
 
@@ -205,7 +211,8 @@ package body Mem.Processes is
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean;
-      Resizable     : Boolean)
+      Resizable     : Boolean;
+      Private_Region : Boolean := False)
    is
       use type Rose.Objects.Object_Id;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -234,7 +241,8 @@ package body Mem.Processes is
             Write => Writable,
             Execute => Executable,
             Extensible => Resizable,
-            Persistent => True));
+            Persistent => True),
+         Private_Region => Private_Region);
 
       if Log_Segments then
          Report_Segment (P.Segments (P.Num_Segments));
@@ -542,8 +550,49 @@ package body Mem.Processes is
    procedure Kill_Process (Process : Process_Id) is
       use Rose.Interfaces.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
+
+      procedure Delete (Cap : Rose.Capabilities.Capability);
+
+      ------------
+      -- Delete --
+      ------------
+
+      procedure Delete (Cap : Rose.Capabilities.Capability) is
+         use type Rose.Capabilities.Capability;
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         if Cap /= 0 then
+            Rose.System_Calls.Initialize_Send
+              (Params, Rose.System_Calls.Delete_Cap_Capability);
+            Rose.System_Calls.Send_Cap (Params, Cap);
+            Rose.System_Calls.Invoke_Capability (Params);
+         end if;
+      end Delete;
+
+      use type Rose.Capabilities.Capability;
    begin
+      if P.State = Available then
+         return;
+      end if;
+
       Destroy (P.Process);
+      Close (P.Process);
+
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Segment.Private_Region then
+            Rose.Interfaces.Region.Client.Release (Segment.Region);
+         end if;
+         if Rose.Interfaces.Region.Client.Get_Interface_Cap (Segment.Region)
+           /= 0
+         then
+            Rose.Interfaces.Region.Client.Close (Segment.Region);
+         end if;
+      end loop;
+      P.Num_Segments := 0;
+
+      Delete (P.Heap);
+      Delete (P.Server);
+      Delete (P.Interface_Cap);
       P.State := Available;
    end Kill_Process;
 
@@ -555,14 +604,21 @@ package body Mem.Processes is
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
+      Pid : constant Process_Id := Register_Process (Process_Cap);
+      Cap : Rose.Capabilities.Capability;
    begin
-      return Rose.System_Calls.Server.Create_Endpoint
-        (Create_Cap   => Create_Endpoint_Cap,
-         Endpoint_Id  =>
-           Rose.Interfaces.Process.Process_Interface,
-         Identifier   =>
-           Rose.Objects.Capability_Identifier
-             (Register_Process (Process_Cap)));
+      if Pid = 0 then
+         return 0;
+      end if;
+
+      Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Cap   => Create_Endpoint_Cap,
+           Endpoint_Id  =>
+             Rose.Interfaces.Process.Process_Interface,
+           Identifier   => Rose.Objects.Capability_Identifier (Pid));
+      Process_Table (Pid).Interface_Cap := Cap;
+      return Cap;
    end New_Process;
 
    -----------------------------
@@ -621,7 +677,8 @@ package body Mem.Processes is
               Num_Segments => 0,
               Heap         => Heap_Cap,
               Server       => 0,
-              Process      => Client);
+              Process      => Client,
+              Interface_Cap => 0);
       end;
 
       return Next_Pid;

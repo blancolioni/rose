@@ -79,7 +79,7 @@ package body Elf.Loader is
 
       declare
          use type Rose.Words.Word;
-         Region : constant Rose.Interfaces.Region.Client.Region_Client :=
+         Region : Rose.Interfaces.Region.Client.Region_Client :=
            Reserve_Storage
              (Store, Rose.Words.Word_64 (Stack_Size));
       begin
@@ -91,7 +91,9 @@ package body Elf.Loader is
             Region_Offset => 0,
             Flags         =>
               Rose.Interfaces.Segment.Segment_Readable
-            + Rose.Interfaces.Segment.Segment_Writable);
+            + Rose.Interfaces.Segment.Segment_Writable
+            + Rose.Interfaces.Segment.Segment_Private);
+         Close (Region);
       end;
    end Load_Elf_Image;
 
@@ -173,13 +175,24 @@ package body Elf.Loader is
                end;
             end if;
 
+            --  A read-only segment is mapped from the program's image,
+            --  which all its processes share. A writable one has storage
+            --  of its own, which belongs to the process.
+
             Add_Segment
               (Item         => Process,
                Virtual_Base => V_Address / Rose.Limits.Page_Size,
                Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
                Region       => Region,
                Region_Offset => Region_Offset,
-               Flags        => Flags);
+               Flags        =>
+                 Flags
+               + (if Writable then Rose.Interfaces.Segment.Segment_Private
+                  else 0));
+
+            if Writable then
+               Close (Region);
+            end if;
 
          when others =>
             null;

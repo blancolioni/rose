@@ -403,7 +403,7 @@ package body Init.Run is
                        Cap_Set_Cap,
                        (Console_Interface_Cap,
                         Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-                        Page_On_Cap));
+                        Page_On_Cap, Delete_Cap));
          Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
                           Init.Calls.Call
                             (Create_Cap,
@@ -1048,7 +1048,11 @@ package body Init.Run is
                                     Create_Endpoint_Cap,
 
                                     --  create_cap_set
-                                    Cap_Set_Cap
+                                    Cap_Set_Cap,
+
+                                    --  the command registry's Find, for
+                                    --  running commands (ADR 0002)
+                                    Find_Cap
                                    ));
 
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;

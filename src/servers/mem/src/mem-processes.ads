@@ -89,7 +89,10 @@ package Mem.Processes is
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean;
-      Resizable     : Boolean);
+      Resizable     : Boolean;
+      Private_Region : Boolean := False);
+   --  Private_Region is True if Region belongs to the process, and is to
+   --  be released when the process is gone.
 
    procedure Add_Nonpersistent_Segment
      (Process       : Process_Id;

@@ -43,6 +43,12 @@ package Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier;
       Cap        : Rose.Capabilities.Capability);
 
+   procedure Remove_Instance
+     (Instance   : in out Server_Instance;
+      Identifier : Rose.Objects.Capability_Identifier);
+   --  Delete the caps of the endpoints for Identifier in Instance, and
+   --  forget them: the object Identifier is gone.
+
    function Get_Instance_Cap
      (Instance   : Server_Instance;
       Endpoint   : Rose.Objects.Endpoint_Id;

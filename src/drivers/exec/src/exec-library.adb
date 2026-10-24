@@ -30,6 +30,8 @@ package body Exec.Library is
          ELF_Base        : Rose.Objects.Page_Object_Id;
          ELF_Bound       : Rose.Objects.Page_Object_Id;
          Launch_Caps     : Interface_Caps := (others => 0);
+         Have_Image      : Boolean := False;
+         Image           : Rose.Interfaces.Region.Client.Region_Client;
          Metadata_Offset : Storage_Count := 0;
          Metadata_Length : Storage_Count := 0;
       end record;
@@ -157,23 +159,6 @@ package body Exec.Library is
       end;
    end Find_Metadata;
 
-   ---------------------
-   -- Get_Image_Pages --
-   ---------------------
-
-   procedure Get_Image_Pages
-     (Id          : Rose.Objects.Capability_Identifier;
-      Base, Bound : out Rose.Objects.Page_Object_Id)
-   is
-   begin
-      if Id in Installed_Program_Index
-        and then Installed_Programs (Id).Installed
-      then
-         Base := Installed_Programs (Id).ELF_Base;
-         Bound := Installed_Programs (Id).ELF_Bound;
-      end if;
-   end Get_Image_Pages;
-
    ------------------
    -- Get_Metadata --
    ------------------
@@ -234,6 +219,25 @@ package body Exec.Library is
          Name (Last) := Ch;
       end loop;
    end Get_Program_Name;
+
+   ------------------
+   -- Image_Region --
+   ------------------
+
+   function Image_Region
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Interfaces.Region.Client.Region_Client
+   is
+      Program : Installed_Program_Record renames Installed_Programs (Id);
+   begin
+      if not Program.Have_Image then
+         Program.Image :=
+           Rose.Interfaces.Region.Client.Create_Subregion
+             (Region, Program.ELF_Base, Program.ELF_Bound, 5);
+         Program.Have_Image := True;
+      end if;
+      return Program.Image;
+   end Image_Region;
 
    -------------
    -- Install --

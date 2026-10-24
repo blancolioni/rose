@@ -25,6 +25,15 @@ package body Elf.Server is
    Server_Context : Rose.Server.Server_Context;
    Memory_Client  : Rose.Interfaces.Memory.Client.Memory_Client;
 
+   Last_Process   : Rose.Interfaces.Process.Client.Process_Client;
+   Last_Command   : Rose.Capabilities.Capability := 0;
+   Have_Last      : Boolean := False;
+   --  What the last launch returned: the new process's Process interface,
+   --  or a command's endpoint cap. They are kept until the next launch,
+   --  because the reply to the launch sends them.
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
@@ -151,6 +160,22 @@ package body Elf.Server is
       Rose.Interfaces.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
 
+   ----------------
+   -- Delete_Cap --
+   ----------------
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Cap /= 0 then
+         Rose.System_Calls.Initialize_Send
+           (Params, Rose.System_Calls.Delete_Cap_Capability);
+         Rose.System_Calls.Send_Cap (Params, Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end if;
+   end Delete_Cap;
+
    -----------------
    -- Encode_Name --
    -----------------
@@ -250,7 +275,38 @@ package body Elf.Server is
       Storage        : Rose.Interfaces.Storage.Client.Storage_Client;
       Start          : Rose.Words.Word;
       Success        : Boolean;
+
+      procedure Clean_Up;
+      --  Delete the caps that this launch used, apart from its result.
+
+      --------------
+      -- Clean_Up --
+      --------------
+
+      procedure Clean_Up is
+      begin
+         Rose.Interfaces.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Client.Close (Storage);
+         Rose.Interfaces.Kernel_Process.Client.Close (Kernel_Client);
+         Delete_Cap (Start_Cap);
+         Delete_Cap (Initial_Cap);
+         Delete_Cap (Endpoint_Cap);
+         for Cap of Caps loop
+            Delete_Cap (Cap);
+         end loop;
+      end Clean_Up;
+
    begin
+      if Have_Last then
+         Rose.Interfaces.Process.Client.Close (Last_Process);
+         Have_Last := False;
+      end if;
+      Delete_Cap (Last_Command);
+      Last_Command := 0;
+
+      Rose.Interfaces.Region.Client.Open (Region, Image);
+      Rose.Interfaces.Storage.Client.Open (Storage, Store);
+
       Create_Process
         (Name, Kernel_Process, Start_Cap, Initial_Cap, Endpoint_Cap);
       Rose.Interfaces.Kernel_Process.Client.Open
@@ -291,6 +347,8 @@ package body Elf.Server is
          if Command_Cap = 0 then
             Rose.Console_IO.Put_Line
               ("elf: failed to create command endpoint");
+            Rose.Interfaces.Process.Client.Close (Process_Client);
+            Clean_Up;
             return 0;
          end if;
       end if;
@@ -307,20 +365,28 @@ package body Elf.Server is
          end;
       end if;
 
-      Rose.Interfaces.Region.Client.Open (Region, Image);
-      Rose.Interfaces.Storage.Client.Open (Storage, Store);
       Elf.Loader.Load_Elf_Image
         (Process_Client, Storage, Region, Start, Success);
       if Success then
          Start_Process (Start_Cap, Start);
-         if Command then
-            return Command_Cap;
-         else
-            return Get_Interface_Cap (Process_Client);
-         end if;
       else
          Rose.Console_IO.Put_Line ("elf: failed to load process");
+      end if;
+
+      Clean_Up;
+
+      if not Success then
+         Rose.Interfaces.Process.Client.Close (Process_Client);
+         Delete_Cap (Command_Cap);
          return 0;
+      elsif Command then
+         Rose.Interfaces.Process.Client.Close (Process_Client);
+         Last_Command := Command_Cap;
+         return Command_Cap;
+      else
+         Last_Process := Process_Client;
+         Have_Last := True;
+         return Get_Interface_Cap (Process_Client);
       end if;
    end Launch_Process;
 

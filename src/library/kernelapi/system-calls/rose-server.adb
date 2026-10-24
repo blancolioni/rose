@@ -208,6 +208,40 @@ package body Rose.Server is
            Params   => <>);
    end Register_Handler;
 
+   ---------------------
+   -- Remove_Instance --
+   ---------------------
+
+   procedure Remove_Instance
+     (Instance   : in out Server_Instance;
+      Identifier : Rose.Objects.Capability_Identifier)
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Kept : Natural := 0;
+   begin
+      for I in 1 .. Instance.Instance_Count loop
+         declare
+            Item : constant Instanced_Handler_Record :=
+              Instance.Instances (I);
+         begin
+            if Item.Identifier = Identifier then
+               declare
+                  Params : aliased Rose.Invocation.Invocation_Record;
+               begin
+                  Rose.System_Calls.Initialize_Send
+                    (Params, Rose.System_Calls.Delete_Cap_Capability);
+                  Rose.System_Calls.Send_Cap (Params, Item.Capability);
+                  Rose.System_Calls.Invoke_Capability (Params);
+               end;
+            else
+               Kept := Kept + 1;
+               Instance.Instances (Kept) := Item;
+            end if;
+         end;
+      end loop;
+      Instance.Instance_Count := Kept;
+   end Remove_Instance;
+
    ----------------------
    -- Set_Instance_Cap --
    ----------------------

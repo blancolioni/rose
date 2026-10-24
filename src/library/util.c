@@ -6,7 +6,7 @@ memcmp(void *a, void *b, unsigned int n)
 {
     unsigned char u1, u2;
 
-    for ( ; n-- ; a++, a++) {
+    for ( ; n-- ; a++, b++) {
 	u1 = * (unsigned char *) a;
 	u2 = * (unsigned char *) b;
 	if ( u1 != u2) {
