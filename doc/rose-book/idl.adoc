@@ -790,13 +790,6 @@ package_name ::= Name { '.' Name }
 
 These are differences between this chapter and the current compiler, or problems in it.
 
-* The name after `end` is not checked against the interface name.
-* An `interface X` type is not checked: an unknown interface is only found when the generated Ada fails to compile.
-* If two parents declare methods with the same name, the generated package declares two constants with the same name and fails to compile.
-* An enumeration type takes its name from its interface, not from its type declaration.
-* The count type of `Storage_Array` refers to an undefined type, `Storage_Offset`.
 * The ATA server does not use the generated `Block_Device` server package; it builds its capabilities by hand with endpoint ids from `Rose.Devices.Block`.
-* `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build.
+* `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build, and `idle --check` warns about them.
   `Named` is still used through `Kernel_Process`, which inherits it.
-* The compiler is built with alix and depends on libraries outside the repository (WLib, GCS, syn and tropos); the build runs a prebuilt binary called `idle`.
-* The compiler also contains an unused generator for a non-kernel target, and an init-script generator for a `+procedure ... begin invoke ... end+` script language that nothing uses.
