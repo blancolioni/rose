@@ -8,7 +8,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
-TOOLS=idl configure-driver
+TOOLS=configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
@@ -18,7 +18,7 @@ BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf tim
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
 
-all: rts idl rose doc
+all: idl rts rose doc
 
 rts:
 	(cd rts; make)
@@ -77,7 +77,6 @@ boot:
 	(cd src/asm/$(ARCH); make)
 
 idl:
-	(cd src/tools/idl; make)
 	(cd src/library/kernelapi/generated; make)
 
 configure-driver:
@@ -102,7 +101,6 @@ clean:
 	rm -f $(ROSE)
 	rm -f `find . -name "*~" -print`
 	rm -f `find . -name "b~*" -print`
-	rm -f src/tools/idl/idl.gpr
 	rm -f src/tools/configure-driver/configure.gpr
 	rm -f src/rts/support/librose-util.a
 

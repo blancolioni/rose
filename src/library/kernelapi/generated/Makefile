@@ -5,6 +5,7 @@ IDL=cap block_device file_system directory file file_system \
     timeout timer constructor cap_set terminal event_source event_listener \
     map heap receiver kernel_process kernel_log
 
+IDLE ?= idle
 INTERFACES=../../../../interfaces/interfaces.txt
 all: $(IDL)
 
@@ -12,6 +13,6 @@ clean:
 	rm -f *.ad[bs]
 
 rose-interfaces-%.ads: ../../../../interfaces/%.idl
-	idle $< $(INTERFACES)
+	$(IDLE) --target kernel --endpoints $(INTERFACES) -o . $<
 
 $(IDL): %: rose-interfaces-%.ads

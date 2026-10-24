@@ -58,8 +58,10 @@ package Rose.Server is
      (Endpoint_Id  : Rose.Objects.Endpoint_Id);
 
    procedure Publish_Interface
-     (Process_Cap   : Rose.Capabilities.Capability;
-      Interface_Cap : Rose.Capabilities.Capability);
+     (Interface_Cap : Rose.Capabilities.Capability);
+   --  Publish Interface_Cap through the Process interface of the current
+   --  process, which must have been started through exec
+   --  (see Rose.Capabilities.Standard).
 
 private
 

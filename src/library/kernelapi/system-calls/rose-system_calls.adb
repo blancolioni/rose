@@ -1,9 +1,10 @@
+with Rose.Capabilities.Standard;
+with Rose.Interfaces.Cap_Set;
+
 package body Rose.System_Calls is
 
    Default_32_Bit : constant Boolean :=
                       Rose.Words.Word'Size = 32;
-
-   Argument_Cap_Set : constant Rose.Capabilities.Capability := 3;
 
    type Local_Cap_Type is
      (Create_Endpoint, Delete_Cap, Rescind_Cap);
@@ -189,10 +190,12 @@ package body Rose.System_Calls is
             declare
                Params : aliased Rose.Invocation.Invocation_Record;
             begin
-               Initialize_Send (Params, Argument_Cap_Set);
-               Receive_Caps (Params, 3);
+               Initialize_Send
+                 (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
+               Receive_Caps (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
                Invoke_Capability (Params);
-               Get_Environment_Cap := Params.Caps (1);
+               Get_Environment_Cap :=
+                 Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
             end;
          end if;
 
@@ -203,7 +206,7 @@ package body Rose.System_Calls is
             Send_Word (Params, Set_Index (Cap_Type));
             Receive_Caps (Params, 1);
             Invoke_Capability (Params);
-            Local_Cap (Cap_Type) := Params.Caps (1);
+            Local_Cap (Cap_Type) := Params.Caps (0);
             Cap_Loaded (Cap_Type) := True;
          end;
       end if;

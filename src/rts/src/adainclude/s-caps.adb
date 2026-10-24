@@ -1,6 +1,8 @@
 with System.Standard_Caps;
 with System.Storage_Elements;
 
+with Rose.Interfaces.Cap_Set;
+with Rose.Interfaces.Process;
 with Rose.Invocation;
 with Rose.System_Calls.Client;
 with Rose.Words;
@@ -72,15 +74,18 @@ package body System.Caps is
       begin
          Rose.System_Calls.Initialize_Send
            (Params, System.Standard_Caps.Argument_Cap_Set);
-         Rose.System_Calls.Receive_Caps (Params, 3);
+         Rose.System_Calls.Receive_Caps
+           (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
          Rose.System_Calls.Invoke_Capability (Params);
-         Get_Cap := Params.Caps (1);
+         Get_Cap := Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
 
          Rose.System_Calls.Initialize_Send
            (Params, System.Standard_Caps.Process_Interface_Cap);
-         Rose.System_Calls.Receive_Caps (Params, 7);
+         Rose.System_Calls.Receive_Caps
+           (Params, Rose.Interfaces.Process.Subprogram_Count);
          Rose.System_Calls.Invoke_Capability (Params);
-         Exit_Process_Cap := Params.Caps (6);
+         Exit_Process_Cap :=
+           Params.Caps (Rose.Interfaces.Process.Exit_Process_Index);
       end;
 
       Standard_Input_Cap := Get_Environment_Cap (1);
