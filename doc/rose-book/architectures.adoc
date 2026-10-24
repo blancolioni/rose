@@ -1,0 +1,33 @@
+= Architecture Specifics
+
+== i686
+
+=== Invocation Record
+
+The first four words of an invocation are placed in registers.
+The remaining words, if any, are pushed onto the stack.
+
+[#i686-invocation]
+.i686 invocation record
+[cols="1,4",options="header"]
+|===
+| Register | Parameter
+| `eax` | Control word
+| `edx` | Used by _sysenter_ instruction
+| `ebx` | Invoked capability
+| `ecx` | Used by _sysenter_ instruction
+| `esp` |
+| `ebp` |
+| `esi` | First argument
+| `edi` | Second argument
+|===
+
+=== Page Table
+
+Uses 4K pages.
+Per-process virtual memory is 3G.
+Page object ids are 31 bits long, allowing up to 2^43^ bytes or 8TB of state.
+
+=== Persistence
+
+== x64

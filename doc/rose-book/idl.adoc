@@ -1,3 +1,4 @@
+[#idl]
 = The Interface Definition Language
 
 [NOTE]

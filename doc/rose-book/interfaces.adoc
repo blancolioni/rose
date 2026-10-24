@@ -1,0 +1,330 @@
+= Interfaces
+
+== Standard Interfaces
+
+[NOTE]
+====
+This section is out of date (#147).
+The interfaces are declared in IDL, one per file in `interfaces/` (see <<idl>>), and most of those described here have no IDL declaration.
+====
+
+=== Rose
+
+The _Rose_ interface provides operations common to all other interfaces.
+It is implicitly inherited by every interface.
+
+==== Operations
+
+* *Destroy* Destroys the object associated with the capability.
+
+=== Rose.Capability
+
+Operations on capabilities.
+
+==== Inherits
+
+Rose
+
+==== Operations
+
+* *Create Entry* Manufactures a capability which can call the given endpoint
++
+[source,ada]
+----
+function Create_Entry
+  (Endpoint : Rose.Objects.Endpoint_Id)
+  return Capability;
+----
+
+* *Create Endpoint* Creates a new endpoint and returns its identity.
++
+[source,ada]
+----
+function Create_Endpoint
+  return Endpoint_Id;
+----
+
+* *Receive Any* Respond to an invocation of any known capability.
++
+[source,ada]
+----
+procedure Receive_Any
+  (Called_Endpoint : out Endpoint_Id;
+   Reply_Cap       : Capability;
+   Parameters      : Invocation_Record);
+----
+
+* *Create Set* Manufactures a capability which represents a set of capabilities.
++
+[source,ada]
+----
+function Create_Set
+  return interface Rose.Capability_Set;
+----
+
+=== Rose.Capability_Set
+
+Operations on capability sets.
+
+==== Inherits
+
+Rose
+
+==== Operations
+
+* *Insert* Adds a capability to the set
++
+[source,ada]
+----
+function Insert
+  (Cap : Capability);
+----
+
+* *Delete* Delete a capability from the set.
++
+[source,ada]
+----
+procedure Delete
+  (Cap : Capability);
+----
+
+=== Rose.Streams
+
+Operations on streams.
+
+==== Inherits
+
+Rose
+
+=== Rose.Streams.Read
+
+Operations for reading from streams
+
+==== Inherits
+
+Rose.Streams
+
+==== Operations
+
+* *Read* Reads a buffer from the stream
++
+[source,ada]
+----
+procedure Read
+  (Buffer : out Storage_Array;
+   Length : in out Storage_Count)
+----
+
+=== Rose.Streams.Write
+
+Operations for writing to streams
+
+==== Inherits
+
+Rose.Streams
+
+==== Operations
+
+* *Write* Writes a buffer to the stream
++
+[source,ada]
+----
+procedure Write
+  (Buffer : Storage_Array;
+   Length : Storage_Count)
+----
+
+=== Rose.Launch
+
+Launching processes.
+
+==== Operations
+
+* *Launch* Launches the process named by this capability.
+Sent caps are copied to the process.
+Returns a capability which implements the Processes interface for this process.
++
+[source,ada]
+----
+function Launch
+  (Caps : Array_Of_Capabilities)
+  return interface Rose.Process;
+----
+
+=== Rose.Process
+
+Interface to processes.
+
+==== Operations
+
+* *Suspend* Suspend the process
++
+[source,ada]
+----
+procedure Suspend;
+----
+
+=== Rose.System.Create
+
+Interface for creating capabilities.
+
+==== Operations
+
+* *Create Capability* Manufactures a capability based on the representation given in the sent words.
++
+[source,ada]
+----
+function Create_Capability
+  (Header : Word_32;
+   Payload_1, Payload_2, Payload_3 : Word_32)
+  return Capability;
+----
+
+==== Derived Operations
+
+* *Create Interface Capability* Manufactures an interface capability for the given endpoint and object.
++
+[source,ada]
+----
+function Create_Interface_Capability
+  (Endpoint : Endpoint_Id;
+   Object   : Object_Id)
+  return Capability
+is (Create_Capability
+     (16#0000_0005#, Endpoint,
+      Low_Word (Object), High_Word (Object0)));
+----
+
+=== Rose.System.Cap_Copy
+
+Interface for copying capabilities from other objects.
+
+==== Operations
+
+* *Copy Capability* Manufactures a capability which is a copy of an existing capability in the given object.
++
+[source,ada]
+----
+function Copy_Capability
+  (Header : Word_32;
+   Payload_1, Payload_2, Payload_3 : Word_32)
+  return Capability;
+----
+
+=== Rose.System.Boot
+
+Boot module interface
+
+==== Operations
+
+* *Launch* Starts a boot module.
++
+[source,ada]
+----
+function Launch
+  (Module_Index : Positive;
+   Caps         : Capability_Array)
+  return Object_Id;
+----
+
+=== Rose.System.Device_Memory
+
+Interface for setting up memory-mapped devices.
+
+==== Operations
+
+* *Reserve* Reserves an area of memory for devices.
+Pages within this area can be acquired by device drivers using a page object cap.
++
+[source,ada]
+----
+procedure Reserve
+  (Base  : Physical_Address;
+   Bound : Physical_Address);
+----
+
+[#system-interfaces]
+.Standard System Interfaces
+[cols="2,1,2,5",options="header"]
+|===
+| Name | Identity | Implemented By | Notes
+| Meta | 1 | All | A process usually has this as capability 1
+| Cap Copy | 2 | Kernel | Used during installation to subvert security
+| Kernel | 3 | Kernel |
+| Procmem | 4 | `mm` | Paged process memory management
+| Registry | 5 | registry | Registry of interface identifiers
+| Signal | 6 | any | Send and receive signals
+| Authentication | 7 | passwd |
+| Account | 8 | passwd |
+| Make Executable | 9 | exec |
+| Executable | 10 | ELF binaries |
+| Process | 11 | running processes |
+| Login | 12 | login |
+| User | 13 | user |
+|===
+
+==== Meta Interface
+
+[NOTE]
+====
+The meta interface no longer exists (#147).
+The request below is drawn on the current invocation record, with the values of the original request.
+====
+
+The _meta_ interface is used for managing capabilities.
+Sending to this interface creates new capabilities, or sends existing capabilities to other objects.
+It can also be used to get a capability for an object's default interface.
+
+[#interface-cap-request]
+image::interface-cap-request.svg[Interface capability request]
+
+The request sends two words: the interface id, and its version.
+Its flags are `Send`, `Block`, `Send_Words` and `Recv_Caps`.
+
+[#meta-interface]
+.The meta interface
+[cols="1,3,1,4",options="header"]
+|===
+| Endpoint | Name | Operations | Description
+| 1 | Create Interface Cap | Send | Creates and returns a new interface capability for the sending object
+| 2 | Create Endpoint Cap | Send | Creates and returns a new endpoint capability for the sending object
+| 3 | Create Page Object Cap | Send | _data~0~_ contains page address; _data~1~_ contains the readable and writable flags
+| 5 | Create Singleton Receive | Send |
+| 6 | Create Cap Set | Send |
+| 16 | Receive on provided caps | Receive | Maximum receive caps is 6
+| 17 | Receive on any known cap | Receive |
+| 31 | Exit | Send | End the sending process.
+|===
+
+==== The process memory manager interface
+
+A server implementing the `procmem` interface can be notified when a process starts, when it ends, and when it requests access to virtual addresses which it does not currently have.
+
+It is expected that the server will have access to a page mapper interface, which will allow it to map and unmap pages as required.
+
+=== Authentication Interfaces
+
+[#auth-interfaces]
+.Standard Authentication Interfaces
+[cols="2,1,2,5",options="header"]
+|===
+| Name | Identity | Implemented By | Notes
+| Login | 12 | login |
+| User | 13 | user |
+|===
+
+=== File Interfaces
+
+[#file-interfaces]
+.Standard File Interfaces
+[cols="2,1,2,5",options="header"]
+|===
+| Name | Identity | Implemented By | Notes
+| File System | 100 | rfs, xmlfs, isofs |
+| Directory | 101 | rfs, xmlfs, isofs |
+| File | 102 | |
+|===
+
+== Interface Definition Language
+
+The interface definition language is described in <<idl>>.

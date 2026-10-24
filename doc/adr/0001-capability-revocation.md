@@ -81,4 +81,4 @@ This follows the approach of seL4, which records a derivation tree and revokes t
 - #118: membrane library.
 - #119: petal runs commands inside a membrane.
 - #120: memory server revocation: unmap a revoked page or region from every process that has it mapped.
-- #121: update `doc/rose-book/capabilities.tex` to describe rescind, derive and revocation.
+- #121: update `doc/rose-book/capabilities.adoc` to describe rescind, derive and revocation.
