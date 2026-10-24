@@ -454,7 +454,7 @@ No aspect is required: anything a declaration must have is part of its syntax, a
   A short option for any other type takes the next word as its value.
 * `--` ends option processing, so later words are always positional.
 
-So `echo -n Welcome to Rose` binds `+New_Line => False+` and `+Arguments => ("Welcome", "to", "Rose")+`.
+So `echo -n Welcome to Rose` binds `+New_Line => False+` and `+Arguments => ["Welcome", "to", "Rose"]+`.
 
 [#string-values]
 ==== String values
@@ -545,6 +545,11 @@ command_decl  ::= 'command' qualified_name [ ':' role_list ]
 qualified_name ::= Name '.' Name { '.' Name }
 role_list     ::= Name { ',' Name }
 
+role_decl     ::= 'role' Name ':' Name ';'
+                | 'role' Name [ ':' role_list ] 'is'
+                  { member_decl } 'end' Name ';'
+member_decl   ::= Name ':' Name ';'
+
 argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
                   [ ':=' value ]
                   [ 'with' aspect { ',' aspect } ] ';'
@@ -597,22 +602,17 @@ A command inherits roles after its name, and receives their members as arguments
 
 [source,ada]
 ----
-role Standard_Input is
-   Standard_Input : Stream_Reader;
-end Standard_Input;
-
-role Standard_Output is
-   Standard_Output : Stream_Writer;
-end Standard_Output;
-
-role Standard_Error is
-   Standard_Error : Stream_Writer;
-end Standard_Error;
+role Standard_Input : Stream_Reader;
+role Standard_Output : Stream_Writer;
+role Standard_Error : Stream_Writer;
 
 role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
 end Standard_IO;
 ----
 
+* *A role with one member can be declared in one line.*
+  `role Standard_Input : Stream_Reader;` declares a role with a single member, `Standard_Input : Stream_Reader`, named after the role.
+  A single name followed by `;` is always the short form, so that name must be an interface; a role that inherits other roles always has `is` and `end`, as in `role X : Y is end X;`.
 * *Each member is a cap of an interface type*, so its type is written without the `interface` keyword, and it has no mode or default.
   The interface type says what right the member grants.
 * *Inherited members come first* in the command's signature, each role once, as with parent interfaces.

@@ -46,12 +46,10 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 - **Parameter types are IDL interfaces.** `in File` means "any object that implements `File`", so a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 - **Typed results.** A command returns structured values through `out` parameters, such as `stat (path => "x", size => s, modified => m)`, instead of text that the caller has to parse.
 - **Standard streams are roles a command declares.** A command gets standard input, standard output or standard error only if its declaration asks for it, so a command that asks for none can do no I/O at all.
-  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and `Echo`, which only writes, inherits `Standard_Output` (it reports errors through `Fail`, below):
+  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and `Echo`, which only writes, inherits `Standard_Output` (it reports errors through `Fail`, below). A role with one member, named after the role, can be declared in one line, as `Standard_Output` is here:
 
     ```ada
-    role Standard_Output is
-       Standard_Output : Stream_Writer;
-    end Standard_Output;
+    role Standard_Output : Stream_Writer;
 
     role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
     end Standard_IO;
@@ -74,7 +72,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
   - **The generated main passes them to `Rose.System_Calls.Use_Capabilities`**, as it gives the streams to the run-time system, so library code that needs them works as now.
   - **The kernel implements these interfaces.** It must decode their invocations exactly as the generated code encodes them, and serve the interface cap that opens them, as it already does for `Kernel_Process`.
   - **Most commands need none of them.** A command's endpoint exists before it starts (section 2), so only a command that serves further endpoints, or manages caps, declares these roles.
-- **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ("Welcome", "to", "Rose")`.
+- **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ["Welcome", "to", "Rose"]`.
 - **Short options.** An argument can have a short option (`Short_Name`) and, for a `Boolean`, the value the option gives it (`Short_Value`). For example, `-n` sets `New_Line` to `False`. A `Boolean` argument can also be given by name as `--name` or `--no-name`.
 
 ### 2. Commands are declared in IDL, and the main program is generated
