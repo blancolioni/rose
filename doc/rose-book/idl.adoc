@@ -324,10 +324,11 @@ Whether to have this target is still open; it would tie in with the "Rose: SPARK
 ADR 0002 (#135) adds two declarations to the language (idle#2).
 
 * A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
-  A command is named as a child of the package it belongs to, such as `Core_Utilities.Echo`.
+  A command is named as a child of the package it belongs to, such as `Rose.Core.Echo`.
   The compiler generates the procedure spec, a one-shot server main that receives the shell's invocation and calls the author's procedure body, and metadata embedded in the executable.
   Like any command process, it starts with only a receive cap and waits for the shell to invoke it (#143).
 * A `package` declaration gives the name, version and copyright that a group of commands share.
+  Packages can be children of other packages, to any depth.
 
 [#search-paths]
 === Finding declarations
@@ -335,11 +336,11 @@ ADR 0002 (#135) adds two declarations to the language (idle#2).
 The compiler is given a list of directories to search, much like the include paths of a C compiler:
 
 ----
-idl -I interfaces -I src/commands/core_utilities core_utilities-echo.idl
+idle -I interfaces -I src/commands rose-core-echo.idl
 ----
 
-* Whenever a declaration names another one, as a parent interface, an `interface X` type, or a command's package, the compiler looks for its file in each directory in turn and uses the first it finds.
-* The file name is the declaration's name in lower case, with each `.` replaced by `-`, as GNAT names Ada units: `Core_Utilities` is in `core_utilities.idl`, and `Core_Utilities.Echo` is in `core_utilities-echo.idl`.
+* Whenever a declaration names another one, as a parent interface, an `interface X` type, a role, or a command's package, the compiler looks for its file in each directory in turn and uses the first it finds.
+* The file name is the declaration's name in lower case, with each `.` replaced by `-`, as GNAT names Ada units: `Rose.Core` is in `rose-core.idl`, and `Rose.Core.Echo` is in `rose-core-echo.idl`.
 * A name that is not found in any directory is an error.
 
 The build passes `interfaces/` and the directories that hold packages and commands.
@@ -357,13 +358,14 @@ Its main choices are settled (see <<command-decisions>>); the remaining open que
 
 ==== Declaring a command
 
-A command is named as a child of the package it belongs to, like an Ada child unit: `Core_Utilities.Echo` is the command `Echo` in the package `Core_Utilities`.
-It is declared in its own file, named as GNAT names child units (`core_utilities-echo.idl`), and kept with the command's source rather than in `interfaces/`.
+A command is named as a child of the package it belongs to, like an Ada child unit: `Rose.Core.Echo` is the command `Echo` in the package `Rose.Core`.
+Package names can have any number of parts (see <<nested-packages>>).
+It is declared in its own file, named as GNAT names child units (`rose-core-echo.idl`), and kept with the command's source rather than in `interfaces/`.
 The declaration has the same shape as an interface or package: aspects for the command as a whole, then `is`, then one declaration for each argument, then `end`.
 
 [source,ada]
 ----
-command Core_Utilities.Echo : Standard_Output
+command Rose.Core.Echo : Standard_Output
   with Summary     => "Write arguments to standard output",
        Description => "Writes each argument to standard output, " &
                       "separated by single spaces."
@@ -377,7 +379,7 @@ is
    Arguments : String_List
      with Help => "Words to write, separated by spaces";
 
-end Core_Utilities.Echo;
+end Rose.Core.Echo;
 ----
 
 `Echo` inherits the role `Standard_Output`, which gives it standard output (see <<roles>>).
@@ -386,7 +388,7 @@ A command that takes and produces files gives its arguments modes and interface 
 
 [source,ada]
 ----
-command Core_Utilities.Copy
+command Rose.Core.Copy
   with Summary => "Copy a file"
 is
 
@@ -396,13 +398,13 @@ is
    Target : out interface File
      with Help => "The new file";
 
-end Core_Utilities.Copy;
+end Rose.Core.Copy;
 ----
 
 * Each argument is declared like an Ada object: a name, an optional mode, a type, an optional default, and aspects, ending with `;`.
   Because each declaration ends with its own `;`, an argument's aspects cannot be confused with the next argument's or with the command's.
 * The compiler generates the Ada procedure spec from the argument declarations, in declaration order.
-* Standard input, output and error are supplied by the shell and are not declared.
+* Standard input, output and error are not declared as arguments: a command receives them by inheriting roles (see <<roles>>).
 
 ==== Command aspects
 
@@ -412,8 +414,8 @@ No aspect is required: anything a declaration must have is part of its syntax, a
 |===
 | Aspect | Meaning
 
-| `Name` | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Core_Utilities.Echo`. For example, `+Name => "myecho"+`.
-| `Summary` | A one-line description, shown by `--help` and in command listings. Without it, the command's qualified name followed by "(no summary)" is used: `Core_Utilities.Echo (no summary)`.
+| `Name` | The name the shell registers the command under. Without it, the last part of the command's name in lower case is used: `echo` for `Rose.Core.Echo`. For example, `+Name => "myecho"+`.
+| `Summary` | A one-line description, shown by `--help` and in command listings. Without it, the command's qualified name followed by "(no summary)" is used: `Rose.Core.Echo (no summary)`.
 | `Description` | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>). Without it, there is no description.
 | `Authors` | Who wrote the command, printed by `--version` as "Written by ...". Without it, the package's `Authors` is used.
 | `Version`, `Copyright` | Override the package's version or copyright for this command. Without them, the package's values are used.
@@ -517,27 +519,30 @@ The exact layout of the options list is still to be fixed; the order of the part
 
 ==== What the compiler generates
 
-For `core_utilities-echo.idl`, the compiler writes:
+For `rose-core-echo.idl`, the compiler writes:
 
-* `core_utilities-echo.ads`, the procedure spec, a child of the package's generated Ada package (see <<packages>>), which the author implements in `core_utilities-echo.adb`:
+* `rose-core-echo.ads`, the procedure spec, a child of the package's generated Ada package (see <<packages>>), which the author implements in `rose-core-echo.adb`:
 +
 [source,ada]
 ----
 with Rose.Command_Line;
-procedure Core_Utilities.Echo
+procedure Rose.Core.Echo
   (New_Line  : Boolean := True;
    Arguments : Rose.Command_Line.String_List);
 ----
-* `core_utilities-echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Core_Utilities.Echo`, and reports success or failure (ADR 0002).
+* `rose-core-echo_main.adb`, the program's main, which receives the shell's invocation, decodes the arguments, calls `Rose.Core.Echo`, and reports success or failure (ADR 0002).
 * The command's metadata, embedded in the executable: its registered name, the argument declarations, the help text, and the details of its package.
 
 ==== Grammar changes
 
 [source,ebnf]
 ----
-command_decl  ::= 'command' Name '.' Name
+command_decl  ::= 'command' qualified_name [ ':' role_list ]
                   'with' aspect { ',' aspect }
-                  'is' { argument_decl } 'end' Name '.' Name ';'
+                  'is' { argument_decl } 'end' qualified_name ';'
+
+qualified_name ::= Name '.' Name { '.' Name }
+role_list     ::= Name { ',' Name }
 
 argument_decl ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
                   [ ':=' value ]
@@ -576,8 +581,9 @@ The lexer also needs character literals, which it does not yet produce, and the 
 * *Command files live with the command's source*, so each command is self-contained.
   Keeping them all in one directory, like `interfaces/`, was considered; it makes them easy to check together, but separates each declaration from its code.
 * *The compiler searches a list of directories* for the declarations a file names (see <<search-paths>>).
-* *A command is a child of its package*, `Core_Utilities.Echo`, in `core_utilities-echo.idl`.
+* *A command is a child of its package*, `Rose.Core.Echo`, in `rose-core-echo.idl`.
   An earlier draft named the package with a `Part_Of` aspect instead; the child name says the same thing in the way Ada does, and needs no extra aspect.
+* *Packages nest to any depth*, and only a command's own package must be declared in IDL (see <<nested-packages>>).
 * *The shell registers a command under the last part of its name*, in lower case, unless a `Name` aspect overrides it.
 
 * *An ambiguous name is resolved by asking the user* (see <<command-visibility>>).
@@ -637,8 +643,8 @@ A package is declared in its own file, named after the package like any other ID
 
 [source,ada]
 ----
---  core_utilities.idl
-package Core_Utilities
+--  rose-core.idl
+package Rose.Core
   with Title       => "Rose core utilities",
        Version     => "1.0.0",
        Copyright   => "Copyright (C) 2026 Fraser Wilson",
@@ -654,7 +660,7 @@ package Core_Utilities
           Full documentation: <https://rose-os.org/rose-book/{command}.html>
           """
 is
-end Core_Utilities;
+end Rose.Core;
 ----
 
 As for commands, no aspect is required, and each has a default:
@@ -664,11 +670,25 @@ As for commands, no aspect is required, and each has a default:
 * `Copyright` is a single line of text. Without it, `--version` prints no copyright line.
 * `Authors` is the default for each command's `Authors`. Without it, `--version` prints no "Written by" line, unless the command has its own.
 * `License` is printed by `--version` after the copyright line. Without it, nothing is printed there.
+* `Version`, `Copyright`, `Authors`, `License` and `Help_Footer` are inherited from an enclosing package when they are left out (see <<nested-packages>>), and the defaults above apply only when no enclosing package gives them.
 * `Summary` is a one-line description, shown when listing packages. Without it, the package name followed by "(no summary)" is used, as for commands.
 * `Help_Footer` is printed at the end of every `--help` in the package, like the "GNU coreutils online help" lines. Without it, `--help` ends after the description.
 * `{command}` in any of the package's string aspects is replaced with the name of the command, so one footer can point to each command's own page.
 * The body is empty. A package does not list its commands; each command is declared as a child of its package, so adding a command does not mean editing the package.
 * A package declares no methods and has no endpoint ids.
+
+[#nested-packages]
+==== Nested packages
+
+A package can be a child of another package, to any depth, as in Ada: `Rose.Core` is a child of `Rose`.
+
+* *Only a command's own package must be an IDL package.*
+  Its ancestors can be IDL packages or ordinary Ada packages.
+  `Rose` is the existing Ada package in `src/base/rose.ads`, so the IDL declares only `Rose.Core`, and its generated Ada package is a child of `Rose`.
+  An ancestor that is not on the search path is taken to be an Ada package; if it does not exist, the generated Ada fails to compile.
+* *Details are inherited.* `Version`, `Copyright`, `Authors`, `License` and `Help_Footer` that a package leaves out come from the nearest enclosing IDL package that gives them, so a family of packages can state its copyright and licence once.
+  `Title` and `Summary` describe the package itself, so they are not inherited.
+* Names are written in full, in declarations and in file names: `package Rose.Core` in `rose-core.idl`.
 
 ==== Commands in a package
 
@@ -676,35 +696,35 @@ A command belongs to the package it is a child of:
 
 [source,ada]
 ----
-command Core_Utilities.Echo
+command Rose.Core.Echo
   with Summary => "Write arguments to standard output"
 is
    ...
-end Core_Utilities.Echo;
+end Rose.Core.Echo;
 ----
 
-* Every command belongs to exactly one package, the parent in its name, and that package must be found on the search path.
+* Every command belongs to exactly one package, the parent in its name (`Rose.Core` for `Rose.Core.Echo`), and that package must be an IDL package found on the search path.
 * A command can override the package's version, copyright or authors with its own `Version`, `Copyright` or `Authors` aspect, for example a command that is updated more often than the rest of its package.
   Without an override, it uses the package's values.
 * Moving a command to another package means renaming it, and its file.
 
 ==== What the compiler does with a package
 
-* When it compiles a command, the compiler reads the package's file (`core_utilities.idl` for `Core_Utilities`) from the search path.
-  It reports an error if the package does not exist.
+* When it compiles a command, the compiler reads the package's file (`rose-core.idl` for `Rose.Core`) from the search path, and the files of any enclosing IDL packages for inherited details.
+  It reports an error if the command's own package does not exist.
 * It copies the package's name, title, version, copyright, authors, license, summary and help footer, with any overrides from the command, into the command's embedded metadata, replacing `{command}` with the command's registered name.
   The registry can then answer `--version` from the executable alone, without reading the package file.
-* A package generates a small Ada package, the parent of its commands' procedures, holding its details as constants:
+* A package generates a small Ada package, the parent of its commands' procedures, holding its details, inherited ones included, as constants:
 +
 [source,ada]
 ----
-package Core_Utilities is
+package Rose.Core is
    Title     : constant String := "Rose core utilities";
    Version   : constant String := "1.0.0";
    Copyright : constant String := "Copyright (C) 2026 Fraser Wilson";
    Authors   : constant String := "Fraser Wilson";
    License   : constant String := "...";
-end Core_Utilities;
+end Rose.Core;
 ----
 
 ==== What the shell does with packages
@@ -723,7 +743,7 @@ Written by Fraser Wilson.
 * `--help` ends with the package's help footer (see <<commands>>).
 * The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
 * The build collects every command that is a child of a package to form that package's set of executables.
-  `init` installs the `Core_Utilities` package from the boot image, so its commands are registered before petal's first prompt.
+  `init` installs the `Rose.Core` package from the boot image, so its commands are registered before petal's first prompt.
 
 [#command-visibility]
 ==== Which commands are visible
@@ -731,12 +751,13 @@ Written by Fraser Wilson.
 The shell treats packages much as Ada treats a `use` clause:
 
 * The commands of a used package can be run by their registered names alone.
-  There is an implicit `use Core_Utilities;`, so `echo` runs `Core_Utilities.Echo`.
-* Any command can be run by its qualified name, in Ada syntax: `core_utilities.echo`.
-  Names are not case sensitive, so `Core_Utilities.Echo` and `Debug.Echo` work too.
+  There is an implicit `use Rose.Core;`, so `echo` runs `Rose.Core.Echo`.
+* Any command can be run by its qualified name, in Ada syntax: `rose.core.echo`.
+  Names are not case sensitive, so `Rose.Core.Echo` and `Debug.Echo` work too.
+* As in Ada, a name can be qualified only as far as needed: after `use Rose;`, `core.echo` runs `Rose.Core.Echo`.
 * Arguments follow the name as words, as in any shell; a command is not written as a procedure call with parentheses.
 * Installing a command whose name is already visible from another package is not an error.
-  The shell warns, for example `echo already visible from package core_utilities. This command will be available with debug.echo`, and the new command can then be run by its qualified name.
+  The shell warns, for example `echo already visible from package rose.core. This command will be available with debug.echo`, and the new command can then be run by its qualified name.
 * If a `use` makes the same name visible from two packages, the name alone is ambiguous, as in Ada.
   Petal asks the user which command was meant, listing the qualified names.
   When it is not interactive, for example when running a script, it reports the ambiguity as an error instead.
@@ -756,9 +777,11 @@ This proposal needs two changes to the grammar:
 +
 [source,ebnf]
 ----
-package_decl ::= 'package' Name
+package_decl ::= 'package' package_name
                  'with' aspect { ',' aspect }
-                 'is' 'end' Name ';'
+                 'is' 'end' package_name ';'
+
+package_name ::= Name { '.' Name }
 ----
 * Aspect values can be strings in any of the forms in <<string-values>>, as well as integers and names.
 
