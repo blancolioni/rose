@@ -13,6 +13,7 @@ Rose is a persistent capability system. A process can only act through the capab
 - **Petal formal arguments.** Built-in commands declare formals that are named (long and short names) or positional, with defaults (`Petal.Formal_Arguments`). The argument types are Boolean, Integer, String, read stream and write stream.
 - **External commands don't run yet.** Petal's `Execute` prints `launching:` with the command's launch cap and returns. External programs have no way to declare their own formals.
 - **Launch is untyped.** `Launch.Launch` takes a `Capability_Array` and an `Environment` storage array. The caller and the program agree on what they mean by convention only.
+- **Standard streams travel by position.** The launcher builds a `Cap_Set` whose first three entries are standard input, output and error, followed by system caps such as create-endpoint. The launched process finds that set in slot 2 of its cap table, and its run-time system reads the streams from entries 1 to 3. The layout is documented only by comments in `init`.
 - **Directory and file interfaces.** `Directory` offers lookup (`Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File`) and creation (`Create_File`, `Create_Directory`) on the same interface. `File` is `Stream` plus `Seekable`, and `Stream` is `Stream_Reader` plus `Stream_Writer`, which carry raw storage arrays.
 - **The IDL compiler.** `src/tools/idl` compiles `interfaces/*.idl` into Ada client and server packages in `src/library/kernelapi/generated`. It is built with alix, the package manager that predates Alire. Its output is restricted to the subset of Ada available to kernel-level code, which has no tagged types or interfaces. So an IDL interface becomes a pair of packages, not an Ada interface type.
 
@@ -44,7 +45,35 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 - **Parameter types are IDL interfaces.** `in File` means "any object that implements `File`", so a pipe, a synthesised object or a remote resource can be passed wherever a file is expected.
 - **Typed results.** A command returns structured values through `out` parameters, such as `stat (path => "x", size => s, modified => m)`, instead of text that the caller has to parse.
-- **Standard streams are supplied by the shell.** Every command receives standard input, standard output and standard error without declaring them, and uses them through `Ada.Text_IO` as now. They are not ambient authority: the shell grants them for each launch, and they cross the job's membrane like any other cap. Everything else must be in the signature.
+- **Standard streams are roles a command declares.** A command gets standard input, standard output or standard error only if its declaration asks for it, so a command that asks for none can do no I/O at all.
+  - **Roles.** A `role` declaration names a set of caps that a command can be granted. Each standard stream is a role: `Standard_Input`, `Standard_Output` and `Standard_Error`, each holding one stream. `Standard_IO` inherits all three. A command inherits the roles it needs, so a filter inherits `Standard_IO`, and `Echo`, which only writes, inherits `Standard_Output` (it reports errors through `Fail`, below):
+
+    ```ada
+    role Standard_Output is
+       Standard_Output : Stream_Writer;
+    end Standard_Output;
+
+    role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
+    end Standard_IO;
+
+    command Core_Utilities.Echo : Standard_Output is
+       ...
+    end Core_Utilities.Echo;
+    ```
+
+  - **Role members are caps of interface types.** A role grants authority, and authority is a cap, so every member's type is an interface. The declaration names the interface without the `interface` keyword, and has no mode or default: a member is always a granted cap, and its interface type says what right it grants (a lookup-only `Directory`, for example, as in section 5). Settings that are not authority, such as a locale, are ordinary arguments.
+  - **Roles are not interfaces.** When an interface inherits from another, it provides the parent's operations. When a command inherits a role, it receives the role's caps, which is the opposite direction. So roles are a separate kind of declaration, and a command can inherit only from roles.
+  - **Inherited members are arguments.** They come first in the signature, each role once, as with parent interfaces. They are passed in the launch invocation like any other argument (section 2), and the generated main gives the streams to the run-time system, so the command uses them through `Ada.Text_IO` as now.
+  - **The shell binds them by role.** When a signature includes a stream role, the shell supplies the job's corresponding stream without the user naming it. The streams cross the job's membrane like any other cap.
+  - **Typed streams fit the same model.** A command that writes typed values (section 6) inherits a role whose output stream has that element type, so the signature says what the command can be piped to.
+  - **No streams, no I/O library.** For a command that inherits none of the stream roles, the generated configuration includes `pragma Restrictions (No_Dependence => Ada.Text_IO)`, so I/O is a compile-time error, not a failure when the command runs.
+  - **Failure needs no standard error.** `Fail` is the reply to the launch invocation (section 2), so a command without standard error can still report an error.
+- **System caps are roles too.** Today every launched process receives caps to create endpoints, delete caps, rescind caps and create cap sets, found by position in its argument cap set. Instead, each becomes a role, so a command receives one only if it declares it:
+  - **One role for each cap**, as with the streams: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`.
+  - **Each has an IDL interface type.** `Create_Cap_Set` uses the existing `Constructor` interface. Creating endpoints and deleting and rescinding caps are kernel operations, untyped today, and each gets an IDL interface.
+  - **The generated main passes them to `Rose.System_Calls.Use_Capabilities`**, as it gives the streams to the run-time system, so library code that needs them works as now.
+  - **The kernel implements these interfaces.** It must decode their invocations exactly as the generated code encodes them, and serve the interface cap that opens them, as it already does for `Kernel_Process`.
+  - **Most commands need none of them.** A command's endpoint exists before it starts (section 2), so only a command that serves further endpoints, or manages caps, declares these roles.
 - **List arguments.** A command's last positional argument may have a list type, such as `Rose.Command_Line.String_List`. It takes all remaining positional words, which can be none. At most one argument in a signature may do this. Named arguments and short options can appear anywhere among the words, so `echo -n Welcome to Rose` binds `New_Line => False` and `Arguments => ("Welcome", "to", "Rose")`.
 - **Short options.** An argument can have a short option (`Short_Name`) and, for a `Boolean`, the value the option gives it (`Short_Value`). For example, `-n` sets `New_Line` to `False`. A `Boolean` argument can also be given by name as `--name` or `--no-name`.
 
@@ -81,7 +110,7 @@ A command is declared once, in IDL, together with its help text: a `command ... 
   end Echo_Main;
   ```
 
-  - **`Receive`** waits for the shell's single invocation. Arguments are encoded as for any IDL method call: scalars in words, strings and lists in the shared buffer, and files and directories as caps. Launching a command is calling a method, so decoding uses the same generated server-side code.
+  - **`Receive`** waits for the shell's single invocation. Arguments are encoded as for any IDL method call: scalars in words, strings and lists in the shared buffer, and files, directories and streams as caps. Launching a command is calling a method, so decoding uses the same generated server-side code. `Receive` gives the run-time system the standard streams the command requires (section 1).
   - **The `*_Argument` functions** turn each argument into an Ada value. A cap becomes a client object of the argument's interface type, so an `in File` argument is an object implementing the Ada `File` interface (user-mode target, section 10).
   - **The shell applies defaults**, since it has the signature, so the main always receives every argument. The defaults in the generated spec only matter for Ada code that calls the procedure directly.
   - **`out` parameters** are locals in the main. Their values are returned in `Complete`.
@@ -89,7 +118,7 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 
 - **A command receives its arguments by invocation, not at process start.** This is a deliberate choice.
   - **At start**, a command process holds only a receive cap for its command endpoint. The launcher gives the shell the matching endpoint cap.
-  - **The shell then calls that endpoint** with a reply cap, sending the arguments, their caps and the standard streams. The generated main's `Receive` waits for that call, and `Complete` or `Fail` is the reply.
+  - **The shell then calls that endpoint** with a reply cap, sending the arguments, their caps and the standard streams the command requires. The generated main's `Receive` waits for that call, and `Complete` or `Fail` is the reply.
   - **Why:** arguments use the same encoding as every other IDL method call, decoded by the same generated server code, so there is one encoding and not two. The reply cap gives the shell its completion signal without a separate result cap. Starting a command is calling a method on it.
   - **Alternatives considered.** Passing everything at process start, as `Launch` does today with a `Capability_Array` and `Environment` bytes, saves a step. But it needs a second encoding for arguments and a separate cap for the result. Creating the process with the invocation already pending would avoid the extra step too, but it adds a special case to process creation for little gain.
   - **Cost:** one extra round trip per launch, and a short period when the process exists without its arguments. A blocking send from the shell waits until the process is ready, so there is no race.
@@ -160,6 +189,7 @@ The language features above need the IDL compiler to do more than it does now, s
 - **User-mode target.** This uses the full Ada language. An IDL interface becomes an Ada interface type, and its implementations become tagged types, so `in File` accepts any object that implements `File`, and typed streams can be generic over their element type.
 - **Language additions:**
   - command declarations: argument declarations with modes, defaults, short options and list arguments, help text and package details, generating the spec, the main program and the embedded metadata (section 2)
+  - roles: named sets of caps that commands inherit, starting with the standard streams (section 1)
   - record types for stream elements
   - namespaces and versions
   - unit types
@@ -192,14 +222,16 @@ The language features above need the IDL compiler to do more than it does now, s
 - **Attenuation.** Should narrower directory grants come mainly from separate IDL types, from derive, or from membrane filters? Each has different costs for persistence and checks.
 - **Text rendering.** What should the canonical text format be, and should it round-trip?
 - **Background jobs across restores.** How does a user find and reconnect to their jobs after a restore?
+- **Creating an endpoint returns two caps**, the endpoint cap and, when asked, a receive cap. Its IDL interface needs `out` cap parameters (blancolioni/idle#19), or two operations.
 
 ## Follow-up work
 
 - Rewrite the IDL compiler with kernel and user-mode targets, built with Alire (blancolioni/idle#1).
-- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, and `package` declarations whose details are copied into each command's metadata (blancolioni/idle#2).
+- Add command declarations to IDL: generate the spec, the main program and the embedded metadata, `package` declarations whose details are copied into each command's metadata, and roles, starting with the standard streams (blancolioni/idle#2).
 - Add the `Rose.Command_Line` package, with `String_List` and the launch support that generated mains call (#156).
 - Change `Launch` and the exec server so a command process starts with only a receive cap for its command endpoint, and the launcher returns the matching endpoint cap to the shell (#143).
 - Petal: a command registry that reads metadata from executables, handles `--help`, `--version` and `--`, binds arguments to signatures, and launches external commands with exactly the caps their arguments resolve to (#138). The built-in `echo` is removed in the same change, and `echo` becomes the first external command, installed at boot by `init` as part of the core-utilities package.
+- Define IDL interfaces for the kernel's system caps (creating endpoints, deleting and rescinding caps), implement them in the kernel, and declare the system cap roles (#162).
 - Split the `Directory` interface into lookup and create-and-modify parts (#139).
 - Define the core stream interfaces (`core.File_Info` and similar) and unit types (#140).
 - Shell-owned commit for `out` and `in out` files, with the file system and persistence layers (#141).
