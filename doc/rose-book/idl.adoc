@@ -3,7 +3,7 @@
 [NOTE]
 ====
 This chapter is a draft (#146).
-It describes the language and code generation as the current compiler (`src/tools/idl`) implements them, and marks the planned changes: the compiler rewrite (idle#1), command declarations (idle#2), endpoint ids (#148, and idle#3 to idle#5) and ADR 0002.
+It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target. It marks the planned changes: command declarations (idle#2), endpoint ids (#148, and idle#3 to idle#5) and ADR 0002.
 References written idle#N are to issues in the compiler's own repository, https://github.com/blancolioni/idle[blancolioni/idle].
 ====
 

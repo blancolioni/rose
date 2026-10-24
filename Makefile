@@ -8,7 +8,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
-TOOLS=idl configure-driver
+TOOLS=configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
@@ -101,7 +101,6 @@ clean:
 	rm -f $(ROSE)
 	rm -f `find . -name "*~" -print`
 	rm -f `find . -name "b~*" -print`
-	rm -f src/tools/idl/idl.gpr
 	rm -f src/tools/configure-driver/configure.gpr
 	rm -f src/rts/support/librose-util.a
 
