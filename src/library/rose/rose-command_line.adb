@@ -1,34 +1,56 @@
-with Rose.Environment;
-with Rose.Strings;
+with Rose.Words;
 
 package body Rose.Command_Line is
 
-   --------------------
-   -- Argument_Count --
-   --------------------
+   use System.Storage_Elements;
 
-   function Argument_Count return Natural is
-      Count : String (1 .. 10);
-      Last  : Natural;
-   begin
-      Rose.Environment.Get_Environment_Value ("@arg-count", Count, Last);
-      return Rose.Strings.To_Integer (Count (1 .. Last));
-   end Argument_Count;
+   -------------
+   -- Element --
+   -------------
 
-   ------------------
-   -- Get_Argument --
-   ------------------
-
-   procedure Get_Argument
-     (Index    : Positive;
-      Argument : out String;
-      Last     : out Natural)
+   function Element
+     (List  : String_List;
+      Index : Positive)
+      return String
    is
-      Name : String := "@arg00";
+      Item   : constant Positive := List.First_Item + Index - 1;
+      Offset : Storage_Offset := 0;
+      Length : Storage_Count := 0;
    begin
-      Name (Name'Last) := Character'Val (Index mod 10 + 48);
-      Name (Name'Last - 1) := Character'Val (Index / 10 mod 10 + 48);
-      Rose.Environment.Get_Environment_Value (Name, Argument, Last);
-   end Get_Argument;
+      if Index > List.Count then
+         return "";
+      end if;
+
+      --  Each item is a 32-bit length, the characters, and padding to a
+      --  multiple of four bytes. An item that is not all in the buffer is
+      --  taken to be empty.
+
+      for Current in 1 .. Item loop
+         if Offset + 4 > List.Buffer_Length then
+            return "";
+         end if;
+
+         declare
+            Length_Word : Rose.Words.Word_32
+              with Import, Address => List.Buffer + Offset;
+         begin
+            Length := Storage_Count (Length_Word);
+         end;
+
+         if Offset + 4 + Length > List.Buffer_Length then
+            return "";
+         end if;
+
+         exit when Current = Item;
+         Offset := Offset + 4 + (Length + 3) / 4 * 4;
+      end loop;
+
+      declare
+         Text : constant String (1 .. Natural (Length))
+           with Import, Address => List.Buffer + Offset + 4;
+      begin
+         return Text;
+      end;
+   end Element;
 
 end Rose.Command_Line;

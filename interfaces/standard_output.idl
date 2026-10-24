@@ -1,0 +1,1 @@
+role Standard_Output : Stream_Writer;

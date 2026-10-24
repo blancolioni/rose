@@ -1,6 +1,5 @@
-with System.Caps;
-
 with Rose.Invocation;
+with Rose.Standard_Streams;
 with Rose.System_Calls.Client;
 
 package body Ada.Text_IO is
@@ -20,24 +19,52 @@ package body Ada.Text_IO is
 
    File_Control : array (Open_File_Index) of File_Control_Block;
 
+   --  The standard files have no caps of their own: Input_Cap and
+   --  Output_Cap ask Rose.Standard_Streams for them when they are used,
+   --  because a command is only given its streams after elaboration.
+
+   Standard_Input_Control  : constant Open_File_Index := 1;
+   Standard_Output_Control : constant Open_File_Index := 2;
+   Standard_Error_Control  : constant Open_File_Index := 3;
+
    Standard_Input_File : constant File_Type :=
                     File_Type'
                       (Is_Open => True,
                        Mode    => In_File,
-                       In_Cap  => System.Caps.Standard_Input,
+                       In_Cap  => Rose.Capabilities.Null_Capability,
                        Out_Cap => Rose.Capabilities.Null_Capability,
-                       Control => 1);
+                       Control => Standard_Input_Control);
 
    Standard_Output_File : constant File_Type :=
                     File_Type'
                       (Is_Open => True,
                        Mode    => Out_File,
                        In_Cap  => Rose.Capabilities.Null_Capability,
-                       Out_Cap => System.Caps.Standard_Output,
-                       Control => 2);
+                       Out_Cap => Rose.Capabilities.Null_Capability,
+                       Control => Standard_Output_Control);
+
+   Standard_Error_File : constant File_Type :=
+                    File_Type'
+                      (Is_Open => True,
+                       Mode    => Out_File,
+                       In_Cap  => Rose.Capabilities.Null_Capability,
+                       Out_Cap => Rose.Capabilities.Null_Capability,
+                       Control => Standard_Error_Control);
 
    Current_Input_File  : File_Type := Standard_Input_File;
    Current_Output_File : File_Type := Standard_Output_File;
+
+   function Input_Cap (File : File_Type) return Rose.Capabilities.Capability
+   is (if File.Control = Standard_Input_Control
+       then Rose.Standard_Streams.Standard_Input
+       else File.In_Cap);
+
+   function Output_Cap (File : File_Type) return Rose.Capabilities.Capability
+   is (if File.Control = Standard_Output_Control
+       then Rose.Standard_Streams.Standard_Output
+       elsif File.Control = Standard_Error_Control
+       then Rose.Standard_Streams.Standard_Error
+       else File.Out_Cap);
 
    procedure Read_Input_Stream
      (Cap : Rose.Capabilities.Capability;
@@ -79,12 +106,17 @@ package body Ada.Text_IO is
    -----------
 
    procedure Flush (File : File_Type) is
+      use type Rose.Capabilities.Capability;
       FCB : File_Control_Block renames File_Control (File.Control);
+      Cap : constant Rose.Capabilities.Capability := Output_Cap (File);
    begin
       if FCB.Buffer_Last > 0 then
-         Rose.System_Calls.Client.Send_String
-           (Cap     => File.Out_Cap,
-            Message => FCB.Buffer (1 .. FCB.Buffer_Last));
+         --  Text written to a stream the program does not have is lost.
+         if Cap /= Rose.Capabilities.Null_Capability then
+            Rose.System_Calls.Client.Send_String
+              (Cap     => Cap,
+               Message => FCB.Buffer (1 .. FCB.Buffer_Last));
+         end if;
          FCB.Buffer_Last := 0;
       end if;
    end Flush;
@@ -116,7 +148,7 @@ package body Ada.Text_IO is
       Last := Line'First - 1;
       for Ch of Line loop
          if Index > FCB.Buffer_Last then
-            Read_Input_Stream (File.In_Cap, FCB);
+            Read_Input_Stream (Input_Cap (File), FCB);
             if FCB.Buffer_Last = 0 then
                FCB.At_End := True;
                return;
@@ -209,7 +241,7 @@ package body Ada.Text_IO is
       end if;
       Add (Character'Val (10));
       Rose.System_Calls.Client.Send_String
-        (Cap     => Standard_Output_File.Out_Cap,
+        (Cap     => Output_Cap (Standard_Output_File),
          Message => Buffer (1 .. Last));
    end Log;
 
@@ -337,6 +369,15 @@ package body Ada.Text_IO is
    begin
       Current_Output_File := File;
    end Set_Output;
+
+   --------------------
+   -- Standard_Error --
+   --------------------
+
+   function Standard_Error return File_Type is
+   begin
+      return Standard_Error_File;
+   end Standard_Error;
 
    --------------------
    -- Standard_Input --

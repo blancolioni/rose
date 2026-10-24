@@ -5,8 +5,15 @@ IDL=cap block_device file_system directory file \
     timeout timer constructor cap_set terminal event_source event_listener \
     map heap receiver kernel_process kernel_log
 
+# Declarations for commands (ADR 0002): the roles they inherit, and the
+# package of the core commands. They are checked with the interfaces, but
+# nothing is generated for them here; each command generates its own units.
+
+COMMANDS=rose-core standard_input standard_output standard_error standard_io
+
 IDLE ?= idle
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)
+COMMAND_SOURCES=$(COMMANDS:%=../../../../interfaces/%.idl)
 
 all: check $(IDL)
 
@@ -16,7 +23,7 @@ all: check $(IDL)
 # table of them.
 
 check:
-	$(IDLE) --check $(SOURCES)
+	$(IDLE) --check $(SOURCES) $(COMMAND_SOURCES)
 
 clean:
 	rm -f *.ad[bs]
