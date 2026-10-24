@@ -4,7 +4,7 @@
 [NOTE]
 ====
 This chapter is a draft (#146).
-It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target. It marks the planned changes: command declarations (idle#2), endpoint ids (#148, and idle#3 to idle#5) and ADR 0002.
+It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target. It marks the planned changes: command declarations (idle#2) and ADR 0002.
 References written idle#N are to issues in the compiler's own repository, https://github.com/blancolioni/idle[blancolioni/idle].
 ====
 
@@ -64,7 +64,7 @@ The lexical rules follow Ada.
 ----
 interface_decl ::= 'interface' Name [ constraints ]
                    [ ':' Name { ',' Name } ]
-                   [ 'with' Name '=>' Integer { ',' Name '=>' Integer } ]
+                   [ 'with' aspect { ',' aspect } ]
                    'is' { declaration } 'end' Name ';'
 
 constraints    ::= '(' Name ':' type { ',' Name ':' type } ')'
@@ -74,9 +74,9 @@ declaration    ::= subprogram | type_decl | constant_decl
 subprogram     ::= ( 'procedure' | 'function' ) Name
                    [ '(' param { ';' param } ')' ]
                    [ 'return' type ]
-                   [ 'with' sub_aspect { ',' sub_aspect } ] ';'
+                   [ 'with' aspect { ',' aspect } ] ';'
 
-sub_aspect     ::= Name [ ''' Name ] '=>' Name
+aspect         ::= 'Endpoint_Id' '=>' Integer
 
 param          ::= Name ':' [ 'in' | 'out' | 'in' 'out' ] type
 
@@ -146,9 +146,10 @@ Segment_Writable : constant := 2;
 
 === Aspects and constraints
 
-The grammar allows aspects on interfaces (`+with Name => Integer+`) and on subprograms (`+with Name => Name+` or `+with Name'Attribute => Name+`), and a list of constraints after an interface name.
-The parser records them, but no interface uses them, and their meaning is not yet defined.
-Pinned endpoint ids (idle#4) will be the first use of subprogram aspects.
+An interface or a subprogram can have aspects, after its parents or its result and before `is` or `;`.
+The only aspect is `Endpoint_Id`, which pins its endpoint id (see <<endpoint-ids>>); any other is an error.
+
+The grammar also allows a list of constraints after an interface name, but no interface uses them, and their meaning is not defined.
 
 == Predefined types
 
@@ -179,36 +180,56 @@ How the words, capabilities and buffer of an invocation are filled is described 
 
 The compiler can map the stream element types to `Ada.Streams` instead, but that option is turned off, since `Ada.Streams` isn't available to kernel-level code.
 
+[#endpoint-ids]
 == Endpoint ids
 
-Every method, and every interface, has a 64-bit endpoint id.
-A server registers each method under its id, and a client's capability for a method carries the id.
-The generated package for an interface declares the ids as constants: `<Interface>_Interface` for the interface, and `<Method>_Endpoint` for each method, including inherited ones.
+Every subprogram, and every interface, has a 64-bit endpoint id.
+A server registers each subprogram under its id, and a client's capability for a subprogram carries the id.
+The generated package for an interface declares the ids as constants: `<Interface>_Interface` for the interface, and `<Method>_Endpoint` for each subprogram, including inherited ones.
+The kernel uses these constants for the ids it needs (#148).
 
-=== Current mechanism
+=== Derived ids
 
-The compiler keeps every id in `interfaces/interfaces.txt`, one `+Interface.method = 16#...#+` line per id.
+An id is derived from its declaration, so the same source always gives the same ids (idle#3).
 
-* The first time it sees a method or interface, it picks a random 48-bit value, adds it to the table and rewrites the whole file.
-* Inherited methods use the key of the interface that declares them, so a parent and its children agree, as long as the table entry exists when both are compiled.
-* Entries are never removed.
+* The *canonical form* of a declaration is written in lower case, with single spaces:
++
+----
+interface rose.interfaces.directory
+rose.interfaces.directory.find_entry(in string) return natural
+rose.interfaces.cap.destroy
+----
+* A subprogram is named in the interface that declares it, so an inherited subprogram has its parent's id.
+* Each parameter contributes its mode and type, but not its name, so renaming a parameter keeps the id.
+* Predefined types use their IDL names (`word`, `capability`, `string`), a type declared in an interface is qualified by it (`rose.interfaces.block_device.block_address_type`), and an interface type is written `interface rose.interfaces.<name>`.
+* The id is the first eight bytes, big-endian, of the SHA-256 of the canonical form.
+  A hash of zero, which is not a valid id, becomes 1.
 
-This is fragile.
-The ids exist only in that file, so losing an entry silently assigns a new random value; parallel builds can lose entries; the kernel copies five of the values as literals; and the build writes to the source tree.
+An incompatible change to a signature changes the id, so a caller built against the old signature fails with an invalid endpoint instead of decoding the wrong arguments.
+A saved process that holds an old id is no longer valid, so Rose starts from a fresh disk image when ids change.
 
-=== Planned mechanism
+`idle --list-endpoints` writes each id with its canonical form, which helps when reading kernel traces:
 
-* *Ids derived from the source* (idle#3).
-  An endpoint id is a hash (SHA-256, truncated to 64 bits) of a canonical form of the method's qualified name, parameter modes and types, and result type, for example `rose.interfaces.directory.find_entry(in string) return natural`.
-  An interface id is the hash of `interface rose.interfaces.<name>`.
-  An incompatible change to a signature changes the id, so old callers fail with an invalid endpoint instead of decoding the wrong arguments.
-  `interfaces.txt` is removed.
-* *Pinned ids* (idle#4).
-  `+with Endpoint_Id => 16#...#+` on a method or interface keeps a specific id, for example when a method is renamed but persisted processes still use the old id.
-* *A whole-set check* (idle#5).
-  `idl --check` reads every interface and rejects duplicate ids, clashing inherited names, unknown interfaces and mismatched names.
-* *Generated kernel constants* (#148).
-  The kernel uses generated constants instead of copying ids as literals.
+----
+16#ECDE_34C4_3D46_477B#  rose.interfaces.directory.find_entry(in string) return natural
+----
+
+=== Pinned ids
+
+An `Endpoint_Id` aspect pins a subprogram or an interface to a given id, for example to keep the id of a renamed subprogram that saved processes still use (idle#4):
+
+[source,ada]
+----
+function Find_Entry (Name : String) return Natural
+  with Endpoint_Id => 16#ECDE_34C4_3D46_477B#;
+----
+
+The value is an integer literal, in any base, that is not zero and fits in 64 bits.
+
+=== Checking ids
+
+`idle --check` reads every interface the build compiles, and reports two declarations with the same id, which in practice only a pin can cause, and a pin that equals the hash it replaces (idle#5).
+The build runs it before generating any code.
 
 == Generation targets
 
