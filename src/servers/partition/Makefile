@@ -9,7 +9,7 @@ CFILES=$(UTIL)
 ENVIRONMENT_OBJECTS= \
 	$(BUILDDIR)/rose-environment.o \
 	$(BUILDDIR)/rose-environment_pages.o \
-	$(BUILDDIR)/rose-command_line.o
+	$(BUILDDIR)/rose-environment-arguments.o
 
 LIBROSE_OBJECTS=$(BUILDDIR)/rose-strings.o
 BLOCK_DEVICE_OBJECTS= \

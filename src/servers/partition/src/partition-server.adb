@@ -4,7 +4,7 @@ with Rose.Console_IO;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Command_Line;
+with Rose.Environment.Arguments;
 
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Block_Device.Server;
@@ -95,16 +95,16 @@ package body Partition.Server is
          Argument : String (1 .. 20);
          Last     : Natural;
       begin
-         Rose.Command_Line.Get_Argument (1, Argument, Last);
+         Rose.Environment.Arguments.Get_Argument (1, Argument, Last);
          Device_Base_Address :=
            Block_Address_Type (To_Word_32 (Argument (1 .. Last)));
 
-         Rose.Command_Line.Get_Argument (2, Argument, Last);
+         Rose.Environment.Arguments.Get_Argument (2, Argument, Last);
          Device_Block_Count :=
            Block_Address_Type (To_Word_32 (Argument (1 .. Last)))
            - Device_Base_Address + 1;
 
-         Rose.Command_Line.Get_Argument (3, Argument, Last);
+         Rose.Environment.Arguments.Get_Argument (3, Argument, Last);
          Partition_Block_Size :=
            Block_Size_Type (To_Word_32 (Argument (1 .. Last)));
       end;

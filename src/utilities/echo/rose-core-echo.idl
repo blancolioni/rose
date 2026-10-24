@@ -1,0 +1,14 @@
+command Rose.Core.Echo : Standard_Output
+  with Summary     => "Write the arguments to standard output.",
+       Description => """
+          Echo writes its arguments to standard output, separated by
+          single spaces and followed by a line break.
+          """
+is
+   New_Line : Boolean := True
+     with Short_Name  => 'n',
+          Short_Value => False,
+          Help        => "end the output with a line break (-n: do not)";
+   Arguments : String_List
+     with Help => "the words to write";
+end Rose.Core.Echo;

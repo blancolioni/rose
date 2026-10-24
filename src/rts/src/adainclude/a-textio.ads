@@ -27,6 +27,7 @@ package Ada.Text_IO is
 
    function Standard_Input return File_Type;
    function Standard_Output return File_Type;
+   function Standard_Error return File_Type;
 
    procedure Set_Input (File : File_Type);
    procedure Set_Output (File : File_Type);

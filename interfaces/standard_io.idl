@@ -1,0 +1,2 @@
+role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
+end Standard_IO;

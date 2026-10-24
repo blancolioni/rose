@@ -1,0 +1,13 @@
+package Rose.Core
+  with Title       => "Rose core utilities",
+       Version     => "0.1.0",
+       Copyright   => "Copyright (C) 2018-2026 Fraser Wilson",
+       Authors     => "Fraser Wilson",
+       License     => """
+          License GPLv3+: GNU GPL version 3 or later <https://gnu.org/licenses/gpl.html>.
+          This is free software: you are free to change and redistribute it.
+          There is NO WARRANTY, to the extent permitted by law.
+          """,
+       Help_Footer => "Rose core utilities: {command} is part of Rose."
+is
+end Rose.Core;
