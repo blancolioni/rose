@@ -580,9 +580,20 @@ The lexer also needs character literals, which it does not yet produce, and the 
 
 * *An ambiguous name is resolved by asking the user* (see <<command-visibility>>).
 
+==== Standard streams
+
+A command receives standard input, standard output or standard error only if it asks for them, by inheriting the corresponding requirement group (ADR 0002, section 1).
+`Standard_Input`, `Standard_Output` and `Standard_Error` each hold one stream, and `Standard_IO` inherits all three.
+Inherited declarations come first in the signature, and the generated main gives the streams to the run-time system, so the command uses them through `Ada.Text_IO`.
+A command that inherits none of them can do no I/O: its generated configuration forbids `Ada.Text_IO`.
+
+The examples above leave the requirements out, because the syntax for groups, and the keyword that declares them, are not settled.
+`Echo` would inherit `Standard_Output`, and `Copy` none.
+
 ==== Open questions
 
-None at present.
+* The keyword for requirement groups, and how a command names the groups it inherits.
+* Whether the system caps (create-endpoint, delete, rescind, create-cap-set) also become requirement groups (ADR 0002, open questions).
 
 [#packages]
 === Packages
