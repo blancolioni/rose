@@ -1,1 +1,66 @@
 = Introduction
+
+Rose is an operating system built on two ideas: a process can do only what its capabilities allow, and the state of the system survives a restart.
+It is written in Ada, runs on i686 under QEMU, and is a long-running personal project, started in November 2018.
+
+This book describes how Rose works, and in places how it is meant to work.
+
+== Design
+
+Capabilities::
+A capability is permission to perform an operation, and holding it is both necessary and sufficient.
+A process sees each capability as a 32-bit word; the kernel uses it to find a structure that names an object and the rights the holder has over it.
+There is no global namespace, no superuser and no ambient authority: a process that has not been given a capability for something cannot name it, let alone use it.
+Directories are capabilities too, so a program sees only the parts of the file system it has been handed.
+
+Persistence::
+Rose is designed to keep running across restarts.
+The system saves its state in regular checkpoints, and a restart restores the latest consistent one, with every process holding the capabilities it held before.
+Long-lived grants therefore stay granted until they are revoked, which shapes how capabilities are handed out and taken back.
+
+A small kernel::
+The kernel manages processes, capabilities, invocation and physical memory.
+Device drivers, file systems, memory management, checkpointing and the shell are user-space servers, which talk to each other only by invoking capabilities.
+
+Interfaces in IDL::
+Every interface between processes is declared in an interface definition language that reads like an Ada package specification.
+The IDL compiler, idle, generates the Ada code on both sides of each call, so a client and its server cannot disagree about an interface.
+Commands are declared the same way, so the shell knows a program's arguments, and the capabilities it needs, before it runs.
+
+Ada::
+The kernel, the servers and the tools are written in Ada.
+Kernel-level code uses a restricted subset with no tagged types; user-mode code can use the whole language.
+
+== Status
+
+Rose boots, starts its servers and reaches the Petal shell.
+It is an experimental system, not one to rely on: it runs under QEMU, and it reformats the disk it is given.
+
+Much of the design is ahead of the code.
+Where a chapter describes something planned rather than built, or where the text has fallen behind the code, a note says so and links the issue that tracks it.
+
+== How This Book Is Organised
+
+<<Capabilities>>::
+What a capability is, how the kernel stores one, and how a process invokes it.
+<<Processes>>::
+How a command is launched, which capabilities it receives, and how it reports success or failure.
+<<Memory>> and <<Persistence>>::
+Page objects, the memory manager, and how checkpoints save and restore the system.
+<<Interfaces>> and <<idl>>::
+The standard interfaces, and the language they are declared in.
+<<Servers>> and <<Boot Sequence>>::
+The servers that make up a running system, and the order in which `init` starts them.
+<<petal>>::
+The shell.
+<<Architecture Specifics,_Architecture Specifics_>>::
+What differs between processor architectures.
+
+== Conventions
+
+* A reference such as #145 is an issue or pull request in the https://github.com/blancolioni/rose[Rose repository].
+  One written idle#2 is in the repository of the IDL compiler, https://github.com/blancolioni/idle[blancolioni/idle].
+* Notes mark text that is out of date or describes planned work.
+* Bit layouts show one 32-bit word per row, with the highest bit on the left.
+  They are drawn from the same descriptions that the build checks against the Ada records, so they match the code.
+* Code examples are Ada, or IDL, which looks like Ada.
