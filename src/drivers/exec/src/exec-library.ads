@@ -18,9 +18,12 @@ package Exec.Library is
    --  a cap whose identifier is the program's, and which Send_Interface
    --  answers.
 
-   procedure Get_Image_Pages
-     (Id          : Rose.Objects.Capability_Identifier;
-      Base, Bound : out Rose.Objects.Page_Object_Id);
+   function Image_Region
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Interfaces.Region.Client.Region_Client;
+   --  A region of the pages of program Id's ELF image. It is made the
+   --  first time, and kept: the store has room for a limited number of
+   --  regions.
 
    procedure Get_Program_Name
      (Id   : Rose.Objects.Capability_Identifier;

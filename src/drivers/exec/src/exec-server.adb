@@ -49,6 +49,18 @@ package body Exec.Server is
    --  Send the image and storage of program Id, as the ELF server's
    --  Launch and Launch_Command take them.
 
+   function Result
+     (Params : Rose.Invocation.Invocation_Record)
+      return Rose.Capabilities.Capability;
+   --  The cap in the reply Params to a launch, or null if it failed. It
+   --  is kept until the next launch, because the reply to the launch
+   --  sends it, and then deleted.
+
+   Last_Result : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+
    Context : Rose.Server.Server_Context;
    Region : Rose.Interfaces.Region.Client.Region_Client;
 
@@ -84,6 +96,19 @@ package body Exec.Server is
          Launch_Command => On_Launch_Command'Access,
          Metadata       => On_Metadata'Access);
    end Create_Server;
+
+   ----------------
+   -- Delete_Cap --
+   ----------------
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send
+        (Params, Rose.System_Calls.Delete_Cap_Capability);
+      Rose.System_Calls.Send_Cap (Params, Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Delete_Cap;
 
    -----------------------------
    -- On_Get_Launch_Interface --
@@ -144,13 +169,11 @@ package body Exec.Server is
 
       Invoke_Capability (Params);
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         return Rose.Capabilities.Null_Capability;
-      else
-         return Params.Caps (0);
-      end if;
+      for Cap of Caps loop
+         Delete_Cap (Cap);
+      end loop;
+
+      return Result (Params);
    end On_Launch;
 
    -----------------------
@@ -182,13 +205,11 @@ package body Exec.Server is
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         return Rose.Capabilities.Null_Capability;
-      else
-         return Params.Caps (0);
-      end if;
+      for Cap of Caps loop
+         Delete_Cap (Cap);
+      end loop;
+
+      return Result (Params);
    end On_Launch_Command;
 
    -----------------
@@ -204,6 +225,30 @@ package body Exec.Server is
       Exec.Library.Get_Metadata (Id, Result, Last);
    end On_Metadata;
 
+   ------------
+   -- Result --
+   ------------
+
+   function Result
+     (Params : Rose.Invocation.Invocation_Record)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if Last_Result /= Rose.Capabilities.Null_Capability then
+         Delete_Cap (Last_Result);
+      end if;
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         Last_Result := Rose.Capabilities.Null_Capability;
+      else
+         Last_Result := Params.Caps (0);
+      end if;
+      return Last_Result;
+   end Result;
+
    ----------------
    -- Send_Image --
    ----------------
@@ -212,16 +257,11 @@ package body Exec.Server is
      (Params : in out Rose.Invocation.Invocation_Record;
       Id     : Rose.Objects.Capability_Identifier)
    is
-      Base, Bound   : Rose.Objects.Page_Object_Id;
-      Subregion_Cap : Rose.Interfaces.Region.Client.Region_Client;
    begin
-      Exec.Library.Get_Image_Pages (Id, Base, Bound);
-      Subregion_Cap :=
-        Rose.Interfaces.Region.Client.Create_Subregion
-          (Region, Base, Bound, 5);
       Rose.System_Calls.Send_Cap
         (Params,
-         Rose.Interfaces.Region.Client.Get_Interface_Cap (Subregion_Cap));
+         Rose.Interfaces.Region.Client.Get_Interface_Cap
+           (Exec.Library.Image_Region (Id)));
       Rose.System_Calls.Send_Cap (Params, Storage_Cap);
    end Send_Image;
 
