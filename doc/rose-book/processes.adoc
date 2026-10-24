@@ -1,0 +1,74 @@
+= Processes
+
+A process is named by a launch capability.
+Invoking the capability executes the process.
+
+Object ids in the range 1 to 2^24^ − 1 represent processes.
+
+Process id 1 is used to refer to the Kernel.
+
+== Launch Capability
+
+== Initial Capabilities
+
+[NOTE]
+====
+This section is out of date (#147).
+The standard process caps are defined by `Rose.Capabilities.Standard`, in `rose-capabilities-standard.ads`, and `Rose.System_Calls` finds Delete_Cap, Rescind_Cap and Create_Endpoint at indices 6, 7 and 8 of the argument cap set.
+The launch protocol of ADR 0002 replaces this convention.
+====
+
+The generated interface libraries rely on caps 1 and 2 being the ones from <<standard-caps>>.
+
+The set referenced by cap 2 is defined by <<standard-cap-env>>.
+The environment accessed by the Ada.Environment_Variables package contains an entry for each _Id_ in the table, with the index of the corresponding capability in the cap set.
+The standard libraries rely on cap 7 of the cap set being a capability for the `Cap_Set` interface, and cap 6 being the delete capability method.
+
+[#standard-caps]
+.Standard process capabilities
+[cols="1,2,2,5",options="header"]
+|===
+| # | Cap | Type | Description
+| 1 | Self | Interface | Process interface to current process
+| 2 | Argument_Caps | Interface | Cap set containing supplied caps
+|===
+
+[#standard-cap-env]
+.Standard capability environment
+[cols="1,3,3,4",options="header"]
+|===
+| # | Id | Interface | Description
+| 1 | Standard_Input | Stream_Reader | Standard input stream
+| 2 | Standard_Output | Stream_Writer | Standard output stream
+| 3 | Standard_Error | Stream_Writer | Standard error stream
+| 4 | Current_Directory | Directory | Start directory
+| 5 | Clock | Clock | System clock
+| 6 | Delete_Cap | Method | Delete capability
+| 7 | Rescind_Cap | Method | Rescind capability
+| 8 | Create Endpoint | Method | Endpoint constructor
+| 9 | Create Cap_Set | Method | Cap set constructor
+|===
+
+== Standard Launch Sequence
+
+The _launch_ capability invokes the _exec_ server, which holds an _Executable_ capability.
+The _Launch_ method on this capability invokes the _elf_ server,
+which invokes a kernel capability for creating a new process, returning a _Process_ and a start capability.
+The _mem_ server is invoked, which returns a _Process_Memory_ capability.
+This is used to load the ELF image from storage.
+
+== Example
+
+Consider the following excerpt from a shell session:
+
+----
+user$ cat readme.txt
+----
+
+A launch capability for the `cat` program is found in the shell's environment.
+A new environment is created, setting environment capabilities for input/output streams.
+The argument is interpreted as the name of a file, a `stream-reader` capability to this file is added to the environment.
+
+== Environment
+
+The environment is supplied as a table of entries starting at a known address.

@@ -1,0 +1,31 @@
+= Rose: Capability-based persistent Ada OS
+Fraser Wilson
+:doctype: book
+:toc:
+:sectanchors:
+:xrefstyle: short
+
+include::preface.adoc[leveloffset=+1]
+
+include::introduction.adoc[leveloffset=+1]
+
+include::capabilities.adoc[leveloffset=+1]
+
+include::processes.adoc[leveloffset=+1]
+
+include::memory.adoc[leveloffset=+1]
+
+include::persistence.adoc[leveloffset=+1]
+
+include::interfaces.adoc[leveloffset=+1]
+
+include::idl.adoc[leveloffset=+1]
+
+include::servers.adoc[leveloffset=+1]
+
+include::boot.adoc[leveloffset=+1]
+
+include::petal.adoc[leveloffset=+1]
+
+[appendix]
+include::architectures.adoc[leveloffset=+1]
