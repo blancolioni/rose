@@ -249,9 +249,11 @@ package body Init.Calls is
       return Rose.Objects.Object_Id
    is
       use Rose.Invocation;
-      Params : aliased Rose.Invocation.Invocation_Record;
+      Params      : aliased Rose.Invocation.Invocation_Record;
+      Launch_Caps : Array_Of_Capabilities (1 .. 3);
    begin
-      Params.Cap := Launch_Cap;
+      Get_Interface (Launch_Cap, Launch_Caps);
+      Params.Cap := Launch_Caps (1);
       Params.Control.Flags := (Send             => True,
                                Send_Words       => False,
                                Recv_Words       => True,

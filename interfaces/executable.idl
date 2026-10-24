@@ -7,4 +7,14 @@ interface Executable is
       Caps  : Capability_Array)
      return interface Process;
 
+   --  As Launch, but the process also starts with the receive cap of a
+   --  command endpoint, and the result is the endpoint cap (ADR 0002).
+
+   function Launch_Command
+     (Name  : String;
+      Image : interface Region;
+      Store : interface Storage;
+      Caps  : Capability_Array)
+     return Capability;
+
 end Executable;

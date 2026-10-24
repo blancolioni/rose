@@ -3,7 +3,7 @@ IDL=cap block_device file_system directory file \
     ata partitions keyboard_handler interrupt_handler \
     launch exec region executable memory process segment server \
     timeout timer constructor cap_set terminal event_source event_listener \
-    map heap receiver kernel_process kernel_log
+    map heap receiver kernel_process kernel_log command_endpoint
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
 # package of the core commands. They are checked with the interfaces, but
@@ -28,7 +28,8 @@ check:
 clean:
 	rm -f *.ad[bs]
 
-rose-interfaces-%.ads: ../../../../interfaces/%.idl
+# Every interface depends on all of them, since a parent can change.
+rose-interfaces-%.ads: ../../../../interfaces/%.idl $(SOURCES)
 	$(IDLE) --target kernel -o . $<
 
 $(IDL): %: rose-interfaces-%.ads

@@ -128,6 +128,7 @@ package body Init.Run is
       Reserve_Storage_Cap  : Rose.Capabilities.Capability;
 
       Launch_Elf_Cap       : Rose.Capabilities.Capability;
+      Launch_Command_Elf_Cap : Rose.Capabilities.Capability;
       Install_Media_FS     : Rose.Capabilities.Capability;
       Install_Receiver     : Rose.Capabilities.Capability;
       Install_Endpoint     : Rose.Capabilities.Capability;
@@ -636,6 +637,10 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Elf_Cap,
               Rose.Interfaces.Executable.Launch_Endpoint);
+         Launch_Command_Elf_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Elf_Cap,
+              Rose.Interfaces.Executable.Launch_Command_Endpoint);
       end;
 
       declare
@@ -781,11 +786,14 @@ package body Init.Run is
                                   Storage_Cap     => Storage_Cap,
                                   Reserve_Cap     => Reserve_Storage_Cap,
                                   Launch_Cap      => Launch_Elf_Cap,
+                                  Launch_Command_Cap =>
+                                    Launch_Command_Elf_Cap,
                                   Cap_Stream      => Params.Caps (0),
                                   Standard_Output => Console_Interface_Cap,
                                   Binary_Stream   => Params.Caps (1),
                                   Binary_Length   => Params.Data (0));
-                  Caps     : Init.Calls.Array_Of_Capabilities (1 .. 2);
+                  Caps     : Init.Calls.Array_Of_Capabilities
+                    (1 .. Rose.Interfaces.Exec.Subprogram_Count);
                   Public_Cap : constant Rose.Capabilities.Capability :=
                                  Get_Public_Interface_From_Process (Exec_Cap);
                begin
@@ -797,7 +805,8 @@ package body Init.Run is
                         "unable to find exec interface" & NL);
                   else
                      Init.Calls.Get_Interface (Public_Cap, Caps);
-                     Install_Cap := Caps (2);
+                     Install_Cap :=
+                       Caps (Rose.Interfaces.Exec.Install_Index + 1);
                   end if;
                end;
 
@@ -887,8 +896,19 @@ package body Init.Run is
                        Extra_Caps    => Extra_Caps (1 .. Last_Cap));
 
                   Wait (1000);
+
+                  --  Launch is the program's Launch interface. Restore
+                  --  launches drivers itself, through the interface's
+                  --  Launch cap, and saves commands with the interface.
+
                   if Params.Data (1) = 0 then
-                     Rose.System_Calls.Send_Cap (Reply, Launch);
+                     declare
+                        Launch_Caps : Init.Calls.Array_Of_Capabilities
+                          (1 .. 3);
+                     begin
+                        Init.Calls.Get_Interface (Launch, Launch_Caps);
+                        Rose.System_Calls.Send_Cap (Reply, Launch_Caps (1));
+                     end;
                   elsif Params.Data (1) = 1 then
                      Rose.System_Calls.Send_Cap (Reply, Add_Cap);
                      Rose.System_Calls.Send_Cap (Reply, Launch);

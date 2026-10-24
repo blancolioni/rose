@@ -13,4 +13,7 @@ package Exec is
    Region_Cap           : constant Rose.Capabilities.Capability := 7;
    Storage_Cap          : constant Rose.Capabilities.Capability := 8;
 
+   Launch_Command_Cap   : constant Rose.Capabilities.Capability := 9;
+   --  The ELF server's Launch_Command (interfaces/executable.idl).
+
 end Exec;

@@ -180,6 +180,76 @@ package body Rose.Kernel.Capabilities.Processes is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Command_Endpoint_Endpoint =>
+            declare
+               use Rose.Capabilities;
+               use type Rose.Invocation.Parameter_Word_Index;
+               use type Rose.Objects.Endpoint_Id;
+               use type Rose.Objects.Endpoint_Index;
+               Endpoint_Id    : Rose.Objects.Endpoint_Id := 0;
+               Local_Endpoint : Rose.Objects.Endpoint_Index := 0;
+               Receive_Cap    : Capability := Null_Capability;
+               Endpoint_Cap   : Capability := Null_Capability;
+            begin
+               if Params.Control.Flags (Rose.Invocation.Send_Words)
+                 and then Params.Control.Last_Sent_Word >= 1
+               then
+                  Endpoint_Id :=
+                    Rose.Objects.Endpoint_Id (Params.Data (0))
+                    + 2 ** 32 * Rose.Objects.Endpoint_Id (Params.Data (1));
+               end if;
+
+               if Endpoint_Id = 0 then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Request_Error);
+                  Rose.Kernel.Processes.Set_Current_State
+                    (Current_Pid, Rose.Kernel.Processes.Ready);
+                  return;
+               end if;
+
+               Local_Endpoint :=
+                 Rose.Kernel.Processes.Require_Endpoint (Pid, Endpoint_Id);
+               if Local_Endpoint /= 0 then
+                  Receive_Cap := Rose.Kernel.Processes.Create_Cap (Pid);
+               end if;
+               if Receive_Cap /= Null_Capability then
+                  Endpoint_Cap :=
+                    Rose.Kernel.Processes.New_Cap
+                      (Current_Pid,
+                       Rose.Capabilities.Layout.Endpoint_Capability
+                         (Rose.Kernel.Processes.To_Object_Id (Pid),
+                          Local_Endpoint, 0));
+               end if;
+
+               if Endpoint_Cap = Null_Capability then
+                  if Receive_Cap /= Null_Capability then
+                     Rose.Kernel.Processes.Delete_Cap (Pid, Receive_Cap);
+                  end if;
+                  Rose.Kernel.Processes.Return_Error
+                    (Params,
+                     (if Local_Endpoint = 0
+                      then Rose.Invocation.Out_Of_Endpoints
+                      else Rose.Invocation.Out_Of_Capabilities));
+                  Rose.Kernel.Processes.Set_Current_State
+                    (Current_Pid, Rose.Kernel.Processes.Ready);
+                  return;
+               end if;
+
+               Rose.Kernel.Processes.Set_Cap
+                 (Pid, Receive_Cap,
+                  Rose.Capabilities.Layout.Receive_Capability
+                    (Rose.Kernel.Processes.To_Object_Id (Pid),
+                     Local_Endpoint));
+               Rose.Kernel.Processes.Set_Receive_Cap
+                 (Pid, Local_Endpoint, Receive_Cap);
+
+               Params.Control.Flags :=
+                 (Rose.Invocation.Reply => True, others => False);
+               Rose.Invocation.Send_Cap (Params.all, Endpoint_Cap);
+               Rose.Kernel.Processes.Set_Current_State
+                 (Current_Pid, Rose.Kernel.Processes.Ready);
+            end;
+
          when others =>
             Rose.Boot.Console.Put ("invalid endpoint: ");
             Rose.Boot.Console.Put (Natural (Cap.Header.Endpoint));

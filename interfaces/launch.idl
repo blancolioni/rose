@@ -5,4 +5,17 @@ interface Launch is
       Environment : Storage_Array)
      return interface Process;
 
+   --  Start the program as a command (ADR 0002): its process starts with
+   --  the receive cap of a command endpoint, and the result is the
+   --  endpoint cap, which the shell calls with the command's arguments.
+
+   function Launch_Command
+     (Caps : Capability_Array)
+     return Capability;
+
+   --  The command's metadata, from the .rose_command section of its
+   --  executable, or an empty string if it is not a command.
+
+   function Metadata return String;
+
 end Launch;

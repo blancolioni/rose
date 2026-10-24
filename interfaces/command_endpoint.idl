@@ -1,0 +1,10 @@
+--  The command endpoint of a command (ADR 0002). The shell calls Launch
+--  once, with the command's arguments, as Rose.Command_Line.Launch
+--  describes; the encoding is the command's own, so only the endpoint id
+--  is used.
+
+interface Command_Endpoint is
+
+   procedure Launch;
+
+end Command_Endpoint;
