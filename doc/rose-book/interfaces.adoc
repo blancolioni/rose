@@ -3,8 +3,9 @@
 Every interface between Rose processes is declared in IDL (see <<idl>>), one interface to a file in `interfaces/`.
 The file name is the interface name in lower case: `Cap_Set` is declared in `cap_set.idl`.
 
-The build compiles 35 of the 38 interfaces into Ada packages in `src/library/kernelapi/generated`, listed in that directory's `Makefile`.
-`Named` is not compiled on its own; it is used only as a parent of `Kernel_Process`, which inherits its operation.
+The build compiles 40 interfaces into Ada packages in `src/library/kernelapi/generated`, listed in that directory's `Makefile`.
+`interfaces/` also holds the declarations that commands use: the package `Rose.Core` (see <<packages>>) and the standard stream roles `Standard_Input`, `Standard_Output`, `Standard_Error` and `Standard_IO` (see <<roles>>).
+The build checks them with the interfaces, but generates nothing for them there; each command generates its own units.
 `Data_Source` and `Rose_Interface` are declared but not compiled, and nothing uses them.
 
 Each subprogram and each interface has an endpoint id derived from its declaration, so there is no table of ids to keep (see <<endpoint-ids>>).
@@ -61,7 +62,7 @@ end Cap_Set;
 | `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment` |
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint` | `mem`
-| `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion` | `store`
+| `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
 | `Storage` | | `Reserve_Storage`, `Add_Backing_Store` | `store`
 |===
 
@@ -82,10 +83,12 @@ interface Process : Segment, Server, Cap is
 end Process;
 ----
 
-A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable` and `Segment_Initialized`.
+A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Private`.
+A private segment's region belongs to its process, and is released when the process is gone.
 A nonpersistent segment has no region behind it.
 
 `Storage` reserves regions of persistent storage, backed by block devices, and a `Region` reads and writes its pages.
+`Region.Release` frees a region that is no longer needed, with its storage if it has its own; neither the region nor its subregions can be used afterwards.
 
 == Launching Programs
 
@@ -94,9 +97,10 @@ A nonpersistent segment has no region behind it.
 [cols="2,2,4,2",options="header"]
 |===
 | Interface | Parents | Operations | Implemented by
-| `Launch` | | `Launch` | `exec`
+| `Launch` | | `Launch`, `Launch_Command`, `Metadata` | `exec`
 | `Exec` | `Launch` | `Install` | `exec`
-| `Executable` | | `Launch` | `elf`
+| `Executable` | | `Launch`, `Launch_Command` | `elf`
+| `Command_Endpoint` | | `Launch` | Each command
 | `Map` | | `Add`, `Remove`, `Find` | `command`
 |===
 
@@ -104,11 +108,17 @@ A nonpersistent segment has no region behind it.
 `Executable.Launch` creates the process from an image in a region, and returns its `Process`.
 `Map` holds launch capabilities by name.
 
-[NOTE]
-====
-`Launch.Launch` takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention.
-ADR 0002 replaces this with a command endpoint, which the shell calls with the command's arguments (see <<launch-sequence>>, #143).
-====
+A program is started in one of two ways:
+
+* *`Launch.Launch`* takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention, and returns the new process's `Process`.
+* *`Launch.Launch_Command`* starts the program as a command (ADR 0002, see <<launch-sequence>>).
+  Its process starts with the receive capability of a command endpoint, and the result is the endpoint capability, which the shell calls once with the command's arguments.
+  `Executable.Launch_Command` does the same for `elf`.
+
+`Command_Endpoint` is that endpoint.
+Its one operation, `Launch`, is only an endpoint id: the arguments are encoded as the command's own signature declares, and the command's generated main receives them through `Rose.Command_Line.Launch`.
+
+`Launch.Metadata` returns a command's metadata, from the `.rose_command` section of its executable, or an empty string if the program is not a command.
 
 == Streams and Files
 
@@ -121,11 +131,16 @@ ADR 0002 replaces this with a command endpoint, which the shell calls with the c
 | `Stream_Writer` | | `Write` | `console`
 | `Stream` | `Stream_Reader`, `Stream_Writer` | |
 | `Seekable` | | `Seek` |
-| `File` | `Stream`, `Seekable` | |
+| `File` | `Stream_Reader`, `Seekable` | `Size` |
+| `Writable_File` | `File`, `Stream_Writer` | | `file`
 | `Terminal` | `Stream` | |
-| `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File`, `Create_Directory`, `Create_File` | `isofs`
+| `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File` | `isofs`
+| `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory` |
 | `File_System` | | `Root_Directory` | `isofs`
 |===
+
+Files and directories come in a read-only and a writable form, so that the type of a capability says what right it grants (ADR 0002).
+A `File` can be read and sought, and a `Writable_File` can also be written; a `Directory` can only be looked up, and a `Writable_Directory` can also create entries and return them in writable form.
 
 A directory lists its entries by index, and gives a capability for each one:
 
@@ -147,17 +162,26 @@ interface Directory is
 
    function Read_File (Index : Positive) return interface Stream_Reader;
 
-   function Create_Directory (Name : String) return interface Directory;
-   function Create_File (Name : String) return interface File;
-
 end Directory;
 ----
 
-[NOTE]
-====
-`Directory` combines lookup with creation, so a capability for it always grants both.
-ADR 0002 splits it into a lookup-only interface and one that adds `Create_File` and `Create_Directory` (#139).
-====
+`Writable_Directory` adds the operations that need the right to modify it:
+
+[source,ada]
+----
+interface Writable_Directory : Directory is
+
+   function Get_Writable_File
+     (Index : Positive) return interface Writable_File;
+   function Get_Writable_Directory
+     (Index : Positive) return interface Writable_Directory;
+
+   function Create_File (Name : String) return interface Writable_File;
+   function Create_Directory
+     (Name : String) return interface Writable_Directory;
+
+end Writable_Directory;
+----
 
 == Devices
 
@@ -168,7 +192,7 @@ ADR 0002 splits it into a lookup-only interface and one that adds `Create_File` 
 | Interface | Parents | Operations | Implemented by
 | `Block_Device` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
 | `ATA` | | `Get_Device` | `ata`
-| `Partitions` | | `Partition_Count`, `Get_Partition` |
+| `Partitions` | | `Partition_Count`, `Get_Partition` | `scan`
 | `Interrupt_Handler` | | `Handle_Interrupt` | `keyboard`
 | `Keyboard_Handler` | | `Handle_Key` |
 | `Event_Source` | | `Add_Listener` | `keyboard`
@@ -188,10 +212,14 @@ The `partition` server serves each partition of a device as a block device of it
 | `Timer` | | `Set_Timer` | `timer`
 | `Timeout` | | `On_Timeout` | `checkpoint`, `timer`
 | `Kernel_Log` | | `Create`, `Append`, `Commit`, `Add_Log_Device` | `log`
+| `Log_Reader` | | `First_Entry`, `Last_Entry`, `Next_Entry`, `Page_Count`, `Read_Page` | `log`
 |===
 
 `Timer.Set_Timer` invokes the capability it is given after a number of milliseconds, usually a `Timeout`, and returns a `Cap` whose `Destroy` cancels the timer.
 The kernel notifies `Kernel_Log` as a checkpoint starts and commits.
+
+`Log_Reader` reads the committed entries of the checkpoint log.
+An entry is named by its location in the log, which never changes; `First_Entry`, `Last_Entry` and `Next_Entry` walk the entries, and `Read_Page` reads the pages of one.
 
 == Unused Interfaces
 
