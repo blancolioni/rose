@@ -1,0 +1,2 @@
+interface Writable_File : File, Stream_Writer is
+end Writable_File;

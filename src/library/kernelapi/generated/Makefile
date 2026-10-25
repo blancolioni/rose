@@ -1,9 +1,10 @@
 IDL=cap block_device file_system directory file \
+    writable_directory writable_file \
     stream_reader stream_writer stream seekable storage state \
     ata partitions keyboard_handler interrupt_handler \
     launch exec region executable memory process segment server \
     timeout timer constructor cap_set terminal event_source event_listener \
-    map heap receiver kernel_process kernel_log command_endpoint
+    map heap receiver named kernel_process kernel_log command_endpoint
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
 # package of the core commands. They are checked with the interfaces, but

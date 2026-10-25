@@ -1,0 +1,12 @@
+interface Writable_Directory : Directory is
+
+   function Get_Writable_File
+     (Index : Positive) return interface Writable_File;
+   function Get_Writable_Directory
+     (Index : Positive) return interface Writable_Directory;
+
+   function Create_File (Name : String) return interface Writable_File;
+   function Create_Directory
+     (Name : String) return interface Writable_Directory;
+
+end Writable_Directory;
