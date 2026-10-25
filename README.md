@@ -22,7 +22,7 @@ A bootable iso is created in the images directory.
 ## Status
 
 Rose boots, launches various services, and
-reformats that hard drive.  It is therefore not what 
+reformats the hard drive.  It is therefore not what 
 you would call ready for production.
 
 ## Screenshots
