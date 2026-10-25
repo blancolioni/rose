@@ -16,5 +16,6 @@ package Restore is
    Install_Media_Cap   : Rose.Capabilities.Capability;
    Install_Exec_Cap    : Rose.Capabilities.Capability;
    Add_Log_Device_Cap  : Rose.Capabilities.Capability;
+   Log_Reader_Cap      : Rose.Capabilities.Capability;
 
 end Restore;

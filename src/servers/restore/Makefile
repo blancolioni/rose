@@ -21,16 +21,22 @@ FILE_SYSTEM_OBJECTS= \
 BLOCK_DEVICE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o
+LOG_READER_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-log_reader.o \
+	$(BUILDDIR)/rose-interfaces-log_reader-client.o
 
 OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
 	$(BUILDDIR)/b__restore-driver.o \
+	$(BUILDDIR)/restore-checkpoint_log.o \
 	$(BUILDDIR)/restore-driver.o \
 	$(BUILDDIR)/restore-installer.o \
 	$(BUILDDIR)/restore-installer-default.o \
 	$(BUILDDIR)/restore.o \
 	$(BUILDDIR)/rose.o \
+	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
+	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-directories.o \
 	$(BUILDDIR)/rose-devices-checkpoints.o \
@@ -47,7 +53,8 @@ OBJECTS= \
 	$(FILE_OBJECTS) \
 	$(FILE_SYSTEM_OBJECTS) \
 	$(STREAM_READER_OBJECTS) \
-	$(BLOCK_DEVICE_OBJECTS)
+	$(BLOCK_DEVICE_OBJECTS) \
+	$(LOG_READER_OBJECTS)
 
 all: restore $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/restore $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g

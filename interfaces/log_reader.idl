@@ -1,0 +1,27 @@
+interface Log_Reader is
+
+   --  Read the committed entries of the checkpoint log. An entry is
+   --  named by its location in the log, which never changes.
+
+   function First_Entry return Word_64;
+   --  The first committed entry, or 0 if the log is empty.
+
+   function Last_Entry return Word_64;
+   --  The last committed entry, or 0 if the log is empty.
+
+   function Next_Entry (Location : Word_64) return Word_64;
+   --  The entry after the one at Location, or 0 if that is the last
+   --  entry or Location is not an entry.
+
+   function Page_Count (Location : Word_64) return Natural;
+   --  The number of pages in the entry at Location, not counting its
+   --  header, or 0 if Location is not an entry.
+
+   procedure Read_Page
+     (Location : Word_64;
+      Index    : Positive;
+      Page     : out Storage_Array);
+   --  Read page Index, from 1 to Page_Count (Location), of the entry at
+   --  Location.
+
+end Log_Reader;
