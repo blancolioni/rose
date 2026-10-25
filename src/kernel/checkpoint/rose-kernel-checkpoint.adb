@@ -2,7 +2,7 @@ with Rose.Boot.Console;
 with Rose.Interfaces.Kernel_Log;
 with Rose.Invocation;
 
-with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Snapshot;
 
 package body Rose.Kernel.Checkpoint is
 
@@ -20,8 +20,23 @@ package body Rose.Kernel.Checkpoint is
    -- Enter_Checkpoint --
    ----------------------
 
-   procedure Enter_Checkpoint is
+   procedure Enter_Checkpoint
+     (Tables     : out System.Storage_Elements.Storage_Array;
+      Page_Count : out Natural;
+      Success    : out Boolean)
+   is
    begin
+      --  The snapshot is taken first, while the caller's page directory
+      --  is still active, because Tables is in the caller's memory.
+      Rose.Kernel.Processes.Snapshot.Write_Tables
+        (Tables, Page_Count, Success);
+
+      if not Success then
+         Rose.Boot.Console.Put_Line
+           ("kernel: checkpoint tables do not fit; not entering checkpoint");
+         return;
+      end if;
+
       Rose.Boot.Console.Checkpoint_Status (True);
       Rose.Boot.Console.Put_Line ("Entering checkpoint");
       Rose.Kernel.Processes.Enter_Checkpoint;

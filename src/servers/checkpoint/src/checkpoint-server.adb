@@ -1,4 +1,7 @@
+with System.Storage_Elements;
+
 with Rose.Invocation;
+with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
@@ -12,6 +15,8 @@ with Rose.Interfaces.Timer.Client;
 
 package body Checkpoint.Server is
 
+   use type System.Storage_Elements.Storage_Offset;
+
    Timer : Rose.Interfaces.Timer.Client.Timer_Client;
 
    Timeout_Cap           : Rose.Interfaces.Cap.Client.Cap_Client;
@@ -20,13 +25,51 @@ package body Checkpoint.Server is
    Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
    Append_Log_Cap        : Rose.Capabilities.Capability;
 
+   Max_Table_Pages : constant := 16;
+
+   Kernel_Tables : System.Storage_Elements.Storage_Array
+     (1 .. Max_Table_Pages * Rose.Limits.Page_Size)
+     with Alignment => Rose.Limits.Page_Size;
+   --  The kernel writes the snapshot of its tables here when the
+   --  checkpoint starts.
+
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier);
 
-   procedure Enter_Checkpoint;
+   function Enter_Checkpoint (Page_Count : out Natural) return Boolean;
+   --  Enter checkpoint mode, with the kernel's tables in Kernel_Tables.
+   --  False if the kernel could not take the snapshot, in which case
+   --  checkpoint mode was not entered.
+
    procedure Leave_Checkpoint;
 
+   procedure Append_Kernel_Tables (Page_Count : Natural);
+   --  Append the first Page_Count pages of Kernel_Tables to the log.
+
    procedure Execute_Checkpoint;
+
+   --------------------------
+   -- Append_Kernel_Tables --
+   --------------------------
+
+   procedure Append_Kernel_Tables (Page_Count : Natural) is
+   begin
+      for Page in 1 .. Page_Count loop
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+            Start  : constant System.Storage_Elements.Storage_Offset :=
+                       Kernel_Tables'First
+                         + System.Storage_Elements.Storage_Offset (Page - 1)
+                         * Rose.Limits.Page_Size;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Append_Log_Cap);
+            Rose.System_Calls.Send_Buffer
+              (Params, Rose.Limits.Page_Size,
+               Kernel_Tables (Start)'Address, False);
+            Rose.System_Calls.Invoke_Capability (Params);
+         end;
+      end loop;
+   end Append_Kernel_Tables;
 
    -------------------
    -- Create_Server --
@@ -72,11 +115,27 @@ package body Checkpoint.Server is
    -- Enter_Checkpoint --
    ----------------------
 
-   procedure Enter_Checkpoint is
+   function Enter_Checkpoint (Page_Count : out Natural) return Boolean is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+      --  The kernel writes into Kernel_Tables directly, so every page
+      --  of it must be mapped and writable first.
+      Kernel_Tables := (others => 0);
+
       Rose.System_Calls.Initialize_Send (Params, Enter_Checkpoint_Cap);
+      Rose.System_Calls.Send_Buffer
+        (Params, Kernel_Tables'Length, Kernel_Tables'Address, True);
+      Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
+      Params.Control.Last_Recv_Word := 0;
       Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         Page_Count := 0;
+         return False;
+      end if;
+
+      Page_Count := Natural (Params.Data (0));
+      return True;
    end Enter_Checkpoint;
 
    ------------------------
@@ -110,13 +169,25 @@ package body Checkpoint.Server is
      (Id    : in     Rose.Objects.Capability_Identifier)
    is
       pragma Unreferenced (Id);
+      Page_Count : Natural;
    begin
       Rose.Interfaces.Cap.Client.Destroy (Timeout_Cap);
       Rose.Interfaces.Cap.Client.Close (Timeout_Cap);
 
-      Enter_Checkpoint;
-      Execute_Checkpoint;
-      Leave_Checkpoint;
+      --  The kernel's tables come first in the log entry, then the
+      --  memory server's pages.  Without the tables the entry would be
+      --  no use for a restore, so if the kernel can't take its snapshot
+      --  there is no checkpoint this time, and the memory server keeps
+      --  its dirty pages for the next one.
+
+      if Enter_Checkpoint (Page_Count) then
+         Append_Kernel_Tables (Page_Count);
+         Execute_Checkpoint;
+         Leave_Checkpoint;
+      else
+         Rose.Console_IO.Put_Line
+           ("checkpoint: kernel tables not saved; skipping checkpoint");
+      end if;
 
       Timeout_Cap :=
         Rose.Interfaces.Timer.Client.Set_Timer

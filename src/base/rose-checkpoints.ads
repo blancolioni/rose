@@ -1,8 +1,160 @@
+with System.Storage_Elements;
+
 with Rose.Addresses;
 with Rose.Limits;
 with Rose.Words;
 
 package Rose.Checkpoints is
+
+   use type System.Storage_Elements.Storage_Offset;
+
+   --  A checkpoint log entry holds the kernel's tables, followed by the
+   --  memory server's pages.
+
+   --  The kernel's part: a header page, then for each persistent process
+   --  a process record page followed by its capability pages.  The
+   --  kernel writes a snapshot of these into the checkpoint server's
+   --  buffer when the checkpoint starts, and the checkpoint server
+   --  appends the pages to the log.
+
+   Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
+   Kernel_Table_Version : constant := 1;
+
+   type Kernel_Table_Header is
+      record
+         Magic         : Rose.Words.Word_64 := Kernel_Table_Magic;
+         Version       : Rose.Words.Word_32 := Kernel_Table_Version;
+         Page_Count    : Rose.Words.Word_32 := 0;
+         --  All of the kernel's pages, including this one.
+         Process_Count : Rose.Words.Word_32 := 0;
+         Reserved      : System.Storage_Elements.Storage_Array
+                           (1 .. Rose.Limits.Page_Size - 20) :=
+                             (others => 0);
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   Process_Record_Magic : constant := 16#5052_4F43_4553_5331#;
+
+   Max_Saved_Waiting   : constant := 16;
+   Max_Saved_Ranges    : constant := 8;
+   Max_Saved_Endpoints : constant := 32;
+
+   Saved_Register_Bytes   : constant := 64;
+   Saved_Invocation_Bytes : constant := 160;
+
+   --  Page range flags.
+   Range_Valid         : constant := 16#01#;
+   Range_Readable      : constant := 16#02#;
+   Range_Writable      : constant := 16#04#;
+   Range_Executable    : constant := 16#08#;
+   Range_Disable_Cache : constant := 16#10#;
+   Range_Write_Through : constant := 16#20#;
+   Range_Fixed_Address : constant := 16#40#;
+
+   type Saved_Page_Range is
+      record
+         Base  : Rose.Words.Word_32 := 0;
+         Bound : Rose.Words.Word_32 := 0;
+         Flags : Rose.Words.Word_32 := 0;
+      end record
+     with Pack, Size => 96;
+
+   type Saved_Endpoint is
+      record
+         Endpoint    : Rose.Words.Word_64 := 0;
+         Receive_Cap : Rose.Words.Word_32 := 0;
+         Send_Cap    : Rose.Words.Word_32 := 0;
+      end record
+     with Pack, Size => 128;
+
+   type Saved_Waiting_Array is
+     array (1 .. Max_Saved_Waiting) of Rose.Words.Word_64
+     with Pack, Size => Max_Saved_Waiting * 64;
+
+   type Saved_Range_Array is
+     array (1 .. Max_Saved_Ranges) of Saved_Page_Range
+     with Pack, Size => Max_Saved_Ranges * 96;
+
+   type Saved_Endpoint_Array is
+     array (1 .. Max_Saved_Endpoints) of Saved_Endpoint
+     with Pack, Size => Max_Saved_Endpoints * 128;
+
+   Process_Record_Bytes : constant := 1216;
+   --  The bytes of a process record page that are in use.
+
+   --  State is the kernel's Process_State'Pos, and bit N of Flags is set
+   --  if the process has the flag whose Process_Flag'Pos is N.
+   --  Registers and the two invocation records are copied as the kernel
+   --  lays them out on this architecture.  Waiting holds the object ids
+   --  of the processes waiting to send to this one, in order.
+
+   type Process_Record is
+      record
+         Magic            : Rose.Words.Word_64 := Process_Record_Magic;
+         Oid              : Rose.Words.Word_64 := 0;
+         Name             : String (1 .. 16) := (others => ' ');
+         State            : Rose.Words.Word_32 := 0;
+         Flags            : Rose.Words.Word_32 := 0;
+         Priority         : Rose.Words.Word_32 := 0;
+         Default_Cap      : Rose.Words.Word_32 := 0;
+         Receive_Cap      : Rose.Words.Word_32 := 0;
+         Send_Cap         : Rose.Words.Word_32 := 0;
+         Last_Cap         : Rose.Words.Word_32 := 0;
+         Cap_Count        : Rose.Words.Word_32 := 0;
+         Cap_Page_Count   : Rose.Words.Word_32 := 0;
+         Command_Endpoint : Rose.Words.Word_32 := 0;
+         Waiting_Endpoint : Rose.Words.Word_32 := 0;
+         Waiting_Cap_Id   : Rose.Words.Word_32 := 0;
+         Queued_Endpoint  : Rose.Words.Word_32 := 0;
+         Queued_Cap_Id    : Rose.Words.Word_32 := 0;
+         Checkpoint_Fault : Rose.Words.Word_32 := 0;
+         Waiting_Count    : Rose.Words.Word_32 := 0;
+         Waiting          : Saved_Waiting_Array := (others => 0);
+         Registers        : System.Storage_Elements.Storage_Array
+                              (1 .. Saved_Register_Bytes) :=
+                                (others => 0);
+         Current_Params   : System.Storage_Elements.Storage_Array
+                              (1 .. Saved_Invocation_Bytes) :=
+                                (others => 0);
+         Queued_Params    : System.Storage_Elements.Storage_Array
+                              (1 .. Saved_Invocation_Bytes) :=
+                                (others => 0);
+         Page_Ranges      : Saved_Range_Array;
+         Endpoints        : Saved_Endpoint_Array;
+         Reserved         : System.Storage_Elements.Storage_Array
+                              (1 .. Rose.Limits.Page_Size
+                                   - Process_Record_Bytes) :=
+                                     (others => 0);
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   --  A capability page holds up to Caps_Per_Page of the process's
+   --  active capabilities, as its index and its 16-byte layout.
+
+   Saved_Layout_Bytes : constant := 16;
+
+   type Saved_Cap is
+      record
+         Index  : Rose.Words.Word_32 := 0;
+         Layout : System.Storage_Elements.Storage_Array
+                    (1 .. Saved_Layout_Bytes) := (others => 0);
+      end record
+     with Pack, Size => 160;
+
+   Caps_Per_Page : constant := Rose.Limits.Page_Size / 20;
+
+   type Saved_Cap_Array is
+     array (1 .. Caps_Per_Page) of Saved_Cap
+     with Pack, Size => Caps_Per_Page * 160;
+
+   type Cap_Page is
+      record
+         Caps     : Saved_Cap_Array;
+         Reserved : System.Storage_Elements.Storage_Array
+                      (1 .. Rose.Limits.Page_Size - Caps_Per_Page * 20) :=
+                        (others => 0);
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
 
    --  The memory server's part of a checkpoint log entry: one or more
    --  header pages that list the pages it saved, followed by those
