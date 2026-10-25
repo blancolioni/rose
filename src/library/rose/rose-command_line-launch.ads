@@ -1,6 +1,7 @@
 with Rose.Capabilities;
 
 private with Rose.Invocation;
+private with Rose.Words;
 
 package Rose.Command_Line.Launch is
 
@@ -28,10 +29,21 @@ package Rose.Command_Line.Launch is
    --  multiple of four bytes.
    --
    --  The reply's first data word is zero if the command completed, and
-   --  one if it failed, in which case the buffer holds a message.
+   --  one if it failed, in which case the buffer holds a message. A reply
+   --  that completes the call also holds the command's results: its out
+   --  and in out scalars in data words 1 onwards, and its out and in out
+   --  strings as buffer items, in the format of the launch buffer, each
+   --  in declaration order.
 
    Max_Buffer_Length : constant := 4096;
-   --  The most argument text a call can carry.
+   --  The most argument text a call can carry, and the most result text
+   --  a reply can carry.
+
+   Max_Result_Length : constant := 1024;
+   --  The longest string result.
+
+   Max_Result_Words : constant := 15;
+   --  The most scalar results.
 
    type Launch_Call is limited private;
 
@@ -82,8 +94,25 @@ package Rose.Command_Line.Launch is
    --  Give the stream in cap Cap_Index of Call to Ada.Text_IO. For now, the
    --  shell sends the stream's Read or Write cap, not its interface.
 
+   procedure Boolean_Result
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Boolean);
+
+   procedure Natural_Result
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Natural);
+
+   procedure String_Result
+     (Call  : in out Launch_Call;
+      Item  : Positive;
+      Value : String);
+   --  Set a result that Complete sends: data word Word, or buffer item
+   --  Item. String results are set in the order of their items.
+
    procedure Complete (Call : in out Launch_Call);
-   --  Reply that the command completed.
+   --  Reply that the command completed, with its results.
 
    procedure Fail
      (Call    : in out Launch_Call;
@@ -95,11 +124,18 @@ private
    subtype Launch_Buffer is
      System.Storage_Elements.Storage_Array (1 .. Max_Buffer_Length);
 
+   type Result_Word_Array is
+     array (1 .. Max_Result_Words) of Rose.Words.Word;
+
    type Launch_Call is limited
       record
          Params        : aliased Rose.Invocation.Invocation_Record;
          Buffer        : Launch_Buffer;
          Buffer_Length : System.Storage_Elements.Storage_Count := 0;
+         Result_Words  : Result_Word_Array := (others => 0);
+         Word_Count    : Natural := 0;
+         Results       : Launch_Buffer;
+         Results_Length : System.Storage_Elements.Storage_Count := 0;
       end record;
    --  The buffer is copied out of the invocation, because the kernel maps
    --  the buffer of each message the process receives, replies included,

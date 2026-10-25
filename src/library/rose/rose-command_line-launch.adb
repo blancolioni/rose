@@ -2,7 +2,6 @@ with Rose.Capabilities.Standard;
 with Rose.Last_Chance;
 with Rose.Standard_Streams;
 with Rose.System_Calls;
-with Rose.Words;
 
 package body Rose.Command_Line.Launch is
 
@@ -19,6 +18,11 @@ package body Rose.Command_Line.Launch is
      (Status  : Rose.Words.Word;
       Message : String);
    --  Reply to the launch invocation, if that has not been done.
+
+   procedure Set_Word
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Rose.Words.Word);
 
    procedure Report_Failure (Message : String);
    --  Fail the launch invocation with Message: the handler of unhandled
@@ -39,6 +43,19 @@ package body Rose.Command_Line.Launch is
         /= 0;
    end Boolean_Argument;
 
+   --------------------
+   -- Boolean_Result --
+   --------------------
+
+   procedure Boolean_Result
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Boolean)
+   is
+   begin
+      Set_Word (Call, Word, (if Value then 1 else 0));
+   end Boolean_Result;
+
    ------------------
    -- Cap_Argument --
    ------------------
@@ -57,9 +74,24 @@ package body Rose.Command_Line.Launch is
    --------------
 
    procedure Complete (Call : in out Launch_Call) is
-      pragma Unreferenced (Call);
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Reply (Completed, "");
+      if Reply_Cap = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Reply (Params, Reply_Cap);
+      Rose.System_Calls.Send_Word (Params, Completed);
+      for Value of Call.Result_Words (1 .. Call.Word_Count) loop
+         Rose.System_Calls.Send_Word (Params, Value);
+      end loop;
+      if Call.Results_Length > 0 then
+         Rose.System_Calls.Send_Storage_Array
+           (Params, Call.Results (1 .. Call.Results_Length), False);
+      end if;
+      Reply_Cap := Rose.Capabilities.Null_Capability;
+      Rose.System_Calls.Invoke_Capability (Params);
    end Complete;
 
    ----------
@@ -88,6 +120,19 @@ package body Rose.Command_Line.Launch is
       return Natural
         (Call.Params.Data (Rose.Invocation.Parameter_Word_Index (Word)));
    end Natural_Argument;
+
+   --------------------
+   -- Natural_Result --
+   --------------------
+
+   procedure Natural_Result
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Natural)
+   is
+   begin
+      Set_Word (Call, Word, Rose.Words.Word (Value));
+   end Natural_Result;
 
    -------------
    -- Receive --
@@ -158,6 +203,22 @@ package body Rose.Command_Line.Launch is
       Reply (Failed, Message);
    end Report_Failure;
 
+   --------------
+   -- Set_Word --
+   --------------
+
+   procedure Set_Word
+     (Call  : in out Launch_Call;
+      Word  : Positive;
+      Value : Rose.Words.Word)
+   is
+   begin
+      if Word <= Max_Result_Words then
+         Call.Result_Words (Word) := Value;
+         Call.Word_Count := Natural'Max (Call.Word_Count, Word);
+      end if;
+   end Set_Word;
+
    ---------------------
    -- String_Argument --
    ---------------------
@@ -192,6 +253,39 @@ package body Rose.Command_Line.Launch is
               First_Item    => First_Item,
               Count         => Natural_Argument (Call, Count_Word));
    end String_List_Argument;
+
+   -------------------
+   -- String_Result --
+   -------------------
+
+   procedure String_Result
+     (Call  : in out Launch_Call;
+      Item  : Positive;
+      Value : String)
+   is
+      pragma Unreferenced (Item);
+      Length : constant Storage_Count := Value'Length;
+      Size   : constant Storage_Count := 4 + (Length + 3) / 4 * 4;
+      Rest   : Storage_Count := Length;
+      First  : constant Storage_Offset := Call.Results_Length;
+   begin
+      if First + Size > Max_Buffer_Length then
+         return;
+      end if;
+
+      --  The length, little-endian, then the text, then padding.
+
+      for I in Storage_Offset range 1 .. 4 loop
+         Call.Results (First + I) := Storage_Element (Rest mod 256);
+         Rest := Rest / 256;
+      end loop;
+      for I in Value'Range loop
+         Call.Results (First + 5 + Storage_Offset (I - Value'First)) :=
+           Character'Pos (Value (I));
+      end loop;
+      Call.Results (First + 5 + Length .. First + Size) := (others => 0);
+      Call.Results_Length := First + Size;
+   end String_Result;
 
    ------------------------
    -- Use_Standard_Error --
