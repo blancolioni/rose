@@ -2,84 +2,98 @@
 
 == Overview
 
-The boot process initialises the kernel and starts the first process, `init`.
+GRUB loads the kernel and the boot modules.
+The kernel initialises itself and starts the first boot module, `init`, which starts the others in a fixed order.
+On a first boot, the `restore` server then installs the system from the install media; `init` starts the checkpoint server, launches the shell, and exits.
 
-== Initial Processes
+The sequence is written in Ada, in `src/servers/init/src/init-run.adb`.
 
-[#boot-module-summary]
-.Boot module summary (x86)
-[cols="1,2,5",options="header"]
-|===
-| Name | Interface | Effect
-| `init` | -- | --
-| `console` | Stream_Writer | Non-kernel processes can now write to console
-| `cap set` | Cap_Set | Can now send more than 4 capabilities
-| `timer` | Timer | Can now create time outs
-| `mem` | Memory_Manager | No longer need to load all pages in advance
-| `pci` | PCI | Can now look for available devices
-| `ata` | Storage |
-|===
+== The Kernel
 
-=== `init`
+GRUB loads the kernel with multiboot 2, together with 15 boot modules: `init` and one for each server below.
+The kernel sets up the console, the memory map, its heap, the page table and the process table, then creates the `init` process.
+`init` starts with a single capability, the _create_ capability, as cap 1.
+The kernel then switches its log output to the serial port and starts the clock.
 
-The kernel gives the init process a single `create` capability, which is used to create launch and copy capabilities for the boot modules.
+== `init`
 
-=== console
+`init` uses the create capability to make every other capability it needs: a boot capability for launching boot modules, capabilities for creating endpoints and for deleting and rescinding caps, page-object and port capabilities for devices, interrupt reservations, and the kernel capabilities for memory, checkpoints and the log.
+The create capability never leaves `init`.
 
-The console program implements a stream writer interface, and sends anything it receives to its device.
-For rose-x86 it writes directly to the console buffer, which is mapped by the kernel at boot time.
-Normally this is the first server launched by `init`.
-
-=== cap set
-
-The cap set process allows other processes to create a set of capabilities, which can be referenced using a single capability.
-Once this process is running, the remaining boot processes are not limited to four capabilities each.
-
-=== timer
-
-The kernel provides a single timeout, so there is a timer server which multiplexes multiple timers onto it.
-
-=== mem
-
-The standard memory manager is launched with a memory capability, which can be queried for the available physical memory layout, and invoked to map and unmap virtual addresses to physical ones.
-It implements the `memory manager` interface, which can add and remove processes, and handle page faults.
-
-=== pci
-
-Scans the PCI bus.
-
-=== ata
-
-Driver for ATA/ATAPI storage.
-
-== First Boot
-
-== Restore Boot
-
-== Scripts
+Each boot module is launched with a priority, a capability for creating endpoints, and its own capabilities.
+An invocation is meant to carry at most four capabilities, and most modules need more, so they receive their capabilities in a cap set.
+The cap set server is therefore the second module `init` starts.
+The first two modules, `console` and `caps`, receive their capabilities directly in the launch invocation; every later module receives a single cap set, and reads its capabilities from it by index.
 
 [NOTE]
 ====
-This section is out of date (#147).
-`init` now uses the checked-in package `src/servers/init/src/init-script.ads`; the rule that generated it from a Petal script is commented out of `src/servers/init/Makefile` (see <<petal>>).
+The four-capability limit is not enforced yet: an invocation can carry up to 16 capabilities (`Max_Capabilities` in `Rose.Invocation`, #234).
 ====
 
-The boot process is controlled by a compiled Petal script.
-A sample script is shown in <<init-petal>>.
+After launching a module, `init` takes a copy capability for the new process and uses it to fetch the interfaces it needs from that module, such as the console's `Stream_Writer`.
 
-[#init-petal]
-.Sample Petal script for init
-[source,ada]
-----
-procedure Init
-  (Create    : interface Meta)
-is
-   Console : constant interface Process :=
-     Launch.Launch_Boot_Module (2);
-   Writer  : constant interface Stream_Writer :=
-     Cap_Copy.Copy_Cap (Console, 1);
-begin
-   Output_Buffer := Start_Init;
-   Writer.Write (Output_Buffer, Start_Init'Length);
-end Init;
-----
+== Boot Modules
+
+[#boot-modules]
+.Boot modules, in the order `init` starts them
+[cols="1,2,4,3",options="header"]
+|===
+| | Module | Receives | Provides to `init`
+| 1 | `console` | The text buffer at `B8000`, as a page object; cursor ports `3D4` and `3D5` | `Stream_Writer`
+| 2 | `caps` | The console | `Constructor`, for creating cap sets
+| 3 | `mem` | Memory region queries, page-on, delete, trace | `Memory`, and its `Checkpoint` endpoint
+| 4 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
+| 5 | `pci` | PCI configuration ports `CF8` and `CFC` | Its device lookup endpoint
+| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Two block devices: hd0, the system disk, and hd1, the install media
+| 7 | `store` | Delete, the console, trace | `Storage`
+| 8 | `elf` | Create-process, `Memory`, delete, rescind | `Executable.Launch` and `Launch_Command`
+| 9 | `scan` | hd0 | `Partitions`
+| 10 | `partition` | A block device, and a partition's start, bound and block size | `Block_Device`, one server per partition
+| 11 | `isofs` | hd1 | The install media's root directory
+| 12 | `log` | The kernel's start-log capability | `Add_Log_Device` and `Append`
+| 13 | `restore` | The swap and log partitions, `Storage`, the install media, `init`'s install endpoint | (see <<first-boot>>)
+| 14 | `checkpoint` | The timer, enter and leave checkpoint, `Memory.Checkpoint`, log append | --
+|===
+
+`init` launches a `partition` server for the active swap partition, the inactive swap partition and the log partition that `scan` finds on hd0.
+`checkpoint` is launched last, after `restore` has finished.
+
+[#first-boot]
+== First Boot
+
+`restore` opens the active swap partition and looks for a checkpoint.
+If there is none, this is a first boot:
+
+. `restore` adds the active swap partition to `store` as backing storage.
+. It reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
+** the drivers `exec`, `command`, `keyboard` and `event-input-stream`, which are launched;
+** the commands `echo`, `tests` and `petal`, which are saved in the command registry.
+. It adds the log partition to `log`.
+
+`init` serves the install endpoint while `restore` runs.
+The first program installed is `exec`, which installs every later program; the second is `command`, the command registry, whose `Find` operation `init` keeps.
+Once `event-input-stream` is running, `restore` sends `init` the keyboard input stream.
+
+[#restore-boot]
+== Restore Boot
+
+If `restore` finds a checkpoint on the active swap partition, it reports that it is restoring from it.
+
+[NOTE]
+====
+Restoring is not implemented yet: `restore` finds the checkpoint but does not restore pages or processes from it (#114).
+====
+
+== Starting the Shell
+
+When `restore` has finished, `init` launches `checkpoint`, then finds `tests` and `petal` in the command registry and launches them.
+Each receives a cap set with the standard streams, using the console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
+`petal` also receives the registry's `Find`, for running commands, and a capability for trace events.
+
+`init` then exits.
+
+[NOTE]
+====
+The shell's caps are passed by position in a cap set.
+ADR 0002 replaces this with roles, given in the launch invocation (see <<launch-sequence>>).
+====
