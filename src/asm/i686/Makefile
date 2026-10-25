@@ -69,6 +69,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-kernel-processes-debug.o \
 	$(BUILDDIR)/rose-kernel-processes-init.o \
 	$(BUILDDIR)/rose-kernel-processes-queue.o \
+	$(BUILDDIR)/rose-kernel-processes-snapshot.o \
 	$(BUILDDIR)/rose-multiboot.o
 
 OBJECTS=\

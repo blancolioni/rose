@@ -331,10 +331,46 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Rose.Kernel.Processes.Ready);
 
          when Enter_Checkpoint_Endpoint =>
-            Rose.Kernel.Checkpoint.Enter_Checkpoint;
-            Rose.Kernel.Processes.Set_Current_State
-              (Rose.Kernel.Processes.Current_Process_Id,
-               Rose.Kernel.Processes.Ready);
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else not Params.Control.Flags
+                (Rose.Invocation.Writable_Buffer)
+            then
+               Rose.Boot.Console.Put_Line
+                 ("kernel: enter checkpoint needs a writable buffer");
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
+            declare
+               Tables     : System.Storage_Elements.Storage_Array
+                 (1 .. Params.Buffer_Length);
+               pragma Import (Ada, Tables);
+               for Tables'Address use Params.Buffer_Address;
+               Page_Count : Natural;
+               Success    : Boolean;
+            begin
+               Rose.Kernel.Checkpoint.Enter_Checkpoint
+                 (Tables, Page_Count, Success);
+
+               if not Success then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+
+               Params.all :=
+                 (Control => (Flags => (Rose.Invocation.Reply => True,
+                                        Rose.Invocation.Send_Words => True,
+                                        others                     => False),
+                              Last_Sent_Word => 0,
+                              others         => <>),
+                  Data    => (Rose.Words.Word (Page_Count), others => 0),
+                  others  => <>);
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
+            end;
 
          when Leave_Checkpoint_Endpoint =>
             Rose.Kernel.Checkpoint.Leave_Checkpoint;

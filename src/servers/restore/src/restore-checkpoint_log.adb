@@ -17,12 +17,26 @@ package body Restore.Checkpoint_Log is
      with Alignment => Rose.Limits.Page_Size;
    Header : Rose.Checkpoints.Header_Page
      with Import, Address => Page'Address;
+   Kernel_Header : Rose.Checkpoints.Kernel_Table_Header
+     with Import, Address => Page'Address;
+   Process : Rose.Checkpoints.Process_Record
+     with Import, Address => Page'Address;
 
    function Check_Entry
      (Reader   : Log_Reader_Client;
       Location : Rose.Words.Word_64)
       return Boolean;
    --  Check the entry at Location, and report it if it is inconsistent.
+
+   function Check_Kernel_Tables
+     (Reader       : Log_Reader_Client;
+      Location     : Rose.Words.Word_64;
+      Pages        : Natural;
+      Kernel_Pages : out Natural)
+      return Boolean;
+   --  Check the kernel's tables at the start of the entry at Location,
+   --  which has Pages pages, and set Kernel_Pages to the number of pages
+   --  they take.
 
    procedure Report_Bad_Entry
      (Location : Rose.Words.Word_64;
@@ -39,16 +53,21 @@ package body Restore.Checkpoint_Log is
    is
       use type Rose.Checkpoints.Header_Page_Flags;
       Pages        : constant Natural := Page_Count (Reader, Location);
+      Kernel_Pages : Natural;
       Header_Pages : Natural := 0;
       Listed       : Natural := 0;
    begin
+      if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages) then
+         return False;
+      end if;
+
       loop
-         if Header_Pages = Pages then
+         if Kernel_Pages + Header_Pages = Pages then
             Report_Bad_Entry (Location, "header pages run past the entry");
             return False;
          end if;
 
-         Read_Page (Reader, Location, Header_Pages + 1, Page);
+         Read_Page (Reader, Location, Kernel_Pages + Header_Pages + 1, Page);
 
          if Has_Error
            or else Header.Magic /= Rose.Checkpoints.Header_Page_Magic
@@ -64,13 +83,93 @@ package body Restore.Checkpoint_Log is
            /= 0;
       end loop;
 
-      if Header_Pages + Listed /= Pages then
+      if Kernel_Pages + Header_Pages + Listed /= Pages then
          Report_Bad_Entry (Location, "page count does not match its headers");
          return False;
       end if;
 
       return True;
    end Check_Entry;
+
+   -------------------------
+   -- Check_Kernel_Tables --
+   -------------------------
+
+   function Check_Kernel_Tables
+     (Reader       : Log_Reader_Client;
+      Location     : Rose.Words.Word_64;
+      Pages        : Natural;
+      Kernel_Pages : out Natural)
+      return Boolean
+   is
+      use type Rose.Words.Word_32;
+      Process_Count : Natural;
+      Index         : Positive := 2;
+   begin
+      Kernel_Pages := 0;
+
+      if Pages = 0 then
+         Report_Bad_Entry (Location, "entry is empty");
+         return False;
+      end if;
+
+      Read_Page (Reader, Location, 1, Page);
+
+      if Has_Error
+        or else Kernel_Header.Magic /= Rose.Checkpoints.Kernel_Table_Magic
+      then
+         Report_Bad_Entry (Location, "expected the kernel's tables");
+         return False;
+      end if;
+
+      if Kernel_Header.Version /= Rose.Checkpoints.Kernel_Table_Version then
+         Report_Bad_Entry (Location, "unknown kernel tables version");
+         return False;
+      end if;
+
+      Kernel_Pages := Natural (Kernel_Header.Page_Count);
+      Process_Count := Natural (Kernel_Header.Process_Count);
+
+      if Kernel_Pages = 0 or else Kernel_Pages > Pages then
+         Report_Bad_Entry (Location, "kernel tables run past the entry");
+         return False;
+      end if;
+
+      for I in 1 .. Process_Count loop
+         if Index > Kernel_Pages then
+            Report_Bad_Entry (Location, "process records run past the "
+                              & "kernel tables");
+            return False;
+         end if;
+
+         Read_Page (Reader, Location, Index, Page);
+
+         if Has_Error
+           or else Process.Magic /= Rose.Checkpoints.Process_Record_Magic
+         then
+            Report_Bad_Entry (Location, "expected a process record");
+            return False;
+         end if;
+
+         if Process.Cap_Count > Process.Last_Cap
+           or else Process.Cap_Page_Count
+             /= (Process.Cap_Count + Rose.Checkpoints.Caps_Per_Page - 1)
+               / Rose.Checkpoints.Caps_Per_Page
+         then
+            Report_Bad_Entry (Location, "process caps do not fit its pages");
+            return False;
+         end if;
+
+         Index := Index + 1 + Natural (Process.Cap_Page_Count);
+      end loop;
+
+      if Index /= Kernel_Pages + 1 then
+         Report_Bad_Entry (Location, "kernel tables page count is wrong");
+         return False;
+      end if;
+
+      return True;
+   end Check_Kernel_Tables;
 
    ------------
    -- Report --
