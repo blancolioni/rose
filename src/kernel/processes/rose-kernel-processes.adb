@@ -242,6 +242,8 @@ package body Rose.Kernel.Processes is
       Proc.State := Starting;
       Proc.Quantum_Ticks := 10;
       Proc.Remaining_Ticks := 10;
+      Proc.Command_Endpoint := 0;
+      Proc.Faults_At_Create := Current_Page_Fault_Count;
 
       Proc.Page_Flags := (others => (others => False));
       Proc.Page_Ranges := (others => (others => 0));
@@ -829,6 +831,31 @@ package body Rose.Kernel.Processes is
       end;
    end Is_Blocked_On_Endpoint;
 
+   ----------------
+   -- Is_Command --
+   ----------------
+
+   function Is_Command (Pid : Process_Id) return Boolean is
+      use type Rose.Objects.Endpoint_Index;
+   begin
+      return Process_Table (Pid).Command_Endpoint /= 0;
+   end Is_Command;
+
+   -------------------------
+   -- Is_Command_Endpoint --
+   -------------------------
+
+   function Is_Command_Endpoint
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean
+   is
+      use type Rose.Objects.Endpoint_Index;
+   begin
+      return Endpoint /= 0
+        and then Process_Table (Pid).Command_Endpoint = Endpoint;
+   end Is_Command_Endpoint;
+
    -----------------------------
    -- Is_Valid_Endpoint_Index --
    -----------------------------
@@ -886,6 +913,12 @@ package body Rose.Kernel.Processes is
    is
       P : Kernel_Process_Entry renames Process_Table (Process);
    begin
+      if Trace_Launch then
+         Debug.Put (Process);
+         Rose.Boot.Console.Put (": trace: exit; page faults since created: ");
+         Rose.Boot.Console.Put (Current_Page_Fault_Count - P.Faults_At_Create);
+         Rose.Boot.Console.New_Line;
+      end if;
       P.State := Available;
    end Kill_Process;
 
@@ -1513,8 +1546,19 @@ package body Rose.Kernel.Processes is
       Params          : Rose.Invocation.Invocation_Record)
    is
       use type Rose.Objects.Endpoint_Id;
+      use type Rose.Objects.Endpoint_Index;
       To   : Kernel_Process_Entry renames Process_Table (To_Process_Id);
    begin
+      if Trace_Launch
+        and then Endpoint /= 0
+        and then Endpoint = To.Command_Endpoint
+      then
+         Debug.Put (To_Process_Id);
+         Rose.Boot.Console.Put (": trace: launch call received from ");
+         Debug.Put (From_Process_Id);
+         Rose.Boot.Console.New_Line;
+      end if;
+
       if Endpoint in To.Endpoints'Range
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
@@ -1599,6 +1643,18 @@ package body Rose.Kernel.Processes is
    begin
       Update_Cap (Pid, Cap, Update'Access);
    end Set_Cap_Id;
+
+   --------------------------
+   -- Set_Command_Endpoint --
+   --------------------------
+
+   procedure Set_Command_Endpoint
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+   is
+   begin
+      Process_Table (Pid).Command_Endpoint := Endpoint;
+   end Set_Command_Endpoint;
 
    ----------------------------
    -- Set_Current_Invocation --

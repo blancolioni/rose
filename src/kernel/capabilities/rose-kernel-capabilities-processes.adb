@@ -242,6 +242,8 @@ package body Rose.Kernel.Capabilities.Processes is
                      Local_Endpoint));
                Rose.Kernel.Processes.Set_Receive_Cap
                  (Pid, Local_Endpoint, Receive_Cap);
+               Rose.Kernel.Processes.Set_Command_Endpoint
+                 (Pid, Local_Endpoint);
 
                Params.Control.Flags :=
                  (Rose.Invocation.Reply => True, others => False);

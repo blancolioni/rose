@@ -8,6 +8,7 @@ with Rose.Interfaces.Launch.Client;
 with Rose.Invocation;
 with Rose.Standard_Streams;
 with Rose.System_Calls.Client;
+with Rose.Trace;
 with Rose.Words;
 
 with Petal.Signatures;
@@ -26,6 +27,8 @@ package body Petal.Command_Launch is
    Create_Endpoint_Index : constant := 8;
    Command_Map_Index     : constant := 10;
    --  The command registry's Find (interfaces/map.idl).
+   Trace_Index           : constant := 11;
+   --  For trace events (Rose.Trace).
 
    Find_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -508,8 +511,10 @@ package body Petal.Command_Launch is
             return;
          end if;
 
+         Rose.Trace.Event ("arguments bound");
          Endpoint :=
            Rose.Interfaces.Launch.Client.Launch_Command (Client, No_Caps);
+         Rose.Trace.Event ("launched");
          if Endpoint = Rose.Capabilities.Null_Capability then
             Fail ("cannot launch");
             return;
@@ -528,6 +533,7 @@ package body Petal.Command_Launch is
          end if;
          Rose.System_Calls.Receive_Words (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
+         Rose.Trace.Event ("reply received");
 
          if Params.Control.Flags (Rose.Invocation.Error) then
             Fail ("the launch call failed");
@@ -599,6 +605,7 @@ package body Petal.Command_Launch is
          Delete_Cap      => Argument_Cap (Delete_Cap_Index),
          Rescind_Cap     => Argument_Cap (Rescind_Cap_Index));
       Find_Cap := Argument_Cap (Command_Map_Index);
+      Rose.Trace.Set_Trace_Cap (Argument_Cap (Trace_Index));
    end Open_Registry;
 
    --------------
@@ -727,10 +734,12 @@ package body Petal.Command_Launch is
          Client : Rose.Interfaces.Launch.Client.Launch_Client;
          Last   : Natural;
       begin
+         Rose.Trace.Event ("run " & Name);
          Rose.System_Calls.Initialize_Send (Params, Find_Cap);
          Rose.System_Calls.Send_Text (Params, Name);
          Rose.System_Calls.Receive_Caps (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
+         Rose.Trace.Event ("found in registry");
 
          if Params.Control.Flags (Rose.Invocation.Error)
            or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
@@ -743,6 +752,7 @@ package body Petal.Command_Launch is
          Rose.Interfaces.Launch.Client.Open (Client, Params.Caps (0));
          Rose.Interfaces.Launch.Client.Metadata (Client, Metadata, Last);
          Parse (Metadata (1 .. Last), Current);
+         Rose.Trace.Event ("metadata read, bytes ", Last);
 
          if not Current.Valid then
             Error (Name & ": not a command");

@@ -10,13 +10,14 @@ package Init.Installer is
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Launch_Command_Cap : Rose.Capabilities.Capability;
+      Trace_Cap       : Rose.Capabilities.Capability;
       Cap_Stream      : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
       Binary_Length   : Rose.Words.Word)
       return Rose.Capabilities.Capability;
    --  Launch_Cap and Launch_Command_Cap are the ELF server's Launch and
-   --  Launch_Command.
+   --  Launch_Command. Trace_Cap is for exec's trace events.
 
    function Install_Command_Library
      (Create_Cap      : Rose.Capabilities.Capability;

@@ -60,6 +60,10 @@ private
    Log_Cap_Copy             : Boolean := False;
    Log_Endpoint_Cap_Create  : Boolean := False;
    Log_Page_Faults          : Boolean := False;
+   Trace_Launch             : Boolean := False;
+   --  Write trace events to the log: those that processes send through
+   --  their trace caps, and the kernel's own events for commands
+   --  (blancolioni/rose#197). Set by trace-launch on the command line.
 
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 

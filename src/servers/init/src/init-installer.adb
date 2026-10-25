@@ -192,6 +192,7 @@ package body Init.Installer is
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Launch_Command_Cap : Rose.Capabilities.Capability;
+      Trace_Cap       : Rose.Capabilities.Capability;
       Cap_Stream      : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Binary_Stream   : Rose.Capabilities.Capability;
@@ -237,6 +238,8 @@ package body Init.Installer is
         (Params, Storage_Cap);
       Rose.System_Calls.Send_Cap
         (Params, Launch_Command_Cap);
+      Rose.System_Calls.Send_Cap
+        (Params, Trace_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)

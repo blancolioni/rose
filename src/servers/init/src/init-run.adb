@@ -129,6 +129,9 @@ package body Init.Run is
 
       Launch_Elf_Cap       : Rose.Capabilities.Capability;
       Launch_Command_Elf_Cap : Rose.Capabilities.Capability;
+      Trace_Cap            : Rose.Capabilities.Capability;
+      --  For trace events (Rose.Trace), given to the processes that
+      --  launch commands.
       Install_Media_FS     : Rose.Capabilities.Capability;
       Install_Receiver     : Rose.Capabilities.Capability;
       Install_Endpoint     : Rose.Capabilities.Capability;
@@ -619,13 +622,18 @@ package body Init.Run is
                                 Init.Calls.Call
                                   (Create_Cap,
                                    (7, 4, 0, 0));
+         Kernel_Trace_Cap   : constant Rose.Capabilities.Capability :=
+                                Init.Calls.Call
+                                  (Create_Cap,
+                                   (7, 11, 0, 0));
          Elf_Id       : constant Rose.Objects.Object_Id :=
                             Init.Calls.Launch_Boot_Module
                               (Boot_Cap, Elf_Module, Device_Driver_Priority,
                                Create_Endpoint_Cap, Cap_Set_Cap,
                                (Delete_Cap, Rescind_Cap,
                                 Console_Interface_Cap,
-                                Mem_Cap, Create_Process_Cap));
+                                Mem_Cap, Create_Process_Cap,
+                                Kernel_Trace_Cap));
          Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -633,6 +641,7 @@ package body Init.Run is
                                 Word (Elf_Id mod 2 ** 32),
                                 Word (Elf_Id / 2 ** 32)));
       begin
+         Trace_Cap := Kernel_Trace_Cap;
          Launch_Elf_Cap :=
            Copy_Cap_From_Process
              (Copy_Elf_Cap,
@@ -788,6 +797,7 @@ package body Init.Run is
                                   Launch_Cap      => Launch_Elf_Cap,
                                   Launch_Command_Cap =>
                                     Launch_Command_Elf_Cap,
+                                  Trace_Cap       => Trace_Cap,
                                   Cap_Stream      => Params.Caps (0),
                                   Standard_Output => Console_Interface_Cap,
                                   Binary_Stream   => Params.Caps (1),
@@ -1052,7 +1062,10 @@ package body Init.Run is
 
                                     --  the command registry's Find, for
                                     --  running commands (ADR 0002)
-                                    Find_Cap
+                                    Find_Cap,
+
+                                    --  trace events (Rose.Trace)
+                                    Trace_Cap
                                    ));
 
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;

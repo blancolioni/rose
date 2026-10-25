@@ -16,4 +16,7 @@ package Exec is
    Launch_Command_Cap   : constant Rose.Capabilities.Capability := 9;
    --  The ELF server's Launch_Command (interfaces/executable.idl).
 
+   Trace_Cap            : constant Rose.Capabilities.Capability := 10;
+   --  For trace events (Rose.Trace).
+
 end Exec;
