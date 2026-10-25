@@ -266,7 +266,23 @@ package body Rose.Kernel.Processes.Snapshot is
         and then Process_Table (Pid).Flags (Persistent);
 
       if Success then
-         Set_Current_State (Pid, Ready);
+
+         --  Set_Current_State works out how the process returns to user
+         --  mode from the state it leaves, but Restore_Process has set
+         --  that already, from the state the process was in.
+
+         declare
+            P                : Kernel_Process_Entry renames
+                                 Process_Table (Pid);
+            Invoke_Reply_Set : constant Boolean := P.Flags (Invoke_Reply);
+            Interrupted_Set  : constant Boolean :=
+                                 P.Flags (Interrupt_Resume);
+         begin
+            Set_Current_State (Pid, Ready);
+            P.Flags (Invoke_Reply) := Invoke_Reply_Set;
+            P.Flags (Interrupt_Resume) := Interrupted_Set;
+         end;
+
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);
       end if;
    end Resume_Restored_Process;

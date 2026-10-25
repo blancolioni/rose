@@ -921,8 +921,11 @@ package body Mem.Processes is
          Valid, Readable, Writable, Executable, Persistent);
 
       if not Valid or else not Writable then
-         Rose.Console_IO.Put_Line
-           ("mem: restore page: not in a writable segment");
+         Rose.Console_IO.Put ("mem: restore page: pid ");
+         Rose.Console_IO.Put (Natural (Pid));
+         Rose.Console_IO.Put (" page ");
+         Rose.Console_IO.Put (Rose.Words.Word_32 (Virtual_Page));
+         Rose.Console_IO.Put_Line (" is not in a writable segment");
          return;
       end if;
 
