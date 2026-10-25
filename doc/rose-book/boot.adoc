@@ -67,6 +67,7 @@ If there is none, this is a first boot:
 . `restore` adds the active swap partition to `store` as backing storage.
 . It reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 ** the drivers `exec`, `command`, `keyboard` and `event-input-stream`, which are launched;
+** the file server `file`, which is saved, and launched once for each file;
 ** the commands `echo`, `tests` and `petal`, which are saved in the command registry.
 . It adds the log partition to `log`.
 
