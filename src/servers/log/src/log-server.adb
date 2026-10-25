@@ -45,6 +45,10 @@ package body Log.Server is
 
    Active             : Boolean := False;
    Writing            : Boolean := False;
+   Entry_Failed       : Boolean := False;
+   --  Set when the entry being written can't be completed, because the
+   --  log is full or a write failed.  Commit then leaves it out of the
+   --  log, so the previous entry is still the last one.
 
    Current_Log_Header : Log.Header.Entry_Header_Type;
    Header             : Log.Header.Log_Header_Type;
@@ -89,21 +93,39 @@ package body Log.Server is
      (Location : Log_Location_Id)
       return Log_Device_Count;
 
+   function Has_Room (Location : Log_Location_Id) return Boolean
+   is (Last_Log_Device > 0
+       and then Location <= Log_Devices (Last_Log_Device).Last_Location);
+   --  True if Location is on a log device.
+
+   function Is_Log_Entry
+     (Location : Log_Location_Id;
+      Entry_Header : Log.Header.Entry_Header_Type)
+      return Boolean;
+   --  True if Entry_Header, read from Location, is an entry of this
+   --  generation of the log.
+
+   procedure Fail_Entry (Message : String);
+   --  Report Message, and leave the current entry out of the log.
+
    type Device_Operation is (Read, Write);
 
    procedure Operate
      (Location   : Log_Location_Id;
       Addr       : System.Address;
       Operation  : Device_Operation;
-      Page_Count : Natural);
+      Page_Count : Natural;
+      Success    : out Boolean);
 
    procedure Read
      (Location : Log_Location_Id;
-      Addr     : System.Address);
+      Addr     : System.Address;
+      Success  : out Boolean);
 
    procedure Write
      (Location : Log_Location_Id;
-      Addr     : System.Address);
+      Addr     : System.Address;
+      Success  : out Boolean);
 
    --------------------
    -- Add_Log_Device --
@@ -171,24 +193,31 @@ package body Log.Server is
 
             declare
                use type Rose.Words.Word_64;
+               Success : Boolean;
             begin
-               Read (0, Header'Address);
-               if Header.Magic = Log.Header.Log_Magic then
+               Read (0, Header'Address, Success);
+               if Success and then Header.Magic = Log.Header.Log_Magic then
                   Rose.Console_IO.Put_Line ("log: found valid log device");
 
                   Next_Log_Location := 1;
                   loop
-                     Read (Next_Log_Location, Current_Log_Header'Address);
-                     if Current_Log_Header.Magic = Log.Header.Entry_Magic then
-                        Rose.Console_IO.Put
-                          ("log: skipping entry at location ");
-                        Rose.Console_IO.Put (Natural (Next_Log_Location));
-                        Rose.Console_IO.New_Line;
-
-                        Next_Log_Location := Current_Log_Header.Log_Last + 1;
-                     else
+                     if not Has_Room (Next_Log_Location) then
+                        Rose.Console_IO.Put_Line ("log: log is full");
                         exit;
                      end if;
+
+                     Read (Next_Log_Location, Current_Log_Header'Address,
+                           Success);
+                     exit when not Success
+                       or else not Is_Log_Entry
+                         (Next_Log_Location, Current_Log_Header);
+
+                     Rose.Console_IO.Put
+                       ("log: skipping entry at location ");
+                     Rose.Console_IO.Put (Natural (Next_Log_Location));
+                     Rose.Console_IO.New_Line;
+
+                     Next_Log_Location := Current_Log_Header.Log_Last + 1;
                   end loop;
 
                   Rose.Console_IO.Put
@@ -241,11 +270,33 @@ package body Log.Server is
          return;
       end if;
 
+      if Entry_Failed then
+         return;
+      end if;
+
+      if Data'Length /= Log_Page_Size then
+         Rose.Console_IO.Put ("log: append: page is ");
+         Rose.Console_IO.Put (Natural (Data'Length));
+         Rose.Console_IO.Put (" bytes, expected ");
+         Rose.Console_IO.Put (Natural (Log_Page_Size));
+         Rose.Console_IO.New_Line;
+         Fail_Entry ("log: append: bad page");
+         return;
+      end if;
+
+      if not Has_Room (Current_Log_Header.Log_Last + 1) then
+         Fail_Entry ("log: log is full");
+         return;
+      end if;
+
       Current_Log_Header.Log_Last :=
         Current_Log_Header.Log_Last + 1;
 
       if Page_Buffer_Last = Log_Page_Buffer_Count then
          Flush;
+         if Entry_Failed then
+            return;
+         end if;
          Page_Buffer_Loc := Current_Log_Header.Log_Last;
       end if;
 
@@ -269,8 +320,31 @@ package body Log.Server is
          return;
       end if;
 
-      Write (Next_Log_Location, Current_Log_Header'Address);
-      Next_Log_Location := Current_Log_Header.Log_Last + 1;
+      --  The entry's pages go to the disk before its header, so that a
+      --  header is only ever found with all of its pages.
+
+      if not Entry_Failed then
+         Flush;
+      end if;
+
+      if not Entry_Failed then
+         declare
+            Success : Boolean;
+         begin
+            Write (Next_Log_Location, Current_Log_Header'Address, Success);
+            if Success then
+               Next_Log_Location := Current_Log_Header.Log_Last + 1;
+            else
+               Fail_Entry ("log: commit: cannot write entry header");
+            end if;
+         end;
+      end if;
+
+      if Entry_Failed then
+         Rose.Console_IO.Put_Line ("log: checkpoint not committed");
+      end if;
+
+      Page_Buffer_Last := 0;
       Writing := False;
 
    end Commit;
@@ -296,10 +370,23 @@ package body Log.Server is
       end if;
 
       Writing := True;
+      Entry_Failed := False;
+      --  The startup scan reads into Current_Log_Header, so after a
+      --  restart it holds whatever page followed the last entry.  Set
+      --  each field, rather than assigning a whole header: that would
+      --  need a page-sized temporary on the stack.
+      Current_Log_Header.Magic := Log.Header.Entry_Magic;
+      Current_Log_Header.Version := Log_Version;
       Current_Log_Header.Flags := Log.Header.Is_Active_Entry;
+      Current_Log_Header.Generation := Header.Generation;
       Current_Log_Header.Log_First := Next_Log_Location + 1;
       Current_Log_Header.Log_Last := Next_Log_Location;
+      Page_Buffer_Last := 0;
       Page_Buffer_Loc := Current_Log_Header.Log_First;
+
+      if not Has_Room (Next_Log_Location) then
+         Fail_Entry ("log: log is full");
+      end if;
 
    end Create;
 
@@ -349,6 +436,18 @@ package body Log.Server is
 
    end Create_Server;
 
+   ----------------
+   -- Fail_Entry --
+   ----------------
+
+   procedure Fail_Entry (Message : String) is
+   begin
+      if not Entry_Failed then
+         Rose.Console_IO.Put_Line (Message);
+         Entry_Failed := True;
+      end if;
+   end Fail_Entry;
+
    -----------
    -- Flush --
    -----------
@@ -366,12 +465,20 @@ package body Log.Server is
          --  Rose.Console_IO.Put (Natural (Page_Buffer_Loc));
          --  Rose.Console_IO.New_Line;
 
-         Operate
-           (Location   => Page_Buffer_Loc,
-            Addr       => Page_Buffer'Address,
-            Operation  => Write,
-            Page_Count => Natural (Page_Buffer_Last));
-         Page_Buffer_Last := 0;
+         declare
+            Success : Boolean;
+         begin
+            Operate
+              (Location   => Page_Buffer_Loc,
+               Addr       => Page_Buffer'Address,
+               Operation  => Write,
+               Page_Count => Natural (Page_Buffer_Last),
+               Success    => Success);
+            Page_Buffer_Last := 0;
+            if not Success then
+               Fail_Entry ("log: cannot write entry pages");
+            end if;
+         end;
 
          --  Rose.Console_IO.Put_Line ("done");
 
@@ -399,6 +506,25 @@ package body Log.Server is
       return 0;
    end Get_Device_Index;
 
+   ------------------
+   -- Is_Log_Entry --
+   ------------------
+
+   function Is_Log_Entry
+     (Location : Log_Location_Id;
+      Entry_Header : Log.Header.Entry_Header_Type)
+      return Boolean
+   is
+      use type Rose.Words.Word_32;
+      use type Rose.Words.Word_64;
+   begin
+      return Entry_Header.Magic = Log.Header.Entry_Magic
+        and then Entry_Header.Version = Log_Version
+        and then Entry_Header.Generation = Header.Generation
+        and then Entry_Header.Log_First = Location + 1
+        and then Entry_Header.Log_Last >= Location;
+   end Is_Log_Entry;
+
    -------------
    -- Operate --
    -------------
@@ -407,12 +533,18 @@ package body Log.Server is
      (Location   : Log_Location_Id;
       Addr       : System.Address;
       Operation  : Device_Operation;
-      Page_Count : Natural)
+      Page_Count : Natural;
+      Success    : out Boolean)
    is
       Device_Index : constant Log_Device_Count :=
                        Get_Device_Index (Location);
    begin
-      if Device_Index = 0 then
+      Success := False;
+
+      if Device_Index = 0
+        or else Location + Log_Location_Id (Page_Count) - 1
+          > Log_Devices (Device_Index).Last_Location
+      then
          return;
       end if;
 
@@ -423,7 +555,7 @@ package body Log.Server is
          Count   : constant Natural := Device.Multiplier * Page_Count;
          Start   : constant Block_Address_Type :=
            Block_Address_Type (Location - Device.First_Location)
-           * Block_Address_Type (Count);
+           * Block_Address_Type (Device.Multiplier);
          Data_Last : constant Storage_Count :=
            Log_Page_Size * Storage_Count (Page_Count);
          Data    : System.Storage_Elements.Storage_Array (1 .. Data_Last);
@@ -456,6 +588,8 @@ package body Log.Server is
 
          end case;
       end;
+
+      Success := True;
    end Operate;
 
    ----------
@@ -464,10 +598,11 @@ package body Log.Server is
 
    procedure Read
      (Location : Log_Location_Id;
-      Addr     : System.Address)
+      Addr     : System.Address;
+      Success  : out Boolean)
    is
    begin
-      Operate (Location, Addr, Read, 1);
+      Operate (Location, Addr, Read, 1, Success);
    end Read;
 
    -----------
@@ -485,9 +620,22 @@ package body Log.Server is
       if Last_Log_Device = 0 then
          Rose.Console_IO.Put_Line ("log: reset: no log device");
       else
-         Header := (others => <>);
-         Write (0, Header'Address);
-         Next_Log_Location := 1;
+         declare
+            use type Rose.Words.Word_64;
+            Generation : constant Rose.Words.Word_64 :=
+                           (if Header.Magic = Log.Header.Log_Magic
+                            then Header.Generation + 1
+                            else 1);
+            Success    : Boolean;
+         begin
+            Header := (others => <>);
+            Header.Generation := Generation;
+            Write (0, Header'Address, Success);
+            if not Success then
+               Rose.Console_IO.Put_Line ("log: reset: cannot write header");
+            end if;
+            Next_Log_Location := 1;
+         end;
       end if;
    end Reset;
 
@@ -506,10 +654,11 @@ package body Log.Server is
 
    procedure Write
      (Location : Log_Location_Id;
-      Addr     : System.Address)
+      Addr     : System.Address;
+      Success  : out Boolean)
    is
    begin
-      Operate (Location, Addr, Write, 1);
+      Operate (Location, Addr, Write, 1, Success);
    end Write;
 
 end Log.Server;
