@@ -156,9 +156,86 @@ package Rose.Checkpoints is
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
-   --  The memory server's part of a checkpoint log entry: one or more
-   --  header pages that list the pages it saved, followed by those
-   --  pages in the order they are listed. The last header page has
+   --  The memory server's part of a checkpoint log entry starts with its
+   --  tables: a header page, then a record page for each of its active
+   --  processes, which are the persistent ones.  A record names the
+   --  process by its object id and by the memory server's own process
+   --  id, which the caps the memory server gave the process use as
+   --  their identifier, and which the header pages below use for pages.
+
+   Mem_Table_Magic   : constant := 16#4D45_4D54_4142_4C31#;
+   Mem_Table_Version : constant := 1;
+
+   type Mem_Table_Header is
+      record
+         Magic         : Rose.Words.Word_64 := Mem_Table_Magic;
+         Version       : Rose.Words.Word_32 := Mem_Table_Version;
+         Page_Count    : Rose.Words.Word_32 := 0;
+         --  All of the memory server's table pages, including this one.
+         Process_Count : Rose.Words.Word_32 := 0;
+         Reserved      : System.Storage_Elements.Storage_Array
+                           (1 .. Rose.Limits.Page_Size - 20) :=
+                             (others => 0);
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   Mem_Process_Magic : constant := 16#4D50_524F_4345_5331#;
+
+   Max_Saved_Segments : constant := 8;
+
+   --  Segment flags.
+   Segment_Readable       : constant := 16#01#;
+   Segment_Writable       : constant := 16#02#;
+   Segment_Executable     : constant := 16#04#;
+   Segment_Extensible     : constant := 16#08#;
+   Segment_Persistent     : constant := 16#10#;
+   Segment_Private_Region : constant := 16#20#;
+
+   --  Base, Bound and Limit are virtual page addresses.  The segment's
+   --  pages come from the region whose pages have object ids from
+   --  Region_Base to Region_Bound, starting Region_Offset pages in.  A
+   --  segment without a region has zero for all three.
+
+   type Saved_Segment is
+      record
+         Base          : Rose.Words.Word_32 := 0;
+         Bound         : Rose.Words.Word_32 := 0;
+         Limit         : Rose.Words.Word_32 := 0;
+         Flags         : Rose.Words.Word_32 := 0;
+         Region_Base   : Rose.Words.Word_64 := 0;
+         Region_Bound  : Rose.Words.Word_64 := 0;
+         Region_Offset : Rose.Words.Word_64 := 0;
+      end record
+     with Pack, Size => 320;
+
+   type Saved_Segment_Array is
+     array (1 .. Max_Saved_Segments) of Saved_Segment
+     with Pack, Size => Max_Saved_Segments * 320;
+
+   Mem_Process_Record_Bytes : constant := 32 + Max_Saved_Segments * 40;
+
+   --  State is the memory server's process state: 1 for active, 2 for
+   --  faulted.
+
+   type Mem_Process_Record is
+      record
+         Magic         : Rose.Words.Word_64 := Mem_Process_Magic;
+         Oid           : Rose.Words.Word_64 := 0;
+         Mem_Pid       : Rose.Words.Word_32 := 0;
+         State         : Rose.Words.Word_32 := 0;
+         Segment_Count : Rose.Words.Word_32 := 0;
+         Unused        : Rose.Words.Word_32 := 0;
+         Segments      : Saved_Segment_Array;
+         Reserved      : System.Storage_Elements.Storage_Array
+                           (1 .. Rose.Limits.Page_Size
+                                - Mem_Process_Record_Bytes) :=
+                             (others => 0);
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   --  After the tables come one or more header pages that list the
+   --  pages the memory server saved, followed by those pages in the
+   --  order they are listed. The last header page has
    --  Is_Last_Header_Page set. The memory server writes this, and the
    --  restore server reads it.
 

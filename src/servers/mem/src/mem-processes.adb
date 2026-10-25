@@ -572,6 +572,42 @@ package body Mem.Processes is
         and then Process_Table (Process).State = Active;
    end Is_Valid_Process_Id;
 
+   -----------------------------
+   -- Iterate_Saved_Processes --
+   -----------------------------
+
+   procedure Iterate_Saved_Processes
+     (Process : not null access procedure (Pid : Process_Id))
+   is
+      function Is_Persistent (P : Memory_Process_Record) return Boolean;
+
+      -------------------
+      -- Is_Persistent --
+      -------------------
+
+      function Is_Persistent (P : Memory_Process_Record) return Boolean is
+      begin
+         for I in 1 .. P.Num_Segments loop
+            if P.Segments (I).Flags (Persistent) then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Is_Persistent;
+
+   begin
+      --  The boot modules are here too, but none of their segments are
+      --  persistent; the processes with a persistent segment are the ones
+      --  the kernel marks as persistent.
+      for Pid in Process_Table'Range loop
+         if Process_Table (Pid).State /= Available
+           and then Is_Persistent (Process_Table (Pid))
+         then
+            Process (Pid);
+         end if;
+      end loop;
+   end Iterate_Saved_Processes;
+
    ------------------
    -- Kill_Process --
    ------------------
@@ -865,6 +901,52 @@ package body Mem.Processes is
    begin
       Rose.Interfaces.Kernel_Process.Client.Resume (P.Process);
    end Resume_Process;
+
+   ------------------
+   -- Save_Process --
+   ------------------
+
+   procedure Save_Process
+     (Process : Process_Id;
+      Item    : in out Rose.Checkpoints.Mem_Process_Record)
+   is
+      use Rose.Words;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      Item.Magic := Rose.Checkpoints.Mem_Process_Magic;
+      Item.Oid := Word_64 (P.Oid);
+      Item.Mem_Pid := Word_32 (Process);
+      Item.State := Process_State'Pos (P.State);
+      Item.Segment_Count := Word_32 (P.Num_Segments);
+
+      for I in 1 .. P.Num_Segments loop
+         declare
+            Segment : Segment_Record renames P.Segments (I);
+            Saved   : Rose.Checkpoints.Saved_Segment renames
+                        Item.Segments (Positive (I));
+         begin
+            Saved.Base := Word_32 (Segment.Base);
+            Saved.Bound := Word_32 (Segment.Bound);
+            Saved.Limit := Word_32 (Segment.Limit);
+            Saved.Region_Base := Word_64 (Segment.Region_Base);
+            Saved.Region_Bound := Word_64 (Segment.Region_Bound);
+            Saved.Region_Offset := Word_64 (Segment.Region_Offset);
+            Saved.Flags :=
+              (if Segment.Flags (Read)
+               then Rose.Checkpoints.Segment_Readable else 0)
+              or (if Segment.Flags (Write)
+                  then Rose.Checkpoints.Segment_Writable else 0)
+              or (if Segment.Flags (Execute)
+                  then Rose.Checkpoints.Segment_Executable else 0)
+              or (if Segment.Flags (Extensible)
+                  then Rose.Checkpoints.Segment_Extensible else 0)
+              or (if Segment.Flags (Persistent)
+                  then Rose.Checkpoints.Segment_Persistent else 0)
+              or (if Segment.Private_Region
+                  then Rose.Checkpoints.Segment_Private_Region else 0);
+         end;
+      end loop;
+   end Save_Process;
 
    ---------------------------------
    -- Set_Published_Interface_Cap --
