@@ -2,6 +2,7 @@ with System.Storage_Elements;
 
 with Rose.Addresses;
 with Rose.Capabilities;
+with Rose.Checkpoints;
 with Rose.Objects;
 with Rose.Words;
 
@@ -140,5 +141,16 @@ package Mem.Processes is
      (Process       : Process_Id;
       Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
       R, W, X, P    : Boolean := False);
+
+   procedure Iterate_Saved_Processes
+     (Process : not null access procedure (Pid : Process_Id));
+   --  Call Process for each process that goes into a checkpoint: every
+   --  process with a persistent segment, whether it is active or
+   --  faulted.
+
+   procedure Save_Process
+     (Process : Process_Id;
+      Item    : in out Rose.Checkpoints.Mem_Process_Record);
+   --  Fill in Item, which is all zeroes, for Process.
 
 end Mem.Processes;

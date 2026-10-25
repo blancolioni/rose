@@ -41,6 +41,11 @@ ENTRY_MAGIC = 0x7E753634A3568547
 CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
 
+MEM_TABLE_MAGIC = 0x4D454D5441424C31
+MEM_TABLE_VERSION = 1
+MEM_PROCESS_MAGIC = 0x4D50524F43455331
+MAX_SAVED_SEGMENTS = 8
+
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
 KERNEL_TABLE_VERSION = 1
 PROCESS_RECORD_MAGIC = 0x50524F4345535331
@@ -117,19 +122,20 @@ def check_kernel_tables(log, first, last, verbose):
     """Check the kernel's tables at the start of an entry whose pages are
     first .. last.
 
-    Returns (ok, description, page count)."""
+    Returns (ok, description, page count, object ids)."""
+    oids = set()
     page = log.page(first)
     if u64(page, 0) != KERNEL_TABLE_MAGIC:
         return False, ("location %d: expected the kernel's tables, found %s"
-                       % (first, describe_page(page))), 0
+                       % (first, describe_page(page))), 0, oids
     version = u32(page, 8)
     if version != KERNEL_TABLE_VERSION:
-        return False, "kernel tables version %d" % version, 0
+        return False, "kernel tables version %d" % version, 0, oids
     page_count = u32(page, 12)
     process_count = u32(page, 16)
     if first + page_count - 1 > last:
         return False, ("kernel tables of %d pages run past the entry"
-                       % page_count), 0
+                       % page_count), 0, oids
 
     location = first + 1
     for i in range(process_count):
@@ -137,8 +143,9 @@ def check_kernel_tables(log, first, last, verbose):
         if location > first + page_count - 1 \
            or u64(record, 0) != PROCESS_RECORD_MAGIC:
             return False, ("location %d: expected process record %d of %d"
-                           % (location, i + 1, process_count)), 0
+                           % (location, i + 1, process_count)), 0, oids
         oid = u64(record, 8)
+        oids.add(oid)
         name = record[16:32].decode("latin-1").rstrip(" \0")
         state = u32(record, 32)
         last_cap, cap_count, cap_pages = struct.unpack_from("<III",
@@ -147,7 +154,8 @@ def check_kernel_tables(log, first, last, verbose):
            or cap_count > last_cap:
             return False, ("process %d (%s): %d caps up to %d do not fit "
                            "%d cap pages"
-                           % (oid, name, cap_count, last_cap, cap_pages)), 0
+                           % (oid, name, cap_count, last_cap,
+                              cap_pages)), 0, oids
         if verbose:
             print("    process %d %-16s %-11s %3d caps"
                   % (oid, name or "(no name)",
@@ -157,27 +165,92 @@ def check_kernel_tables(log, first, last, verbose):
 
     if location != first + page_count:
         return False, ("kernel tables hold %d pages of records, header "
-                       "says %d" % (location - first, page_count)), 0
+                       "says %d" % (location - first, page_count)), 0, oids
 
     return True, ("kernel: %d process%s in %d pages"
                   % (process_count, "" if process_count == 1 else "es",
-                     page_count)), page_count
+                     page_count)), page_count, oids
+
+
+def check_mem_tables(log, first, last, verbose):
+    """Check the memory server's tables, which start at page first.
+
+    Returns (ok, description, page count, {mem process id: object id})."""
+    processes = {}
+    page = log.page(first)
+    if page is None or first > last or u64(page, 0) != MEM_TABLE_MAGIC:
+        return False, ("location %d: expected the memory server's tables, "
+                       "found %s" % (first, describe_page(page or b""))), \
+            0, processes
+    version = u32(page, 8)
+    if version != MEM_TABLE_VERSION:
+        return False, "memory tables version %d" % version, 0, processes
+    page_count = u32(page, 12)
+    process_count = u32(page, 16)
+    if page_count != process_count + 1 or first + page_count - 1 > last:
+        return False, ("memory tables: %d pages for %d processes"
+                       % (page_count, process_count)), 0, processes
+
+    for i in range(process_count):
+        location = first + 1 + i
+        record = log.page(location)
+        if u64(record, 0) != MEM_PROCESS_MAGIC:
+            return False, ("location %d: expected memory process record %d "
+                           "of %d" % (location, i + 1, process_count)), \
+                0, processes
+        oid = u64(record, 8)
+        mem_pid, state, segment_count = struct.unpack_from("<III", record,
+                                                           16)
+        if segment_count > MAX_SAVED_SEGMENTS:
+            return False, ("memory process %d: %d segments"
+                           % (mem_pid, segment_count)), 0, processes
+        processes[mem_pid] = oid
+        if verbose:
+            print("    memory process %d: object %d, %s, %d segments"
+                  % (mem_pid, oid, "faulted" if state == 2 else "active",
+                     segment_count))
+            for s in range(segment_count):
+                base, bound, limit, flags, r_base, r_bound, r_offset = \
+                    struct.unpack_from("<IIIIQQQ", record, 32 + s * 40)
+                print("      %05x..%05x %s region %s"
+                      % (base, bound,
+                         "".join(c if flags & bit else "-" for c, bit in
+                                 (("r", 1), ("w", 2), ("x", 4), ("e", 8),
+                                  ("p", 16)))
+                         + ("P" if flags & 32 else "-"),
+                         "%x..%x +%d" % (r_base, r_bound, r_offset)
+                         if r_base or r_bound else "none"))
+
+    return True, ("memory tables: %d process%s"
+                  % (process_count, "" if process_count == 1 else "es")), \
+        page_count, processes
 
 
 def check_entry(log, first, last, verbose):
     """Check the checkpoint stored in pages first .. last.
 
     Returns (ok, description)."""
-    ok, kernel, kernel_pages = check_kernel_tables(log, first, last,
-                                                   verbose)
+    ok, kernel, kernel_pages, oids = check_kernel_tables(log, first, last,
+                                                         verbose)
     if not ok:
         return False, kernel
-    ok, memory = check_memory(log, first + kernel_pages, last, verbose)
-    return ok, kernel + "; " + memory
+    ok, tables, table_pages, processes = check_mem_tables(
+        log, first + kernel_pages, last, verbose)
+    if not ok:
+        return False, kernel + "; " + tables
+    if set(processes.values()) != oids:
+        return False, ("%s; %s: the memory server's processes %s are not "
+                       "the kernel's %s"
+                       % (kernel, tables, sorted(processes.values()),
+                          sorted(oids)))
+    ok, memory = check_memory(log, first + kernel_pages + table_pages, last,
+                              processes, verbose)
+    return ok, kernel + "; " + tables + "; " + memory
 
 
-def check_memory(log, first, last, verbose):
-    """Check a memory checkpoint stored in pages first .. last.
+def check_memory(log, first, last, processes, verbose):
+    """Check a memory checkpoint stored in pages first .. last, whose pages
+    belong to the memory server's processes in processes.
 
     Returns (ok, description)."""
     header_pages = 0
@@ -193,10 +266,21 @@ def check_memory(log, first, last, verbose):
                            "page, found %s"
                            % (location, describe_page(page)))
         header_pages += 1
-        listed += u32(page, 12)
+        count = u32(page, 12)
+        listed += count
         if verbose:
             print("    header page at %d lists %d pages"
-                  % (location, u32(page, 12)))
+                  % (location, count))
+        for i in range(count):
+            # A page reference is 40 bits: the memory server's process id
+            # in the low 16, then the virtual page address.
+            reference = int.from_bytes(page[16 + i * 5:21 + i * 5],
+                                       "little")
+            if reference & 0xFFFF not in processes:
+                return False, ("location %d: page %05x belongs to memory "
+                               "process %d, which is not in the tables"
+                               % (location, reference >> 16,
+                                  reference & 0xFFFF))
         if u32(page, 8) & IS_LAST_HEADER_PAGE:
             break
         location += 1

@@ -11,6 +11,7 @@ with Rose.Interfaces.Log_Reader.Client;
 package body Restore.Checkpoint_Log is
 
    use Rose.Interfaces.Log_Reader.Client;
+   use type Rose.Words.Word_32;
    use type Rose.Words.Word_64;
 
    Page   : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size)
@@ -21,6 +22,38 @@ package body Restore.Checkpoint_Log is
      with Import, Address => Page'Address;
    Process : Rose.Checkpoints.Process_Record
      with Import, Address => Page'Address;
+   Mem_Header : Rose.Checkpoints.Mem_Table_Header
+     with Import, Address => Page'Address;
+   Mem_Process : Rose.Checkpoints.Mem_Process_Record
+     with Import, Address => Page'Address;
+
+   Max_Processes : constant := Rose.Limits.Max_Processes;
+
+   Kernel_Oids      : array (1 .. Max_Processes) of Rose.Words.Word_64;
+   Kernel_Oid_Count : Natural := 0;
+   --  The object ids of the processes in the current entry's kernel
+   --  tables.
+
+   Mem_Pids      : array (1 .. Max_Processes) of Rose.Words.Word_32;
+   Mem_Pid_Count : Natural := 0;
+   --  The memory server's process ids in the current entry.
+
+   function Is_Kernel_Process (Oid : Rose.Words.Word_64) return Boolean
+   is (for some I in 1 .. Kernel_Oid_Count => Kernel_Oids (I) = Oid);
+
+   function Is_Mem_Process (Pid : Rose.Words.Word_32) return Boolean
+   is (for some I in 1 .. Mem_Pid_Count => Mem_Pids (I) = Pid);
+
+   function Check_Mem_Tables
+     (Reader    : Log_Reader_Client;
+      Location  : Rose.Words.Word_64;
+      Pages     : Natural;
+      First     : Positive;
+      Mem_Pages : out Natural)
+      return Boolean;
+   --  Check the memory server's tables, which start at page First of the
+   --  entry at Location, and set Mem_Pages to the number of pages they
+   --  take.  Their processes must be the ones in the kernel's tables.
 
    function Check_Entry
      (Reader   : Log_Reader_Client;
@@ -54,20 +87,27 @@ package body Restore.Checkpoint_Log is
       use type Rose.Checkpoints.Header_Page_Flags;
       Pages        : constant Natural := Page_Count (Reader, Location);
       Kernel_Pages : Natural;
+      Mem_Pages    : Natural;
+      Table_Pages  : Natural;
       Header_Pages : Natural := 0;
       Listed       : Natural := 0;
    begin
-      if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages) then
+      if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
+        or else not Check_Mem_Tables
+          (Reader, Location, Pages, Kernel_Pages + 1, Mem_Pages)
+      then
          return False;
       end if;
 
+      Table_Pages := Kernel_Pages + Mem_Pages;
+
       loop
-         if Kernel_Pages + Header_Pages = Pages then
+         if Table_Pages + Header_Pages = Pages then
             Report_Bad_Entry (Location, "header pages run past the entry");
             return False;
          end if;
 
-         Read_Page (Reader, Location, Kernel_Pages + Header_Pages + 1, Page);
+         Read_Page (Reader, Location, Table_Pages + Header_Pages + 1, Page);
 
          if Has_Error
            or else Header.Magic /= Rose.Checkpoints.Header_Page_Magic
@@ -76,6 +116,16 @@ package body Restore.Checkpoint_Log is
             return False;
          end if;
 
+         for I in 1 .. Header.Count loop
+            if not Is_Mem_Process
+              (Rose.Words.Word_32 (Header.Pages (I).Process))
+            then
+               Report_Bad_Entry
+                 (Location, "a page belongs to an unknown process");
+               return False;
+            end if;
+         end loop;
+
          Header_Pages := Header_Pages + 1;
          Listed := Listed + Natural (Header.Count);
 
@@ -83,7 +133,7 @@ package body Restore.Checkpoint_Log is
            /= 0;
       end loop;
 
-      if Kernel_Pages + Header_Pages + Listed /= Pages then
+      if Table_Pages + Header_Pages + Listed /= Pages then
          Report_Bad_Entry (Location, "page count does not match its headers");
          return False;
       end if;
@@ -102,7 +152,6 @@ package body Restore.Checkpoint_Log is
       Kernel_Pages : out Natural)
       return Boolean
    is
-      use type Rose.Words.Word_32;
       Process_Count : Natural;
       Index         : Positive := 2;
    begin
@@ -129,9 +178,15 @@ package body Restore.Checkpoint_Log is
 
       Kernel_Pages := Natural (Kernel_Header.Page_Count);
       Process_Count := Natural (Kernel_Header.Process_Count);
+      Kernel_Oid_Count := 0;
 
       if Kernel_Pages = 0 or else Kernel_Pages > Pages then
          Report_Bad_Entry (Location, "kernel tables run past the entry");
+         return False;
+      end if;
+
+      if Process_Count > Max_Processes then
+         Report_Bad_Entry (Location, "too many processes");
          return False;
       end if;
 
@@ -160,6 +215,9 @@ package body Restore.Checkpoint_Log is
             return False;
          end if;
 
+         Kernel_Oid_Count := Kernel_Oid_Count + 1;
+         Kernel_Oids (Kernel_Oid_Count) := Process.Oid;
+
          Index := Index + 1 + Natural (Process.Cap_Page_Count);
       end loop;
 
@@ -170,6 +228,85 @@ package body Restore.Checkpoint_Log is
 
       return True;
    end Check_Kernel_Tables;
+
+   ----------------------
+   -- Check_Mem_Tables --
+   ----------------------
+
+   function Check_Mem_Tables
+     (Reader    : Log_Reader_Client;
+      Location  : Rose.Words.Word_64;
+      Pages     : Natural;
+      First     : Positive;
+      Mem_Pages : out Natural)
+      return Boolean
+   is
+      Process_Count : Natural;
+   begin
+      Mem_Pages := 0;
+      Mem_Pid_Count := 0;
+
+      if First > Pages then
+         Report_Bad_Entry (Location, "no memory tables");
+         return False;
+      end if;
+
+      Read_Page (Reader, Location, First, Page);
+
+      if Has_Error
+        or else Mem_Header.Magic /= Rose.Checkpoints.Mem_Table_Magic
+      then
+         Report_Bad_Entry (Location, "expected the memory server's tables");
+         return False;
+      end if;
+
+      if Mem_Header.Version /= Rose.Checkpoints.Mem_Table_Version then
+         Report_Bad_Entry (Location, "unknown memory tables version");
+         return False;
+      end if;
+
+      Mem_Pages := Natural (Mem_Header.Page_Count);
+      Process_Count := Natural (Mem_Header.Process_Count);
+
+      if Mem_Pages /= Process_Count + 1
+        or else First + Mem_Pages - 1 > Pages
+      then
+         Report_Bad_Entry (Location, "memory tables page count is wrong");
+         return False;
+      end if;
+
+      if Process_Count /= Kernel_Oid_Count then
+         Report_Bad_Entry
+           (Location, "memory and kernel tables have different processes");
+         return False;
+      end if;
+
+      for I in 1 .. Process_Count loop
+         Read_Page (Reader, Location, First + I, Page);
+
+         if Has_Error
+           or else Mem_Process.Magic /= Rose.Checkpoints.Mem_Process_Magic
+           or else Mem_Process.Segment_Count
+             > Rose.Checkpoints.Max_Saved_Segments
+         then
+            Report_Bad_Entry (Location, "bad memory process record");
+            return False;
+         end if;
+
+         if not Is_Kernel_Process (Mem_Process.Oid)
+           or else Is_Mem_Process (Mem_Process.Mem_Pid)
+         then
+            Report_Bad_Entry
+              (Location, "memory and kernel tables have different processes");
+            return False;
+         end if;
+
+         Mem_Pid_Count := Mem_Pid_Count + 1;
+         Mem_Pids (Mem_Pid_Count) := Mem_Process.Mem_Pid;
+      end loop;
+
+      return True;
+   end Check_Mem_Tables;
 
    ------------
    -- Report --
