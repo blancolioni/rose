@@ -12,7 +12,7 @@ TOOLS=configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=command keyboard event-input-stream exec
+DRIVERS=command keyboard event-input-stream exec file
 UTILITIES=echo tests petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 

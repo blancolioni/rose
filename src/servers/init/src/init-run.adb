@@ -1003,7 +1003,11 @@ package body Init.Run is
                                     Create_Endpoint_Cap,
 
                                     --  create_cap_set
-                                    Cap_Set_Cap
+                                    Cap_Set_Cap,
+
+                                    --  the command registry's Find, for
+                                    --  launching a file server
+                                    Find_Cap
                                    ));
          Tests_Object     : Rose.Objects.Object_Id with Unreferenced;
       begin
