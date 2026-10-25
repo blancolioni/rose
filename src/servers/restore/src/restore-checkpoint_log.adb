@@ -25,8 +25,26 @@ package body Restore.Checkpoint_Log is
      with Import, Address => Page'Address;
    Mem_Process : Rose.Checkpoints.Mem_Process_Record
      with Import, Address => Page'Address;
+   Store_Header : Rose.Checkpoints.Store_Table_Header
+     with Import, Address => Page'Address;
+   Region_Table : Rose.Checkpoints.Region_Page
+     with Import, Address => Page'Address;
 
    Max_Processes : constant := Rose.Limits.Max_Processes;
+   Max_Regions   : constant := 256;
+
+   type Region_Range is
+      record
+         Base, Bound : Rose.Words.Word_64;
+      end record;
+
+   Regions      : array (1 .. Max_Regions) of Region_Range;
+   Region_Count : Natural := 0;
+   --  The regions in the current entry's storage tables.
+
+   function Is_Region (Base, Bound : Rose.Words.Word_64) return Boolean
+   is (for some I in 1 .. Region_Count =>
+         Regions (I).Base = Base and then Regions (I).Bound = Bound);
 
    Kernel_Oids      : array (1 .. Max_Processes) of Rose.Words.Word_64;
    Kernel_Oid_Count : Natural := 0;
@@ -70,6 +88,17 @@ package body Restore.Checkpoint_Log is
    --  which has Pages pages, and set Kernel_Pages to the number of pages
    --  they take.
 
+   function Check_Store_Tables
+     (Reader      : Log_Reader_Client;
+      Location    : Rose.Words.Word_64;
+      Pages       : Natural;
+      First       : Positive;
+      Store_Pages : out Natural)
+      return Boolean;
+   --  Check the storage server's region table, which starts at page
+   --  First of the entry at Location, and set Store_Pages to the number
+   --  of pages it takes.
+
    procedure Report_Bad_Entry
      (Location : Rose.Words.Word_64;
       Message  : String);
@@ -86,19 +115,23 @@ package body Restore.Checkpoint_Log is
       use type Rose.Checkpoints.Header_Page_Flags;
       Pages        : constant Natural := Page_Count (Reader, Location);
       Kernel_Pages : Natural;
+      Store_Pages  : Natural;
       Mem_Pages    : Natural;
       Table_Pages  : Natural;
       Header_Pages : Natural := 0;
       Listed       : Natural := 0;
    begin
       if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
+        or else not Check_Store_Tables
+          (Reader, Location, Pages, Kernel_Pages + 1, Store_Pages)
         or else not Check_Mem_Tables
-          (Reader, Location, Pages, Kernel_Pages + 1, Mem_Pages)
+          (Reader, Location, Pages, Kernel_Pages + Store_Pages + 1,
+           Mem_Pages)
       then
          return False;
       end if;
 
-      Table_Pages := Kernel_Pages + Mem_Pages;
+      Table_Pages := Kernel_Pages + Store_Pages + Mem_Pages;
 
       loop
          if Table_Pages + Header_Pages = Pages then
@@ -300,12 +333,106 @@ package body Restore.Checkpoint_Log is
             return False;
          end if;
 
+         for Segment of
+           Mem_Process.Segments (1 .. Natural (Mem_Process.Segment_Count))
+         loop
+            if (Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0)
+              and then not Is_Region
+                (Segment.Region_Base, Segment.Region_Bound)
+            then
+               Report_Bad_Entry
+                 (Location, "a segment's region is not in the storage tables");
+               return False;
+            end if;
+         end loop;
+
          Mem_Pid_Count := Mem_Pid_Count + 1;
          Mem_Pids (Mem_Pid_Count) := Mem_Process.Mem_Pid;
       end loop;
 
       return True;
    end Check_Mem_Tables;
+
+   ------------------------
+   -- Check_Store_Tables --
+   ------------------------
+
+   function Check_Store_Tables
+     (Reader      : Log_Reader_Client;
+      Location    : Rose.Words.Word_64;
+      Pages       : Natural;
+      First       : Positive;
+      Store_Pages : out Natural)
+      return Boolean
+   is
+      Count : Natural;
+   begin
+      Store_Pages := 0;
+      Region_Count := 0;
+
+      if First > Pages then
+         Report_Bad_Entry (Location, "no storage tables");
+         return False;
+      end if;
+
+      Read_Page (Reader, Location, First, Page);
+
+      if Has_Error
+        or else Store_Header.Magic /= Rose.Checkpoints.Store_Table_Magic
+      then
+         Report_Bad_Entry (Location, "expected the storage server's tables");
+         return False;
+      end if;
+
+      if Store_Header.Version /= Rose.Checkpoints.Store_Table_Version then
+         Report_Bad_Entry (Location, "unknown storage tables version");
+         return False;
+      end if;
+
+      Store_Pages := Natural (Store_Header.Page_Count);
+      Count := Natural (Store_Header.Region_Count);
+
+      if Count > Max_Regions
+        or else Store_Pages
+          /= 1 + (Count + Rose.Checkpoints.Regions_Per_Page - 1)
+               / Rose.Checkpoints.Regions_Per_Page
+        or else First + Store_Pages - 1 > Pages
+      then
+         Report_Bad_Entry (Location, "storage tables page count is wrong");
+         return False;
+      end if;
+
+      for I in 1 .. Count loop
+         if (I - 1) mod Rose.Checkpoints.Regions_Per_Page = 0 then
+            Read_Page
+              (Reader, Location,
+               First + 1 + (I - 1) / Rose.Checkpoints.Regions_Per_Page, Page);
+            if Has_Error then
+               Report_Bad_Entry (Location, "cannot read storage tables");
+               return False;
+            end if;
+         end if;
+
+         declare
+            Region : Rose.Checkpoints.Saved_Region renames
+                       Region_Table.Regions
+                         ((I - 1) mod Rose.Checkpoints.Regions_Per_Page + 1);
+         begin
+            if Region.Index = 0
+              or else Region.Device = 0
+              or else Region.Bound < Region.Base
+            then
+               Report_Bad_Entry (Location, "bad storage region");
+               return False;
+            end if;
+
+            Region_Count := Region_Count + 1;
+            Regions (Region_Count) := (Region.Base, Region.Bound);
+         end;
+      end loop;
+
+      return True;
+   end Check_Store_Tables;
 
    ---------------------
    -- Find_Checkpoint --

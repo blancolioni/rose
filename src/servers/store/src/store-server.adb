@@ -7,6 +7,7 @@ with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Region.Server;
+with Rose.Interfaces.Storage_Checkpoint.Server;
 with Rose.Interfaces.Stream_Reader.Server;
 
 with Store.Devices;
@@ -56,6 +57,12 @@ package body Store.Server is
         (Server_Context => Server_Context,
          Read           => Store.Devices.Read'Access,
          Instanced      => True);
+
+      Rose.Interfaces.Storage_Checkpoint.Server.Attach_Interface
+        (Server_Context => Server_Context,
+         Checkpoint     => Store.Devices.Checkpoint'Access,
+         Restore_Region => Store.Devices.Restore_Region'Access,
+         Find_Region    => Store.Devices.Find_Region'Access);
    end Create_Server;
 
    ---------------------

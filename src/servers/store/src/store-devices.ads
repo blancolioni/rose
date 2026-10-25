@@ -49,4 +49,29 @@ package Store.Devices is
       Storage : out System.Storage_Elements.Storage_Array;
       Last    : out System.Storage_Elements.Storage_Count);
 
+   procedure Checkpoint
+     (Id          : Rose.Objects.Capability_Identifier;
+      Append_Page : Rose.Capabilities.Capability);
+   --  Append the region table to the checkpoint log through Append_Page,
+   --  in the format of Rose.Checkpoints, then delete Append_Page.
+
+   procedure Restore_Region
+     (Id          : Rose.Objects.Capability_Identifier;
+      Index       : Natural;
+      Device      : Natural;
+      Base        : Rose.Objects.Object_Id;
+      Bound       : Rose.Objects.Object_Id;
+      Alloc_Index : Natural;
+      Alloc_Banks : Natural);
+   --  Recreate a region from a checkpoint.  The backing stores must have
+   --  been added again first, in the same order.
+
+   function Find_Region
+     (Id    : Rose.Objects.Capability_Identifier;
+      Base  : Rose.Objects.Object_Id;
+      Bound : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability;
+   --  The cap for the region whose pages are Base .. Bound - 1, or the
+   --  null cap if there is none.
+
 end Store.Devices;
