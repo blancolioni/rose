@@ -115,6 +115,10 @@ package Mem.Processes is
    --  Count a fault of Process that took Ticks to handle. The counts are
    --  reported as trace events when the process is gone (#195).
 
+   function Store_Read_Count return Natural;
+   --  The number of pages read from a region since boot, for the status
+   --  bar (#210). Cache hits, zero fills and write faults are not counted.
+
    procedure Add_Nonpersistent_Segment
      (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;

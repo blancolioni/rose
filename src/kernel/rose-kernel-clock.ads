@@ -9,7 +9,8 @@ package Rose.Kernel.Clock is
 
    procedure Update_Mem
      (Allocated, Available : Rose.Addresses.Physical_Bytes;
-      Dirty_Pages          : Natural);
+      Dirty_Pages          : Natural;
+      Store_Reads          : Natural);
 
    procedure Set_Timeout
      (Timeout : Rose.Words.Word;
