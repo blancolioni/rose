@@ -3,19 +3,24 @@
 
 Finds the log partition in the image's GPT, reads the log header, and
 walks the entries the way the log server's startup scan does.  Each
-entry should be a memory checkpoint: the check is that it starts with
-the memory server's header pages, and holds exactly those pages plus
-the pages they list.
+entry should be a checkpoint: the kernel's tables, then the memory
+server's pages.  The check is that the kernel's header page, process
+records and capability pages agree with each other, and that the
+memory server's header pages and the pages they list account for the
+rest of the entry.
 
 After walking the entries it also looks at the location after the last
 one, and reports anything there that looks like an entry header, such
 as an entry left over from before a reset.
 
 The layouts are those of src/servers/log/src/log-header.ads,
-src/servers/mem/src/mem-checkpoints.adb and
+src/base/rose-checkpoints.ads and
 src/library/kernelapi/devices/rose-devices-gpt.adb.
 
 Usage: check-log.py [-v] IMAGE
+
+With -v, it also lists the processes in each entry's kernel tables and
+describes each memory checkpoint header page.
 
 Exits with status 1 if the image has no valid log, or if any entry is
 inconsistent.
@@ -35,6 +40,15 @@ LOG_MAGIC = 0x8F8FFFE0FA39FDF7
 ENTRY_MAGIC = 0x7E753634A3568547
 CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
+
+KERNEL_TABLE_MAGIC = 0x4B5441424C455331
+KERNEL_TABLE_VERSION = 1
+PROCESS_RECORD_MAGIC = 0x50524F4345535331
+CAPS_PER_PAGE = PAGE_SIZE // 20
+
+# Rose.Kernel.Processes.Process_State, in order.
+PROCESS_STATES = ["available", "starting", "ready", "running", "blocked",
+                  "interrupted", "faulted", "killed"]
 
 
 def u32(data, offset):
@@ -95,7 +109,74 @@ def entry_fields(page):
     return version, flags, u64(page, 16), u64(page, 24), u64(page, 32)
 
 
-def check_checkpoint(log, first, last, verbose):
+def describe_page(page):
+    return "an empty page" if not any(page) else "something else"
+
+
+def check_kernel_tables(log, first, last, verbose):
+    """Check the kernel's tables at the start of an entry whose pages are
+    first .. last.
+
+    Returns (ok, description, page count)."""
+    page = log.page(first)
+    if u64(page, 0) != KERNEL_TABLE_MAGIC:
+        return False, ("location %d: expected the kernel's tables, found %s"
+                       % (first, describe_page(page))), 0
+    version = u32(page, 8)
+    if version != KERNEL_TABLE_VERSION:
+        return False, "kernel tables version %d" % version, 0
+    page_count = u32(page, 12)
+    process_count = u32(page, 16)
+    if first + page_count - 1 > last:
+        return False, ("kernel tables of %d pages run past the entry"
+                       % page_count), 0
+
+    location = first + 1
+    for i in range(process_count):
+        record = log.page(location)
+        if location > first + page_count - 1 \
+           or u64(record, 0) != PROCESS_RECORD_MAGIC:
+            return False, ("location %d: expected process record %d of %d"
+                           % (location, i + 1, process_count)), 0
+        oid = u64(record, 8)
+        name = record[16:32].decode("latin-1").rstrip(" \0")
+        state = u32(record, 32)
+        last_cap, cap_count, cap_pages = struct.unpack_from("<III",
+                                                            record, 56)
+        if cap_pages != (cap_count + CAPS_PER_PAGE - 1) // CAPS_PER_PAGE \
+           or cap_count > last_cap:
+            return False, ("process %d (%s): %d caps up to %d do not fit "
+                           "%d cap pages"
+                           % (oid, name, cap_count, last_cap, cap_pages)), 0
+        if verbose:
+            print("    process %d %-16s %-11s %3d caps"
+                  % (oid, name or "(no name)",
+                     PROCESS_STATES[state] if state < len(PROCESS_STATES)
+                     else "state %d" % state, cap_count))
+        location += 1 + cap_pages
+
+    if location != first + page_count:
+        return False, ("kernel tables hold %d pages of records, header "
+                       "says %d" % (location - first, page_count)), 0
+
+    return True, ("kernel: %d process%s in %d pages"
+                  % (process_count, "" if process_count == 1 else "es",
+                     page_count)), page_count
+
+
+def check_entry(log, first, last, verbose):
+    """Check the checkpoint stored in pages first .. last.
+
+    Returns (ok, description)."""
+    ok, kernel, kernel_pages = check_kernel_tables(log, first, last,
+                                                   verbose)
+    if not ok:
+        return False, kernel
+    ok, memory = check_memory(log, first + kernel_pages, last, verbose)
+    return ok, kernel + "; " + memory
+
+
+def check_memory(log, first, last, verbose):
     """Check a memory checkpoint stored in pages first .. last.
 
     Returns (ok, description)."""
@@ -108,13 +189,9 @@ def check_checkpoint(log, first, last, verbose):
             return False, ("checkpoint header pages run past the entry "
                            "at location %d" % location)
         if u64(page, 0) != CHECKPOINT_MAGIC:
-            # Every entry is a memory checkpoint for now; the kernel's
-            # tables (#117) will need their own check here.
             return False, ("location %d: expected a checkpoint header "
                            "page, found %s"
-                           % (location,
-                              "an empty page" if not any(page)
-                              else "something else"))
+                           % (location, describe_page(page)))
         header_pages += 1
         listed += u32(page, 12)
         if verbose:
@@ -126,7 +203,7 @@ def check_checkpoint(log, first, last, verbose):
 
     expected = header_pages + listed
     actual = last - first + 1
-    description = ("%d header page%s, %d data pages"
+    description = ("memory: %d header page%s, %d data pages"
                    % (header_pages, "" if header_pages == 1 else "s", listed))
     if expected != actual:
         return False, ("%s: expected %d pages, entry has %d"
@@ -139,7 +216,8 @@ def main():
         description="Check the checkpoint log on a Rose disk image.")
     parser.add_argument("image")
     parser.add_argument("-v", "--verbose", action="store_true",
-                        help="describe each checkpoint header page")
+                        help="list each entry's processes and memory "
+                        "checkpoint header pages")
     args = parser.parse_args()
 
     with open(args.image, "rb") as image:
@@ -178,8 +256,7 @@ def main():
                 break
 
             entries += 1
-            ok, description = check_checkpoint(log, first, last,
-                                               args.verbose)
+            ok, description = check_entry(log, first, last, args.verbose)
             print("entry %d at %d: version %d, pages %d..%d: %s%s"
                   % (entries, location, version, first, last,
                      description, "" if ok else "  ** BAD"))
