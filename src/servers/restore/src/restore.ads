@@ -18,4 +18,12 @@ package Restore is
    Add_Log_Device_Cap  : Rose.Capabilities.Capability;
    Log_Reader_Cap      : Rose.Capabilities.Capability;
 
+   --  For restoring a checkpoint (Restore.Checkpoints).
+   Restore_Process_Cap   : Rose.Capabilities.Capability;
+   Resume_Process_Cap    : Rose.Capabilities.Capability;
+   Restore_Interrupt_Cap : Rose.Capabilities.Capability;
+   Store_Restore_Cap     : Rose.Capabilities.Capability;
+   Memory_Restore_Cap    : Rose.Capabilities.Capability;
+   Log_Reset_Cap         : Rose.Capabilities.Capability;
+
 end Restore;
