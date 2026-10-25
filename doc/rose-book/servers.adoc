@@ -2,6 +2,12 @@
 
 == Boot Servers
 
+[NOTE]
+====
+This section describes an older `init` (#125), and its tables of launch caps and process ids are out of date.
+The servers `init` starts, and the order it starts them in, are described in <<Boot Sequence>>.
+====
+
 When the kernel is ready to schedule its first process, it chooses the first boot module.
 This is the _init_ program.
 Its job is to load the rest of the boot modules, and find the most recent consistent checkpoint from which to restore.
@@ -10,8 +16,7 @@ Init requires a particular set of launch caps (see <<init-launch-caps>>).
 Each of these capabilities is invoked in order.
 Init runs with a low priority, causing it to block while each boot server initialises.
 
-Init is configured via a Petal script (see <<init-petal>> for a small example).
-This script is compiled to an Ada package spec, which is with'd by the `init` source.
+The order in which `init` starts the boot servers is described in <<Boot Sequence>>.
 
 [#init-launch-caps]
 .Launch caps for _init_ process
