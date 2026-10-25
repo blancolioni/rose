@@ -62,6 +62,9 @@ package body Mem.Processes is
 
    type Fault_Count_Array is array (Fault_Kind) of Fault_Count;
 
+   Store_Reads : Natural := 0;
+   --  Pages read from a region, by all processes since boot (#210).
+
    type Memory_Process_Record is
       record
          State        : Process_State := Available;
@@ -539,6 +542,7 @@ package body Mem.Processes is
                              + Object_Id (Virtual_Page - Segment.Base)
                              + Segment.Region_Offset;
                begin
+                  Store_Reads := Store_Reads + 1;
                   Rose.Interfaces.Region.Client.Get
                     (Item => Segment.Region,
                      Page => Page,
@@ -873,5 +877,14 @@ package body Mem.Processes is
    begin
       Process_Table (Process).Server := Cap;
    end Set_Published_Interface_Cap;
+
+   ----------------------
+   -- Store_Read_Count --
+   ----------------------
+
+   function Store_Read_Count return Natural is
+   begin
+      return Store_Reads;
+   end Store_Read_Count;
 
 end Mem.Processes;

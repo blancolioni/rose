@@ -18,7 +18,7 @@ package body Rose.Boot.Console is
    Current_Colour               : constant Word_16 := 16#700#;
    Status_Chars                 : String (1 .. 80);
    Base_Status_Chars            : constant String :=
-                                    "Rose -'-,-{@        "
+                                    "Rose                "
                                     & "                    "
                                     & "                    "
                                     & "                    ";
@@ -208,7 +208,7 @@ package body Rose.Boot.Console is
          12 => 16#0400# + Status_Background,
          others => Status_Foreground + Status_Background);
 
-      Status_Line ("starting ...", 0, 0, 0, 0, 0, 0, 0);
+      Status_Line ("starting ...", 0, 0, 0, 0, 0, 0, 0, 0);
 
       Enable_Serial_Port;
 
@@ -626,6 +626,7 @@ package body Rose.Boot.Console is
      (Current_Process : String;
       Current_Ticks   : Rose.Words.Word;
       Page_Faults     : Natural;
+      Store_Reads     : Natural;
       Dirty_Pages     : Natural;
       Mem_Allocated   : Rose.Addresses.Physical_Bytes;
       Mem_Available   : Rose.Addresses.Physical_Bytes;
@@ -633,7 +634,7 @@ package body Rose.Boot.Console is
       Heap_Available  : Rose.Addresses.Physical_Bytes)
    is
 
-      Last : Positive := 14;
+      Last : Positive := 6;
 
       Acc         : Word_32 := Current_Ticks / 100;
       Time_Image  : String (1 .. 8);
@@ -749,6 +750,8 @@ package body Rose.Boot.Console is
       Put_Status (Current_Process, 12);
 
       Put_Status (Page_Faults);
+      Put_Status (" ");
+      Put_Status (Store_Reads);
       Put_Status (" ");
       Put_Status (Dirty_Pages);
 

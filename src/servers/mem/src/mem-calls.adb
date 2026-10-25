@@ -6,6 +6,7 @@ with Rose.System_Calls.Client;
 
 with Mem.Page_Table;
 with Mem.Physical_Map;
+with Mem.Processes;
 
 package body Mem.Calls is
 
@@ -187,6 +188,8 @@ package body Mem.Calls is
            (Params, Mem.Physical_Map.Allocated_Pages);
          Rose.System_Calls.Send_Word
            (Params, Rose.Words.Word (Mem.Page_Table.Dirty_Page_Count));
+         Rose.System_Calls.Send_Word
+           (Params, Rose.Words.Word (Mem.Processes.Store_Read_Count));
 
          Rose.System_Calls.Invoke_Capability (Params);
 

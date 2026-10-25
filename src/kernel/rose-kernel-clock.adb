@@ -19,6 +19,7 @@ package body Rose.Kernel.Clock is
    Current_Allocated_Memory : Physical_Bytes := 0;
    Current_Available_Memory : Physical_Bytes := 0;
    Current_Dirty_Pages      : Natural := 0;
+   Current_Store_Reads      : Natural := 0;
 
    -------------------
    -- Current_Ticks --
@@ -55,6 +56,7 @@ package body Rose.Kernel.Clock is
               (Current_Process => Name (1 .. Name_Last),
                Current_Ticks   => Ticks,
                Page_Faults     => Rose.Kernel.Processes.Page_Fault_Count,
+               Store_Reads     => Current_Store_Reads,
                Dirty_Pages     => Current_Dirty_Pages,
                Mem_Allocated   => Current_Allocated_Memory,
                Mem_Available   => Current_Available_Memory,
@@ -128,12 +130,14 @@ package body Rose.Kernel.Clock is
 
    procedure Update_Mem
      (Allocated, Available : Rose.Addresses.Physical_Bytes;
-      Dirty_Pages          : Natural)
+      Dirty_Pages          : Natural;
+      Store_Reads          : Natural)
    is
    begin
       Current_Available_Memory := Available;
       Current_Allocated_Memory := Allocated;
       Current_Dirty_Pages := Dirty_Pages;
+      Current_Store_Reads := Store_Reads;
    end Update_Mem;
 
 end Rose.Kernel.Clock;
