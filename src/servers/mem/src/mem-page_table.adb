@@ -72,6 +72,21 @@ package body Mem.Page_Table is
             end if;
          end;
       end loop;
+
+      --  The process's pages are gone, so the next checkpoint must not
+      --  save them: their slots will be used again for other pages.
+
+      declare
+         Kept : Natural := 0;
+      begin
+         for I in 1 .. Dirty_Page_Last loop
+            if Mapped_Pages (Dirty_Pages (I)).Process /= 0 then
+               Kept := Kept + 1;
+               Dirty_Pages (Kept) := Dirty_Pages (I);
+            end if;
+         end loop;
+         Dirty_Page_Last := Kept;
+      end;
    end Delete_All;
 
    ----------------------
