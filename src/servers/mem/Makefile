@@ -25,6 +25,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-heap-server.o \
 	$(BUILDDIR)/rose-interfaces-memory.o \
 	$(BUILDDIR)/rose-interfaces-memory-server.o \
+	$(BUILDDIR)/rose-interfaces-memory_restore.o \
+	$(BUILDDIR)/rose-interfaces-memory_restore-server.o \
 	$(BUILDDIR)/rose-interfaces-process.o \
 	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-process-server.o \

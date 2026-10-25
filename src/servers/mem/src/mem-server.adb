@@ -12,6 +12,7 @@ with Rose.Trace;
 
 with Rose.Interfaces.Heap.Server;
 with Rose.Interfaces.Memory.Server;
+with Rose.Interfaces.Memory_Restore.Server;
 with Rose.Interfaces.Process.Server;
 with Rose.Interfaces.Receiver.Server;
 with Rose.Interfaces.Segment;
@@ -264,6 +265,16 @@ package body Mem.Server is
         (Server_Context => Server,
          Send_Cap       => Send_Cap'Access,
          Instanced      => True);
+
+      --  Attached last, so that the endpoints of the interfaces above
+      --  are where they were.
+
+      Rose.Interfaces.Memory_Restore.Server.Attach_Interface
+        (Server_Context       => Server,
+         Restore_Process      => Mem.Processes.Restore_Process'Access,
+         Restore_Segment      => Mem.Processes.Restore_Segment'Access,
+         Restore_Zero_Segment => Mem.Processes.Restore_Zero_Segment'Access,
+         Restore_Page         => Mem.Processes.Restore_Page'Access);
 
    end Create_Server;
 

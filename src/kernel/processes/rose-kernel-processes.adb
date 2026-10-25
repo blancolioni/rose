@@ -42,10 +42,6 @@ package body Rose.Kernel.Processes is
       Address      : Rose.Addresses.Virtual_Page_Address;
       Writable     : Boolean);
 
-   procedure Create_Process_Table_Entry
-     (Pid : Rose.Kernel.Processes.Process_Id;
-      Name : String);
-
    procedure Disable_Write_Pages
      (Process : in out Kernel_Process_Entry);
 
