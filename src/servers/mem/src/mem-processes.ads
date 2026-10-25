@@ -94,6 +94,18 @@ package Mem.Processes is
    --  Private_Region is True if Region belongs to the process, and is to
    --  be released when the process is gone.
 
+   type Fault_Kind is (Region_Fault, Zero_Fault, Write_Fault, Invalid_Fault);
+   --  A page read from its segment's region, a page filled with zeroes,
+   --  a write to a mapped page, which makes it writable and dirty, and an
+   --  access that is not allowed.
+
+   procedure Count_Fault
+     (Process : Process_Id;
+      Kind    : Fault_Kind;
+      Ticks   : Natural);
+   --  Count a fault of Process that took Ticks to handle. The counts are
+   --  reported as trace events when the process is gone (#195).
+
    procedure Add_Nonpersistent_Segment
      (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;

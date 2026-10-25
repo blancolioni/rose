@@ -8,6 +8,7 @@ with Rose.Objects;
 with Rose.Words;
 
 with Rose.Console_IO;
+with Rose.Trace;
 
 with Rose.Interfaces.Heap.Server;
 with Rose.Interfaces.Memory.Server;
@@ -221,6 +222,7 @@ package body Mem.Server is
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => Create_Endpoint_Cap,
          Delete_Cap      => Get_Cap (5));
+      Rose.Trace.Set_Trace_Cap (Get_Cap (6));
 
       Console_Cap      := Get_Cap (1);
       Region_Count_Cap := Get_Cap (2);
@@ -355,6 +357,8 @@ package body Mem.Server is
       Pid    : constant Process_Id :=
                         Mem.Processes.Get_Process_Id (Object);
       Page_Object : Rose.Objects.Object_Id;
+      Start  : constant Natural := Rose.Trace.Ticks;
+      --  When the fault arrived, for timing it (#195).
    begin
 
       if not Mem.Processes.Is_Valid_Process_Id (Pid) then
@@ -367,6 +371,7 @@ package body Mem.Server is
          Valid, Readable, Writable, Executable, Persistent);
 
       if not Valid then
+         Mem.Processes.Count_Fault (Pid, Mem.Processes.Invalid_Fault, 0);
          Protection_Fault (Object, Virtual_Page, "invalid page reference");
          return;
       end if;
@@ -422,6 +427,11 @@ package body Mem.Server is
                   Persistent    => Persistent);
 
                Mem.Processes.Resume_Process (Pid);
+               Mem.Processes.Count_Fault
+                 (Pid,
+                  (if Persistent then Mem.Processes.Region_Fault
+                   else Mem.Processes.Zero_Fault),
+                  Rose.Trace.Ticks - Start);
 
             end if;
          end;
@@ -469,6 +479,9 @@ package body Mem.Server is
                         --  first write)
                         Mem.Page_Table.Set_Writable (Position);
                         Mem.Processes.Resume_Process (Pid);
+                        Mem.Processes.Count_Fault
+                          (Pid, Mem.Processes.Write_Fault,
+                           Rose.Trace.Ticks - Start);
                      end if;
                end case;
             end if;

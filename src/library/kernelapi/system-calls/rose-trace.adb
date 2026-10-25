@@ -7,6 +7,12 @@ package body Rose.Trace is
    Trace_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
 
+   procedure Put_Image
+     (Value : Natural;
+      Text  : out String;
+      First : out Positive);
+   --  Value in decimal, at the end of Text, from First.
+
    -----------
    -- Event --
    -----------
@@ -54,17 +60,53 @@ package body Rose.Trace is
       Value : Natural)
    is
       Digits_Text : String (1 .. 10);
-      First       : Positive := Digits_Text'Last + 1;
-      Rest        : Natural := Value;
+      First       : Positive;
    begin
+      Put_Image (Value, Digits_Text, First);
+      Event (Text & Digits_Text (First .. Digits_Text'Last));
+   end Event;
+
+   -----------
+   -- Event --
+   -----------
+
+   procedure Event
+     (Text    : String;
+      Value   : Natural;
+      Text_2  : String;
+      Value_2 : Natural)
+   is
+      Digits_1 : String (1 .. 10);
+      Digits_2 : String (1 .. 10);
+      First_1  : Positive;
+      First_2  : Positive;
+   begin
+      Put_Image (Value, Digits_1, First_1);
+      Put_Image (Value_2, Digits_2, First_2);
+      Event (Text & Digits_1 (First_1 .. Digits_1'Last)
+             & Text_2 & Digits_2 (First_2 .. Digits_2'Last));
+   end Event;
+
+   ---------------
+   -- Put_Image --
+   ---------------
+
+   procedure Put_Image
+     (Value : Natural;
+      Text  : out String;
+      First : out Positive)
+   is
+      Rest : Natural := Value;
+   begin
+      Text := (others => ' ');
+      First := Text'Last + 1;
       loop
          First := First - 1;
-         Digits_Text (First) := Character'Val (48 + Rest mod 10);
+         Text (First) := Character'Val (48 + Rest mod 10);
          Rest := Rest / 10;
          exit when Rest = 0;
       end loop;
-      Event (Text & Digits_Text (First .. Digits_Text'Last));
-   end Event;
+   end Put_Image;
 
    -------------------
    -- Set_Trace_Cap --
@@ -74,5 +116,23 @@ package body Rose.Trace is
    begin
       Trace_Cap := Cap;
    end Set_Trace_Cap;
+
+   -----------
+   -- Ticks --
+   -----------
+
+   function Ticks return Natural is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Trace_Cap = Rose.Capabilities.Null_Capability then
+         return 0;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Trace_Cap);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+      return Natural (Params.Data (0));
+   end Ticks;
 
 end Rose.Trace;

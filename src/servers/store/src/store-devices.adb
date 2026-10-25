@@ -3,6 +3,7 @@ with Rose.Allocators;
 
 with Rose.Console_IO;
 with Rose.Invocation;
+with Rose.Trace;
 with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Block_Device.Client;
@@ -32,6 +33,11 @@ package body Store.Devices is
          Device_Bound    : Rose.Objects.Object_Id := 0;
          Allocator_Base  : Positive;
          Allocator_Bound : Positive;
+         Reads           : Natural := 0;
+         Read_Ticks      : Natural := 0;
+         Writes          : Natural := 0;
+         Write_Ticks     : Natural := 0;
+         --  Pages read and written, and the time they took (#196).
       end record;
 
    type Backing_Store_Array is
@@ -48,6 +54,8 @@ package body Store.Devices is
          Access_Cap     : Rose.Capabilities.Capability := 0;
          Alloc_Index    : Natural := 0;
          Alloc_Banks    : Natural := 0;
+         Reads          : Natural := 0;
+         Writes         : Natural := 0;
       end record;
    --  A region, with the banks it was allocated, which a subregion does
    --  not have: Alloc_Index is zero.
@@ -249,6 +257,7 @@ package body Store.Devices is
             Child := (Parent with delta
                         Base => Base, Bound => Bound,
                         Alloc_Index => 0, Alloc_Banks => 0,
+                        Reads => 0, Writes => 0,
                         Access_Cap =>
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
@@ -290,6 +299,7 @@ package body Store.Devices is
          Region : Region_Record renames Regions (Region_Index);
          Store      : Backing_Store_Record renames
                         Backing_Stores (Region.Backing_Device);
+         Start      : constant Natural := Rose.Trace.Ticks;
       begin
          Rose.Interfaces.Block_Device.Client.Read_Blocks
            (Item   => Store.Client,
@@ -298,6 +308,9 @@ package body Store.Devices is
                 (Page - Store.Base),
             Count  => 1,
             Blocks => Data);
+         Store.Reads := Store.Reads + 1;
+         Store.Read_Ticks := Store.Read_Ticks + (Rose.Trace.Ticks - Start);
+         Region.Reads := Region.Reads + 1;
       end;
 
    end Get;
@@ -377,7 +390,8 @@ package body Store.Devices is
             Bound           => Rose.Objects.Page_Object_Id'Last,
             Device_Bound    => Rose.Objects.Page_Object_Id'First,
             Allocator_Base  => 1,
-            Allocator_Bound => Positive'Last);
+            Allocator_Bound => Positive'Last,
+            others          => <>);
       end if;
 
       while Index < Backing_Store_Count loop
@@ -468,6 +482,7 @@ package body Store.Devices is
          Region : Region_Record renames Regions (Region_Index);
          Store      : Backing_Store_Record renames
                         Backing_Stores (Region.Backing_Device);
+         Start      : constant Natural := Rose.Trace.Ticks;
       begin
          Rose.Interfaces.Block_Device.Client.Write_Blocks
            (Item   => Store.Client,
@@ -476,6 +491,10 @@ package body Store.Devices is
                 (Page - Store.Base),
             Count  => 1,
             Blocks => Data);
+         Store.Writes := Store.Writes + 1;
+         Store.Write_Ticks :=
+           Store.Write_Ticks + (Rose.Trace.Ticks - Start);
+         Region.Writes := Region.Writes + 1;
       end;
 
    end Put;
@@ -599,6 +618,23 @@ package body Store.Devices is
          Region : Region_Record renames Regions (Index);
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
+         Rose.Trace.Event
+           ("store: region released: reads ", Region.Reads,
+            ", writes ", Region.Writes);
+         if Region.Backing_Device in 1 .. Backing_Store_Count then
+            declare
+               Store : Backing_Store_Record renames
+                 Backing_Stores (Region.Backing_Device);
+            begin
+               Rose.Trace.Event
+                 ("store: total reads ", Store.Reads,
+                  ", ticks ", Store.Read_Ticks);
+               Rose.Trace.Event
+                 ("store: total writes ", Store.Writes,
+                  ", ticks ", Store.Write_Ticks);
+            end;
+         end if;
+
          if Region.Alloc_Index > 0 then
             Space_Allocators.Deallocate
               (Allocator, Region.Alloc_Index,
@@ -684,7 +720,9 @@ package body Store.Devices is
             Bound          => Bound,
             Access_Cap     => Cap,
             Alloc_Index    => Alloc_Index,
-            Alloc_Banks    => Alloc_Size / Minimum_Bank_Size);
+            Alloc_Banks    => Alloc_Size / Minimum_Bank_Size,
+            Reads          => 0,
+            Writes         => 0);
 
          return Cap;
       end;
