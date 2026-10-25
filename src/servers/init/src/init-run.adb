@@ -11,6 +11,7 @@ with Rose.Interfaces.Constructor;
 with Rose.Interfaces.Exec;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Kernel_Log;
+with Rose.Interfaces.Log_Reader;
 with Rose.Interfaces.Storage;
 with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
@@ -142,6 +143,7 @@ package body Init.Run is
 
       Add_Log_Device_Cap : Rose.Capabilities.Capability;
       Append_To_Log_Cap  : Rose.Capabilities.Capability;
+      Log_Reader_Cap     : Rose.Capabilities.Capability;
       Receive_Timeout    : Rose.Capabilities.Capability;
       Send_Timeout       : Rose.Capabilities.Capability;
 
@@ -739,6 +741,9 @@ package body Init.Run is
          Append_To_Log_Cap :=
            Copy_Cap_From_Process
              (Copy_Cap, Append_Endpoint);
+         Log_Reader_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Rose.Interfaces.Log_Reader.Log_Reader_Interface);
       end;
 
       declare
@@ -761,7 +766,8 @@ package body Init.Run is
                             Write_System_Image_Cap,
                             Install_Media_FS,
                             Install_Endpoint,
-                            Add_Log_Device_Cap));
+                            Add_Log_Device_Cap,
+                            Log_Reader_Cap));
 
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;

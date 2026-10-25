@@ -11,6 +11,7 @@ with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Rose.Devices.Checkpoints;
+with Restore.Checkpoint_Log;
 with Restore.Installer.Default;
 
 procedure Restore.Driver is
@@ -48,8 +49,23 @@ begin
    Next (Install_Media_Cap);
    Next (Install_Exec_Cap);
    Next (Add_Log_Device_Cap);
+   Next (Log_Reader_Cap);
 
    Rose.Console_IO.Open (Console_Cap);
+
+   --  The log server can only read the log once it has its device.
+
+   Rose.Console_IO.Put_Line ("restore: adding log device");
+
+   declare
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Add_Log_Device_Cap);
+      Rose.System_Calls.Send_Cap (Params, Log_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end;
+
+   Restore.Checkpoint_Log.Report (Log_Reader_Cap);
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");
 
@@ -85,16 +101,6 @@ begin
             Source => Restore.Installer.Default.Iterate_Steps'Access);
       end;
    end if;
-
-   Rose.Console_IO.Put_Line ("restore: adding log device");
-
-   declare
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      Rose.System_Calls.Initialize_Send (Params, Add_Log_Device_Cap);
-      Rose.System_Calls.Send_Cap (Params, Log_Cap);
-      Rose.System_Calls.Invoke_Capability (Params);
-   end;
 
    Rose.Console_IO.Put_Line ("restore: done");
 

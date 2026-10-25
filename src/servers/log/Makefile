@@ -18,6 +18,10 @@ KERNEL_LOG_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-kernel_log.o \
 	$(BUILDDIR)/rose-interfaces-kernel_log-server.o
 
+LOG_READER_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-log_reader.o \
+	$(BUILDDIR)/rose-interfaces-log_reader-server.o
+
 STATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-state.o \
 	$(BUILDDIR)/rose-interfaces-state-server.o
@@ -42,6 +46,7 @@ OBJECTS= \
 	$(LIBROSE_OBJECTS) \
 	$(BLOCK_DEVICE_OBJECTS) \
 	$(KERNEL_LOG_OBJECTS) \
+	$(LOG_READER_OBJECTS) \
 	$(STATE_OBJECTS)
 
 all: log $(RELOC)

@@ -7,6 +7,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Kernel_Log.Server;
+with Rose.Interfaces.Log_Reader.Server;
 with Rose.Interfaces.State.Server;
 
 with Rose.Server;
@@ -53,6 +54,17 @@ package body Log.Server is
    Current_Log_Header : Log.Header.Entry_Header_Type;
    Header             : Log.Header.Log_Header_Type;
    Next_Log_Location  : Log_Location_Id;
+
+   First_Committed    : Log_Location_Id := 0;
+   Last_Committed     : Log_Location_Id := 0;
+   --  The locations of the first and last committed entries, or 0 if
+   --  there are none.  Readers only see entries in this range.
+
+   Cached_Location    : Log_Location_Id := 0;
+   Cached_Header      : Log.Header.Entry_Header_Type;
+   --  The header of the committed entry at Cached_Location, if that is
+   --  not 0, so that reading an entry's pages doesn't read its header
+   --  each time.
 
    Log_Page_Buffer_Count : constant := 8;
    type Page_Buffer_Count is range 0 .. Log_Page_Buffer_Count;
@@ -107,6 +119,34 @@ package body Log.Server is
 
    procedure Fail_Entry (Message : String);
    --  Report Message, and leave the current entry out of the log.
+
+   function Load_Entry (Location : Log_Location_Id) return Boolean;
+   --  If Location is a committed entry, put its header in Cached_Header
+   --  and return True.
+
+   function First_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64;
+
+   function Last_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64;
+
+   function Next_Entry
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64)
+      return Rose.Words.Word_64;
+
+   function Page_Count
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64)
+      return Natural;
+
+   procedure Read_Page
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64;
+      Index    : Positive;
+      Page     : out System.Storage_Elements.Storage_Array);
 
    type Device_Operation is (Read, Write);
 
@@ -216,6 +256,11 @@ package body Log.Server is
                        ("log: skipping entry at location ");
                      Rose.Console_IO.Put (Natural (Next_Log_Location));
                      Rose.Console_IO.New_Line;
+
+                     if First_Committed = 0 then
+                        First_Committed := Next_Log_Location;
+                     end if;
+                     Last_Committed := Next_Log_Location;
 
                      Next_Log_Location := Current_Log_Header.Log_Last + 1;
                   end loop;
@@ -333,6 +378,10 @@ package body Log.Server is
          begin
             Write (Next_Log_Location, Current_Log_Header'Address, Success);
             if Success then
+               if First_Committed = 0 then
+                  First_Committed := Next_Log_Location;
+               end if;
+               Last_Committed := Next_Log_Location;
                Next_Log_Location := Current_Log_Header.Log_Last + 1;
             else
                Fail_Entry ("log: commit: cannot write entry header");
@@ -428,6 +477,14 @@ package body Log.Server is
         (Server_Context => Log_Server,
          Reset          => Reset'Access);
 
+      Rose.Interfaces.Log_Reader.Server.Attach_Interface
+        (Server_Context => Log_Server,
+         First_Entry    => First_Entry'Access,
+         Last_Entry     => Last_Entry'Access,
+         Next_Entry     => Next_Entry'Access,
+         Page_Count     => Page_Count'Access,
+         Read_Page      => Read_Page'Access);
+
       for Page of Page_Buffer loop
          for Element of Page loop
             Element := 0;
@@ -447,6 +504,19 @@ package body Log.Server is
          Entry_Failed := True;
       end if;
    end Fail_Entry;
+
+   -----------------
+   -- First_Entry --
+   -----------------
+
+   function First_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64
+   is
+      pragma Unreferenced (Id);
+   begin
+      return Rose.Words.Word_64 (First_Committed);
+   end First_Entry;
 
    -----------
    -- Flush --
@@ -525,6 +595,69 @@ package body Log.Server is
         and then Entry_Header.Log_Last >= Location;
    end Is_Log_Entry;
 
+   ----------------
+   -- Last_Entry --
+   ----------------
+
+   function Last_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64
+   is
+      pragma Unreferenced (Id);
+   begin
+      return Rose.Words.Word_64 (Last_Committed);
+   end Last_Entry;
+
+   ----------------
+   -- Load_Entry --
+   ----------------
+
+   function Load_Entry (Location : Log_Location_Id) return Boolean is
+      Success : Boolean;
+   begin
+      if Location = 0
+        or else Location < First_Committed
+        or else Location > Last_Committed
+      then
+         return False;
+      end if;
+
+      if Location = Cached_Location then
+         return True;
+      end if;
+
+      Cached_Location := 0;
+      Read (Location, Cached_Header'Address, Success);
+      if Success and then Is_Log_Entry (Location, Cached_Header) then
+         Cached_Location := Location;
+      end if;
+
+      return Cached_Location /= 0;
+   end Load_Entry;
+
+   ----------------
+   -- Next_Entry --
+   ----------------
+
+   function Next_Entry
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64)
+      return Rose.Words.Word_64
+   is
+      pragma Unreferenced (Id);
+      Current : constant Log_Location_Id := Log_Location_Id (Location);
+   begin
+      if Current = Last_Committed or else not Load_Entry (Current) then
+         return 0;
+      end if;
+
+      declare
+         Next : constant Log_Location_Id := Cached_Header.Log_Last + 1;
+      begin
+         return (if Load_Entry (Next) then Rose.Words.Word_64 (Next) else 0);
+      end;
+   end Next_Entry;
+
    -------------
    -- Operate --
    -------------
@@ -592,6 +725,25 @@ package body Log.Server is
       Success := True;
    end Operate;
 
+   ----------------
+   -- Page_Count --
+   ----------------
+
+   function Page_Count
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64)
+      return Natural
+   is
+      pragma Unreferenced (Id);
+      Item : constant Log_Location_Id := Log_Location_Id (Location);
+   begin
+      if Load_Entry (Item) then
+         return Natural (Cached_Header.Log_Last - Item);
+      else
+         return 0;
+      end if;
+   end Page_Count;
+
    ----------
    -- Read --
    ----------
@@ -604,6 +756,35 @@ package body Log.Server is
    begin
       Operate (Location, Addr, Read, 1, Success);
    end Read;
+
+   ---------------
+   -- Read_Page --
+   ---------------
+
+   procedure Read_Page
+     (Id       : Rose.Objects.Capability_Identifier;
+      Location : Rose.Words.Word_64;
+      Index    : Positive;
+      Page     : out System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      Item    : constant Log_Location_Id := Log_Location_Id (Location);
+      Success : Boolean := False;
+   begin
+      if Page'Length /= Log_Page_Size then
+         Rose.Console_IO.Put_Line ("log: read: buffer is not one page");
+      elsif not Load_Entry (Item) then
+         Rose.Console_IO.Put_Line ("log: read: not an entry");
+      elsif Log_Location_Id (Index) > Cached_Header.Log_Last - Item then
+         Rose.Console_IO.Put_Line ("log: read: no such page in entry");
+      else
+         Read (Item + Log_Location_Id (Index), Page'Address, Success);
+      end if;
+
+      if not Success then
+         Page := (others => 0);
+      end if;
+   end Read_Page;
 
    -----------
    -- Reset --
@@ -635,6 +816,9 @@ package body Log.Server is
                Rose.Console_IO.Put_Line ("log: reset: cannot write header");
             end if;
             Next_Log_Location := 1;
+            First_Committed := 0;
+            Last_Committed := 0;
+            Cached_Location := 0;
          end;
       end if;
    end Reset;
