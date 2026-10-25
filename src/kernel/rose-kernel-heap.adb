@@ -13,6 +13,10 @@ package body Rose.Kernel.Heap is
 
    Log_Heap : constant Boolean := False;
 
+   Boot_Mapped_Bound : Rose.Words.Word_32;
+   pragma Import (C, Boot_Mapped_Bound, "boot_mapped_bound");
+   --  boot.s maps physical memory below this at Kernel_Virtual_Base
+
    Heap_Start : Virtual_Address;
    Heap_Bound : Virtual_Address;
    Heap_End   : Virtual_Address;
@@ -332,8 +336,8 @@ package body Rose.Kernel.Heap is
       Heap_Phys_Bound : Physical_Address;
    begin
 
-      --  assume addresses up to 4M are identity mapped, and that
-      --  the Kernel is << 4M in size
+      --  the heap is addressed through the boot mapping, so it has
+      --  to lie below Boot_Mapped_Bound
       Heap_Phys_Start :=
         Physical_Memory.Allocate_Bytes
         (Constraint => Physical_Memory.Page_Aligned,
@@ -346,6 +350,11 @@ package body Rose.Kernel.Heap is
         Align_Up_To_Page_Boundary (Heap_Phys_Start + Required);
       Heap_Bound :=
         Virtual_Address (Heap_Phys_Bound) + Kernel_Virtual_Base;
+
+      if Heap_Phys_Bound > Physical_Address (Boot_Mapped_Bound) then
+         Kernel.Panic.Panic
+           ("kernel heap is above the boot mapping: ", Heap_Phys_Bound);
+      end if;
 
       Initial_Physical_Bound := Physical_Address_To_Page (Heap_Phys_Bound);
       Initial_Virtual_Bound  := Virtual_Address_To_Page (Heap_Bound);

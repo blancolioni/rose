@@ -1,6 +1,7 @@
         .global boot                            # Make the startup entry point symbol visible to the linker
         .global boot_page_directory
         .global boot_page_table
+        .global boot_mapped_bound
     
         .global kernel_page_directory
 
@@ -10,6 +11,7 @@
 .set CHECKSUM, -(MULTIBOOT2_HEADER_MAGIC + GRUB_MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header))
 
 .set PAGE_ENTRY_FLAGS,   0x63           # Initial page entry flag value
+.set BOOT_PAGE_TABLES,   16             # Map the first 64M at KERNEL_VIRTUAL_BASE
 
         .set KERNEL_VIRTUAL_BASE, 0xF0000000
         .set KERNEL_PAGE_NUMBER, KERNEL_VIRTUAL_BASE >> 22
@@ -38,7 +40,9 @@ multiboot_entry:
 boot_page_directory:
         .skip 0x1000
 boot_page_table:
-        .skip 0x1000
+        .skip 0x1000 * BOOT_PAGE_TABLES
+boot_mapped_bound:                      # Physical memory below this is mapped
+        .long BOOT_PAGE_TABLES << 22
         
 # Reserve initial kernel stack space
 .set STACKSIZE, 0x4000                  # 0x4000 being 16k.
@@ -54,11 +58,11 @@ _boot:
     movl  %ebx, mbd - KERNEL_VIRTUAL_BASE        # EBX must contain the physical address of the Multiboot information structure
 
         # set up paging
-        # build a table of 1024 identity mapped tables
+        # build BOOT_PAGE_TABLES tables mapping the start of physical memory
         movl    $(boot_page_table - KERNEL_VIRTUAL_BASE), %esi
         xorl %edx, %edx
         movl $PAGE_ENTRY_FLAGS, %edx
-        movl $1024,%ecx
+        movl $(1024 * BOOT_PAGE_TABLES),%ecx
 1:	movl %edx, (%esi)
         addl $0x1000,%edx
         addl $4,%esi
@@ -72,12 +76,17 @@ _boot:
         addl $4,%esi
         loop 1b
 
-        # point 4M starting at 0x0000_0000 and 0xF000_0000 to 0x0000_0000
+        # point 4M starting at 0x0000_0000 to 0x0000_0000, and
+        # BOOT_PAGE_TABLES * 4M starting at 0xF000_0000 to 0x0000_0000
         movl	$(boot_page_directory - KERNEL_VIRTUAL_BASE), %esi
         movl	$(boot_page_table - KERNEL_VIRTUAL_BASE), %edx
         orl	$PAGE_ENTRY_FLAGS, %edx
         movl	%edx,(%esi)
-        movl	%edx,0xF00(%esi)
+        movl	$BOOT_PAGE_TABLES,%ecx
+1:	movl	%edx,0xF00(%esi)
+        addl	$0x1000,%edx
+        addl	$4,%esi
+        loop 1b
 
         # load boot page directory into master mapping register
         movl    $(boot_page_directory - KERNEL_VIRTUAL_BASE), %edx
