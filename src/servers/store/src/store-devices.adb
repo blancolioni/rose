@@ -23,6 +23,18 @@ package body Store.Devices is
 
    --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
 
+   Max_Fresh_Pages : constant := 2 ** 16;
+   --  The pages of a backing store whose freshness is kept: the first
+   --  256 MB. Other pages are always read.
+
+   type Fresh_Page_Array is
+     array (0 .. Max_Fresh_Pages - 1) of Boolean
+     with Pack;
+   --  True for a page that has been reserved and not written since, which
+   --  reads as zeroes without a read from the device (#203). Everything
+   --  else is read: a page whose freshness is not known, after a restore
+   --  for example, is read as it always was.
+
    type Backing_Store_Record is
       record
          Allocated       : Boolean := False;
@@ -38,6 +50,9 @@ package body Store.Devices is
          Writes          : Natural := 0;
          Write_Ticks     : Natural := 0;
          --  Pages read and written, and the time they took (#196).
+         Zero_Reads      : Natural := 0;
+         --  Reads of fresh pages, answered without the device.
+         Fresh           : Fresh_Page_Array := (others => False);
       end record;
 
    type Backing_Store_Array is
@@ -55,6 +70,7 @@ package body Store.Devices is
          Alloc_Index    : Natural := 0;
          Alloc_Banks    : Natural := 0;
          Reads          : Natural := 0;
+         Zero_Reads     : Natural := 0;
          Writes         : Natural := 0;
       end record;
    --  A region, with the banks it was allocated, which a subregion does
@@ -70,6 +86,18 @@ package body Store.Devices is
 
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
+
+   function Is_Fresh
+     (Store : Backing_Store_Record;
+      Page  : Rose.Objects.Object_Id)
+      return Boolean;
+   --  True if Page of Store has been reserved and not written since.
+
+   procedure Set_Fresh
+     (Store       : in out Backing_Store_Record;
+      Base, Bound : Rose.Objects.Object_Id;
+      Fresh       : Boolean);
+   --  Mark the pages Base .. Bound - 1 of Store fresh or not.
 
    Stream_Buffer_Length : constant := 4096;
 
@@ -257,7 +285,7 @@ package body Store.Devices is
             Child := (Parent with delta
                         Base => Base, Bound => Bound,
                         Alloc_Index => 0, Alloc_Banks => 0,
-                        Reads => 0, Writes => 0,
+                        Reads => 0, Zero_Reads => 0, Writes => 0,
                         Access_Cap =>
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
@@ -301,6 +329,13 @@ package body Store.Devices is
                         Backing_Stores (Region.Backing_Device);
          Start      : constant Natural := Rose.Trace.Ticks;
       begin
+         if Is_Fresh (Store, Page) then
+            Data := (others => 0);
+            Store.Zero_Reads := Store.Zero_Reads + 1;
+            Region.Zero_Reads := Region.Zero_Reads + 1;
+            return;
+         end if;
+
          Rose.Interfaces.Block_Device.Client.Read_Blocks
            (Item   => Store.Client,
             Start  =>
@@ -339,6 +374,22 @@ package body Store.Devices is
       Bound := Regions (Region_Index).Bound;
 
    end Get_Range;
+
+   --------------
+   -- Is_Fresh --
+   --------------
+
+   function Is_Fresh
+     (Store : Backing_Store_Record;
+      Page  : Rose.Objects.Object_Id)
+      return Boolean
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      return Page >= Store.Base
+        and then Page - Store.Base < Max_Fresh_Pages
+        and then Store.Fresh (Natural (Page - Store.Base));
+   end Is_Fresh;
 
    ----------------
    -- New_Region --
@@ -491,6 +542,7 @@ package body Store.Devices is
                 (Page - Store.Base),
             Count  => 1,
             Blocks => Data);
+         Set_Fresh (Store, Page, Page + 1, False);
          Store.Writes := Store.Writes + 1;
          Store.Write_Ticks :=
            Store.Write_Ticks + (Rose.Trace.Ticks - Start);
@@ -621,6 +673,8 @@ package body Store.Devices is
          Rose.Trace.Event
            ("store: region released: reads ", Region.Reads,
             ", writes ", Region.Writes);
+         Rose.Trace.Event
+           ("store: region released: zero reads ", Region.Zero_Reads);
          if Region.Backing_Device in 1 .. Backing_Store_Count then
             declare
                Store : Backing_Store_Record renames
@@ -629,6 +683,8 @@ package body Store.Devices is
                Rose.Trace.Event
                  ("store: total reads ", Store.Reads,
                   ", ticks ", Store.Read_Ticks);
+               Rose.Trace.Event
+                 ("store: total zero reads ", Store.Zero_Reads);
                Rose.Trace.Event
                  ("store: total writes ", Store.Writes,
                   ", ticks ", Store.Write_Ticks);
@@ -722,10 +778,34 @@ package body Store.Devices is
             Alloc_Index    => Alloc_Index,
             Alloc_Banks    => Alloc_Size / Minimum_Bank_Size,
             Reads          => 0,
+            Zero_Reads     => 0,
             Writes         => 0);
+
+         --  New storage holds nothing, whatever its device holds.
+
+         Set_Fresh (Backing_Stores (Store), Base, Bound, True);
 
          return Cap;
       end;
    end Reserve_Storage;
+
+   ---------------
+   -- Set_Fresh --
+   ---------------
+
+   procedure Set_Fresh
+     (Store       : in out Backing_Store_Record;
+      Base, Bound : Rose.Objects.Object_Id;
+      Fresh       : Boolean)
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      for Page in Base .. Bound - 1 loop
+         if Page >= Store.Base and then Page - Store.Base < Max_Fresh_Pages
+         then
+            Store.Fresh (Natural (Page - Store.Base)) := Fresh;
+         end if;
+      end loop;
+   end Set_Fresh;
 
 end Store.Devices;
