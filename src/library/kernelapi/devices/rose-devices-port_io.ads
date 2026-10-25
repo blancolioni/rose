@@ -56,4 +56,17 @@ package Rose.Devices.Port_IO is
      (Port : Rose.Capabilities.Capability;
       Data : Word_8_Data_Array);
 
+   type Word_16_Array is
+     array (Positive range <>) of Rose.Words.Word_16;
+
+   procedure Port_Out_16
+     (Port : Rose.Capabilities.Capability;
+      Data : Word_16_Array);
+   --  Write each element of Data to Port, sixteen per invocation.
+
+   procedure Port_In_16
+     (Port : Rose.Capabilities.Capability;
+      Data : out Word_16_Array);
+   --  Fill Data from Port, sixteen per invocation.
+
 end Rose.Devices.Port_IO;

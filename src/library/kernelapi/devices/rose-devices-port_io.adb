@@ -53,6 +53,43 @@ package body Rose.Devices.Port_IO is
    end Port_In_16;
 
    ----------------
+   -- Port_In_16 --
+   ----------------
+
+   procedure Port_In_16
+     (Port : Rose.Capabilities.Capability;
+      Data : out Word_16_Array)
+   is
+      use Rose.Invocation;
+      Params : aliased Invocation_Record;
+      First  : Positive := Data'First;
+   begin
+      while First <= Data'Last loop
+         declare
+            Last : constant Positive :=
+                     Positive'Min (Data'Last,
+                                   First + Max_Parameter_Words - 1);
+         begin
+            Params.Cap := Port;
+            Params.Control.Flags := (Send       => True,
+                                     Block      => True,
+                                     Recv_Words => True,
+                                     No_Trace   => True,
+                                     others     => False);
+            Params.Control.Last_Recv_Word :=
+              Parameter_Word_Index (Last - First);
+            Rose.System_Calls.Invoke_Capability (Params);
+            for I in First .. Last loop
+               Data (I) :=
+                 Rose.Words.Word_16
+                   (Params.Data (Parameter_Word_Index (I - First)));
+            end loop;
+            First := Last + 1;
+         end;
+      end loop;
+   end Port_In_16;
+
+   ----------------
    -- Port_In_32 --
    ----------------
 
@@ -162,6 +199,42 @@ package body Rose.Devices.Port_IO is
       Params.Cap := Port;
       Params.Data (0) := Rose.Words.Word (Value);
       Rose.System_Calls.Invoke_Capability (Params);
+   end Port_Out_16;
+
+   -----------------
+   -- Port_Out_16 --
+   -----------------
+
+   procedure Port_Out_16
+     (Port : Rose.Capabilities.Capability;
+      Data : Word_16_Array)
+   is
+      use Rose.Invocation;
+      Params : aliased Invocation_Record;
+      First  : Positive := Data'First;
+   begin
+      while First <= Data'Last loop
+         declare
+            Last : constant Positive :=
+                     Positive'Min (Data'Last,
+                                   First + Max_Parameter_Words - 1);
+         begin
+            Params.Cap := Port;
+            Params.Control.Flags := (Send       => True,
+                                     Block      => True,
+                                     Send_Words => True,
+                                     No_Trace   => True,
+                                     others     => False);
+            Params.Control.Last_Sent_Word :=
+              Parameter_Word_Index (Last - First);
+            for I in First .. Last loop
+               Params.Data (Parameter_Word_Index (I - First)) :=
+                 Rose.Words.Word (Data (I));
+            end loop;
+            Rose.System_Calls.Invoke_Capability (Params);
+            First := Last + 1;
+         end;
+      end loop;
    end Port_Out_16;
 
    -----------------
