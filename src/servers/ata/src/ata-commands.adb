@@ -277,18 +277,18 @@ package body ATA.Commands is
                return;
             end if;
 
-            for I in 1 .. 256 loop
-               declare
-                  use Rose.Words;
-                  D : constant Rose.Words.Word_16 :=
-                        Rose.Devices.Port_IO.Port_In_16 (Data_Port);
-               begin
+            declare
+               use Rose.Words;
+               Data : Rose.Devices.Port_IO.Word_16_Array (1 .. 256);
+            begin
+               Rose.Devices.Port_IO.Port_In_16 (Data_Port, Data);
+               for D of Data loop
                   Index := Index + 1;
                   Sectors (Index) := Storage_Element (D mod 256);
                   Index := Index + 1;
                   Sectors (Index) := Storage_Element (D / 256);
-               end;
-            end loop;
+               end loop;
+            end;
 
             if not Check_Drive_OK (Drive) then
                ATA.Drives.Log (Drive, "error detected after read");
@@ -390,17 +390,18 @@ package body ATA.Commands is
          end if;
       end;
 
-      for I in 1 .. Block_Size / 2 loop
-         declare
-            D : constant Rose.Words.Word_16 :=
-                  Rose.Devices.Port_IO.Port_In_16 (Data_In);
-         begin
+      declare
+         Data : Rose.Devices.Port_IO.Word_16_Array
+                  (1 .. Natural (Block_Size / 2));
+      begin
+         Rose.Devices.Port_IO.Port_In_16 (Data_In, Data);
+         for D of Data loop
             Index := Index + 1;
             Sector (Index) := Storage_Element (D mod 256);
             Index := Index + 1;
             Sector (Index) := Storage_Element (D / 256);
-         end;
-      end loop;
+         end loop;
+      end;
 
       if not Wait_For_Interrupt (Drive) then
          ATA.Drives.Log (Drive, "no IRQ after reading ATAPI data");
@@ -670,17 +671,17 @@ package body ATA.Commands is
                return;
             end if;
 
-            for I in 1 .. 256 loop
-               declare
-                  use Rose.Words;
-                  D : constant Word_16 :=
-                        Word_16 (Sectors (Index)) +
-                        256 * Word_16 (Sectors (Index + 1));
-               begin
-                  Rose.Devices.Port_IO.Port_Out_16 (Data_Port, D);
+            declare
+               use Rose.Words;
+               Data : Rose.Devices.Port_IO.Word_16_Array (1 .. 256);
+            begin
+               for D of Data loop
+                  D := Word_16 (Sectors (Index)) +
+                    256 * Word_16 (Sectors (Index + 1));
                   Index := Index + 2;
-               end;
-            end loop;
+               end loop;
+               Rose.Devices.Port_IO.Port_Out_16 (Data_Port, Data);
+            end;
 
             if not ATA.Drives.Wait_For_Interrupt (Drive) then
                ATA.Drives.Log (Drive, "did not get interupt after write");

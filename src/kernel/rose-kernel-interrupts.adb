@@ -93,7 +93,12 @@ package body Rose.Kernel.Interrupts is
             when Capability_Handler =>
                Send_Interrupt_Cap
                  (It.Handler_Object, It.Handler_Cap, Argument);
-               New_State := Finished;
+               --  The handler process is now ready; reschedule so that
+               --  it runs now rather than at the next clock tick (#212).
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
+               New_State := Not_Finished;
          end case;
          if New_State = Not_Finished then
             State := New_State;
