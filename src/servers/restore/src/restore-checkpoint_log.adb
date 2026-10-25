@@ -4,7 +4,6 @@ with Rose.Checkpoints;
 with Rose.Console_IO;
 with Rose.Limits;
 with Rose.System_Calls;
-with Rose.Words;
 
 with Rose.Interfaces.Log_Reader.Client;
 
@@ -308,14 +307,18 @@ package body Restore.Checkpoint_Log is
       return True;
    end Check_Mem_Tables;
 
-   ------------
-   -- Report --
-   ------------
+   ---------------------
+   -- Find_Checkpoint --
+   ---------------------
 
-   procedure Report (Reader_Cap : Rose.Capabilities.Capability) is
+   function Find_Checkpoint
+     (Reader_Cap : Rose.Capabilities.Capability)
+      return Rose.Words.Word_64
+   is
       Reader   : Log_Reader_Client;
       Location : Rose.Words.Word_64;
       Last     : Rose.Words.Word_64 := 0;
+      Latest   : Rose.Words.Word_64 := 0;
       Count    : Natural := 0;
       Bad      : Natural := 0;
    begin
@@ -330,7 +333,9 @@ package body Restore.Checkpoint_Log is
       Location := First_Entry (Reader);
       while Location /= 0 loop
          Count := Count + 1;
-         if not Check_Entry (Reader, Location) then
+         if Check_Entry (Reader, Location) then
+            Latest := Location;
+         else
             Bad := Bad + 1;
          end if;
          Last := Location;
@@ -368,8 +373,15 @@ package body Restore.Checkpoint_Log is
          Rose.Console_IO.New_Line;
       end if;
 
+      if Latest /= 0 then
+         Rose.Console_IO.Put ("restore: log: checkpoint at ");
+         Rose.Console_IO.Put (Natural (Latest));
+         Rose.Console_IO.New_Line;
+      end if;
+
       Rose.System_Calls.Use_Buffer (System.Null_Address, 0);
-   end Report;
+      return Latest;
+   end Find_Checkpoint;
 
    ----------------------
    -- Report_Bad_Entry --

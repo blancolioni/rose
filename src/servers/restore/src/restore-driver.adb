@@ -10,13 +10,18 @@ with Rose.Invocation;
 with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
-with Rose.Devices.Checkpoints;
 with Restore.Checkpoint_Log;
 with Restore.Installer.Default;
 
 procedure Restore.Driver is
 
    use Rose.Interfaces.Block_Device.Client;
+   use type Rose.Words.Word_64;
+
+   Restore_Enabled : constant Boolean := False;
+   --  Restoring from a checkpoint is not implemented yet (#102), so a
+   --  checkpoint is found and reported, but the system is installed
+   --  as before.
 
    Next_Cap_Index : Positive := 1;
 
@@ -34,7 +39,8 @@ procedure Restore.Driver is
       Next_Cap_Index := Next_Cap_Index + 1;
    end Next;
 
-   Device : Block_Device_Client;
+   Device     : Block_Device_Client;
+   Checkpoint : Rose.Words.Word_64;
 
 begin
 
@@ -65,7 +71,9 @@ begin
       Rose.System_Calls.Invoke_Capability (Params);
    end;
 
-   Restore.Checkpoint_Log.Report (Log_Reader_Cap);
+   --  A checkpoint is the last complete entry in the checkpoint log.
+
+   Checkpoint := Restore.Checkpoint_Log.Find_Checkpoint (Log_Reader_Cap);
 
    Rose.Console_IO.Put_Line ("restore: opening swap device");
 
@@ -73,9 +81,12 @@ begin
      (Client         => Device,
       Interface_Cap  => Active_Swap_Cap);
 
-   Rose.Console_IO.Put_Line ("restore: looking for system image");
+   if Checkpoint /= 0 and then not Restore_Enabled then
+      Rose.Console_IO.Put_Line
+        ("restore: restoring from a checkpoint is not implemented yet");
+   end if;
 
-   if Rose.Devices.Checkpoints.Has_Checkpoint (Device) then
+   if Checkpoint /= 0 and then Restore_Enabled then
       Rose.Console_IO.Put_Line ("restore: restoring from checkpoint");
    else
       Rose.Console_IO.Put_Line ("restore: activating storage");
