@@ -1,47 +1,196 @@
 = Servers
 
-== Boot Servers
+Rose's services are user-space processes, and come in two kinds.
+
+Boot servers::
+Started by `init` from the boot modules, in the order given in <<Boot Sequence>>.
+Each boot server's cap 1 creates endpoints.
+`console` and `caps` receive their other capabilities directly when they are launched; every later boot server receives a cap set, whose `Get_Cap` is its cap 2, and reads its capabilities from it by index.
+
+Drivers::
+Installed from the install media by `restore`, through `exec`.
+Each driver names the capabilities it needs in a `.driver` manifest, such as `create-endpoint`, `register-interrupt 33` or `port-in-8 96`, and `init` grants them when the driver is installed.
 
 [NOTE]
 ====
-This section describes an older `init` (#125), and its tables of launch caps and process ids are out of date.
-The servers `init` starts, and the order it starts them in, are described in <<Boot Sequence>>.
+`init` will resolve these named requests against a policy of its own, from capabilities it already holds, and refuse any it does not allow (#115).
 ====
 
-When the kernel is ready to schedule its first process, it chooses the first boot module.
-This is the _init_ program.
-Its job is to load the rest of the boot modules, and find the most recent consistent checkpoint from which to restore.
+Each entry below says what the server provides, what it is launched with, and who uses it.
 
-Init requires a particular set of launch caps (see <<init-launch-caps>>).
-Each of these capabilities is invoked in order.
-Init runs with a low priority, causing it to block while each boot server initialises.
+== Boot Servers
 
-The order in which `init` starts the boot servers is described in <<Boot Sequence>>.
+=== `console`
 
-[#init-launch-caps]
-.Launch caps for _init_ process
-[cols="1,2,5",options="header"]
-|===
-| Cap | Name | Description
-| 1 | meta | Standard meta cap
-| 2 | launch | Cap for launching boot modules
-| 2 | copy | Cap for copying process caps
-| 3 | construct-port | Cap for constructing port caps
-|===
+Writes text to the screen.
 
-[#boot-servers]
-.Boot Servers
-[cols="1,2,2,5",options="header"]
-|===
-| Pid | Name | Interface | Description
-| 2 | init | none | Installs system image and launches boot servers
-| 3 | console | stream-writer | writes to boot terminal
-| 4 | hd0 | storage | boot hard drive
-| 7 | mem | mem | memory manager
-| 8 | checkpoint | checkpoint | checkpointing process
-| 9 | proc | proc | process manager
-|===
+Provides:: `Stream_Writer`.
+Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`.
+Used by:: Every other server, for its messages, and the shell, for its standard output and standard error.
 
-=== Memory Manager
+=== `caps`
 
-=== Process Manager
+Holds cap sets, so that a process can pass many capabilities as one.
+
+Provides:: `Constructor`, whose `Create` makes a new, empty cap set; `Cap_Set` (`Append`, `Get_Cap`, `Length`) for each set; and `Cap`, whose `Destroy` frees a set.
+Launched with:: The console.
+Used by:: `init`, to give every later boot server its capabilities, and the shell's run-time, to create cap sets.
+
+A cap set holds up to 30 capabilities, and `caps` holds up to 100 sets.
+`Append` silently drops capabilities beyond the 30th.
+
+=== `mem`
+
+The memory manager, described in <<Memory>>.
+
+Provides:: `Memory`, and a `Process` for each process, with its `Segment` and `Heap`.
+Launched with:: The kernel's memory region queries, page-on, delete and trace.
+Used by:: `elf`, to create the `Process` for each new process, and `checkpoint`.
+
+=== `timer`
+
+Multiplexes the kernel's single timeout.
+
+Provides:: `Timer`, whose `Set_Timer` invokes a capability after a number of milliseconds; and `Cap`, whose `Destroy` cancels a timer.
+Launched with:: The kernel's set-timeout and get-ticks.
+Used by:: `init`, to wait, `ata` and `checkpoint`.
+
+`timer` keeps up to 100 timers, in ticks of 10 milliseconds, and sets the kernel's timeout for the earliest.
+When a timer expires, it invokes the timer's capability without waiting for a reply.
+
+=== `pci`
+
+Scans the PCI bus.
+
+Provides:: A lookup of a device by its vendor and device ids, which returns a capability for that device.
+Launched with:: The PCI configuration ports `CF8` and `CFC`.
+Used by:: `ata`, to find its controller.
+
+=== `ata`
+
+The driver for ATA disks.
+
+Provides:: `ATA`, and a `Block_Device` for each drive, chosen by the identifier of the interface capability: hd0 is the system disk, and hd1 is the install media.
+Launched with:: The PCI lookup, IRQs 46 and 47, the ports `1F0`–`1F7` and `3F6`, and the timer.
+Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
+
+=== `store`
+
+Manages persistent storage, divided into regions of pages.
+
+Provides:: `Storage`, whose `Reserve_Storage` returns a new region, and whose `Add_Backing_Store` adds a block device; a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Stream_Reader` for reading a region as a stream.
+Launched with:: Delete, the console and trace.
+Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
+
+A backing store's block size must be the page size, 4096 bytes.
+`store` holds up to 16 backing stores and 256 regions.
+A page that has been reserved and not written since reads as zeroes, without a read from the device (#203).
+
+=== `elf`
+
+Creates processes from ELF executables.
+
+Provides:: `Executable`, whose `Launch` returns the new process's `Process`, and whose `Launch_Command` returns the endpoint capability of a command (ADR 0002).
+Launched with:: Delete, rescind, the console, `Memory`, the kernel's create-process, and trace.
+Used by:: `exec`.
+
+To launch a program, `elf`:
+
+. creates the process through the kernel, and asks `mem` for its `Process`;
+. sends the process its `Process` interface as its first capability;
+. for a command, creates the command endpoint and sends the process its receive capability;
+. sends the process the capabilities it was launched with;
+. loads the executable's image from its region into segments of the process, and starts it.
+
+=== `scan`
+
+Reads the partition table of the system disk.
+*This is the server that reformats the disk.*
+
+Provides:: `Partitions` (`Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
+Launched with:: The console and hd0.
+Used by:: `init`.
+
+If hd0 has no GPT partition table, `scan` writes one.
+If the table has no partitions, `scan` creates three: two swap partitions, each a quarter of the disk, the first of them active, and a log partition from the rest.
+
+=== `partition`
+
+Serves one partition of a block device as a block device of its own.
+`init` starts one for each swap and log partition that `scan` finds.
+
+Provides:: `Block_Device`, whose block numbers are relative to the start of the partition.
+Launched with:: The console and the device, with the partition's start, its bound and its block size as launch words.
+Used by:: `store`, for the active swap partition, `restore`, and `log`, for the log partition.
+
+A partition's block size can be a multiple of the device's: the swap partitions have 4096-byte blocks on a disk of 512-byte blocks.
+
+=== `isofs`
+
+Reads the ISO 9660 file system on the install media.
+
+Provides:: `File_System`, whose `Root_Directory` returns the root; `Directory` for each directory, for lookup only; and `Stream_Reader` for the contents of a file, returned by `Directory.Read_File`.
+Launched with:: The console and hd1.
+Used by:: `restore`, to read the programs it installs.
+
+`Get_Ordinary_File` returns no capability, and the file system cannot be written.
+
+=== `log`, `checkpoint` and `restore`
+
+These servers save and restore the system's state.
+`log` writes to the log partition, `checkpoint` takes a checkpoint every few seconds, and `restore` either restores from a checkpoint or installs the system on a first boot (see <<Boot Sequence>> and <<Persistence>>).
+Documenting them fully is tracked in #130.
+
+== Drivers
+
+=== `exec`
+
+Installs and launches executables.
+
+Provides:: `Exec`, whose `Install` stores an executable and returns a `Launch` interface for it; and `Launch` for each installed program.
+Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`.
+Used by:: `init`, which installs every program after `exec` itself.
+
+=== `command`
+
+The command registry.
+
+Provides:: `Map` (`Add`, `Remove`, `Find`), from a command's name to its launch capability.
+Requests:: `create-endpoint`.
+Used by:: `init`, which adds the commands it installs and launches the shell from the registry, and the shell, which finds commands by name.
+
+=== `keyboard`
+
+The driver for the PC keyboard.
+
+Provides:: `Event_Source`, whose `Add_Listener` registers the one listener that receives each key.
+Requests:: `create-endpoint`, `register-interrupt 33`, and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
+Used by:: `event-input-stream`.
+
+`keyboard` also echoes each key to the console itself.
+
+=== `event-input-stream`
+
+Turns keyboard events into a stream of input.
+
+Provides:: `Stream_Reader`, which returns a line of input at a time; and `Event_Listener`, which it registers with the keyboard.
+Requests:: `create-endpoint`.
+Used by:: The shell, as its standard input.
+
+`event-input-stream` buffers up to 4096 bytes, and releases them when a line is complete.
+`restore` sends its `Stream_Reader` to `init`, which gives it to the shell.
+
+=== `file`
+
+Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
+
+Provides:: `Writable_File` (ADR 0003).
+Requests:: `create-endpoint`.
+Used by:: Nothing yet; the installer saves it, without launching it.
+
+A file holds up to 1 MB, and every holder of the file shares one position in it.
+
+=== `terminal` and `hello`
+
+The source of these two drivers is in `src/drivers`, but the build does not include them.
+`terminal` serves a `Stream_Writer` that writes to an output device, and `hello` is an example that prints `Hello`.
