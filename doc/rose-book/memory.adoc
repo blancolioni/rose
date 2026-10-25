@@ -1,54 +1,54 @@
 = Memory
 
-Physical memory is managed by the memory manager.
-Page objects are managed by the page object manager.
-A process belongs to a particular space bank, which represents a range of page objects.
-Space banks are hierarchical.
-A page object is a direct member of at most one space bank.
-At the top of the space bank hierarchy is the root space bank, which encompasses the entire page object id range.
+Each process runs in its own flat address space, starting at zero, divided into pages of 4096 bytes.
+The memory manager, `mem`, decides what each page of each process holds, and maps it to physical memory when the process first uses it.
+The mapping from virtual to physical pages is not persisted; what persists is the storage behind each page.
 
-Each process executes in a flat memory space starting at zero.
-These are the virtual pages.
-Virtual pages are mapped or unmapped.
-A mapped virtual page references a corresponding physical page.
-A physical page may be mapped by any number of virtual pages.
-This mapping is not persisted.
+== Segments
+
+A process's address space is made of _segments_.
+A segment maps a range of virtual pages onto a region of storage from `store`, with flags that say whether the pages can be read, written or executed.
+
+`elf` builds a process's segments when it launches the program:
+
+* *Each loadable segment of the ELF executable* becomes a segment of the process.
+** A read-only segment is mapped straight from the program's image.
+   Every process running the program maps the same storage, and, once a page is in memory, the same physical page.
+** A writable segment gets storage of its own: `elf` reserves a new region, copies the segment's contents from the image into it, and marks the segment _private_, so that its storage is released when the process is gone.
+   The part of the segment beyond the contents of the file, such as `.bss`, reads as zeroes.
+* *The stack* is a private, writable segment of 1 MB, which ends at `E000_0000`.
+
+The run-time's heap is part of the program's `.bss`, so it has a fixed size.
+
+== Page Faults
+
+A process's pages are not mapped when it starts.
+The first access to a page faults, and the kernel passes the fault to `mem`, which checks it against the process's segments.
+
+* *An access that its segment does not allow*, or to an address outside every segment, is a protection fault, and stops the process.
+* *A page of a read-only segment that is already in memory* is mapped to the same physical page, without reading storage.
+  `mem` keeps these pages in a cache, and counts how many mappings each one has; a page that nothing maps stays cached until its memory is needed (#200).
+* *Any other page* gets a free physical page, filled from the segment's region, or with zeroes if the segment has no region.
+  If there is no free page, `mem` reclaims one; if it cannot, the process is stopped as out of memory.
+* *A write to a page that is mapped read-only*, in a writable segment, makes the page writable and marks it dirty, so that the next checkpoint saves it (see <<Persistence>>).
+
+`mem` gets physical memory from the kernel's memory map when it starts, and keeps track of which physical pages are free.
 
 == Example
 
-The command `ls` lists the contents of a directory.
-A user shell normally has a launch capability for `ls`.
-When this capability is invoked, a new process is created.
-A snapshot of part of the memory state might look something like <<ls-launch>>.
+The `echo` command has three loadable segments.
+When it runs, its address space is:
 
-[#ls-launch]
-.Example memory snapshot after launching `ls`
+[#echo-memory]
+.The address space of `echo`
 [cols="2,2,2,5",options="header"]
 |===
-| Page Object | Virtual Address | Physical Address | Description
-| _ls_ + 0 | `0000 0000` | `4020 C000` | 1st page of ls text segment
-| _ls_ + 1000 | `0000 1000` | `ABCD 2000` | 2nd page of ls text segment
-| _ls_ + 2000 | `0000 2000` | | 3rd page (not paged in yet)
-| _base_ + 3000 | `BFFF F000` | `D020 1000` | stack page (in user space map)
+| Virtual address | Size | Access | Storage
+| `0000_0000` | 48 KB | Read, execute | The code, from `echo`'s image, shared by every `echo` process
+| `0000_D000` | 25 KB | Read | Constants, from the image, shared
+| `0001_4000` | 105 KB | Read, write | Data and `.bss`, in a private region: the first page is copied from the image, and the rest reads as zeroes
+| `DFF0_0000` | 1 MB | Read, write | The stack, in a private region
 |===
 
-Every physical page is either free, or mapped to a page object.
-This mapping is not persisted.
-The memory manager keeps track of free memory pages and memory page ⇔ page object mappings.
-
-== Memory Interface
-
-A memory capability can be used to map a page object id.
-This makes the page object available to a running process, although it does not necessarily exist in physical memory yet.
-When a process is launched, four page object ranges are mapped: the code segment (read-only, executable), the text segment (read-only), the data segment (read/write) and the stack segment (read/write).
-
-If the memory server already knows about a read-only page object id, the map is not updated.
-
-A stack segment page object id is always new, and is therefore always recorded in the memory manager.
-
-A data segment page object may be initialised or uninitialised.
-
-If an initialised read/write page object id is mapped, and the memory manager already has the page object mapped read-only, the page object is mapped to the read-only version.
-If it is later written to, a copy will be made and the page object will be re-mapped.
-
-An uninitialised read/write page object is recorded (same as a stack segment page).
+The first time `echo` runs, each page it uses faults and is read from storage.
+The next `echo` finds the pages of its code and constants already in memory, and maps them without reading storage; only its data and stack pages are new.
