@@ -1,3 +1,5 @@
-interface File : Stream, Seekable is
+interface File : Stream_Reader, Seekable is
+
+   function Size return Storage_Count;
 
 end File;

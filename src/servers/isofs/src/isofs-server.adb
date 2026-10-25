@@ -311,8 +311,6 @@ package body IsoFS.Server is
          Get_Ordinary_File     => Get_Ordinary_File'Access,
          Get_Directory         => Get_Directory'Access,
          Read_File             => Read_File'Access,
-         Create_Directory      => null,
-         Create_File           => null,
          Instanced             => True);
 
       Rose.Interfaces.Stream_Reader.Server.Attach_Interface
