@@ -1,0 +1,20 @@
+# Bochs configuration for Rose, matching qemu/init-qemu.sh.
+# Run from the top of the repository with bochs/run-bochs.sh.
+
+memory: guest=8, host=8
+
+romimage: file=$BXSHARE/BIOS-bochs-latest
+vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
+
+# 128M raw disk: 512 * 16 * 32 * 512 bytes.
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+ata0-master: type=disk, path="rose-hd0.img", mode=flat, cylinders=512, heads=16, spt=32
+ata0-slave: type=cdrom, path="images/rose.iso", status=inserted
+
+boot: cdrom
+
+com1: enabled=1, mode=file, dev=bochs-port-1.txt
+
+clock: sync=realtime, time0=local
+
+log: bochs.log

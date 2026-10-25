@@ -7,6 +7,8 @@ The build process requires [alix](https://github.com/blancolioni/alix) to genera
 
 On Fedora, you'll need the following packages: qemu-img gcc-gnat gprbuild make xorriso 
 
+To test under Bochs as well as QEMU, install bochs and run `sh bochs/run-bochs.sh`.
+
 Building Rose requires gcc 10 or gcc 11.  Earlier versions might also work.
 
 ## Build
