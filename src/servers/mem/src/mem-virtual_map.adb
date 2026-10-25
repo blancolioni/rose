@@ -3,6 +3,7 @@ with System.Storage_Elements;
 with Rose.Limits;
 
 with Mem.Calls;
+with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Processes;
 
@@ -53,8 +54,7 @@ package body Mem.Virtual_Map is
       Success       : out Boolean)
    is
    begin
-      Physical_Page := 0;
-      Success := False;
+      Mem.Page_Cache.Evict (Physical_Page, Success);
    end Reclaim;
 
    ----------------

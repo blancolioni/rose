@@ -622,6 +622,7 @@ package body Mem.Processes is
          Rose.Trace.Event ("faults of process ", Natural (P.Oid));
          Report ("  region reads ", Region_Fault);
          Report ("  zero-filled ", Zero_Fault);
+         Report ("  cached ", Cached_Fault);
          Report ("  writes ", Write_Fault);
          Report ("  invalid ", Invalid_Fault);
       end Report_Faults;
@@ -690,6 +691,32 @@ package body Mem.Processes is
    begin
       return Process_Table (Process).Server;
    end Published_Interface_Cap;
+
+   -----------------
+   -- Region_Page --
+   -----------------
+
+   function Region_Page
+     (Process      : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id
+   is
+      use Rose.Addresses;
+      use Rose.Objects;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments loop
+         if Virtual_Page >= Segment.Base
+           and then Virtual_Page < Segment.Bound
+           and then Segment.Region_Base /= 0
+         then
+            return Segment.Region_Base
+              + Object_Id (Virtual_Page - Segment.Base)
+              + Segment.Region_Offset;
+         end if;
+      end loop;
+      return 0;
+   end Region_Page;
 
    ----------------------
    -- Register_Process --

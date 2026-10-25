@@ -94,9 +94,18 @@ package Mem.Processes is
    --  Private_Region is True if Region belongs to the process, and is to
    --  be released when the process is gone.
 
-   type Fault_Kind is (Region_Fault, Zero_Fault, Write_Fault, Invalid_Fault);
+   function Region_Page
+     (Process      : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id;
+   --  The store page that Virtual_Page of Process is read from, or zero if
+   --  its segment has no region.
+
+   type Fault_Kind is
+     (Region_Fault, Zero_Fault, Cached_Fault, Write_Fault, Invalid_Fault);
    --  A page read from its segment's region, a page filled with zeroes,
-   --  a write to a mapped page, which makes it writable and dirty, and an
+   --  a page of a read-only segment that was already in memory (#200), a
+   --  write to a mapped page, which makes it writable and dirty, and an
    --  access that is not allowed.
 
    procedure Count_Fault

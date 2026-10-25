@@ -2,6 +2,7 @@ with Rose.Console_IO;
 with Rose.Objects;
 
 with Mem.Calls;
+with Mem.Page_Cache;
 with Mem.Physical_Map;
 with Mem.Processes;
 
@@ -56,7 +57,16 @@ package body Mem.Page_Table is
             Element : Mapped_Page_Record renames Mapped_Pages (I);
          begin
             if Element.Process = Process then
-               Mem.Physical_Map.Deallocate_Page (Element.Phys);
+               declare
+                  Cached : Boolean;
+               begin
+                  --  A cached page stays in memory for the next process
+                  --  that maps it, until Reclaim needs it.
+                  Mem.Page_Cache.Release (Element.Phys, Cached);
+                  if not Cached then
+                     Mem.Physical_Map.Deallocate_Page (Element.Phys);
+                  end if;
+               end;
                Element.Process := 0;
                Free_Count := Free_Count + 1;
             end if;

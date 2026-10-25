@@ -24,6 +24,7 @@ with Rose.System_Calls.Client;
 
 with Mem.Calls;
 with Mem.Checkpoints;
+with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Processes;
@@ -286,6 +287,7 @@ package body Mem.Server is
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier) is
    begin
+      Mem.Page_Table.Delete_All (Process_Id (Id));
       Mem.Processes.Kill_Process (Process_Id (Id));
       Remove_Instances (Id);
    end Destroy;
@@ -399,9 +401,37 @@ package body Mem.Server is
 
       if Physical_Page = 0 then
          declare
-            Have_Page : Boolean;
-            Page      : Rose.Addresses.Physical_Page_Address;
+            use type Rose.Objects.Object_Id;
+            Shared     : constant Boolean := Persistent and then not Writable;
+            --  Pages of read-only segments are cached, and shared by the
+            --  processes that map them (#200).
+            Store_Page : constant Rose.Objects.Object_Id :=
+                           (if Shared
+                            then Mem.Processes.Region_Page (Pid, Virtual_Page)
+                            else 0);
+            Cached     : constant Physical_Page_Address :=
+                           (if Store_Page /= 0
+                            then Mem.Page_Cache.Find (Store_Page)
+                            else 0);
+            Have_Page  : Boolean;
+            Page       : Rose.Addresses.Physical_Page_Address;
          begin
+            if Cached /= 0 then
+               Mem.Virtual_Map.Map
+                 (Process       => Object,
+                  Virtual_Page  => Virtual_Page,
+                  Physical_Page => Cached,
+                  Readable      => Readable,
+                  Writable      => Writable,
+                  Executable    => Executable,
+                  Persistent    => Persistent);
+               Mem.Page_Cache.Acquire (Cached);
+               Mem.Processes.Resume_Process (Pid);
+               Mem.Processes.Count_Fault
+                 (Pid, Mem.Processes.Cached_Fault, Rose.Trace.Ticks - Start);
+               return;
+            end if;
+
             Mem.Physical_Map.Allocate_Page
               (Page, Have_Page);
             if not Have_Page then
@@ -425,6 +455,10 @@ package body Mem.Server is
                   Writable      => Writable,
                   Executable    => Executable,
                   Persistent    => Persistent);
+
+               if Store_Page /= 0 then
+                  Mem.Page_Cache.Add (Store_Page, Page);
+               end if;
 
                Mem.Processes.Resume_Process (Pid);
                Mem.Processes.Count_Fault
