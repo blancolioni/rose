@@ -2,6 +2,7 @@ with Rose.Objects;
 with Rose.Words;
 
 with Rose.Console_IO;
+with Rose.Trace;
 with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Storage.Server;
@@ -33,6 +34,7 @@ package body Store.Server is
          Delete_Cap      => Delete_Endpoint_Cap);
 
       Console_Cap := Get_Cap (2);
+      Rose.Trace.Set_Trace_Cap (Get_Cap (3));
 
       Rose.Console_IO.Open (Console_Cap);
 

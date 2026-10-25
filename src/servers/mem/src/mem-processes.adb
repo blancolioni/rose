@@ -1,5 +1,6 @@
 with Rose.Console_IO;
 with Rose.Invocation;
+with Rose.Trace;
 with Rose.System_Calls.Server;
 with Rose.Limits;
 
@@ -53,6 +54,14 @@ package body Mem.Processes is
    subtype Kernel_Process_Client is
      Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
 
+   type Fault_Count is
+      record
+         Count : Natural := 0;
+         Ticks : Natural := 0;
+      end record;
+
+   type Fault_Count_Array is array (Fault_Kind) of Fault_Count;
+
    type Memory_Process_Record is
       record
          State        : Process_State := Available;
@@ -63,6 +72,7 @@ package body Mem.Processes is
          Heap         : Rose.Capabilities.Capability;
          Server       : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := 0;
+         Faults        : Fault_Count_Array;
       end record;
 
    subtype Real_Process_Id is
@@ -299,6 +309,21 @@ package body Mem.Processes is
          end;
       end if;
    end Allocate_Physical_Page;
+
+   -----------------
+   -- Count_Fault --
+   -----------------
+
+   procedure Count_Fault
+     (Process : Process_Id;
+      Kind    : Fault_Kind;
+      Ticks   : Natural)
+   is
+      Count : Fault_Count renames Process_Table (Process).Faults (Kind);
+   begin
+      Count.Count := Count.Count + 1;
+      Count.Ticks := Count.Ticks + Ticks;
+   end Count_Fault;
 
    -------------------
    -- Fault_Process --
@@ -553,6 +578,9 @@ package body Mem.Processes is
 
       procedure Delete (Cap : Rose.Capabilities.Capability);
 
+      procedure Report_Faults;
+      --  Report the process's fault counts as trace events.
+
       ------------
       -- Delete --
       ------------
@@ -569,12 +597,42 @@ package body Mem.Processes is
          end if;
       end Delete;
 
+      -------------------
+      -- Report_Faults --
+      -------------------
+
+      procedure Report_Faults is
+
+         procedure Report (Text : String; Kind : Fault_Kind);
+
+         ------------
+         -- Report --
+         ------------
+
+         procedure Report (Text : String; Kind : Fault_Kind) is
+         begin
+            if P.Faults (Kind).Count > 0 then
+               Rose.Trace.Event
+                 (Text, P.Faults (Kind).Count,
+                  ", ticks ", P.Faults (Kind).Ticks);
+            end if;
+         end Report;
+
+      begin
+         Rose.Trace.Event ("faults of process ", Natural (P.Oid));
+         Report ("  region reads ", Region_Fault);
+         Report ("  zero-filled ", Zero_Fault);
+         Report ("  writes ", Write_Fault);
+         Report ("  invalid ", Invalid_Fault);
+      end Report_Faults;
+
       use type Rose.Capabilities.Capability;
    begin
       if P.State = Available then
          return;
       end if;
 
+      Report_Faults;
       Destroy (P.Process);
       Close (P.Process);
 
@@ -678,7 +736,8 @@ package body Mem.Processes is
               Heap         => Heap_Cap,
               Server       => 0,
               Process      => Client,
-              Interface_Cap => 0);
+              Interface_Cap => 0,
+              Faults        => <>);
       end;
 
       return Next_Pid;

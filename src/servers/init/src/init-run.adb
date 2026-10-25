@@ -354,6 +354,8 @@ package body Init.Run is
       Rose.System_Calls.Use_Buffer
         (Invoke_Buffer'Address, Invoke_Buffer'Last);
 
+      Trace_Cap := Init.Calls.Call (Create_Cap, (7, 11, 0, 0));
+
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Console_Id :=
         Init.Calls.Launch_Boot_Module
@@ -406,7 +408,7 @@ package body Init.Run is
                        Cap_Set_Cap,
                        (Console_Interface_Cap,
                         Mem_Region_Count_Cap, Mem_Get_Region_Cap,
-                        Page_On_Cap, Delete_Cap));
+                        Page_On_Cap, Delete_Cap, Trace_Cap));
          Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
                           Init.Calls.Call
                             (Create_Cap,
@@ -595,7 +597,8 @@ package body Init.Run is
                         (Boot_Cap, Store_Module, Device_Driver_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Delete_Cap,
-                          Console_Interface_Cap));
+                          Console_Interface_Cap,
+                          Trace_Cap));
          Copy_Store_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -622,10 +625,6 @@ package body Init.Run is
                                 Init.Calls.Call
                                   (Create_Cap,
                                    (7, 4, 0, 0));
-         Kernel_Trace_Cap   : constant Rose.Capabilities.Capability :=
-                                Init.Calls.Call
-                                  (Create_Cap,
-                                   (7, 11, 0, 0));
          Elf_Id       : constant Rose.Objects.Object_Id :=
                             Init.Calls.Launch_Boot_Module
                               (Boot_Cap, Elf_Module, Device_Driver_Priority,
@@ -633,7 +632,7 @@ package body Init.Run is
                                (Delete_Cap, Rescind_Cap,
                                 Console_Interface_Cap,
                                 Mem_Cap, Create_Process_Cap,
-                                Kernel_Trace_Cap));
+                                Trace_Cap));
          Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Call
                               (Create_Cap,
@@ -641,7 +640,6 @@ package body Init.Run is
                                 Word (Elf_Id mod 2 ** 32),
                                 Word (Elf_Id / 2 ** 32)));
       begin
-         Trace_Cap := Kernel_Trace_Cap;
          Launch_Elf_Cap :=
            Copy_Cap_From_Process
              (Copy_Elf_Cap,

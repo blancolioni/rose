@@ -301,7 +301,9 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Rose.Kernel.Processes.Ready);
 
          when Trace_Endpoint =>
-            if Trace_Launch then
+            if Trace_Launch
+              and then Params.Control.Flags (Rose.Invocation.Send_Words)
+            then
                declare
                   Text : String (1 .. 4 * Rose.Invocation.Max_Parameter_Words);
                   Last : Natural;
@@ -315,8 +317,15 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                end;
             end if;
 
-            Params.Control.Flags :=
-              (Rose.Invocation.Reply => True, others => False);
+            Params.all :=
+              (Control =>
+                 (Flags  =>
+                      (Rose.Invocation.Reply => True,
+                       others                => False),
+                  others => <>),
+               others  => <>);
+            Rose.Invocation.Send_Word
+              (Params.all, Rose.Kernel.Clock.Current_Ticks);
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
