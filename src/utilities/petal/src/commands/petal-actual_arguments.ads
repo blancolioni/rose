@@ -1,3 +1,5 @@
+with Rose.Capabilities;
+
 with Petal.Formal_Arguments;
 with Petal.Values;
 

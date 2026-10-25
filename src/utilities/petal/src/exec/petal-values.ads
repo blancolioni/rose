@@ -1,3 +1,5 @@
+with Rose.Capabilities;
+
 package Petal.Values is
 
    type Value_Type is
