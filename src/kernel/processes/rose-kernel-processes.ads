@@ -325,6 +325,20 @@ package Rose.Kernel.Processes is
       Write_Attempt     : Boolean;
       Execution_Attempt : Boolean);
 
+   procedure Set_Command_Endpoint
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index);
+   --  Note that Endpoint is the command endpoint of Pid, for tracing.
+
+   function Is_Command (Pid : Process_Id) return Boolean;
+   --  True if Pid has a command endpoint.
+
+   function Is_Command_Endpoint
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean;
+   --  True if Endpoint is the command endpoint of Pid.
+
    function Page_Fault_Count
      return Natural;
 
@@ -496,6 +510,10 @@ private
          Checkpoint_Fault  : Rose.Addresses.Virtual_Page_Address;
          Shared_Pages      : Shared_Page_Array;
          Saved_Stack_Value : Rose.Words.Word_32;
+         Command_Endpoint  : Rose.Objects.Endpoint_Index := 0;
+         --  The command endpoint of a command (ADR 0002), or zero.
+         Faults_At_Create  : Natural := 0;
+         --  The page fault count when the process was created.
       end record;
 
    type Kernel_Process_Table is

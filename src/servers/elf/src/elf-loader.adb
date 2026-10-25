@@ -5,6 +5,7 @@ with Rose.Objects;
 
 with Rose.Console_IO;
 with Rose.Interfaces.Segment;
+with Rose.Trace;
 
 with Elf.Format;
 
@@ -68,6 +69,7 @@ package body Elf.Loader is
       Get_Range (Image, Base, Bound);
       Success := True;
       Read_Header (Image, Base, Header);
+      Rose.Trace.Event ("header read");
       if not Elf.Format.Valid (Header) then
          Rose.Console_IO.Put_Line ("elf: invalid header");
          Success := False;
@@ -76,6 +78,7 @@ package body Elf.Loader is
 
       Start := Header.E_Entry;
       Scan_Program_Headers (Store, Image, Base, Process, Header);
+      Rose.Trace.Event ("segments added");
 
       declare
          use type Rose.Words.Word;
@@ -94,6 +97,7 @@ package body Elf.Loader is
             + Rose.Interfaces.Segment.Segment_Writable
             + Rose.Interfaces.Segment.Segment_Private);
          Close (Region);
+         Rose.Trace.Event ("stack added");
       end;
    end Load_Elf_Image;
 
@@ -152,6 +156,8 @@ package body Elf.Loader is
                  Reserve_Storage
                    (Top_Store, Word_64 (Memory_Size));
                Region_Offset := 0;
+               Rose.Trace.Event ("storage reserved, bytes ",
+                                 Natural (Memory_Size));
 
                Get_Range (Region, Segment_Base, Segment_Bound);
 
@@ -172,6 +178,8 @@ package body Elf.Loader is
                      Put (Region, Segment_Base + Page_Offset, Page);
                      Offset := Offset + Rose.Limits.Page_Size;
                   end loop;
+                  Rose.Trace.Event ("segment copied, bytes ",
+                                    Natural (File_Size));
                end;
             end if;
 

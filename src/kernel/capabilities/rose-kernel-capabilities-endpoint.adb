@@ -110,6 +110,17 @@ package body Rose.Kernel.Capabilities.Endpoint is
          end;
       end if;
 
+      if Trace_Launch
+        and then Rose.Kernel.Processes.Is_Command_Endpoint
+                   (Pid, Endpoint_Index)
+      then
+         Rose.Kernel.Processes.Debug.Put
+           (Rose.Kernel.Processes.Current_Process_Id);
+         Rose.Boot.Console.Put (": trace: launch call sent to ");
+         Rose.Kernel.Processes.Debug.Put (Pid);
+         Rose.Boot.Console.New_Line;
+      end if;
+
       Send_To_Endpoint
         (Sender     => Rose.Kernel.Processes.Current_Process_Id,
          Receiver   => Pid,

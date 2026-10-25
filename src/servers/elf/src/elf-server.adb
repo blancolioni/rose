@@ -7,6 +7,7 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Console_IO;
+with Rose.Trace;
 with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Command_Endpoint;
@@ -150,6 +151,13 @@ package body Elf.Server is
       Next (Console_Cap);
       Next (Memory_Cap);
       Next (Create_Process_Cap);
+
+      declare
+         Trace_Cap : Rose.Capabilities.Capability;
+      begin
+         Next (Trace_Cap);
+         Rose.Trace.Set_Trace_Cap (Trace_Cap);
+      end;
 
       Rose.Console_IO.Open (Console_Cap);
 
@@ -304,17 +312,21 @@ package body Elf.Server is
       Delete_Cap (Last_Command);
       Last_Command := 0;
 
+      Rose.Trace.Event ("load " & Name);
       Rose.Interfaces.Region.Client.Open (Region, Image);
       Rose.Interfaces.Storage.Client.Open (Storage, Store);
+      Rose.Trace.Event ("regions opened");
 
       Create_Process
         (Name, Kernel_Process, Start_Cap, Initial_Cap, Endpoint_Cap);
       Rose.Interfaces.Kernel_Process.Client.Open
         (Kernel_Client, Kernel_Process);
+      Rose.Trace.Event ("process created");
       Process_Client :=
         Rose.Interfaces.Memory.Client.New_Process
           (Item    => Memory_Client,
            Process => Kernel_Client);
+      Rose.Trace.Event ("mem process");
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -344,6 +356,7 @@ package body Elf.Server is
             end if;
          end;
 
+         Rose.Trace.Event ("command endpoint");
          if Command_Cap = 0 then
             Rose.Console_IO.Put_Line
               ("elf: failed to create command endpoint");
@@ -367,13 +380,16 @@ package body Elf.Server is
 
       Elf.Loader.Load_Elf_Image
         (Process_Client, Storage, Region, Start, Success);
+      Rose.Trace.Event ("image loaded");
       if Success then
          Start_Process (Start_Cap, Start);
+         Rose.Trace.Event ("started");
       else
          Rose.Console_IO.Put_Line ("elf: failed to load process");
       end if;
 
       Clean_Up;
+      Rose.Trace.Event ("cleaned up");
 
       if not Success then
          Rose.Interfaces.Process.Client.Close (Process_Client);

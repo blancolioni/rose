@@ -300,6 +300,27 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Trace_Endpoint =>
+            if Trace_Launch then
+               declare
+                  Text : String (1 .. 4 * Rose.Invocation.Max_Parameter_Words);
+                  Last : Natural;
+               begin
+                  Decode_Name (Params, Text, Last);
+                  Rose.Kernel.Processes.Debug.Put
+                    (Rose.Kernel.Processes.Current_Process_Id);
+                  Rose.Boot.Console.Put (": trace: ");
+                  Rose.Boot.Console.Put (Text (1 .. Last));
+                  Rose.Boot.Console.New_Line;
+               end;
+            end if;
+
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply => True, others => False);
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when Enter_Checkpoint_Endpoint =>
             Rose.Kernel.Checkpoint.Enter_Checkpoint;
             Rose.Kernel.Processes.Set_Current_State

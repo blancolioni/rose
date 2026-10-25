@@ -13,6 +13,11 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
 
    Start_Log_Endpoint         : constant Rose.Objects.Endpoint_Index := 10;
 
+   Trace_Endpoint             : constant Rose.Objects.Endpoint_Index := 11;
+   --  Write the text in the data words, four characters to a word, to the
+   --  log as a trace event of the calling process, if tracing is on
+   --  (Trace_Launch). See Rose.Trace.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

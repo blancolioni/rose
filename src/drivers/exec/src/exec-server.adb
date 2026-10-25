@@ -4,6 +4,7 @@ with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Server;
+with Rose.Trace;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Exec.Server;
@@ -193,6 +194,7 @@ package body Exec.Server is
       --  A command has only the caps it is given (ADR 0002): no install
       --  caps, and no console.
 
+      Rose.Trace.Event ("launch command, program ", Natural (Id));
       Initialize_Send (Params, Launch_Command_Cap);
       Send_Image (Params, Id);
 
@@ -204,6 +206,7 @@ package body Exec.Server is
       Send_Text (Params, Name (1 .. Last));
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
+      Rose.Trace.Event ("command launched");
 
       for Cap of Caps loop
          Delete_Cap (Cap);
