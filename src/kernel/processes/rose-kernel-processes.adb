@@ -875,6 +875,23 @@ package body Rose.Kernel.Processes is
         and then Process_Table (Pid).Command_Endpoint = Endpoint;
    end Is_Command_Endpoint;
 
+   ------------------
+   -- Is_User_Page --
+   ------------------
+
+   function Is_User_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      return Rose.Kernel.Page_Table.Is_User_Page
+        (Rose.Kernel.Heap.Get_Virtual_Page
+           (Physical_Address_To_Page (P.Directory_Page)),
+         Virtual_Page);
+   end Is_User_Page;
+
    -----------------------------
    -- Is_Valid_Endpoint_Index --
    -----------------------------

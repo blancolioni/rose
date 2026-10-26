@@ -287,7 +287,19 @@ system_call:
     mov     %esi, Process_EBP(%ebp)
     mov     %eax, Process_EAX(%ebp)
     mov     %ebx, Process_EBX(%ebp)
-    
+
+    push    %eax                            # check the caller's record first
+    call    is_valid_invocation_record
+    add     $4, %esp
+    test    %eax, %eax
+    jnz     2f
+    push    Process_EAX(%ebp)               # not mapped user memory: fault the
+    call    fault_invocation_record         # caller, and run the next process
+    add     $4, %esp
+    mov     $invocation_record, %esi
+    jmp     continue
+2:
+    mov     Process_EAX(%ebp), %eax
     movl %eax, %esi
     movl $invocation_record, %ebp
     movl $INVOKE_WORDS,%ecx

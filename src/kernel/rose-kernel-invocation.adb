@@ -1,3 +1,4 @@
+with Rose.Addresses;
 with Rose.Words;
 with Rose.Boot.Console;
 
@@ -15,6 +16,23 @@ with Rose.Kernel.Capabilities;
 with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Invocation is
+
+   -----------------------------
+   -- Fault_Invocation_Record --
+   -----------------------------
+
+   procedure Fault_Invocation_Record
+     (Address : Rose.Words.Word_32)
+   is
+      use Rose.Kernel.Processes;
+   begin
+      Rose.Kernel.Processes.Debug.Put (Current_Process_Id);
+      Rose.Boot.Console.Put (": invalid invocation record at ");
+      Rose.Boot.Console.Put (Address);
+      Rose.Boot.Console.New_Line;
+      Set_Current_State (Current_Process_Id, Faulted);
+      Rose.Kernel.Processes.Queue.Choose_Process;
+   end Fault_Invocation_Record;
 
    -----------------------
    -- Invoke_Capability --
@@ -96,5 +114,37 @@ package body Rose.Kernel.Invocation is
       Rose.Kernel.Processes.Queue.Choose_Process;
 
    end Invoke_Capability;
+
+   --------------------------------
+   -- Is_Valid_Invocation_Record --
+   --------------------------------
+
+   function Is_Valid_Invocation_Record
+     (Address : Rose.Words.Word_32)
+      return Rose.Words.Word_32
+   is
+      use Rose.Addresses;
+      Record_Bytes : constant Virtual_Address :=
+                       Rose.Invocation.Invocation_Record'Size / 8;
+      First        : constant Virtual_Address := Virtual_Address (Address);
+   begin
+      if First < Virtual_Page_Bytes
+        or else First >= Kernel_Virtual_Base - Record_Bytes
+      then
+         return 0;
+      end if;
+
+      for Page in Virtual_Address_To_Page (First)
+        .. Virtual_Address_To_Page (First + Record_Bytes - 1)
+      loop
+         if not Rose.Kernel.Processes.Is_User_Page
+           (Rose.Kernel.Processes.Current_Process_Id, Page)
+         then
+            return 0;
+         end if;
+      end loop;
+
+      return 1;
+   end Is_Valid_Invocation_Record;
 
 end Rose.Kernel.Invocation;
