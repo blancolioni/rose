@@ -72,7 +72,11 @@ package Rose.Server is
 private
 
    Max_Handled_Endpoints  : constant := 20;
-   Max_Endpoint_Instances : constant := 160;
+   Max_Endpoint_Instances : constant := 512;
+   --  Each instance of an instanced interface uses one entry for each of
+   --  its endpoints.  The store's regions use six (Region), so this is
+   --  room for about 85 regions.  Set_Instance_Cap ignores an entry that
+   --  doesn't fit, and the client then gets a null cap for it.
 
    type Instanced_Handler_Record is
       record
