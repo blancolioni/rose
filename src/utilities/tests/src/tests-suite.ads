@@ -2,6 +2,7 @@ with Tests.Directories;
 with Tests.Files;
 with Tests.Smoke;
 with Tests.Stack;
+with Tests.Users;
 
 package Tests.Suite is
 
@@ -9,6 +10,7 @@ package Tests.Suite is
                   (Tests.Smoke.Smoke_Test'Access,
                    Tests.Stack.Stack_Test'Access,
                    Tests.Files.File_Test'Access,
-                   Tests.Directories.Directory_Test'Access);
+                   Tests.Directories.Directory_Test'Access,
+                   Tests.Users.User_Test'Access);
 
 end Tests.Suite;

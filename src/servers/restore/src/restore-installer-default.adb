@@ -28,6 +28,7 @@ package body Restore.Installer.Default is
       Process ("file", "drivers", Save, Default_Flags);
       Process ("directory", "drivers", Save, Default_Flags);
       Process ("echo", "bin", Save, Default_Flags);
+      Process ("user", "bin", Save, Default_Flags);
       Process ("tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,
                (Requires_Input_Stream => True,

@@ -69,6 +69,22 @@ package body Rose.Command_Line.Launch is
       return Call.Params.Caps (Rose.Invocation.Capability_Index (Index));
    end Cap_Argument;
 
+   ----------------
+   -- Cap_Result --
+   ----------------
+
+   procedure Cap_Result
+     (Call  : in out Launch_Call;
+      Index : Natural;
+      Cap   : Rose.Capabilities.Capability)
+   is
+   begin
+      if Index < Max_Result_Caps then
+         Call.Result_Caps (Index) := Cap;
+         Call.Cap_Count := Natural'Max (Call.Cap_Count, Index + 1);
+      end if;
+   end Cap_Result;
+
    --------------
    -- Complete --
    --------------
@@ -85,6 +101,9 @@ package body Rose.Command_Line.Launch is
       Rose.System_Calls.Send_Word (Params, Completed);
       for Value of Call.Result_Words (1 .. Call.Word_Count) loop
          Rose.System_Calls.Send_Word (Params, Value);
+      end loop;
+      for Cap of Call.Result_Caps (0 .. Call.Cap_Count - 1) loop
+         Rose.System_Calls.Send_Cap (Params, Cap);
       end loop;
       if Call.Results_Length > 0 then
          Rose.System_Calls.Send_Storage_Array
