@@ -526,6 +526,12 @@ private
 
    Process_Table : Process_Table_Access;
 
+   procedure Create_Process_Table_Entry
+     (Pid : Rose.Kernel.Processes.Process_Id;
+      Name : String);
+   --  Set up the entry for a new process Pid, with its page directory,
+   --  environment page and standard page ranges, ready to start.
+
    Process_Table_Heap_Size : constant Rose.Addresses.Physical_Bytes :=
                                Kernel_Process_Table'Size / 8
                                  + Rose.Addresses.Physical_Bytes

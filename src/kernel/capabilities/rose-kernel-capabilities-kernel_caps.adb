@@ -17,6 +17,9 @@ with Rose.Kernel.Heap;
 with Rose.Kernel.Checkpoint;
 
 with Rose.Kernel.Processes.Debug;
+with Rose.Kernel.Processes.Snapshot;
+
+with Rose.Arch.Interrupts;
 
 package body Rose.Kernel.Capabilities.Kernel_Caps is
 
@@ -377,6 +380,112 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
+
+         when Restore_Process_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
+            declare
+               use Rose.Kernel.Processes;
+               Pages   : System.Storage_Elements.Storage_Array
+                 (1 .. Params.Buffer_Length);
+               pragma Import (Ada, Pages);
+               for Pages'Address use Params.Buffer_Address;
+               Pid     : Process_Id;
+               Success : Boolean;
+            begin
+               Rose.Kernel.Processes.Snapshot.Restore_Process
+                 (Pages, Pid, Success);
+
+               if not Success then
+                  Rose.Boot.Console.Put_Line
+                    ("kernel: cannot restore process");
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+
+               Rose.Boot.Console.Put ("kernel: restored process ");
+               Rose.Kernel.Processes.Debug.Put (Pid);
+               Rose.Boot.Console.New_Line;
+
+               Params.all :=
+                 (Control =>
+                    (Flags          =>
+                         (Rose.Invocation.Reply => True,
+                          others                => False),
+                     others         => <>),
+                  others  => <>);
+
+               Rose.Invocation.Send_Object_Id
+                 (Params.all, To_Object_Id (Pid));
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap (Current_Process_Id, Process_Interface_Cap (Pid)));
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap (Current_Process_Id, Start_Process_Cap (Pid)));
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap (Current_Process_Id, Initial_Cap (Pid)));
+               Rose.Invocation.Send_Cap
+                 (Params => Params.all,
+                  Cap    =>
+                    New_Cap (Current_Process_Id, Command_Endpoint_Cap (Pid)));
+
+               Set_Current_State (Current_Process_Id, Ready);
+            end;
+
+         when Resume_Process_Endpoint =>
+            declare
+               use Rose.Kernel.Processes;
+               Success : Boolean;
+            begin
+               Rose.Kernel.Processes.Snapshot.Resume_Restored_Process
+                 (To_Process_Id
+                    (Rose.Invocation.Get_Object_Id (Params.all, 0)),
+                  Success);
+               if not Success then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+               Params.Control.Flags :=
+                 (Rose.Invocation.Reply => True, others => False);
+               Set_Current_State (Current_Process_Id, Ready);
+            end;
+
+         when Restore_Interrupt_Endpoint =>
+            declare
+               use Rose.Kernel.Processes;
+               use type Rose.Words.Word_32;
+               Success : Boolean;
+            begin
+               if Params.Data (0) > 63 then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+
+               Rose.Kernel.Processes.Snapshot.Restore_Interrupt
+                 (Interrupt =>
+                    Rose.Arch.Interrupts.Interrupt_Vector (Params.Data (0)),
+                  Object    => Rose.Invocation.Get_Object_Id (Params.all, 1),
+                  Cap       => Rose.Capabilities.Capability (Params.Data (3)),
+                  Success   => Success);
+               if not Success then
+                  Rose.Boot.Console.Put_Line
+                    ("kernel: cannot restore interrupt");
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+               Params.Control.Flags :=
+                 (Rose.Invocation.Reply => True, others => False);
+               Set_Current_State (Current_Process_Id, Ready);
+            end;
 
          when others =>
             Rose.Kernel.Panic.Panic

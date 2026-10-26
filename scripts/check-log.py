@@ -52,7 +52,8 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 8
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 1
+KERNEL_TABLE_VERSION = 2
+MAX_SAVED_INTERRUPTS = 32
 PROCESS_RECORD_MAGIC = 0x50524F4345535331
 CAPS_PER_PAGE = PAGE_SIZE // 20
 
@@ -172,9 +173,22 @@ def check_kernel_tables(log, first, last, verbose):
         return False, ("kernel tables hold %d pages of records, header "
                        "says %d" % (location - first, page_count)), 0, oids
 
-    return True, ("kernel: %d process%s in %d pages"
+    interrupt_count = u32(page, 20)
+    if interrupt_count > MAX_SAVED_INTERRUPTS:
+        return False, "kernel tables: %d interrupts" % interrupt_count, \
+            0, oids
+    for i in range(interrupt_count):
+        vector, cap, oid = struct.unpack_from("<IIQ", page, 24 + i * 16)
+        if oid not in oids:
+            return False, ("interrupt %d goes to process %d, which is not "
+                           "in the kernel tables" % (vector, oid)), 0, oids
+        if verbose:
+            print("    interrupt %d -> process %d cap %d" % (vector, oid, cap))
+
+    return True, ("kernel: %d process%s in %d pages, %d interrupt%s"
                   % (process_count, "" if process_count == 1 else "es",
-                     page_count)), page_count, oids
+                     page_count, interrupt_count,
+                     "" if interrupt_count == 1 else "s")), page_count, oids
 
 
 def check_store_tables(log, first, last, verbose):

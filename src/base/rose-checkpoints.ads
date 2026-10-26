@@ -15,21 +15,44 @@ package Rose.Checkpoints is
    --  a process record page followed by its capability pages.  The
    --  kernel writes a snapshot of these into the checkpoint server's
    --  buffer when the checkpoint starts, and the checkpoint server
-   --  appends the pages to the log.
+   --  appends the pages to the log.  The header page also lists the
+   --  interrupts that persistent processes handle: each is the vector,
+   --  the process, and the endpoint cap in that process that the kernel
+   --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 1;
+   Kernel_Table_Version : constant := 2;
+   --  Version 2 added the interrupts.
+
+   Max_Saved_Interrupts : constant := 32;
+
+   type Saved_Interrupt is
+      record
+         Vector : Rose.Words.Word_32 := 0;
+         Cap    : Rose.Words.Word_32 := 0;
+         Oid    : Rose.Words.Word_64 := 0;
+      end record
+     with Pack, Size => 128;
+
+   type Saved_Interrupt_Array is
+     array (1 .. Max_Saved_Interrupts) of Saved_Interrupt
+     with Pack, Size => Max_Saved_Interrupts * 128;
+
+   Kernel_Header_Bytes : constant := 24 + Max_Saved_Interrupts * 16;
 
    type Kernel_Table_Header is
       record
-         Magic         : Rose.Words.Word_64 := Kernel_Table_Magic;
-         Version       : Rose.Words.Word_32 := Kernel_Table_Version;
-         Page_Count    : Rose.Words.Word_32 := 0;
+         Magic           : Rose.Words.Word_64 := Kernel_Table_Magic;
+         Version         : Rose.Words.Word_32 := Kernel_Table_Version;
+         Page_Count      : Rose.Words.Word_32 := 0;
          --  All of the kernel's pages, including this one.
-         Process_Count : Rose.Words.Word_32 := 0;
-         Reserved      : System.Storage_Elements.Storage_Array
-                           (1 .. Rose.Limits.Page_Size - 20) :=
-                             (others => 0);
+         Process_Count   : Rose.Words.Word_32 := 0;
+         Interrupt_Count : Rose.Words.Word_32 := 0;
+         Interrupts      : Saved_Interrupt_Array;
+         Reserved        : System.Storage_Elements.Storage_Array
+                             (1 .. Rose.Limits.Page_Size
+                                  - Kernel_Header_Bytes) :=
+                               (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
