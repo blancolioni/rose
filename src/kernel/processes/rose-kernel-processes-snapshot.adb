@@ -1,5 +1,6 @@
 with Rose.Arch.Interrupt_Table;
 with Rose.Checkpoints;
+with Rose.Interfaces.Restorable;
 with Rose.Limits;
 
 with Rose.Kernel.Interrupts;
@@ -273,6 +274,7 @@ package body Rose.Kernel.Processes.Snapshot is
          --  that already, from the state the process was in.
 
          declare
+            use type Rose.Objects.Endpoint_Index;
             P                : Kernel_Process_Entry renames
                                  Process_Table (Pid);
             Invoke_Reply_Set : constant Boolean := P.Flags (Invoke_Reply);
@@ -282,6 +284,13 @@ package body Rose.Kernel.Processes.Snapshot is
             Set_Current_State (Pid, Ready);
             P.Flags (Invoke_Reply) := Invoke_Reply_Set;
             P.Flags (Interrupt_Resume) := Interrupted_Set;
+
+            --  A process with a Restorable interface is told, the next
+            --  time it receives, that it has been restored.
+
+            P.Flags (Restore_Notice) :=
+              Find_Endpoint
+                (Pid, Rose.Interfaces.Restorable.Restored_Endpoint) /= 0;
          end;
 
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);

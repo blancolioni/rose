@@ -1,0 +1,8 @@
+interface Restorable is
+
+   --  Sent by the kernel to a restored process, before any other
+   --  message, the first time it receives after it is resumed.
+
+   procedure Restored;
+
+end Restorable;

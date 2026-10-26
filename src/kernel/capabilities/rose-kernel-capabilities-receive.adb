@@ -19,6 +19,12 @@ package body Rose.Kernel.Capabilities.Receive is
          Rose.Kernel.Processes.Send_Pending_Memory_Request;
          Rose.Kernel.Processes.Get_Current_Invocation
            (Receiver_Id, Params.all);
+      elsif Rose.Kernel.Processes.Has_Restore_Notice
+        (Receiver_Id, Cap.Header.Endpoint)
+      then
+         Rose.Kernel.Processes.Send_Restore_Notice (Receiver_Id);
+         Rose.Kernel.Processes.Get_Current_Invocation
+           (Receiver_Id, Params.all);
       elsif Rose.Kernel.Processes.Has_Queued_Message
         (Receiver_Id, Cap.Header.Endpoint)
       then
