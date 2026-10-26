@@ -26,7 +26,11 @@ package body Checkpoint.Server is
    Append_Log_Cap        : Rose.Capabilities.Capability;
    Store_Checkpoint_Cap  : Rose.Capabilities.Capability;
 
-   Max_Table_Pages : constant := 16;
+   Max_Table_Pages : constant := 1 + 2 * Rose.Limits.Max_Processes;
+   --  The header page, and for each process its record and one page of
+   --  caps (Rose.Checkpoints.Caps_Per_Page of them).  A process with more
+   --  caps needs more pages; if the tables don't fit, the kernel skips
+   --  the checkpoint.
 
    Kernel_Tables : System.Storage_Elements.Storage_Array
      (1 .. Max_Table_Pages * Rose.Limits.Page_Size)
