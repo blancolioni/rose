@@ -308,7 +308,8 @@ package Rose.Kernel.Processes is
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean;
-      User          : Boolean);
+      User          : Boolean;
+      Device        : Boolean := False);
 
    procedure Unmap_Page
      (Pid           : Process_Id;
