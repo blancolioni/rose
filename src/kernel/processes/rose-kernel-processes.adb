@@ -1563,11 +1563,50 @@ package body Rose.Kernel.Processes is
                             (Params with delta
                                Endpoint   => To.Endpoints (Endpoint).Endpoint,
                                Identifier => Identifier);
+
+            procedure Queue_Message;
+            --  Keep the message until the process next receives.
+
+            -------------------
+            -- Queue_Message --
+            -------------------
+
+            procedure Queue_Message is
+            begin
+               if To.Flags (Message_Queued) then
+                  Rose.Boot.Console.Put_Line ("lost queued message");
+               end if;
+
+               To.Queued_Params := Send_Params;
+               To.Queued_Endpoint := Endpoint;
+               To.Queued_Cap_Id := Identifier;
+               To.Flags (Message_Queued) := True;
+
+               if To.Flags (Trace) then
+                  Debug.Put (To_Process_Id);
+                  Rose.Boot.Console.Put_Line (": message queued");
+                  Rose.Invocation.Trace.Put (To.Queued_Params, True);
+               end if;
+            end Queue_Message;
+
          begin
             case Current_State (To_Process_Id) is
                when Blocked =>
-                  Send_Cap (From_Process_Id, To_Process_Id,
-                            Sender_Cap, Sender_Cap, Send_Params);
+
+                  --  A process that is waiting for the reply to a call
+                  --  would get the message as the result of its call, and
+                  --  the reply when it arrives as a message: an interrupt
+                  --  that arrives while a driver waits for a server does
+                  --  this.  So the message waits for its next receive.
+
+                  if To.Flags (Wait_Reply)
+                    and then not To.Flags (Receive_Any)
+                  then
+                     Queue_Message;
+                  else
+                     Send_Cap (From_Process_Id, To_Process_Id,
+                               Sender_Cap, Sender_Cap, Send_Params);
+                  end if;
                when Available | Faulted | Killed =>
                   Debug.Put (From_Process_Id);
                   Rose.Boot.Console.Put ("->");
@@ -1575,20 +1614,7 @@ package body Rose.Kernel.Processes is
                   Rose.Boot.Console.Put (": to cannot accept messages");
                   Rose.Boot.Console.New_Line;
                when Starting | Ready | Running | Interrupted =>
-                  if To.Flags (Message_Queued) then
-                     Rose.Boot.Console.Put_Line ("lost queued message");
-                  end if;
-
-                  To.Queued_Params := Send_Params;
-                  To.Queued_Endpoint := Endpoint;
-                  To.Queued_Cap_Id := Identifier;
-                  To.Flags (Message_Queued) := True;
-
-                  if To.Flags (Trace) then
-                     Debug.Put (To_Process_Id);
-                     Rose.Boot.Console.Put_Line (": message queued");
-                     Rose.Invocation.Trace.Put (To.Queued_Params, True);
-                  end if;
+                  Queue_Message;
             end case;
          end;
          return;

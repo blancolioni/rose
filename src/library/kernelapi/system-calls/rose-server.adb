@@ -198,7 +198,23 @@ package body Rose.Server is
       Endpoint : Rose.Objects.Endpoint_Id;
       Handler  : Invocation_Handler)
    is
+      use type Rose.Capabilities.Capability;
    begin
+      --  Register the endpoint with the kernel now, even for an instanced
+      --  interface whose caps are made later.  The kernel gives each
+      --  endpoint the next free index, so this fixes the indices by the
+      --  order in which the server attaches its interfaces, and not by
+      --  the order its clients first use them.  Caps hold the index, and
+      --  the caps that persistent processes hold are saved in
+      --  checkpoints, so after a restore the server's endpoints have to
+      --  be where they were.
+
+      if Rose.System_Calls.Create_Endpoint_Capability
+        /= Rose.Capabilities.Null_Capability
+      then
+         Create_Anonymous_Endpoint (Endpoint);
+      end if;
+
       Context.Endpoint_Count := Context.Endpoint_Count + 1;
       Context.Endpoints (Context.Endpoint_Count) :=
         Endpoint_Record'
