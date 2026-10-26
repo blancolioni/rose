@@ -318,6 +318,13 @@ package Rose.Kernel.Processes is
    procedure Unmap_Invocation_Buffer
      (From_Pid, To_Pid : Process_Id);
 
+   function Is_User_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if Virtual_Page is mapped in Pid, and Pid can reach it from
+   --  user mode.
+
    function Mapped_Physical_Page
      (Pid          : Process_Id;
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)

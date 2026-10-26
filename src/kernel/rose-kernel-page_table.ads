@@ -28,6 +28,13 @@ package Rose.Kernel.Page_Table is
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address);
 
+   function Is_User_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if Virtual_Page is present, and a process can reach it from
+   --  user mode.
+
    function Mapped_Physical_Page
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address)

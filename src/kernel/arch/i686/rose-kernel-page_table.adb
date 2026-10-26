@@ -270,6 +270,46 @@ package body Rose.Kernel.Page_Table is
         Page_Directory (Kernel_Page_Directory_Index);
    end Init_User_Page_Directory;
 
+   ------------------
+   -- Is_User_Page --
+   ------------------
+
+   function Is_User_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index     : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page mod 1024);
+   begin
+      if not Directory (Directory_Index).Present
+        or else Directory (Directory_Index).PFA = 0
+      then
+         return False;
+      end if;
+
+      declare
+         Phys_Addr   : constant Physical_Address :=
+                         Physical_Address (Directory (Directory_Index).PFA)
+                         * Physical_Page_Bytes;
+         Addr        : constant Virtual_Address :=
+                         Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
+         Table_Page  : Page_Table_Array;
+         for Table_Page'Address use System'To_Address (Addr);
+         pragma Import (Ada, Table_Page);
+         Table_Entry : Page_Entry renames Table_Page (Table_Index);
+      begin
+         return Table_Entry.Present and then Table_Entry.User;
+      end;
+   end Is_User_Page;
+
    ---------------------------
    -- Kernel_Page_Directory --
    ---------------------------
