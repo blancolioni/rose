@@ -37,6 +37,8 @@ package body Configure.Writer is
             Cap := (2, 29, 0, 0);
          elsif Name = "register-interrupt" then
             Cap := (6, 1, Field (1), 0);
+         elsif Name = "device-page" then
+            Cap := (1, 1, Field (1), 16#FF00_0000#);
          elsif Name = "port-out-8" then
             if Field_Count = 1 then
                Cap := (16#0000_000E#, 1, Field (1), Field (1));
