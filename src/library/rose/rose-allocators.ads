@@ -9,6 +9,16 @@ package Rose.Allocators is
       Size      : Positive)
       return Natural;
 
+   function Allocate_At
+     (Allocator : in out Store;
+      Base      : Positive;
+      Size      : Positive)
+      return Boolean;
+   --  Allocate the block that Allocate returned as Base for an allocation
+   --  of Size, as when allocations are made again after a restart.
+   --  False if Base is not where such a block starts, or the block is
+   --  not free.
+
    procedure Deallocate
      (Allocator : in out Store;
       Base      : Positive;

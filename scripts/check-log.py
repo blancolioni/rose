@@ -3,11 +3,12 @@
 
 Finds the log partition in the image's GPT, reads the log header, and
 walks the entries the way the log server's startup scan does.  Each
-entry should be a checkpoint: the kernel's tables, then the memory
-server's pages.  The check is that the kernel's header page, process
-records and capability pages agree with each other, and that the
-memory server's header pages and the pages they list account for the
-rest of the entry.
+entry should be a checkpoint: the kernel's tables, the storage
+server's region table, then the memory server's tables and pages.
+The check is that each part's header agrees with what follows it, that
+the memory server's processes are the kernel's, that their segments'
+regions are in the region table, and that the memory server's header
+pages and the pages they list account for the rest of the entry.
 
 After walking the entries it also looks at the location after the last
 one, and reports anything there that looks like an entry header, such
@@ -40,6 +41,10 @@ LOG_MAGIC = 0x8F8FFFE0FA39FDF7
 ENTRY_MAGIC = 0x7E753634A3568547
 CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
+
+STORE_TABLE_MAGIC = 0x53544F5245544231
+STORE_TABLE_VERSION = 1
+REGIONS_PER_PAGE = PAGE_SIZE // 32
 
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 1
@@ -172,8 +177,54 @@ def check_kernel_tables(log, first, last, verbose):
                      page_count)), page_count, oids
 
 
-def check_mem_tables(log, first, last, verbose):
-    """Check the memory server's tables, which start at page first.
+def check_store_tables(log, first, last, verbose):
+    """Check the storage server's region table, which starts at page
+    first.
+
+    Returns (ok, description, page count, set of (base, bound))."""
+    regions = set()
+    page = log.page(first)
+    if page is None or first > last or u64(page, 0) != STORE_TABLE_MAGIC:
+        return False, ("location %d: expected the storage server's tables, "
+                       "found %s" % (first, describe_page(page or b""))), \
+            0, regions
+    version = u32(page, 8)
+    if version != STORE_TABLE_VERSION:
+        return False, "storage tables version %d" % version, 0, regions
+    page_count = u32(page, 12)
+    region_count = u32(page, 16)
+    if page_count != 1 + (region_count + REGIONS_PER_PAGE - 1) \
+            // REGIONS_PER_PAGE or first + page_count - 1 > last:
+        return False, ("storage tables: %d pages for %d regions"
+                       % (page_count, region_count)), 0, regions
+
+    indices = set()
+    for i in range(region_count):
+        record = log.page(first + 1 + i // REGIONS_PER_PAGE)
+        index, device, base, bound, alloc_index, alloc_banks = \
+            struct.unpack_from("<IIQQII", record,
+                               (i % REGIONS_PER_PAGE) * 32)
+        if index == 0 or index in indices or bound < base or device == 0:
+            return False, ("storage region %d of %d: index %d, device %d, "
+                           "pages %x..%x"
+                           % (i + 1, region_count, index, device, base,
+                              bound)), 0, regions
+        indices.add(index)
+        regions.add((base, bound))
+        if verbose:
+            print("    region %3d: %x..%x%s"
+                  % (index, base, bound,
+                     " space %d+%d" % (alloc_index, alloc_banks)
+                     if alloc_index else " subregion"))
+
+    return True, ("storage: %d region%s"
+                  % (region_count, "" if region_count == 1 else "s")), \
+        page_count, regions
+
+
+def check_mem_tables(log, first, last, regions, verbose):
+    """Check the memory server's tables, which start at page first.  The
+    regions of their segments must be among regions.
 
     Returns (ok, description, page count, {mem process id: object id})."""
     processes = {}
@@ -209,9 +260,16 @@ def check_mem_tables(log, first, last, verbose):
             print("    memory process %d: object %d, %s, %d segments"
                   % (mem_pid, oid, "faulted" if state == 2 else "active",
                      segment_count))
-            for s in range(segment_count):
-                base, bound, limit, flags, r_base, r_bound, r_offset = \
-                    struct.unpack_from("<IIIIQQQ", record, 32 + s * 40)
+        for s in range(segment_count):
+            base, bound, limit, flags, r_base, r_bound, r_offset = \
+                struct.unpack_from("<IIIIQQQ", record, 32 + s * 40)
+            if (r_base or r_bound) and (r_base, r_bound) not in regions:
+                return False, ("memory process %d: segment %05x..%05x uses "
+                               "region %x..%x, which the storage server "
+                               "doesn't have"
+                               % (mem_pid, base, bound, r_base, r_bound)), \
+                    0, processes
+            if verbose:
                 print("      %05x..%05x %s region %s"
                       % (base, bound,
                          "".join(c if flags & bit else "-" for c, bit in
@@ -234,8 +292,13 @@ def check_entry(log, first, last, verbose):
                                                          verbose)
     if not ok:
         return False, kernel
-    ok, tables, table_pages, processes = check_mem_tables(
+    ok, store, store_pages, regions = check_store_tables(
         log, first + kernel_pages, last, verbose)
+    if not ok:
+        return False, kernel + "; " + store
+    kernel = kernel + "; " + store
+    ok, tables, table_pages, processes = check_mem_tables(
+        log, first + kernel_pages + store_pages, last, regions, verbose)
     if not ok:
         return False, kernel + "; " + tables
     if set(processes.values()) != oids:
@@ -243,8 +306,10 @@ def check_entry(log, first, last, verbose):
                        "the kernel's %s"
                        % (kernel, tables, sorted(processes.values()),
                           sorted(oids)))
-    ok, memory = check_memory(log, first + kernel_pages + table_pages, last,
-                              processes, verbose)
+    ok, memory = check_memory(log,
+                              first + kernel_pages + store_pages
+                              + table_pages,
+                              last, processes, verbose)
     return ok, kernel + "; " + tables + "; " + memory
 
 

@@ -1,3 +1,4 @@
+with Rose.Checkpoints;
 with Rose.Limits;
 with Rose.Allocators;
 
@@ -83,6 +84,15 @@ package body Store.Devices is
    Region_Count : Natural := 0;
    --  The highest region index used. A released region's index is used
    --  again.
+
+   Table_Page   : System.Storage_Elements.Storage_Array
+                    (1 .. Rose.Limits.Page_Size)
+     with Alignment => Rose.Limits.Page_Size;
+   Table_Header : Rose.Checkpoints.Store_Table_Header
+     with Import, Address => Table_Page'Address;
+   Region_Table : Rose.Checkpoints.Region_Page
+     with Import, Address => Table_Page'Address;
+   --  The page in which Checkpoint builds the region table.
 
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
@@ -189,6 +199,90 @@ package body Store.Devices is
       end;
 
    end Add_Backing_Store;
+
+   ----------------
+   -- Checkpoint --
+   ----------------
+
+   procedure Checkpoint
+     (Id          : Rose.Objects.Capability_Identifier;
+      Append_Page : Rose.Capabilities.Capability)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Checkpoints;
+      Count : Natural := 0;
+      Slot  : Natural := 0;
+
+      procedure Append;
+      --  Append Table_Page to the log, and clear it.
+
+      ------------
+      -- Append --
+      ------------
+
+      procedure Append is
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Append_Page);
+         Rose.System_Calls.Send_Buffer
+           (Params, Rose.Limits.Page_Size, Table_Page'Address, False);
+         Rose.System_Calls.Invoke_Capability (Params);
+         Table_Page := (others => 0);
+      end Append;
+
+   begin
+      for Region of Regions (1 .. Region_Count) loop
+         if Region.In_Use then
+            Count := Count + 1;
+         end if;
+      end loop;
+
+      Table_Page := (others => 0);
+      Table_Header.Magic := Store_Table_Magic;
+      Table_Header.Version := Store_Table_Version;
+      Table_Header.Page_Count :=
+        Rose.Words.Word_32
+          (1 + (Count + Regions_Per_Page - 1) / Regions_Per_Page);
+      Table_Header.Region_Count := Rose.Words.Word_32 (Count);
+      Append;
+
+      for Index in 1 .. Region_Count loop
+         declare
+            Region : Region_Record renames Regions (Index);
+         begin
+            if Region.In_Use then
+               Slot := Slot + 1;
+               Region_Table.Regions (Slot) :=
+                 Saved_Region'
+                   (Index       => Rose.Words.Word_32 (Index),
+                    Device      => Rose.Words.Word_32 (Region.Backing_Device),
+                    Base        => Rose.Words.Word_64 (Region.Base),
+                    Bound       => Rose.Words.Word_64 (Region.Bound),
+                    Alloc_Index => Rose.Words.Word_32 (Region.Alloc_Index),
+                    Alloc_Banks => Rose.Words.Word_32 (Region.Alloc_Banks));
+               if Slot = Regions_Per_Page then
+                  Append;
+                  Slot := 0;
+               end if;
+            end if;
+         end;
+      end loop;
+
+      if Slot > 0 then
+         Append;
+      end if;
+
+      --  A new cap comes with each checkpoint.
+
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send
+           (Params, Rose.System_Calls.Delete_Cap_Capability);
+         Rose.System_Calls.Send_Cap (Params, Append_Page);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
+   end Checkpoint;
 
    ----------------------
    -- Create_Subregion --
@@ -297,6 +391,34 @@ package body Store.Devices is
       end;
 
    end Create_Subregion;
+
+   -----------------
+   -- Find_Region --
+   -----------------
+
+   function Find_Region
+     (Id    : Rose.Objects.Capability_Identifier;
+      Base  : Rose.Objects.Object_Id;
+      Bound : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+      use type Rose.Objects.Object_Id;
+   begin
+      for Region of Regions (1 .. Region_Count) loop
+         if Region.In_Use
+           and then Region.Base = Base
+           and then Region.Bound = Bound
+         then
+            return Region.Access_Cap;
+         end if;
+      end loop;
+
+      Rose.Console_IO.Put ("storage: no region for pages ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Base));
+      Rose.Console_IO.New_Line;
+      return Rose.Capabilities.Null_Capability;
+   end Find_Region;
 
    ---------
    -- Get --
@@ -788,6 +910,71 @@ package body Store.Devices is
          return Cap;
       end;
    end Reserve_Storage;
+
+   --------------------
+   -- Restore_Region --
+   --------------------
+
+   procedure Restore_Region
+     (Id          : Rose.Objects.Capability_Identifier;
+      Index       : Natural;
+      Device      : Natural;
+      Base        : Rose.Objects.Object_Id;
+      Bound       : Rose.Objects.Object_Id;
+      Alloc_Index : Natural;
+      Alloc_Banks : Natural)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Objects;
+   begin
+      if Index not in Regions'Range or else Regions (Index).In_Use then
+         Rose.Console_IO.Put ("storage: restore: region ");
+         Rose.Console_IO.Put (Index);
+         Rose.Console_IO.Put_Line (" is not free");
+         return;
+      end if;
+
+      if Device not in 1 .. Backing_Store_Count then
+         Rose.Console_IO.Put ("storage: restore: no backing store ");
+         Rose.Console_IO.Put (Device);
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      --  A subregion has no space of its own.
+
+      if Alloc_Index > 0
+        and then not Space_Allocators.Allocate_At
+          (Allocator, Alloc_Index, Alloc_Banks)
+      then
+         Rose.Console_IO.Put ("storage: restore: space for region ");
+         Rose.Console_IO.Put (Index);
+         Rose.Console_IO.Put_Line (" is not free");
+         return;
+      end if;
+
+      --  The region's pages are not marked fresh: they hold what was
+      --  written to them before the restart.
+
+      Regions (Index) :=
+        Region_Record'
+          (In_Use         => True,
+           Backing_Device => Device,
+           Base           => Base,
+           Bound          => Bound,
+           Access_Cap     =>
+             Rose.System_Calls.Server.Create_Endpoint
+               (Create_Endpoint_Cap,
+                Rose.Interfaces.Region.Region_Interface,
+                Capability_Identifier (Index)),
+           Alloc_Index    => Alloc_Index,
+           Alloc_Banks    => Alloc_Banks,
+           Reads          => 0,
+           Zero_Reads     => 0,
+           Writes         => 0);
+
+      Region_Count := Natural'Max (Region_Count, Index);
+   end Restore_Region;
 
    ---------------
    -- Set_Fresh --

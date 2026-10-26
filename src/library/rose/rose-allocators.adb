@@ -104,6 +104,63 @@ package body Rose.Allocators is
 
    end Allocate;
 
+   -----------------
+   -- Allocate_At --
+   -----------------
+
+   function Allocate_At
+     (Allocator : in out Store;
+      Base      : Positive;
+      Size      : Positive)
+      return Boolean
+   is
+      Order      : Order_Type := Order_Type'Last;
+      Alloc_Size : Positive := 1;
+      Index      : Positive;
+      Level      : Order_Type;
+      Block      : Positive;
+   begin
+      while Alloc_Size < Size loop
+         Order := Order - 1;
+         Alloc_Size := Alloc_Size * 2;
+      end loop;
+
+      if (Base - 1) mod Alloc_Size /= 0 then
+         return False;
+      end if;
+
+      Index := First_Free_Index (Order) + (Base - 1) / Alloc_Size;
+
+      --  The free block that holds it is the block itself, or the nearest
+      --  of its ancestors: the parent of block I is I / 2.
+
+      Level := Order;
+      Block := Index;
+      while not Allocator.Free (Block) loop
+         if Level = 0 then
+            return False;
+         end if;
+         Level := Level - 1;
+         Block := Block / 2;
+      end loop;
+
+      --  Split that block down to this one, as Allocate does: the children
+      --  of block I are 2I and 2I + 1.
+
+      while Level < Order loop
+         Allocator.Free (Block) := False;
+         Allocator.Count (Level) := Allocator.Count (Level) - 1;
+         Allocator.Free (2 * Block .. 2 * Block + 1) := (True, True);
+         Allocator.Count (Level + 1) := Allocator.Count (Level + 1) + 2;
+         Level := Level + 1;
+         Block := Index / 2 ** Natural (Order - Level);
+      end loop;
+
+      Allocator.Free (Index) := False;
+      Allocator.Count (Order) := Allocator.Count (Order) - 1;
+      return True;
+   end Allocate_At;
+
    ----------------
    -- Deallocate --
    ----------------

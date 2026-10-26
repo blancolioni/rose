@@ -13,6 +13,7 @@ with Rose.Interfaces.File_System;
 with Rose.Interfaces.Kernel_Log;
 with Rose.Interfaces.Log_Reader;
 with Rose.Interfaces.Storage;
+with Rose.Interfaces.Storage_Checkpoint;
 with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
 with Rose.Interfaces.Timeout;
@@ -127,6 +128,9 @@ package body Init.Run is
       Storage_Cap          : Rose.Capabilities.Capability;
       Add_Storage_Cap      : Rose.Capabilities.Capability;
       Reserve_Storage_Cap  : Rose.Capabilities.Capability;
+      Store_Checkpoint_Cap : Rose.Capabilities.Capability;
+      --  For the checkpoint server, to add the region table to each
+      --  checkpoint.
 
       Launch_Elf_Cap       : Rose.Capabilities.Capability;
       Launch_Command_Elf_Cap : Rose.Capabilities.Capability;
@@ -620,6 +624,10 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Store_Cap,
               Rose.Interfaces.Storage.Reserve_Storage_Endpoint);
+         Store_Checkpoint_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage_Checkpoint.Checkpoint_Endpoint);
       end;
 
       declare
@@ -955,7 +963,8 @@ package body Init.Run is
                                       Leave_Checkpoint_Cap,
                                       Delete_Cap,
                                       Memory_Checkpoint_Cap,
-                                      Append_To_Log_Cap));
+                                      Append_To_Log_Cap,
+                                      Store_Checkpoint_Cap));
          pragma Unreferenced (Checkpoint_Id);
       begin
          null;

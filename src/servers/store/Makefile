@@ -12,7 +12,9 @@ OBJECTS= \
 	$(BUILDDIR)/store-server.o \
 	$(BUILDDIR)/store-devices.o \
 	$(BUILDDIR)/rose.o \
+	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-allocators.o \
+	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
@@ -23,6 +25,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-region-server.o \
 	$(BUILDDIR)/rose-interfaces-storage.o \
 	$(BUILDDIR)/rose-interfaces-storage-server.o \
+	$(BUILDDIR)/rose-interfaces-storage_checkpoint.o \
+	$(BUILDDIR)/rose-interfaces-storage_checkpoint-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
