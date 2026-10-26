@@ -22,10 +22,11 @@ package body Restore.Installer.Default is
                 Provides_Input_Stream       => True,
                 others                      => False));
 
-      --  Saved, not launched: each file is its own process, launched
-      --  when the file is created (ADR 0003).
+      --  Saved, not launched: each file and directory is its own
+      --  process, launched when it is created (ADR 0003).
 
       Process ("file", "drivers", Save, Default_Flags);
+      Process ("directory", "drivers", Save, Default_Flags);
       Process ("echo", "bin", Save, Default_Flags);
       Process ("tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,
