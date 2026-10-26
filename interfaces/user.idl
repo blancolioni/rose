@@ -1,0 +1,5 @@
+interface User : Named is
+
+   function Home_Directory return interface Writable_Directory;
+
+end User;

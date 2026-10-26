@@ -32,8 +32,8 @@ package Rose.Command_Line.Launch is
    --  one if it failed, in which case the buffer holds a message. A reply
    --  that completes the call also holds the command's results: its out
    --  and in out scalars in data words 1 onwards, and its out and in out
-   --  strings as buffer items, in the format of the launch buffer, each
-   --  in declaration order.
+   --  strings as buffer items, in the format of the launch buffer, and
+   --  its cap results as caps from 0, each in declaration order.
 
    Max_Buffer_Length : constant := 4096;
    --  The most argument text a call can carry, and the most result text
@@ -44,6 +44,9 @@ package Rose.Command_Line.Launch is
 
    Max_Result_Words : constant := 15;
    --  The most scalar results.
+
+   Max_Result_Caps : constant := 4;
+   --  The most cap results.
 
    type Launch_Call is limited private;
 
@@ -108,8 +111,12 @@ package Rose.Command_Line.Launch is
      (Call  : in out Launch_Call;
       Item  : Positive;
       Value : String);
-   --  Set a result that Complete sends: data word Word, or buffer item
-   --  Item. String results are set in the order of their items.
+   procedure Cap_Result
+     (Call  : in out Launch_Call;
+      Index : Natural;
+      Cap   : Rose.Capabilities.Capability);
+   --  Set a result that Complete sends: data word Word, buffer item Item,
+   --  or cap Index. String results are set in the order of their items.
 
    procedure Complete (Call : in out Launch_Call);
    --  Reply that the command completed, with its results.
@@ -127,6 +134,9 @@ private
    type Result_Word_Array is
      array (1 .. Max_Result_Words) of Rose.Words.Word;
 
+   type Result_Cap_Array is
+     array (0 .. Max_Result_Caps - 1) of Rose.Capabilities.Capability;
+
    type Launch_Call is limited
       record
          Params        : aliased Rose.Invocation.Invocation_Record;
@@ -134,6 +144,9 @@ private
          Buffer_Length : System.Storage_Elements.Storage_Count := 0;
          Result_Words  : Result_Word_Array := (others => 0);
          Word_Count    : Natural := 0;
+         Result_Caps   : Result_Cap_Array :=
+           (others => Rose.Capabilities.Null_Capability);
+         Cap_Count     : Natural := 0;
          Results       : Launch_Buffer;
          Results_Length : System.Storage_Elements.Storage_Count := 0;
       end record;

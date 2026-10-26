@@ -13,7 +13,7 @@ TOOLS=configure-driver
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard event-input-stream exec file directory vga-console
-UTILITIES=echo tests petal
+UTILITIES=echo user tests petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
