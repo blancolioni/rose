@@ -20,3 +20,4 @@ rose-hd0.img
 bochs-port-1.txt
 bochs.log
 rose-hd0.img.lock
+src/tests/*/obj
