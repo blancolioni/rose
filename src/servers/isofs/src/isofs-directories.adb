@@ -937,55 +937,65 @@ package body IsoFS.Directories is
             Sector_Start := Position - 1;
          end if;
 
-         exit when Sector (Position - Sector_Start) = 0;
+         if Sector (Position - Sector_Start) = 0 then
 
-         declare
-            Start         : constant Storage_Offset := Position - Sector_Start;
-            Record_Length : constant Storage_Count :=
-                              Storage_Count (Sector (Start));
-            Rec           : Directory_Entry;
-            pragma Import (Ada, Rec);
-            for Rec'Address use Sector (Start)'Address;
+            --  The rest of the sector is padding. A directory record never
+            --  crosses a sector boundary, so the next record, if there is
+            --  one, starts the next sector.
 
-            Name : String (1 .. Natural (Rec.File_Identifier_Length));
-            Last : Natural := Name'Last;
+            Position := Sector_Start + ISO_Sector_Size + 1;
+            Location := Location + 1;
+            Have_Sector := False;
+         else
+            declare
+               Start         : constant Storage_Offset :=
+                                 Position - Sector_Start;
+               Record_Length : constant Storage_Count :=
+                                 Storage_Count (Sector (Start));
+               Rec           : Directory_Entry;
+               pragma Import (Ada, Rec);
+               for Rec'Address use Sector (Start)'Address;
 
-            RR_Name : String (1 .. 255);
-            RR_Last : Natural;
-         begin
+               Name : String (1 .. Natural (Rec.File_Identifier_Length));
+               Last : Natural := Name'Last;
 
-            for I in Name'Range loop
-               declare
-                  Index : constant Storage_Offset :=
-                            Start + 32 + Storage_Count (I);
-               begin
-                  Name (I) := Character'Val (Sector (Index));
-                  if Name (I) = ';' then
-                     Last := I - 1;
-                     exit;
-                  end if;
-               end;
-            end loop;
+               RR_Name : String (1 .. 255);
+               RR_Last : Natural;
+            begin
 
-            if Name (Last) = '.' then
-               Last := Last - 1;
-            end if;
+               for I in Name'Range loop
+                  declare
+                     Index : constant Storage_Offset :=
+                               Start + 32 + Storage_Count (I);
+                  begin
+                     Name (I) := Character'Val (Sector (Index));
+                     if Name (I) = ';' then
+                        Last := I - 1;
+                        exit;
+                     end if;
+                  end;
+               end loop;
 
-            Get_Rock_Ridge_Name
-              (Sector, Start, Record_Length, RR_Name, RR_Last);
+               if Name (Last) = '.' then
+                  Last := Last - 1;
+               end if;
 
-            if RR_Last > 0 then
-               Process (Rec, RR_Name (1 .. RR_Last));
-            else
-               Process (Rec, Name (1 .. Last));
-            end if;
+               Get_Rock_Ridge_Name
+                 (Sector, Start, Record_Length, RR_Name, RR_Last);
 
-            Position := Position + Record_Length;
-            if Position - Sector_Start >= Sector'Last then
-               Location := Location + 1;
-               Have_Sector := False;
-            end if;
-         end;
+               if RR_Last > 0 then
+                  Process (Rec, RR_Name (1 .. RR_Last));
+               else
+                  Process (Rec, Name (1 .. Last));
+               end if;
+
+               Position := Position + Record_Length;
+               if Position - Sector_Start >= Sector'Last then
+                  Location := Location + 1;
+                  Have_Sector := False;
+               end if;
+            end;
+         end if;
 
       end loop;
    end Scan_Directory_Entries;
