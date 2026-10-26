@@ -102,14 +102,14 @@ end User;
 - **The `user` server** is one process per user. It holds its name and its home directory cap, given to it at launch.
 - **No sessions, logins or credentials yet.** Holding a user's cap is being that user, as with any other capability.
 
-### 4. First boot creates monty
+### 4. First boot creates fraser
 
 Because init runs only on a fresh boot, init creates the first user there:
 
 1. Launch a `directory` process, the home directory.
 2. Call `Create_File (".petalrc")` on it, and write `echo Welcome to Rose` and a line break to the new file.
-3. Launch a `user` process named `monty`, giving it the home directory.
-4. Launch petal with monty's `User` cap and the home directory, alongside the caps it gets now.
+3. Launch a `user` process named `fraser`, giving it the home directory.
+4. Launch petal with fraser's `User` cap and the home directory, alongside the caps it gets now.
 
 Init keeps launching petal for now. Launching a shell for a user is a later step, for example a `User` operation.
 
@@ -177,7 +177,7 @@ end Rose.Core.List;
 - A `file` server: one process per file, contents in memory (#215).
 - A `directory` server: one process per directory, launching file and directory processes on creation (#216).
 - A `User` interface and a `user` server (#217).
-- Init: on first boot, create monty's home directory with `.petalrc`, launch monty, and launch petal with monty's user and home directory (#218).
+- Init: on first boot, create fraser's home directory with `.petalrc`, launch fraser, and launch petal with fraser's user and home directory (#218).
 - Petal: take a user and directory, keep `home` in its directory table, and run `.petalrc` before the first prompt (#219).
 - Petal: bind interface-typed command arguments from its directory table, defaulting to `home` (#220).
 - `Rose.Core.List`, installed with the core utilities (#221).

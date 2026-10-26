@@ -13,16 +13,24 @@ OBJECTS= \
 	$(BUILDDIR)/init-driver.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
+	$(BUILDDIR)/init-users.o \
 	$(BUILDDIR)/init.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-directory-client.o \
+	$(BUILDDIR)/rose-interfaces-file-client.o \
+	$(BUILDDIR)/rose-interfaces-heap-client.o \
+	$(BUILDDIR)/rose-interfaces-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
+	$(BUILDDIR)/rose-interfaces-process-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
+	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-objects.o \
