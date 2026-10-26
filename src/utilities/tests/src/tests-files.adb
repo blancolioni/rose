@@ -2,30 +2,23 @@ with Ada.Text_IO;
 
 with System.Storage_Elements;
 
-with Rose.Capabilities.Standard;
-with Rose.Invocation;
-with Rose.System_Calls.Client;
+with Rose.Capabilities;
 with Rose.Words;
 
-with Rose.Interfaces.Cap_Set;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Map.Client;
 with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.Writable_File.Client.Conversions;
+
+with Tests.Registry;
 
 package body Tests.Files is
 
    use System.Storage_Elements;
 
-   Find_Index : constant := 10;
-   --  The command registry's Find, in the caps init gives the tests.
-
    Hello : constant Storage_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
-
-   function Find_Cap return Rose.Capabilities.Capability;
 
    ---------------
    -- File_Test --
@@ -34,8 +27,8 @@ package body Tests.Files is
    function File_Test return Boolean is
       use Rose.Interfaces.Writable_File.Client;
       use type Rose.Capabilities.Capability;
-      Registry  : Rose.Interfaces.Map.Client.Map_Client;
-      Launch    : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launch    : constant Rose.Interfaces.Launch.Client.Launch_Client :=
+        Tests.Registry.Launcher ("file");
       Process   : Rose.Interfaces.Process.Client.Process_Client;
       File      : Writable_File_Client;
       Read_Only : Rose.Interfaces.File.Client.File_Client;
@@ -46,12 +39,6 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("File test");
 
-      Rose.Interfaces.Map.Client.Open_Cap_Set
-        (Registry,
-         Add    => Rose.Capabilities.Null_Capability,
-         Remove => Rose.Capabilities.Null_Capability,
-         Find   => Find_Cap);
-      Launch := Rose.Interfaces.Map.Client.Find (Registry, "file");
       Process :=
         Rose.Interfaces.Launch.Client.Launch (Launch, No_Caps, No_Words);
       Open (File, Rose.Interfaces.Process.Client.Published_Interface
@@ -97,22 +84,5 @@ package body Tests.Files is
 
       return True;
    end File_Test;
-
-   --------------
-   -- Find_Cap --
-   --------------
-
-   function Find_Cap return Rose.Capabilities.Capability is
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-      return Rose.System_Calls.Client.Get_Capability
-        (Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index),
-         (1 => Find_Index));
-   end Find_Cap;
 
 end Tests.Files;

@@ -72,7 +72,11 @@ package Rose.Server is
 private
 
    Max_Handled_Endpoints  : constant := 20;
-   Max_Endpoint_Instances : constant := 160;
+   Max_Endpoint_Instances : constant := 1024;
+   --  An instanced server such as mem has a cap for each endpoint and
+   --  object, so this bounds how many objects it can serve: mem uses
+   --  eight for each process. When the table is full, the caps of new
+   --  objects are null.
 
    type Instanced_Handler_Record is
       record
@@ -83,6 +87,10 @@ private
 
    type Instanced_Handler_Array is
      array (1 .. Max_Endpoint_Instances) of Instanced_Handler_Record;
+   pragma Suppress_Initialization (Instanced_Handler_Array);
+   --  Entries past Instance_Count are never read, so the table is not
+   --  initialized: under Normalize_Scalars that would write every page
+   --  of it in every server when it starts.
 
    type Endpoint_Record is
       record

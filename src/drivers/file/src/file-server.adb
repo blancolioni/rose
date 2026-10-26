@@ -10,9 +10,11 @@ package body File.Server is
 
    use System.Storage_Elements;
 
-   Max_Size : constant := 2 ** 20;
-   --  User-mode malloc can't grow, so the contents are a fixed buffer.
-   --  Only the pages that are written use memory.
+   Max_Size : constant := 2 ** 16;
+   --  User-mode malloc can't grow (#229), so the contents are a fixed
+   --  buffer. Only the pages that are written use memory, but elf
+   --  reserves store for the whole of .bss when the process starts, so
+   --  the buffer is kept small.
 
    Context  : Rose.Server.Server_Context;
    Contents : Storage_Array (1 .. Max_Size);
