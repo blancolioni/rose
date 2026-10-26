@@ -29,6 +29,22 @@ package body Rose.Kernel.Processes is
    Current_Page_Fault_Count  : Natural := 0;
    Page_Fault_Params         : aliased Rose.Invocation.Invocation_Record;
 
+   Heap_Request_Pending : Boolean := False;
+   Heap_Request_Amount  : Rose.Addresses.Physical_Bytes := 0;
+   Last_Fault_Pid       : Process_Id := Null_Process_Id;
+   --  Page faults and requests for heap memory go to mem only while it
+   --  waits to receive. If it waits for the reply to a call, they would
+   --  be taken as that reply (#270), so they wait for its next receive.
+
+   function Can_Send_To_Memory return Boolean;
+   --  True if mem waits to receive, and not for the reply to a call.
+
+   procedure Send_Heap_Request;
+   --  Ask mem for Heap_Request_Amount of memory.
+
+   procedure Send_Page_Fault (Pid : Process_Id);
+   --  Tell mem about the page fault recorded for Pid.
+
    Page_Fault_Address : Rose.Words.Word_32;
    pragma Import (C, Page_Fault_Address, "page_fault_address");
 
@@ -47,6 +63,18 @@ package body Rose.Kernel.Processes is
 
    procedure Enable_Write_Pages
      (Process : in out Kernel_Process_Entry);
+
+   ------------------------
+   -- Can_Send_To_Memory --
+   ------------------------
+
+   function Can_Send_To_Memory return Boolean is
+      Mem : Kernel_Process_Entry renames Process_Table (Mem_Process);
+   begin
+      return Mem.State = Blocked
+        and then (not Mem.Flags (Wait_Reply)
+                  or else Mem.Flags (Receive_Any));
+   end Can_Send_To_Memory;
 
    ----------------
    -- Cap_Layout --
@@ -387,47 +415,16 @@ package body Rose.Kernel.Processes is
    procedure Expand_Heap
      (Amount : Rose.Addresses.Physical_Bytes)
    is
-      use Rose.Invocation;
-      P : Kernel_Process_Entry renames Process_Table (Mem_Process);
-      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      if P.State = Blocked then
-         Params.Control.Flags := (Send   => True,
-                                  Recv_Words => True,
-                                  others => False);
+      if Heap_Request_Pending then
+         return;
+      end if;
 
-         Params.Cap := Mem_Page_Fault_Cap;
-         Params.Endpoint :=
-           Rose.Interfaces.Memory.Take_Physical_Memory_Endpoint;
-         Params.Identifier := 0;
-
-         Send_Word (Params, Rose.Words.Word (Amount));
-         Params.Control.Last_Recv_Word := 1;
-
-         Params.Reply_Cap :=
-           New_Cap
-             (Mem_Process,
-              Rose.Capabilities.Layout.Capability_Layout'
-                (Header  => Rose.Capabilities.Layout.Capability_Header'
-                   (Cap_Type         => Rose.Capabilities.Layout.Kernel_Cap,
-                    Single_Use       => True,
-                    Endpoint         => 5,
-                    Identifier       => 0,
-                    others           => <>),
-                 Payload => 0));
-
-         Rose.Boot.Console.Put ("kernel: expanding heap by ");
-         Rose.Boot.Console.Put (Natural (Amount) / 1024);
-         Rose.Boot.Console.Put ("K");
-         Rose.Boot.Console.New_Line;
-
-         Send_Cap
-           (From_Process_Id => 1,
-            To_Process_Id   => Mem_Process,
-            Sender_Cap      => 0,
-            Receiver_Cap    => Mem_Page_Fault_Cap,
-            Params          => Params);
-
+      Heap_Request_Amount := Amount;
+      if Can_Send_To_Memory then
+         Send_Heap_Request;
+      else
+         Heap_Request_Pending := True;
       end if;
    end Expand_Heap;
 
@@ -626,8 +623,6 @@ package body Rose.Kernel.Processes is
    is
       pragma Unreferenced (Read_Attempt);
       use type Rose.Words.Word;
-      use Rose.Invocation;
-      Params : Invocation_Record renames Page_Fault_Params;
    begin
 
       if Active_Checkpoint
@@ -665,39 +660,23 @@ package body Rose.Kernel.Processes is
            ("page fault in page fault handler process");
       end if;
 
-      Params.Control.Flags := (Send => True,
-                               others => False);
+      declare
+         Proc : Kernel_Process_Entry renames Process_Table (Pid);
+      begin
+         Proc.Pending_Fault_Page := Virtual_Page;
+         Proc.Pending_Fault_Mapped := Is_Mapped;
+         Proc.Pending_Fault_Write := Write_Attempt;
+         Proc.Pending_Fault_Execute := Execution_Attempt;
+      end;
 
-      Params.Cap := Mem_Page_Fault_Cap;
-      Params.Endpoint := Rose.Interfaces.Memory.Page_Fault_Endpoint;
-      Params.Identifier := 0;
+      --  The process stays interrupted until mem resumes it, so a fault
+      --  that has to wait for mem to receive is only marked.
 
-      Send_Object_Id (Params, To_Object_Id (Pid));
-      Send_Word (Params, Rose.Words.Word (Virtual_Page));
-
-      if Is_Mapped then
-         Send_Word (Params,
-                    Rose.Words.Word
-                      (Mapped_Physical_Page
-                         (Pid, Virtual_Page)));
+      if Can_Send_To_Memory then
+         Send_Page_Fault (Pid);
       else
-         Send_Word (Params, 0);
+         Process_Table (Pid).Flags (Fault_Pending) := True;
       end if;
-
-      if Write_Attempt then
-         Send_Word (Params, 1);
-      elsif Execution_Attempt then
-         Send_Word (Params, 2);
-      else
-         Send_Word (Params, 0);
-      end if;
-
-      Send_Cap
-        (From_Process_Id => Pid,
-         To_Process_Id   => Mem_Process,
-         Sender_Cap      => 0,
-         Receiver_Cap    => Mem_Page_Fault_Cap,
-         Params          => Params);
 
    end Handle_Page_Fault;
 
@@ -723,6 +702,29 @@ package body Rose.Kernel.Processes is
          return Layout.Header.Cap_Type /= Null_Cap;
       end if;
    end Has_Cap;
+
+   --------------------------------
+   -- Has_Pending_Memory_Request --
+   --------------------------------
+
+   function Has_Pending_Memory_Request
+     (Receiver : Process_Id)
+      return Boolean
+   is
+   begin
+      if Receiver /= Mem_Process then
+         return False;
+      elsif Heap_Request_Pending then
+         return True;
+      end if;
+
+      for P of Process_Table.all loop
+         if P.Flags (Fault_Pending) then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Has_Pending_Memory_Request;
 
    ------------------------
    -- Has_Queued_Message --
@@ -1425,6 +1427,127 @@ package body Rose.Kernel.Processes is
       end if;
 
    end Send_Cap;
+
+   -----------------------
+   -- Send_Heap_Request --
+   -----------------------
+
+   procedure Send_Heap_Request is
+      use Rose.Invocation;
+      Amount : constant Rose.Addresses.Physical_Bytes := Heap_Request_Amount;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Heap_Request_Pending := False;
+
+      Params.Control.Flags := (Send   => True,
+                               Recv_Words => True,
+                               others => False);
+
+      Params.Cap := Mem_Page_Fault_Cap;
+      Params.Endpoint :=
+        Rose.Interfaces.Memory.Take_Physical_Memory_Endpoint;
+      Params.Identifier := 0;
+
+      Send_Word (Params, Rose.Words.Word (Amount));
+      Params.Control.Last_Recv_Word := 1;
+
+      Params.Reply_Cap :=
+        New_Cap
+          (Mem_Process,
+           Rose.Capabilities.Layout.Capability_Layout'
+             (Header  => Rose.Capabilities.Layout.Capability_Header'
+                (Cap_Type         => Rose.Capabilities.Layout.Kernel_Cap,
+                 Single_Use       => True,
+                 Endpoint         => 5,
+                 Identifier       => 0,
+                 others           => <>),
+              Payload => 0));
+
+      Rose.Boot.Console.Put ("kernel: expanding heap by ");
+      Rose.Boot.Console.Put (Natural (Amount) / 1024);
+      Rose.Boot.Console.Put ("K");
+      Rose.Boot.Console.New_Line;
+
+      Send_Cap
+        (From_Process_Id => 1,
+         To_Process_Id   => Mem_Process,
+         Sender_Cap      => 0,
+         Receiver_Cap    => Mem_Page_Fault_Cap,
+         Params          => Params);
+   end Send_Heap_Request;
+
+   ---------------------
+   -- Send_Page_Fault --
+   ---------------------
+
+   procedure Send_Page_Fault (Pid : Process_Id) is
+      use Rose.Invocation;
+      Proc   : Kernel_Process_Entry renames Process_Table (Pid);
+      Params : Invocation_Record renames Page_Fault_Params;
+   begin
+      Proc.Flags (Fault_Pending) := False;
+
+      Params.Control.Flags := (Send => True,
+                               others => False);
+
+      Params.Cap := Mem_Page_Fault_Cap;
+      Params.Endpoint := Rose.Interfaces.Memory.Page_Fault_Endpoint;
+      Params.Identifier := 0;
+
+      Send_Object_Id (Params, To_Object_Id (Pid));
+      Send_Word (Params, Rose.Words.Word (Proc.Pending_Fault_Page));
+
+      if Proc.Pending_Fault_Mapped then
+         Send_Word (Params,
+                    Rose.Words.Word
+                      (Mapped_Physical_Page
+                         (Pid, Proc.Pending_Fault_Page)));
+      else
+         Send_Word (Params, 0);
+      end if;
+
+      if Proc.Pending_Fault_Write then
+         Send_Word (Params, 1);
+      elsif Proc.Pending_Fault_Execute then
+         Send_Word (Params, 2);
+      else
+         Send_Word (Params, 0);
+      end if;
+
+      Send_Cap
+        (From_Process_Id => Pid,
+         To_Process_Id   => Mem_Process,
+         Sender_Cap      => 0,
+         Receiver_Cap    => Mem_Page_Fault_Cap,
+         Params          => Params);
+   end Send_Page_Fault;
+
+   ---------------------------------
+   -- Send_Pending_Memory_Request --
+   ---------------------------------
+
+   procedure Send_Pending_Memory_Request is
+      Pid : Process_Id := Last_Fault_Pid;
+   begin
+      if Heap_Request_Pending then
+         Send_Heap_Request;
+         return;
+      end if;
+
+      --  Start after the process served last, so that none waits for
+      --  ever behind others.
+
+      for Count in Process_Table'Range loop
+         Pid := (if Pid >= Process_Table'Last
+                 then Process_Table'First
+                 else Pid + 1);
+         if Process_Table (Pid).Flags (Fault_Pending) then
+            Last_Fault_Pid := Pid;
+            Send_Page_Fault (Pid);
+            return;
+         end if;
+      end loop;
+   end Send_Pending_Memory_Request;
 
    -------------------------
    -- Send_Queued_Message --

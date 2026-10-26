@@ -231,6 +231,16 @@ package Rose.Kernel.Processes is
    procedure Send_Queued_Message
      (Process : Process_Id);
 
+   function Has_Pending_Memory_Request
+     (Receiver : Process_Id)
+      return Boolean;
+   --  True if Receiver is mem, and a page fault or a request for heap
+   --  memory waits for it to receive (#270).
+
+   procedure Send_Pending_Memory_Request;
+   --  Give mem the request for heap memory if there is one, or else the
+   --  next pending page fault.
+
    function Next_Blocked_Sender
      (Receiver_Id : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index)
@@ -350,7 +360,7 @@ private
    type Process_Flag is
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
-      Persistent, Checkpoint_Page_Fault);
+      Persistent, Checkpoint_Page_Fault, Fault_Pending);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -508,6 +518,11 @@ private
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
          Env_Page          : Rose.Addresses.Physical_Page_Address;
          Checkpoint_Fault  : Rose.Addresses.Virtual_Page_Address;
+         Pending_Fault_Page    : Rose.Addresses.Virtual_Page_Address := 0;
+         Pending_Fault_Mapped  : Boolean := False;
+         Pending_Fault_Write   : Boolean := False;
+         Pending_Fault_Execute : Boolean := False;
+         --  A page fault that waits for mem to receive (Fault_Pending).
          Shared_Pages      : Shared_Page_Array;
          Saved_Stack_Value : Rose.Words.Word_32;
          Command_Endpoint  : Rose.Objects.Endpoint_Index := 0;
