@@ -1,5 +1,8 @@
 build
-images
+/images/*
+!/images/iso/
+/images/iso/*
+!/images/iso/images/
 logs
 *.o
 lib*.a
