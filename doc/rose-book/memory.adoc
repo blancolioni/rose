@@ -16,7 +16,12 @@ A segment maps a range of virtual pages onto a region of storage from `store`, w
    Every process running the program maps the same storage, and, once a page is in memory, the same physical page.
 ** A writable segment gets storage of its own: `elf` reserves a new region, copies the segment's contents from the image into it, and marks the segment _private_, so that its storage is released when the process is gone.
    The part of the segment beyond the contents of the file, such as `.bss`, reads as zeroes.
-* *The stack* is a private, writable segment of 1 MB, which ends at `E000_0000`.
+* *The stack* is a private, writable segment of 1 MB, from `DFF0_0000` up to `E000_0000`.
+
+[NOTE]
+====
+`elf` copies the last page of a writable segment from the image in full, so the part of that page beyond the contents of the file holds whatever follows the segment in the file, not zeroes (#265).
+====
 
 The run-time's heap is part of the program's `.bss`, so it has a fixed size.
 
@@ -43,10 +48,10 @@ When it runs, its address space is:
 .The address space of `echo`
 [cols="2,2,2,5",options="header"]
 |===
-| Virtual address | Size | Access | Storage
+| Start | Size | Access | Storage
 | `0000_0000` | 48 KB | Read, execute | The code, from `echo`'s image, shared by every `echo` process
 | `0000_D000` | 25 KB | Read | Constants, from the image, shared
-| `0001_4000` | 105 KB | Read, write | Data and `.bss`, in a private region: the first page is copied from the image, and the rest reads as zeroes
+| `0001_4000` | 105 KB | Read, write | Data and `.bss`, in a private region. The file holds only the 460 bytes of `.data`, so `elf` copies one page from the image; the rest is `.bss`, which reads as zeroes
 | `DFF0_0000` | 1 MB | Read, write | The stack, in a private region
 |===
 
