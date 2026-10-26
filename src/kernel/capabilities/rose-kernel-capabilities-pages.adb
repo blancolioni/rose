@@ -29,7 +29,8 @@ package body Rose.Kernel.Capabilities.Pages is
                   Readable      => True,
                   Writable      => True,
                   Executable    => False,
-                  User          => True);
+                  User          => True,
+                  Device        => True);
             end;
 
             Params.Control.Flags :=

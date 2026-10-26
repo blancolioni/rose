@@ -12,6 +12,7 @@ with Rose.Interfaces.Exec;
 with Rose.Interfaces.File_System;
 with Rose.Interfaces.Kernel_Log;
 with Rose.Interfaces.Log_Reader;
+with Rose.Interfaces.Output_Redirect;
 with Rose.Interfaces.Storage;
 with Rose.Interfaces.Storage_Checkpoint;
 with Rose.Interfaces.Stream_Writer;
@@ -98,6 +99,8 @@ package body Init.Run is
       Console_Interface_Cap : Rose.Capabilities.Capability :=
                                 Null_Capability;
       Console_Stream_Cap    : Rose.Capabilities.Capability :=
+                                Null_Capability;
+      Console_Redirect_Cap  : Rose.Capabilities.Capability :=
                                 Null_Capability;
       Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                                  Null_Capability
@@ -396,6 +399,11 @@ package body Init.Run is
         Copy_Cap_From_Process
           (Copy_Console_Cap,
            Rose.Interfaces.Stream_Writer.Write_Endpoint);
+
+      Console_Redirect_Cap :=
+        Copy_Cap_From_Process
+          (Copy_Console_Cap,
+           Rose.Interfaces.Output_Redirect.Redirect_Endpoint);
 
       declare
          Cap_Set_Id : constant Rose.Objects.Object_Id :=
@@ -829,6 +837,40 @@ package body Init.Run is
                          Rose.Capabilities.Null_Capability;
          Do_Exec     : Boolean := True;
          Do_Command  : Boolean := True;
+         Set_Output_Cap : Rose.Capabilities.Capability :=
+                            Rose.Capabilities.Null_Capability;
+
+         function Installs (Name : String) return Boolean;
+         --  True if Params asks to install the program called Name.
+
+         --------------
+         -- Installs --
+         --------------
+
+         function Installs (Name : String) return Boolean is
+            use System.Storage_Elements;
+            Buffer : Storage_Array (1 .. Params.Buffer_Length);
+            pragma Import (Ada, Buffer);
+            for Buffer'Address use Params.Buffer_Address;
+         begin
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else Buffer'Length /= Name'Length
+            then
+               return False;
+            end if;
+
+            for I in Name'Range loop
+               if Character'Val
+                 (Buffer (Storage_Offset (I - Name'First + 1)))
+                 /= Name (I)
+               then
+                  return False;
+               end if;
+            end loop;
+
+            return True;
+         end Installs;
+
       begin
          loop
             Rose.System_Calls.Initialize_Receive (Params, Install_Receiver);
@@ -880,10 +922,13 @@ package body Init.Run is
                      Init.Calls.Get_Interface (Public_Cap, Caps);
                      Install_Cap :=
                        Caps (Rose.Interfaces.Exec.Install_Index + 1);
+                     Set_Output_Cap :=
+                       Caps
+                         (Rose.Interfaces.Exec.Set_Standard_Output_Index + 1);
                   end if;
                end;
 
-            elsif Do_Command then
+            elsif Do_Command and then Installs ("command") then
                Do_Command := False;
 
                declare
@@ -933,6 +978,40 @@ package body Init.Run is
                   Init.Calls.Send_String
                     (Console_Stream_Cap, "received input stream cap" & NL);
                end if;
+            elsif Params.Data (1) = 98 then
+
+               --  The persistent console is running.  The boot console
+               --  sends what it is given on to it, and it is the
+               --  standard output of everything installed from now on.
+
+               Console_Interface_Cap := Params.Caps (0);
+
+               declare
+                  Caps : Init.Calls.Array_Of_Capabilities (1 .. 1);
+
+                  procedure Send_Console (To : Rose.Capabilities.Capability);
+
+                  ------------------
+                  -- Send_Console --
+                  ------------------
+
+                  procedure Send_Console
+                    (To : Rose.Capabilities.Capability)
+                  is
+                     Call_Params : aliased Rose.Invocation.Invocation_Record;
+                  begin
+                     Rose.System_Calls.Initialize_Send (Call_Params, To);
+                     Rose.System_Calls.Send_Cap
+                       (Call_Params, Console_Interface_Cap);
+                     Rose.System_Calls.Invoke_Capability (Call_Params);
+                  end Send_Console;
+
+               begin
+                  Init.Calls.Get_Interface (Console_Interface_Cap, Caps);
+                  Console_Stream_Cap := Caps (1);
+                  Send_Console (Console_Redirect_Cap);
+                  Send_Console (Set_Output_Cap);
+               end;
             else
 
                declare
@@ -1026,6 +1105,20 @@ package body Init.Run is
 
       if Restored then
 
+         Init.Calls.Send_String
+           (Console_Stream_Cap,
+            "init: restored from a checkpoint; exiting" & NL);
+
+         --  The restored console redraws the screen as it was at the
+         --  checkpoint, so the boot console stops writing to it.
+
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Console_Redirect_Cap);
+            Rose.System_Calls.Invoke_Capability (Params);
+         end;
+
          --  The restore server lets the restored processes run when
          --  this reply arrives, now that the boot modules are started.
 
@@ -1036,9 +1129,6 @@ package body Init.Run is
             Rose.System_Calls.Invoke_Capability (Reply);
          end;
 
-         Init.Calls.Send_String
-           (Console_Stream_Cap,
-            "init: restored from a checkpoint; exiting" & NL);
          Init.Calls.Send (Exit_Cap);
          return;
       end if;

@@ -5,5 +5,10 @@ interface Exec : Launch is
       Name         : String;
       Install_Caps : Capability_Array)
      return interface Launch;
-      
+
+   --  The standard output that exec gives the programs it launches, and
+   --  uses itself.
+
+   procedure Set_Standard_Output (Output : interface Stream_Writer);
+
 end Exec;
