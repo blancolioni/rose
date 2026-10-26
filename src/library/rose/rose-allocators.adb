@@ -8,6 +8,38 @@ package body Rose.Allocators is
    function Last_Free_Index (Level : Order_Type) return Natural
    is (2 ** (Natural (Level) + 1) - 1);
 
+   ---------------
+   -- Add_Range --
+   ---------------
+
+   procedure Add_Range
+     (Allocator : in out Store;
+      Base      : Positive;
+      Bound     : Positive)
+   is
+      Largest : constant Positive := 2 ** Natural (Order_Type'Last);
+      --  The size of a block of order 0.
+      Start   : Positive := Base;
+   begin
+      while Start < Bound loop
+         declare
+            Size : Positive := 1;
+         begin
+            --  Grow the block while it stays aligned at Start and inside
+            --  the range.
+            while Size < Largest
+              and then (Start - 1) mod (Size * 2) = 0
+              and then Start + Size * 2 <= Bound
+            loop
+               Size := Size * 2;
+            end loop;
+
+            Deallocate (Allocator, Start, Start + Size);
+            Start := Start + Size;
+         end;
+      end loop;
+   end Add_Range;
+
    --------------
    -- Allocate --
    --------------

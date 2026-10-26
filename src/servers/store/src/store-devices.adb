@@ -179,7 +179,7 @@ package body Store.Devices is
                     Rose.Words.Word (Block_Count),
                     Base, Bound);
 
-         Space_Allocators.Deallocate
+         Space_Allocators.Add_Range
            (Allocator => Allocator,
             Base      =>
               Natural ((Base - Page_Object_Id'First) / Minimum_Bank_Pages) + 1,

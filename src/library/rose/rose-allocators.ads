@@ -4,6 +4,15 @@ package Rose.Allocators is
 
    type Store is limited private;
 
+   procedure Add_Range
+     (Allocator : in out Store;
+      Base      : Positive;
+      Bound     : Positive);
+   --  Make the blocks Base .. Bound - 1 free, for example the space of a
+   --  new backing store. The range need not be a power of two or
+   --  aligned: it is freed as the largest aligned blocks that fit, so
+   --  nothing outside it can be allocated.
+
    function Allocate
      (Allocator : in out Store;
       Size      : Positive)
@@ -13,6 +22,9 @@ package Rose.Allocators is
      (Allocator : in out Store;
       Base      : Positive;
       Bound     : Positive);
+   --  Free a block that Allocate returned: Base is its index, and
+   --  Bound - Base its size, which is rounded up to a power of two as
+   --  Allocate rounds it. For any other range, use Add_Range.
 
 private
 
