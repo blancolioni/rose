@@ -17,11 +17,21 @@ The memory state is a cache of the swap state.
 
 Persistence is implemented by a regular checkpoint operation.
 
+[NOTE]
+====
+This section describes an earlier design, built on swap and change partitions.
+Checkpoints are now written to a log by the log server, and the chapter is to be rewritten around it (#127).
+====
+
 === Pages
 
 Memory pages are always allocated read-only.
 The first write to a page (if it is allowed) causes a page fault which switches the page to read/write and marks it as dirty.
 When a dirty page is swapped out or synchronised, it is written to swap and its page object id is recorded in a list.
+
+_Device pages_ are an exception.
+A page that the kernel maps straight into a process, such as the VGA text page that `vga-console` writes to, is not managed by the memory server, so it is not part of a checkpoint.
+The kernel marks such a page as a device page, in a spare bit of its page table entry, and leaves it writable while a checkpoint is active, so that a write to the screen during a checkpoint does not fault (ADR 0005).
 
 === Process
 
@@ -90,9 +100,49 @@ Commit_And_Activate (New_page_Object_State)
 
 == Restore
 
-To restore from a checkpoint, the most recent consistent checkpoint state is copied to swap.
-Then, for each checkpoint based on this state, the previous checkpoint is recursively applied, followed by each changed page object.
-Any required pages can be loaded from swap, and the system will proceed normally.
+At boot, the `restore` server looks for a checkpoint: the last complete entry in the checkpoint log.
+If it finds one, it brings back the persistent processes as they were at that checkpoint, in this order:
+
+. the storage server's regions, through `Storage_Checkpoint`;
+. each process in the kernel, with its capabilities, not yet runnable;
+. each process in the memory server, with its segments, through `Memory_Restore`;
+. the newest saved contents of each page the processes changed, from any log entry up to the checkpoint;
+. the interrupts they handle.
+
+When `init` has started the last boot modules and replied, `restore` resumes the processes (see <<restore-boot>>).
+A restored process continues from where it was.
+A process that was blocked in a system call makes the call again.
+
+If there is no checkpoint, or it cannot be restored, `restore` starts a new log and installs the system instead.
+
+[#restore-notification]
+=== Telling a Process It Has Been Restored
+
+Most processes need nothing more: everything they depend on was restored with them.
+Some depend on state that a checkpoint cannot hold:
+
+* *hardware*, since a reboot resets devices, so a driver's device is no longer set up the way the driver left it;
+* *direct mappings*, such as the VGA text page, which the kernel maps straight into a process and which the memory server does not track, so the restored process no longer has it;
+* *the screen*, which shows the messages of the boot that did the restore.
+
+Such a process implements the `Restorable` interface (ADR 0004):
+
+[source,ada]
+----
+interface Restorable is
+   procedure Restored;
+end Restorable;
+----
+
+* When `restore` resumes a process, the kernel looks for its `Restorable.Restored` endpoint.
+  If it has one, the kernel sets the process's `Restore_Notice` flag.
+* The next time the process receives, on any endpoint, the kernel clears the flag and sends it `Restored`, before any queued message or waiting sender.
+  The message comes from the kernel, and has no reply cap.
+* The notice comes once for each restore.
+  If a checkpoint is taken while it is still pending, the flag is saved with the process, and a restore from that checkpoint sets it again.
+* It does not make a blocked call safe: a process that was blocked in a call makes the call again first, and receives the notice at its next receive.
+
+`vga-console` is the first process to use it: when it is told that it has been restored, it maps the VGA page again and redraws the screen as it was at the checkpoint (see <<Servers>>).
 
 == Drive Layout
 
@@ -115,8 +165,8 @@ This is an example of how to partition a 64G disk.
 === Boot partition
 
 This partition contains the boot sector, grub, a kernel image and enough modules to launch a minimal system.
-The init module looks for a checkpoint, and if found, restores from it.
-Otherwise, the installation process is started.
+The `restore` module looks for a checkpoint, and if it finds one, restores from it.
+Otherwise, it installs the system (see <<Boot Sequence>>).
 
 === Swap and checkpoint state partition
 
