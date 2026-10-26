@@ -20,9 +20,11 @@ package Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Device         : Boolean := False);
-   --  A device page, such as the VGA text page, is not part of a
-   --  checkpoint, so Disable_Page_Writes leaves it writable.
+      Managed        : Boolean := False);
+   --  Managed is true for a page the memory server maps.  Only those are
+   --  part of a checkpoint, so Disable_Page_Writes leaves every other
+   --  page writable: device pages such as the VGA text page, shared
+   --  invocation buffers, and environment pages.
 
    procedure Unmap_Page
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
@@ -50,8 +52,8 @@ package Rose.Kernel.Page_Table is
    procedure Disable_Page_Writes
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);
    --  Scan all pages referenced by directory pages referenced
-   --  by this page.  If write enabled, and not a device page, disable
-   --  and set the checkpoint-read-only flag.
+   --  by this page.  If write enabled, and mapped by the memory server,
+   --  disable and set the checkpoint-read-only flag.
 
    procedure Enable_Page_Writes
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);

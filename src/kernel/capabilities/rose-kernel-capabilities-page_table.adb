@@ -114,7 +114,8 @@ package body Rose.Kernel.Capabilities.Page_Table is
          Readable      => Readable,
          Writable      => Writable,
          Executable    => Executable,
-         User          => True);
+         User          => True,
+         Managed       => True);
 
       if Available_Pages > 0 then
          Rose.Kernel.Clock.Update_Mem

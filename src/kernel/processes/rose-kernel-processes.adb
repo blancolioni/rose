@@ -1119,7 +1119,7 @@ package body Rose.Kernel.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       User          : Boolean;
-      Device        : Boolean := False)
+      Managed       : Boolean := False)
    is
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
@@ -1132,7 +1132,7 @@ package body Rose.Kernel.Processes is
          Writable       => Writable,
          Executable     => Executable,
          User           => User,
-         Device         => Device);
+         Managed        => Managed);
    end Map_Page;
 
    --------------------------

@@ -17,7 +17,7 @@ package body Rose.Kernel.Page_Table is
       record
          PFA                  : Physical_Page_Address := 0;
          Available_11         : Boolean               := False;
-         Device_Page          : Boolean               := False;
+         Managed              : Boolean               := False;
          Checkpoint_Read_Only : Boolean               := False;
          Global               : Boolean               := False;
          Zero                 : Boolean               := False;
@@ -42,7 +42,7 @@ package body Rose.Kernel.Page_Table is
          Zero                 at 0 range 7 .. 7;
          Global               at 1 range 0 .. 0;
          Checkpoint_Read_Only at 1 range 1 .. 1;
-         Device_Page          at 1 range 2 .. 2;
+         Managed              at 1 range 2 .. 2;
          Available_11         at 1 range 3 .. 3;
          PFA                  at 1 range 4 .. 23;
       end record;
@@ -52,7 +52,12 @@ package body Rose.Kernel.Page_Table is
    type Page_Entry_Index is range 0 .. Entries_Per_Page - 1;
 
    First_Kernel_Page_Entry_Index : constant :=
-                                     (Entries_Per_Page / 4) * 3;
+                                     Kernel_Virtual_Base
+                                       / (Entries_Per_Page
+                                          * Physical_Page_Bytes);
+   --  The kernel's address space starts at Kernel_Virtual_Base.  Every
+   --  entry below it is a process's own, stacks and the environment page
+   --  among them (#314).
 
    subtype Page_Directory_Index is Page_Entry_Index;
 
@@ -98,7 +103,7 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Device         : Boolean);
+      Managed        : Boolean);
 
    procedure Unmap_Page
      (Directory      : in out Page_Table_Array;
@@ -176,8 +181,8 @@ package body Rose.Kernel.Page_Table is
             begin
                for Table_Entry of Table_Page loop
                   if Table_Entry.Present
+                    and then Table_Entry.Managed
                     and then Table_Entry.Writable
-                    and then not Table_Entry.Device_Page
                   then
                      Table_Entry.Writable := False;
                      Table_Entry.Checkpoint_Read_Only := True;
@@ -294,7 +299,7 @@ package body Rose.Kernel.Page_Table is
    is
    begin
       Map_Page (Page_Directory, Virtual_Page, Physical_Page,
-                Readable, Writable, Executable, User, Device => False);
+                Readable, Writable, Executable, User, Managed => False);
    end Map_Kernel_Page;
 
    --------------
@@ -309,7 +314,7 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Device         : Boolean := False)
+      Managed        : Boolean := False)
    is
       Directory : Page_Table_Array;
       pragma Import (Ada, Directory);
@@ -317,7 +322,7 @@ package body Rose.Kernel.Page_Table is
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
       Map_Page (Directory, Virtual_Page, Physical_Page,
-                Readable, Writable, Executable, User, Device);
+                Readable, Writable, Executable, User, Managed);
    end Map_Page;
 
    --------------
@@ -332,7 +337,7 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Device         : Boolean)
+      Managed        : Boolean)
    is
       pragma Unreferenced (Executable, Readable);   --   :-(
       Directory_Index : constant Page_Entry_Index :=
@@ -390,7 +395,7 @@ package body Rose.Kernel.Page_Table is
          Table_Entry.PFA := Physical_Page;
          Table_Entry.Writable := Writable;
          Table_Entry.User := User;
-         Table_Entry.Device_Page := Device;
+         Table_Entry.Managed := Managed;
          if Log_Page_Table then
             Show_Page_Entry (Table_Entry);
          end if;
@@ -537,7 +542,7 @@ package body Rose.Kernel.Page_Table is
       Rose.Boot.Console.Put (Word_32 (Page.PFA) * 4096);
       Rose.Boot.Console.Put (" ");
       Put_Flag (Page.Available_11, "z");
-      Put_Flag (Page.Device_Page, "y");
+      Put_Flag (Page.Managed, "y");
       Put_Flag (Page.Checkpoint_Read_Only, "r");
       Put_Flag (Page.Global, "g");
       Put_Flag (Page.Zero, "0");
