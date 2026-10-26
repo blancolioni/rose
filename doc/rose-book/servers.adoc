@@ -9,7 +9,7 @@ Each boot server's cap 1 creates endpoints.
 
 Drivers::
 Installed from the install media by `restore`, through `exec`.
-Each driver names the capabilities it needs in a `.driver` manifest, such as `create-endpoint`, `register-interrupt 33` or `port-in-8 96`, and `init` grants them when the driver is installed.
+Each driver names the capabilities it needs in a `.driver` manifest, such as `create-endpoint`, `register-interrupt 33`, `port-in-8 96` or `device-page 184`, and `init` grants them when the driver is installed.
 
 [NOTE]
 ====
@@ -22,11 +22,17 @@ Each entry below says what the server provides, what it is launched with, and wh
 
 === `console`
 
-Writes text to the screen.
+The boot console, which writes text to the screen until the persistent console, `vga-console`, takes over.
 
-Provides:: `Stream_Writer`.
+Provides:: `Stream_Writer`, and `Output_Redirect`, whose `Redirect` sends everything written from then on to another `Stream_Writer`, or discards it if that is null.
 Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`.
-Used by:: Every other server, for its messages, and the shell, for its standard output and standard error.
+Used by:: Every boot server, for its messages, and `init` and the first programs it installs, until the handover.
+
+`console` is a boot module, so it is not persistent.
+Once `vga-console` is running, `init` redirects `console` to it, so the boot servers' messages still reach the screen (see <<Boot Sequence>>).
+After a restore, `init` tells `console` to discard its output instead, so that the boot servers do not write over the restored screen; their messages no longer appear.
+
+`console` registers the `Redirect` endpoint with `Rose.Server` itself, rather than through the generated `Output_Redirect` server package, whose instance table would not fit in the kernel heap that boot modules use before the memory server starts.
 
 === `caps`
 
@@ -147,9 +153,29 @@ Documenting them fully is tracked in #130.
 
 Installs and launches executables.
 
-Provides:: `Exec`, whose `Install` stores an executable and returns a `Launch` interface for it; and `Launch` for each installed program.
+Provides:: `Exec`, whose `Install` stores an executable and returns a `Launch` interface for it, and whose `Set_Standard_Output` sets the standard output that `exec` gives the programs it launches, and uses itself; and `Launch` for each installed program.
 Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`.
-Used by:: `init`, which installs every program after `exec` itself.
+Used by:: `init`, which installs every program after `exec` itself, and sets its standard output to `vga-console` once that is running.
+
+=== `vga-console`
+
+The persistent console: it writes text to the screen, and survives a restore (ADR 0005).
+
+Provides:: `Stream_Writer`, and `Restorable`.
+Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`.
+Used by:: Everything installed after it, as its standard output, through `exec`; the boot console, which sends its output on to it; and the shell.
+
+* *It keeps a copy of the screen in its own memory:* rows 1 to 24, as VGA cells, and the cursor position.
+  Every write changes the copy and the VGA page.
+  The copy is ordinary process memory, so a checkpoint holds the screen.
+* *Row 0 stays the kernel's status line.*
+* *It takes over the screen as it finds it.*
+  At its first write, it copies rows 1 to 24 from the VGA page, and reads the cursor position from the CRT controller, so the install messages already on the screen stay there.
+* *It redraws the screen after a restore.*
+  When it is told that it has been restored (see <<restore-notification>>), it maps the VGA page again, copies its saved screen to rows 1 to 24, and puts the cursor back, so the screen is as it was at the checkpoint.
+  Output written after the last checkpoint is lost from the screen, like everything else written since then.
+
+`restore` installs `vga-console` straight after `exec`, and sends its `Stream_Writer` to `init`, which hands the screen over to it (see <<Boot Sequence>>).
 
 === `command`
 
@@ -186,9 +212,29 @@ Serves one file: each file is a process of its own, which holds the file's conte
 
 Provides:: `Writable_File` (ADR 0003).
 Requests:: `create-endpoint`.
-Used by:: Nothing yet; the installer saves it, without launching it.
+Used by:: `directory`, which launches a `file` process for each file it creates.
 
 A file holds up to 1 MB, and every holder of the file shares one position in it.
+
+=== `directory`
+
+Serves one directory: each directory is a process of its own, as each file is.
+
+Provides:: `Writable_Directory` (ADR 0003).
+Requests:: `create-endpoint`.
+Used by:: `init`, for the first user's home directory, and the shell, as its current directory.
+
+Each entry of a directory is a `file` or `directory` process, launched when the entry is created.
+The directory holds the entry's writable interface, and hands out read-only ones.
+
+=== `user`
+
+Serves one user: the user's name, and the user's home directory (ADR 0003).
+
+Provides:: `User`, whose `Name` is the user's name, and whose `Home_Directory` is a `Writable_Directory`.
+Used by:: `init`, which creates the first user, `fraser`, on a first boot, and gives it to the shell.
+
+`user` is installed with the commands, and launched once for each user, with the name and the home directory in its launch call.
 
 === `terminal` and `hello`
 

@@ -4,7 +4,8 @@
 
 GRUB loads the kernel and the boot modules.
 The kernel initialises itself and starts the first boot module, `init`, which starts the others in a fixed order.
-On a first boot, the `restore` server then installs the system from the install media; `init` starts the checkpoint server, launches the shell, and exits.
+The `restore` server then either restores the system from its last checkpoint, or, on a first boot, installs it from the install media.
+`init` starts the checkpoint server, launches the shell if this is a first boot, and exits.
 
 The sequence is written in Ada, in `src/servers/init/src/init-run.adb`.
 
@@ -51,45 +52,76 @@ After launching a module, `init` takes a copy capability for the new process and
 | 10 | `partition` | A block device, and a partition's start, bound and block size | `Block_Device`, one server per partition
 | 11 | `isofs` | hd1 | The install media's root directory
 | 12 | `log` | The kernel's start-log capability | `Add_Log_Device` and `Append`
-| 13 | `restore` | The swap and log partitions, `Storage`, the install media, `init`'s install endpoint | (see <<first-boot>>)
+| 13 | `restore` | The swap and log partitions, `Storage`, the install media, `init`'s install endpoint, the log's `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore` | (see <<restore-server>>)
 | 14 | `checkpoint` | The timer, enter and leave checkpoint, `Memory.Checkpoint`, log append | --
 |===
 
 `init` launches a `partition` server for the active swap partition, the inactive swap partition and the log partition that `scan` finds on hd0.
 `checkpoint` is launched last, after `restore` has finished.
 
+[#restore-server]
+== `restore`
+
+`restore` decides whether this boot restores the system or installs it:
+
+. It adds the log partition to `log`, so that the checkpoint log can be read.
+. It looks for a checkpoint: the last complete entry in the checkpoint log.
+. It adds the active swap partition to `store` as backing storage, which both a restore and an install need.
+. If there is a checkpoint, it restores it (see <<restore-boot>>).
+  If there is none, or the checkpoint cannot be restored, this is a first boot (see <<first-boot>>).
+. It tells `init` that it has finished, and whether it restored a checkpoint.
+
 [#first-boot]
 == First Boot
 
-`restore` opens the active swap partition and looks for a checkpoint.
-If there is none, this is a first boot:
+On a first boot, `restore` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
+It then reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 
-. `restore` adds the active swap partition to `store` as backing storage.
-. It reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
-** the drivers `exec`, `command`, `keyboard` and `event-input-stream`, which are launched;
-** the file server `file`, which is saved, and launched once for each file;
-** the commands `echo`, `tests` and `petal`, which are saved in the command registry.
-. It adds the log partition to `log`.
+* the drivers `exec`, `vga-console`, `command`, `keyboard` and `event-input-stream`, which are launched;
+* the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
+* the commands `echo`, `user`, `tests` and `petal`, which are saved in the command registry.
 
 `init` serves the install endpoint while `restore` runs.
-The first program installed is `exec`, which installs every later program; the second is `command`, the command registry, whose `Find` operation `init` keeps.
+The first program installed is `exec`, which installs every later program.
+The second is `vga-console`, the persistent console (see <<Servers>>), and the third is `command`, the command registry, whose `Find` operation `init` keeps.
 Once `event-input-stream` is running, `restore` sends `init` the keyboard input stream.
+
+=== Handing over the console
+
+Until `vga-console` is running, everything writes to the boot console, `console`, which is a boot module and not persistent.
+When `restore` has launched `vga-console`, it sends `init` the new console's `Stream_Writer`, and `init`:
+
+. tells the boot console to send everything it is given on to the new console, through `Output_Redirect`;
+. tells `exec` to use the new console as the standard output of the programs it launches, and for its own output, through `Exec.Set_Standard_Output`;
+. uses the new console itself, as the standard output of everything it installs or launches from then on.
+
+The boot console passes its output on, rather than stopping, because boot modules and `restore` still hold caps to it.
 
 [#restore-boot]
 == Restore Boot
 
-If `restore` finds a checkpoint on the active swap partition, it reports that it is restoring from it.
+On a restore boot, `restore` brings back the persistent processes as they were at the checkpoint, in this order:
 
-[NOTE]
-====
-Restoring is not implemented yet: `restore` finds the checkpoint but does not restore pages or processes from it (#114).
-====
+. the storage server's regions;
+. each process in the kernel, not yet runnable;
+. each process in the memory server, with its segments;
+. the newest saved contents of each page they changed, from any log entry up to the checkpoint;
+. the interrupts they handle.
+
+The restored processes cannot run yet.
+`init` starts `checkpoint`, then tells the boot console to discard its output, so that boot modules don't write over the restored screen.
+It replies to `restore`, and exits without launching anything else: the programs it would launch are running already, as they were at the checkpoint.
+
+When `init`'s reply arrives, `restore` resumes the restored processes.
+A process that was blocked in a system call makes the call again when it runs, so most servers are back in a receive almost at once.
+A process that depends on state a checkpoint cannot hold, such as a device or the screen, is told that it has been restored (see <<restore-notification>>).
 
 == Starting the Shell
 
-When `restore` has finished, `init` launches `checkpoint`, then finds `tests` and `petal` in the command registry and launches them.
-Each receives a cap set with the standard streams, using the console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
-`petal` also receives the registry's `Find`, for running commands, and a capability for trace events.
+On a first boot, when `restore` has finished, `init` launches `checkpoint`.
+It then finds `tests` in the command registry and launches it, creates the first user, `fraser`, with a home directory (ADR 0003), and launches `petal`.
+`tests` and `petal` each receive a cap set with the standard streams, using the persistent console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
+`petal` also receives the registry's `Find`, for running commands, a capability for trace events, the user, and the user's home directory as its current directory.
 
 `init` then exits.
 
