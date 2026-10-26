@@ -1,5 +1,6 @@
 with Rose.Boot.Console;
 with Rose.Interfaces.Memory;
+with Rose.Interfaces.Restorable;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Page_Table;
@@ -742,6 +743,26 @@ package body Rose.Kernel.Processes is
         and then (Endpoint = 0
                   or else Endpoint = P.Queued_Endpoint);
    end Has_Queued_Message;
+
+   ------------------------
+   -- Has_Restore_Notice --
+   ------------------------
+
+   function Has_Restore_Notice
+     (Process  : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean
+   is
+      use type Rose.Objects.Endpoint_Index;
+      P : Kernel_Process_Entry renames Process_Table (Process);
+   begin
+      return P.Flags (Restore_Notice)
+        and then (Endpoint = 0
+                  or else Endpoint =
+                    Find_Endpoint
+                      (Process,
+                       Rose.Interfaces.Restorable.Restored_Endpoint));
+   end Has_Restore_Notice;
 
    ---------------------------
    -- Have_Process_Handlers --
@@ -1651,6 +1672,40 @@ package body Rose.Kernel.Processes is
       Set_Current_State (To_Process_Id, Ready);
 
    end Send_Reply;
+
+   -------------------------
+   -- Send_Restore_Notice --
+   -------------------------
+
+   procedure Send_Restore_Notice
+     (Process : Process_Id)
+   is
+      use Rose.Invocation;
+      To     : Kernel_Process_Entry renames Process_Table (Process);
+      Params : constant Invocation_Record :=
+                 Invocation_Record'
+                   (Control =>
+                      Control_Word'
+                        (Flags  => (Send => True, others => False),
+                         others => <>),
+                    others  => <>);
+   begin
+      if To.Flags (Trace) then
+         Debug.Put (Process);
+         Rose.Boot.Console.Put_Line (": sending restore notice");
+      end if;
+
+      To.Flags (Restore_Notice) := False;
+      Send_To_Endpoint
+        (From_Process_Id => 1,
+         To_Process_Id   => Process,
+         Sender_Cap      => 0,
+         Endpoint        =>
+           Find_Endpoint
+             (Process, Rose.Interfaces.Restorable.Restored_Endpoint),
+         Identifier      => 0,
+         Params          => Params);
+   end Send_Restore_Notice;
 
    ----------------------
    -- Send_To_Endpoint --

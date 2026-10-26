@@ -241,6 +241,17 @@ package Rose.Kernel.Processes is
    --  Give mem the request for heap memory if there is one, or else the
    --  next pending page fault.
 
+   function Has_Restore_Notice
+     (Process  : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean;
+   --  True if Process has been restored and resumed, has not yet been
+   --  told, and Endpoint is 0 (any) or its Restorable.Restored endpoint.
+
+   procedure Send_Restore_Notice
+     (Process : Process_Id);
+   --  Send Restorable.Restored to Process.
+
    function Next_Blocked_Sender
      (Receiver_Id : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index)
@@ -360,7 +371,7 @@ private
    type Process_Flag is
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
-      Persistent, Checkpoint_Page_Fault, Fault_Pending);
+      Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
