@@ -56,6 +56,11 @@ package body Restore.Installer is
       Last : in out Natural;
       S    : String);
 
+   procedure Send_Console (Console_Cap : Rose.Capabilities.Capability);
+   --  Give init the persistent console's Stream_Writer interface, so
+   --  that it replaces the boot console before anything else is
+   --  installed.
+
    ------------
    -- Append --
    ------------
@@ -341,6 +346,12 @@ package body Restore.Installer is
                                (Reply.Caps (0));
                         end if;
 
+                        if Flags (Provides_Console) then
+                           Send_Console
+                             (Get_Public_Interface_From_Process
+                                (Reply.Caps (0)));
+                        end if;
+
                      when Save =>
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
@@ -354,6 +365,20 @@ package body Restore.Installer is
       end;
 
    end Install_Executable;
+
+   ------------------
+   -- Send_Console --
+   ------------------
+
+   procedure Send_Console (Console_Cap : Rose.Capabilities.Capability) is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+      Rose.System_Calls.Send_Cap (Params, Console_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(98));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Send_Console;
 
    --------------------------------
    -- Write_Initial_System_Image --

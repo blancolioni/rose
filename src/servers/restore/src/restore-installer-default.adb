@@ -14,6 +14,12 @@ package body Restore.Installer.Default is
       Default_Flags : constant Install_Flag_Array := (others => False);
    begin
       Process ("exec", "drivers", Launch, Default_Flags);
+
+      --  The persistent console comes straight after exec, so that
+      --  everything installed after it writes to it.
+
+      Process ("vga-console", "drivers", Launch,
+               (Provides_Console => True, others => False));
       Process ("command", "drivers", Launch, Default_Flags);
       Process ("keyboard", "drivers", Launch,
                (Provides_Keyboard_Interface => True, others => False));

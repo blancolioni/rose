@@ -8,7 +8,10 @@ package Restore.Installer is
      (Provides_Keyboard_Interface,
       Requires_Keyboard_Interface,
       Provides_Input_Stream,
-      Requires_Input_Stream);
+      Requires_Input_Stream,
+      Provides_Console);
+   --  Provides_Console: the program is the persistent console, which
+   --  init gives everything installed after it as standard output.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 
