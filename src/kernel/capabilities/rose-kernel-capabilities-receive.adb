@@ -22,9 +22,12 @@ package body Rose.Kernel.Capabilities.Receive is
       elsif Rose.Kernel.Processes.Has_Restore_Notice
         (Receiver_Id, Cap.Header.Endpoint)
       then
+
+         --  The notice arrives as a message from the kernel does: the
+         --  process blocks in its receive, and the notice is sent to it.
+
+         Rose.Kernel.Processes.Receive (Receiver_Id, Params.all);
          Rose.Kernel.Processes.Send_Restore_Notice (Receiver_Id);
-         Rose.Kernel.Processes.Get_Current_Invocation
-           (Receiver_Id, Params.all);
       elsif Rose.Kernel.Processes.Has_Queued_Message
         (Receiver_Id, Cap.Header.Endpoint)
       then

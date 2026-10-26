@@ -39,7 +39,7 @@ It attaches the interface to its server context like any other. `Rose.Server.Reg
 ### 2. The kernel delivers `Restored`
 
 - When restore resumes a process (`Resume_Process`), the kernel looks for its `Restorable.Restored` endpoint. If it has one, the kernel sets a flag on the process (`Restore_Notice`).
-- The next time the process receives, on any endpoint or on that one, the kernel delivers `Restored` to it, clears the flag, and returns. This comes before any queued message and any blocked sender.
+- The next time the process receives, on any endpoint or on that one, the kernel clears the flag and sends `Restored` to it. The process blocks in its receive as usual, and the notice is delivered the way any other sender's message is. It comes before any queued message and any blocked sender.
 - The message comes from the kernel and has no reply cap, as interrupts do.
 
 The flag is separate from the queued message, so it can't collide with an interrupt that is queued for the same process.
