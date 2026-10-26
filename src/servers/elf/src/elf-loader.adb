@@ -16,7 +16,10 @@ package body Elf.Loader is
    use Rose.Interfaces.Storage.Client;
 
    Stack_Bound : constant := 16#E000_0000#;
-   Stack_Size  : constant := 16#0010_0000#;
+   Stack_Size  : constant := 16#0004_0000#;
+   --  The store allocates a region's backing blocks when it is reserved,
+   --  so every process's stack uses this much of the backing store,
+   --  however little of it is touched (#305).
    Stack_Base  : constant := Stack_Bound - Stack_Size;
 
    procedure Read
