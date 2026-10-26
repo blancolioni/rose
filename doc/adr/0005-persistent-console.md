@@ -50,6 +50,8 @@ After a restore, the boot console comes back without a redirect. Just before res
 
 While a checkpoint is active, the kernel makes every writable page of a persistent process read-only, and gives a blocked write to the memory server as a page fault when the checkpoint ends. The memory server doesn't manage device pages, so a console write during a checkpoint would fail. The kernel now marks a page mapped by `Identity_Map_Page` as a device page, in a spare bit of the page table entry, and the checkpoint leaves device pages writable. Their contents aren't part of a checkpoint anyway.
 
+**Update (#314):** the rule is now more general. The same bit means "mapped by the memory server": it is set only on the memory server's page-table cap, and a checkpoint write-protects only those pages. Every page the kernel maps itself, including device pages, shared invocation buffers and environment pages, stays writable.
+
 ## Consequences
 
 - **A restore puts back the screen as it was at the checkpoint,** including what petal had written and where the cursor was.
