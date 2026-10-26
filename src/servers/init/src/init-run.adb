@@ -31,6 +31,7 @@ with Rose.System_Calls;
 
 with Init.Calls;
 with Init.Installer;
+with Init.Users;
 
 package body Init.Run is
 
@@ -168,6 +169,11 @@ package body Init.Run is
 
       Find_Cap    : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
+
+      First_User : constant String := "fraser";
+      User_Cap   : Rose.Capabilities.Capability;
+      Home_Cap   : Rose.Capabilities.Capability;
+      --  The first user, and its home directory, created on first boot.
 
       function Copy_Cap_From_Process
         (Copy_Cap   : Rose.Capabilities.Capability;
@@ -1204,6 +1210,23 @@ package body Init.Run is
 
       Wait (2000);
 
+      --  The first user, with a home directory (ADR 0003). Init runs
+      --  only on a fresh boot, so it is created once.
+
+      Init.Calls.Send_String
+        (Console_Stream_Cap, "creating user " & First_User & NL);
+      Init.Users.Create_First_User
+        (Name            => First_User,
+         Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         User            => User_Cap,
+         Home            => Home_Cap);
+      if User_Cap = Rose.Capabilities.Null_Capability then
+         Init.Calls.Send_String
+           (Console_Stream_Cap,
+            "init: unable to create user " & First_User & NL);
+      end if;
+
       declare
          Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
                               Init.Calls.Find_In_Map
@@ -1222,8 +1245,9 @@ package body Init.Run is
                                     --  standard_error
                                     Console_Stream_Cap,
 
-                                    --  current_directory
-                                    Null_Capability,
+                                    --  current_directory: the
+                                    --  user's home directory
+                                    Home_Cap,
 
                                     --  clock
                                     Null_Capability,
@@ -1245,7 +1269,10 @@ package body Init.Run is
                                     Find_Cap,
 
                                     --  trace events (Rose.Trace)
-                                    Trace_Cap
+                                    Trace_Cap,
+
+                                    --  the user (interfaces/user.idl)
+                                    User_Cap
                                    ));
 
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
