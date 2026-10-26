@@ -17,7 +17,9 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-output_redirect.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
+	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-server.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
