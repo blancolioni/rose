@@ -1,7 +1,7 @@
 # Bochs configuration for Rose, matching qemu/init-qemu.sh.
 # Run from the top of the repository with bochs/run-bochs.sh.
 
-memory: guest=8, host=8
+memory: guest=32, host=32
 
 romimage: file=$BXSHARE/BIOS-bochs-latest
 vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
