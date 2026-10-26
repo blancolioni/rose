@@ -153,4 +153,35 @@ package Mem.Processes is
       Item    : in out Rose.Checkpoints.Mem_Process_Record);
    --  Fill in Item, which is all zeroes, for Process.
 
+   --  Restoring a checkpoint (the Memory_Restore interface).
+
+   procedure Restore_Process
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Capabilities.Capability;
+      Mem_Pid : Natural);
+
+   procedure Restore_Segment
+     (Id            : Rose.Objects.Capability_Identifier;
+      Mem_Pid       : Natural;
+      Base          : Rose.Words.Word;
+      Bound         : Rose.Words.Word;
+      Limit         : Rose.Words.Word;
+      Flags         : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Region_Offset : Rose.Words.Word);
+
+   procedure Restore_Zero_Segment
+     (Id      : Rose.Objects.Capability_Identifier;
+      Mem_Pid : Natural;
+      Base    : Rose.Words.Word;
+      Bound   : Rose.Words.Word;
+      Limit   : Rose.Words.Word;
+      Flags   : Rose.Words.Word);
+
+   procedure Restore_Page
+     (Id           : Rose.Objects.Capability_Identifier;
+      Mem_Pid      : Natural;
+      Virtual_Page : Rose.Words.Word;
+      Page         : System.Storage_Elements.Storage_Array);
+
 end Mem.Processes;

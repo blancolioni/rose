@@ -19,6 +19,22 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  (Trace_Launch) and there is text. The reply's data word is the
    --  current tick count. See Rose.Trace.
 
+   --  Restoring a checkpoint (Rose.Kernel.Processes.Snapshot). Only the
+   --  restore server has these caps.
+
+   Restore_Process_Endpoint   : constant Rose.Objects.Endpoint_Index := 12;
+   --  The sent buffer holds a process record page and its cap pages.
+   --  Recreate the process, not yet runnable, and reply with the same
+   --  four caps as Create_Process, and its object id in the data words.
+
+   Resume_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 13;
+   --  Let the restored process whose object id is in data words 0 and 1
+   --  run.
+
+   Restore_Interrupt_Endpoint : constant Rose.Objects.Endpoint_Index := 14;
+   --  Send interrupt data word 0 to the endpoint cap data word 3 of the
+   --  restored process whose object id is in data words 1 and 2.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

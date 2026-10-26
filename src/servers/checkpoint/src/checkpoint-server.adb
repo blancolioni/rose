@@ -24,6 +24,7 @@ package body Checkpoint.Server is
    Leave_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
    Append_Log_Cap        : Rose.Capabilities.Capability;
+   Store_Checkpoint_Cap  : Rose.Capabilities.Capability;
 
    Max_Table_Pages : constant := 16;
 
@@ -47,6 +48,9 @@ package body Checkpoint.Server is
    --  Append the first Page_Count pages of Kernel_Tables to the log.
 
    procedure Execute_Checkpoint;
+
+   procedure Store_Checkpoint;
+   --  Have the storage server append its region table to the log.
 
    --------------------------
    -- Append_Kernel_Tables --
@@ -89,6 +93,7 @@ package body Checkpoint.Server is
       Leave_Checkpoint_Cap := Get_Cap (4);
       Memory_Checkpoint_Cap := Get_Cap (6);
       Append_Log_Cap := Get_Cap (7);
+      Store_Checkpoint_Cap := Get_Cap (8);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
@@ -175,13 +180,15 @@ package body Checkpoint.Server is
       Rose.Interfaces.Cap.Client.Close (Timeout_Cap);
 
       --  The kernel's tables come first in the log entry, then the
-      --  memory server's pages.  Without the tables the entry would be
+      --  storage server's region table, then the memory server's tables
+      --  and pages.  Without the kernel's tables the entry would be
       --  no use for a restore, so if the kernel can't take its snapshot
       --  there is no checkpoint this time, and the memory server keeps
       --  its dirty pages for the next one.
 
       if Enter_Checkpoint (Page_Count) then
          Append_Kernel_Tables (Page_Count);
+         Store_Checkpoint;
          Execute_Checkpoint;
          Leave_Checkpoint;
       else
@@ -205,5 +212,17 @@ package body Checkpoint.Server is
       Rose.Console_IO.Put_Line ("checkpoint: starting server");
       Rose.Server.Start_Server (Server_Context);
    end Start_Server;
+
+   ----------------------
+   -- Store_Checkpoint --
+   ----------------------
+
+   procedure Store_Checkpoint is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Store_Checkpoint_Cap);
+      Rose.System_Calls.Send_Cap (Params, Append_Log_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Store_Checkpoint;
 
 end Checkpoint.Server;

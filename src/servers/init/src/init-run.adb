@@ -13,6 +13,7 @@ with Rose.Interfaces.File_System;
 with Rose.Interfaces.Kernel_Log;
 with Rose.Interfaces.Log_Reader;
 with Rose.Interfaces.Storage;
+with Rose.Interfaces.Storage_Checkpoint;
 with Rose.Interfaces.Stream_Writer;
 with Rose.Interfaces.Timer;
 with Rose.Interfaces.Timeout;
@@ -21,6 +22,8 @@ with Rose.Interfaces.Partitions.Client;
 
 with Rose.Interfaces.Executable;
 with Rose.Interfaces.Memory;
+with Rose.Interfaces.Memory_Restore;
+with Rose.Interfaces.State;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -127,6 +130,19 @@ package body Init.Run is
       Storage_Cap          : Rose.Capabilities.Capability;
       Add_Storage_Cap      : Rose.Capabilities.Capability;
       Reserve_Storage_Cap  : Rose.Capabilities.Capability;
+      Store_Checkpoint_Cap : Rose.Capabilities.Capability;
+      --  For the checkpoint server, to add the region table to each
+      --  checkpoint.
+      Store_Restore_Cap    : Rose.Capabilities.Capability;
+      Memory_Restore_Cap   : Rose.Capabilities.Capability;
+      Log_Reset_Cap        : Rose.Capabilities.Capability;
+      --  For the restore server, to recreate the regions, the memory
+      --  server's processes, and to start a new log on a fresh install.
+      Restored             : Boolean := False;
+      --  Set if the restore server restored a checkpoint, in which case
+      --  the programs it would have installed are running already.
+      Restore_Reply_Cap    : Rose.Capabilities.Capability := 0;
+      --  The reply cap of the restore server's last message.
 
       Launch_Elf_Cap       : Rose.Capabilities.Capability;
       Launch_Command_Elf_Cap : Rose.Capabilities.Capability;
@@ -424,6 +440,10 @@ package body Init.Run is
          Memory_Checkpoint_Cap :=
            Copy_Cap_From_Process
              (Copy_Mem_Cap, Rose.Interfaces.Memory.Checkpoint_Endpoint);
+         Memory_Restore_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Mem_Cap,
+              Rose.Interfaces.Memory_Restore.Memory_Restore_Interface);
       end;
 
       declare
@@ -620,6 +640,15 @@ package body Init.Run is
            Copy_Cap_From_Process
              (Copy_Store_Cap,
               Rose.Interfaces.Storage.Reserve_Storage_Endpoint);
+         Store_Checkpoint_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage_Checkpoint.Checkpoint_Endpoint);
+         Store_Restore_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Store_Cap,
+              Rose.Interfaces.Storage_Checkpoint
+              .Storage_Checkpoint_Interface);
       end;
 
       declare
@@ -744,6 +773,9 @@ package body Init.Run is
          Log_Reader_Cap :=
            Copy_Cap_From_Process
              (Copy_Cap, Rose.Interfaces.Log_Reader.Log_Reader_Interface);
+         Log_Reset_Cap :=
+           Copy_Cap_From_Process
+             (Copy_Cap, Rose.Interfaces.State.Reset_Endpoint);
       end;
 
       declare
@@ -751,6 +783,19 @@ package body Init.Run is
                                     Init.Calls.Call
                                       (Create_Cap,
                                        (7, 2, 0, 0));
+
+         --  The kernel's restore endpoints (Rose.Kernel.Capabilities
+         --  .Kernel_Caps): restore a process, let it run, and restore an
+         --  interrupt handler.
+         Restore_Process_Cap    : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap, (7, 12, 0, 0));
+         Resume_Process_Cap     : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap, (7, 13, 0, 0));
+         Restore_Interrupt_Cap  : constant Rose.Capabilities.Capability :=
+                                    Init.Calls.Call
+                                      (Create_Cap, (7, 14, 0, 0));
 
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
@@ -767,7 +812,13 @@ package body Init.Run is
                             Install_Media_FS,
                             Install_Endpoint,
                             Add_Log_Device_Cap,
-                            Log_Reader_Cap));
+                            Log_Reader_Cap,
+                            Restore_Process_Cap,
+                            Resume_Process_Cap,
+                            Restore_Interrupt_Cap,
+                            Store_Restore_Cap,
+                            Memory_Restore_Cap,
+                            Log_Reset_Cap));
 
          pragma Unreferenced (Restore_Id);
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -785,7 +836,15 @@ package body Init.Run is
             Rose.System_Calls.Receive_Words (Params, 3);
             Rose.System_Calls.Receive_Buffer (Params, 4096);
             Rose.System_Calls.Invoke_Capability (Params);
-            exit when not Params.Control.Flags (Rose.Invocation.Send_Caps);
+            --  The restore server's last message has no caps.  Its first
+            --  data word is 1 if it restored a checkpoint.
+
+            if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
+               Restored := Params.Control.Flags (Rose.Invocation.Send_Words)
+                 and then Params.Data (0) = 1;
+               Restore_Reply_Cap := Params.Reply_Cap;
+               exit;
+            end if;
 
             Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
@@ -955,11 +1014,34 @@ package body Init.Run is
                                       Leave_Checkpoint_Cap,
                                       Delete_Cap,
                                       Memory_Checkpoint_Cap,
-                                      Append_To_Log_Cap));
+                                      Append_To_Log_Cap,
+                                      Store_Checkpoint_Cap));
          pragma Unreferenced (Checkpoint_Id);
       begin
          null;
       end;
+
+      --  After a restore, the programs that would be launched below are
+      --  running already, as they were at the checkpoint.
+
+      if Restored then
+
+         --  The restore server lets the restored processes run when
+         --  this reply arrives, now that the boot modules are started.
+
+         declare
+            Reply : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Reply (Reply, Restore_Reply_Cap);
+            Rose.System_Calls.Invoke_Capability (Reply);
+         end;
+
+         Init.Calls.Send_String
+           (Console_Stream_Cap,
+            "init: restored from a checkpoint; exiting" & NL);
+         Init.Calls.Send (Exit_Cap);
+         return;
+      end if;
 
       Init.Calls.Send_String
         (Console_Stream_Cap,

@@ -1,3 +1,5 @@
+with System;
+
 with Rose.Words;
 
 with Rose.Interfaces.Block_Device.Client;
@@ -11,17 +13,13 @@ with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Restore.Checkpoint_Log;
+with Restore.Checkpoints;
 with Restore.Installer.Default;
 
 procedure Restore.Driver is
 
    use Rose.Interfaces.Block_Device.Client;
    use type Rose.Words.Word_64;
-
-   Restore_Enabled : constant Boolean := False;
-   --  Restoring from a checkpoint is not implemented yet (#102), so a
-   --  checkpoint is found and reported, but the system is installed
-   --  as before.
 
    Next_Cap_Index : Positive := 1;
 
@@ -41,6 +39,7 @@ procedure Restore.Driver is
 
    Device     : Block_Device_Client;
    Checkpoint : Rose.Words.Word_64;
+   Restored   : Boolean := False;
 
 begin
 
@@ -56,6 +55,12 @@ begin
    Next (Install_Exec_Cap);
    Next (Add_Log_Device_Cap);
    Next (Log_Reader_Cap);
+   Next (Restore_Process_Cap);
+   Next (Resume_Process_Cap);
+   Next (Restore_Interrupt_Cap);
+   Next (Store_Restore_Cap);
+   Next (Memory_Restore_Cap);
+   Next (Log_Reset_Cap);
 
    Rose.Console_IO.Open (Console_Cap);
 
@@ -81,21 +86,38 @@ begin
      (Client         => Device,
       Interface_Cap  => Active_Swap_Cap);
 
-   if Checkpoint /= 0 and then not Restore_Enabled then
-      Rose.Console_IO.Put_Line
-        ("restore: restoring from a checkpoint is not implemented yet");
+   --  The storage server needs its backing store either way: a restore
+   --  recreates regions on it, and an install reserves them.
+
+   Rose.Console_IO.Put_Line ("restore: activating storage");
+
+   declare
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
+      Rose.System_Calls.Send_Cap (Params, Active_Swap_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end;
+
+   if Checkpoint /= 0 then
+      Rose.Console_IO.Put_Line ("restore: restoring from checkpoint");
+      Restore.Checkpoints.Restore (Log_Reader_Cap, Checkpoint, Restored);
+      Rose.System_Calls.Use_Buffer (System.Null_Address, 0);
+      if not Restored then
+         Rose.Console_IO.Put_Line
+           ("restore: cannot restore the checkpoint; installing instead");
+      end if;
    end if;
 
-   if Checkpoint /= 0 and then Restore_Enabled then
-      Rose.Console_IO.Put_Line ("restore: restoring from checkpoint");
-   else
-      Rose.Console_IO.Put_Line ("restore: activating storage");
+   if not Restored then
+
+      --  A new system starts a new log, so that the entries of the old
+      --  one are never mixed with its own.
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
-         Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
-         Rose.System_Calls.Send_Cap (Params, Active_Swap_Cap);
+         Rose.System_Calls.Initialize_Send (Params, Log_Reset_Cap);
          Rose.System_Calls.Invoke_Capability (Params);
       end;
 
@@ -115,12 +137,25 @@ begin
 
    Rose.Console_IO.Put_Line ("restore: done");
 
+   --  Init's install loop ends with a message without caps.  Its data
+   --  word tells init whether the installed programs are running
+   --  already, restored from the checkpoint.  After a restore, init
+   --  replies once it has started its last boot modules, and only then
+   --  can the restored processes run (see Restore.Checkpoints).
+
    declare
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word'(if Restored then 1 else 0));
       Rose.System_Calls.Invoke_Capability (Params);
    end;
+
+   if Restored then
+      Restore.Checkpoints.Resume_Processes;
+      Rose.Console_IO.Put_Line ("restore: restored processes are running");
+   end if;
 
    declare
       use Rose.Invocation;

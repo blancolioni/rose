@@ -120,6 +120,31 @@ package body Rose.Kernel.Interrupts is
       return Interrupt_Table (Interrupt) /= null;
    end Has_Handler;
 
+   --------------------------
+   -- Iterate_Cap_Handlers --
+   --------------------------
+
+   procedure Iterate_Cap_Handlers
+     (Process : not null access procedure
+        (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+         Object    : Rose.Objects.Object_Id;
+         Cap       : Rose.Capabilities.Capability))
+   is
+   begin
+      for Interrupt in Interrupt_Table'Range loop
+         declare
+            It : Interrupt_Handler_Access := Interrupt_Table (Interrupt);
+         begin
+            while It /= null loop
+               if It.Spec = Capability_Handler then
+                  Process (Interrupt, It.Handler_Object, It.Handler_Cap);
+               end if;
+               It := It.Next;
+            end loop;
+         end;
+      end loop;
+   end Iterate_Cap_Handlers;
+
    ------------------------
    -- Send_Interrupt_Cap --
    ------------------------

@@ -36,6 +36,14 @@ package Rose.Kernel.Interrupts is
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector)
       return Boolean;
 
+   procedure Iterate_Cap_Handlers
+     (Process : not null access procedure
+        (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+         Object    : Rose.Objects.Object_Id;
+         Cap       : Rose.Capabilities.Capability));
+   --  Call Process for each interrupt that is handled by sending to the
+   --  endpoint cap Cap of the process Object.
+
    function Handle_Interrupt
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
       Argument  : Rose.Words.Word)

@@ -1,5 +1,9 @@
+with Rose.Arch.Interrupt_Table;
 with Rose.Checkpoints;
 with Rose.Limits;
+
+with Rose.Kernel.Interrupts;
+with Rose.Kernel.Processes.Queue;
 
 package body Rose.Kernel.Processes.Snapshot is
 
@@ -41,6 +45,247 @@ package body Rose.Kernel.Processes.Snapshot is
       end loop;
       return Count;
    end Active_Cap_Count;
+
+   -----------------------
+   -- Restore_Interrupt --
+   -----------------------
+
+   procedure Restore_Interrupt
+     (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+      Object    : Rose.Objects.Object_Id;
+      Cap       : Rose.Capabilities.Capability;
+      Success   : out Boolean)
+   is
+      Pid : constant Process_Id := To_Process_Id (Object);
+   begin
+      Success := Interrupt in 32 .. 47
+        and then Pid in Process_Table'Range
+        and then Process_Table (Pid).State /= Available
+        and then Process_Table (Pid).Flags (Persistent)
+        and then not Rose.Kernel.Interrupts.Has_Handler (Interrupt);
+
+      if Success then
+         Rose.Kernel.Interrupts.Set_Handler (Interrupt, Object, Cap);
+         Rose.Arch.Interrupt_Table.Enable_Interrupt (Interrupt);
+      end if;
+   end Restore_Interrupt;
+
+   ---------------------
+   -- Restore_Process --
+   ---------------------
+
+   procedure Restore_Process
+     (Pages   : System.Storage_Elements.Storage_Array;
+      Pid     : out Process_Id;
+      Success : out Boolean)
+   is
+      use type Rose.Capabilities.Capability;
+      Item : Rose.Checkpoints.Process_Record
+        with Import, Address => Pages'Address;
+   begin
+      Pid := Null_Process_Id;
+      Success := False;
+
+      if Pages'Length < Page_Bytes
+        or else Item.Magic /= Rose.Checkpoints.Process_Record_Magic
+        or else Pages'Length
+          < Storage_Count (1 + Item.Cap_Page_Count) * Page_Bytes
+        or else Item.Cap_Count > Item.Last_Cap
+        or else Item.Last_Cap > Max_Capability_Index
+        or else Item.State > Process_State'Pos (Process_State'Last)
+        or else Item.Priority not in
+          Process_Priority'Pos (Process_Priority'First)
+            .. Process_Priority'Pos (Process_Priority'Last)
+      then
+         return;
+      end if;
+
+      Pid := To_Process_Id (Rose.Objects.Object_Id (Item.Oid));
+
+      if Pid not in Process_Table'Range
+        or else Process_Table (Pid).State /= Available
+        or else Process_Table (Pid).Last_Cap /= 0
+      then
+         Pid := Null_Process_Id;
+         return;
+      end if;
+
+      declare
+         Last : Natural := 0;
+      begin
+         for I in Item.Name'Range loop
+            if Item.Name (I) /= ' ' then
+               Last := I;
+            end if;
+         end loop;
+         Create_Process_Table_Entry (Pid, Item.Name (1 .. Last));
+      end;
+
+      declare
+         P         : Kernel_Process_Entry renames Process_Table (Pid);
+         Registers : Storage_Array (1 .. P.Stack'Size / 8)
+           with Import, Address => P.Stack'Address;
+         Current   : Storage_Array (1 .. P.Current_Params'Size / 8)
+           with Import, Address => P.Current_Params'Address;
+         State     : constant Process_State :=
+                       Process_State'Val (Item.State);
+         Flags     : Process_Flag_Array := (others => False);
+      begin
+         for Flag in Process_Flag loop
+            Flags (Flag) := (Item.Flags and 2 ** Process_Flag'Pos (Flag)) /= 0;
+         end loop;
+
+         P.Priority := Process_Priority'Val (Item.Priority);
+         P.Default_Cap := Rose.Capabilities.Capability (Item.Default_Cap);
+         P.Receive_Cap := Rose.Capabilities.Capability (Item.Receive_Cap);
+         P.Send_Cap := Rose.Capabilities.Capability (Item.Send_Cap);
+         P.Command_Endpoint :=
+           Rose.Objects.Endpoint_Index (Item.Command_Endpoint);
+         Registers := Item.Registers (1 .. Registers'Length);
+
+         for I in Page_Range_Index loop
+            declare
+               Saved : Rose.Checkpoints.Saved_Page_Range renames
+                         Item.Page_Ranges (Positive (I));
+               function Has (Flag : Word_32) return Boolean
+               is ((Saved.Flags and Flag) /= 0);
+            begin
+               P.Page_Ranges (I) :=
+                 (Base  => Virtual_Page_Address (Saved.Base),
+                  Bound => Virtual_Page_Address (Saved.Bound));
+               P.Page_Flags (I) :=
+                 (Valid         => Has (Rose.Checkpoints.Range_Valid),
+                  Readable      => Has (Rose.Checkpoints.Range_Readable),
+                  Writable      => Has (Rose.Checkpoints.Range_Writable),
+                  Executable    => Has (Rose.Checkpoints.Range_Executable),
+                  Disable_Cache =>
+                    Has (Rose.Checkpoints.Range_Disable_Cache),
+                  Write_Through =>
+                    Has (Rose.Checkpoints.Range_Write_Through),
+                  Fixed_Address =>
+                    Has (Rose.Checkpoints.Range_Fixed_Address));
+            end;
+         end loop;
+
+         for I in Registered_Endpoint_Index loop
+            declare
+               Saved : Rose.Checkpoints.Saved_Endpoint renames
+                         Item.Endpoints (Positive (I));
+            begin
+               P.Endpoints (I) :=
+                 (Endpoint    => Rose.Objects.Endpoint_Id (Saved.Endpoint),
+                  Receive_Cap =>
+                    Rose.Capabilities.Capability (Saved.Receive_Cap),
+                  Send_Cap    =>
+                    Rose.Capabilities.Capability (Saved.Send_Cap));
+            end;
+         end loop;
+
+         --  The caps go back at the indices they had, since the process's
+         --  code and data refer to them by index.
+
+         P.Last_Cap := Rose.Capabilities.Capability (Item.Last_Cap);
+
+         for I in 1 .. Natural (Item.Cap_Count) loop
+            declare
+               Page   : Rose.Checkpoints.Cap_Page
+                 with Import,
+                 Address => Pages'Address
+                   + Storage_Offset (1 + (I - 1)
+                                     / Rose.Checkpoints.Caps_Per_Page)
+                 * Page_Bytes;
+               Saved  : Rose.Checkpoints.Saved_Cap renames
+                          Page.Caps
+                            ((I - 1) mod Rose.Checkpoints.Caps_Per_Page + 1);
+               Cap    : constant Rose.Capabilities.Capability :=
+                          Rose.Capabilities.Capability (Saved.Index);
+               Layout : Rose.Capabilities.Layout.Capability_Layout
+                 with Import, Address => Saved.Layout'Address;
+            begin
+               if Cap in 1 .. P.Last_Cap then
+                  P.Is_Active (Cap) := True;
+                  Set_Cap (Pid, Cap, Layout);
+               end if;
+            end;
+         end loop;
+
+         --  Whatever a blocked process was waiting for was lost in the
+         --  restart: a server that is not persistent has no record of
+         --  its request, and one that is was restarted at its own call.
+         --  So it makes its call again: the system call page pushed three
+         --  words before entering the kernel, and starts at FFFF_0000.
+
+         case State is
+            when Blocked =>
+               P.Stack.EIP := 16#FFFF_0000#;
+               P.Stack.ESP := P.Stack.ESP + 12;
+               Flags (Receive_Any) := False;
+               Flags (Receive_Cap) := False;
+               Flags (Invoke_Reply) := False;
+               Flags (Wait_Reply) := False;
+               Flags (Interrupt_Resume) := False;
+            when Interrupted =>
+               Flags (Interrupt_Resume) := True;
+               Flags (Wait_Reply) := False;
+            when Ready | Running =>
+               Current := Item.Current_Params (1 .. Current'Length);
+            when Faulted =>
+               null;
+            when Available | Starting | Killed =>
+               P.State := Available;
+               Pid := Null_Process_Id;
+               return;
+         end case;
+
+         Flags (Message_Queued) := False;
+         Flags (Checkpoint_Page_Fault) := False;
+         Flags (Boot_Module) := False;
+         Flags (Persistent) := True;
+         P.Flags := Flags;
+         P.State := (if State = Faulted then Faulted else Starting);
+      end;
+
+      if Pid >= Next_Pid then
+         Next_Pid := Pid + 1;
+      end if;
+
+      Success := True;
+   end Restore_Process;
+
+   -----------------------------
+   -- Resume_Restored_Process --
+   -----------------------------
+
+   procedure Resume_Restored_Process
+     (Pid     : Process_Id;
+      Success : out Boolean)
+   is
+   begin
+      Success := Pid in Process_Table'Range
+        and then Process_Table (Pid).State = Starting
+        and then Process_Table (Pid).Flags (Persistent);
+
+      if Success then
+
+         --  Set_Current_State works out how the process returns to user
+         --  mode from the state it leaves, but Restore_Process has set
+         --  that already, from the state the process was in.
+
+         declare
+            P                : Kernel_Process_Entry renames
+                                 Process_Table (Pid);
+            Invoke_Reply_Set : constant Boolean := P.Flags (Invoke_Reply);
+            Interrupted_Set  : constant Boolean :=
+                                 P.Flags (Interrupt_Resume);
+         begin
+            Set_Current_State (Pid, Ready);
+            P.Flags (Invoke_Reply) := Invoke_Reply_Set;
+            P.Flags (Interrupt_Resume) := Interrupted_Set;
+         end;
+
+         Rose.Kernel.Processes.Queue.Queue_Process (Pid);
+      end if;
+   end Resume_Restored_Process;
 
    ---------------
    -- Save_Caps --
@@ -221,11 +466,51 @@ package body Rose.Kernel.Processes.Snapshot is
       declare
          Header : Rose.Checkpoints.Kernel_Table_Header
            with Import, Address => Page_Address (1);
+
+         procedure Save_Interrupt
+           (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+            Object    : Rose.Objects.Object_Id;
+            Cap       : Rose.Capabilities.Capability);
+
+         --------------------
+         -- Save_Interrupt --
+         --------------------
+
+         procedure Save_Interrupt
+           (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
+            Object    : Rose.Objects.Object_Id;
+            Cap       : Rose.Capabilities.Capability)
+         is
+            Pid : constant Process_Id := To_Process_Id (Object);
+         begin
+            if Pid in Process_Table'Range
+              and then Is_Saved (Process_Table (Pid))
+            then
+               if Header.Interrupt_Count
+                 = Rose.Checkpoints.Max_Saved_Interrupts
+               then
+                  Success := False;
+               else
+                  Header.Interrupt_Count := Header.Interrupt_Count + 1;
+                  Header.Interrupts (Natural (Header.Interrupt_Count)) :=
+                    (Vector => Word_32 (Interrupt),
+                     Cap    => Word_32 (Cap),
+                     Oid    => Word_64 (Object));
+               end if;
+            end if;
+         end Save_Interrupt;
+
       begin
+         Success := True;
          Header.Magic := Rose.Checkpoints.Kernel_Table_Magic;
          Header.Version := Rose.Checkpoints.Kernel_Table_Version;
          Header.Page_Count := Word_32 (Page_Count);
          Header.Process_Count := Word_32 (Process_Count);
+         Rose.Kernel.Interrupts.Iterate_Cap_Handlers (Save_Interrupt'Access);
+         if not Success then
+            Page_Count := 0;
+            return;
+         end if;
       end;
 
       for P of Process_Table.all loop

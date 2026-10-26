@@ -1,0 +1,29 @@
+interface Storage_Checkpoint is
+
+   --  The storage server's part in checkpoints and restores. These are
+   --  kept out of Storage, so that only the checkpoint server and the
+   --  restore server can use them.
+
+   procedure Checkpoint
+     (Append_Page : Capability);
+   --  Append the storage server's region table to the checkpoint log
+   --  through Append_Page (see Rose.Checkpoints).
+
+   procedure Restore_Region
+     (Index       : Natural;
+      Device      : Natural;
+      Base        : Object_Id;
+      Bound       : Object_Id;
+      Alloc_Index : Natural;
+      Alloc_Banks : Natural);
+   --  Recreate a region from a checkpoint, with the index, pages and
+   --  backing store space it had.  Its pages are read from the device:
+   --  they hold whatever was written to them before the restart.
+
+   function Find_Region
+     (Base  : Object_Id;
+      Bound : Object_Id)
+     return interface Region;
+   --  The region whose pages are Base .. Bound - 1.
+
+end Storage_Checkpoint;

@@ -1,0 +1,40 @@
+interface Memory_Restore is
+
+   --  Restoring the memory server's processes from a checkpoint. Kept
+   --  out of Memory, so that only the restore server can use it.
+
+   procedure Restore_Process
+     (Process : Capability;
+      Mem_Pid : Natural);
+   --  Recreate the memory server's process Mem_Pid for the kernel
+   --  process whose Kernel_Process interface is Process.  Mem_Pid must
+   --  be the id it had, since the caps the memory server gave it carry
+   --  that id.
+
+   procedure Restore_Segment
+     (Mem_Pid       : Natural;
+      Base          : Word;
+      Bound         : Word;
+      Limit         : Word;
+      Flags         : Word;
+      Region        : Capability;
+      Region_Offset : Word);
+   --  Add a segment that reads its pages from Region, as saved in a
+   --  checkpoint (Rose.Checkpoints).  Region_Offset is in pages.
+
+   procedure Restore_Zero_Segment
+     (Mem_Pid : Natural;
+      Base    : Word;
+      Bound   : Word;
+      Limit   : Word;
+      Flags   : Word);
+   --  Add a segment without a region, whose pages start as zeroes.
+
+   procedure Restore_Page
+     (Mem_Pid      : Natural;
+      Virtual_Page : Word;
+      Page         : Storage_Array);
+   --  Give the process the saved contents of one of its pages.  The page
+   --  is dirty, so the next checkpoint saves it again.
+
+end Memory_Restore;

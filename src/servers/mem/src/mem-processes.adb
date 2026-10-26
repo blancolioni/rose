@@ -10,6 +10,7 @@ with Rose.Interfaces.Kernel_Process.Client;
 
 with Mem.Calls;
 
+with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Virtual_Map;
 
@@ -905,6 +906,219 @@ package body Mem.Processes is
          end;
       end if;
    end Resize_Segment;
+
+   ------------------
+   -- Restore_Page --
+   ------------------
+
+   procedure Restore_Page
+     (Id           : Rose.Objects.Capability_Identifier;
+      Mem_Pid      : Natural;
+      Virtual_Page : Rose.Words.Word;
+      Page         : System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Addresses;
+      Pid       : constant Process_Id := Process_Id (Mem_Pid);
+      V_Page    : constant Virtual_Page_Address :=
+                    Virtual_Page_Address (Virtual_Page);
+      Page_Object : Rose.Objects.Object_Id;
+      Valid, Readable, Writable, Executable, Persistent : Boolean;
+      Have_Page : Boolean;
+      Phys_Page : Physical_Page_Address;
+   begin
+      if not Is_Valid_Process_Id (Pid) or else Page'Length /= 4096 then
+         Rose.Console_IO.Put_Line ("mem: restore page: bad request");
+         return;
+      end if;
+
+      Get_Process_Segment
+        (Pid, V_Page, Page_Object,
+         Valid, Readable, Writable, Executable, Persistent);
+
+      if not Valid or else not Writable then
+         Rose.Console_IO.Put ("mem: restore page: pid ");
+         Rose.Console_IO.Put (Natural (Pid));
+         Rose.Console_IO.Put (" page ");
+         Rose.Console_IO.Put (Rose.Words.Word_32 (Virtual_Page));
+         Rose.Console_IO.Put_Line (" is not in a writable segment");
+         return;
+      end if;
+
+      if Mem.Page_Table.Has_Element (Mem.Page_Table.Find (Pid, V_Page)) then
+         Rose.Console_IO.Put_Line ("mem: restore page: already restored");
+         return;
+      end if;
+
+      Mem.Physical_Map.Allocate_Page (Phys_Page, Have_Page);
+      if not Have_Page then
+         Mem.Virtual_Map.Reclaim (Phys_Page, Have_Page);
+      end if;
+
+      if not Have_Page then
+         Rose.Console_IO.Put_Line ("mem: restore page: out of memory");
+         return;
+      end if;
+
+      declare
+         Base : constant System.Address := Long_Buffer'Address;
+         X    : constant Virtual_Address := To_Virtual_Address (Base);
+         Y    : constant Virtual_Address :=
+                  (if X mod 4096 = 0 then X
+                   else X - (X mod 4096) + 4096);
+         Buffer : Page_Buffer;
+         pragma Import (Ada, Buffer);
+         for Buffer'Address use To_System_Address (Y);
+      begin
+         Mem.Calls.Load_Page (Phys_Page, Buffer'Address);
+         Buffer := Page;
+         Mem.Calls.Unload_Page (Phys_Page, Buffer'Address);
+      end;
+
+      Mem.Virtual_Map.Map
+        (Process       => Process_Table (Pid).Oid,
+         Virtual_Page  => V_Page,
+         Physical_Page => Phys_Page,
+         Readable      => Readable,
+         Writable      => Writable,
+         Executable    => Executable,
+         Persistent    => Persistent);
+
+      --  The page is in the log only in older entries, so it is dirty:
+      --  the next checkpoint saves it with the rest.
+
+      Mem.Page_Table.Set_Writable (Mem.Page_Table.Find (Pid, V_Page));
+   end Restore_Page;
+
+   ---------------------
+   -- Restore_Process --
+   ---------------------
+
+   procedure Restore_Process
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Capabilities.Capability;
+      Mem_Pid : Natural)
+   is
+      pragma Unreferenced (Id);
+      Pid    : constant Process_Id := Process_Id (Mem_Pid);
+      Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
+   begin
+      if Pid not in Real_Process_Id
+        or else Process_Table (Pid).State /= Available
+      then
+         Rose.Console_IO.Put_Line ("mem: restore process: slot in use");
+         return;
+      end if;
+
+      Rose.Interfaces.Kernel_Process.Client.Open (Client, Process);
+
+      --  The heap and process caps the process holds carry its id, so
+      --  they are made again in the same way as when it was created.
+
+      Process_Table (Pid) :=
+        Memory_Process_Record'
+          (State         => Active,
+           Oid           =>
+             Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client),
+           Segments      => <>,
+           Num_Segments  => 0,
+           Heap          =>
+             Rose.System_Calls.Server.Create_Endpoint
+               (Create_Cap   => Create_Endpoint_Cap,
+                Endpoint_Id  => Rose.Interfaces.Heap.Heap_Interface,
+                Identifier   => Rose.Objects.Capability_Identifier (Pid)),
+           Server        => 0,
+           Process       => Client,
+           Interface_Cap =>
+             Rose.System_Calls.Server.Create_Endpoint
+               (Create_Cap   => Create_Endpoint_Cap,
+                Endpoint_Id  => Rose.Interfaces.Process.Process_Interface,
+                Identifier   => Rose.Objects.Capability_Identifier (Pid)),
+           Faults        => <>);
+   end Restore_Process;
+
+   ---------------------
+   -- Restore_Segment --
+   ---------------------
+
+   procedure Restore_Segment
+     (Id            : Rose.Objects.Capability_Identifier;
+      Mem_Pid       : Natural;
+      Base          : Rose.Words.Word;
+      Bound         : Rose.Words.Word;
+      Limit         : Rose.Words.Word;
+      Flags         : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Region_Offset : Rose.Words.Word)
+   is
+      Pid : constant Process_Id := Process_Id (Mem_Pid);
+   begin
+      Restore_Zero_Segment (Id, Mem_Pid, Base, Bound, Limit, Flags);
+
+      if Is_Valid_Process_Id (Pid)
+        and then Process_Table (Pid).Num_Segments > 0
+      then
+         declare
+            P       : Memory_Process_Record renames Process_Table (Pid);
+            Segment : Segment_Record renames P.Segments (P.Num_Segments);
+         begin
+            Rose.Interfaces.Region.Client.Open (Segment.Region, Region);
+            Rose.Interfaces.Region.Client.Get_Range
+              (Segment.Region, Segment.Region_Base, Segment.Region_Bound);
+            Segment.Region_Offset := Rose.Objects.Object_Id (Region_Offset);
+         end;
+      end if;
+   end Restore_Segment;
+
+   --------------------------
+   -- Restore_Zero_Segment --
+   --------------------------
+
+   procedure Restore_Zero_Segment
+     (Id      : Rose.Objects.Capability_Identifier;
+      Mem_Pid : Natural;
+      Base    : Rose.Words.Word;
+      Bound   : Rose.Words.Word;
+      Limit   : Rose.Words.Word;
+      Flags   : Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Words;
+      Pid : constant Process_Id := Process_Id (Mem_Pid);
+
+      function Has (Flag : Word) return Boolean is ((Flags and Flag) /= 0);
+
+   begin
+      if not Is_Valid_Process_Id (Pid)
+        or else Process_Table (Pid).Num_Segments = Max_Segments
+      then
+         Rose.Console_IO.Put_Line ("mem: restore segment: bad request");
+         return;
+      end if;
+
+      declare
+         P : Memory_Process_Record renames Process_Table (Pid);
+      begin
+         P.Num_Segments := P.Num_Segments + 1;
+         P.Segments (P.Num_Segments) :=
+           Segment_Record'
+             (Base           => Rose.Addresses.Virtual_Page_Address (Base),
+              Bound          => Rose.Addresses.Virtual_Page_Address (Bound),
+              Limit          => Rose.Addresses.Virtual_Page_Address (Limit),
+              Region         => <>,
+              Region_Base    => 0,
+              Region_Bound   => 0,
+              Region_Offset  => 0,
+              Flags          =>
+                (Read       => Has (Rose.Checkpoints.Segment_Readable),
+                 Write      => Has (Rose.Checkpoints.Segment_Writable),
+                 Execute    => Has (Rose.Checkpoints.Segment_Executable),
+                 Extensible => Has (Rose.Checkpoints.Segment_Extensible),
+                 Persistent => Has (Rose.Checkpoints.Segment_Persistent)),
+              Private_Region =>
+                Has (Rose.Checkpoints.Segment_Private_Region));
+      end;
+   end Restore_Zero_Segment;
 
    --------------------
    -- Resume_Process --

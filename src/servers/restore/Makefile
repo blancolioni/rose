@@ -24,6 +24,14 @@ BLOCK_DEVICE_OBJECTS= \
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-log_reader-client.o
+RESTORE_OBJECTS= \
+	$(BUILDDIR)/restore-checkpoints.o \
+	$(BUILDDIR)/rose-interfaces-memory_restore.o \
+	$(BUILDDIR)/rose-interfaces-memory_restore-client.o \
+	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage_checkpoint.o \
+	$(BUILDDIR)/rose-interfaces-storage_checkpoint-client.o
 
 OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
@@ -54,7 +62,8 @@ OBJECTS= \
 	$(FILE_SYSTEM_OBJECTS) \
 	$(STREAM_READER_OBJECTS) \
 	$(BLOCK_DEVICE_OBJECTS) \
-	$(LOG_READER_OBJECTS)
+	$(LOG_READER_OBJECTS) \
+	$(RESTORE_OBJECTS)
 
 all: restore $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/restore $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
