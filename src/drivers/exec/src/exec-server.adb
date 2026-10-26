@@ -1,5 +1,6 @@
 with System.Storage_Elements;
 
+with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.Objects;
 
@@ -60,6 +61,14 @@ package body Exec.Server is
    Last_Result : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
 
+   procedure On_Set_Standard_Output
+     (Id     : Rose.Objects.Capability_Identifier;
+      Output : Rose.Capabilities.Capability);
+
+   Standard_Output : Rose.Capabilities.Capability := Console_Cap;
+   --  Given to every program exec launches.  It starts as the boot
+   --  console, and init replaces it once the persistent console runs.
+
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
 
    Context : Rose.Server.Server_Context;
@@ -95,7 +104,8 @@ package body Exec.Server is
          Install        => On_Install'Access,
          Launch         => On_Launch'Access,
          Launch_Command => On_Launch_Command'Access,
-         Metadata       => On_Metadata'Access);
+         Metadata       => On_Metadata'Access,
+         Set_Standard_Output => On_Set_Standard_Output'Access);
    end Create_Server;
 
    ----------------
@@ -165,7 +175,7 @@ package body Exec.Server is
          Send_Cap (Params, Cap);
       end loop;
 
-      Send_Cap (Params, Console_Cap);
+      Send_Cap (Params, Standard_Output);
       Rose.System_Calls.Send_Storage_Array (Params, Environment, False);
 
       Invoke_Capability (Params);
@@ -227,6 +237,20 @@ package body Exec.Server is
    begin
       Exec.Library.Get_Metadata (Id, Result, Last);
    end On_Metadata;
+
+   ----------------------------
+   -- On_Set_Standard_Output --
+   ----------------------------
+
+   procedure On_Set_Standard_Output
+     (Id     : Rose.Objects.Capability_Identifier;
+      Output : Rose.Capabilities.Capability)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Standard_Output := Output;
+      Rose.Console_IO.Open (Output);
+   end On_Set_Standard_Output;
 
    ------------
    -- Result --
