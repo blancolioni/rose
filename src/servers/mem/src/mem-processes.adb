@@ -239,6 +239,22 @@ package body Mem.Processes is
       Rose.Interfaces.Region.Client.Get_Range
         (Region, Region_Base, Region_Bound);
 
+      --  Without its range, the segment would be read from page 0 of the
+      --  store, which gives zeroes, and the process would run zeroes as
+      --  code (#261). Leave the segment out, so that a fault in it is
+      --  reported as an invalid page reference.
+
+      if Rose.Interfaces.Region.Client.Has_Error
+        or else not Region_Base'Valid
+        or else not Region_Bound'Valid
+      then
+         Rose.Console_IO.Put
+           ("mem: add segment: region has no range, process ");
+         Rose.Console_IO.Put (Natural (Process));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
         (Base         => Virtual_Base,
