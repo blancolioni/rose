@@ -43,6 +43,20 @@ package body Partition.Server is
       Block_Count :    out Block_Address_Type;
       Block_Size  :    out Rose.Interfaces.Block_Device.Block_Size_Type);
 
+   function In_Partition
+     (Start : Block_Address_Type;
+      Count : Natural)
+      return Boolean
+   is (Start <= Partition_Block_Count
+       and then Block_Address_Type (Count) <= Partition_Block_Count - Start);
+   --  True if blocks Start .. Start + Count - 1 are in the partition.  A
+   --  request outside it would reach the next partition on the device.
+
+   procedure Report_Out_Of_Range
+     (Operation : String;
+      Start     : Block_Address_Type;
+      Count     : Natural);
+
    procedure Read_Blocks
      (Id     : in     Rose.Objects.Capability_Identifier;
       Start  : in     Block_Address_Type;
@@ -149,8 +163,8 @@ package body Partition.Server is
         (" total ");
       Rose.Console_IO.Put
         (Natural (Partition_Block_Count)
-         * Natural (Partition_Block_Size)
-         / 1024 / 1024);
+         / 1024 * Natural (Partition_Block_Size)
+         / 1024);
       Rose.Console_IO.Put ("M");
       Rose.Console_IO.New_Line;
 
@@ -189,6 +203,12 @@ package body Partition.Server is
    is
       pragma Unreferenced (Id);
    begin
+      if not In_Partition (Start, Count) then
+         Report_Out_Of_Range ("read", Start, Count);
+         Blocks := (others => 0);
+         return;
+      end if;
+
       Client.Read_Blocks
         (Item   => Device_Client,
          Start  =>
@@ -196,6 +216,27 @@ package body Partition.Server is
          Count  => Count * Positive (Block_Size_Ratio),
          Blocks => Blocks);
    end Read_Blocks;
+
+   -------------------------
+   -- Report_Out_Of_Range --
+   -------------------------
+
+   procedure Report_Out_Of_Range
+     (Operation : String;
+      Start     : Block_Address_Type;
+      Count     : Natural)
+   is
+   begin
+      Rose.Console_IO.Put ("partition: ");
+      Rose.Console_IO.Put (Operation);
+      Rose.Console_IO.Put (" outside the partition: block ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Start));
+      Rose.Console_IO.Put (" count ");
+      Rose.Console_IO.Put (Count);
+      Rose.Console_IO.Put (" of ");
+      Rose.Console_IO.Put (Rose.Words.Word_64 (Partition_Block_Count));
+      Rose.Console_IO.New_Line;
+   end Report_Out_Of_Range;
 
    ------------------
    -- Start_Server --
@@ -237,6 +278,11 @@ package body Partition.Server is
    is
       pragma Unreferenced (Id);
    begin
+      if not In_Partition (Start, Count) then
+         Report_Out_Of_Range ("write", Start, Count);
+         return;
+      end if;
+
       Client.Write_Blocks
         (Item   => Device_Client,
          Start  =>

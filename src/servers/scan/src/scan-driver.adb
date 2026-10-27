@@ -90,43 +90,70 @@ begin
 
       else
          declare
-            use Rose.Devices.Partitions;
-            Available_Blocks : constant Block_Address_Type :=
-                                 Block_Count - 4;
-            Partition_Size   : constant Block_Address_Type :=
-                                 Available_Blocks / 4;
-            Current_Start    : Block_Address_Type := 3;
-         begin
 
+            --  Four partitions (#321): GRUB's core.img and the boot
+            --  partition (#322), then swap and the log, which share what
+            --  is left.  Each starts on a 1 MiB boundary, the first at
+            --  1 MiB, as partitioning tools do.  The GPT keeps its entries
+            --  in block 2 and a copy of its header in the last block.
+
+            --  The sizes are worked out in 32 bits, which is enough for a
+            --  disk of 2 TB: the run time has no 64-bit division.
+
+            use Rose.Devices.Partitions;
+            MiB          : constant Rose.Words.Word_32 :=
+                                2 ** 20 / Rose.Words.Word_32 (Block_Size);
+            MiB_Blocks      : constant Block_Address_Type :=
+                                Block_Address_Type (MiB);
+            Last_Usable     : constant Block_Address_Type :=
+                                Block_Count - 4;
+            BIOS_Boot_Start : constant Block_Address_Type := MiB_Blocks;
+            Rose_Boot_Start : constant Block_Address_Type :=
+                                BIOS_Boot_Start + MiB_Blocks;
+            Swap_Start      : constant Block_Address_Type :=
+                                Rose_Boot_Start + 16 * MiB_Blocks;
+            Swap_Size       : constant Block_Address_Type :=
+                                Block_Address_Type
+                                  (Rose.Words.Word_32
+                                     (Last_Usable + 1 - Swap_Start)
+                                   / 2 / MiB * MiB);
+            Log_Start       : constant Block_Address_Type :=
+                                Swap_Start + Swap_Size;
+         begin
 
             Rose.Console_IO.Put_Line ("creating partitions");
 
             Rose.Devices.GPT.Add_Partition
               (Block_Device        => Device,
-               First_Block         => Current_Start,
-               Last_Block          => Current_Start + Partition_Size - 1,
-               Partition_Type_Low  => Swap_Id_Low,
-               Partition_Type_High => Swap_Id_High,
-               Partition_Flags     => Active_Swap_Flag,
-               Partition_Name      => "rose-storage-1");
-
-            Current_Start := Current_Start + Partition_Size;
+               First_Block         => BIOS_Boot_Start,
+               Last_Block          => Rose_Boot_Start - 1,
+               Partition_Type_Low  => BIOS_Boot_Id_Low,
+               Partition_Type_High => BIOS_Boot_Id_High,
+               Partition_Flags     => 0,
+               Partition_Name      => "bios-boot");
 
             Rose.Devices.GPT.Add_Partition
               (Block_Device        => Device,
-               First_Block         => Current_Start,
-               Last_Block          => Current_Start + Partition_Size - 1,
+               First_Block         => Rose_Boot_Start,
+               Last_Block          => Swap_Start - 1,
+               Partition_Type_Low  => EFI_System_Id_Low,
+               Partition_Type_High => EFI_System_Id_High,
+               Partition_Flags     => 0,
+               Partition_Name      => "rose-boot");
+
+            Rose.Devices.GPT.Add_Partition
+              (Block_Device        => Device,
+               First_Block         => Swap_Start,
+               Last_Block          => Log_Start - 1,
                Partition_Type_Low  => Swap_Id_Low,
                Partition_Type_High => Swap_Id_High,
                Partition_Flags     => 0,
-               Partition_Name      => "rose-storage-2");
-
-            Current_Start := Current_Start + Partition_Size;
+               Partition_Name      => "rose-swap");
 
             Rose.Devices.GPT.Add_Partition
               (Block_Device        => Device,
-               First_Block         => Current_Start,
-               Last_Block          => Available_Blocks,
+               First_Block         => Log_Start,
+               Last_Block          => Last_Usable,
                Partition_Type_Low  => Log_Id_Low,
                Partition_Type_High => Log_Id_High,
                Partition_Flags     => 0,

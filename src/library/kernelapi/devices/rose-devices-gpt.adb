@@ -83,6 +83,13 @@ package body Rose.Devices.GPT is
      (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
       Entries      : GPT_Partition_Entry_Array);
 
+   procedure Write_Protective_MBR
+     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+   --  Write the protective MBR that a GPT disk has in block 0: a single
+   --  partition of type EE covering the disk, so that tools which only
+   --  know MBRs leave it alone.  GRUB looks for it too (#322).  The
+   --  boot code in the first 440 bytes is kept.
+
    -------------------
    -- Add_Partition --
    -------------------
@@ -190,6 +197,7 @@ package body Rose.Devices.GPT is
    begin
       Check_Cached (Device);
       if GPT_Data.Dirty then
+         Write_Protective_MBR (Device);
          Write_Header (Device, GPT_Data.Header);
          Write_Partition_Entries
            (Device,
@@ -385,13 +393,19 @@ package body Rose.Devices.GPT is
                then
                   Rose.Console_IO.Put
                     ("rose-log  ");
+               elsif Part.Partition_Type_Low = BIOS_Boot_Id_Low
+                 and then Part.Partition_Type_High = BIOS_Boot_Id_High
+               then
+                  Rose.Console_IO.Put
+                    ("bios-boot ");
+               elsif Part.Partition_Type_Low = EFI_System_Id_Low
+                 and then Part.Partition_Type_High = EFI_System_Id_High
+               then
+                  Rose.Console_IO.Put
+                    ("efi-system");
                else
                   Rose.Console_IO.Put
                     ("unknown   ");
-               end if;
-
-               if (Part.Flags and Active_Swap_Flag) /= 0 then
-                  Rose.Console_IO.Put ("A");
                end if;
             end;
 
@@ -467,5 +481,66 @@ package body Rose.Devices.GPT is
            (Block_Device, 2, 1, Block_Storage);
       end;
    end Write_Partition_Entries;
+
+   --------------------------
+   -- Write_Protective_MBR --
+   --------------------------
+
+   procedure Write_Protective_MBR
+     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+   is
+      use System.Storage_Elements;
+      Block_Size  : Block_Size_Type;
+      Block_Count : Block_Address_Type;
+   begin
+      Client.Get_Parameters (Block_Device, Block_Count, Block_Size);
+
+      declare
+         MBR   : Storage_Array (0 .. Storage_Offset (Block_Size) - 1);
+         Size  : constant Block_Address_Type :=
+                   Block_Address_Type'Min (Block_Count - 1, 16#FFFF_FFFF#);
+         Entry_Start : constant := 446;
+
+         procedure Put_32
+           (Offset : Storage_Offset;
+            Value  : Rose.Words.Word_32);
+
+         ------------
+         -- Put_32 --
+         ------------
+
+         procedure Put_32
+           (Offset : Storage_Offset;
+            Value  : Rose.Words.Word_32)
+         is
+            use type Rose.Words.Word_32;
+            X : Rose.Words.Word_32 := Value;
+         begin
+            for I in 0 .. 3 loop
+               MBR (Offset + Storage_Offset (I)) :=
+                 Storage_Element (X mod 256);
+               X := X / 256;
+            end loop;
+         end Put_32;
+
+      begin
+         Client.Read_Blocks (Block_Device, 0, 1, MBR);
+         MBR (440 .. MBR'Last) := (others => 0);
+
+         --  The partition entry: not bootable, CHS 0/0/2 to the largest
+         --  CHS address, type EE, from block 1 to the end of the disk.
+
+         MBR (Entry_Start + 1 .. Entry_Start + 3) := (16#00#, 16#02#, 16#00#);
+         MBR (Entry_Start + 4) := 16#EE#;
+         MBR (Entry_Start + 5 .. Entry_Start + 7) := (16#FF#, 16#FF#, 16#FF#);
+         Put_32 (Entry_Start + 8, 1);
+         Put_32 (Entry_Start + 12, Rose.Words.Word_32 (Size));
+
+         MBR (510) := 16#55#;
+         MBR (511) := 16#AA#;
+
+         Client.Write_Blocks (Block_Device, 0, 1, MBR);
+      end;
+   end Write_Protective_MBR;
 
 end Rose.Devices.GPT;
