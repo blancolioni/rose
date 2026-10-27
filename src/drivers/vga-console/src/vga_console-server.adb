@@ -1,5 +1,6 @@
 with System.Storage_Elements;
 
+with Rose.Capabilities;
 with Rose.Server;
 with Rose.System_Calls;
 
@@ -24,11 +25,31 @@ package body VGA_Console.Server is
 
    overriding procedure Restored (Item : in out Console);
 
+   --  The console's caps for its two interfaces, from the server
+   --  packages it is attached to.
+
+   overriding function Stream_Writer_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability;
+
+   overriding function Restorable_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability;
+
    Server_Context : Rose.Server.Server_Context;
    Screen         : aliased Console;
 
    Console_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
+
+   --------------------
+   -- Restorable_Cap --
+   --------------------
+
+   overriding function Restorable_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
@@ -58,6 +79,15 @@ package body VGA_Console.Server is
 
       Rose.Server.Start_Server (Server_Context);
    end Start_Server;
+
+   -----------------------
+   -- Stream_Writer_Cap --
+   -----------------------
+
+   overriding function Stream_Writer_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Stream_Writer.Server.Cap_Of (Item));
 
    -----------
    -- Write --
