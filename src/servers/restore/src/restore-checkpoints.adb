@@ -400,6 +400,18 @@ package body Restore.Checkpoints is
          Rose.Console_IO.New_Line;
       end;
 
+      --  Then the storage server is given its tables back, to read the
+      --  rest of its state from them: which pages are fresh (#327).
+
+      for I in 1 .. Store_Pages loop
+         if not Read (Reader, Checkpoint, Kernel_Pages + I) then
+            Fail ("cannot read the storage tables");
+            return;
+         end if;
+         Send_Page := Page;
+         Restore_Table_Page (Store, I, Send_Page);
+      end loop;
+
       --  The kernel's processes, which can't run until the memory server
       --  has their pages.
 

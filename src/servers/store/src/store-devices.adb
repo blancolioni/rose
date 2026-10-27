@@ -24,17 +24,21 @@ package body Store.Devices is
 
    --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
 
-   Max_Fresh_Pages : constant := 2 ** 16;
-   --  The pages of a backing store whose freshness is kept: the first
-   --  256 MB. Other pages are always read.
+   Max_Fresh_Pages : constant := 2 ** Store_Size_Bits;
+   --  Every page that Allocator can hand out, on any backing store.
 
    type Fresh_Page_Array is
      array (0 .. Max_Fresh_Pages - 1) of Boolean
      with Pack;
+
+   Fresh : Fresh_Page_Array;
    --  True for a page that has been reserved and not written since, which
-   --  reads as zeroes without a read from the device (#203). Everything
-   --  else is read: a page whose freshness is not known, after a restore
-   --  for example, is read as it always was.
+   --  reads as zeroes without a read from the device (#203), indexed from
+   --  Page_Object_Id'First. Everything else is read. Only the pages of
+   --  regions are kept: Reserve_Storage marks a new region's pages fresh,
+   --  Restore_Region marks a restored region's pages not fresh, and
+   --  Restore_Table_Page then puts back the ones a checkpoint saved as
+   --  fresh (#327). Other pages may hold anything.
 
    type Backing_Store_Record is
       record
@@ -53,7 +57,6 @@ package body Store.Devices is
          --  Pages read and written, and the time they took (#196).
          Zero_Reads      : Natural := 0;
          --  Reads of fresh pages, answered without the device.
-         Fresh           : Fresh_Page_Array := (others => False);
       end record;
 
    type Backing_Store_Array is
@@ -73,9 +76,12 @@ package body Store.Devices is
          Reads          : Natural := 0;
          Zero_Reads     : Natural := 0;
          Writes         : Natural := 0;
+         Restored       : Boolean := False;
       end record;
    --  A region, with the banks it was allocated, which a subregion does
-   --  not have: Alloc_Index is zero.
+   --  not have: Alloc_Index is zero.  Restored is True for a region that
+   --  Restore_Region recreated, whose fresh pages Restore_Table_Page
+   --  puts back.
 
    type Region_Array is
      array (1 .. Max_Regions) of Region_Record;
@@ -92,22 +98,56 @@ package body Store.Devices is
      with Import, Address => Table_Page'Address;
    Region_Table : Rose.Checkpoints.Region_Page
      with Import, Address => Table_Page'Address;
+   Fresh_Table  : Rose.Checkpoints.Fresh_Page
+     with Import, Address => Table_Page'Address;
    --  The page in which Checkpoint builds the region table.
+
+   Restore_Region_Count : Natural := 0;
+   Restore_Last_Region  : Natural := 0;
+   Restore_First_Fresh  : Natural := 0;
+   Restore_Last_Fresh   : Natural := 0;
+   --  While a restore gives the tables back: the regions they hold, the
+   --  last table page that holds regions, and the table pages that hold
+   --  fresh pages (zero if there are none).
+
+   type Saved_Space_Record is
+      record
+         Index       : Natural := 0;
+         Base, Bound : Rose.Objects.Object_Id := 0;
+      end record;
+
+   type Saved_Space_Array is
+     array (1 .. Max_Regions) of Saved_Space_Record;
+
+   Saved_Spaces      : Saved_Space_Array;
+   Saved_Space_Count : Natural := 0;
+   --  The regions with space of their own in the tables a restore gives
+   --  back, in the order their fresh pages are saved.
+
+   Restore_Space     : Natural := 0;
+   Restore_Next_Page : Rose.Objects.Object_Id := 0;
+   --  The next page whose freshness a restore gives back, and the space
+   --  it is in; Restore_Space is zero before the first.
 
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
 
    function Is_Fresh
-     (Store : Backing_Store_Record;
-      Page  : Rose.Objects.Object_Id)
+     (Page : Rose.Objects.Object_Id)
       return Boolean;
-   --  True if Page of Store has been reserved and not written since.
+   --  True if Page has been reserved and not written since.
 
    procedure Set_Fresh
-     (Store       : in out Backing_Store_Record;
-      Base, Bound : Rose.Objects.Object_Id;
-      Fresh       : Boolean);
-   --  Mark the pages Base .. Bound - 1 of Store fresh or not.
+     (Base, Bound : Rose.Objects.Object_Id;
+      Value       : Boolean);
+   --  Mark the pages Base .. Bound - 1 fresh or not.
+
+   procedure Next_Restored_Page
+     (Page  : out Rose.Objects.Object_Id;
+      Space : out Natural);
+   --  The next page of the saved regions with space of their own, in the
+   --  order Checkpoint saves them, and its index in Saved_Spaces; zero if
+   --  there are no more.
 
    Stream_Buffer_Length : constant := 4096;
 
@@ -210,8 +250,12 @@ package body Store.Devices is
    is
       pragma Unreferenced (Id);
       use Rose.Checkpoints;
-      Count : Natural := 0;
-      Slot  : Natural := 0;
+      use type Rose.Objects.Object_Id;
+      Count       : Natural := 0;
+      Slot        : Natural := 0;
+      Fresh_Bits  : Natural := 0;
+      Fresh_Pages : Natural;
+      Bit         : Natural := 0;
 
       procedure Append;
       --  Append Table_Page to the log, and clear it.
@@ -234,16 +278,24 @@ package body Store.Devices is
       for Region of Regions (1 .. Region_Count) loop
          if Region.In_Use then
             Count := Count + 1;
+            if Region.Alloc_Index > 0 then
+               Fresh_Bits := Fresh_Bits + Natural (Region.Bound - Region.Base);
+            end if;
          end if;
       end loop;
+
+      Fresh_Pages :=
+        (Fresh_Bits + Fresh_Bits_Per_Page - 1) / Fresh_Bits_Per_Page;
 
       Table_Page := (others => 0);
       Table_Header.Magic := Store_Table_Magic;
       Table_Header.Version := Store_Table_Version;
       Table_Header.Page_Count :=
         Rose.Words.Word_32
-          (1 + (Count + Regions_Per_Page - 1) / Regions_Per_Page);
+          (1 + (Count + Regions_Per_Page - 1) / Regions_Per_Page
+           + Fresh_Pages);
       Table_Header.Region_Count := Rose.Words.Word_32 (Count);
+      Table_Header.Fresh_Page_Count := Rose.Words.Word_32 (Fresh_Pages);
       Append;
 
       for Index in 1 .. Region_Count loop
@@ -269,6 +321,25 @@ package body Store.Devices is
       end loop;
 
       if Slot > 0 then
+         Append;
+      end if;
+
+      --  Then the fresh pages of each region with space of its own.
+
+      for Region of Regions (1 .. Region_Count) loop
+         if Region.In_Use and then Region.Alloc_Index > 0 then
+            for Page in Region.Base .. Region.Bound - 1 loop
+               Bit := Bit + 1;
+               Fresh_Table (Bit) := Is_Fresh (Page);
+               if Bit = Fresh_Bits_Per_Page then
+                  Append;
+                  Bit := 0;
+               end if;
+            end loop;
+         end if;
+      end loop;
+
+      if Bit > 0 then
          Append;
       end if;
 
@@ -380,6 +451,7 @@ package body Store.Devices is
                         Base => Base, Bound => Bound,
                         Alloc_Index => 0, Alloc_Banks => 0,
                         Reads => 0, Zero_Reads => 0, Writes => 0,
+                        Restored => False,
                         Access_Cap =>
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
@@ -451,7 +523,7 @@ package body Store.Devices is
                         Backing_Stores (Region.Backing_Device);
          Start      : constant Natural := Rose.Trace.Ticks;
       begin
-         if Is_Fresh (Store, Page) then
+         if Is_Fresh (Page) then
             Data := (others => 0);
             Store.Zero_Reads := Store.Zero_Reads + 1;
             Region.Zero_Reads := Region.Zero_Reads + 1;
@@ -502,15 +574,14 @@ package body Store.Devices is
    --------------
 
    function Is_Fresh
-     (Store : Backing_Store_Record;
-      Page  : Rose.Objects.Object_Id)
+     (Page : Rose.Objects.Object_Id)
       return Boolean
    is
-      use type Rose.Objects.Object_Id;
+      use Rose.Objects;
    begin
-      return Page >= Store.Base
-        and then Page - Store.Base < Max_Fresh_Pages
-        and then Store.Fresh (Natural (Page - Store.Base));
+      return Page >= Page_Object_Id'First
+        and then Page - Page_Object_Id'First < Max_Fresh_Pages
+        and then Fresh (Natural (Page - Page_Object_Id'First));
    end Is_Fresh;
 
    ----------------
@@ -632,6 +703,37 @@ package body Store.Devices is
 
    end New_Store;
 
+   ------------------------
+   -- Next_Restored_Page --
+   ------------------------
+
+   procedure Next_Restored_Page
+     (Page  : out Rose.Objects.Object_Id;
+      Space : out Natural)
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      while Restore_Space = 0
+        or else (Restore_Space <= Saved_Space_Count
+                 and then Restore_Next_Page
+                   >= Saved_Spaces (Restore_Space).Bound)
+      loop
+         Restore_Space := Restore_Space + 1;
+         exit when Restore_Space > Saved_Space_Count;
+         Restore_Next_Page := Saved_Spaces (Restore_Space).Base;
+      end loop;
+
+      if Restore_Space > Saved_Space_Count then
+         Page := 0;
+         Space := 0;
+         return;
+      end if;
+
+      Page := Restore_Next_Page;
+      Space := Restore_Space;
+      Restore_Next_Page := Restore_Next_Page + 1;
+   end Next_Restored_Page;
+
    ---------
    -- Put --
    ---------
@@ -664,7 +766,7 @@ package body Store.Devices is
                 (Page - Store.Base),
             Count  => 1,
             Blocks => Data);
-         Set_Fresh (Store, Page, Page + 1, False);
+         Set_Fresh (Page, Page + 1, False);
          Store.Writes := Store.Writes + 1;
          Store.Write_Ticks :=
            Store.Write_Ticks + (Rose.Trace.Ticks - Start);
@@ -901,11 +1003,12 @@ package body Store.Devices is
             Alloc_Banks    => Alloc_Size / Minimum_Bank_Size,
             Reads          => 0,
             Zero_Reads     => 0,
-            Writes         => 0);
+            Writes         => 0,
+            Restored       => False);
 
          --  New storage holds nothing, whatever its device holds.
 
-         Set_Fresh (Backing_Stores (Store), Base, Bound, True);
+         Set_Fresh (Base, Bound, True);
 
          return Cap;
       end;
@@ -953,8 +1056,13 @@ package body Store.Devices is
          return;
       end if;
 
-      --  The region's pages are not marked fresh: they hold what was
-      --  written to them before the restart.
+      --  The region's pages are not fresh until Restore_Table_Page gives
+      --  back the ones that were: the others hold what was written to
+      --  them before the restart.
+
+      if Alloc_Index > 0 then
+         Set_Fresh (Base, Bound, False);
+      end if;
 
       Regions (Index) :=
         Region_Record'
@@ -971,26 +1079,144 @@ package body Store.Devices is
            Alloc_Banks    => Alloc_Banks,
            Reads          => 0,
            Zero_Reads     => 0,
-           Writes         => 0);
+           Writes         => 0,
+           Restored       => True);
 
       Region_Count := Natural'Max (Region_Count, Index);
    end Restore_Region;
+
+   ------------------------
+   -- Restore_Table_Page --
+   ------------------------
+
+   procedure Restore_Table_Page
+     (Id    : Rose.Objects.Capability_Identifier;
+      Index : Natural;
+      Page  : System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Checkpoints;
+      use type Rose.Objects.Object_Id;
+      use type Rose.Words.Word_32, Rose.Words.Word_64;
+   begin
+      if Page'Length /= Rose.Limits.Page_Size then
+         Rose.Console_IO.Put ("storage: restore: table page ");
+         Rose.Console_IO.Put (Index);
+         Rose.Console_IO.Put_Line (" is not a page");
+         return;
+      end if;
+
+      if Index = 1 then
+         declare
+            Header : Store_Table_Header
+              with Import, Address => Page'Address;
+         begin
+            Restore_Region_Count := 0;
+            Restore_Last_Region := 0;
+            Restore_First_Fresh := 0;
+            Restore_Last_Fresh := 0;
+            Saved_Space_Count := 0;
+            Restore_Space := 0;
+
+            --  A checkpoint before version 2 has no fresh pages.
+
+            if Header.Magic = Store_Table_Magic
+              and then Header.Version >= 2
+              and then Header.Fresh_Page_Count > 0
+              and then Natural (Header.Region_Count) <= Max_Regions
+            then
+               Restore_Region_Count := Natural (Header.Region_Count);
+               Restore_Last_Region :=
+                 1 + (Restore_Region_Count + Regions_Per_Page - 1)
+                 / Regions_Per_Page;
+               Restore_First_Fresh := Restore_Last_Region + 1;
+               Restore_Last_Fresh :=
+                 Restore_Last_Region + Natural (Header.Fresh_Page_Count);
+            end if;
+         end;
+
+      elsif Index in 2 .. Restore_Last_Region then
+
+         --  The regions, to find the ones whose fresh pages are saved.
+
+         declare
+            Table : Region_Page
+              with Import, Address => Page'Address;
+            First : constant Natural := (Index - 2) * Regions_Per_Page + 1;
+            Last  : constant Natural :=
+                      Natural'Min (Restore_Region_Count,
+                                   First + Regions_Per_Page - 1);
+         begin
+            for I in First .. Last loop
+               declare
+                  Region : Saved_Region renames
+                             Table.Regions (I - First + 1);
+               begin
+                  if Region.Alloc_Index > 0 then
+                     Saved_Space_Count := Saved_Space_Count + 1;
+                     Saved_Spaces (Saved_Space_Count) :=
+                       (Index => Natural (Region.Index),
+                        Base  => Rose.Objects.Object_Id (Region.Base),
+                        Bound => Rose.Objects.Object_Id (Region.Bound));
+                  end if;
+               end;
+            end loop;
+         end;
+
+      elsif Index in Restore_First_Fresh .. Restore_Last_Fresh then
+         declare
+            Bits     : Fresh_Page
+              with Import, Address => Page'Address;
+            Next     : Rose.Objects.Object_Id;
+            Space    : Natural;
+            Restored : Natural := 0;
+         begin
+            for Bit of Bits loop
+               Next_Restored_Page (Next, Space);
+               exit when Space = 0;
+
+               --  Only the pages of a region that was recreated as it
+               --  was saved.
+
+               declare
+                  Saved : Saved_Space_Record renames Saved_Spaces (Space);
+               begin
+                  if Saved.Index in 1 .. Region_Count
+                    and then Regions (Saved.Index).In_Use
+                    and then Regions (Saved.Index).Restored
+                    and then Regions (Saved.Index).Base = Saved.Base
+                    and then Regions (Saved.Index).Bound = Saved.Bound
+                  then
+                     Set_Fresh (Next, Next + 1, Bit);
+                     if Bit then
+                        Restored := Restored + 1;
+                     end if;
+                  end if;
+               end;
+            end loop;
+
+            Rose.Console_IO.Put ("storage: restore: fresh pages: ");
+            Rose.Console_IO.Put (Restored);
+            Rose.Console_IO.New_Line;
+         end;
+      end if;
+   end Restore_Table_Page;
 
    ---------------
    -- Set_Fresh --
    ---------------
 
    procedure Set_Fresh
-     (Store       : in out Backing_Store_Record;
-      Base, Bound : Rose.Objects.Object_Id;
-      Fresh       : Boolean)
+     (Base, Bound : Rose.Objects.Object_Id;
+      Value       : Boolean)
    is
-      use type Rose.Objects.Object_Id;
+      use Rose.Objects;
    begin
       for Page in Base .. Bound - 1 loop
-         if Page >= Store.Base and then Page - Store.Base < Max_Fresh_Pages
+         if Page >= Page_Object_Id'First
+           and then Page - Page_Object_Id'First < Max_Fresh_Pages
          then
-            Store.Fresh (Natural (Page - Store.Base)) := Fresh;
+            Fresh (Natural (Page - Page_Object_Id'First)) := Value;
          end if;
       end loop;
    end Set_Fresh;

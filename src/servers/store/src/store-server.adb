@@ -59,10 +59,11 @@ package body Store.Server is
          Instanced      => True);
 
       Rose.Interfaces.Storage_Checkpoint.Server.Attach_Interface
-        (Server_Context => Server_Context,
-         Checkpoint     => Store.Devices.Checkpoint'Access,
-         Restore_Region => Store.Devices.Restore_Region'Access,
-         Find_Region    => Store.Devices.Find_Region'Access);
+        (Server_Context     => Server_Context,
+         Checkpoint         => Store.Devices.Checkpoint'Access,
+         Restore_Region     => Store.Devices.Restore_Region'Access,
+         Restore_Table_Page => Store.Devices.Restore_Table_Page'Access,
+         Find_Region        => Store.Devices.Find_Region'Access);
    end Create_Server;
 
    ---------------------

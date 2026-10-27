@@ -17,8 +17,16 @@ interface Storage_Checkpoint is
       Alloc_Index : Natural;
       Alloc_Banks : Natural);
    --  Recreate a region from a checkpoint, with the index, pages and
-   --  backing store space it had.  Its pages are read from the device:
-   --  they hold whatever was written to them before the restart.
+   --  backing store space it had.  Its pages are read from the device,
+   --  except those that Restore_Table_Page marks fresh.
+
+   procedure Restore_Table_Page
+     (Index : Natural;
+      Page  : Storage_Array);
+   --  Give back page Index of the tables that Checkpoint appended, the
+   --  header being page 1.  Every page is given back, in order, after
+   --  the regions have been recreated.  The storage server reads its own
+   --  state from them (see Rose.Checkpoints).
 
    function Find_Region
      (Base  : Object_Id;

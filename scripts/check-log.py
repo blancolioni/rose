@@ -43,8 +43,9 @@ CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 1
+STORE_TABLE_VERSION = 2
 REGIONS_PER_PAGE = PAGE_SIZE // 32
+FRESH_BITS_PER_PAGE = PAGE_SIZE * 8
 
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 1
@@ -203,16 +204,20 @@ def check_store_tables(log, first, last, verbose):
                        "found %s" % (first, describe_page(page or b""))), \
             0, regions
     version = u32(page, 8)
-    if version != STORE_TABLE_VERSION:
+    if version not in (1, STORE_TABLE_VERSION):
         return False, "storage tables version %d" % version, 0, regions
     page_count = u32(page, 12)
     region_count = u32(page, 16)
-    if page_count != 1 + (region_count + REGIONS_PER_PAGE - 1) \
-            // REGIONS_PER_PAGE or first + page_count - 1 > last:
-        return False, ("storage tables: %d pages for %d regions"
-                       % (page_count, region_count)), 0, regions
+    fresh_pages = u32(page, 20) if version >= 2 else 0
+    region_pages = (region_count + REGIONS_PER_PAGE - 1) // REGIONS_PER_PAGE
+    if page_count != 1 + region_pages + fresh_pages \
+            or first + page_count - 1 > last:
+        return False, ("storage tables: %d pages for %d regions and %d "
+                       "fresh pages"
+                       % (page_count, region_count, fresh_pages)), 0, regions
 
     indices = set()
+    space_pages = 0
     for i in range(region_count):
         record = log.page(first + 1 + i // REGIONS_PER_PAGE)
         index, device, base, bound, alloc_index, alloc_banks = \
@@ -225,14 +230,30 @@ def check_store_tables(log, first, last, verbose):
                               bound)), 0, regions
         indices.add(index)
         regions.add((base, bound))
+        if alloc_index:
+            space_pages += bound - base
         if verbose:
             print("    region %3d: %x..%x%s"
                   % (index, base, bound,
                      " space %d+%d" % (alloc_index, alloc_banks)
                      if alloc_index else " subregion"))
 
-    return True, ("storage: %d region%s"
-                  % (region_count, "" if region_count == 1 else "s")), \
+    fresh = ""
+    if version >= 2:
+        if fresh_pages != (space_pages + FRESH_BITS_PER_PAGE - 1) \
+                // FRESH_BITS_PER_PAGE:
+            return False, ("storage tables: %d fresh pages for %d pages "
+                           "of regions" % (fresh_pages, space_pages)), \
+                0, regions
+        count = 0
+        for i in range(fresh_pages):
+            bits = log.page(first + 1 + region_pages + i)
+            count += sum(bin(b).count("1") for b in bits)
+        fresh = ", %d of %d pages fresh" % (count, space_pages)
+
+    return True, ("storage: %d region%s%s"
+                  % (region_count, "" if region_count == 1 else "s",
+                     fresh)), \
         page_count, regions
 
 
