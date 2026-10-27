@@ -137,6 +137,42 @@ package body Rose.Kernel.Processes.Queue is
       end if;
    end Queue_Process;
 
+   --------------------
+   -- Remove_Process --
+   --------------------
+
+   procedure Remove_Process
+     (Process : Rose.Kernel.Processes.Process_Id)
+   is
+      P : constant Kernel_Process_Access :=
+            Process_Table (Process)'Access;
+   begin
+      for Q of Process_Queue loop
+         if Q.First = P then
+            Q.First := P.Queue_Next;
+            if Q.First = null then
+               Q.Last := null;
+            end if;
+         else
+            declare
+               It : Kernel_Process_Access := Q.First;
+            begin
+               while It /= null and then It.Queue_Next /= P loop
+                  It := It.Queue_Next;
+               end loop;
+               if It /= null then
+                  It.Queue_Next := P.Queue_Next;
+                  if Q.Last = P then
+                     Q.Last := It;
+                  end if;
+               end if;
+            end;
+         end if;
+      end loop;
+
+      P.Queue_Next := null;
+   end Remove_Process;
+
    ----------------------------
    -- Resume_Current_Process --
    ----------------------------

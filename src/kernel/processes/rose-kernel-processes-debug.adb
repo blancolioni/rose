@@ -4,11 +4,29 @@ with Rose.Addresses;
 
 package body Rose.Kernel.Processes.Debug is
 
+   procedure Put_Entry (Pid : Process_Id);
+   --  Put Pid, which names an entry of the process table.
+
    ---------
    -- Put --
    ---------
 
    procedure Put (Pid : Process_Id) is
+   begin
+      if Pid not in Process_Table'Range then
+         Rose.Boot.Console.Put (Natural (Pid));
+         Rose.Boot.Console.Put ("/none");
+         return;
+      end if;
+
+      Put_Entry (Pid);
+   end Put;
+
+   ---------------
+   -- Put_Entry --
+   ---------------
+
+   procedure Put_Entry (Pid : Process_Id) is
       Name : String renames Process_Table (Pid).Name;
    begin
       Rose.Boot.Console.Put (Natural (Pid));
@@ -38,7 +56,7 @@ package body Rose.Kernel.Processes.Debug is
       end if;
 
       Rose.Boot.Console.Put ("]");
-   end Put;
+   end Put_Entry;
 
    --------------------
    -- Report_Process --

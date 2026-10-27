@@ -5,6 +5,8 @@ with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Reply is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    ------------
    -- Handle --
    ------------
@@ -19,7 +21,9 @@ package body Rose.Kernel.Capabilities.Reply is
                    Rose.Kernel.Processes.To_Process_Id
                      (Cap.Payload);
    begin
-      if not Rose.Kernel.Processes.Is_Blocked_On_Reply (To_Pid) then
+      if To_Pid = Rose.Kernel.Processes.Null_Process_Id
+        or else not Rose.Kernel.Processes.Is_Blocked_On_Reply (To_Pid)
+      then
          Rose.Boot.Console.Put ("reply-cap: ");
          Rose.Kernel.Processes.Debug.Put (From_Pid);
          Rose.Boot.Console.Put (" -> ");

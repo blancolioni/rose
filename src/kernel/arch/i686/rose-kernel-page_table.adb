@@ -233,6 +233,27 @@ package body Rose.Kernel.Page_Table is
       end loop;
    end Enable_Page_Writes;
 
+   ---------------------------
+   -- Free_User_Page_Tables --
+   ---------------------------
+
+   procedure Free_User_Page_Tables
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+   begin
+      for Index in User_Page_Directory_Index loop
+         if Directory (Index).PFA /= 0 then
+            Rose.Kernel.Heap.Free_Page
+              (Rose.Kernel.Heap.Get_Virtual_Page (Directory (Index).PFA));
+            Init_Page_Entry (Directory (Index));
+         end if;
+      end loop;
+   end Free_User_Page_Tables;
+
    ---------------------
    -- Init_Page_Entry --
    ---------------------

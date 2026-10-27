@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Boot.Console;
 with Rose.Interfaces.Memory;
 with Rose.Interfaces.Restorable;
@@ -19,9 +21,12 @@ package body Rose.Kernel.Processes is
    Log_State_Changes  : constant Boolean := False;
    Log_Cap_Cache      : constant Boolean := False;
 
-   First_Persistent_Pid : constant Process_Id := 0;
-
    Active_Checkpoint : Boolean := False;
+
+   procedure Release_Entry (Pid : Process_Id);
+   --  Take the process in entry Pid off the run queue and every wait
+   --  list, give its kernel pages back to the heap, and clear the entry
+   --  as it was before its first use, keeping its pid and object id.
 
    procedure Show_Address
      (Addr : Rose.Words.Word);
@@ -64,6 +69,21 @@ package body Rose.Kernel.Processes is
 
    procedure Enable_Write_Pages
      (Process : in out Kernel_Process_Entry);
+
+   ----------------------
+   -- Assign_Object_Id --
+   ----------------------
+
+   procedure Assign_Object_Id (Pid : Process_Id) is
+      use type Rose.Objects.Object_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      if P.Oid = Rose.Objects.Null_Object_Id then
+         P.Oid := Rose.Objects.Object_Id (Pid);
+      else
+         P.Oid := P.Oid + Rose.Kernel.Limits.Max_Processes;
+      end if;
+   end Assign_Object_Id;
 
    ------------------------
    -- Can_Send_To_Memory --
@@ -253,7 +273,14 @@ package body Rose.Kernel.Processes is
       Proc_Name               : Process_Name := (others => ' ');
    begin
 
-      Proc.Oid := Rose.Objects.Object_Id (Pid);
+      --  Kill_Process does not release the entry of the process that is
+      --  running, whose page directory is in use, so that is done here.
+
+      if Proc.Directory_Page /= 0 then
+         Release_Entry (Pid);
+      end if;
+
+      Assign_Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
 
       if Name'Length <= Proc_Name'Length then
@@ -938,7 +965,12 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put (Current_Page_Fault_Count - P.Faults_At_Create);
          Rose.Boot.Console.New_Line;
       end if;
-      P.State := Available;
+
+      if Process = Current_Process_Id then
+         P.State := Available;
+      else
+         Release_Entry (Process);
+      end if;
    end Kill_Process;
 
    ----------------------
@@ -1178,16 +1210,26 @@ package body Rose.Kernel.Processes is
      (Name : String)
      return Process_Id
    is
-      Pid               : Process_Id := Next_Pid;
+      function Next (Pid : Process_Id) return Process_Id
+      is (if Pid = Process_Table'Last then Process_Table'First
+          else Pid + 1);
+
+      Pid : Process_Id := Next_Pid;
    begin
 
+      --  Look at each entry once, from where the last search stopped, so
+      --  that entries freed by processes that have gone are used again.
+
       while Process_Table (Pid).State /= Available loop
-         Pid := Pid + 1;
+         Pid := Next (Pid);
+         if Pid = Next_Pid then
+            return Null_Process_Id;
+         end if;
       end loop;
 
       Create_Process_Table_Entry (Pid, Name);
 
-      Next_Pid := Pid + 1;
+      Next_Pid := Next (Pid);
       return Pid;
 
    end New_Process;
@@ -1227,6 +1269,20 @@ package body Rose.Kernel.Processes is
       end if;
       return 0;
    end Next_Blocked_Sender;
+
+   -----------------
+   -- Object_Slot --
+   -----------------
+
+   function Object_Slot
+     (Oid : Rose.Objects.Object_Id)
+      return Process_Id
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      return Process_Id
+        ((Oid - 1) mod Rose.Kernel.Limits.Max_Processes + 1);
+   end Object_Slot;
 
    ----------------------
    -- Page_Fault_Count --
@@ -1269,6 +1325,79 @@ package body Rose.Kernel.Processes is
       Receive (Receiver_Id, Params);
       Process_Table (Receiver_Id).Flags (Receive_Any) := True;
    end Receive_Any;
+
+   -------------------
+   -- Release_Entry --
+   -------------------
+
+   procedure Release_Entry (Pid : Process_Id) is
+      use System.Storage_Elements;
+      use type System.Address;
+      P   : Kernel_Process_Entry renames Process_Table (Pid);
+      Me  : constant Kernel_Process_Access := P'Access;
+      Oid : constant Rose.Objects.Object_Id := P.Oid;
+   begin
+      Rose.Kernel.Processes.Queue.Remove_Process (Pid);
+
+      --  A process that went while it waited to send is still on its
+      --  receiver's list.
+
+      for Receiver of Process_Table.all loop
+         if Receiver.Waiting_First = Me then
+            Receiver.Waiting_First := Me.Waiting_Next;
+         else
+            declare
+               It : Kernel_Process_Access := Receiver.Waiting_First;
+            begin
+               while It /= null and then It.Waiting_Next /= Me loop
+                  It := It.Waiting_Next;
+               end loop;
+               if It /= null then
+                  It.Waiting_Next := Me.Waiting_Next;
+               end if;
+            end;
+         end if;
+      end loop;
+
+      for Page of P.Cap_Pages loop
+         if Page /= System.Null_Address then
+            Rose.Kernel.Heap.Free_Page
+              (Virtual_Address_To_Page (To_Virtual_Address (Page)));
+         end if;
+      end loop;
+
+      if P.Directory_Page /= 0 then
+         declare
+            Directory_VP : constant Virtual_Page_Address :=
+              Rose.Kernel.Heap.Get_Virtual_Page
+                (Physical_Address_To_Page (P.Directory_Page));
+         begin
+            Rose.Kernel.Page_Table.Free_User_Page_Tables (Directory_VP);
+            Rose.Kernel.Heap.Free_Page (Directory_VP);
+         end;
+      end if;
+
+      if P.Env_Page /= 0 then
+         Rose.Kernel.Heap.Free_Page
+           (Rose.Kernel.Heap.Get_Virtual_Page (P.Env_Page));
+      end if;
+
+      --  The process table starts out zeroed, as the kernel heap gives
+      --  it, and an entry is used as if it were new.
+
+      declare
+         Contents : Storage_Array
+           (1 .. Storage_Offset (Kernel_Process_Entry'Size / 8))
+           with Import, Address => P'Address;
+      begin
+         Contents := (others => 0);
+      end;
+
+      P.Pid := Pid;
+      P.Oid := Oid;
+      P.State := Available;
+      P.Name := (others => ' ');
+   end Release_Entry;
 
    ----------------------------
    -- Report_Current_Process --
@@ -2096,14 +2225,21 @@ package body Rose.Kernel.Processes is
      (Oid : Rose.Objects.Object_Id)
       return Process_Id
    is
-      use Rose.Objects;
+      use type Rose.Objects.Object_Id;
    begin
-      if Oid in Persistent_Process_Object_Id then
-         return Process_Id (Oid - Persistent_Process_Object_Id'First)
-           + First_Persistent_Pid;
-      else
-         return Process_Id (Oid);
+      if not Rose.Objects.Is_Process_Object_Id (Oid) then
+         return Null_Process_Id;
       end if;
+
+      declare
+         Pid : constant Process_Id := Object_Slot (Oid);
+         P   : Kernel_Process_Entry renames Process_Table (Pid);
+      begin
+         if P.State = Available or else P.Oid /= Oid then
+            return Null_Process_Id;
+         end if;
+         return Pid;
+      end;
    end To_Process_Id;
 
    ----------------------

@@ -8,6 +8,8 @@ with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Capabilities.Page_Table is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    procedure Map_Process_Page
      (Params : Rose.Invocation.Invocation_Access;
       Pid    : Rose.Kernel.Processes.Process_Id;
@@ -34,7 +36,12 @@ package body Rose.Kernel.Capabilities.Page_Table is
                                (if Object_Fits_In_Word
                                 then 1 else 2);
             begin
-               Map_Process_Page (Params, Pid, Start_Index);
+               if Pid = Rose.Kernel.Processes.Null_Process_Id then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Invalid_Object);
+               else
+                  Map_Process_Page (Params, Pid, Start_Index);
+               end if;
             end;
 
          when Unmap_Page =>

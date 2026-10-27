@@ -6,6 +6,8 @@ with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Copy is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    ------------
    -- Handle --
    ------------
@@ -33,8 +35,13 @@ package body Rose.Kernel.Capabilities.Copy is
                   else 0);
 
       Endpoint_Cap : constant Rose.Capabilities.Capability :=
-                       Rose.Kernel.Processes.Find_Endpoint_Cap
-                         (From_Process_Id, Endpoint_Id);
+                       (if From_Process_Id
+                          = Rose.Kernel.Processes.Null_Process_Id
+                        then Null_Capability
+                        else Rose.Kernel.Processes.Find_Endpoint_Cap
+                          (From_Process_Id, Endpoint_Id));
+      --  Null if the cap names a process that has gone, which is
+      --  reported as a missing endpoint.
       Local_Cap       : Rose.Capabilities.Capability :=
                           Rose.Capabilities.Null_Capability;
    begin
