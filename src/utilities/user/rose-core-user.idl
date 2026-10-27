@@ -1,0 +1,16 @@
+command Rose.Core.User : Create_Endpoint
+  with Summary     => "Serve a user's User interface.",
+       Description => """
+          User serves the User interface of one user (ADR 0003): the
+          user's name, and the user's home directory. It returns the
+          interface, and then keeps serving it.
+          """,
+       Server      => User_Server.Start_Server
+is
+   Name : String
+     with Help => "the user's name";
+   Home : in Writable_Directory
+     with Help => "the user's home directory";
+   User : out User
+     with Help => "the user's User interface";
+end Rose.Core.User;

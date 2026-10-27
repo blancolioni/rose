@@ -20,7 +20,7 @@ package body Init.Users is
    --  The contents of the new user's .petalrc.
 
    Max_Name_Length : constant := 64;
-   --  The longest user name (the user utility's User.Server).
+   --  The longest user name (the user utility's User_Server).
 
    function Launch_User
      (Launcher        : Rose.Interfaces.Launch.Client.Launch_Client;
@@ -29,9 +29,9 @@ package body Init.Users is
       Name            : String)
       return Rose.Capabilities.Capability;
    --  Launch the user program as a command, and call it with
-   --  Create_Endpoint, Home and Name (see the user utility's package
-   --  User). Return the User interface from the reply, or null if the
-   --  launch or the call fails.
+   --  Create_Endpoint, Home and Name (see its command declaration,
+   --  src/utilities/user/rose-core-user.idl). Return the User interface
+   --  from the reply, or null if the launch or the call fails.
 
    -----------------------
    -- Create_First_User --

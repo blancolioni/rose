@@ -5,7 +5,7 @@ with Rose.Server;
 with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.User.Server;
 
-package body User.Server is
+package body User_Server is
 
    Context   : Rose.Server.Server_Context;
    Name      : String (1 .. Max_Name_Length);
@@ -98,4 +98,4 @@ package body User.Server is
       Rose.Server.Start_Server (Context);
    end Start_Server;
 
-end User.Server;
+end User_Server;
