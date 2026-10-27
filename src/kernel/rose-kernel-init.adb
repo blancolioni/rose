@@ -28,33 +28,21 @@ package body Rose.Kernel.Init is
         + 64 * Physical_Page_Bytes;   --  initial page tables
       Process_Table_Size : constant Physical_Bytes :=
                              Processes.Process_Table_Heap_Size;
-      --  Guarantee space for up to 5 boot modules before a
-      --  memory manager is launched.  Each requires three pages:
-      --  page directory, first data page, top of stack page.
-      --  Boot will probably fail if these constraints are
-      --  exceeded.
-      --
-      --  Once memory manager is running, we can allocate more heap.
+      --  Boot modules, and the processes they launch before the
+      --  memory server adds to the heap, take their pages from here:
+      --  a page directory and page tables, a stack page, an
+      --  environment page, and each writable segment, including its
+      --  .bss.  Boot_Module_Pages sets how many pages they can have
+      --  (boot-module-pages on the command line); loading a boot
+      --  module that needs more is a panic.
 
-      Boot_Module_Heap   : constant Physical_Bytes :=
-                             6 * 3 * 16#1000#;
-
-      --  Module_Size : constant Virtual_Bytes :=
-      --    Modules.Module_Heap_Size;
-      Heap_Size       : constant Physical_Bytes :=
-                          Page_Table_Size
-                            + Process_Table_Size
-                            + Boot_Module_Heap;
+      Heap_Size       : Physical_Bytes;
    begin
 
       Rose.Boot.Console.Put ("Kernel init: ");
       Rose.Boot.Console.Put (Kernel_Physical_Base);
       Rose.Boot.Console.Put (" - ");
       Rose.Boot.Console.Put (Kernel_Physical_Bound);
-      Rose.Boot.Console.New_Line;
-      Rose.Boot.Console.Put ("kernel: heap size ");
-      Rose.Boot.Console.Put (Natural (Heap_Size / 1024));
-      Rose.Boot.Console.Put ("K");
       Rose.Boot.Console.New_Line;
 
       --  Protect low RAM and Kernel
@@ -105,6 +93,23 @@ package body Rose.Kernel.Init is
            (Rose.Kernel.Command_Line.Integer_Argument
               ("trace-object-id"));
       end if;
+
+      if Rose.Kernel.Command_Line.Integer_Argument
+        ("boot-module-pages") > 0
+      then
+         Boot_Module_Pages :=
+           Rose.Kernel.Command_Line.Integer_Argument ("boot-module-pages");
+      end if;
+
+      Heap_Size := Page_Table_Size + Process_Table_Size
+        + Physical_Bytes (Boot_Module_Pages) * Physical_Page_Bytes;
+
+      Rose.Boot.Console.Put ("kernel: heap size ");
+      Rose.Boot.Console.Put (Natural (Heap_Size / 1024));
+      Rose.Boot.Console.Put ("K, with ");
+      Rose.Boot.Console.Put (Boot_Module_Pages);
+      Rose.Boot.Console.Put (" pages for boot modules");
+      Rose.Boot.Console.New_Line;
 
       Rose.Boot.Console.Put_Line ("Loading boot modules");
 

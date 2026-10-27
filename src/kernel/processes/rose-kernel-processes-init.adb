@@ -133,6 +133,73 @@ package body Rose.Kernel.Processes.Init is
          Directory_VP            : Virtual_Page_Address;
          Physical_Directory_Page : Physical_Page_Address;
 
+         Heap_Pages : Natural := 0;
+         --  The kernel heap pages that loading the module takes
+         Last_Table : Natural := Natural'Last;
+         --  The page table that maps the last segment counted
+
+         procedure Count_Program_Header
+           (Segment_Type : Program_Header_Type;
+            File_Offset  : Rose.Formats.ELF.Elf_Addr;
+            V_Address    : Rose.Formats.ELF.Elf_Addr;
+            File_Size    : Rose.Words.Word_32;
+            Memory_Size  : Rose.Words.Word_32;
+            Alignment    : Rose.Words.Word_32;
+            Readable     : Boolean;
+            Writable     : Boolean;
+            Executable   : Boolean);
+
+         --------------------------
+         -- Count_Program_Header --
+         --------------------------
+
+         procedure Count_Program_Header
+           (Segment_Type : Program_Header_Type;
+            File_Offset  : Rose.Formats.ELF.Elf_Addr;
+            V_Address    : Rose.Formats.ELF.Elf_Addr;
+            File_Size    : Rose.Words.Word_32;
+            Memory_Size  : Rose.Words.Word_32;
+            Alignment    : Rose.Words.Word_32;
+            Readable     : Boolean;
+            Writable     : Boolean;
+            Executable   : Boolean)
+         is
+            pragma Unreferenced (File_Offset, Alignment,
+                                 Readable, Executable);
+            use type Rose.Words.Word_32;
+            Page_Bytes  : constant := Virtual_Page_Bytes;
+            Table_Bytes : constant := 1024 * Page_Bytes;
+            First_Table : constant Natural :=
+                            Natural (V_Address / Table_Bytes);
+            Final_Table : constant Natural :=
+                            Natural
+                              ((V_Address
+                               + Rose.Words.Word_32'Max (Memory_Size, 1) - 1)
+                               / Table_Bytes);
+         begin
+            if Segment_Type /= PT_LOAD then
+               return;
+            end if;
+
+            if Writable then
+               declare
+                  Size : constant Rose.Words.Word_32 :=
+                           (if Have_Process_Handlers and then Enable_Paging
+                            then File_Size else Memory_Size);
+               begin
+                  Heap_Pages := Heap_Pages
+                    + Natural ((Size + Page_Bytes - 1) / Page_Bytes);
+               end;
+            end if;
+
+            for Table in First_Table .. Final_Table loop
+               if Table /= Last_Table then
+                  Heap_Pages := Heap_Pages + 1;
+                  Last_Table := Table;
+               end if;
+            end loop;
+         end Count_Program_Header;
+
          procedure Load_Program_Header
            (Segment_Type : Program_Header_Type;
             File_Offset  : Rose.Formats.ELF.Elf_Addr;
@@ -284,6 +351,32 @@ package body Rose.Kernel.Processes.Init is
       begin
          if not Is_Valid (Image) then
             Rose.Kernel.Panic.Panic ("boot module: not an ELF image");
+         end if;
+
+         --  a page directory, a stack page and its page table, an
+         --  environment page and its page table, and a page table for
+         --  the system call page
+         Heap_Pages := (if Environment = null then 5 else 6);
+         Rose.Formats.ELF.Scan_Program_Headers
+           (Image, Count_Program_Header'Access);
+
+         if Physical_Bytes (Heap_Pages) * Physical_Page_Bytes
+           > Rose.Kernel.Heap.Available_Heap
+         then
+            Rose.Boot.Console.Enable_Display;
+            Rose.Boot.Console.Put ("kernel: loading ");
+            Rose.Boot.Console.Put (Name (1 .. Name_Length));
+            Rose.Boot.Console.Put (" needs ");
+            Rose.Boot.Console.Put (Heap_Pages);
+            Rose.Boot.Console.Put (" pages of kernel heap; ");
+            Rose.Boot.Console.Put
+              (Natural (Rose.Kernel.Heap.Available_Heap
+               / Physical_Page_Bytes));
+            Rose.Boot.Console.Put (" are left (boot-module-pages=");
+            Rose.Boot.Console.Put (Boot_Module_Pages);
+            Rose.Boot.Console.Put (")");
+            Rose.Boot.Console.New_Line;
+            Rose.Kernel.Panic.Panic ("boot module heap exhausted");
          end if;
 
          Assign_Object_Id (Pid);

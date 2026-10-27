@@ -67,4 +67,9 @@ private
 
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
+   Boot_Module_Pages : Natural := 24;
+   --  Pages of kernel heap kept for boot modules, which are loaded before
+   --  the memory server can add to the heap (#309). Set by
+   --  boot-module-pages on the command line.
+
 end Rose.Kernel;
