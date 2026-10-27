@@ -24,6 +24,17 @@ package body Rose.Kernel.Processes is
    Active_Checkpoint : Boolean := False;
 
    procedure Release_Entry (Pid : Process_Id);
+
+   procedure Wake_Waiting_Processes (Pid : Process_Id);
+   --  Wake each process that is waiting on Pid, which is being killed,
+   --  as if its call had failed: those blocked sending to it, and those
+   --  waiting for its reply, which it holds reply caps for.
+
+   procedure Wake_With_Error
+     (Pid   : Process_Id;
+      Error : Rose.Invocation.Invocation_Error);
+   --  Make the blocked process Pid ready, with its call failing with
+   --  Error.
    --  Take the process in entry Pid off the run queue and every wait
    --  list, give its kernel pages back to the heap, and clear the entry
    --  as it was before its first use, keeping its pid and object id.
@@ -983,6 +994,8 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.New_Line;
       end if;
 
+      Wake_Waiting_Processes (Process);
+
       if Process = Current_Process_Id then
          P.State := Available;
       else
@@ -1389,7 +1402,7 @@ package body Rose.Kernel.Processes is
               Rose.Kernel.Heap.Get_Virtual_Page
                 (Physical_Address_To_Page (P.Directory_Page));
          begin
-            Rose.Kernel.Page_Table.Free_User_Page_Tables (Directory_VP);
+            Rose.Kernel.Page_Table.Free_Process_Page_Tables (Directory_VP);
             Rose.Kernel.Heap.Free_Page (Directory_VP);
          end;
       end if;
@@ -2412,5 +2425,81 @@ package body Rose.Kernel.Processes is
    begin
       Process_Table (Pid).Flags (Wait_Reply) := True;
    end Wait_For_Reply;
+
+   ----------------------------
+   -- Wake_Waiting_Processes --
+   ----------------------------
+
+   procedure Wake_Waiting_Processes (Pid : Process_Id) is
+      use type Rose.Capabilities.Layout.Capability_Type;
+      P    : Kernel_Process_Entry renames Process_Table (Pid);
+      Next : Kernel_Process_Access := P.Waiting_First;
+   begin
+      P.Waiting_First := null;
+      while Next /= null loop
+         declare
+            Sender : constant Kernel_Process_Access := Next;
+         begin
+            Next := Sender.Waiting_Next;
+            Sender.Waiting_Next := null;
+            Wake_With_Error (Sender.Pid, Rose.Invocation.Closed);
+         end;
+      end loop;
+
+      --  A caller waiting for the reply is named by the payload of the
+      --  reply cap that the dead process holds for it.
+
+      for Cap in 1 .. P.Last_Cap loop
+         if P.Is_Active (Cap) then
+            declare
+               Layout : constant Rose.Capabilities.Layout.Capability_Layout :=
+                 Cap_Layout (Pid, Cap);
+            begin
+               if Layout.Header.Cap_Type = Rose.Capabilities.Layout.Reply_Cap
+               then
+                  declare
+                     Caller : constant Process_Id :=
+                       To_Process_Id (Layout.Payload);
+                  begin
+                     if Caller /= Null_Process_Id
+                       and then Caller /= Pid
+                       and then Process_Table (Caller).State = Blocked
+                       and then Process_Table (Caller).Flags (Wait_Reply)
+                     then
+                        Wake_With_Error (Caller, Rose.Invocation.Closed);
+                     end if;
+                  end;
+               end if;
+            end;
+         end if;
+      end loop;
+   end Wake_Waiting_Processes;
+
+   ---------------------
+   -- Wake_With_Error --
+   ---------------------
+
+   procedure Wake_With_Error
+     (Pid   : Process_Id;
+      Error : Rose.Invocation.Invocation_Error)
+   is
+      W : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      if Trace_Launch or else W.Flags (Trace) then
+         Debug.Put (Pid);
+         Rose.Boot.Console.Put_Line
+           (": woken: the process it waited on has gone");
+      end if;
+
+      W.Flags (Wait_Reply) := False;
+      W.Current_Params.Control.Flags :=
+        (Rose.Invocation.Error => True,
+         Rose.Invocation.Reply => True,
+         others                => False);
+      W.Current_Params.Control.Last_Sent_Word := 0;
+      W.Current_Params.Error := Error;
+      W.Current_Params.Cap := W.Receive_Cap;
+      Set_Current_State (Pid, Ready);
+   end Wake_With_Error;
 
 end Rose.Kernel.Processes;

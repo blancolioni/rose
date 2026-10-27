@@ -9,11 +9,14 @@ package Rose.Kernel.Page_Table is
    --  Init_User_Page_Directory is called while Kernel is mapped,
    --  thus the virtual page address argument
 
-   procedure Free_User_Page_Tables
+   procedure Free_Process_Page_Tables
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);
-   --  Give the page tables of the user part of a page directory back to
-   --  the kernel heap, and clear the directory entries that held them.
-   --  The pages they mapped are not the kernel's, and are not freed.
+   --  Give the page tables that a process's page directory has of its
+   --  own back to the kernel heap, and clear the entries that held them.
+   --  That is every entry not shared with the kernel's directory: the
+   --  user range, and the process's mappings above it, such as its stack
+   --  and environment page. The pages they mapped are not the kernel's,
+   --  and are not freed.
 
    procedure Activate_Page_Directory
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);
