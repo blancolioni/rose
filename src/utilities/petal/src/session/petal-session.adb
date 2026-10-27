@@ -8,7 +8,9 @@ with Rose.System_Calls.Client;
 with Rose.Words;
 
 with Rose.Interfaces.Cap_Set;
+with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Writable_Directory.Client.Conversions;
 
 with Petal.Read;
 
@@ -25,7 +27,6 @@ package body Petal.Session is
    User_Index : constant := 12;
    --  The user's User interface (interfaces/user.idl).
 
-   Home_Name         : constant String := "home";
    Startup_File_Name : constant String := ".petalrc";
 
    Max_Directories : constant := 16;
@@ -36,6 +37,9 @@ package body Petal.Session is
          Name      : String (1 .. Max_Name_Length);
          Name_Last : Natural := 0;
          Directory : Writable_Directory_Client;
+         Grant     : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         --  The read-only grant of Directory, once it has been made.
       end record;
 
    Directories     : array (1 .. Max_Directories) of Directory_Entry;
@@ -89,6 +93,33 @@ package body Petal.Session is
       end loop;
       Found := False;
    end Find_Directory;
+
+   ----------------
+   -- Find_Grant --
+   ----------------
+
+   procedure Find_Grant
+     (Name  : String;
+      Grant : out Rose.Capabilities.Capability;
+      Found : out Boolean)
+   is
+   begin
+      for Item of Directories (1 .. Directory_Count) loop
+         if Item.Name (1 .. Item.Name_Last) = Name then
+            if Item.Grant = Rose.Capabilities.Null_Capability then
+               Item.Grant :=
+                 Rose.Interfaces.Directory.Client.Get_Interface_Cap
+                   (Rose.Interfaces.Writable_Directory.Client.Conversions
+                    .To_Directory (Item.Directory));
+            end if;
+            Grant := Item.Grant;
+            Found := Grant /= Rose.Capabilities.Null_Capability;
+            return;
+         end if;
+      end loop;
+      Grant := Rose.Capabilities.Null_Capability;
+      Found := False;
+   end Find_Grant;
 
    --------------
    -- Get_User --

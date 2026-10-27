@@ -1,3 +1,5 @@
+with Rose.Capabilities;
+
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 
@@ -30,6 +32,19 @@ package Petal.Session is
                         .Writable_Directory_Client;
       Found     : out Boolean);
    --  The directory called Name in the table, if there is one.
+
+   procedure Find_Grant
+     (Name  : String;
+      Grant : out Rose.Capabilities.Capability;
+      Found : out Boolean);
+   --  A read-only grant of the directory called Name, for an in Directory
+   --  argument: the interface cap of its Directory interface, which has
+   --  only the lookup operations (ADR 0003, section 1). It is made the
+   --  first time it is asked for, and then kept.
+
+   Home_Name : constant String := "home";
+   --  The user's home directory, the first entry in the table. An in
+   --  Directory argument that is not given is bound to it.
 
    procedure Get_User
      (User  : out Rose.Interfaces.User.Client.User_Client;
