@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-27
-- **Related:** #321 (partition layout), #322 (booting from hd0), #327 (fresh pages after a restore), #305 (allocating storage on first write), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (persistent console)
+- **Related:** #321 (partition layout), #322 (booting from hd0), #327 and #348 (fresh pages after a restore), #305 (allocating storage on first write), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (persistent console)
 
 ## Context
 
@@ -41,6 +41,7 @@ The processes that a page fault, a checkpoint or a restore passes through are th
 - **Pager-path processes are boot modules, and save their state as data.**
   - Each one writes the state that persistent processes depend on to the log at a checkpoint, and is given it back at a restore.
   - The kernel already does this with its tables, and `store` with its region table (`Restore_Region`).
+  - Given back means the process's own saved pages, in order. `restore` copies them from the log without decoding them, and the process reads its own format. `store` gets its fresh-page table back this way (`Storage_Checkpoint.Restore_Table_Page`, #348), and other pager-path processes with state can do the same.
   - Their own memory is never part of a checkpoint.
 - **Every other process is persistent.** It is installed once and is restored, never relaunched.
 
@@ -96,7 +97,7 @@ Until hd0 can boot (#322), the ISO has a second menu entry with the hard-disk mo
 - **The bug class goes away at the source.** A persistent process can only depend on another persistent process, or on a pager-path process that saves its state as data.
 - **Every boot after the install is a restore,** so the restore path runs on every boot. Today a first boot never runs it, and restore bugs show up only on the second boot.
 - **The pager path is small, and fixed.** It is the code that must be right for persistence to work at all, and so the natural place for SPARK proofs.
-- **Pager-path state must be saved explicitly.** Anything a pager-path process keeps that persistent processes depend on has to go into the checkpoint by hand, as store's fresh-page table must (#327). This is the price of not paging the pager path.
+- **Pager-path state must be saved explicitly.** Anything a pager-path process keeps that persistent processes depend on has to go into the checkpoint by hand, as store's fresh-page table does (#327, #348). This is the price of not paging the pager path.
 - **`elf`, `caps`, `pci` and `timer` become installed programs,** and need install manifests like the other drivers.
 - **A restore no longer depends on the boot order of modules that aren't on the pager path.** Persistent processes find boot modules by object id, and only the pager path is left to find.
 
@@ -105,4 +106,4 @@ Until hd0 can boot (#322), the ISO has a second menu entry with the hard-disk mo
 - **Persistent object ids for pager-path endpoints.** The ids must be the same on the install boot and every hard-disk boot, although the two boots load different modules. They should not depend on load order.
 - **`init` on a hard-disk boot.** `init` does less: no install endpoint, no launching. It may be simpler as a separate program, `init` and `install-init`.
 - **Updating the pager path.** A new build changes the boot modules on the boot partition, but not the restored processes. The interfaces between them must stay compatible, or an update needs a fresh install.
-- **The fresh-page table** (#327) and any other pager-path state that isn't saved yet must be saved before the hard-disk boot can be trusted.
+- **Pager-path state that isn't saved yet** must be saved before the hard-disk boot can be trusted. Store's fresh-page table is saved by #348 (#327). The others aren't surveyed yet.
