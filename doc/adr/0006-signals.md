@@ -32,36 +32,31 @@ A signal tells a process that something happened, without making the sender wait
 
 ### 2. Named signals and the process's own signals
 
-Bits 0 to 15 are named signals, defined by the system. Bits 16 to 31 belong to the process, which gives them their meaning.
+Bits 0 to 7 are named signals, defined by the system. Bits 8 to 31 belong to the process, which gives them their meaning.
 
-| Signal | Kind | If not handled | Meaning |
-|---|---|---|---|
-| `Kill` | kernel | | The kernel ends the process, as `Kill_Process` does now. |
-| `Suspend` | kernel | | The kernel stops scheduling the process. |
-| `Resume` | kernel | | The kernel schedules a suspended process again. |
-| `Interrupt` | urgent | end the process | Ctrl-C: stop what you are doing (section 4). |
-| `Terminate` | ordinary | end the process | Please exit. A process that handles it finishes what it is doing, tidies up and exits. |
-| `Stop` | ordinary | suspend the process | Ctrl-Z. A process that handles it tidies up, then asks the kernel to suspend it. |
-| `Child_Exited` | ordinary | ignore | A process this one launched has ended. It is sent through a signal cap that the launcher gives when it launches the process. |
-| `Hangup` | ordinary | end the process | The terminal or console the process was using has gone away. |
-| `Resized` | ordinary | ignore | The terminal the process is using has changed size. |
-| `Restored` | ordinary | ignore | The process has been restored (section 7). |
+| Signal | If not handled | Meaning |
+|---|---|---|
+| `Interrupt` | end the process | Ctrl-C: stop what you are doing. It is urgent (section 4). |
+| `Terminate` | end the process | Please exit. A process that handles it finishes what it is doing, tidies up and exits. |
+| `Stop` | suspend the process | Ctrl-Z. A process that handles it tidies up, then asks the kernel to suspend it (section 3). |
+| `Restored` | ignore | The process has been restored (section 7). |
 
-The other named bits are reserved.
+The other named bits are reserved. The order of the table is not a numbering: the bit for each named signal is defined once, in the Rose package that declares them, not in this ADR.
 
 - **A process tells the kernel which named signals it handles,** through a kernel operation on its own process. When a named signal that the process doesn't handle is sent, the kernel takes the default action for it and doesn't set the bit.
-- **Kernel signals can't be handled.**
 - **The process's own bits have no default action.** They are always set and delivered.
 
-These follow the POSIX signals that Rose needs. `SIGTERM`, `SIGTSTP`, `SIGCHLD`, `SIGHUP` and `SIGWINCH` became `Terminate`, `Stop`, `Child_Exited`, `Hangup` and `Resized`. Others don't apply:
+A named signal is kept only where the sender mustn't wait, the notice mustn't be lost, or the kernel must act on a process that is busy or blocked. From POSIX, `SIGTERM` and `SIGTSTP` became `Terminate` and `Stop`, and `SIGKILL`, `SIGSTOP` and `SIGCONT` are operations on the process cap (section 3). The others need no named signal:
 - **Faults** (`SIGSEGV`, `SIGFPE` and the like) go to `mem` or put the process in the kernel's `Faulted` state.
 - **Timers** (`SIGALRM` and the like) are the process's own bits, set by the timer through a signal cap.
-- **`SIGPIPE`** is a `Closed` error from the call.
+- **`SIGPIPE` and `SIGHUP`** are a `Closed` error from the next call on the stream or console that has gone away. A process that never uses it again doesn't need to know.
+- **`SIGCHLD`.** The reply to the launch invocation (ADR 0002) tells the launcher that a command has ended. A shell that can't wait for the reply, for a background job, gives exec a signal cap for one of its own bits, and then asks which job ended. A signal couldn't say which, so it would have to ask anyway.
+- **`SIGWINCH`.** A program that needs the terminal's size gives the terminal a signal cap for one of its own bits, through the terminal's interface, and asks for the new size when it is signalled. Only the programs that care are told.
 - **`SIGTTIN` and `SIGTTOU`** exist because of a shared controlling terminal, which Rose doesn't have.
 
-### 3. Kernel signals: the process never knows
+### 3. Kill, suspend and resume are operations on the process cap
 
-`Kill`, `Suspend` and `Resume` are carried out by the kernel when they are sent. They never set a bit in the word, and the process can't see, handle or refuse them.
+Killing, suspending and resuming a process need no signal. The kernel carries them out when it is called, and calling the kernel never waits for the target process. They are endpoints on the process cap: `Kill_Process` exists now, and `Suspend` and `Resume` are new. Each is its own endpoint cap, so it can be given out and derived on its own (ADR 0001). The process can't see, handle or refuse them.
 
 - **A suspended process is not scheduled,** whatever state it is in. If it was blocked in a call and the reply arrives, it stays suspended until it is resumed, and then sees the reply as usual.
 - **Suspension is saved in checkpoints,** so a process suspended at a checkpoint is still suspended after a restore.
@@ -71,12 +66,12 @@ These follow the POSIX signals that Rose needs. `SIGTERM`, `SIGTSTP`, `SIGCHLD`,
 
 `Interrupt` must take effect at once, not when the process next happens to receive.
 
-- **By default, it ends the process.** When the process is next scheduled, the kernel ends it, as for `Kill`.
+- **By default, it ends the process.** When the process is next scheduled, the kernel ends it, as `Kill_Process` does.
 - **A process can handle it instead** (section 2). Then, when the process is next scheduled:
   - if it is blocked in an invocation, the invocation is cancelled and returns a new error, `Interrupted`;
   - otherwise, its next invocation returns `Interrupted` without being made.
 - **The run-time system raises an exception** for `Interrupted`, so in Ada it is handled like any other exception, and a generated command main (ADR 0002) turns it into `Fail`.
-- **A handling process that is computing** without invoking anything sees `Interrupted` only at its next invocation. The shell can still use `Kill` on a job that doesn't stop. Handlers that break into running code would close this gap, and are an open question.
+- **A handling process that is computing** without invoking anything sees `Interrupted` only at its next invocation. The shell can still kill a job that doesn't stop. Handlers that break into running code would close this gap, and are an open question.
 
 ### 5. Ordinary signals: delivered at the next receive
 
@@ -89,9 +84,9 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 
 ### 6. Signal caps
 
-- **A signal cap names a process and one bit.** It is a new cap type: the process's object id in the payload and the bit in the header, which fits the existing cap layout. Invoking it sets the bit, or for a kernel signal, carries it out. It never blocks and has no reply.
+- **A signal cap names a process and one bit.** It is a new cap type: the process's object id in the payload and the bit in the header, which fits the existing cap layout. Invoking it sets the bit, or, for a named signal that the process doesn't handle, takes the signal's default action. It never blocks and has no reply.
 - **A process makes caps for its own bits,** through a kernel operation on its own process. It gives them to whoever should signal it: the timer, or a driver signalling `net`.
-- **Caps for named signals come with the process cap.** Whoever holds a process's cap, usually the process that launched it, can make caps for its named signals, except `Restored`, which only the kernel sends. Exec gives petal those of each job it launches.
+- **Caps for named signals come with the process cap.** Whoever holds a process's cap, usually the process that launched it, can make caps for its named signals, except `Restored`, which only the kernel sends. Exec gives petal those of each job it launches, with the job's kill, suspend and resume caps.
 - **They can be derived and revoked** like any other cap (ADR 0001).
 
 ### 7. The timer and the restore notice use signals
@@ -113,13 +108,15 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 **Costs**
 - **Kernel work:** the signal word, a new cap type, cancelling a blocked invocation, and suspension in the scheduler.
 - **Signals carry no data.** A process that uses one bit for several things, such as many timers, must work out which one happened.
-- **16 bits for each process's own use.** A process with more sources than that must share bits between them.
+- **24 bits for each process's own use.** A process with more sources than that must share bits between them.
 - **Cancelling an invocation is new.** A server may already be working on the cancelled request, and its reply then has nowhere to go. The kernel must discard it safely.
 
 ## Alternatives considered
 
 - **A pending bit for each endpoint.** A signal would be a message to an endpoint, kept if the receiver is busy. This needs state for each endpoint, and the receiver can't see all pending signals at once.
 - **Counting signals.** A counter instead of a bit says how many times a signal was sent. It costs more space, and the senders that need a count can say so in a call.
+- **Kill, suspend and resume as signals.** They would never set a bit, since the kernel carries them out at once, so a signal gives nothing that an operation on the process cap doesn't.
+- **More named signals, following POSIX,** such as a child exiting, a hangup or a resized terminal. Each is better as a reply, an error, or one of the process's own bits (section 2).
 - **Suspension that the process can see.** A process told that it is being suspended could refuse or delay it. Suspension is the shell's decision, not the job's.
 
 ## Open questions
@@ -127,17 +124,16 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - **Handlers that break into running code.** The scheduler could check a process's urgent signals each time it schedules the process, and act there: save the process's state and start it at a handler, as Unix signals do. A process computing without invoking anything would then see `Interrupt` straight away. But servers run without tasking, so a handler that runs in the middle of other code needs a run-time system that copes with it, and the kernel needs a way to return to the interrupted code. For now, cancelling the current invocation (section 4) covers the common case.
 - **Hardware interrupts as signals.** An interrupt could set a bit instead of being sent as a message. That would remove the one-message slot that ADR 0004 works around, but a driver would lose the interrupt code that comes with the message.
 - **Masking.** Should a process be able to hold off its own signals for a while, for example while it updates state that a handler reads?
-- **Which caps petal gets.** Exec could give petal every named signal cap for a job, or only `Interrupt`, `Terminate` and `Kill`, with `Stop`, `Suspend` and `Resume` for job control later.
-- **Who sends `Hangup` and `Resized`.** They come from the terminal or console a process uses, which doesn't hold the process's cap. Petal could pass them on to its jobs, or give the terminal signal caps for them.
+- **Which caps petal gets.** Exec could give petal every named signal cap and process operation for a job, or only `Interrupt`, `Terminate` and kill, with `Stop`, suspend and resume for job control later.
 
 ## Follow-up work
 
 - Kernel: the signal word, signal caps, and delivery of ordinary signals at receive, saved in checkpoints (new issue).
-- Kernel: `Kill`, `Suspend` and `Resume` as signals, and suspension in the scheduler (new issue).
+- Kernel: `Suspend` and `Resume` operations on the process cap, and suspension in the scheduler (new issue).
 - Kernel: which named signals a process handles, and the default actions of the ones it doesn't (new issue).
 - Kernel and run-time system: `Interrupt`, the `Interrupted` error, cancelling a blocked invocation, and the exception (new issue).
 - `Rose.Server`: dispatch signal bits to handlers (new issue).
 - `Restored` as a signal, replacing the `Restore_Notice` flag (new issue).
 - Timer: accept only signal caps (new issue).
-- Exec: send `Child_Exited` to the launcher when a process it launched ends (new issue).
+- Exec: signal the launcher, through a signal cap it gives, when a process it launched ends, for background jobs (#142).
 - Remove `Kernel_Process.Notify` (new issue).
