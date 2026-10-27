@@ -157,8 +157,7 @@ package body Init.Run is
       Install_Receiver     : Rose.Capabilities.Capability;
       Install_Endpoint     : Rose.Capabilities.Capability;
 
-      Active_Swap_Cap   : Rose.Capabilities.Capability := 0;
-      Inactive_Swap_Cap : Rose.Capabilities.Capability := 0;
+      Swap_Cap          : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
 
       Add_Log_Device_Cap : Rose.Capabilities.Capability;
@@ -292,30 +291,23 @@ package body Init.Run is
          Start_Address       : Rose.Words.Word_64;
          Length              : Rose.Words.Word_64;
          Id                  : Rose.Objects.Object_Id;
-         Is_Active_Swap      : Boolean := False;
-         Is_Inactive_Swap    : Boolean := False;
+         Is_Swap             : Boolean := False;
          Is_Log              : Boolean := False;
          Block_Size          : Rose.Words.Word;
-         Active_Swap_Flag    : constant Word_64 :=
-                                 Rose.Devices.Partitions.Active_Swap_Flag;
       begin
          Rose.Interfaces.Partitions.Client.Get_Partition
            (Client, Index, Partition_Type_Low,
             Partition_Type_High, Partition_Flags,
             Start_Address, Length);
 
+         --  Only the first swap and log partitions are used.  Others,
+         --  such as GRUB's (#321), are left alone.
+
          if Is_Swap_Partition (Partition_Type_Low, Partition_Type_High) then
             Block_Size := 4096;
-            if (Partition_Flags and Active_Swap_Flag) /= 0 then
-               Is_Active_Swap := True;
-               if Active_Swap_Cap /= 0 then
-                  return;
-               end if;
-            else
-               Is_Inactive_Swap := True;
-               if Inactive_Swap_Cap /= 0 then
-                  return;
-               end if;
+            Is_Swap := True;
+            if Swap_Cap /= 0 then
+               return;
             end if;
          elsif Is_Log_Partition (Partition_Type_Low, Partition_Type_High) then
             Block_Size := 512;
@@ -351,10 +343,8 @@ package body Init.Run is
                                  Rose.Interfaces.Block_Device
                                  .Block_Device_Interface);
          begin
-            if Is_Active_Swap then
-               Active_Swap_Cap := Interface_Cap;
-            elsif Is_Inactive_Swap then
-               Inactive_Swap_Cap := Interface_Cap;
+            if Is_Swap then
+               Swap_Cap := Interface_Cap;
             elsif Is_Log then
                Log_Cap := Interface_Cap;
             end if;
@@ -817,8 +807,7 @@ package body Init.Run is
                            Create_Endpoint_Cap, Cap_Set_Cap,
                            (Delete_Cap,
                             Console_Interface_Cap,
-                            Active_Swap_Cap,
-                            Inactive_Swap_Cap,
+                            Swap_Cap,
                             Log_Cap,
                             Add_Storage_Cap,
                             Reserve_Storage_Cap,

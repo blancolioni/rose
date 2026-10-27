@@ -18,10 +18,12 @@ package body Rose.Allocators is
       Bound     : Positive)
    is
       Largest : constant Positive := 2 ** Natural (Order_Type'Last);
-      --  The size of a block of order 0.
+      --  The size of a block of order 0, which is all the blocks there
+      --  are: anything at or past Largest + 1 is not in the allocator.
+      Last    : constant Positive := Positive'Min (Bound, Largest + 1);
       Start   : Positive := Base;
    begin
-      while Start < Bound loop
+      while Start < Last loop
          declare
             Size : Positive := 1;
          begin
@@ -29,7 +31,7 @@ package body Rose.Allocators is
             --  the range.
             while Size < Largest
               and then (Start - 1) mod (Size * 2) = 0
-              and then Start + Size * 2 <= Bound
+              and then Start + Size * 2 <= Last
             loop
                Size := Size * 2;
             end loop;

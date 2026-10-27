@@ -7,8 +7,7 @@ package Restore is
 
    Delete_Endpoint_Cap : Rose.Capabilities.Capability;
    Console_Cap         : Rose.Capabilities.Capability;
-   Active_Swap_Cap     : Rose.Capabilities.Capability;
-   Inactive_Swap_Cap   : Rose.Capabilities.Capability;
+   Swap_Cap            : Rose.Capabilities.Capability;
    Log_Cap             : Rose.Capabilities.Capability;
    Add_Storage_Cap     : Rose.Capabilities.Capability;
    Reserve_Storage_Cap : Rose.Capabilities.Capability;

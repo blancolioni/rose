@@ -45,8 +45,7 @@ begin
 
    Next (Delete_Endpoint_Cap);
    Next (Console_Cap);
-   Next (Active_Swap_Cap);
-   Next (Inactive_Swap_Cap);
+   Next (Swap_Cap);
    Next (Log_Cap);
    Next (Add_Storage_Cap);
    Next (Reserve_Storage_Cap);
@@ -84,7 +83,7 @@ begin
 
    Rose.Interfaces.Block_Device.Client.Open
      (Client         => Device,
-      Interface_Cap  => Active_Swap_Cap);
+      Interface_Cap  => Swap_Cap);
 
    --  The storage server needs its backing store either way: a restore
    --  recreates regions on it, and an install reserves them.
@@ -95,7 +94,7 @@ begin
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
-      Rose.System_Calls.Send_Cap (Params, Active_Swap_Cap);
+      Rose.System_Calls.Send_Cap (Params, Swap_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end;
 

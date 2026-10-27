@@ -17,14 +17,17 @@ package body Store.Devices is
    Max_Backing_Stores : constant := 16;
    Max_Regions        : constant := 256;
    Bank_Size_Bits     : constant := 2;
-   Store_Size_Bits    : constant := 20;
+   Store_Size_Bits    : constant := 21;
    Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
    Minimum_Bank_Size  : constant := Minimum_Bank_Pages * Rose.Limits.Page_Size;
    Max_Open_Streams   : constant := 10;
 
-   --  Maximum_Store_Size : constant := 2 ** Store_Size_Bits;
+   Max_Store_Pages : constant := 2 ** (Store_Size_Bits - 1);
+   --  The pages that Allocator can hand out, on all the backing stores
+   --  together: 4 GiB.  Its tree of 2 ** (Store_Size_Bits - Bank_Size_Bits)
+   --  blocks has half that many banks as leaves.
 
-   Max_Fresh_Pages : constant := 2 ** Store_Size_Bits;
+   Max_Fresh_Pages : constant := Max_Store_Pages;
    --  Every page that Allocator can hand out, on any backing store.
 
    type Fresh_Page_Array is
@@ -228,6 +231,22 @@ package body Store.Devices is
          New_Store (Client,
                     Rose.Words.Word (Block_Count),
                     Base, Bound);
+
+         --  The store's page ids run to a power of two, but only the
+         --  banks that lie wholly on the device can be allocated: a page
+         --  beyond it would be read and written past the end of the
+         --  partition (#321).
+
+         Bound := Base + Object_Id (Block_Count);
+
+         if Bound - Page_Object_Id'First > Max_Store_Pages then
+            Rose.Console_IO.Put ("storage: only the first ");
+            Rose.Console_IO.Put
+              (Natural ((Max_Store_Pages - (Base - Page_Object_Id'First))
+               / 256));
+            Rose.Console_IO.Put_Line ("M of this backing store can be used");
+            Bound := Page_Object_Id'First + Max_Store_Pages;
+         end if;
 
          Space_Allocators.Add_Range
            (Allocator => Allocator,

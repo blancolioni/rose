@@ -11,7 +11,8 @@ package Rose.Allocators is
    --  Make the blocks Base .. Bound - 1 free, for example the space of a
    --  new backing store. The range need not be a power of two or
    --  aligned: it is freed as the largest aligned blocks that fit, so
-   --  nothing outside it can be allocated.
+   --  nothing outside it can be allocated.  The allocator holds
+   --  2 ** (Log_2_Capacity - 1) blocks: anything past them is ignored.
 
    function Allocate
      (Allocator : in out Store;

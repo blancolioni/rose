@@ -44,6 +44,7 @@ package body Test_Allocation is
 
    procedure Test_Merge;
    procedure Test_One_MiB_Blocks;
+   procedure Test_Past_Capacity;
    procedure Test_Random_Use;
    procedure Test_Smoke;
    procedure Test_Store_Partition;
@@ -110,6 +111,7 @@ package body Test_Allocation is
       Test_Store_Partition;
       Test_One_MiB_Blocks;
       Test_Unaligned_Range;
+      Test_Past_Capacity;
       Test_Merge;
       Test_Random_Use;
 
@@ -157,6 +159,25 @@ package body Test_Allocation is
       Fill (Allocator, 64, 1, 1793, Count, Inside);
       Check ("1 MiB blocks: 28 in 28 MB", Count = 28 and then Inside);
    end Test_One_MiB_Blocks;
+
+   ------------------------
+   -- Test_Past_Capacity --
+   ------------------------
+
+   --  A range that runs past the allocator's capacity, as a 3 GB swap
+   --  partition did with the store's allocator (#321): only the blocks
+   --  the allocator holds are freed, and the others are left alone.
+
+   procedure Test_Past_Capacity is
+      Allocator : Small_Allocators.Store;
+      Count     : Natural;
+      Inside    : Boolean;
+   begin
+      Small_Allocators.Add_Range (Allocator, 1, Capacity + 1000);
+      Fill (Allocator, 1, 1, Capacity + 1, Count, Inside);
+      Check ("past capacity: all 2048 blocks, all inside",
+             Count = Capacity and then Inside);
+   end Test_Past_Capacity;
 
    ---------------------
    -- Test_Random_Use --
