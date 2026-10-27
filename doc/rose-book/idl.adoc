@@ -329,8 +329,8 @@ The ATA server follows the same pattern for its drives, using the drive index as
 
 The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
 An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
-`idle --target user` generates interfaces (idle#40).
-It does not yet support commands, interface arguments and results, string results, or `out` and `in out` strings, and reports them as errors.
+`idle --target user` generates interfaces (idle#40), and commands whose arguments are not interfaces (idle#43).
+It does not yet support interface arguments and results, string results, `out` and `in out` strings, role members other than the standard streams and system capabilities, or server commands, and reports them as errors.
 The rest of phase 1 is idle#39.
 
 ==== Which programs use it
@@ -471,6 +471,9 @@ For a command (see <<commands>>), the user-mode target generates the same three 
 * *A server command* attaches an `aliased` object, and sets each `out` interface parameter to the capability for one of the interfaces it attached the object to, from `X.Server.Interface_Cap`.
   The main replies with those capabilities, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
 * *The metadata* is the same for both targets.
+
+A command with no capability arguments, no `out` or `in out` strings and no server, whose role members are the standard streams or system capabilities, names no generated interface package, so its three units are the same for both targets.
+These are the commands the user-mode target supports today (idle#43); `echo` is built this way (#371).
 
 For `Rose.Core.Copy`, the spec is:
 
