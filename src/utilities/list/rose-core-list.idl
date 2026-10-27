@@ -1,0 +1,10 @@
+command Rose.Core.List : Standard_Output
+  with Summary     => "Write the name of each entry in a directory.",
+       Description => """
+          List writes the name of each entry in the directory to
+          standard output, one to a line, in the directory's order.
+          """
+is
+   Directory : in Directory
+     with Help => "the directory to list";
+end Rose.Core.List;
