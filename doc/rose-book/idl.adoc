@@ -329,8 +329,7 @@ The ATA server follows the same pattern for its drives, using the drive index as
 
 The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
 An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
-`idle --target user` generates interfaces (idle#40), commands (idle#43), and interface arguments and results (idle#44).
-It does not yet support string results, or `out` and `in out` strings (idle#45), and reports them as errors.
+`idle --target user` generates interfaces (idle#40), commands (idle#43), interface arguments and results (idle#44), and string results and `out` strings (idle#45): everything that the kernel target generates.
 The rest of phase 1 is idle#39.
 
 ==== Which programs use it
@@ -467,11 +466,11 @@ Where the user-mode target differs from the kernel target:
 
 | `String` result
 | `Result : out String; Last : out Natural`
-| `String`
+| `String`, on the secondary stack
 
-| `out String`
+| `out String`, `in out String`
 | `out String` with `Last`
-| `out Rose.Strings.Text`, a bounded type written for Rose, since the run-time system has no `Ada.Strings.Bounded`
+| `Rose.Texts.Text` of the same mode, a bounded type written for Rose, since the run-time system has no `Ada.Strings.Bounded`
 
 | `out interface X`
 | an `out` capability
@@ -480,6 +479,10 @@ Where the user-mode target differs from the kernel target:
 
 A limited class-wide result compiles and links with the userland run-time system's restrictions (`No_Allocators`, `No_Finalization`): it is returned on the secondary stack.
 A program that calls a function with an interface result, or serves an interface that has one, cannot have the restriction `No_Secondary_Stack`.
+
+A text holds up to `Rose.Texts.Max_Length` (1024) characters.
+A server's handler copies a string result, and an `out` or `in out` text, to the invocation buffer with `Rose.Texts.Copy`, as much of it as fits, and sends its length as the kernel target does.
+`Rose.Texts` is a package of its own, and not part of `Rose.Strings`, because `To_String` needs the secondary stack, and some programs that use `Rose.Strings` do not have one.
 
 A server's handler gives the object an `X_Client` for each interface argument, opened from the capability it received, and leaves it open: the object can keep its capabilities with `Get_Interface_Cap`.
 For an interface result, and for an `out` interface, the handler replies with the object's capability for the interface, from its cap function.
@@ -490,7 +493,7 @@ For a command (see <<commands>>), the user-mode target generates the same three 
 
 * *The procedure spec.*
   A capability argument is `in out X_Object'Class`, whatever its IDL mode, since the mode is carried by the capability's rights and interface type.
-  An `out` or `in out` string is a `Rose.Command_Line.Text`, not a `String` and its `Last`.
+  An `out` or `in out` string is a `Rose.Command_Line.Text`, a subtype of `Rose.Texts.Text`, not a `String` and its `Last`.
 * *The main.*
   It makes the same `Rose.Command_Line.Launch` calls, with the same argument indices, as the kernel target.
   Each capability argument becomes an `X_Client` local, opened from `Cap_Argument`.
@@ -500,7 +503,7 @@ For a command (see <<commands>>), the user-mode target generates the same three 
 * *The metadata* is the same for both targets.
 
 The main and the metadata are the same for both targets, and so is the spec of a command without capability arguments, such as `echo`, which is built with the user-mode target (#371).
-The user-mode target supports every command but one with `out` or `in out` strings (idle#43, idle#44).
+The user-mode target generates every command (idle#43, idle#44, idle#45).
 
 For `Rose.Core.Copy`, the spec is:
 
