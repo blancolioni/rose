@@ -329,8 +329,8 @@ The ATA server follows the same pattern for its drives, using the drive index as
 
 The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
 An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
-`idle --target user` generates interfaces (idle#40), and commands whose arguments are not interfaces (idle#43).
-It does not yet support interface arguments and results, string results, `out` and `in out` strings, role members other than the standard streams and system capabilities, or server commands, and reports them as errors.
+`idle --target user` generates interfaces (idle#40), commands (idle#43), and interface arguments and results (idle#44).
+It does not yet support string results, or `out` and `in out` strings (idle#45), and reports them as errors.
 The rest of phase 1 is idle#39.
 
 ==== Which programs use it
@@ -372,18 +372,23 @@ For an interface `X`, the user-mode target writes the same three packages as the
 | Package | Contents
 
 | `Rose.Interfaces.X`
-| The endpoint ids, constants and types, as in the kernel target, and `type X_Object is limited interface`, with one abstract primitive for each subprogram.
-IDL parents become interface parents, so `File_Object` is also a `Stream_Reader_Object` and a `Seekable_Object`.
-An IDL procedure becomes a primitive on `Item : in out X_Object`, and an IDL function a primitive on `Item : X_Object`.
+| The endpoint ids, constants and types, as in the kernel target, and `type X_Object is limited interface`, with one abstract primitive for each subprogram, and the abstract function `X_Cap`, which returns the object's capability for `X`.
+IDL parents become interface parents, so `File_Object` is also a `Stream_Reader_Object` and a `Seekable_Object`, and has their `Stream_Reader_Cap` and `Seekable_Cap`.
+Every primitive takes `Item : in out X_Object`, functions too, so that a client can get its capabilities on its first call.
+The package names other interfaces, and its own client, through `limited with` clauses, so interface packages can name each other.
 
 | `Rose.Interfaces.X.Client`
 | `X_Client`, which implements `X_Object` by invoking a capability.
-`Open` and `Close` are as in the kernel target, and a call that fails raises `Invocation_Error`.
+`Open` records the interface capability, and the client gets the capabilities of the subprograms on its first call.
+`From_Cap` returns a client opened from a capability, which an interface result is built from.
+`X_Cap` is the interface capability; for each ancestor `A`, `A_Cap` asks the server for the ancestor's interface capability the first time, as the kernel target's conversions do, and keeps it.
+`Close` is as in the kernel target, and a call that fails raises `Invocation_Error`.
 
 | `Rose.Interfaces.X.Server`
 | `type X_Interface is limited interface and X_Object`, for implementations in the program itself.
 `Attach (Context, Object)` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
 `Publish` attaches the object and publishes its interface capability as the server's public interface.
+`Cap_Of` gives an attached object's capability, for its cap functions.
 The generated handlers look the object up and make a dispatching call to its primitive.
 |===
 
@@ -399,9 +404,19 @@ An interface type has no components, so each server package records the identifi
 An object attached to two interfaces has two identifiers and two interface capabilities, one for each.
 `X_Client` has its capability already, and `Get_Interface_Cap` returns it, as in the kernel target.
 
+When an object is passed to another process as an `X_Object'Class` argument, the generated code sends `Object.X_Cap`, so every type that implements `X_Object` says how it is reached.
+A client answers with its own capability.
+A type that the program serves implements each cap function in one line, with `Cap_Of` from the server package of the interface it is attached to.
+`X.Server.Cap_Of (Object)` returns the object's interface capability for `X`, and `Cap_Of (Object, A_Interface)` its interface capability for an ancestor `A` of `X`, which the server creates the first time it is asked for, as it does when a client asks for it.
+`Cap_Of` finds the object by its address, and raises `Not_Served` if it is not attached.
+A subprogram cannot have the name of a cap function of its interface, which idle reports.
+
+Opening a client is not an invocation.
+A server that receives one of its caller's objects as an argument gets a client of it, and could not invoke it before it replies, since the caller is waiting for the reply.
+
 `X.Server.X_Interface` has the same name as the endpoint id constant `X_Interface` in `Rose.Interfaces.X`, which it hides in the server package.
 The generated server body therefore names the endpoint ids by their package; a program does not need to.
-`Rose.Interfaces.Objects` declares `Invocation_Error`, and `Not_Served`, which is raised when an object that has no capability for an interface, because it was never attached to it, is passed to another process as that interface.
+`Rose.Interfaces.Objects` declares `Invocation_Error`, and `Not_Served`, which `Cap_Of` raises for an object that has no capability for an interface, because it was never attached to it.
 
 An object is declared `aliased` by the program, often at library level, so serving one allocates nothing.
 `Attach`, `Publish` and `Interface_Cap` take a `not null access X_Interface'Class`, so an object that would not outlive the server's table is rejected by an accessibility check.
@@ -418,6 +433,11 @@ end record;
 
 overriding procedure Write (Item : in out Console; Buffer : Storage_Array);
 overriding procedure Restored (Item : in out Console);
+
+overriding function Stream_Writer_Cap (Item : in out Console) return Capability
+is (Rose.Interfaces.Stream_Writer.Server.Cap_Of (Item));
+overriding function Restorable_Cap (Item : in out Console) return Capability
+is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
 
 Screen : aliased Console;
 ...
@@ -437,6 +457,10 @@ Where the user-mode target differs from the kernel target:
 | `X_Client`
 | `in out X_Object'Class`
 
+| `in out interface X`
+| an `in out` capability
+| `in out X_Object'Class`: the object is the caller's, and the capability the server sends back is not used
+
 | `interface X` result
 | `X_Client`
 | `X_Object'Class`, built in place as an `X_Client`
@@ -454,8 +478,11 @@ Where the user-mode target differs from the kernel target:
 | `in out X_Client`, opened by the subprogram
 |===
 
-Whether a limited class-wide result compiles with the userland run-time system's restrictions (`No_Allocators`, `No_Finalization`) is still to be checked.
-If it does not, an interface result becomes an `in out X_Client` parameter instead, until allocators and finalization are available (#358, #359).
+A limited class-wide result compiles and links with the userland run-time system's restrictions (`No_Allocators`, `No_Finalization`): it is returned on the secondary stack.
+A program that calls a function with an interface result, or serves an interface that has one, cannot have the restriction `No_Secondary_Stack`.
+
+A server's handler gives the object an `X_Client` for each interface argument, opened from the capability it received, and leaves it open: the object can keep its capabilities with `Get_Interface_Cap`.
+For an interface result, and for an `out` interface, the handler replies with the object's capability for the interface, from its cap function.
 
 ==== Commands
 
@@ -472,8 +499,8 @@ For a command (see <<commands>>), the user-mode target generates the same three 
   The main replies with those capabilities, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
 * *The metadata* is the same for both targets.
 
-A command with no capability arguments, no `out` or `in out` strings and no server, whose role members are the standard streams or system capabilities, names no generated interface package, so its three units are the same for both targets.
-These are the commands the user-mode target supports today (idle#43); `echo` is built this way (#371).
+The main and the metadata are the same for both targets, and so is the spec of a command without capability arguments, such as `echo`, which is built with the user-mode target (#371).
+The user-mode target supports every command but one with `out` or `in out` strings (idle#43, idle#44).
 
 For `Rose.Core.Copy`, the spec is:
 
