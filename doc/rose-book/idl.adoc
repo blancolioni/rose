@@ -377,28 +377,38 @@ An IDL procedure becomes a primitive on `Item : in out X_Object`, and an IDL fun
 `Open` and `Close` are as in the kernel target, and a call that fails raises `Invocation_Error`.
 
 | `Rose.Interfaces.X.Server`
-| `X_Service`, an abstract base for implementations in the program itself.
-`Attach` registers the object with a `Rose.Server` context as an instanced interface (see <<kernel-target>>) and records it under its identifier.
+| `type X_Interface is limited interface and X_Object`, for implementations in the program itself.
+`Attach` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
 The generated handlers look the object up and make a dispatching call to its primitive.
 |===
 
-Every object type derives from `Rose.Interfaces.Objects.Capability_Object`, whose `Interface_Cap` returns the capability that reaches the object.
-That package also declares `Invocation_Error`, and `Not_Served`, which is raised when an object that has no capability, because it was never attached, is passed to another process.
+Server packages declare only interfaces, so one type can implement several, and one object can serve each of them.
+`X_Interface` adds nothing to `X_Object`, but it extends it, so an object that a program serves is also an `X_Object` within that program, and can be passed wherever an `X_Object'Class` is expected.
 
-Service objects are declared `aliased` by the program, often at library level, so serving one allocates nothing:
+An interface type has no components, so each server package records the identifier and capabilities of the objects attached to it, and `X.Server.Interface_Cap (Object)` returns the capability that reaches an object through interface `X`.
+An object attached to two interfaces has two identifiers and two interface capabilities, one for each.
+`X_Client` has its capability already, and `Interface_Cap` returns it.
+`Rose.Interfaces.Objects` declares `Invocation_Error`, and `Not_Served`, which is raised when an object that has no capability for an interface, because it was never attached to it, is passed to another process as that interface.
+
+An object is declared `aliased` by the program, often at library level, so serving one allocates nothing.
+For example, `vga-console` serves the console's screen both as a stream to write to and as something told when it has been restored:
 
 [source,ada]
 ----
-type Memory_File is new Rose.Interfaces.File.Server.File_Service with record
+type Console is limited new
+  Rose.Interfaces.Stream_Writer.Server.Stream_Writer_Interface
+  and Rose.Interfaces.Restorable.Server.Restorable_Interface
+with record
    ...
 end record;
 
-overriding function Size (Item : Memory_File) return Storage_Count;
-...
+overriding procedure Write (Item : in out Console; Buffer : Storage_Array);
+overriding procedure Restored (Item : in out Console);
 
-File : aliased Memory_File;
+Screen : aliased Console;
 ...
-Rose.Interfaces.File.Server.Attach (Context, File);
+Rose.Interfaces.Stream_Writer.Server.Attach (Context, Screen);
+Rose.Interfaces.Restorable.Server.Attach (Context, Screen);
 ----
 
 ==== Types
@@ -444,8 +454,8 @@ For a command (see <<commands>>), the user-mode target generates the same three 
   It makes the same `Rose.Command_Line.Launch` calls, with the same argument indices, as the kernel target.
   Each capability argument becomes an `X_Client` local, opened from `Cap_Argument`.
   Once exceptions propagate (#170), the main also gets the handler from ADR 0002, `when E : others => Fail (Call, E)`, and until then an unhandled exception goes to the last-chance handler, which should reply `Fail` to the shell (#171).
-* *A server command* attaches an `aliased` service object and returns it through `Result : out Rose.Interfaces.Objects.Capability_Object_Access`.
-  The main replies with the object's capability, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
+* *A server command* attaches an `aliased` object, and sets each `out` interface parameter to the capability for one of the interfaces it attached the object to, from `X.Server.Interface_Cap`.
+  The main replies with those capabilities, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
 * *The metadata* is the same for both targets.
 
 For `Rose.Core.Copy`, the spec is:
