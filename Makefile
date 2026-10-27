@@ -57,6 +57,18 @@ hdd:
 iso:
 	sh ./scripts/rose-iso-install
 
+# Copy the ISO to the rose-os.org web root.  This doesn't build anything,
+# so run "make" first.  The copy goes to a temporary name and is renamed
+# into place, so a download never gets a half-written ISO.
+ISO_PUBLISH_DIR ?= /var/www/rose-os.org/html
+
+publish-iso:
+	test -f images/rose.iso
+	cp images/rose.iso $(ISO_PUBLISH_DIR)/.rose.iso.new
+	mv -f $(ISO_PUBLISH_DIR)/.rose.iso.new $(ISO_PUBLISH_DIR)/rose.iso
+
+.PHONY: publish-iso
+
 floppy:
 	sh ./scripts/rose-floppy-install
 
