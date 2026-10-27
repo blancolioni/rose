@@ -75,7 +75,14 @@ package body Rose.Kernel.Heap is
          Rose.Boot.Console.New_Line;
       end if;
 
-      if Heap_End >= Heap_Bound then
+      if Heap_End > Heap_Bound then
+         Rose.Boot.Console.Enable_Display;
+         Rose.Boot.Console.Put ("kernel heap: ");
+         Rose.Boot.Console.Put (Natural (Count));
+         Rose.Boot.Console.Put (" bytes requested, ");
+         Rose.Boot.Console.Put (Natural (Heap_Bound - Original_Start));
+         Rose.Boot.Console.Put (" left");
+         Rose.Boot.Console.New_Line;
          Kernel.Panic.Panic ("Kernel heap exhausted ", Heap_Bound);
       end if;
 
