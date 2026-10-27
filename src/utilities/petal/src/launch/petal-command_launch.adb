@@ -73,9 +73,19 @@ package body Petal.Command_Launch is
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
        and then Value (Item, Argument.Interface_Name) = "Directory");
-   --  True if Argument is an in Directory: the only interface argument
-   --  that petal can bind so far. It names a directory in petal's table,
-   --  and is bound to home if it is not given (ADR 0003, section 6).
+   --  True if Argument is an in Directory. It names a directory in
+   --  petal's table, and is bound to home if it is not given (ADR 0003,
+   --  section 6).
+
+   function Is_In_File
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Value (Item, Argument.Interface_Name) = "File");
+   --  True if Argument is an in File, which names a file in the current
+   --  directory (#344). It must be given, unless it has a default.
 
    procedure Launch
      (Command_Name : String;
@@ -266,10 +276,7 @@ package body Petal.Command_Launch is
                   List_Words (List_Count) := Where;
                end if;
             when Interface_Type =>
-               if not Is_In_Directory (Item, Argument) then
-                  Fail ("cannot bind " & Argument_Name (Index)
-                        & ": only in Directory arguments are supported");
-               else
+               if Is_In_Directory (Item, Argument) then
                   declare
                      Found : Boolean;
                   begin
@@ -278,6 +285,27 @@ package body Petal.Command_Launch is
                         Fail ("no directory named '" & Text & "'");
                      end if;
                   end;
+               elsif Is_In_File (Item, Argument) then
+                  declare
+                     use all type Petal.Session.File_Lookup;
+                     Result : Petal.Session.File_Lookup;
+                  begin
+                     Petal.Session.Find_File (Text, Value.Cap, Result);
+                     case Result is
+                        when File_Found =>
+                           null;
+                        when No_Such_File =>
+                           Fail ("no file named '" & Text & "'");
+                        when Not_A_File =>
+                           Fail ("'" & Text & "' is not a file");
+                        when No_Directory =>
+                           Fail ("no directory to find '" & Text & "' in");
+                     end case;
+                  end;
+               else
+                  Fail ("cannot bind " & Argument_Name (Index)
+                        & ": only in Directory and in File arguments are "
+                        & "supported");
                end if;
          end case;
       end Set_Value;
@@ -812,6 +840,7 @@ package body Petal.Command_Launch is
             Put_Version (Current);
          else
             Launch (Name, Current, Client, Line, Words, Count);
+            Petal.Session.Release_Files;
          end if;
 
          Rose.Interfaces.Launch.Client.Close (Client);

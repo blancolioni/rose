@@ -48,6 +48,11 @@ package body Petal.Session is
    Session_User : Rose.Interfaces.User.Client.User_Client;
    Have_User    : Boolean := False;
 
+   Max_Found_Files : constant := 16;
+   Found_Files     : Rose.Capabilities.Capability_Array (1 .. Max_Found_Files);
+   Found_Count     : Natural := 0;
+   --  The caps that Find_File has returned, for Release_Files.
+
    -------------------
    -- Add_Directory --
    -------------------
@@ -94,6 +99,63 @@ package body Petal.Session is
       Found := False;
    end Find_Directory;
 
+   ---------------
+   -- Find_File --
+   ---------------
+
+   procedure Find_File
+     (Name   : String;
+      File   : out Rose.Capabilities.Capability;
+      Result : out File_Lookup)
+   is
+      use type Rose.Interfaces.Directory.File_Kind;
+      Home      : Writable_Directory_Client;
+      Have_Home : Boolean;
+      Index     : Natural;
+      Params    : aliased Rose.Invocation.Invocation_Record;
+   begin
+      File := Rose.Capabilities.Null_Capability;
+
+      Find_Directory (Home_Name, Home, Have_Home);
+      if not Have_Home then
+         Result := No_Directory;
+         return;
+      end if;
+
+      Index := Find_Entry (Home, Name);
+      if Index = 0 then
+         Result := No_Such_File;
+         return;
+      elsif Directory_Entry_Kind (Home, Index)
+        /= Rose.Interfaces.Directory.Ordinary_File
+      then
+         Result := Not_A_File;
+         return;
+      end if;
+
+      --  Only the file's interface cap: Get_Ordinary_File would also open
+      --  a client of it, with a cap for each of its subprograms, which
+      --  petal does not need.
+
+      Rose.System_Calls.Initialize_Send
+        (Params, Get_Get_Ordinary_File_Cap (Home));
+      Rose.System_Calls.Send_Word (Params, Index);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         Result := No_Such_File;
+         return;
+      end if;
+
+      File := Params.Caps (0);
+      if Found_Count < Max_Found_Files then
+         Found_Count := Found_Count + 1;
+         Found_Files (Found_Count) := File;
+      end if;
+      Result := File_Found;
+   end Find_File;
+
    ----------------
    -- Find_Grant --
    ----------------
@@ -133,6 +195,22 @@ package body Petal.Session is
       User := Session_User;
       Found := Have_User;
    end Get_User;
+
+   -------------------
+   -- Release_Files --
+   -------------------
+
+   procedure Release_Files is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      for Cap of Found_Files (1 .. Found_Count) loop
+         Rose.System_Calls.Initialize_Send
+           (Params, Rose.System_Calls.Delete_Cap_Capability);
+         Rose.System_Calls.Send_Cap (Params, Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end loop;
+      Found_Count := 0;
+   end Release_Files;
 
    ----------------------
    -- Run_Startup_File --
