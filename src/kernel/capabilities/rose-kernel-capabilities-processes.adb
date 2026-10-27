@@ -6,6 +6,8 @@ with Rose.Kernel.Capabilities.Meta;
 
 package body Rose.Kernel.Capabilities.Processes is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    ------------
    -- Handle --
    ------------
@@ -20,6 +22,12 @@ package body Rose.Kernel.Capabilities.Processes is
       Current_Pid : constant Rose.Kernel.Processes.Process_Id :=
                       Rose.Kernel.Processes.Current_Process_Id;
    begin
+      if Pid = Rose.Kernel.Processes.Null_Process_Id then
+         Rose.Kernel.Processes.Return_Error
+           (Params, Rose.Invocation.Invalid_Object);
+         return;
+      end if;
+
       case Cap.Header.Endpoint is
          when Process_Interface_Endpoint =>
             declare

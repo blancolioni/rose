@@ -6,6 +6,8 @@ with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Interrupts is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    type Interrupt_Argument_Spec is
      (No_Argument_Handler,
       Word_Argument_Handler,
@@ -169,6 +171,10 @@ package body Rose.Kernel.Interrupts is
                     others         => <>);
       Layout : Rose.Capabilities.Layout.Capability_Layout;
    begin
+      if Pid = Rose.Kernel.Processes.Null_Process_Id then
+         return;
+      end if;
+
       Rose.Kernel.Processes.Get_Cap (Pid, Cap, Layout);
 
       Params.Data (0) := Argument;

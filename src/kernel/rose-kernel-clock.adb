@@ -8,6 +8,8 @@ with Rose.Capabilities.Layout;
 
 package body Rose.Kernel.Clock is
 
+   use type Rose.Kernel.Processes.Process_Id;
+
    use Rose.Words;
 
    Ticks : Word := 0;
@@ -86,15 +88,20 @@ package body Rose.Kernel.Clock is
                Layout : Rose.Capabilities.Layout.Capability_Layout;
             begin
 
-               Rose.Kernel.Processes.Get_Cap (Pid, Timeout_Cap, Layout);
+               --  The timeout is dropped if its process has gone.
 
-               Rose.Kernel.Processes.Send_To_Endpoint
-                 (From_Process_Id => Rose.Kernel.Processes.To_Process_Id (1),
-                  To_Process_Id   => Pid,
-                  Sender_Cap      => Params.Cap,
-                  Endpoint        => Layout.Header.Endpoint,
-                  Identifier      => Layout.Header.Identifier,
-                  Params          => Params);
+               if Pid /= Rose.Kernel.Processes.Null_Process_Id then
+                  Rose.Kernel.Processes.Get_Cap (Pid, Timeout_Cap, Layout);
+
+                  Rose.Kernel.Processes.Send_To_Endpoint
+                    (From_Process_Id =>
+                       Rose.Kernel.Processes.To_Process_Id (1),
+                     To_Process_Id   => Pid,
+                     Sender_Cap      => Params.Cap,
+                     Endpoint        => Layout.Header.Endpoint,
+                     Identifier      => Layout.Header.Identifier,
+                     Params          => Params);
+               end if;
             end;
          end if;
       end if;

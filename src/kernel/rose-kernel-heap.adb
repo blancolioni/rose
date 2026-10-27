@@ -41,6 +41,10 @@ package body Rose.Kernel.Heap is
      with Pack, Size => 4096 * 8;
 
    Heap_Regions        : Heap_Region_Array;
+
+   Free_Pages : Virtual_Page_Address := 0;
+   --  The first of the pages given back by Free_Page, or zero. Each free
+   --  page holds the next in its first word.
    Next_Region         : Heap_Region_Index := 0;
    Initial_Physical_Bound : Physical_Page_Address;
    Initial_Virtual_Bound  : Virtual_Page_Address;
@@ -94,6 +98,25 @@ package body Rose.Kernel.Heap is
 
    function Allocate_Page return Virtual_Page_Address is
    begin
+      if Free_Pages /= 0 then
+         declare
+            use System.Storage_Elements;
+            Page : constant Virtual_Page_Address := Free_Pages;
+            Next : Virtual_Page_Address;
+            for Next'Address use
+              System'To_Address (Virtual_Page_To_Address (Page));
+            pragma Import (Ada, Next);
+            Block : Storage_Array (1 .. Storage_Offset (Virtual_Page_Bytes));
+            for Block'Address use
+              System'To_Address (Virtual_Page_To_Address (Page));
+            pragma Import (Ada, Block);
+         begin
+            Free_Pages := Next;
+            Block := (others => 0);
+            return Page;
+         end;
+      end if;
+
       Heap_End := Align_Up_To_Unit (Heap_End, Virtual_Page_Bytes);
       return Virtual_Address_To_Page (Allocate (Virtual_Page_Bytes));
    end Allocate_Page;
@@ -119,6 +142,20 @@ package body Rose.Kernel.Heap is
    begin
       null;    --  UMMMMMAAAAAAAAAAAAA
    end Free;
+
+   ---------------
+   -- Free_Page --
+   ---------------
+
+   procedure Free_Page (Page : Virtual_Page_Address) is
+      Next : Virtual_Page_Address;
+      for Next'Address use
+        System'To_Address (Virtual_Page_To_Address (Page));
+      pragma Import (Ada, Next);
+   begin
+      Next := Free_Pages;
+      Free_Pages := Page;
+   end Free_Page;
 
    --------------------------
    -- Get_Physical_Address --

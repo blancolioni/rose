@@ -286,7 +286,7 @@ package body Rose.Kernel.Processes.Init is
             Rose.Kernel.Panic.Panic ("boot module: not an ELF image");
          end if;
 
-         Proc.Oid := Rose.Objects.Object_Id (Pid);
+         Assign_Object_Id (Pid);
          Proc.Flags (Boot_Module) := True;
 
          declare

@@ -24,6 +24,10 @@ package Rose.Kernel.Heap is
 
    procedure Free (Addr : Rose.Addresses.Virtual_Address);
 
+   procedure Free_Page (Page : Rose.Addresses.Virtual_Page_Address);
+   --  Give back Page, which Allocate_Page returned. Allocate_Page uses
+   --  freed pages before it takes new ones from the heap.
+
    function Get_Physical_Page
      (Virtual_Page : Virtual_Page_Address)
       return Physical_Page_Address;

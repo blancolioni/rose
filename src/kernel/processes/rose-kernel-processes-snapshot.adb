@@ -101,7 +101,7 @@ package body Rose.Kernel.Processes.Snapshot is
          return;
       end if;
 
-      Pid := To_Process_Id (Rose.Objects.Object_Id (Item.Oid));
+      Pid := Object_Slot (Rose.Objects.Object_Id (Item.Oid));
 
       if Pid not in Process_Table'Range
         or else Process_Table (Pid).State /= Available
@@ -120,6 +120,7 @@ package body Rose.Kernel.Processes.Snapshot is
             end if;
          end loop;
          Create_Process_Table_Entry (Pid, Item.Name (1 .. Last));
+         Process_Table (Pid).Oid := Rose.Objects.Object_Id (Item.Oid);
       end;
 
       declare
