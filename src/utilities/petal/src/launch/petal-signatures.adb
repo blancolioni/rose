@@ -120,7 +120,18 @@ package body Petal.Signatures is
                         elsif Item = "Natural" then Natural_Type
                         elsif Item = "Positive" then Positive_Type
                         elsif Item = "String_List" then String_List_Type
+                        elsif Starts (Item, "interface ")
+                        then Interface_Type
                         else String_Type);
+                     if Argument.Of_Type = Interface_Type then
+                        Argument.Interface_Name :=
+                          (Field.First + 10, Field.Last);
+                     end if;
+                  elsif Key = "mode" then
+                     Argument.Mode :=
+                       (if Item = "out" then Out_Mode
+                        elsif Item = "in out" then In_Out_Mode
+                        else In_Mode);
                   elsif Key = "place" then
                      if Starts (Item, "word ") then
                         Argument.Place := Word_Place;
@@ -128,6 +139,9 @@ package body Petal.Signatures is
                      elsif Starts (Item, "item ") then
                         Argument.Place := Item_Place;
                         Argument.Index := After (Item, "item ");
+                     elsif Starts (Item, "cap ") then
+                        Argument.Place := Cap_Place;
+                        Argument.Index := After (Item, "cap ");
                      elsif Starts (Item, "list ") then
                         --  list I word W
                         Argument.Place := List_Place;

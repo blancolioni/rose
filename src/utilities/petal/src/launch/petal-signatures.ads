@@ -17,17 +17,24 @@ package Petal.Signatures is
 
    type Argument_Type is
      (Boolean_Type, Natural_Type, Positive_Type, String_Type,
-      String_List_Type);
+      String_List_Type, Interface_Type);
+   --  An Interface_Type argument is a cap of the interface Interface_Name
+   --  (ADR 0002, section 1).
 
-   type Place_Kind is (Word_Place, Item_Place, List_Place);
+   type Argument_Mode is (In_Mode, Out_Mode, In_Out_Mode);
+   --  For an interface, the right that the shell grants to the cap.
+
+   type Place_Kind is (Word_Place, Item_Place, List_Place, Cap_Place);
    --  Where an argument goes in the launch invocation: a data word, a
-   --  buffer item, or buffer items from Index, with their number in data
-   --  word Count_Word (see Rose.Command_Line.Launch).
+   --  buffer item, buffer items from Index with their number in data
+   --  word Count_Word, or a cap (see Rose.Command_Line.Launch).
 
    type Argument_Record is
       record
          Name            : Slice;
          Of_Type         : Argument_Type := String_Type;
+         Interface_Name  : Slice;
+         Mode            : Argument_Mode := In_Mode;
          Place           : Place_Kind := Word_Place;
          Index           : Natural := 0;
          Count_Word      : Natural := 0;

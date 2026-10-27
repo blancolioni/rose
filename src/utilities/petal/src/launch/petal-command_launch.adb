@@ -11,6 +11,7 @@ with Rose.System_Calls.Client;
 with Rose.Trace;
 with Rose.Words;
 
+with Petal.Session;
 with Petal.Signatures;
 
 package body Petal.Command_Launch is
@@ -48,9 +49,12 @@ package body Petal.Command_Launch is
          Word      : Rose.Words.Word := 0;
          From_Line : Boolean := True;
          Text      : Slice;
+         Cap       : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
       end record;
-   --  The value bound to an argument: a data word, or the text of a
-   --  String, in the command line or in the signature's default.
+   --  The value bound to an argument: a data word, the text of a String
+   --  in the command line or in the signature's default, or the cap of
+   --  an interface.
 
    type Bound_Value_Array is array (1 .. Max_Arguments) of Bound_Value;
 
@@ -61,6 +65,17 @@ package body Petal.Command_Launch is
 
    procedure Error (Message : String);
    --  Report Message on standard error.
+
+   function Is_In_Directory
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Value (Item, Argument.Interface_Name) = "Directory");
+   --  True if Argument is an in Directory: the only interface argument
+   --  that petal can bind so far. It names a directory in petal's table,
+   --  and is bound to home if it is not given (ADR 0003, section 6).
 
    procedure Launch
      (Command_Name : String;
@@ -250,6 +265,20 @@ package body Petal.Command_Launch is
                   List_Count := List_Count + 1;
                   List_Words (List_Count) := Where;
                end if;
+            when Interface_Type =>
+               if not Is_In_Directory (Item, Argument) then
+                  Fail ("cannot bind " & Argument_Name (Index)
+                        & ": only in Directory arguments are supported");
+               else
+                  declare
+                     Found : Boolean;
+                  begin
+                     Petal.Session.Find_Grant (Text, Value.Cap, Found);
+                     if not Found then
+                        Fail ("no directory named '" & Text & "'");
+                     end if;
+                  end;
+               end if;
          end case;
       end Set_Value;
 
@@ -398,6 +427,18 @@ package body Petal.Command_Launch is
             elsif Argument.Has_Default then
                Set_Value (Index, Value (Item, Argument.Default),
                           Argument.Default, From_Line => False);
+            elsif Is_In_Directory (Item, Argument) then
+               declare
+                  Found : Boolean;
+               begin
+                  Petal.Session.Find_Grant
+                    (Petal.Session.Home_Name, Values (Index).Cap, Found);
+                  if Found then
+                     Values (Index).Is_Set := True;
+                  else
+                     Fail ("missing argument " & Argument_Name (Index));
+                  end if;
+               end;
             else
                Fail ("missing argument " & Argument_Name (Index));
             end if;
@@ -472,6 +513,9 @@ package body Petal.Command_Launch is
                        Natural'Max (Word_Count, Argument.Count_Word + 1);
                   when Item_Place =>
                      null;
+                  when Cap_Place =>
+                     Caps (Argument.Index + 1) := Values (Index).Cap;
+                     Cap_Count := Natural'Max (Cap_Count, Argument.Index + 1);
                end case;
             end;
          end loop;
@@ -634,7 +678,9 @@ package body Petal.Command_Launch is
                end loop;
                if Argument.Of_Type = String_List_Type then
                   Put (" [" & Upper & "]...");
-               elsif Argument.Has_Default then
+               elsif Argument.Has_Default
+                 or else Is_In_Directory (Item, Argument)
+               then
                   Put (" [" & Upper & "]");
                else
                   Put (" " & Upper);
