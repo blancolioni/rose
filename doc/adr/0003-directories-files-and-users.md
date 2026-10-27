@@ -1,6 +1,6 @@
 # 3. Directories, files and users
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-25
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands and directory caps), #222 (Directories, files and users), #139 (split the Directory interface), #141 (shell-owned commit), Petal Shell project
 
