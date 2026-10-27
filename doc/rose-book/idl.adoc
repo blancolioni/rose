@@ -325,11 +325,13 @@ The instance table holds up to 160 (endpoint, identifier) pairs for each interfa
 The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
 
 [#user-mode-target]
-=== User-mode target (planned)
+=== User-mode target (in progress)
 
 The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
 An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
-Phase 1 is idle#39.
+`idle --target user` generates interfaces (idle#40).
+It does not yet support commands, interface arguments and results, string results, or `out` and `in out` strings, and reports them as errors.
+The rest of phase 1 is idle#39.
 
 ==== Which programs use it
 
@@ -338,8 +340,9 @@ The two targets are not mixed in one program, and the run-time system decides wh
 * *Kernel target:* programs built with the kernel run-time system (`rts`): the boot modules, the pager path (ADR 0008), and today every server and driver.
 * *User-mode target:* programs built with the userland run-time system (`src/rts`): commands, petal, and installed drivers that are not on the pager path, such as `vga-console`.
 
-The userland run-time system itself uses the user-mode `Rose.Interfaces.Process` and `Rose.Interfaces.Cap_Set`.
-So it moves to the user-mode target once idle#39 generates them, and every program built with it moves at the same time.
+The userland run-time system itself will use the user-mode `Rose.Interfaces.Process` and `Rose.Interfaces.Cap_Set`, once idle#41 generates them.
+Until then it uses the kernel target's, which is enough until a user-mode program needs the user-mode version of one of them, since it uses only their constants.
+Each user-mode `Rose.Interfaces.X` declares everything the kernel target's does, so the programs built with the run-time system can move to the user-mode target one at a time.
 
 Handwritten libraries are either for one target, because they use its generated clients or servers (`Rose.Console_IO`, `Rose.Directories` and `Rose.Devices.GPT` use the kernel target's), or neutral, because they use none (`Rose.Server`, `Rose.System_Calls`, `Rose.Command_Line.Launch`).
 
@@ -350,7 +353,8 @@ Handwritten libraries are either for one target, because they use its generated 
   A program that tried to use both would have two units with the same name, so the barrier between the targets is checked when the program is built.
 * *One wire format.*
   A program of one target calls servers of the other all the time: a command calls the store, timer and exec servers, for example.
-  The generator writes the encoding for both targets with the same code, and idle's tests check that each target's client works with the other target's server.
+  The generator writes the encoding for both targets with the same code: the client and server generators take the target as a parameter, and only what surrounds the encoding differs.
+  Moving `vga-console` to the user-mode target (#367) tests this on Rose, where the kernel target's `exec`, `keyboard` and boot console write to a user-mode server.
 * *No allocation or finalization at first.*
   Phase 1 needs only tagged types and the secondary stack.
   Objects are `limited`, so copying one cannot duplicate a capability, and closing one is explicit.
@@ -378,19 +382,29 @@ An IDL procedure becomes a primitive on `Item : in out X_Object`, and an IDL fun
 
 | `Rose.Interfaces.X.Server`
 | `type X_Interface is limited interface and X_Object`, for implementations in the program itself.
-`Attach` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
+`Attach (Context, Object)` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
+`Publish` attaches the object and publishes its interface capability as the server's public interface.
 The generated handlers look the object up and make a dispatching call to its primitive.
 |===
+
+An object's identifier is its position among the objects attached to the interface, so the first is 0.
+That is the identifier of the capabilities that a kernel-target server creates when it is not instanced, and of the kernel's restore notice, so a server that serves one object behaves exactly as a kernel-target server that is not instanced.
+A server holds up to 16 objects for each interface.
+An invocation whose identifier has no object gets the error `Invalid_Operation`.
 
 Server packages declare only interfaces, so one type can implement several, and one object can serve each of them.
 `X_Interface` adds nothing to `X_Object`, but it extends it, so an object that a program serves is also an `X_Object` within that program, and can be passed wherever an `X_Object'Class` is expected.
 
 An interface type has no components, so each server package records the identifier and capabilities of the objects attached to it, and `X.Server.Interface_Cap (Object)` returns the capability that reaches an object through interface `X`.
 An object attached to two interfaces has two identifiers and two interface capabilities, one for each.
-`X_Client` has its capability already, and `Interface_Cap` returns it.
+`X_Client` has its capability already, and `Get_Interface_Cap` returns it, as in the kernel target.
+
+`X.Server.X_Interface` has the same name as the endpoint id constant `X_Interface` in `Rose.Interfaces.X`, which it hides in the server package.
+The generated server body therefore names the endpoint ids by their package; a program does not need to.
 `Rose.Interfaces.Objects` declares `Invocation_Error`, and `Not_Served`, which is raised when an object that has no capability for an interface, because it was never attached to it, is passed to another process as that interface.
 
 An object is declared `aliased` by the program, often at library level, so serving one allocates nothing.
+`Attach`, `Publish` and `Interface_Cap` take a `not null access X_Interface'Class`, so an object that would not outlive the server's table is rejected by an accessibility check.
 For example, `vga-console` serves the console's screen both as a stream to write to and as something told when it has been restored:
 
 [source,ada]
@@ -407,8 +421,8 @@ overriding procedure Restored (Item : in out Console);
 
 Screen : aliased Console;
 ...
-Rose.Interfaces.Stream_Writer.Server.Attach (Context, Screen);
-Rose.Interfaces.Restorable.Server.Attach (Context, Screen);
+Rose.Interfaces.Stream_Writer.Server.Publish (Context, Screen'Access);
+Rose.Interfaces.Restorable.Server.Attach (Context, Screen'Access);
 ----
 
 ==== Types
