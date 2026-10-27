@@ -66,6 +66,14 @@ package Store.Devices is
    --  Recreate a region from a checkpoint.  The backing stores must have
    --  been added again first, in the same order.
 
+   procedure Restore_Table_Page
+     (Id    : Rose.Objects.Capability_Identifier;
+      Index : Natural;
+      Page  : System.Storage_Elements.Storage_Array);
+   --  Read back page Index of the tables that Checkpoint appended, after
+   --  the regions have been recreated: the fresh pages of the restored
+   --  regions are marked fresh again.
+
    function Find_Region
      (Id    : Rose.Objects.Capability_Identifier;
       Base  : Rose.Objects.Object_Id;

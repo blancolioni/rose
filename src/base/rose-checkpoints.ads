@@ -185,20 +185,28 @@ package Rose.Checkpoints is
    --  backing store it is on, its pages Base .. Bound - 1, and the
    --  space it was allocated, which a subregion doesn't have: its
    --  Alloc_Index is zero.
+   --
+   --  Version 2 adds Fresh_Page_Count pages after the regions (#327).
+   --  They hold a bit for each page of each region with space of its
+   --  own, in the order of the regions, packed together: True for a
+   --  page that has been reserved and not written since, which reads as
+   --  zeroes.  The storage server reads them back itself
+   --  (Storage_Checkpoint.Restore_Table_Page).
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 1;
+   Store_Table_Version : constant := 2;
 
    type Store_Table_Header is
       record
-         Magic        : Rose.Words.Word_64 := Store_Table_Magic;
-         Version      : Rose.Words.Word_32 := Store_Table_Version;
-         Page_Count   : Rose.Words.Word_32 := 0;
+         Magic            : Rose.Words.Word_64 := Store_Table_Magic;
+         Version          : Rose.Words.Word_32 := Store_Table_Version;
+         Page_Count       : Rose.Words.Word_32 := 0;
          --  All of the storage server's pages, including this one.
-         Region_Count : Rose.Words.Word_32 := 0;
-         Reserved     : System.Storage_Elements.Storage_Array
-                          (1 .. Rose.Limits.Page_Size - 20) :=
-                            (others => 0);
+         Region_Count     : Rose.Words.Word_32 := 0;
+         Fresh_Page_Count : Rose.Words.Word_32 := 0;
+         Reserved         : System.Storage_Elements.Storage_Array
+                              (1 .. Rose.Limits.Page_Size - 24) :=
+                                (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
@@ -223,6 +231,12 @@ package Rose.Checkpoints is
       record
          Regions : Saved_Region_Array;
       end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   Fresh_Bits_Per_Page : constant := Rose.Limits.Page_Size * 8;
+
+   type Fresh_Page is
+     array (1 .. Fresh_Bits_Per_Page) of Boolean
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
    --  The memory server's part of a checkpoint log entry starts with its
