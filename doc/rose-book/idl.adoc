@@ -324,19 +324,142 @@ The instance table holds up to 160 (endpoint, identifier) pairs for each interfa
 
 The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
 
-=== Ada 2022 target (planned)
+[#user-mode-target]
+=== User-mode target (planned)
 
-The rewritten compiler (idle#1) adds a target for user-mode code that uses the full Ada 2022 language.
+The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
+An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
+Phase 1 is idle#39.
 
-* An IDL interface becomes an Ada interface type, and its implementations become tagged types, so a parameter of type `interface File` accepts any object that implements `File`.
-* Inheritance between IDL interfaces maps to inheritance between Ada interface types.
-* Typed streams can be generic over their element type.
-* Every IDL type gets a text rendering, so typed values can be shown or passed to untyped tools.
-* Command declarations generate the procedure spec, the main program and the embedded metadata (see <<commands>>).
+==== Principles
 
-=== Ada 2022 with SPARK (possible)
+* *One wire format.*
+  The user-mode packages are built on the kernel target's `Client` and `Server` packages, which do not change.
+  Arguments are encoded and decoded once, by the same code, and a program can use both targets.
+* *No allocation or finalization at first.*
+  Phase 1 needs only tagged types and the secondary stack.
+  Objects are `limited`, so copying one cannot duplicate a capability, and closing one is explicit.
+* *Errors are exceptions.*
+  A failed call raises `Rose.Interfaces.Objects.Invocation_Error`, where the kernel target sets `Has_Error`.
+  Until the run-time system propagates exceptions (#170), nothing can catch it, and it goes to the last-chance handler.
+  Code written now needs no change when propagation arrives.
 
-A further target could generate the Ada 2022 packages with `SPARK_Mode` and contracts derived from the IDL, such as preconditions that check a client is open and postconditions on results.
+==== Generated packages
+
+For an interface `X`, the user-mode target writes three packages in addition to the kernel target's:
+
+[cols="2,5",options="header"]
+|===
+| Package | Contents
+
+| `Rose.Interfaces.X.Objects`
+| `type X_Object is limited interface`, with one abstract primitive for each subprogram.
+IDL parents become interface parents, so `File_Object` is also a `Stream_Reader_Object` and a `Seekable_Object`.
+An IDL procedure becomes a primitive on `Item : in out X_Object`, and an IDL function a primitive on `Item : X_Object`.
+
+| `Rose.Interfaces.X.Remote`
+| `X_Remote`, which implements `X_Object` by invoking a capability.
+It wraps an `X_Client`, with `Open` and `Close`, and raises `Invocation_Error` when the client reports an error.
+
+| `Rose.Interfaces.X.Service`
+| `X_Service`, an abstract base for implementations in the program itself.
+`Attach` registers the object with a `Rose.Server` context as an instanced interface (see <<kernel-target>>) and records it under its identifier.
+The generated handlers look the object up and make a dispatching call to its primitive.
+|===
+
+Every object type derives from `Rose.Interfaces.Objects.Capability_Object`, whose `Interface_Cap` returns the capability that reaches the object.
+That package also declares `Invocation_Error`, and `Not_Served`, which is raised when an object that has no capability, because it was never attached, is passed to another process.
+
+Service objects are declared `aliased` by the program, often at library level, so serving one allocates nothing:
+
+[source,ada]
+----
+type Memory_File is new Rose.Interfaces.File.Service.File_Service with record
+   ...
+end record;
+
+overriding function Size (Item : Memory_File) return Storage_Count;
+...
+
+File : aliased Memory_File;
+...
+Rose.Interfaces.File.Service.Attach (Context, File);
+----
+
+==== Types
+
+Where the user-mode target differs from the kernel target:
+
+[cols="2,3,4",options="header"]
+|===
+| IDL | Kernel target | User-mode target
+
+| `interface X` argument
+| `X_Client`
+| `in out X_Object'Class`
+
+| `interface X` result
+| `X_Client`
+| `X_Object'Class`, built in place as an `X_Remote`
+
+| `String` result
+| `Result : out String; Last : out Natural`
+| `String`
+
+| `out String`
+| `out String` with `Last`
+| `out Rose.Strings.Text`, a bounded type written for Rose, since the run-time system has no `Ada.Strings.Bounded`
+
+| `out interface X`
+| an `out` capability
+| `in out X_Remote`, opened by the subprogram
+|===
+
+Whether a limited class-wide result compiles with the userland run-time system's restrictions (`No_Allocators`, `No_Finalization`) is still to be checked.
+If it does not, an interface result becomes an `in out X_Remote` parameter instead, until allocators and finalization are available (#358, #359).
+
+==== Commands
+
+For a command (see <<commands>>), the user-mode target generates the same three units as the kernel target, with objects in place of clients:
+
+* *The procedure spec.*
+  A capability argument is `in out X_Object'Class`, whatever its IDL mode, since the mode is carried by the capability's rights and interface type.
+  An `out` or `in out` string is a `Rose.Command_Line.Text`, not a `String` and its `Last`.
+* *The main.*
+  It makes the same `Rose.Command_Line.Launch` calls, with the same argument indices, as the kernel target.
+  Each capability argument becomes an `X_Remote` local, opened from `Cap_Argument`.
+  Once exceptions propagate (#170), the main also gets the handler from ADR 0002, `when E : others => Fail (Call, E)`, and until then an unhandled exception goes to the last-chance handler, which should reply `Fail` to the shell (#171).
+* *A server command* attaches an `aliased` service object and returns it through `Result : out Rose.Interfaces.Objects.Capability_Object_Access`.
+  The main replies with the object's capability, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
+* *The metadata* is the same for both targets.
+
+For `Rose.Core.Copy`, the spec is:
+
+[source,ada]
+----
+procedure Rose.Core.Copy
+  (Logging : in out Rose.Interfaces.Stream_Writer.Objects.Stream_Writer_Object'Class;
+   Source  : in out Rose.Interfaces.File.Objects.File_Object'Class;
+   Target  : in out Rose.Interfaces.File.Objects.File_Object'Class;
+   Root    : in out Rose.Interfaces.Directory.Objects.Directory_Object'Class;
+   Count   : out Natural;
+   Verbose : in out Boolean;
+   Report  : out Rose.Command_Line.Text;
+   Note    : in out Rose.Command_Line.Text);
+----
+
+==== Later phases
+
+* *Records, typed streams, errors and units.*
+  A `record` declaration becomes an Ada record with generated `Encode`, `Decode` and `Image`.
+  A stream of a record type becomes an instance of a generic over the element type, with reader and writer object types, and a header naming the element type by an id hashed from its name and version, as endpoint ids are.
+  An error type becomes an exception and a payload record, which `Fail` sends to the shell.
+  A unit type becomes a distinct numeric type whose `Image` includes the unit.
+* *After allocators and finalization* (#358, #359): remote objects that close their capabilities automatically, `Unbounded_String` in place of `Text`, namespaces and versions, and conformance declarations (ADR 0002, section 6).
+
+=== User mode with SPARK (possible)
+
+A further target could generate the user-mode packages with `SPARK_Mode` and contracts derived from the IDL, such as preconditions that check a client is open and postconditions on results.
 Whether to have this target is still open; it would tie in with the "Rose: SPARK annotations" project.
 
 [#commands]
