@@ -18,6 +18,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-cap_set.o \
 	$(BUILDDIR)/rose-interfaces-process.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader-server.o \
 	$(BUILDDIR)/rose-interfaces-writable_file.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-server.o \
 	$(BUILDDIR)/rose-invocation.o \

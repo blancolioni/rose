@@ -215,6 +215,14 @@ package body Rose.Server is
          Create_Anonymous_Endpoint (Endpoint);
       end if;
 
+      --  Checks are suppressed in the servers, so a full table would
+      --  otherwise be written past its end. Servers cannot raise, so the
+      --  endpoint is not handled.
+
+      if Context.Endpoint_Count = Max_Handled_Endpoints then
+         return;
+      end if;
+
       Context.Endpoint_Count := Context.Endpoint_Count + 1;
       Context.Endpoints (Context.Endpoint_Count) :=
         Endpoint_Record'

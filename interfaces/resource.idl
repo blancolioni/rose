@@ -1,0 +1,8 @@
+--  Something that holds a resource until it is released (ADR 0010).
+--  After Release, every cap to the object fails, whoever holds it.
+
+interface Resource is
+
+   procedure Release;
+
+end Resource;

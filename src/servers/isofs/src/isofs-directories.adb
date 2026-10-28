@@ -4,8 +4,6 @@ with Rose.System_Calls.Server;
 
 with Rose.Console_IO;
 
-with Rose.Interfaces.Stream_Reader;
-
 with Rose.Containers.Bounded_Hashed_Maps;
 with Rose.Containers.Queues;
 
@@ -15,7 +13,8 @@ package body IsoFS.Directories is
    use Rose.Words;
 
    Max_Directories : constant := 100;
-   Max_Open_Files  : constant := 20;
+   Max_Files       : constant := 64;
+   Max_Readers     : constant := 20;
 
    Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
 
@@ -139,18 +138,41 @@ package body IsoFS.Directories is
    Directory_Caps : Directory_Caps_Array;
    Directory_Count : Directory_Type := 0;
 
-   type Open_File_Record is
+   --  Files that have been asked for, each identified by its position in
+   --  the table. A file is found again by its extent.
+
+   type File_Record is
       record
-         Open          : Boolean := False;
          Start_Address : Rose.Words.Word := 0;
          Length        : Rose.Words.Word := 0;
-         Current       : Rose.Words.Word := 0;
       end record;
 
-   type Open_File_Array is array (1 .. Max_Open_Files) of Open_File_Record;
+   type File_Array is array (1 .. Max_Files) of File_Record;
 
-   Open_Files      : Open_File_Array;
-   Open_File_Count : Natural := 0;
+   Files      : File_Array;
+   File_Count : Natural := 0;
+
+   --  Readers (ADR 0009), each with its own position. Identifiers are
+   --  never used again, so a cap to a released reader finds no reader.
+
+   No_Reader : constant Rose.Objects.Capability_Identifier := 0;
+
+   type Reader_Record is
+      record
+         Identifier : Rose.Objects.Capability_Identifier := No_Reader;
+         File       : Natural := 0;
+         Current    : Rose.Words.Word := 0;
+      end record;
+
+   type Reader_Array is array (1 .. Max_Readers) of Reader_Record;
+
+   Readers         : Reader_Array;
+   Next_Identifier : Rose.Objects.Capability_Identifier := 1;
+
+   function Find_Reader
+     (Reader : Rose.Objects.Capability_Identifier)
+      return Natural;
+   --  The slot of Reader, or 0 if there is no such reader.
 
    procedure Read_Root_Directory
      (Device : Client.Block_Device_Client);
@@ -280,6 +302,36 @@ package body IsoFS.Directories is
       Scan_Directory_Entries (Directory, Add_Child_Entry'Access);
 
    end Create_Cap_Record;
+
+   ---------------
+   -- File_Size --
+   ---------------
+
+   function File_Size
+     (File : Positive)
+      return System.Storage_Elements.Storage_Count
+   is (if File > File_Count then 0
+       else System.Storage_Elements.Storage_Count (Files (File).Length));
+
+   -----------------
+   -- Find_Reader --
+   -----------------
+
+   function Find_Reader
+     (Reader : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      if Reader /= No_Reader then
+         for Slot in Readers'Range loop
+            if Readers (Slot).Identifier = Reader then
+               return Slot;
+            end if;
+         end loop;
+      end if;
+      return 0;
+   end Find_Reader;
 
    -------------------------
    -- Get_Child_Directory --
@@ -536,6 +588,58 @@ package body IsoFS.Directories is
       return System.Storage_Elements.Storage_Count (Size);
    end Get_Entry_Size;
 
+   --------------
+   -- Get_File --
+   --------------
+
+   function Get_File
+     (Directory : Directory_Type;
+      Index     : Positive)
+      return Natural
+   is
+      Count  : Natural := 0;
+      Result : Natural := 0;
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String);
+
+      -------------
+      -- Process --
+      -------------
+
+      procedure Process
+        (Rec        : Directory_Entry;
+         Entry_Name : String)
+      is
+         pragma Unreferenced (Entry_Name);
+      begin
+         Count := Count + 1;
+         if Count /= Index then
+            return;
+         end if;
+
+         for File in 1 .. File_Count loop
+            if Files (File).Start_Address = Rec.Extent_Location_LSB then
+               Result := File;
+               return;
+            end if;
+         end loop;
+
+         if File_Count < Max_Files then
+            File_Count := File_Count + 1;
+            Files (File_Count) :=
+              (Start_Address => Rec.Extent_Location_LSB,
+               Length        => Rec.Extent_Size_LSB);
+            Result := File_Count;
+         end if;
+      end Process;
+
+   begin
+      Scan_Directory_Entries (Directory, Process'Access);
+      return Result;
+   end Get_File;
+
    ------------------------------
    -- Get_Identified_Directory --
    ------------------------------
@@ -697,108 +801,86 @@ package body IsoFS.Directories is
       end if;
    end Get_Root_Directory;
 
+   -----------------
+   -- Open_Reader --
+   -----------------
+
+   function Open_Reader
+     (File : Positive)
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      if File > File_Count then
+         return No_Reader;
+      end if;
+      for R of Readers loop
+         if R.Identifier = No_Reader then
+            R := (Identifier => Next_Identifier,
+                  File       => File,
+                  Current    => 0);
+            Next_Identifier := Next_Identifier + 1;
+            return R.Identifier;
+         end if;
+      end loop;
+      return No_Reader;
+   end Open_Reader;
+
    ----------
    -- Read --
    ----------
 
    procedure Read
-     (File   : Positive;
+     (Reader : Rose.Objects.Capability_Identifier;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Count  : out System.Storage_Elements.Storage_Count)
+      Last   : out System.Storage_Elements.Storage_Count)
    is
       use System.Storage_Elements;
-      F              : Open_File_Record renames Open_Files (File);
+      Slot           : constant Natural := Find_Reader (Reader);
+      Count          : Storage_Count;
       Start_Sector   : Word;
       Current_Sector : Word;
       Current_Offset : Storage_Offset;
       Sector_Data    : ISO_Sector;
    begin
-      if not F.Open then
-         Count := 0;
+      Last := Buffer'First - 1;
+      if Slot = 0 then
          return;
       end if;
 
-      Start_Sector := F.Start_Address + F.Current / ISO_Sector_Size;
-      Current_Sector := Start_Sector;
-      Current_Offset := Storage_Offset (F.Current mod ISO_Sector_Size) + 1;
-
-      Count := Storage_Count'Min (Buffer'Length,
-                                  Storage_Count (F.Length - F.Current));
-
-      Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
-
-      for I in 1 .. Count loop
-         Buffer (Buffer'First + I - 1) :=
-           Sector_Data (Storage_Count (Current_Offset));
-         Current_Offset := Current_Offset + 1;
-         if I < Count and then Current_Offset > ISO_Sector_Size then
-            Current_Offset := 1;
-            Current_Sector := Current_Sector + 1;
-            Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
-         end if;
-      end loop;
-
-      F.Current := F.Current + Word (Count);
-
-      if Count < Buffer'Length then
-         F.Open := False;
-         if File = Open_File_Count then
-            Open_File_Count := Open_File_Count - 1;
-         end if;
-      end if;
-
-   end Read;
-
-   ---------------
-   -- Read_File --
-   ---------------
-
-   function Read_File
-     (Directory : Directory_Type;
-      Index     : Positive)
-      return Rose.Capabilities.Capability
-   is
-      Count : Natural := 0;
-
-      procedure Process
-        (Rec        : Directory_Entry;
-         Entry_Name : String);
-
-      -------------
-      -- Process --
-      -------------
-
-      procedure Process
-        (Rec        : Directory_Entry;
-         Entry_Name : String)
-      is
-         pragma Unreferenced (Entry_Name);
+      declare
+         R : Reader_Record renames Readers (Slot);
+         F : File_Record renames Files (R.File);
       begin
-         Count := Count + 1;
-         if Count = Index then
-            Open_File_Count := Open_File_Count + 1;
-            Open_Files (Open_File_Count) :=
-              Open_File_Record'
-                (Open          => True,
-                 Start_Address => Rec.Extent_Location_LSB,
-                 Length        => Rec.Extent_Size_LSB,
-                 Current       => 0);
+         if R.Current >= F.Length then
+            return;
          end if;
-      end Process;
 
-   begin
-      if Open_File_Count >= Max_Open_Files then
-         return Rose.Capabilities.Null_Capability;
-      end if;
+         Start_Sector := F.Start_Address + R.Current / ISO_Sector_Size;
+         Current_Sector := Start_Sector;
+         Current_Offset :=
+           Storage_Offset (R.Current mod ISO_Sector_Size) + 1;
 
-      Scan_Directory_Entries (Directory, Process'Access);
+         Count := Storage_Count'Min (Buffer'Length,
+                                     Storage_Count (F.Length - R.Current));
 
-      return Rose.System_Calls.Server.Create_Endpoint
-        (Create_Cap  => Create_Endpoint_Cap,
-         Endpoint_Id => Rose.Interfaces.Stream_Reader.Stream_Reader_Interface,
-         Identifier  => Rose.Objects.Capability_Identifier (Open_File_Count));
+         Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
 
-   end Read_File;
+         for I in 1 .. Count loop
+            Buffer (Buffer'First + I - 1) :=
+              Sector_Data (Storage_Count (Current_Offset));
+            Current_Offset := Current_Offset + 1;
+            if I < Count and then Current_Offset > ISO_Sector_Size then
+               Current_Offset := 1;
+               Current_Sector := Current_Sector + 1;
+               Read_Sector (Block_Address_Type (Current_Sector), Sector_Data);
+            end if;
+         end loop;
+
+         R.Current := R.Current + Word (Count);
+         Last := Buffer'First + Count - 1;
+      end;
+   end Read;
 
    -------------------------
    -- Read_Root_Directory --
@@ -910,6 +992,20 @@ package body IsoFS.Directories is
 
    end Read_Sector;
 
+   --------------------
+   -- Release_Reader --
+   --------------------
+
+   procedure Release_Reader
+     (Reader : Rose.Objects.Capability_Identifier)
+   is
+      Slot : constant Natural := Find_Reader (Reader);
+   begin
+      if Slot /= 0 then
+         Readers (Slot) := (others => <>);
+      end if;
+   end Release_Reader;
+
    ----------------------------
    -- Scan_Directory_Entries --
    ----------------------------
@@ -999,5 +1095,25 @@ package body IsoFS.Directories is
 
       end loop;
    end Scan_Directory_Entries;
+
+   -----------------
+   -- Seek_Reader --
+   -----------------
+
+   procedure Seek_Reader
+     (Reader : Rose.Objects.Capability_Identifier;
+      Offset : Rose.Words.Word_64)
+   is
+      Slot : constant Natural := Find_Reader (Reader);
+   begin
+      if Slot /= 0 then
+         declare
+            Length : constant Word := Files (Readers (Slot).File).Length;
+         begin
+            Readers (Slot).Current :=
+              (if Offset > Word_64 (Length) then Length else Word (Offset));
+         end;
+      end if;
+   end Seek_Reader;
 
 end IsoFS.Directories;
