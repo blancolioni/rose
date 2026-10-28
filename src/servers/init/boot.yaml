@@ -1,0 +1,257 @@
+# The boot description (#374): which boot modules GRUB loads, and how
+# init starts them.  scripts/make-init turns it into the package
+# Init.Boot (build/generated), and writes the module2 lines of the two
+# GRUB menus.
+#
+# There are two variants.  The install media's (install) loads
+# init-install and restore-install, and the boot disk's (disk) loads init
+# and restore (#373).  An entry with 'when: install' or 'when: disk'
+# belongs to that variant only.
+#
+# Caps are named.  A name is one of init's fixed caps
+# (Rose.Init_Capabilities, without _Cap), or a name given earlier by an
+# export, an endpoint or a call.  Each name is a variable in Init.Boot,
+# called Name_Cap, which is null until it is set.
+#
+# Steps:
+#
+#   launch: MODULE   launch a boot module, with:
+#     oid            its object id, which never changes (#372)
+#     priority       one of the priorities below
+#     cap_set        the cap that makes cap sets, if not cap_set; 'none'
+#                    for none
+#     caps           the caps it is given, in order: a name;
+#                    {cap: name, when: variant}; {ports: [endpoint, size,
+#                    first, last]}; {interrupt: vector}; or {device_page:
+#                    page}.  The last three are granted to the module
+#                    (Init.Grants), or to nobody with 'owner: none'.
+#     words          data words for the launch, if any
+#     exports        names for endpoints copied from it: an endpoint, or
+#                    {endpoint: e, identifier: n, when: variant}.
+#                    Endpoints are named relative to Rose.Interfaces.
+#
+#   endpoint: E      an endpoint of init's own, with 'receiver' and
+#                    'sender' naming the caps it makes
+#
+#   call: NAME       a procedure in Init.Boot_Steps, for what isn't
+#                    wiring; 'sets' names the caps it may set
+
+modules:
+  # Module 1 is init.  The order is GRUB's, which the kernel checks
+  # against its own lists in src/kernel/modules/rose-kernel-modules-init.adb.
+  - {name: init, install: init-install}
+  - console
+  - mem
+  - pci
+  - ata
+  - store
+  - {name: isofs, when: install}
+  - {name: restore, install: restore-install}
+  - scan
+  - partition
+  - elf
+  - timer
+  - caps
+  - checkpoint
+  - log
+
+grub:
+  install: images/iso/boot/grub/grub.cfg
+  disk: images/hd0/grub.cfg
+
+priorities:
+  memory: 2
+  device_driver: 5
+  file_system: 10
+  low: 12
+  log: 13
+  checkpoint: 14
+
+# Object ids of servers that a call launches.  The kernel gives idle and
+# init ids 1 and 2.
+oids:
+  swap_partition: 11
+  log_partition: 17
+  # The install media's partition servers for writing the boot loader
+  # (#322): block 0, which holds the MBR, and the BIOS boot and boot
+  # partitions.
+  mbr: 18
+  bios_boot: 19
+  boot_partition: 20
+
+stages:
+
+  boot_servers:
+
+    # The boot console's screen and cursor aren't recorded as granted,
+    # because the persistent console takes the screen over from the boot
+    # console (#304).
+    - launch: console
+      oid: 3
+      priority: low
+      cap_set: none
+      caps:
+        - {device_page: 0xB8, owner: none}
+        - {ports: [out_range, 8, 0x3D4, 0x3D5], owner: none}
+      exports:
+        console_interface: Stream_Writer.Stream_Writer_Interface
+        console_stream: Stream_Writer.Write_Endpoint
+        console_redirect: Output_Redirect.Redirect_Endpoint
+
+    # Where Init.Calls.Send_String reports, as when the installer refuses
+    # a cap request.
+    - call: Set_Console
+
+    - launch: caps
+      oid: 14
+      priority: device_driver
+      cap_set: none
+      caps: [console_interface]
+      exports:
+        cap_set: Constructor.Create_Endpoint
+
+    - launch: mem
+      oid: 4
+      priority: memory
+      caps: [console_interface, region_count, get_region, page_on, delete,
+             trace]
+      exports:
+        mem: Memory.Memory_Interface
+        memory_checkpoint: Memory.Checkpoint_Endpoint
+        memory_restore: Memory_Restore.Memory_Restore_Interface
+
+    - launch: timer
+      oid: 13
+      priority: device_driver
+      caps: [console_interface, set_timeout, get_ticks]
+      exports:
+        timer: Timer.Set_Timer_Endpoint
+
+    - endpoint: Timeout.On_Timeout_Endpoint
+      receiver: receive_timeout
+      sender: send_timeout
+
+    - launch: pci
+      oid: 5
+      priority: low
+      caps:
+        - console_interface
+        - {ports: [out, 32, 0xCF8, 0xCF8]}
+        - {ports: [out, 32, 0xCFC, 0xCFC]}
+        - {ports: [in, 32, 0xCFC, 0xCFC]}
+      exports:
+        pci: 450
+
+    - launch: ata
+      oid: 6
+      priority: device_driver
+      caps:
+        - console_interface
+        - pci
+        - {interrupt: 46}
+        - {interrupt: 47}
+        - {ports: [out_range, 8, 0x1F0, 0x1F7]}
+        - {ports: [out, 8, 0x3F6, 0x3F6]}
+        - {ports: [in, 8, 0x1F0, 0x1F7]}
+        - {ports: [in, 16, 0x1F0, 0x1F7]}
+        - {ports: [out, 16, 0x1F0, 0x1F7]}
+        - timer
+      exports:
+        hd0: {endpoint: Get_Interface_Endpoint, identifier: 0}
+        # The install media is hd1, which only the install init uses.
+        hd1: {endpoint: Get_Interface_Endpoint, identifier: 1,
+              when: install}
+
+    - launch: store
+      oid: 7
+      priority: device_driver
+      caps: [delete, console_interface, trace]
+      exports:
+        storage: Storage.Storage_Interface
+        add_storage: Storage.Add_Backing_Store_Endpoint
+        reserve_storage: Storage.Reserve_Storage_Endpoint
+        # For the checkpoint server, to add the region table to each
+        # checkpoint.
+        store_checkpoint: Storage_Checkpoint.Checkpoint_Endpoint
+        store_restore: Storage_Checkpoint.Storage_Checkpoint_Interface
+
+    - launch: elf
+      oid: 12
+      priority: device_driver
+      caps: [delete, rescind, console_interface, mem, create_process,
+             trace]
+      exports:
+        launch_elf: Executable.Launch_Endpoint
+        launch_command_elf: Executable.Launch_Command_Endpoint
+
+    - launch: scan
+      oid: 10
+      priority: file_system
+      caps: [console_interface, hd0]
+      exports:
+        partition_count: Partitions.Partition_Count_Endpoint
+        get_partition: Partitions.Get_Partition_Endpoint
+
+    # Partition servers for the swap and log partitions, and on the
+    # install media, for block 0 and the two boot partitions (#322).
+    - call: Load_Partitions
+      sets: [swap, log, mbr, bios_boot, boot_partition]
+
+    - endpoint: Exec.Install_Endpoint
+      receiver: install_receiver
+      sender: install_endpoint
+
+    # isofs deletes the caps of the file readers that are released
+    # (ADR 0009).
+    - launch: isofs
+      when: install
+      oid: 8
+      priority: file_system
+      caps: [console_interface, hd1, delete]
+      exports:
+        install_media_fs: File_System.Root_Directory_Endpoint
+
+    - launch: log
+      oid: 16
+      priority: log
+      caps: [console_interface, start_log]
+      exports:
+        add_log_device: Kernel_Log.Add_Log_Device_Endpoint
+        append_to_log: Kernel_Log.Append_Endpoint
+        log_reader: Log_Reader.Log_Reader_Interface
+        log_reset: State.Reset_Endpoint
+
+    # In the order Restore.Start takes them.  Only restore-install has
+    # the last five, to install from the install media, start a new log,
+    # and write the boot loader (#322).
+    - launch: restore
+      oid: 9
+      priority: file_system
+      caps:
+        - console_interface
+        - swap
+        - log
+        - add_storage
+        - install_endpoint
+        - add_log_device
+        - log_reader
+        - restore_process
+        - resume_process
+        - restore_interrupt
+        - store_restore
+        - memory_restore
+        - {cap: install_media_fs, when: install}
+        - {cap: log_reset, when: install}
+        - {cap: mbr, when: install}
+        - {cap: bios_boot, when: install}
+        - {cap: boot_partition, when: install}
+
+  # After the restore server has restored a checkpoint or installed a new
+  # system.
+  checkpoint:
+
+    - launch: checkpoint
+      oid: 15
+      priority: checkpoint
+      caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
+             delete, memory_checkpoint, append_to_log, store_checkpoint]

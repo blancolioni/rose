@@ -1,0 +1,609 @@
+#!/usr/bin/env python3
+"""Generate init's boot sequence from a boot description (#374).
+
+The description (src/servers/init/boot.yaml, which says what it holds)
+becomes the package Init.Boot, written to OUTDIR as init-boot.ads and
+init-boot.adb.  The module2 lines of each variant's GRUB menu are
+rewritten to load the description's modules in its order; a file is
+only written if it changes.
+
+Usage: make-init -o OUTDIR [--root DIR] [--no-grub] DESCRIPTION
+"""
+
+import argparse
+import os
+import re
+import sys
+
+import yaml
+
+VARIANTS = ("install", "disk")
+
+LINE_LENGTH = 79
+
+PORT_ENDPOINTS = {
+    "out": "Port_Out_Endpoint",
+    "in": "Port_In_Endpoint",
+    "out_range": "Port_Out_Range_Endpoint",
+    "in_range": "Port_In_Range_Endpoint",
+}
+
+PORT_SIZES = {8: "Port_Size_8", 16: "Port_Size_16", 32: "Port_Size_32"}
+
+INIT_CAPS = "Rose.Init_Capabilities"
+
+ROOT_CAPS = ("Ports", "Interrupts", "Device_Pages")
+# Caps in Rose.Init_Capabilities that only Init.Grants uses.
+
+
+class DescriptionError(Exception):
+    pass
+
+
+def fail(message):
+    raise DescriptionError(message)
+
+
+ACRONYMS = {"ata", "bios", "fs", "isofs", "mbr", "pci"}
+
+
+def ada_name(name):
+    """boot_partition -> Boot_Partition, bios_boot -> BIOS_Boot"""
+    return "_".join(part.upper() if part in ACRONYMS else part.capitalize()
+                    for part in name.split("_"))
+
+
+def module_component(name):
+    """restore-install -> Restore_Install"""
+    return ada_name(name.replace("-", "_"))
+
+
+def hex_literal(value):
+    return "16#%04X#" % value
+
+
+def variants_of(entry):
+    """The variants an entry belongs to."""
+    when = entry.get("when") if isinstance(entry, dict) else None
+    if when is None:
+        return set(VARIANTS)
+    if when not in VARIANTS:
+        fail("unknown variant '%s'" % when)
+    return {when}
+
+
+def condition(variants):
+    """Ada condition for a set of variants, or None if it is all of
+    them."""
+    if variants == set(VARIANTS):
+        return None
+    return "Installing" if variants == {"install"} else "not Installing"
+
+
+def read_init_caps(path):
+    """Names of init's fixed caps, as used in the description."""
+    caps = []
+    with open(path) as f:
+        for line in f:
+            m = re.match(r"\s+(\w+)_Cap\s*:\s*constant", line)
+            if m and m.group(1) not in ROOT_CAPS + ("Last",):
+                caps.append(m.group(1).lower())
+    return caps
+
+
+class Module:
+    def __init__(self, entry):
+        if isinstance(entry, str):
+            entry = {"name": entry}
+        self.name = entry["name"]
+        self.variants = variants_of(entry)
+        self.files = {v: self.name for v in VARIANTS}
+        if "install" in entry:
+            self.files["install"] = entry["install"]
+
+
+class Generator:
+
+    def __init__(self, description, init_caps):
+        self.d = description
+        self.init_caps = init_caps
+        self.modules = [Module(e) for e in description["modules"]]
+        if self.modules[0].name != "init":
+            fail("module 1 must be init")
+        self.module_names = {m.name: m for m in self.modules}
+        self.priorities = description["priorities"]
+        self.oids = {}
+        for name, oid in description.get("oids", {}).items():
+            self.add_oid(name, oid)
+        self.caps = []
+        # Names of the caps in Init.Boot, in the order they are first set
+        self.defined = {}
+        # cap name -> variants in which it has been set
+        self.withs = set()
+
+    def add_oid(self, name, oid):
+        if name in self.oids:
+            fail("two object ids for %s" % name)
+        if oid in self.oids.values():
+            fail("object id %d is used twice" % oid)
+        self.oids[name] = oid
+
+    def module_number(self, module, variant):
+        number = 0
+        for m in self.modules:
+            if variant in m.variants:
+                number += 1
+                if m is module:
+                    return number
+        return 0
+
+    # Names
+
+    def define(self, name, variants):
+        if name in self.init_caps:
+            fail("'%s' is one of init's caps" % name)
+        if name not in self.defined:
+            self.caps.append(name)
+            self.defined[name] = set()
+        self.defined[name] |= variants
+
+    def use(self, name, variants, where):
+        """The Ada name for cap NAME, used in VARIANTS."""
+        if name in self.init_caps:
+            return ada_name(name) + "_Cap"
+        if name == "none":
+            return "Rose.Capabilities.Null_Capability"
+        missing = variants - self.defined.get(name, set())
+        if missing:
+            fail("%s: '%s' is not set before this in the %s variant"
+                 % (where, name, " and ".join(sorted(missing))))
+        return ada_name(name) + "_Cap"
+
+    def endpoint(self, value):
+        if isinstance(value, int):
+            return str(value)
+        if "." in value:
+            package = value.split(".")[0]
+            self.withs.add("Rose.Interfaces." + package)
+        else:
+            self.withs.add("Rose.Interfaces")
+        return "Rose.Interfaces." + value
+
+    # Steps
+
+    def launch(self, step, variants, out):
+        name = step["launch"]
+        where = "launch " + name
+        module = self.module_names.get(name)
+        if module is None:
+            fail("%s: no such module" % where)
+        variants = variants & variants_of(step)
+        if not variants <= module.variants:
+            fail("%s: the module isn't loaded in every variant this "
+                 "runs in" % where)
+        self.add_oid(name, step["oid"])
+        oid = ada_name(name) + "_Oid"
+        priority = step["priority"]
+        if priority not in self.priorities:
+            fail("%s: unknown priority '%s'" % (where, priority))
+        cap_set = step.get("cap_set", "cap_set")
+
+        caps = []
+        grants = []
+        for item in step.get("caps", []):
+            if isinstance(item, str):
+                caps.append((variants, self.use(item, variants, where)))
+            elif "cap" in item:
+                v = variants & variants_of(item)
+                caps.append((v, self.use(item["cap"], v, where)))
+            else:
+                owner = (oid if item.get("owner") != "none"
+                         else "Init.Grants.No_Owner")
+                if "ports" in item:
+                    endpoint, size, first, last = item["ports"]
+                    call = ("Init.Grants.Ports",
+                            [owner,
+                             INIT_CAPS + "." + PORT_ENDPOINTS[endpoint],
+                             INIT_CAPS + "." + PORT_SIZES[size],
+                             hex_literal(first), hex_literal(last)])
+                elif "interrupt" in item:
+                    call = ("Init.Grants.Interrupt",
+                            [owner, str(item["interrupt"])])
+                elif "device_page" in item:
+                    call = ("Init.Grants.Device_Page",
+                            [owner, hex_literal(item["device_page"])])
+                else:
+                    fail("%s: unknown cap %r" % (where, item))
+                grant = "Grant_%d" % (len(grants) + 1)
+                grants.append((grant, call))
+                caps.append((variants, grant))
+
+        cap_set_cap = self.use(cap_set, variants, where)
+
+        exports = []
+        for export, value in (step.get("exports") or {}).items():
+            if isinstance(value, dict):
+                v = variants & variants_of(value)
+                identifier = value.get("identifier")
+                value = value["endpoint"]
+            else:
+                v = variants
+                identifier = None
+            exports.append((v, ada_name(export) + "_Cap",
+                            self.endpoint(value), identifier))
+            self.define(export, v)
+
+        out.line("--  " + name)
+        out.line("")
+        out.line("declare")
+        out.indent()
+        for grant, (name_, args) in grants:
+            out.line("%s : constant Rose.Capabilities.Capability :=" % grant)
+            out.call(name_, args, ";")
+        out.line("Copy_Cap : constant Rose.Capabilities.Capability :=")
+        out.line("  Init.Calls.Launch_Boot_Module")
+        out.indent(4)
+        out.line("(Boot_Cap, Modules.%s, %s," % (module_component(name), oid))
+        out.line(" %s_Priority," % ada_name(priority))
+        out.line(" Create_Endpoint_Cap, %s," % cap_set_cap)
+        out.cap_array(caps, variants, step.get("words"))
+        out.dedent(4)
+        if not exports:
+            out.line("pragma Unreferenced (Copy_Cap);")
+        out.dedent()
+        out.line("begin")
+        out.indent()
+        if not exports:
+            out.line("null;")
+        for v, target, endpoint, identifier in exports:
+            args = ["Copy_Cap", endpoint]
+            if identifier is not None:
+                args.append(str(identifier))
+            cond = condition(v) if v != variants else None
+            if cond:
+                out.line("if %s then" % cond)
+                out.indent()
+            out.line(target + " :=")
+            out.call("Init.Boot_Steps.Copy", args, ";")
+            if cond:
+                out.dedent()
+                out.line("end if;")
+        out.dedent()
+        out.line("end;")
+
+    def endpoint_step(self, step, variants, out):
+        endpoint = self.endpoint(step["endpoint"])
+        receiver, sender = step["receiver"], step["sender"]
+        out.line("--  " + step["endpoint"])
+        out.line("")
+        out.line("declare")
+        out.indent()
+        out.line("use type Rose.Objects.Endpoint_Id;")
+        out.line("Endpoint : constant Rose.Objects.Endpoint_Id :=")
+        out.line("  %s;" % endpoint)
+        out.line("Caps     : Init.Calls.Array_Of_Capabilities (1 .. 2);")
+        out.dedent()
+        out.line("begin")
+        out.indent()
+        out.line("Init.Calls.Call")
+        out.line("  (Create_Endpoint_Cap,")
+        out.line("   (Rose.Words.Word (Endpoint mod 2 ** 32),")
+        out.line("    Rose.Words.Word (Endpoint / 2 ** 32)),")
+        out.line("   Caps);")
+        out.line("%s_Cap := Caps (1);" % ada_name(receiver))
+        out.line("%s_Cap := Caps (2);" % ada_name(sender))
+        out.dedent()
+        out.line("end;")
+        self.define(receiver, variants)
+        self.define(sender, variants)
+
+    def call_step(self, step, variants, out):
+        out.line("Init.Boot_Steps.%s;" % step["call"])
+        for name in step.get("sets", []):
+            self.define(name, variants)
+
+    def stage(self, name, steps, out):
+        out.line("procedure Launch_%s is" % ada_name(name))
+        out.line("begin")
+        out.indent()
+        for step in steps:
+            variants = variants_of(step)
+            cond = condition(variants)
+            out.line("")
+            if cond:
+                out.line("if %s then" % cond)
+                out.indent()
+            if "launch" in step:
+                self.launch(step, variants, out)
+            elif "endpoint" in step:
+                self.endpoint_step(step, variants, out)
+            elif "call" in step:
+                self.call_step(step, variants, out)
+            else:
+                fail("unknown step %r" % step)
+            if cond:
+                out.dedent()
+                out.line("end if;")
+        out.dedent()
+        out.line("end Launch_%s;" % ada_name(name))
+
+    # Output
+
+    def generate(self, source):
+        stages = self.d["stages"]
+        body = Writer()
+        body.indent()
+        for name, steps in stages.items():
+            body.line("")
+            body.rule("Launch_" + ada_name(name))
+            body.line("")
+            self.stage(name, steps, body)
+
+        header = ("--  Generated by scripts/make-init from %s.  Don't edit."
+                  % os.path.basename(source))
+
+        spec = Writer()
+        spec.line(header)
+        spec.line("")
+        spec.line("with Rose.Capabilities;")
+        spec.line("with Rose.Words;")
+        spec.line("")
+        spec.line("package Init.Boot is")
+        spec.indent()
+        spec.line("")
+        spec.line("--  The boot modules' numbers, which are their positions"
+                  " in the")
+        spec.line("--  GRUB configuration that loads them.  Module 1 is "
+                  "init, and a")
+        spec.line("--  module that isn't loaded is 0.")
+        spec.line("")
+        components = [module_component(m.name) for m in self.modules[1:]]
+        spec.line("type Module_Table is")
+        spec.line("   record")
+        spec.indent(6)
+        spec.aligned([(c, "Rose.Words.Word;") for c in components], ":")
+        spec.dedent(6)
+        spec.line("   end record;")
+        for variant in VARIANTS:
+            spec.line("")
+            spec.line("%s_Modules : constant Module_Table :=" %
+                      ada_name(variant))
+            numbers = [self.module_number(m, variant)
+                       for m in self.modules[1:]]
+            width = max(len(c) for c in components)
+            for i, (c, n) in enumerate(zip(components, numbers)):
+                spec.line("  %s%s => %d%s" % ("(" if i == 0 else " ",
+                                              c.ljust(width), n,
+                                              ");" if i == len(numbers) - 1
+                                              else ","))
+        spec.line("")
+        spec.line("Installing : Boolean := False;")
+        spec.line("Modules    : Module_Table := Disk_Modules;")
+        spec.line("--  Set by Start.")
+        spec.line("")
+        spec.aligned([(ada_name(name) + "_Priority", "%d;" % value)
+                      for name, value in self.priorities.items()],
+                     ": constant :=")
+        spec.line("")
+        spec.line("--  The boot servers' object ids (#372)")
+        spec.line("")
+        spec.aligned([(ada_name(name) + "_Oid", "%d;" % oid)
+                      for name, oid in sorted(self.oids.items(),
+                                              key=lambda x: x[1])],
+                     ": constant :=")
+        spec.line("")
+        spec.line("--  The caps that init gets from the boot servers, and "
+                  "makes")
+        spec.line("")
+        for name in self.caps:
+            spec.line("%s_Cap : Rose.Capabilities.Capability :=" %
+                      ada_name(name))
+            spec.line("  Rose.Capabilities.Null_Capability;")
+        spec.line("")
+        spec.line("procedure Start (Install : Boolean);")
+        spec.line("--  Choose the install media's boot (Install), or the "
+                  "boot disk's.")
+        for name in stages:
+            spec.line("")
+            spec.line("procedure Launch_%s;" % ada_name(name))
+        spec.line("")
+        spec.dedent()
+        spec.line("end Init.Boot;")
+
+        used_init_caps = sorted(
+            {c for c in self.init_caps
+             if re.search(r"\b%s_Cap\b" % ada_name(c), body.text())}
+            | {"boot", "create_endpoint"})
+
+        adb = Writer()
+        adb.line(header)
+        adb.line("")
+        for w in sorted(self.withs | {INIT_CAPS, "Rose.Objects"}):
+            adb.line("with %s;" % w)
+        adb.line("")
+        adb.line("with Init.Boot_Steps;")
+        adb.line("with Init.Calls;")
+        adb.line("with Init.Grants;")
+        adb.line("")
+        adb.line("package body Init.Boot is")
+        adb.indent()
+        adb.line("")
+        adb.line("--  Init's caps (Rose.Init_Capabilities)")
+        adb.line("")
+        for c in used_init_caps:
+            adb.line("%s_Cap : constant Rose.Capabilities.Capability :=" %
+                     ada_name(c))
+            adb.line("  %s.%s_Cap;" % (INIT_CAPS, ada_name(c)))
+        adb.lines.extend(body.lines)
+        adb.line("")
+        adb.rule("Start")
+        adb.line("")
+        adb.line("procedure Start (Install : Boolean) is")
+        adb.line("begin")
+        adb.line("   Installing := Install;")
+        adb.line("   Modules := (if Install then Install_Modules "
+                 "else Disk_Modules);")
+        adb.line("end Start;")
+        adb.line("")
+        adb.dedent()
+        adb.line("end Init.Boot;")
+        return spec.text(), adb.text()
+
+    def grub_modules(self, variant):
+        return [m.files[variant] for m in self.modules
+                if variant in m.variants]
+
+
+class Writer:
+
+    def __init__(self):
+        self.lines = []
+        self.level = 0
+
+    def indent(self, n=3):
+        self.level += n
+
+    def dedent(self, n=3):
+        self.level -= n
+
+    def line(self, text):
+        self.lines.append(" " * self.level + text if text else "")
+
+    def rule(self, name):
+        bar = "-" * (len(name) + 6)
+        self.line(bar)
+        self.line("-- %s --" % name)
+        self.line(bar)
+
+    def fits(self, text):
+        return self.level + len(text) <= LINE_LENGTH
+
+    def call(self, name, args, tail):
+        """A continuation line calling NAME with ARGS, or if that is too
+        long, NAME and then the arguments, as many to a line as fit."""
+        one = "  %s (%s)%s" % (name, ", ".join(args), tail)
+        if self.fits(one):
+            self.line(one)
+            return
+        self.line("  " + name)
+        current = None
+        for i, arg in enumerate(args):
+            text = arg + (")" + tail if i == len(args) - 1 else ",")
+            if current is None:
+                current = "    (" + text
+            elif self.fits(current + " " + text):
+                current += " " + text
+            else:
+                self.line(current)
+                current = "     " + text
+        self.line(current)
+
+    def aligned(self, pairs, separator):
+        """NAME SEPARATOR VALUE lines, with the separators lined up."""
+        width = max(len(name) for name, _ in pairs)
+        for name, value in pairs:
+            self.line("%s %s %s" % (name.ljust(width), separator, value))
+
+    def cap_array(self, caps, variants, words):
+        """The launch's caps, and words if any, closing the call.  Caps
+        that only some variants get go at the end, chosen by a
+        conditional expression."""
+        common = [c for v, c in caps if v == variants]
+        rest = [(v, c) for v, c in caps if v != variants]
+        if any(v == variants for v, _ in caps[len(common):]):
+            fail("a cap for every variant follows one for some")
+        tail = ");" if words is None else ","
+        if rest:
+            only = rest[0][0]
+            if any(v != only for v, _ in rest):
+                fail("conditional caps must be for the same variant")
+            self.line(" (if %s" % condition(only))
+            self.line("  then")
+            self.cap_list(common + [c for _, c in rest], "   ", "")
+            self.line("  else")
+            self.cap_list(common, "   ", ")" + tail)
+        else:
+            self.cap_list(common, " ", tail)
+        if words is not None:
+            self.line(" (" + ", ".join(str(w) for w in words) + "));")
+
+    def cap_list(self, caps, lead, close):
+        if len(caps) == 1:
+            self.line("%s(1 => %s)%s" % (lead, caps[0], close))
+            return
+        for i, cap in enumerate(caps):
+            opener = "(" if i == 0 else " "
+            end = ")" + close if i == len(caps) - 1 else ","
+            self.line(lead + opener + cap + end)
+
+    def text(self):
+        return "\n".join(self.lines) + "\n"
+
+
+def write_if_changed(path, text):
+    try:
+        with open(path) as f:
+            if f.read() == text:
+                return
+    except FileNotFoundError:
+        pass
+    with open(path, "w") as f:
+        f.write(text)
+
+
+def rewrite_grub(path, modules):
+    """Replace each run of module2 lines in the GRUB menu at PATH."""
+    with open(path) as f:
+        lines = f.read().split("\n")
+    result = []
+    in_run = False
+    for line in lines:
+        m = re.match(r"(\s*)module2\s", line)
+        if m:
+            if not in_run:
+                result.extend("%smodule2 /boot/%s %s" % (m.group(1), name,
+                                                         name)
+                              for name in modules)
+            in_run = True
+        else:
+            in_run = False
+            result.append(line)
+    write_if_changed(path, "\n".join(result))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    parser.add_argument("-o", dest="outdir", required=True)
+    parser.add_argument("--root", default=".",
+                        help="the Rose tree, for paths in the description")
+    parser.add_argument("--no-grub", action="store_true",
+                        help="don't rewrite the GRUB menus")
+    parser.add_argument("description")
+    args = parser.parse_args()
+
+    with open(args.description) as f:
+        description = yaml.safe_load(f)
+
+    init_caps = read_init_caps(
+        os.path.join(args.root, "src/base/rose-init_capabilities.ads"))
+
+    try:
+        generator = Generator(description, init_caps)
+        source = os.path.relpath(os.path.abspath(args.description),
+                                 os.path.abspath(args.root))
+        spec, body = generator.generate(source)
+    except DescriptionError as e:
+        sys.exit("%s: %s" % (args.description, e))
+
+    os.makedirs(args.outdir, exist_ok=True)
+    write_if_changed(os.path.join(args.outdir, "init-boot.ads"), spec)
+    write_if_changed(os.path.join(args.outdir, "init-boot.adb"), body)
+
+    if not args.no_grub:
+        for variant, path in description["grub"].items():
+            rewrite_grub(os.path.join(args.root, path),
+                         generator.grub_modules(variant))
+
+
+if __name__ == "__main__":
+    main()

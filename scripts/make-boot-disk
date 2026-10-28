@@ -22,9 +22,9 @@ BIOS_BOOT_START=2048
 BIOS_BOOT_BLOCKS=2048
 BOOT_PARTITION_BYTES=$((16 * 1024 * 1024))
 
-# The boot disk's boot modules, in the order of images/hd0/grub.cfg.
-MODULES="init console mem pci ata store restore scan partition elf timer
-caps checkpoint log"
+# The boot disk's boot modules: the ones images/hd0/grub.cfg loads, which
+# come from src/servers/init/boot.yaml (#374).
+MODULES=$(awk '$1 == "module2" && !seen[$3]++ { print $3 }' images/hd0/grub.cfg)
 
 # Write the 64-bit little-endian value $2 at byte offset $3 of file $1.
 put_word_64 () {
