@@ -7,9 +7,18 @@ The work is tracked in #143 (launch), #156 (`Rose.Command_Line`), #162 (system c
 Notes marked _Today_ say what the code does now.
 ====
 
-Object ids in the range 1 to 2^24^ − 1 represent processes.
+Object ids in the range 1 to 2^32^ − 1 represent processes.
 
 Process id 1 is used to refer to the Kernel.
+It is the idle process's id, and invocations sent to it go to the kernel.
+
+The ids up to 255 belong to boot modules.
+Init has id 2, and init chooses an id for each boot module it launches, so that a boot server has the same id on every boot, whichever other modules are launched.
+The caps that restored processes hold for a boot server still name it after a restart.
+
+Other processes have ids from 256 up, given out in order and never used again, so a cap that names a process that has gone cannot reach a later one.
+A process's id does not depend on the entry it has in the kernel's process table.
+A checkpoint records the next id, and a restore carries on from there.
 
 A process started by the shell runs a _command_: an Ada procedure whose typed signature is declared in IDL (see <<commands>>).
 The shell reads the signature before the command runs, binds the user's arguments to it, and starts the process with exactly the capabilities those arguments call for.
