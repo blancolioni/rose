@@ -1,5 +1,7 @@
 package body Rose.CRTL is
 
+   use System.Storage_Elements;
+
    type GCC_Exception_Access is access all Integer;
 
    type Unwind_Action is new Integer;
@@ -8,8 +10,21 @@ package body Rose.CRTL is
 
    type Unwind_Reason_Code is new Integer;
 
-   Heap        : System.Storage_Elements.Storage_Array (1 .. 65536);
-   Current_Top : System.Storage_Elements.Storage_Offset := Heap'First;
+   Heap_Alignment : constant := Standard'Maximum_Alignment;
+
+   Header_Size : constant Storage_Count := Heap_Alignment;
+   --  Each block starts with a header that holds its size, which
+   --  Reallocate needs. Keeping the header a whole alignment unit keeps
+   --  the block that follows aligned.
+
+   Heap        : Storage_Array (1 .. 65536)
+     with Alignment => Heap_Alignment;
+   Current_Top : Storage_Offset := Heap'First;
+   --  A bump allocator: Deallocate does nothing, so freed memory is not
+   --  reused. A real heap waits for space banks.
+
+   function Block_Size (Ptr : System.Address) return Storage_Count;
+   --  The size that the block at Ptr was allocated with.
 
    Exception_Tracebacks : Integer := 0;
    pragma Export (C, Exception_Tracebacks, "__gl_exception_tracebacks");
@@ -66,18 +81,44 @@ package body Rose.CRTL is
      (Size : System.Storage_Elements.Storage_Count)
      return System.Address
    is
-      use System.Storage_Elements;
    begin
-      if Size = 0 or else Current_Top + Size > Heap'Last then
+      if Size = 0 or else Size > Heap'Length then
          return System.Null_Address;
       end if;
 
-      return Result : constant System.Address :=
-        Heap (Current_Top)'Address
-      do
-         Current_Top := Current_Top + Size;
-      end return;
+      declare
+         Rounded : constant Storage_Count :=
+           (Size + Heap_Alignment - 1) / Heap_Alignment * Heap_Alignment;
+      begin
+         if Header_Size + Rounded > Heap'Last - Current_Top + 1 then
+            return System.Null_Address;
+         end if;
+
+         declare
+            Header : Storage_Count
+              with Import, Address => Heap (Current_Top)'Address;
+         begin
+            Header := Size;
+         end;
+
+         return Result : constant System.Address :=
+           Heap (Current_Top + Header_Size)'Address
+         do
+            Current_Top := Current_Top + Header_Size + Rounded;
+         end return;
+      end;
    end Allocate;
+
+   ----------------
+   -- Block_Size --
+   ----------------
+
+   function Block_Size (Ptr : System.Address) return Storage_Count is
+      Header : constant Storage_Count
+        with Import, Address => Ptr - Header_Size;
+   begin
+      return Header;
+   end Block_Size;
 
    procedure Deallocate
      (Ptr : System.Address)
@@ -101,9 +142,25 @@ package body Rose.CRTL is
       Size : System.Storage_Elements.Storage_Count)
      return System.Address
    is
-      pragma Unreferenced (Ptr);
+      use type System.Address;
+      Result : constant System.Address := Allocate (Size);
    begin
-      return Allocate (Size);
+      if Ptr /= System.Null_Address
+        and then Result /= System.Null_Address
+      then
+         declare
+            Count  : constant Storage_Count :=
+              Storage_Count'Min (Block_Size (Ptr), Size);
+            Source : constant Storage_Array (1 .. Count)
+              with Import, Address => Ptr;
+            Target : Storage_Array (1 .. Count)
+              with Import, Address => Result;
+         begin
+            Target := Source;
+         end;
+      end if;
+
+      return Result;
    end Reallocate;
 
    procedure Gnat_Personality_V0 is null;

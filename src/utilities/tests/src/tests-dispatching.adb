@@ -2,10 +2,6 @@ with Ada.Text_IO;
 
 package body Tests.Dispatching is
 
-   --  The tests program has no secondary stack, so nothing here is
-   --  returned by a function: a tagged result is returned on the
-   --  secondary stack.
-
    package Shapes is
 
       type Shape is interface;
