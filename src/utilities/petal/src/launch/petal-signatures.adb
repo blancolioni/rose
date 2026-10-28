@@ -171,7 +171,20 @@ package body Petal.Signatures is
       end Line;
 
    begin
+      --  Result can hold the signature of an earlier command, so a field
+      --  that this command's metadata leaves out must be cleared.
+
       Result.Valid := False;
+      Result.Name := (others => <>);
+      Result.Package_Name := (others => <>);
+      Result.Title := (others => <>);
+      Result.Version := (others => <>);
+      Result.Copyright := (others => <>);
+      Result.Authors := (others => <>);
+      Result.License := (others => <>);
+      Result.Help_Footer := (others => <>);
+      Result.Summary := (others => <>);
+      Result.Description := (others => <>);
       Result.Length := Natural'Min (Text'Length, Max_Text);
       Result.Text (1 .. Result.Length) :=
         Text (Text'First .. Text'First + Result.Length - 1);

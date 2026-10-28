@@ -1,0 +1,6 @@
+command Rose.Core.Cat : Standard_Output
+  with Summary => "Write the contents of a file to standard output."
+is
+   File : in File
+     with Help => "the file to write";
+end Rose.Core.Cat;
