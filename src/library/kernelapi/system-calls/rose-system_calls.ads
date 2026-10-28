@@ -21,9 +21,11 @@ package Rose.System_Calls is
    procedure Invoke_Capability
      (Item : aliased in out Rose.Invocation.Invocation_Record);
    pragma No_Inline (Invoke_Capability);
+   pragma Machine_Attribute (Invoke_Capability, "noipa");
    --  Its body jumps to the system call page, which takes the address of
-   --  Item from the stack, where a call puts it. Inlined, the jump would
-   --  find whatever its caller has there (#399).
+   --  Item from the stack, where a call puts it. Inlined, or cloned by
+   --  GCC without the parameter that the body does not name, the jump
+   --  would find whatever its caller has there (#399).
 
    procedure Invoke
      (Cap       : Rose.Capabilities.Capability;
@@ -166,13 +168,22 @@ package Rose.System_Calls is
    function Create_Endpoint_Capability return Rose.Capabilities.Capability;
    function Delete_Cap_Capability return Rose.Capabilities.Capability;
    function Rescind_Cap_Capability return Rose.Capabilities.Capability;
+   --  The process's caps for creating endpoints, and for deleting and
+   --  rescinding caps: those given to Use_Capabilities, or for the
+   --  others, those in its argument cap set, which it gets the first
+   --  time it asks (Rose.Capabilities.Standard).
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
    procedure Rescind_Cap (Cap : Rose.Capabilities.Capability);
+   --  Delete or rescind Cap. Nothing happens if Cap is null, or if the
+   --  process has no cap to delete or rescind with.
 
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability);
+   --  The process's caps for creating endpoints, and for deleting and
+   --  rescinding caps. Only the caps that are not null are recorded, so
+   --  a process can give them in more than one call.
 
    procedure Use_Buffer
      (Buffer_Address : System.Address;
