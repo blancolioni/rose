@@ -11,6 +11,7 @@ with Rose.Interfaces.File_System.Client;
 with Rose.Console_IO;
 with Rose.Directories;
 
+with Restore.Boot_Disk;
 with Restore.Installer.Default;
 with Restore.Start;
 
@@ -22,6 +23,9 @@ begin
    Restore.Start.Get_Caps;
    Restore.Start.Next (Install_Media_Cap);
    Restore.Start.Next (Log_Reset_Cap);
+   Restore.Start.Next (MBR_Cap);
+   Restore.Start.Next (BIOS_Boot_Cap);
+   Restore.Start.Next (Boot_Partition_Cap);
 
    Restore.Start.Prepare (Checkpoint);
 
@@ -55,6 +59,12 @@ begin
          Restore.Installer.Install
            (Source => Restore.Installer.Default.Iterate_Steps'Access);
       end;
+
+      --  So that the disk boots without the install media.  Only a new
+      --  system writes it; updating it on a disk that has a checkpoint
+      --  is #375.
+
+      Restore.Boot_Disk.Write_Boot_Loader;
    end if;
 
    Restore.Start.Finish (Restored);

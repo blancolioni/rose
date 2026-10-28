@@ -113,6 +113,14 @@ package body Init.Run is
    Log_Oid            : constant := 16;
    Log_Partition_Oid  : constant := 17;
 
+   --  The install media's partition servers for writing the boot loader
+   --  (#322): block 0, which holds the MBR, and the BIOS boot and boot
+   --  partitions.
+
+   MBR_Oid            : constant := 18;
+   BIOS_Boot_Oid      : constant := 19;
+   Boot_Partition_Oid : constant := 20;
+
    Is_Driver_Flag     : constant := 32;
    --  Set in the flags of an install message for a program from the
    --  drivers directory (Restore.Installer.Is_Driver).
@@ -216,6 +224,12 @@ package body Init.Run is
       Swap_Cap          : Rose.Capabilities.Capability := 0;
       Log_Cap           : Rose.Capabilities.Capability := 0;
 
+      MBR_Cap            : Rose.Capabilities.Capability := 0;
+      BIOS_Boot_Cap      : Rose.Capabilities.Capability := 0;
+      Boot_Partition_Cap : Rose.Capabilities.Capability := 0;
+      --  Block devices for block 0 and the two boot partitions, which
+      --  restore-install writes the boot loader to (#322)
+
       Add_Log_Device_Cap : Rose.Capabilities.Capability;
       Append_To_Log_Cap  : Rose.Capabilities.Capability;
       Log_Reader_Cap     : Rose.Capabilities.Capability;
@@ -239,6 +253,17 @@ package body Init.Run is
       function Get_Public_Interface_From_Process
         (Process_Cap : Rose.Capabilities.Capability)
          return Rose.Capabilities.Capability;
+
+      function Launch_Partition_Server
+        (Oid        : Rose.Objects.Object_Id;
+         Device_Cap : Rose.Capabilities.Capability;
+         Start      : Rose.Words.Word_64;
+         Bound      : Rose.Words.Word_64;
+         Block_Size : Rose.Words.Word)
+         return Rose.Capabilities.Capability;
+      --  Launch a partition server for the device's blocks Start ..
+      --  Bound - 1, in 512-byte blocks, and return its block device
+      --  interface, which has blocks of Block_Size bytes.
 
       procedure Load_Partition
         (Client            : Rose.Interfaces.Partitions
@@ -331,6 +356,34 @@ package body Init.Run is
          return Interface_Cap;
       end Get_Public_Interface_From_Process;
 
+      -----------------------------
+      -- Launch_Partition_Server --
+      -----------------------------
+
+      function Launch_Partition_Server
+        (Oid        : Rose.Objects.Object_Id;
+         Device_Cap : Rose.Capabilities.Capability;
+         Start      : Rose.Words.Word_64;
+         Bound      : Rose.Words.Word_64;
+         Block_Size : Rose.Words.Word)
+         return Rose.Capabilities.Capability
+      is
+         Copy_Id_Cap : constant Rose.Capabilities.Capability :=
+                         Init.Calls.Launch_Boot_Module
+                           (Boot_Cap, Modules.Partition, Oid,
+                            Device_Driver_Priority,
+                            Create_Endpoint_Cap, Cap_Set_Cap,
+                            (Console_Interface_Cap,
+                             Device_Cap),
+                            (Rose.Words.Word (Start),
+                             Rose.Words.Word (Bound),
+                             Block_Size));
+      begin
+         return Copy_Cap_From_Process
+           (Copy_Id_Cap,
+            Rose.Interfaces.Block_Device.Block_Device_Interface);
+      end Launch_Partition_Server;
+
       --------------------
       -- Load_Partition --
       --------------------
@@ -341,67 +394,53 @@ package body Init.Run is
          Device_Cap        : Rose.Capabilities.Capability;
          Index             : Positive)
       is
+         use Rose.Devices.Partitions;
          Partition_Type_Low  : Rose.Words.Word_64;
          Partition_Type_High : Rose.Words.Word_64;
          Partition_Flags     : Rose.Words.Word_64;
          Start_Address       : Rose.Words.Word_64;
          Length              : Rose.Words.Word_64;
-         Copy_Id_Cap         : Rose.Capabilities.Capability;
-         Is_Swap             : Boolean := False;
-         Is_Log              : Boolean := False;
-         Block_Size          : Rose.Words.Word;
+
+         function Is_Type (Low, High : Rose.Words.Word_64) return Boolean
+         is (Partition_Type_Low = Low and then Partition_Type_High = High);
+
+         function Launch
+           (Oid        : Rose.Objects.Object_Id;
+            Block_Size : Rose.Words.Word)
+            return Rose.Capabilities.Capability
+         is (Launch_Partition_Server
+               (Oid, Device_Cap, Start_Address, Start_Address + Length,
+                Block_Size));
+
       begin
          Rose.Interfaces.Partitions.Client.Get_Partition
            (Client, Index, Partition_Type_Low,
             Partition_Type_High, Partition_Flags,
             Start_Address, Length);
 
-         --  Only the first swap and log partitions are used.  Others,
-         --  such as GRUB's (#321), are left alone.
+         --  Only the first partition of each type is used.  The install
+         --  media's init also uses GRUB's, to write the boot loader
+         --  (#322).
 
          if Is_Swap_Partition (Partition_Type_Low, Partition_Type_High) then
-            Block_Size := 4096;
-            Is_Swap := True;
-            if Swap_Cap /= 0 then
-               return;
+            if Swap_Cap = 0 then
+               Swap_Cap := Launch (Swap_Partition_Oid, 4096);
             end if;
          elsif Is_Log_Partition (Partition_Type_Low, Partition_Type_High) then
-            Block_Size := 512;
-            Is_Log := True;
-            if Log_Cap /= 0 then
-               return;
+            if Log_Cap = 0 then
+               Log_Cap := Launch (Log_Partition_Oid, 512);
             end if;
-
-         else
-            return;
+         elsif not Install then
+            null;
+         elsif Is_Type (BIOS_Boot_Id_Low, BIOS_Boot_Id_High) then
+            if BIOS_Boot_Cap = 0 then
+               BIOS_Boot_Cap := Launch (BIOS_Boot_Oid, 512);
+            end if;
+         elsif Is_Type (EFI_System_Id_Low, EFI_System_Id_High) then
+            if Boot_Partition_Cap = 0 then
+               Boot_Partition_Cap := Launch (Boot_Partition_Oid, 4096);
+            end if;
          end if;
-
-         Copy_Id_Cap :=
-           Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Modules.Partition,
-              (if Is_Swap then Swap_Partition_Oid else Log_Partition_Oid),
-              Device_Driver_Priority,
-              Create_Endpoint_Cap, Cap_Set_Cap,
-              (Console_Interface_Cap,
-               Device_Cap),
-              (Rose.Words.Word (Start_Address),
-               Rose.Words.Word (Start_Address + Length),
-               Block_Size));
-
-         declare
-            Interface_Cap : constant Rose.Capabilities.Capability :=
-                              Copy_Cap_From_Process
-                                (Copy_Id_Cap,
-                                 Rose.Interfaces.Block_Device
-                                 .Block_Device_Interface);
-         begin
-            if Is_Swap then
-               Swap_Cap := Interface_Cap;
-            elsif Is_Log then
-               Log_Cap := Interface_Cap;
-            end if;
-         end;
-
       end Load_Partition;
 
       ----------
@@ -701,6 +740,13 @@ package body Init.Run is
 
       end;
 
+      --  Block 0 isn't a partition, but restore-install writes GRUB's
+      --  boot.img to it (#322).
+
+      if Install then
+         MBR_Cap := Launch_Partition_Server (MBR_Oid, Hd0_Cap, 0, 1, 512);
+      end if;
+
       declare
          Install_Caps : Init.Calls.Array_Of_Capabilities (1 .. 2);
       begin
@@ -770,8 +816,9 @@ package body Init.Run is
                                     Init_Caps.Restore_Interrupt_Cap;
 
          --  The restore server's caps, in the order Restore.Start takes
-         --  them.  Only restore-install has the last two, to install
-         --  from the install media and start a new log.
+         --  them.  Only restore-install has the last five, to install
+         --  from the install media, start a new log, and write the boot
+         --  loader (#322).
 
          Restore_Caps     : constant Init.Calls.Array_Of_Capabilities :=
                               (Console_Interface_Cap,
@@ -787,11 +834,14 @@ package body Init.Run is
                                Store_Restore_Cap,
                                Memory_Restore_Cap,
                                Install_Media_FS,
-                               Log_Reset_Cap);
+                               Log_Reset_Cap,
+                               MBR_Cap,
+                               BIOS_Boot_Cap,
+                               Boot_Partition_Cap);
          Last_Restore_Cap : constant Positive :=
                               (if Install
                                then Restore_Caps'Last
-                               else Restore_Caps'Last - 2);
+                               else Restore_Caps'Last - 5);
 
          Copy_Restore_Cap : constant Rose.Capabilities.Capability :=
                               Init.Calls.Launch_Boot_Module

@@ -1,0 +1,76 @@
+#!/bin/sh
+# Build what the installer writes to hd0 so that Rose boots from it
+# (#322), in images/iso/rose/install/boot:
+#
+#   boot.img  GRUB's MBR code, for the first 440 bytes of block 0
+#   core.img  GRUB's core image, for the BIOS boot partition
+#   boot.fat  a FAT image of the boot partition, with GRUB's menu and
+#             modules, the kernel and the boot disk's boot modules
+#
+# The disk layout is scan's (#321): the BIOS boot partition starts at
+# block 2048 and is 1 MiB, and the boot partition follows it and is
+# 16 MiB.  Run after prepare-boot-executables, which leaves the stripped
+# kernel and modules in images/tmp.
+
+set -e
+
+GRUB_DIR=/usr/lib/grub/i386-pc
+OUT=images/iso/rose/install/boot
+TMP=images/tmp
+
+BIOS_BOOT_START=2048
+BIOS_BOOT_BLOCKS=2048
+BOOT_PARTITION_BYTES=$((16 * 1024 * 1024))
+
+# The boot disk's boot modules, in the order of images/hd0/grub.cfg.
+MODULES="init console mem pci ata store restore scan partition elf timer
+caps checkpoint log"
+
+# Write the 64-bit little-endian value $2 at byte offset $3 of file $1.
+put_word_64 () {
+    python3 -c '
+import struct, sys
+with open(sys.argv[1], "r+b") as f:
+    f.seek(int(sys.argv[3]))
+    f.write(struct.pack("<Q", int(sys.argv[2])))
+' "$1" "$2" "$3"
+}
+
+mkdir -p $OUT
+
+# The MBR code finds core.img by the address at 0x5c, which is 1 when
+# core.img follows the MBR.  Here it starts the BIOS boot partition.
+
+cp $GRUB_DIR/boot.img $OUT/boot.img
+put_word_64 $OUT/boot.img $BIOS_BOOT_START $((0x5c))
+
+# core.img's first sector loads the rest of it from the block list at
+# its end (0x1f4), which starts at block 2 by default.
+
+grub2-mkimage -O i386-pc -o $OUT/core.img \
+    -p '(hd0,gpt2)/boot/grub' biosdisk part_gpt fat
+put_word_64 $OUT/core.img $((BIOS_BOOT_START + 1)) $((0x1f4))
+
+CORE_BLOCKS=$(( ($(stat -c %s $OUT/core.img) + 511) / 512 ))
+if [ $CORE_BLOCKS -gt $BIOS_BOOT_BLOCKS ]; then
+    echo "make-boot-disk: core.img is $CORE_BLOCKS blocks," \
+         "more than the BIOS boot partition's $BIOS_BOOT_BLOCKS" >&2
+    exit 1
+fi
+
+# The boot partition
+
+rm -f $OUT/boot.fat
+truncate -s $BOOT_PARTITION_BYTES $OUT/boot.fat
+mformat -i $OUT/boot.fat -v ROSE-BOOT ::
+mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc
+mcopy -i $OUT/boot.fat images/hd0/grub.cfg ::/boot/grub/grub.cfg
+mcopy -i $OUT/boot.fat $GRUB_DIR/*.mod $GRUB_DIR/*.lst \
+    ::/boot/grub/i386-pc/
+mcopy -i $OUT/boot.fat $TMP/kernel ::/boot/kernel
+for module in $MODULES; do
+    mcopy -i $OUT/boot.fat $TMP/$module ::/boot/$module
+done
+
+echo "make-boot-disk: core.img $CORE_BLOCKS blocks; boot partition" \
+     "$(mdir -i $OUT/boot.fat :: | grep 'bytes free' | sed 's/^ *//')"
