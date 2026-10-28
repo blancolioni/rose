@@ -42,6 +42,22 @@ package Petal.Session is
    --  only the lookup operations (ADR 0003, section 1). It is made the
    --  first time it is asked for, and then kept.
 
+   type File_Lookup is (File_Found, No_Such_File, Not_A_File, No_Directory);
+
+   procedure Find_File
+     (Name   : String;
+      File   : out Rose.Capabilities.Capability;
+      Result : out File_Lookup);
+   --  For an in File argument (#344): the interface cap of the read-only
+   --  File interface of the ordinary file called Name in the current
+   --  directory, which is home until petal has one (#342). Result says
+   --  whether there is such a file. The cap is petal's until
+   --  Release_Files deletes it.
+
+   procedure Release_Files;
+   --  Delete the caps that Find_File has returned since the last call,
+   --  once the command they were bound for has run.
+
    Home_Name : constant String := "home";
    --  The user's home directory, the first entry in the table. An in
    --  Directory argument that is not given is bound to it.
