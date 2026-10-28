@@ -9,9 +9,12 @@ package Restore.Installer is
       Requires_Keyboard_Interface,
       Provides_Input_Stream,
       Requires_Input_Stream,
-      Provides_Console);
+      Provides_Console,
+      Is_Driver);
    --  Provides_Console: the program is the persistent console, which
    --  init gives everything installed after it as standard output.
+   --  Is_Driver: the program is from the drivers directory, so init may
+   --  give it more caps than other programs (#115).  Install sets it.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 

@@ -11,6 +11,7 @@ OBJECTS= \
 	$(BUILDDIR)/b__init-driver.o \
 	$(BUILDDIR)/init-calls.o \
 	$(BUILDDIR)/init-driver.o \
+	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
 	$(BUILDDIR)/init-users.o \
@@ -36,12 +37,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o
 
-# all: src/init-script.ads init $(RELOC)
 all: init $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/init $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
-
-#src/init-script.ads: ../../../scripts/petal/init.petal ../../../scripts/petal/aquarius/petal/aqua/*.aqua
-#	(cd src; aquarius --plugin-dir=../../../../scripts/petal/aquarius -f -i ../../../../scripts/petal/init.petal -a init)
 
 init:
 	mkdir -p build/obj

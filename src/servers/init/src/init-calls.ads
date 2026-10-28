@@ -53,6 +53,11 @@ package Init.Calls is
 
    procedure Send_String
      (Message : String);
+   --  Send Message to the console set by Set_Console, or the cap of the
+   --  last Send_String with a cap.  Nothing is sent if there is neither.
+
+   procedure Set_Console
+     (Cap : Rose.Capabilities.Capability);
 
    function Find_In_Map
      (Find_Cap : Rose.Capabilities.Capability;
@@ -65,25 +70,28 @@ package Init.Calls is
       return Rose.Capabilities.Capability;
 
    function Launch_Boot_Module
-     (Cap            : Rose.Capabilities.Capability;
-      Module_Index   : Rose.Words.Word;
-      Oid            : Rose.Objects.Object_Id;
-      Priority       : Rose.Words.Word;
-      Create_Cap     : Rose.Capabilities.Capability;
-      Create_Cap_Set : Rose.Capabilities.Capability;
-      Launch_Caps    : Array_Of_Capabilities)
-      return Rose.Objects.Object_Id;
+     (Cap             : Rose.Capabilities.Capability;
+      Module_Index    : Rose.Words.Word;
+      Oid             : Rose.Objects.Object_Id;
+      Priority        : Rose.Words.Word;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability;
+      Launch_Caps     : Array_Of_Capabilities)
+      return Rose.Capabilities.Capability;
 
    function Launch_Boot_Module
-     (Cap            : Rose.Capabilities.Capability;
-      Module_Index   : Rose.Words.Word;
-      Oid            : Rose.Objects.Object_Id;
-      Priority       : Rose.Words.Word;
-      Create_Cap     : Rose.Capabilities.Capability;
-      Create_Cap_Set : Rose.Capabilities.Capability;
-      Launch_Caps    : Array_Of_Capabilities;
-      Launch_Words   : Array_Of_Words)
-      return Rose.Objects.Object_Id;
+     (Cap             : Rose.Capabilities.Capability;
+      Module_Index    : Rose.Words.Word;
+      Oid             : Rose.Objects.Object_Id;
+      Priority        : Rose.Words.Word;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability;
+      Launch_Caps     : Array_Of_Capabilities;
+      Launch_Words    : Array_Of_Words)
+      return Rose.Capabilities.Capability;
+   --  Launch a boot module with object id Oid, and return a copy cap for
+   --  it, or the null cap if the launch failed.  The module's first cap
+   --  is Create_Endpoint.
 
    function Launch
      (Launch_Cap  : Rose.Capabilities.Capability;

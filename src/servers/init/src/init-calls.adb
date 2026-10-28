@@ -291,16 +291,16 @@ package body Init.Calls is
       Module_Index    : Rose.Words.Word;
       Oid             : Rose.Objects.Object_Id;
       Priority        : Rose.Words.Word;
-      Create_Cap      : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
       Create_Cap_Set  : Rose.Capabilities.Capability;
       Launch_Caps     : Array_Of_Capabilities)
-      return Rose.Objects.Object_Id
+      return Rose.Capabilities.Capability
    is
       No_Words : Array_Of_Words (1 .. 0);
    begin
       return Launch_Boot_Module
         (Cap, Module_Index, Oid, Priority,
-         Create_Cap, Create_Cap_Set, Launch_Caps, No_Words);
+         Create_Endpoint, Create_Cap_Set, Launch_Caps, No_Words);
    end Launch_Boot_Module;
 
    ------------------------
@@ -308,15 +308,15 @@ package body Init.Calls is
    ------------------------
 
    function Launch_Boot_Module
-     (Cap            : Rose.Capabilities.Capability;
-      Module_Index   : Rose.Words.Word;
-      Oid            : Rose.Objects.Object_Id;
-      Priority       : Rose.Words.Word;
-      Create_Cap     : Rose.Capabilities.Capability;
-      Create_Cap_Set : Rose.Capabilities.Capability;
-      Launch_Caps    : Array_Of_Capabilities;
-      Launch_Words   : Array_Of_Words)
-      return Rose.Objects.Object_Id
+     (Cap             : Rose.Capabilities.Capability;
+      Module_Index    : Rose.Words.Word;
+      Oid             : Rose.Objects.Object_Id;
+      Priority        : Rose.Words.Word;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability;
+      Launch_Caps     : Array_Of_Capabilities;
+      Launch_Words    : Array_Of_Words)
+      return Rose.Capabilities.Capability
    is
       use Rose.Capabilities;
       use Rose.Invocation;
@@ -326,6 +326,7 @@ package body Init.Calls is
       Params.Control.Flags := (Send             => True,
                                Send_Words       => True,
                                Recv_Words       => True,
+                               Recv_Caps        => True,
                                Send_Caps        => False,
                                Block            => True,
                                Create_Reply_Cap => True,
@@ -341,7 +342,7 @@ package body Init.Calls is
          Params.Data (Params.Control.Last_Sent_Word) := W;
       end loop;
 
-      Rose.System_Calls.Send_Cap (Params, Create_Cap);
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
 
       if Create_Cap_Set = Null_Capability then
          for Launch_Cap of Launch_Caps loop
@@ -385,20 +386,15 @@ package body Init.Calls is
 
       Rose.System_Calls.Invoke_Capability (Params);
 
-      declare
-         use Rose.Objects;
-         Result : Object_Id := 0;
-      begin
-         if Params.Control.Flags (Send_Words) then
-            Result := Object_Id (Params.Data (0));
-            if Params.Control.Last_Sent_Word > 0 then
-               Result := Result
-                 + Object_Id (Params.Data (1)) * 2 ** 32;
-            end if;
-         end if;
+      --  The kernel's reply has a copy cap for the new process (#115).
 
-         return Result;
-      end;
+      if Params.Control.Flags (Error)
+        or else not Params.Control.Flags (Send_Caps)
+      then
+         return Null_Capability;
+      else
+         return Params.Caps (0);
+      end if;
 
    end Launch_Boot_Module;
 
@@ -496,8 +492,11 @@ package body Init.Calls is
    procedure Send_String
      (Message : String)
    is
+      use type Rose.Capabilities.Capability;
    begin
-      Send_String (Console_Cap, Message);
+      if Console_Cap /= Rose.Capabilities.Null_Capability then
+         Send_String (Console_Cap, Message);
+      end if;
    end Send_String;
 
    -----------------
@@ -531,5 +530,16 @@ package body Init.Calls is
 
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_String;
+
+   -----------------
+   -- Set_Console --
+   -----------------
+
+   procedure Set_Console
+     (Cap : Rose.Capabilities.Capability)
+   is
+   begin
+      Console_Cap := Cap;
+   end Set_Console;
 
 end Init.Calls;
