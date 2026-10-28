@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-23
 - **Related:** [ADR 0001](0001-capability-revocation.md) (capability revocation), #118 (membrane library), #119 (petal runs commands inside a membrane), Petal Shell project
+- **Amended by:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md), where the mode is the direction, the interface type is the right, and the command is the transaction (sections 1, 4 and 5)
 
 ## Context
 
@@ -32,7 +33,7 @@ A program's arguments are declared in IDL (section 2), and its entry point is th
 
 - **The shell does the binding.** Petal resolves each actual argument against the signature, applies defaults, and reports type errors, missing files or missing permissions before the program starts, naming the argument that failed. Help text and completion come from the same signature.
 - **The signature is the sandbox manifest.** The program receives exactly the capabilities its arguments resolve to and nothing else. Anything else, such as network access or launching other programs, must appear in the signature as a parameter. There is no ambient authority to fall back on.
-- **Modes map to capabilities:**
+- **Modes map to capabilities** (replaced by ADR 0012, where the type gives the right and the command commits):
 
   | Parameter | The program receives |
   |---|---|
@@ -143,7 +144,7 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 
 ### 4. The shell owns the commit
 
-Because the shell opens the files, it controls when changes to them become visible.
+Because the shell opens the files, it controls when changes to them become visible. (ADR 0012 makes the commit the command's, over all its `Writable` arguments, not one argument's mode.)
 
 - **`out File`:** the program writes a new, unnamed object. The shell binds it to the target name only if the program exits successfully. A program that fails or crashes leaves the old contents, or no file, behind.
 - **`in out File`:** the program works on a copy-on-write version. The shell commits it on success and discards it otherwise.
