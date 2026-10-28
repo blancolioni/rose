@@ -7,7 +7,7 @@ DIRS="src/adainclude src/arch/$ARCH ../base ../library/capabilities ../library/k
 # The generated interface packages that the RTS uses: only these, because
 # every unit in the RTS's source directories goes into the library.
 
-INTERFACES="process cap_set"
+INTERFACES="process heap cap_set"
 mkdir -p build/interfaces
 for name in $INTERFACES
 do
