@@ -144,7 +144,7 @@ A command is declared once, in IDL, together with its help text: a `command ... 
 
 ### 4. The shell owns the commit
 
-Because the shell opens the files, it controls when changes to them become visible. (ADR 0012 makes the commit the command's, over all its `Writable` arguments, not one argument's mode.)
+Because the shell opens the files, it controls when changes to them become visible. (ADR 0012 makes the commit the command's, over all its `Versioned` arguments, not one argument's mode.)
 
 - **`out File`:** the program writes a new, unnamed object. The shell binds it to the target name only if the program exits successfully. A program that fails or crashes leaves the old contents, or no file, behind.
 - **`in out File`:** the program works on a copy-on-write version. The shell commits it on success and discards it otherwise.

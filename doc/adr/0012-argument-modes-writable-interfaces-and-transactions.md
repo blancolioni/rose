@@ -34,7 +34,7 @@ A command argument is either `in` or `out`, with the meaning those modes have in
 
 **`in out` is not allowed on a command argument.** Nothing a command does needs it.
 - A value the command changes is an `in` and an `out`.
-- A cap the command changes is an `in` of a `Writable` type.
+- A cap the command changes is an `in` of a `Versioned` type.
 - A cap the command replaces is an `out`.
 
 Idle accepts `in out` on command arguments today, and no Rose command uses it.
@@ -45,24 +45,30 @@ An argument's interface type says what the command can do with the object. A com
 
 An interface argument is a cap, which is a reference, and the mode of a reference doesn't limit what can be done through it. Ada works the same way: `Ada.Text_IO.Put` takes its `File` with mode `in`, and still writes to the file.
 
-An interface whose objects can be versioned and committed is marked with the `Writable` aspect:
+An interface whose objects can be versioned and committed is marked with the `Versioned` aspect:
 
 ```ada
 interface Writable_File : File, Stream_Writer
-  with Writable
+  with Versioned
 is
 end Writable_File;
 ```
 
-- **Inherited.** An interface that inherits from a `Writable` interface is `Writable` too, without repeating the aspect.
+- **Inherited.** An interface that inherits from a `Versioned` interface is `Versioned` too, without repeating the aspect.
 - **Explicit.** Idle can't tell from an interface's operations whether they change its object: `Create_File` and `Create_Directory` are functions, and they change the directory. So the interface states it.
-- **It replaces the names `File` and `Directory`** in idle's `Grants_Right`, which treats those two interfaces and their descendants specially. With section 1, interface arguments need no special case for direction. `Writable` only decides which arguments a transaction covers (section 3).
+- **Named for what the shell does.** The aspect says that the shell can version and commit the object, not that a command can write to it. `Stream_Writer` can be written to, and is deliberately not `Versioned`.
+- **An aspect, not an interface (#421).**
+  - A `Versioned` interface for `Writable_File` and `Writable_Directory` to inherit would say how the shell treats an object, not what a command can do with it, so it would break section 2's rule that the type is the right.
+  - `X : in Versioned` would be a legal argument that means nothing.
+  - If the interface carried the versioning protocol, every command given a version could commit or discard it itself, which defeats section 3.
+  - If #141 needs a uniform protocol for versions, it goes on a separate interface that only the shell and the persistence layer hold.
+- **It replaces the names `File` and `Directory`** in idle's `Grants_Right`, which treats those two interfaces and their descendants specially. With section 1, interface arguments need no special case for direction. `Versioned` only decides which arguments a transaction covers (section 3).
 
 ### 3. The command is the transaction
 
-By default a command runs as a transaction over its `Writable` arguments:
+By default a command runs as a transaction over its `Versioned` arguments:
 
-- **Before it starts,** the shell gives it a version of each `Writable` object it names, not the object itself.
+- **Before it starts,** the shell gives it a version of each `Versioned` object it names, not the object itself.
 - **If the command completes,** the shell commits every version together.
 - **If it fails,** the shell discards them all, and the objects are as they were before the command ran.
 
@@ -83,7 +89,7 @@ end Rose.Core.Touch;
 ```
 
 - **A live command** gets the shell's own caps, and its changes take effect as it makes them. If it fails part way, it can leave its objects changed.
-- **Until #141,** petal can't make versions. It refuses to run a command that is transactional by default and has `Writable` arguments, rather than running it live without saying so. The Rose.Core commands that change a directory (`touch`, `mkdir`, `rename`, `remove` and `rmdir`) declare `Live`.
+- **Until #141,** petal can't make versions. It refuses to run a command that is transactional by default and has `Versioned` arguments, rather than running it live without saying so. The Rose.Core commands that change a directory (`touch`, `mkdir`, `rename`, `remove` and `rmdir`) declare `Live`.
 - **Streams are never versioned.** A stream's data is gone once it's read, and anything written to it has already been seen. So the standard streams stay live in a transactional command. Standard error is a log that survives the command's failure.
 
 `copy` needs no special mode:
@@ -112,7 +118,7 @@ Which object an argument names, and whether it may exist already, depends on how
 This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 
 - **section 1:** the table of modes, and the rows for `out File`, `in out File`, `in Directory` and `in out Directory`;
-- **section 4:** the commit is the command's, over all its `Writable` arguments, not one argument's `out` or `in out` mode;
+- **section 4:** the commit is the command's, over all its `Versioned` arguments, not one argument's `out` or `in out` mode;
 - **section 5:** a directory grant is `in Directory` or `in Writable_Directory`, not `in out Directory`.
 
 ## Consequences
@@ -126,26 +132,26 @@ This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 
 **Costs**
 - **Idle:**
-  - the `Writable` interface aspect, with its inheritance;
+  - the `Versioned` interface aspect, with its inheritance;
   - the `Live` command aspect;
   - `in out` command arguments become an error, for values as well as interfaces;
   - `out` interface arguments become cap results for every interface;
   - idle's command tests that use `in out` or `out File` change.
-- **Interfaces:** `writable_file.idl` and `writable_directory.idl` gain the `Writable` aspect.
+- **Interfaces:** `writable_file.idl` and `writable_directory.idl` gain the `Versioned` aspect.
 - **Most commands that write are blocked until #141,** unless they declare `Live`. That is deliberate: a command shouldn't run live without saying so.
 - **ADR 0002's examples are out of date** where they use `out File`, `in out File` or `in out Directory`.
 
 ## Open questions
 
-- **A live log in a transactional command.** A build commits its outputs together, but its log should survive a failure. This is like the Writer monad: an effect that sits outside the transaction and is kept whatever the result. Standard error already works this way (section 3). A command could perhaps declare more log streams as roles. Making one `Writable` argument live inside a transactional command can wait for a real case.
-- **Snapshot reads.** A transactional command's `in File` is the live file. A read consistent with the command's writes needs a version of a `File`, which isn't `Writable`. This waits for the persistence layer to version any object.
+- **A live log in a transactional command.** A build commits its outputs together, but its log should survive a failure. This is like the Writer monad: an effect that sits outside the transaction and is kept whatever the result. Standard error already works this way (section 3). A command could perhaps declare more log streams as roles. Making one `Versioned` argument live inside a transactional command can wait for a real case.
+- **Snapshot reads.** A transactional command's `in File` is the live file. A read consistent with the command's writes needs a version of a `File`, which isn't `Versioned`. This waits for the persistence layer to version any object.
 - **Directory versions.** What does a version of a `Writable_Directory` hold, and what does committing it do when the command has also written files inside it? This is part of #141.
-- **Narrower grants.** A `Writable_Directory` can create entries, and with #346 delete and rename them too. Should `touch` get a grant that can only create? This is ADR 0002's open question on attenuation.
+- **Narrower grants.** A `Writable_Directory` can create entries, and with #346 delete and rename them too. Should `touch` get a grant that can only create? This is ADR 0002's open question on attenuation. #422 proposes arguments typed by a single method, such as `in Writable_Directory.Create_File`.
 
 ## Follow-up work
 
-- Idle: the `Writable` and `Live` aspects and the argument rules in section 1 (blancolioni/idle, issue to be opened).
-- Mark `Writable_File` and `Writable_Directory` as `Writable`.
-- Petal: bind `in Writable_Directory` and `in Writable_File`, and refuse transactional commands with `Writable` arguments until #141 (#345).
+- Idle: the `Versioned` and `Live` aspects and the argument rules in section 1 (blancolioni/idle, issue to be opened).
+- Mark `Writable_File` and `Writable_Directory` as `Versioned`.
+- Petal: bind `in Writable_Directory` and `in Writable_File`, and refuse transactional commands with `Versioned` arguments until #141 (#345).
 - Update the Rose.Core issues (#332 to #337) to the new spellings.
 - #141: versions and the commit, for transactional commands.
