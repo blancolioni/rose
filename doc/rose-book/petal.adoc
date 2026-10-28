@@ -6,7 +6,8 @@
 [NOTE]
 ====
 This section is out of date (#147).
-`init` no longer uses a script: its boot sequence is written in Ada, in `init-run.adb` (see <<Boot Sequence>>).
+`init` no longer uses a script.
+Its boot sequence is described in `src/servers/init/boot.yaml`, from which the build generates Ada, and what it does after the boot servers is written in Ada, in `init-run.adb` (see <<Boot Sequence>>).
 The Aquarius rule that generated the script is commented out of `src/servers/init/Makefile`, and nothing uses the generated `init-script.ads` that is still checked in.
 ====
 

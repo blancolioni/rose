@@ -2,28 +2,66 @@
 
 == Overview
 
-GRUB loads the kernel and the boot modules.
-The kernel initialises itself and starts the first boot module, `init`, which starts the others in a fixed order.
-The `restore` server then either restores the system from its last checkpoint, or, on a first boot, installs it from the install media.
-`init` starts the checkpoint server, launches the shell if this is a first boot, and exits.
+Rose boots in one of two ways: from the install media, or from the boot disk, hd0.
+In both, GRUB loads the kernel and the boot modules, and the kernel starts the first boot module, `init`, which starts the others in a fixed order.
+The `restore` server then restores the system from its last checkpoint, if there is one.
+`init` starts the checkpoint server, launches the shell if this boot installed a new system, and exits.
 
-The sequence is written in Ada, in `src/servers/init/src/init-run.adb`.
+The two boots differ in their boot modules and in what they do when there is no checkpoint to restore (#373):
+
+[#boot-variants]
+.The two boots
+[cols="1,3,3",options="header"]
+|===
+| | Install media | Boot disk
+| GRUB menu | `images/iso/boot/grub/grub.cfg`, on the ISO | `images/hd0/grub.cfg`, on the boot partition, `rose-boot`
+| Modules | 15: `init-install`, `restore-install`, `isofs`, and the 12 that both boots load | 14: `init`, `restore`, and the 12 that both boots load
+| A checkpoint on hd0 | Restored | Restored
+| No checkpoint on hd0 | A new system is installed from the install media, and GRUB is written to hd0 (see <<first-boot>>) | `init` says "no system on this disk; boot the install media", and the system stays idle
+|===
+
+The boot sequence is described in `src/servers/init/boot.yaml` (#374).
+The build turns it into the Ada package `Init.Boot` with `scripts/make-init`, and writes the `module2` lines of both GRUB menus from it.
+The boot description names each boot module, the object id it is launched with, its priority, the capabilities it is given and the endpoints `init` keeps from it.
+The few steps that aren't wiring, such as launching the partition servers, are written by hand in `Init.Boot_Steps`.
+What `init` does after the boot servers, installing a new system and launching the shell, is in `src/servers/init/src/init-run.adb`.
 
 == The Kernel
 
-GRUB loads the kernel with multiboot 2, together with 15 boot modules: `init` and one for each server below.
+GRUB loads the kernel with multiboot 2, together with the boot modules.
+The kernel checks the modules against its own list for each boot, in `src/kernel/modules/rose-kernel-modules-init.adb`: the first module's name, `init-install` or `init`, says which list applies.
+If they don't match, the kernel stops with a panic, because `init` launches boot modules by their position.
+
 The kernel sets up the console, the memory map, its heap, the page table and the process table, then creates the `init` process.
-`init` starts with a single capability, the _create_ capability, as cap 1.
+The idle process has object id 1, and `init` has object id 2.
 The kernel then switches its log output to the serial port and starts the clock.
+
+`init` starts with a fixed set of 23 capabilities, at the indices given in `Rose.Init_Capabilities` (#115):
+
+* the boot capability, for launching boot modules, and create-process, for `elf`;
+* capabilities for creating endpoints, deleting and rescinding caps, and exiting;
+* the memory map: reserving memory, counting and getting memory regions, and page-on;
+* the clock: set-timeout and get-ticks;
+* checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process and restore-interrupt;
+* trace events, and writing the system image;
+* three _root capabilities_, for I/O ports, interrupts and device pages.
+
+A root capability makes capabilities for hardware.
+Given a range of ports, an interrupt vector or a physical page, it replies with a capability for just that, with less authority than its own; none of the capabilities it makes can make others.
+The device-page root refuses a page that is RAM.
 
 == `init`
 
-`init` uses the create capability to make every other capability it needs: a boot capability for launching boot modules, capabilities for creating endpoints and for deleting and rescinding caps, page-object and port capabilities for devices, interrupt reservations, and the kernel capabilities for memory, checkpoints and the log.
-The create capability never leaves `init`.
+`init` gives each program the hardware it needs from its root capabilities, through `Init.Grants`.
+It records which program each port, interrupt and device page has gone to, and refuses it to any other.
+A boot server is recorded by its object id, and an installed program by a number `init` gives it.
+The boot console's screen and cursor ports are given to nobody, so they are not recorded, because the persistent console takes the screen over from the boot console (see <<handing-over-the-console>>).
 
-Each boot module is launched with a priority, a capability for creating endpoints, and its own capabilities.
+Each boot module is launched with an object id, a priority, a capability for creating endpoints, and its own capabilities.
+The launch replies with a copy capability for the new process, which `init` uses to copy the endpoints it needs from the module, such as the console's `Stream_Writer`.
+
 An invocation is meant to carry at most four capabilities, and most modules need more, so they receive their capabilities in a cap set.
-The cap set server is therefore the second module `init` starts.
+The cap set server, `caps`, is therefore the second module `init` starts.
 The first two modules, `console` and `caps`, receive their capabilities directly in the launch invocation; every later module receives a single cap set, and reads its capabilities from it by index.
 
 [NOTE]
@@ -31,76 +69,125 @@ The first two modules, `console` and `caps`, receive their capabilities directly
 The four-capability limit is not enforced yet: an invocation can carry up to 16 capabilities (`Max_Capabilities` in `Rose.Invocation`, #234).
 ====
 
-After launching a module, `init` takes a copy capability for the new process and uses it to fetch the interfaces it needs from that module, such as the console's `Stream_Writer`.
-
 == Boot Modules
 
+Every boot server has a fixed object id (#372).
+A process that holds a cap to a boot server holds its object id, so the id has to be the same on every boot, whichever boot it is and whichever modules it loads.
+
 [#boot-modules]
-.Boot modules, in the order `init` starts them
+.Boot servers, in the order `init` starts them
 [cols="1,2,4,3",options="header"]
 |===
-| | Module | Receives | Provides to `init`
-| 1 | `console` | The text buffer at `B8000`, as a page object; cursor ports `3D4` and `3D5` | `Stream_Writer`
-| 2 | `caps` | The console | `Constructor`, for creating cap sets
-| 3 | `mem` | Memory region queries, page-on, delete, trace | `Memory`, and its `Checkpoint` endpoint
-| 4 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
+| Id | Server | Receives | Provides to `init`
+| 3 | `console` | The text buffer at `B8000`, as a device page; cursor ports `3D4` and `3D5` | `Stream_Writer` and `Output_Redirect`
+| 14 | `caps` | The console | `Constructor`, for creating cap sets
+| 4 | `mem` | Memory region queries, page-on, delete, trace | `Memory`, its `Checkpoint` endpoint, and `Memory_Restore`
+| 13 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
 | 5 | `pci` | PCI configuration ports `CF8` and `CFC` | Its device lookup endpoint
-| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Two block devices: hd0, the system disk, and hd1, the install media
-| 7 | `store` | Delete, the console, trace | `Storage`
-| 8 | `elf` | Create-process, `Memory`, delete, rescind | `Executable.Launch` and `Launch_Command`
-| 9 | `scan` | hd0 | `Partitions`
-| 10 | `partition` | A block device, and a partition's start, bound and block size | `Block_Device`, one server per partition
-| 11 | `isofs` | hd1 | The install media's root directory
-| 12 | `log` | The kernel's start-log capability | `Add_Log_Device` and `Append`
-| 13 | `restore` | The swap and log partitions, `Storage`, the install media, `init`'s install endpoint, the log's `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore` | (see <<restore-server>>)
-| 14 | `checkpoint` | The timer, enter and leave checkpoint, `Memory.Checkpoint`, log append | --
+| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Block devices: hd0, the system disk, and on the install media hd1, the install media
+| 7 | `store` | Delete, the console, trace | `Storage`, `Add_Backing_Store`, `Reserve_Storage` and `Storage_Checkpoint`
+| 12 | `elf` | Create-process, `Memory`, delete, rescind, trace | `Executable.Launch` and `Launch_Command`
+| 10 | `scan` | hd0 | `Partitions`
+| 11 | `partition` | hd0, and the swap partition's start, bound and block size | The swap partition's `Block_Device`, with 4096-byte blocks
+| 17 | `partition` | The same, for the log partition | The log partition's `Block_Device`, with 512-byte blocks
+| 18 | `partition` | Install media only: hd0's block 0 | `Block_Device`, for writing the MBR
+| 19 | `partition` | Install media only: the BIOS boot partition | `Block_Device`
+| 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
+| 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
+| 16 | `log` | The kernel's start-log capability | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
+| 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
-`init` launches a `partition` server for the active swap partition, the inactive swap partition and the log partition that `scan` finds on hd0.
+`init` launches the partition servers from the partitions that `scan` finds on hd0, using only the first of each type.
+On a blank disk, `scan` first creates the partitions:
+
+* `bios-boot`, 1 MiB, which holds GRUB's `core.img`;
+* `rose-boot`, a 16 MiB EFI System Partition with a FAT file system, which holds GRUB's menu and modules, the kernel and the boot disk's boot modules;
+* `rose-swap` and `rose-log`, which share the rest of the disk equally.
+
 `checkpoint` is launched last, after `restore` has finished.
+
+GRUB loads the modules in a different order, given by the `modules` list in `boot.yaml`: `init` first, then `console`, `mem`, `pci`, `ata`, `store`, `isofs` on the install media, `restore`, `scan`, `partition`, `elf`, `timer`, `caps`, `checkpoint` and `log`.
+`partition` is loaded once, and launched once for each partition server.
 
 [#restore-server]
 == `restore`
 
-`restore` decides whether this boot restores the system or installs it:
+Both `restore` servers start the same way:
 
-. It adds the log partition to `log`, so that the checkpoint log can be read.
-. It looks for a checkpoint: the last complete entry in the checkpoint log.
-. It adds the active swap partition to `store` as backing storage, which both a restore and an install need.
-. If there is a checkpoint, it restores it (see <<restore-boot>>).
-  If there is none, or the checkpoint cannot be restored, this is a first boot (see <<first-boot>>).
-. It tells `init` that it has finished, and whether it restored a checkpoint.
+. They add the log partition to `log`, so that the checkpoint log can be read.
+. They look for a checkpoint: the last complete entry in the checkpoint log.
+. They add the swap partition to `store` as backing storage, which both a restore and an install need.
+. If there is a checkpoint, they restore it (see <<restore-boot>>).
+
+What happens if there is no checkpoint, or it cannot be restored, depends on the boot:
+
+* The boot disk's `restore` says "no system on this disk" and tells `init`, which stops (see <<boot-variants>>).
+* The install media's `restore-install` installs a new system (see <<first-boot>>).
+
+Either way, it finally tells `init` that it has finished, and whether it restored a checkpoint.
 
 [#first-boot]
 == First Boot
 
-On a first boot, `restore` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
+A new system is installed when the install media boots on a disk with no checkpoint.
+`restore-install` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
 It then reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 
 * the drivers `exec`, `vga-console`, `command`, `keyboard` and `event-input-stream`, which are launched;
 * the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
-* the commands `echo`, `user`, `tests` and `petal`, which are saved in the command registry.
+* the commands `echo`, `list`, `cat`, `user`, `tests` and `petal`, which are saved in the command registry.
 
-`init` serves the install endpoint while `restore` runs.
+`init` serves the install endpoint while `restore-install` runs.
 The first program installed is `exec`, which installs every later program.
 The second is `vga-console`, the persistent console (see <<Servers>>), and the third is `command`, the command registry, whose `Find` operation `init` keeps.
-Once `event-input-stream` is running, `restore` sends `init` the keyboard input stream.
+Once `event-input-stream` is running, `restore-install` sends `init` the keyboard input stream.
 
+Each program on the install media comes with a list of the capabilities it asks for, such as `create-endpoint`, `register-interrupt 33` or `port-in-8 96`.
+`init` grants each request that its policy allows, and leaves out the rest:
+
+* any program may have `create-endpoint`;
+* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages;
+* hardware that another program already has is refused (see <<_init>>).
+
+[#handing-over-the-console]
 === Handing over the console
 
 Until `vga-console` is running, everything writes to the boot console, `console`, which is a boot module and not persistent.
-When `restore` has launched `vga-console`, it sends `init` the new console's `Stream_Writer`, and `init`:
+When `restore-install` has launched `vga-console`, it sends `init` the new console's `Stream_Writer`, and `init`:
 
 . tells the boot console to send everything it is given on to the new console, through `Output_Redirect`;
 . tells `exec` to use the new console as the standard output of the programs it launches, and for its own output, through `Exec.Set_Standard_Output`;
 . uses the new console itself, as the standard output of everything it installs or launches from then on.
 
-The boot console passes its output on, rather than stopping, because boot modules and `restore` still hold caps to it.
+The boot console passes its output on, rather than stopping, because boot modules and `restore-install` still hold caps to it.
+
+[#writing-the-boot-loader]
+=== Writing the boot loader
+
+When the programs are installed, `restore-install` writes GRUB to hd0, so that the disk boots without the install media (#322).
+The build makes three files for it with `scripts/make-boot-disk`, and puts them on the install media in `/rose/install/boot`:
+
+[cols="1,2,4",options="header"]
+|===
+| File | Written to | Holds
+| `boot.img` | hd0's block 0, the MBR | GRUB's first stage, which loads `core.img`. Only the boot code, the first 440 bytes, is written: the rest of the block holds the protective MBR's partition entry and signature, which the partition table needs.
+| `core.img` | `bios-boot` | GRUB's second stage, which reads the boot partition
+| `boot.fat` | `rose-boot` | The FAT file system: GRUB's menu, `images/hd0/grub.cfg`, its modules, the kernel and the boot disk's boot modules
+|===
+
+`restore-install` writes them through the install media's three extra partition servers.
+A file that is missing, or doesn't fit its partition, is reported and left out.
+
+The boot loader is written only when a new system is installed.
+Updating the kernel and boot modules on a disk that already has a checkpoint is #375.
 
 [#restore-boot]
 == Restore Boot
 
-On a restore boot, `restore` brings back the persistent processes as they were at the checkpoint, in this order:
+Both boots restore the system if hd0 has a checkpoint, so booting the install media on an installed disk restores the system rather than installing it again.
+`restore` brings back the persistent processes as they were at the checkpoint, in this order:
 
 . the storage server's regions;
 . each process in the kernel, not yet runnable;
@@ -118,7 +205,7 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 
 == Starting the Shell
 
-On a first boot, when `restore` has finished, `init` launches `checkpoint`.
+When a new system has been installed, `init` launches `checkpoint`.
 It then finds `tests` in the command registry and launches it, creates the first user, `fraser`, with a home directory (ADR 0003), and launches `petal`.
 `tests` and `petal` each receive a cap set with the standard streams, using the persistent console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
 `petal` also receives the registry's `Find`, for running commands, a capability for trace events, the user, and the user's home directory as its current directory.

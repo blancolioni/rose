@@ -166,7 +166,7 @@ This is an example of how to partition a 64G disk.
 
 This partition contains the boot sector, grub, a kernel image and enough modules to launch a minimal system.
 The `restore` module looks for a checkpoint, and if it finds one, restores from it.
-Otherwise, it installs the system (see <<Boot Sequence>>).
+Otherwise, the boot disk's `restore` stops, and the install media's `restore-install` installs the system (see <<Boot Sequence>>).
 
 === Swap and checkpoint state partition
 

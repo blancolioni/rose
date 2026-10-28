@@ -8,13 +8,9 @@ Each boot server's cap 1 creates endpoints.
 `console` and `caps` receive their other capabilities directly when they are launched; every later boot server receives a cap set, whose `Get_Cap` is its cap 2, and reads its capabilities from it by index.
 
 Drivers::
-Installed from the install media by `restore`, through `exec`.
-Each driver names the capabilities it needs in a `.driver` manifest, such as `create-endpoint`, `register-interrupt 33`, `port-in-8 96` or `device-page 184`, and `init` grants them when the driver is installed.
-
-[NOTE]
-====
-`init` will resolve these named requests against a policy of its own, from capabilities it already holds, and refuse any it does not allow (#115).
-====
+Installed from the install media by `restore-install`, through `exec`.
+Each driver names the capabilities it needs in a `.driver` manifest, such as `create-endpoint`, `register-interrupt 33`, `port-in-8 96` or `device-page 184`.
+`init` grants the requests its policy allows when the driver is installed, deriving hardware caps from its root caps, and leaves out the rest (#115, see <<first-boot>>).
 
 Each entry below says what the server provides, what it is launched with, and who uses it.
 
