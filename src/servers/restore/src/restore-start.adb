@@ -73,6 +73,8 @@ package body Restore.Start is
 
    procedure Get_Caps is
    begin
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap);
       Next (Console_Cap);
       Next (Swap_Cap);
       Next (Log_Cap);
