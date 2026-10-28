@@ -30,5 +30,13 @@ package Restore is
                            Rose.Capabilities.Null_Capability;
    Log_Reset_Cap       : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   MBR_Cap             : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   BIOS_Boot_Cap       : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Boot_Partition_Cap  : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  Block devices for block 0 and the two boot partitions, for writing
+   --  the boot loader (Restore.Boot_Disk).
 
 end Restore;

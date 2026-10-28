@@ -15,7 +15,7 @@ DRIVERS=command keyboard event-input-stream exec file directory vga-console
 UTILITIES=echo list cat user tests petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 
-rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped hdd iso finished
+rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk hdd iso finished
 
 all: idl rts rose doc
 
@@ -47,6 +47,10 @@ exports:
 
 stripped:
 	sh ./scripts/prepare-boot-executables
+
+# GRUB and the boot partition for hd0, which the installer writes (#322)
+bootdisk:
+	sh ./scripts/make-boot-disk
 
 hdd:
 	sh ./scripts/rose-hdd-install

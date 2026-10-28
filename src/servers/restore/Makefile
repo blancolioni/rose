@@ -25,6 +25,9 @@ FILE_OBJECTS= \
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o
+BLOCK_DEVICE_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-block_device.o \
+	$(BUILDDIR)/rose-interfaces-block_device-client.o
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-log_reader-client.o
@@ -71,12 +74,14 @@ OBJECTS= \
 INSTALL_OBJECTS= \
 	$(BUILDDIR)/b__restore-install_driver.o \
 	$(BUILDDIR)/restore-install_driver.o \
+	$(BUILDDIR)/restore-boot_disk.o \
 	$(BUILDDIR)/restore-installer.o \
 	$(BUILDDIR)/restore-installer-default.o \
 	$(BUILDDIR)/rose-directories.o \
 	$(DIRECTORY_OBJECTS) \
 	$(FILE_OBJECTS) \
 	$(FILE_SYSTEM_OBJECTS) \
+	$(BLOCK_DEVICE_OBJECTS) \
 	$(COMMON_OBJECTS)
 
 all: restore $(RELOC)

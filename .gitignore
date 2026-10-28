@@ -1,6 +1,7 @@
 build
 /images/*
 !/images/iso/
+!/images/hd0/
 /images/iso/*
 !/images/iso/images/
 logs

@@ -18,13 +18,15 @@ package body Rose.Devices.GPT is
          Header_Size           : Rose.Words.Word_32 := 16#0000_005C#;
          Header_CRC            : Rose.Words.Word_32 := 0;
          Reserved_Zero         : Rose.Words.Word_32 := 0;
-         Current_LBA           : Block_Address_Type := 0;
+         Current_LBA           : Block_Address_Type := 1;
          Backup_LBA            : Block_Address_Type := 0;
          First_Usable_LBA      : Block_Address_Type := 0;
          Last_Usable_LBA       : Block_Address_Type := 0;
          Disk_GUID_Lo          : Rose.Words.Word_64 := 0;
          Disk_GUID_Hi          : Rose.Words.Word_64 := 0;
-         Start_Partition_LBA   : Block_Address_Type := 0;
+         Start_Partition_LBA   : Block_Address_Type := 2;
+         --  The entries are always in block 2 (Write_Partition_Entries).
+         --  GRUB reads them from the block this says (#322).
          Partition_Entry_Count : Rose.Words.Word_32 := 0;
          Partition_Entry_Size  : Rose.Words.Word_32 := 16#0000_0080#;
          Partition_Array_CRC   : Rose.Words.Word_32 := 0;
