@@ -1,6 +1,7 @@
 with Tests.Directories;
 with Tests.Dispatching;
 with Tests.Files;
+with Tests.Finalization;
 with Tests.Heap;
 with Tests.Secondary_Stack;
 with Tests.Smoke;
@@ -15,6 +16,7 @@ package Tests.Suite is
                    Tests.Secondary_Stack.Secondary_Stack_Test'Access,
                    Tests.Heap.Heap_Test'Access,
                    Tests.Dispatching.Dispatching_Test'Access,
+                   Tests.Finalization.Finalization_Test'Access,
                    Tests.Files.File_Test'Access,
                    Tests.Directories.Directory_Test'Access,
                    Tests.Users.User_Test'Access);
