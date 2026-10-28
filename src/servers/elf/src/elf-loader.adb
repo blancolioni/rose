@@ -22,6 +22,12 @@ package body Elf.Loader is
    --  however little of it is touched (#305).
    Stack_Base  : constant := Stack_Bound - Stack_Size;
 
+   Heap_Base   : constant := 16#4000_0000#;
+   Heap_Size   : constant := 16#0010_0000#;
+   --  Each program's heap starts empty at Heap_Base, and grows when the
+   --  program asks (interfaces/heap.idl), up to Heap_Size. As with the
+   --  stack, the store allocates all of its backing blocks now (#305).
+
    procedure Read
      (Region : Region_Client;
       Base   : Rose.Objects.Object_Id;
@@ -101,6 +107,27 @@ package body Elf.Loader is
             + Rose.Interfaces.Segment.Segment_Private);
          Close (Region);
          Rose.Trace.Event ("stack added");
+      end;
+
+      declare
+         use type Rose.Words.Word;
+         Region : Rose.Interfaces.Region.Client.Region_Client :=
+           Reserve_Storage
+             (Store, Rose.Words.Word_64 (Heap_Size));
+      begin
+         Add_Segment
+           (Item          => Process,
+            Virtual_Base  => Heap_Base / Rose.Limits.Page_Size,
+            Virtual_Bound => (Heap_Base + Heap_Size) / Rose.Limits.Page_Size,
+            Region        => Region,
+            Region_Offset => 0,
+            Flags         =>
+              Rose.Interfaces.Segment.Segment_Readable
+            + Rose.Interfaces.Segment.Segment_Writable
+            + Rose.Interfaces.Segment.Segment_Resizable
+            + Rose.Interfaces.Segment.Segment_Private);
+         Close (Region);
+         Rose.Trace.Event ("heap added");
       end;
    end Load_Elf_Image;
 

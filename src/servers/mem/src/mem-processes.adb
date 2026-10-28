@@ -892,7 +892,9 @@ package body Mem.Processes is
             P : Memory_Process_Record renames Process_Table (Process);
          begin
             for Segment of P.Segments loop
-               if New_Virtual_Bound in Segment.Base .. Segment.Limit then
+               if Segment.Flags (Extensible)
+                 and then New_Virtual_Bound in Segment.Base .. Segment.Limit
+               then
                   if New_Virtual_Bound < Segment.Bound then
                      for I in New_Virtual_Bound .. Segment.Bound - 1 loop
                         Mem.Calls.Unmap (P.Oid, I);

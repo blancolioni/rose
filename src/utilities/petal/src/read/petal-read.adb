@@ -9,6 +9,12 @@ package body Petal.Read is
 
    Done : Boolean;
 
+   type Line_Access is access String;
+
+   Line : constant Line_Access := new String (1 .. 2000);
+   --  The line being read. It is on the heap, so that petal working after
+   --  a restore shows that its heap came back (#358).
+
    -------------
    -- Execute --
    -------------
@@ -80,7 +86,6 @@ package body Petal.Read is
 
    procedure Reader_Loop is
       use Ada_Text_IO;
-      Line : String (1 .. 2000);
       Last : Natural;
    begin
       Done := False;
@@ -94,7 +99,7 @@ package body Petal.Read is
             exit;
          end if;
 
-         Get_Line (Line, Last);
+         Get_Line (Line.all, Last);
          Execute (Line (1 .. Last));
       end loop;
    end Reader_Loop;
