@@ -12,14 +12,23 @@ package body Rose.Kernel.Modules.Init is
    pragma Import (C, Boot_Mapped_Bound, "boot_mapped_bound");
    --  boot.s maps physical memory below this at Kernel_Virtual_Base
 
-   Expected_Modules : constant String :=
-                        "init console mem pci ata store isofs restore "
-                        & "scan partition elf timer caps checkpoint log";
-   --  init launches boot modules by position, so this has to match
-   --  the module2 lines in grub.cfg and the module constants in
-   --  src/servers/init/src/init-run.adb
+   Install_Modules : constant String :=
+                       "init-install console mem pci ata store isofs "
+                       & "restore-install scan partition elf timer caps "
+                       & "checkpoint log";
+   --  The install media's images/iso/boot/grub/grub.cfg
 
-   procedure Check_Modules;
+   Disk_Modules    : constant String :=
+                       "init console mem pci ata store restore "
+                       & "scan partition elf timer caps checkpoint log";
+   --  The boot disk's grub.cfg (#322)
+
+   --  Init launches boot modules by position, so these have to match the
+   --  module2 lines in each grub.cfg, and the module tables in
+   --  src/servers/init/src/init-run.adb.  The first module's name says
+   --  which list applies (#373).
+
+   procedure Check_Modules (Expected_Modules : String);
 
    procedure Process_Module
      (Mod_Start  : Rose.Words.Word_32;
@@ -30,7 +39,7 @@ package body Rose.Kernel.Modules.Init is
    -- Check_Modules --
    -------------------
 
-   procedure Check_Modules is
+   procedure Check_Modules (Expected_Modules : String) is
       Start  : Positive := Expected_Modules'First;
       Module : Module_Index := Module_Index'First;
    begin
@@ -79,7 +88,19 @@ package body Rose.Kernel.Modules.Init is
    procedure Load_Modules is
    begin
       Rose.Multiboot.Scan_Modules (Process_Module'Access);
-      Check_Modules;
+      declare
+         Name : String (1 .. 16);
+         Last : Natural := 0;
+      begin
+         if Last_Boot_Module >= Module_Index'First then
+            Get_Module_Name (Module_Index'First, Name, Last);
+         end if;
+         if Name (1 .. Last) = "init-install" then
+            Check_Modules (Install_Modules);
+         else
+            Check_Modules (Disk_Modules);
+         end if;
+      end;
    end Load_Modules;
 
    --------------------

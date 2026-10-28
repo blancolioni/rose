@@ -25,9 +25,6 @@ FILE_OBJECTS= \
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o
-BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-log_reader-client.o
@@ -40,21 +37,16 @@ RESTORE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage_checkpoint.o \
 	$(BUILDDIR)/rose-interfaces-storage_checkpoint-client.o
 
-OBJECTS= \
+COMMON_OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
-	$(BUILDDIR)/b__restore-driver.o \
 	$(BUILDDIR)/restore-checkpoint_log.o \
-	$(BUILDDIR)/restore-driver.o \
-	$(BUILDDIR)/restore-installer.o \
-	$(BUILDDIR)/restore-installer-default.o \
+	$(BUILDDIR)/restore-start.o \
 	$(BUILDDIR)/restore.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-addresses.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-directories.o \
-	$(BUILDDIR)/rose-devices-checkpoints.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
@@ -64,16 +56,32 @@ OBJECTS= \
 	$(BUILDDIR)/rose-system_calls-server.o \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o \
+	$(LOG_READER_OBJECTS) \
+	$(RESTORE_OBJECTS) \
+	$(STREAM_READER_OBJECTS)
+
+# restore is the boot disk's restore server, which has no installer, and
+# restore-install the install media's (#373).
+
+OBJECTS= \
+	$(BUILDDIR)/b__restore-driver.o \
+	$(BUILDDIR)/restore-driver.o \
+	$(COMMON_OBJECTS)
+
+INSTALL_OBJECTS= \
+	$(BUILDDIR)/b__restore-install_driver.o \
+	$(BUILDDIR)/restore-install_driver.o \
+	$(BUILDDIR)/restore-installer.o \
+	$(BUILDDIR)/restore-installer-default.o \
+	$(BUILDDIR)/rose-directories.o \
 	$(DIRECTORY_OBJECTS) \
 	$(FILE_OBJECTS) \
 	$(FILE_SYSTEM_OBJECTS) \
-	$(STREAM_READER_OBJECTS) \
-	$(BLOCK_DEVICE_OBJECTS) \
-	$(LOG_READER_OBJECTS) \
-	$(RESTORE_OBJECTS)
+	$(COMMON_OBJECTS)
 
 all: restore $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/restore $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/restore-install $(INSTALL_OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 
 restore:
 	mkdir -p build/obj
