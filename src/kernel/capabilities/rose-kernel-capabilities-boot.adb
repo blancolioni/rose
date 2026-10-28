@@ -169,7 +169,40 @@ package body Rose.Kernel.Capabilities.Boot is
 
       Rose.Boot.Console.New_Line;
 
-      Params.Control.Flags := (Reply  => True, others => False);
+      --  If the caller receives caps, the reply has a copy cap for the
+      --  new process, so that the caller never has to make one (#115).
+
+      declare
+         use type Rose.Capabilities.Capability;
+         Receives_Caps : constant Boolean :=
+                           Params.Control.Flags (Recv_Caps);
+         Copy_Cap      : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+      begin
+         if Receives_Caps then
+            Copy_Cap := Rose.Kernel.Processes.Create_Cap (Current_Pid);
+            if Copy_Cap /= Rose.Capabilities.Null_Capability then
+               Rose.Kernel.Processes.Set_Cap
+                 (Pid    => Current_Pid,
+                  Cap    => Copy_Cap,
+                  Layout =>
+                    (Header  =>
+                       (Cap_Type => Rose.Capabilities.Layout.Copy_Cap,
+                        Endpoint => 1,
+                        others   => <>),
+                     Payload => Oid));
+            end if;
+         end if;
+
+         Params.Control.Flags := (Reply  => True, others => False);
+
+         if Copy_Cap /= Rose.Capabilities.Null_Capability then
+            Params.Control.Flags (Send_Caps) := True;
+            Params.Control.Last_Sent_Cap := 0;
+            Params.Caps (0) := Copy_Cap;
+         end if;
+      end;
+
       Rose.Invocation.Send_Object_Id
         (Params.all, Rose.Kernel.Processes.To_Object_Id (New_Pid));
       Rose.Kernel.Processes.Set_Current_State

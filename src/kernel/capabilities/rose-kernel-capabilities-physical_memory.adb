@@ -1,5 +1,7 @@
+with Rose.Limits;
 with Rose.Words;
 
+with Rose.Kernel.Capabilities.Pages;
 with Rose.Kernel.Physical_Memory;
 with Rose.Kernel.Processes;
 
@@ -132,6 +134,51 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                   end;
                end;
             end if;
+
+         when Device_Page =>
+            declare
+               use type Rose.Capabilities.Capability;
+               use type Rose.Objects.Object_Id;
+               Page    : constant Word := Params.Data (0);
+               New_Cap : Rose.Capabilities.Capability;
+            begin
+               if not Params.Control.Flags (Send_Words)
+                 or else Params.Control.Last_Sent_Word /= 0
+                 or else Page > Rose.Limits.Max_Physical_Pages
+                 or else Rose.Kernel.Physical_Memory.Is_RAM
+                   (Rose.Addresses.Physical_Page_Address (Page))
+               then
+                  Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+               else
+                  New_Cap := Rose.Kernel.Processes.Create_Cap (Process_Id);
+                  if New_Cap = Rose.Capabilities.Null_Capability then
+                     Rose.Kernel.Processes.Return_Error
+                       (Params, Out_Of_Capabilities);
+                  else
+                     Rose.Kernel.Processes.Set_Cap
+                       (Pid    => Process_Id,
+                        Cap    => New_Cap,
+                        Layout =>
+                          (Header  =>
+                             (Cap_Type =>
+                                  Rose.Capabilities.Layout.Page_Object_Cap,
+                              Endpoint =>
+                                Rose.Kernel.Capabilities.Pages
+                                  .Identity_Map_Page,
+                              others   => <>),
+                           Payload =>
+                             Rose.Objects.Page_Object_Id'First
+                           + Rose.Objects.Object_Id (Page)));
+                     Params.Control.Flags :=
+                       (Reply => True, Send_Caps => True, others => False);
+                     Params.Control.Last_Sent_Cap := 0;
+                     Params.Caps (0) := New_Cap;
+                  end if;
+               end if;
+
+               Rose.Kernel.Processes.Set_Current_State
+                 (Process_Id, Rose.Kernel.Processes.Ready);
+            end;
 
          when others =>
             null;

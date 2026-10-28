@@ -30,6 +30,8 @@ package body Rose.Kernel.Capabilities.Arch is
       procedure Send_To_Encoded_Port (Value : Word);
       procedure Send_To_First_Port (Value : Word);
 
+      procedure Derive_Port_Cap;
+
       procedure Log
         (Port  : Word_16;
          Value : Word_32;
@@ -39,6 +41,60 @@ package body Rose.Kernel.Capabilities.Arch is
         (Port    : Word_16;
          Value   : Word_32;
          Message : String);
+
+      ---------------------
+      -- Derive_Port_Cap --
+      ---------------------
+
+      procedure Derive_Port_Cap is
+         package Init_Caps renames Rose.Init_Capabilities;
+         use type Rose.Capabilities.Capability;
+         Pid      : constant Rose.Kernel.Processes.Process_Id :=
+                      Rose.Kernel.Processes.Current_Process_Id;
+         Endpoint : constant Word := Params.Data (0);
+         Size     : constant Word := Params.Data (1);
+         First    : constant Word := Params.Data (2);
+         Last     : constant Word := Params.Data (3);
+         New_Cap  : Rose.Capabilities.Capability;
+      begin
+         if not Params.Control.Flags (Send_Words)
+           or else Params.Control.Last_Sent_Word /= 3
+           or else Endpoint not in
+             Init_Caps.Port_Out_Endpoint .. Init_Caps.Port_In_Range_Endpoint
+           or else Size > Init_Caps.Port_Size_32
+           or else First > Last
+           or else First < Word (First_Port)
+           or else Last > Word (Last_Port)
+         then
+            Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+            return;
+         end if;
+
+         New_Cap := Rose.Kernel.Processes.Create_Cap (Pid);
+
+         if New_Cap = Rose.Capabilities.Null_Capability then
+            Rose.Kernel.Processes.Return_Error (Params, Out_Of_Capabilities);
+            return;
+         end if;
+
+         Rose.Kernel.Processes.Set_Cap
+           (Pid    => Pid,
+            Cap    => New_Cap,
+            Layout =>
+              (Header  =>
+                 (Cap_Type   => Rose.Capabilities.Layout.Arch_Cap,
+                  Endpoint   => Rose.Objects.Endpoint_Index (Endpoint),
+                  Identifier => Rose.Objects.Capability_Identifier (Size),
+                  others     => <>),
+               Payload =>
+                 Rose.Objects.Object_Id (First)
+               + Rose.Objects.Object_Id (Last) * 2 ** 32));
+
+         Params.Control.Flags :=
+           (Reply => True, Send_Caps => True, others => False);
+         Params.Control.Last_Sent_Cap := 0;
+         Params.Caps (0) := New_Cap;
+      end Derive_Port_Cap;
 
       ---------
       -- Log --
@@ -238,6 +294,9 @@ package body Rose.Kernel.Capabilities.Arch is
             end if;
 
             Params.Control.Last_Sent_Word := Params.Control.Last_Recv_Word;
+
+         when Derive_Endpoint =>
+            Derive_Port_Cap;
 
          when others =>
             Rose.Boot.Console.Put ("arch-cap: bad endpoint: ");

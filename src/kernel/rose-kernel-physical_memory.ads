@@ -87,6 +87,11 @@ package Rose.Kernel.Physical_Memory is
    --  Searches for unallocated RAM pages starting from
    --  page From (inclusive)
 
+   function Is_RAM
+     (Page : Rose.Addresses.Physical_Page_Address)
+      return Boolean;
+   --  True if Page is in a region of RAM
+
    procedure Show_Regions;
    --  Show_Regions: write our region map to the console
 

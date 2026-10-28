@@ -15,6 +15,14 @@ with Rose.Kernel.Processes.Queue;
 
 with Rose.Kernel.Panic;
 
+with Rose.Kernel.Capabilities.Arch;
+with Rose.Kernel.Capabilities.Interrupt;
+with Rose.Kernel.Capabilities.Kernel_Caps;
+with Rose.Kernel.Capabilities.Meta;
+with Rose.Kernel.Capabilities.Physical_Memory;
+
+with Rose.Init_Capabilities;
+
 with Rose.Formats.ELF;
 with Rose.Interfaces.Memory;
 
@@ -29,6 +37,109 @@ package body Rose.Kernel.Processes.Init is
    Enable_Paging : constant Boolean := True;
 
    Empty_Environment : aliased Rose.Environment_Pages.Environment_Page;
+
+   procedure Add_Init_Caps (Pid : Process_Id);
+   --  Give init the caps listed in Rose.Init_Capabilities, at the indices
+   --  listed there.
+
+   -------------------
+   -- Add_Init_Caps --
+   -------------------
+
+   procedure Add_Init_Caps (Pid : Process_Id) is
+      use Rose.Capabilities.Layout;
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Object_Id;
+      package Init_Caps renames Rose.Init_Capabilities;
+      package Kernel_Caps renames Rose.Kernel.Capabilities.Kernel_Caps;
+      package Meta renames Rose.Kernel.Capabilities.Meta;
+      package Memory renames Rose.Kernel.Capabilities.Physical_Memory;
+
+      function Layout
+        (Cap_Type : Capability_Type;
+         Endpoint : Rose.Objects.Endpoint_Index;
+         Payload  : Rose.Objects.Object_Id := 0)
+         return Capability_Layout
+      is ((Cap_Type => Cap_Type, Endpoint => Endpoint, others => <>),
+          Payload);
+
+      function Kernel (Endpoint : Rose.Objects.Endpoint_Index)
+                       return Capability_Layout
+      is (Layout (Kernel_Cap, Endpoint));
+
+      Layouts : constant array
+        (Rose.Capabilities.Capability range 1 .. Init_Caps.Last_Cap)
+        of Capability_Layout :=
+          (Init_Caps.Create_Cap             => Layout (Create_Cap, 0),
+           Init_Caps.Boot_Cap               => Layout (Boot_Cap, 1),
+           Init_Caps.Reserve_Memory_Cap     =>
+             Layout (Physical_Memory_Cap, Memory.Reserve_Device_Memory),
+           Init_Caps.Region_Count_Cap       =>
+             Layout (Physical_Memory_Cap, Memory.Get_Region_Count),
+           Init_Caps.Get_Region_Cap         =>
+             Layout (Physical_Memory_Cap, Memory.Get_Region),
+           Init_Caps.Create_Endpoint_Cap    =>
+             Layout (Meta_Cap, Meta.Create_Endpoint_Endpoint),
+           Init_Caps.Rescind_Cap            =>
+             Layout (Meta_Cap, Meta.Rescind_Cap),
+           Init_Caps.Delete_Cap             =>
+             Layout (Meta_Cap, Meta.Delete_Cap),
+           Init_Caps.Exit_Cap               =>
+             Layout (Meta_Cap, Meta.Exit_Process),
+           Init_Caps.Page_On_Cap            =>
+             Kernel (Kernel_Caps.Enable_Paging_Endpoint),
+           Init_Caps.Write_System_Image_Cap =>
+             Kernel (Kernel_Caps.Start_Checkpoint_Endpoint),
+           Init_Caps.Create_Process_Cap     =>
+             Kernel (Kernel_Caps.Create_Process_Endpoint),
+           Init_Caps.Set_Timeout_Cap        =>
+             Kernel (Kernel_Caps.Set_Timeout_Endpoint),
+           Init_Caps.Get_Ticks_Cap          =>
+             Kernel (Kernel_Caps.Get_Current_Ticks_Endpoint),
+           Init_Caps.Enter_Checkpoint_Cap   =>
+             Kernel (Kernel_Caps.Enter_Checkpoint_Endpoint),
+           Init_Caps.Leave_Checkpoint_Cap   =>
+             Kernel (Kernel_Caps.Leave_Checkpoint_Endpoint),
+           Init_Caps.Start_Log_Cap          =>
+             Kernel (Kernel_Caps.Start_Log_Endpoint),
+           Init_Caps.Trace_Cap              =>
+             Kernel (Kernel_Caps.Trace_Endpoint),
+           Init_Caps.Restore_Process_Cap    =>
+             Kernel (Kernel_Caps.Restore_Process_Endpoint),
+           Init_Caps.Resume_Process_Cap     =>
+             Kernel (Kernel_Caps.Resume_Process_Endpoint),
+           Init_Caps.Restore_Interrupt_Cap  =>
+             Kernel (Kernel_Caps.Restore_Interrupt_Endpoint),
+           Init_Caps.Ports_Cap              =>
+             Layout (Arch_Cap,
+                     Rose.Objects.Endpoint_Index
+                       (Rose.Kernel.Capabilities.Arch.Derive_Endpoint),
+                     16#FFFF# * 2 ** 32),
+           Init_Caps.Interrupts_Cap         =>
+             Layout (Interrupt_Cap,
+                     Rose.Kernel.Capabilities.Interrupt.Derive_Endpoint,
+                     Init_Caps.First_Device_Vector
+                     + Init_Caps.Last_Device_Vector * 2 ** 32),
+           Init_Caps.Device_Pages_Cap       =>
+             Layout (Physical_Memory_Cap, Memory.Device_Page));
+
+   begin
+      for Index in Layouts'Range loop
+         declare
+            Cap : constant Rose.Capabilities.Capability := Create_Cap (Pid);
+         begin
+            if Cap /= Index then
+               Rose.Kernel.Panic.Panic ("init: unexpected cap index");
+            end if;
+            Set_Cap (Pid, Cap, Layouts (Index));
+         end;
+      end loop;
+
+      Rose.Boot.Console.Put ("init: added ");
+      Rose.Boot.Console.Put (Natural (Init_Caps.Last_Cap));
+      Rose.Boot.Console.Put (" caps");
+      Rose.Boot.Console.New_Line;
+   end Add_Init_Caps;
 
    ------------------------
    -- Init_Process_Table --
@@ -508,24 +619,7 @@ package body Rose.Kernel.Processes.Init is
 
             if Pid = 2 then
 
-               declare
-                  Cap : constant Rose.Capabilities.Capability :=
-                          Create_Cap (Pid);
-               begin
-                  Set_Cap
-                    (Pid, Cap,
-                     Rose.Capabilities.Layout.Capability_Layout'
-                       (Header => Rose.Capabilities.Layout.Capability_Header'
-                            (Cap_Type    =>
-                                 Rose.Capabilities.Layout.Create_Cap,
-                             others      => <>),
-                        Payload => 0));
-                  Rose.Boot.Console.Put
-                    ("init: adding create cap as ");
-                  Rose.Boot.Console.Put (Natural (Cap));
-                  Rose.Boot.Console.New_Line;
-
-               end;
+               Add_Init_Caps (Pid);
 
                if Use_Serial_Port then
                   Rose.Boot.Console.Put_Line
