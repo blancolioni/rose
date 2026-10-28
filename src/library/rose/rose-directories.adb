@@ -1,4 +1,5 @@
 with Rose.Console_IO;
+with Rose.Interfaces.File.Client;
 
 package body Rose.Directories is
 
@@ -282,7 +283,7 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File : out Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (File : out Rose.Interfaces.File_Reader.Client.File_Reader_Client;
       Name : String)
    is
       Item : Directory_Entry_Type;
@@ -296,13 +297,15 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File            : out Rose.Interfaces.Stream_Reader.Client
-      .Stream_Reader_Client;
+     (File            : out Rose.Interfaces.File_Reader.Client
+      .File_Reader_Client;
       Directory_Entry : Directory_Entry_Type)
    is
    begin
-      File := Read_File (Directory_Entry.Containing_Directory,
-                         Directory_Entry.Entry_Index);
+      File :=
+        Rose.Interfaces.File.Client.Open_Reader
+          (Get_Ordinary_File (Directory_Entry.Containing_Directory,
+                              Directory_Entry.Entry_Index));
    end Open;
 
    ---------------------------

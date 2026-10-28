@@ -1,6 +1,7 @@
 with System.Storage_Elements;
 
 with Rose.Objects;
+with Rose.Words;
 with Rose.Interfaces.Directory;
 
 with Rose.Interfaces.Block_Device.Client;
@@ -51,15 +52,35 @@ package IsoFS.Directories is
       Index     : Positive)
       return System.Storage_Elements.Storage_Count;
 
-   function Read_File
+   function Get_File
      (Directory : Directory_Type;
       Index     : Positive)
-      return Rose.Capabilities.Capability;
+      return Natural;
+   --  The file at Index in Directory, as a number for its File
+   --  interface, or 0 if there is none, or the table of files is full.
+
+   function File_Size
+     (File : Positive)
+      return System.Storage_Elements.Storage_Count;
+
+   function Open_Reader
+     (File : Positive)
+      return Rose.Objects.Capability_Identifier;
+   --  A new reader of File, at its start, or 0 if the table of readers is
+   --  full (ADR 0009).
 
    procedure Read
-     (File   : Positive;
+     (Reader : Rose.Objects.Capability_Identifier;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Count  : out System.Storage_Elements.Storage_Count);
+      Last   : out System.Storage_Elements.Storage_Count);
+
+   procedure Seek_Reader
+     (Reader : Rose.Objects.Capability_Identifier;
+      Offset : Rose.Words.Word_64);
+   --  The position is capped at the end of the file.
+
+   procedure Release_Reader
+     (Reader : Rose.Objects.Capability_Identifier);
 
    procedure Get_Entry_Name
      (Directory : Directory_Type;

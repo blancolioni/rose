@@ -14,7 +14,14 @@ DIRECTORY_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-directory-client.o
 FILE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file.o \
-	$(BUILDDIR)/rose-interfaces-file-client.o
+	$(BUILDDIR)/rose-interfaces-file-client.o \
+	$(BUILDDIR)/rose-interfaces-file_reader.o \
+	$(BUILDDIR)/rose-interfaces-file_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-file_reader-client-conversions.o \
+	$(BUILDDIR)/rose-interfaces-resource.o \
+	$(BUILDDIR)/rose-interfaces-resource-client.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader-client.o
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o

@@ -1,0 +1,4 @@
+--  A reader of a file that can also seek (ADR 0009).
+
+interface Seekable_File_Reader : File_Reader, Seekable is
+end Seekable_File_Reader;

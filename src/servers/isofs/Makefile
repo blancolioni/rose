@@ -23,7 +23,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-directory-server.o \
 	$(BUILDDIR)/rose-interfaces-file_system-server.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
+	$(BUILDDIR)/rose-interfaces-file.o \
+	$(BUILDDIR)/rose-interfaces-file-server.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \

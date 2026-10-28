@@ -32,6 +32,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
+	$(BUILDDIR)/rose-interfaces-file_reader.o \
+	$(BUILDDIR)/rose-interfaces-file_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-objects.o \

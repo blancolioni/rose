@@ -29,8 +29,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-process-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-seekable.o \
-	$(BUILDDIR)/rose-interfaces-seekable-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
@@ -41,6 +39,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-writable_directory-server.o \
 	$(BUILDDIR)/rose-interfaces-writable_file.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
+	$(BUILDDIR)/rose-interfaces-file_reader.o \
+	$(BUILDDIR)/rose-interfaces-file_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_file_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client-conversions.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
