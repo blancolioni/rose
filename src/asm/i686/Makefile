@@ -40,7 +40,6 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-kernel-capabilities-arch.o \
 	$(BUILDDIR)/rose-kernel-capabilities-boot.o \
 	$(BUILDDIR)/rose-kernel-capabilities-copy.o \
-	$(BUILDDIR)/rose-kernel-capabilities-create.o \
 	$(BUILDDIR)/rose-kernel-capabilities-endpoint.o \
 	$(BUILDDIR)/rose-kernel-capabilities-interrupt.o \
 	$(BUILDDIR)/rose-kernel-capabilities-kernel_caps.o \
