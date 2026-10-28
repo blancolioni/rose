@@ -168,7 +168,7 @@ package body Rose.System_Calls is
       use type Rose.Capabilities.Capability;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      if Cap /= 0 then
+      if Cap /= 0 and then Delete_Cap_Capability /= 0 then
          Initialize_Send (Params, Delete_Cap_Capability);
          Send_Cap (Params, Cap);
          Invoke_Capability (Params);
@@ -515,7 +515,7 @@ package body Rose.System_Calls is
       use type Rose.Capabilities.Capability;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      if Cap /= 0 then
+      if Cap /= 0 and then Rescind_Cap_Capability /= 0 then
          Initialize_Send (Params, Rescind_Cap_Capability);
          Send_Cap (Params, Cap);
          Invoke_Capability (Params);

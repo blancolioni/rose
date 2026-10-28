@@ -249,14 +249,7 @@ package body Rose.Server is
               Instance.Instances (I);
          begin
             if Item.Identifier = Identifier then
-               declare
-                  Params : aliased Rose.Invocation.Invocation_Record;
-               begin
-                  Rose.System_Calls.Initialize_Send
-                    (Params, Rose.System_Calls.Delete_Cap_Capability);
-                  Rose.System_Calls.Send_Cap (Params, Item.Capability);
-                  Rose.System_Calls.Invoke_Capability (Params);
-               end;
+               Rose.System_Calls.Delete_Cap (Item.Capability);
             else
                Kept := Kept + 1;
                Instance.Instances (Kept) := Item;

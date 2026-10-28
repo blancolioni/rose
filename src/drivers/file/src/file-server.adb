@@ -1,7 +1,6 @@
 with System.Storage_Elements;
 
 with Rose.Capabilities;
-with Rose.Invocation;
 with Rose.Objects;
 with Rose.Server;
 with Rose.System_Calls;
@@ -52,11 +51,6 @@ package body File.Server is
 
    Readers         : Reader_Array;
    Next_Identifier : Rose.Objects.Capability_Identifier := 1;
-
-   procedure Delete (Cap : Rose.Capabilities.Capability);
-   --  Delete Cap from the server's cap table. The invocation is made
-   --  here, and not through Rose.System_Calls.Delete_Cap, whose call to
-   --  Invoke_Capability can be inlined, which breaks the invocation.
 
    function Find (Id : Rose.Objects.Capability_Identifier) return Natural;
    --  The slot of the reader Id, or 0 if there is no such reader.
@@ -113,19 +107,6 @@ package body File.Server is
          Seek           => Seek'Access,
          Instanced      => True);
    end Create_Server;
-
-   ------------
-   -- Delete --
-   ------------
-
-   procedure Delete (Cap : Rose.Capabilities.Capability) is
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.System_Calls.Delete_Cap_Capability);
-      Rose.System_Calls.Send_Cap (Params, Cap);
-      Rose.System_Calls.Invoke_Capability (Params);
-   end Delete;
 
    ----------
    -- Find --
@@ -239,7 +220,7 @@ package body File.Server is
       Slot : constant Natural := Find (Id);
    begin
       if Slot /= 0 then
-         Delete (Readers (Slot).Interface_Cap);
+         Rose.System_Calls.Delete_Cap (Readers (Slot).Interface_Cap);
          Readers (Slot) := (others => <>);
       end if;
    end Release;
