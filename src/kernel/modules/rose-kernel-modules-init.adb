@@ -23,10 +23,10 @@ package body Rose.Kernel.Modules.Init is
                        & "scan partition elf timer caps checkpoint log";
    --  The boot disk's grub.cfg (#322)
 
-   --  Init launches boot modules by position, so these have to match the
-   --  module2 lines in each grub.cfg, and the module tables in
-   --  src/servers/init/src/init-run.adb.  The first module's name says
-   --  which list applies (#373).
+   --  Init launches boot modules by position, so these have to match
+   --  the modules in src/servers/init/boot.yaml, which the build writes
+   --  to each grub.cfg and to init's module tables (#374).  The first
+   --  module's name says which list applies (#373).
 
    procedure Check_Modules (Expected_Modules : String);
 

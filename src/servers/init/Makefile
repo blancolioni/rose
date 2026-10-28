@@ -8,6 +8,8 @@ UTIL=../../library/util.c
 CFILES=$(UTIL)
 COMMON_OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
+	$(BUILDDIR)/init-boot.o \
+	$(BUILDDIR)/init-boot_steps.o \
 	$(BUILDDIR)/init-calls.o \
 	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
@@ -56,9 +58,13 @@ all: init $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/init $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/init-install $(INSTALL_OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 
+# Init.Boot, and the GRUB menus' module2 lines, come from boot.yaml
+# (#374).
+
 init:
 	mkdir -p build/obj
 	mkdir -p build/bin
+	python3 ../../../scripts/make-init -o build/generated --root ../../.. boot.yaml
 	gprbuild --RTS=../../../rts/build/i686
 
 $(RELOC): $(OBJECTS)
