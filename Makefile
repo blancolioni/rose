@@ -8,7 +8,6 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
-TOOLS=configure-driver
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
@@ -24,8 +23,6 @@ rts:
 	(cd rts; make)
 	(cd src/rts; make)
 
-tools: $(TOOLS)
-
 interfaces:
 	(cd src/library/kernelapi/generated; make)
 
@@ -37,13 +34,13 @@ $(BOOT_MODULES): %:
 
 $(DRIVERS): %:
 	(cd src/drivers/$@; make)
-	(cd images/iso/rose/install/drivers; configure-driver $@ ../../../../../src/drivers/$@/$@.driver)
+	cp src/drivers/$@/$@.driver images/iso/rose/install/drivers/$@.caps
 
 $(UTILITIES): %:
 	mkdir -p images/iso/rose/install/bin/
 	(cd src/utilities/$@; make)
 	(cp src/utilities/$@/build/bin/$@-driver images/iso/rose/install/bin/$@)
-	(cd images/iso/rose/install/bin; configure-driver $@ ../../../../../src/utilities/$@/$@.caps)
+	cp src/utilities/$@/$@.caps images/iso/rose/install/bin/$@.caps
 
 exports:
 	sh ./scripts/export-elf-trace
@@ -100,9 +97,6 @@ boot:
 idl:
 	(cd src/library/kernelapi/generated; make)
 
-configure-driver:
-	(cd src/tools/configure-driver; make)
-
 config:
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(MODULEDIR)
@@ -122,6 +116,5 @@ clean:
 	rm -f $(ROSE)
 	rm -f `find . -name "*~" -print`
 	rm -f `find . -name "b~*" -print`
-	rm -f src/tools/configure-driver/configure.gpr
 	rm -f src/rts/support/librose-util.a
 

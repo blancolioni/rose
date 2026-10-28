@@ -172,13 +172,15 @@ package body Restore.Installer is
          Action   : Install_Action;
          Flags    : Install_Flag_Array)
       is
+         Install_Flags : Install_Flag_Array := Flags;
       begin
+         Install_Flags (Is_Driver) := Category = "drivers";
          Install_Executable
            (Root_Path => Install_Directory,
             Directory => Category,
             Name      => Name,
             Action    => Action,
-            Flags     => Flags);
+            Flags     => Install_Flags);
       end Process_Executable;
 
    begin
@@ -260,7 +262,7 @@ package body Restore.Installer is
       Append (Exec_Path, Exec_Path_Last, Name);
       Cap_Path := Exec_Path;
       Cap_Path_Last := Exec_Path_Last;
-      Append (Cap_Path, Cap_Path_Last, ".cap");
+      Append (Cap_Path, Cap_Path_Last, ".caps");
 
       if not Rose.Directories.Exists (Exec_Path (1 .. Exec_Path_Last)) then
          Rose.Console_IO.Put ("install: cannot find ");
