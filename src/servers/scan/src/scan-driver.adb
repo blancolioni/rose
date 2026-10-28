@@ -52,21 +52,26 @@ begin
       Rose.Console_IO.Put ("M");
       Rose.Console_IO.New_Line;
 
-      if Rose.Devices.GPT.Has_GPT (Device) then
-         Rose.Console_IO.Put_Line ("Found GPT partition header");
-      else
+      case Rose.Devices.GPT.State (Device) is
+         when Rose.Devices.GPT.Valid_GPT =>
+            Rose.Console_IO.Put_Line ("Found GPT partition header");
+         when Rose.Devices.GPT.No_GPT =>
+            Rose.Console_IO.Put_Line ("Intitialising device");
+            Rose.Devices.GPT.Initialize_GPT (Device);
+         when Rose.Devices.GPT.Invalid_GPT =>
 
-         Rose.Console_IO.Put_Line ("Intitialising device");
+            --  A disk installed before #405 has no CRCs, and so does
+            --  someone's damaged disk.  Neither is overwritten.  Scan
+            --  still answers, with no partitions.
 
-         Rose.Devices.GPT.Initialize_GPT (Device);
-      end if;
+            Rose.Console_IO.Put_Line
+              ("scan: hd0's GPT is not valid; erase the disk to install "
+               & "Rose on it");
+      end case;
 
       if not Rose.Devices.GPT.Has_GPT (Device) then
-         Rose.Console_IO.Put_Line ("Device initialization failed");
-         return;
-      end if;
-
-      if Rose.Devices.GPT.Partition_Count (Device) > 0 then
+         null;
+      elsif Rose.Devices.GPT.Partition_Count (Device) > 0 then
          Rose.Console_IO.Put_Line ("Scanning partitions");
          Rose.Devices.GPT.Report_Partition_Table (Device);
 
@@ -97,8 +102,8 @@ begin
             --  Four partitions (#321): GRUB's core.img and the boot
             --  partition (#322), then swap and the log, which share what
             --  is left.  Each starts on a 1 MiB boundary, the first at
-            --  1 MiB, as partitioning tools do.  The GPT keeps its entries
-            --  in block 2 and a copy of its header in the last block.
+            --  1 MiB, as partitioning tools do.  The log ends where the
+            --  GPT's backup entries start (#405).
 
             --  The sizes are worked out in 32 bits, which is enough for a
             --  disk of 2 TB: the run time has no 64-bit division.
@@ -109,7 +114,7 @@ begin
             MiB_Blocks      : constant Block_Address_Type :=
                                 Block_Address_Type (MiB);
             Last_Usable     : constant Block_Address_Type :=
-                                Block_Count - 4;
+                                Rose.Devices.GPT.Last_Usable_Block (Device);
             BIOS_Boot_Start : constant Block_Address_Type := MiB_Blocks;
             Rose_Boot_Start : constant Block_Address_Type :=
                                 BIOS_Boot_Start + MiB_Blocks;
@@ -249,9 +254,13 @@ begin
                           (Reply, Partition_Flags);
                         Rose.System_Calls.Send_Word
                           (Reply, Rose.Words.Word_64 (First_Block));
+                        --  The length: the GPT's last block is the
+                        --  partition's own (#405).
+
                         Rose.System_Calls.Send_Word
                           (Reply,
-                           Rose.Words.Word_64 (Last_Block - First_Block));
+                           Rose.Words.Word_64
+                             (Last_Block - First_Block + 1));
                      end;
 
                   else
