@@ -19,6 +19,11 @@ package body Rose.System_Calls is
 
    Get_Environment_Cap       : Rose.Capabilities.Capability := 0;
 
+   Caps_Given : Boolean := False;
+   --  True once the process has called Use_Capabilities: then it has
+   --  given every local cap it has, and does not look in an argument cap
+   --  set for the others. Only a process that exec starts has one.
+
    Have_Invoke_Buffer : Boolean := False;
    Invoke_Buffer_Addr : System.Address := System.Null_Address;
    Invoke_Buffer_Len  : System.Storage_Elements.Storage_Count := 0;
@@ -185,6 +190,10 @@ package body Rose.System_Calls is
    is
       use type Rose.Capabilities.Capability;
    begin
+      if not Cap_Loaded (Cap_Type) and then Caps_Given then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
       if not Cap_Loaded (Cap_Type) then
          if Get_Environment_Cap = 0 then
             declare
@@ -793,6 +802,7 @@ package body Rose.System_Calls is
       end Use_Cap;
 
    begin
+      Caps_Given := True;
       Use_Cap (Create_Endpoint, Rose.System_Calls.Create_Endpoint);
       Use_Cap (Delete_Cap, Rose.System_Calls.Delete_Cap);
       Use_Cap (Rescind_Cap, Rose.System_Calls.Rescind_Cap);

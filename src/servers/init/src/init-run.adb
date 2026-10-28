@@ -420,6 +420,11 @@ package body Init.Run is
 
    begin
 
+      Rose.System_Calls.Use_Capabilities
+        (Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Cap,
+         Rescind_Cap     => Rescind_Cap);
+
       Rose.System_Calls.Use_Buffer
         (Invoke_Buffer'Address, Invoke_Buffer'Last);
 
