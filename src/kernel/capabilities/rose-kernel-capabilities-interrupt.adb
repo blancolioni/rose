@@ -88,6 +88,52 @@ package body Rose.Kernel.Capabilities.Interrupt is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Derive_Endpoint =>
+            declare
+               use Rose.Invocation;
+               use type Rose.Capabilities.Capability;
+               use type Rose.Objects.Object_Id;
+               Pid     : constant Rose.Kernel.Processes.Process_Id :=
+                           Rose.Kernel.Processes.Current_Process_Id;
+               First   : constant Rose.Words.Word :=
+                           Rose.Words.Word (Cap.Payload mod 2 ** 32);
+               Last    : constant Rose.Words.Word :=
+                           Rose.Words.Word (Cap.Payload / 2 ** 32);
+               Vector  : constant Rose.Words.Word := Params.Data (0);
+               New_Cap : Rose.Capabilities.Capability;
+            begin
+               if not Params.Control.Flags (Send_Words)
+                 or else Params.Control.Last_Sent_Word /= 0
+                 or else Vector not in First .. Last
+               then
+                  Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+               else
+                  New_Cap := Rose.Kernel.Processes.Create_Cap (Pid);
+                  if New_Cap = Rose.Capabilities.Null_Capability then
+                     Rose.Kernel.Processes.Return_Error
+                       (Params, Out_Of_Capabilities);
+                  else
+                     Rose.Kernel.Processes.Set_Cap
+                       (Pid    => Pid,
+                        Cap    => New_Cap,
+                        Layout =>
+                          (Header  =>
+                             (Cap_Type =>
+                                  Rose.Capabilities.Layout.Interrupt_Cap,
+                              Endpoint => Reserve_Interrupt_Endpoint,
+                              others   => <>),
+                           Payload => Rose.Objects.Object_Id (Vector)));
+                     Params.Control.Flags :=
+                       (Reply => True, Send_Caps => True, others => False);
+                     Params.Control.Last_Sent_Cap := 0;
+                     Params.Caps (0) := New_Cap;
+                  end if;
+               end if;
+
+               Rose.Kernel.Processes.Set_Current_State
+                 (Pid, Rose.Kernel.Processes.Ready);
+            end;
+
          when others =>
             Rose.Boot.Console.Put
               ("kernel: interrupt: unknown endpoint: ");

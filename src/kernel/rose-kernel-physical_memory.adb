@@ -451,6 +451,20 @@ package body Rose.Kernel.Physical_Memory is
       New_Region (Base, Bound, Addressable, Available);
    end Init_Physical_Memory;
 
+   ------------
+   -- Is_RAM --
+   ------------
+
+   function Is_RAM
+     (Page : Rose.Addresses.Physical_Page_Address)
+      return Boolean
+   is
+      Index : constant Maybe_Region_Index :=
+                Find_Region (Physical_Page_To_Address (Page));
+   begin
+      return Index /= 0 and then Memory_Table (Index).Class = RAM;
+   end Is_RAM;
+
    ----------------
    -- New_Region --
    ----------------
