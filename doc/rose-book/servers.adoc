@@ -232,7 +232,7 @@ Used by:: `init`, which creates the first user, `fraser`, on a first boot, and g
 
 `user` is installed with the commands, and launched once for each user, with the name and the home directory in its launch call.
 
-=== `terminal` and `hello`
+=== `terminal`
 
-The source of these two drivers is in `src/drivers`, but the build does not include them.
-`terminal` serves a `Stream_Writer` that writes to an output device, and `hello` is an example that prints `Hello`.
+The source of this driver is in `src/drivers`, but the build does not include it.
+`terminal` serves a `Stream_Writer` that writes to an output device.
