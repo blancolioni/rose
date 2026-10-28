@@ -189,7 +189,7 @@ package body Rose.Kernel.Debug is
             when Boot_Cap            => "boot",
             when Copy_Cap            => "copy",
             when Physical_Memory_Cap => "physical-memory",
-            when Create_Cap          => "create",
+            when Unused_Cap          => "unused",
             when Page_Table_Cap      => "page-table",
             when Reply_Cap           => "reply",
             when Arch_Cap            => "arch",

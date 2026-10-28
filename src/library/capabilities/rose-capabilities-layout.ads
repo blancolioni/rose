@@ -17,12 +17,15 @@ package Rose.Capabilities.Layout is
       Boot_Cap,
       Copy_Cap,
       Physical_Memory_Cap,
-      Create_Cap,
+      Unused_Cap,
       Page_Table_Cap,
       Reply_Cap,
       Arch_Cap,
       Other_Cap)
      with Size => 4;
+   --  Unused_Cap was the Create cap, which made a cap from any layout
+   --  (#115).  It keeps its position so that the types after it keep
+   --  their values.
 
    type Capability_Header is
       record

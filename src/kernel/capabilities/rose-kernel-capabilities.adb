@@ -1,7 +1,6 @@
 with Rose.Kernel.Capabilities.Arch;
 with Rose.Kernel.Capabilities.Boot;
 with Rose.Kernel.Capabilities.Copy;
-with Rose.Kernel.Capabilities.Create;
 with Rose.Kernel.Capabilities.Endpoint;
 with Rose.Kernel.Capabilities.Interrupt;
 with Rose.Kernel.Capabilities.Kernel_Caps;
@@ -46,8 +45,6 @@ package body Rose.Kernel.Capabilities is
             Handlers.Boot.Handle (Cap, Params);
          when Copy_Cap =>
             Handlers.Copy.Handle (Cap, Params);
-         when Create_Cap =>
-            Handlers.Create.Handle (Cap, Params);
          when Endpoint_Cap =>
             Handlers.Endpoint.Handle (Cap, Params);
          when Interrupt_Cap =>
