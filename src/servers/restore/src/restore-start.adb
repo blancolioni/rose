@@ -13,6 +13,10 @@ package body Restore.Start is
 
    Next_Cap_Index : Positive := 1;
 
+   procedure Wait_Forever;
+   --  Wait for a message that never comes, so that restore stays, and
+   --  so do its caps.
+
    ------------
    -- Finish --
    ------------
@@ -41,30 +45,7 @@ package body Restore.Start is
          Rose.Console_IO.Put_Line ("restore: restored processes are running");
       end if;
 
-      declare
-         use Rose.Invocation;
-         use Rose.System_Calls;
-         Params : aliased Rose.Invocation.Invocation_Record;
-         Receive_Cap : constant Rose.Capabilities.Capability :=
-                         Rose.System_Calls.Server.Create_Receive_Cap
-                           (Create_Cap   => Create_Endpoint_Cap);
-      begin
-         Params :=
-           Invocation_Record'
-             (Control       =>
-                Control_Word'
-                  (Flags          =>
-                     (Receive     => True,
-                      Block       => True,
-                      Recv_Words  => True,
-                      Recv_Caps   => True,
-                      others      => False),
-                   others         => <>),
-              Cap           => Receive_Cap,
-              others        => <>);
-
-         Invoke_Capability (Params);
-      end;
+      Wait_Forever;
    end Finish;
 
    --------------
@@ -106,8 +87,22 @@ package body Restore.Start is
    -------------
 
    procedure Prepare (Checkpoint : out Rose.Words.Word_64) is
+      use type Rose.Capabilities.Capability;
    begin
       Rose.Console_IO.Open (Console_Cap);
+
+      --  Without a swap and a log partition, as on a disk whose GPT scan
+      --  refused (#405), there is nothing to restore or install to.  Init
+      --  is left waiting, and the system idles with this on the screen.
+
+      if Swap_Cap = Rose.Capabilities.Null_Capability
+        or else Log_Cap = Rose.Capabilities.Null_Capability
+      then
+         Rose.Console_IO.Put_Line
+           ("restore: hd0 has no swap or log partition; nothing to "
+            & "restore or install to");
+         Wait_Forever;
+      end if;
 
       --  The log server can only read the log once it has its device.
 
@@ -155,5 +150,34 @@ package body Restore.Start is
          Rose.Console_IO.Put_Line ("restore: cannot restore the checkpoint");
       end if;
    end Restore_Checkpoint;
+
+   ------------------
+   -- Wait_Forever --
+   ------------------
+
+   procedure Wait_Forever is
+      use Rose.Invocation;
+      use Rose.System_Calls;
+      Params : aliased Rose.Invocation.Invocation_Record;
+      Receive_Cap : constant Rose.Capabilities.Capability :=
+                      Rose.System_Calls.Server.Create_Receive_Cap
+                        (Create_Cap   => Create_Endpoint_Cap);
+   begin
+      Params :=
+        Invocation_Record'
+          (Control       =>
+             Control_Word'
+               (Flags          =>
+                  (Receive     => True,
+                   Block       => True,
+                   Recv_Words  => True,
+                   Recv_Caps   => True,
+                   others      => False),
+                others         => <>),
+           Cap           => Receive_Cap,
+           others        => <>);
+
+      Invoke_Capability (Params);
+   end Wait_Forever;
 
 end Restore.Start;
