@@ -70,8 +70,7 @@ package body Rose.Kernel.Processes.Init is
       Layouts : constant array
         (Rose.Capabilities.Capability range 1 .. Init_Caps.Last_Cap)
         of Capability_Layout :=
-          (Init_Caps.Create_Cap             => Layout (Create_Cap, 0),
-           Init_Caps.Boot_Cap               => Layout (Boot_Cap, 1),
+          (Init_Caps.Boot_Cap               => Layout (Boot_Cap, 1),
            Init_Caps.Reserve_Memory_Cap     =>
              Layout (Physical_Memory_Cap, Memory.Reserve_Device_Memory),
            Init_Caps.Region_Count_Cap       =>
