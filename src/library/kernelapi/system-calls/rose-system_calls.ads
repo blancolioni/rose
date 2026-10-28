@@ -20,6 +20,10 @@ package Rose.System_Calls is
 
    procedure Invoke_Capability
      (Item : aliased in out Rose.Invocation.Invocation_Record);
+   pragma No_Inline (Invoke_Capability);
+   --  Its body jumps to the system call page, which takes the address of
+   --  Item from the stack, where a call puts it. Inlined, the jump would
+   --  find whatever its caller has there (#399).
 
    procedure Invoke
      (Cap       : Rose.Capabilities.Capability;

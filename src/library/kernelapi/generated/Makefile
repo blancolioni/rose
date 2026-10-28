@@ -1,5 +1,6 @@
 IDL=cap block_device file_system directory file \
     writable_directory writable_file user \
+    resource file_reader seekable_file_reader \
     stream_reader stream_writer stream seekable storage storage_checkpoint \
     state \
     ata partitions keyboard_handler interrupt_handler \

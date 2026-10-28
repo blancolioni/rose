@@ -71,7 +71,9 @@ package Rose.Server is
 
 private
 
-   Max_Handled_Endpoints  : constant := 20;
+   Max_Handled_Endpoints  : constant := 32;
+   --  As many as the kernel registers for a process
+   --  (Rose.Kernel.Processes.Max_Registered_Endpoints).
    Max_Endpoint_Instances : constant := 1024;
    --  An instanced server such as mem has a cap for each endpoint and
    --  object, so this bounds how many objects it can serve: mem uses

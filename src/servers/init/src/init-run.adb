@@ -685,7 +685,10 @@ package body Init.Run is
                          File_System_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Console_Interface_Cap,
-                          Hd1_Cap));
+                          Hd1_Cap,
+                          Delete_Cap));
+         --  isofs deletes the caps of the file readers that are
+         --  released (ADR 0009).
       begin
          Install_Media_FS :=
            Copy_Cap_From_Process

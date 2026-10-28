@@ -1,7 +1,7 @@
 with System.Storage_Elements;
 
 with Rose.Interfaces.File_System.Client;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.File_Reader.Client;
 
 private with Rose.Interfaces.Directory.Client;
 
@@ -21,8 +21,10 @@ package Rose.Directories is
    function Size (Name : String) return File_Size;
 
    procedure Open
-     (File : out Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (File : out Rose.Interfaces.File_Reader.Client.File_Reader_Client;
       Name : String);
+   --  A new reader of the file Name, at its start (ADR 0009). Release it
+   --  when it is done with.
 
    type Directory_Entry_Type is limited private;
 
@@ -71,7 +73,7 @@ package Rose.Directories is
 
    procedure Open
      (File            : out
-        Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+        Rose.Interfaces.File_Reader.Client.File_Reader_Client;
       Directory_Entry : Directory_Entry_Type);
 
 private

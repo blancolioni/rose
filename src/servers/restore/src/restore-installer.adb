@@ -10,7 +10,7 @@ with Rose.Invocation;
 with Rose.System_Calls;
 
 with Rose.Devices.Checkpoints;
-with Rose.Interfaces.Stream_Reader;
+with Rose.Interfaces.File_Reader.Client.Conversions;
 with Rose.Interfaces.Stream_Reader.Client;
 
 package body Restore.Installer is
@@ -235,9 +235,12 @@ package body Restore.Installer is
       Action    : Install_Action;
       Flags     : Install_Flag_Array)
    is
-      use Rose.Interfaces.Stream_Reader.Client;
-      Caps_Reader    : Stream_Reader_Client;
-      Binary_Reader  : Stream_Reader_Client;
+      use Rose.Interfaces.File_Reader.Client;
+      Caps_Reader    : File_Reader_Client;
+      Binary_Reader  : File_Reader_Client;
+      --  Released once exec has read them, which frees their slots in
+      --  isofs (ADR 0009). Restore has no cap to delete caps, so they
+      --  are not closed.
       Exec_Path      : String (1 .. 200);
       Exec_Path_Last : Natural := 0;
       Cap_Path       : String (1 .. 200);
@@ -300,9 +303,13 @@ package body Restore.Installer is
 
          Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
          Rose.System_Calls.Send_Cap
-           (Params, Get_Interface_Cap (Caps_Reader));
+           (Params,
+            Rose.Interfaces.Stream_Reader.Client.Get_Interface_Cap
+              (Conversions.To_Stream_Reader (Caps_Reader)));
          Rose.System_Calls.Send_Cap
-           (Params, Get_Interface_Cap (Binary_Reader));
+           (Params,
+            Rose.Interfaces.Stream_Reader.Client.Get_Interface_Cap
+              (Conversions.To_Stream_Reader (Binary_Reader)));
          Rose.System_Calls.Send_Word
            (Params,
             Natural (Rose.Directories.Size (Exec_Path (1 .. Exec_Path_Last))));
@@ -366,6 +373,8 @@ package body Restore.Installer is
          end if;
       end;
 
+      Release (Caps_Reader);
+      Release (Binary_Reader);
    end Install_Executable;
 
    ------------------

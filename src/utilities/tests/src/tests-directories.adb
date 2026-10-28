@@ -6,9 +6,9 @@ with Rose.Capabilities;
 
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.File_Reader.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Stream_Reader.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
@@ -50,7 +50,7 @@ package body Tests.Directories is
       Notes       : Writable_Files.Writable_File_Client;
       Inner       : Writable_Files.Writable_File_Client;
       Read_Only   : Read_Only_Files.File_Client;
-      Reader      : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      Reader      : Rose.Interfaces.File_Reader.Client.File_Reader_Client;
       Sub_Listing : Read_Only_Directories.Directory_Client;
       Name        : String (1 .. 16);
       Name_Last   : Natural;
@@ -98,20 +98,15 @@ package body Tests.Directories is
          return Fail ("wrong name");
       end if;
 
-      --  Read back through a read-only file, and through Read_File.
+      --  Read back through a reader of the read-only file (ADR 0009).
 
       Read_Only := Get_Ordinary_File (Top, 1);
-      Read_Only_Files.Seek (Read_Only, 0);
-      Read_Only_Files.Read (Read_Only, Buffer, Last);
+      Reader := Read_Only_Files.Open_Reader (Read_Only);
+      Rose.Interfaces.File_Reader.Client.Read (Reader, Buffer, Last);
       if Last /= Hello'Length or else Buffer (1 .. Last) /= Hello then
          return Fail ("wrong contents through Get_Ordinary_File");
       end if;
-
-      Reader := Read_File (Top, 1);
-      Rose.Interfaces.Stream_Reader.Client.Read (Reader, Buffer, Last);
-      if Last /= Hello'Length or else Buffer (1 .. Last) /= Hello then
-         return Fail ("wrong contents through Read_File");
-      end if;
+      Rose.Interfaces.File_Reader.Client.Close (Reader);
 
       --  A subdirectory with a file in it, seen through a read-only
       --  directory.

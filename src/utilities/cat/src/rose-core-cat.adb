@@ -2,20 +2,20 @@ with System.Storage_Elements;
 
 with Ada.Text_IO;
 
+with Rose.Interfaces.File_Reader;
+
 procedure Rose.Core.Cat
   (File : in out Rose.Interfaces.File.File_Object'Class)
 is
    use System.Storage_Elements;
    Buffer : Storage_Array (1 .. 4096);
    Last   : Storage_Count;
+   Reader : Rose.Interfaces.File_Reader.File_Reader_Object'Class :=
+     File.Open_Reader;
+   --  A reader of its own, from the start of the file (ADR 0009).
 begin
-   --  A file has one position, which every reader of it moves, so cat
-   --  starts from the beginning.
-
-   File.Seek (0);
-
    loop
-      File.Read (Buffer, Last);
+      Reader.Read (Buffer, Last);
       exit when Last < Buffer'First;
 
       declare
@@ -28,4 +28,5 @@ begin
    end loop;
 
    Ada.Text_IO.Flush;
+   Reader.Release;
 end Rose.Core.Cat;

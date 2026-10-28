@@ -1,5 +1,11 @@
-interface File : Stream_Reader, Seekable is
+--  A file opens readers, each with its own position (ADR 0009). It is
+--  not a stream itself.
+
+interface File is
 
    function Size return Storage_Count;
+
+   function Open_Reader return interface File_Reader;
+   function Open_Seekable_Reader return interface Seekable_File_Reader;
 
 end File;

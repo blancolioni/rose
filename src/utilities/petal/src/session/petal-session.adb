@@ -9,7 +9,8 @@ with Rose.Words;
 
 with Rose.Interfaces.Cap_Set;
 with Rose.Interfaces.Directory.Client;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.File.Client;
+with Rose.Interfaces.File_Reader.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
 
 with Petal.Read;
@@ -221,7 +222,7 @@ package body Petal.Session is
       Home   : Writable_Directory_Client;
       Found  : Boolean;
       Index  : Natural;
-      Reader : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+      Reader : Rose.Interfaces.File_Reader.Client.File_Reader_Client;
       Buffer : Storage_Array (1 .. 512);
       Last   : Storage_Count;
       Line   : String (1 .. 2000);
@@ -259,10 +260,18 @@ package body Petal.Session is
          return;
       end if;
 
-      Reader := Read_File (Home, Index);
+      --  A reader of its own, from the start of the file (ADR 0009).
+
+      declare
+         File : Rose.Interfaces.File.Client.File_Client :=
+           Get_Ordinary_File (Home, Index);
+      begin
+         Reader := Rose.Interfaces.File.Client.Open_Reader (File);
+         Rose.Interfaces.File.Client.Close (File);
+      end;
 
       loop
-         Rose.Interfaces.Stream_Reader.Client.Read (Reader, Buffer, Last);
+         Rose.Interfaces.File_Reader.Client.Read (Reader, Buffer, Last);
          exit when Last < Buffer'First;
 
          for Element of Buffer (Buffer'First .. Last) loop
@@ -280,6 +289,10 @@ package body Petal.Session is
       --  A last line need not end with a line feed.
 
       End_Line;
+
+      --  Closing the reader releases it.
+
+      Rose.Interfaces.File_Reader.Client.Close (Reader);
    end Run_Startup_File;
 
    -----------

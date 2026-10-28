@@ -9,7 +9,6 @@ with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Stream_Reader.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
 with Rose.Interfaces.Writable_Directory.Server;
 with Rose.Interfaces.Writable_File.Client.Conversions;
@@ -35,11 +34,8 @@ package body Directory.Server is
          Child     : Writable_Directory_Client;
          Read_Only : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
-         Reader    : Rose.Capabilities.Capability :=
-           Rose.Capabilities.Null_Capability;
-         --  The read-only interface of the file or directory, and the
-         --  Stream_Reader of a file, made the first time they are asked
-         --  for.
+         --  The read-only interface of the file or directory, made the
+         --  first time it is asked for.
       end record;
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
@@ -122,11 +118,6 @@ package body Directory.Server is
       Kind  : Rose.Interfaces.Directory.File_Kind)
       return Boolean
    is (Index <= Entry_Count and then Entries (Index).Kind = Kind);
-
-   function Read_File
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability;
 
    ---------------
    -- Add_Entry --
@@ -258,7 +249,6 @@ package body Directory.Server is
          Find_Entry             => Find_Entry'Access,
          Get_Ordinary_File      => Get_Ordinary_File'Access,
          Get_Directory          => Get_Directory'Access,
-         Read_File              => Read_File'Access,
          Get_Writable_File      => Get_Writable_File'Access,
          Get_Writable_Directory => Get_Writable_Directory'Access,
          Create_File            => Create_File'Access,
@@ -443,34 +433,6 @@ package body Directory.Server is
          return Rose.Capabilities.Null_Capability;
       end if;
    end Get_Writable_File;
-
-   ---------------
-   -- Read_File --
-   ---------------
-
-   --  The file is read from the start. Its one position is shared with
-   --  every other holder of the file.
-
-   function Read_File
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability
-   is
-      pragma Unreferenced (Id);
-   begin
-      if not Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      if Entries (Index).Reader = Rose.Capabilities.Null_Capability then
-         Entries (Index).Reader :=
-           Rose.Interfaces.Stream_Reader.Client.Get_Interface_Cap
-             (Rose.Interfaces.Writable_File.Client.Conversions
-              .To_Stream_Reader (Entries (Index).File));
-      end if;
-      Seek (Entries (Index).File, 0);
-      return Entries (Index).Reader;
-   end Read_File;
 
    ------------------
    -- Start_Server --

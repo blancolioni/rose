@@ -1,0 +1,5 @@
+--  A sequential reader of a file, with its own position, which starts at
+--  the beginning of the file (ADR 0009). Release it when it is done with.
+
+interface File_Reader : Stream_Reader, Resource is
+end File_Reader;
