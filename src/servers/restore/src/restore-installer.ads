@@ -1,5 +1,3 @@
-with Rose.Interfaces.Block_Device.Client;
-
 package Restore.Installer is
 
    type Install_Action is (Launch, Save);
@@ -26,7 +24,6 @@ package Restore.Installer is
                              Flags : Install_Flag_Array));
 
    procedure Install
-     (To     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
-      Source : Step_Iterator);
+     (Source : Step_Iterator);
 
 end Restore.Installer;

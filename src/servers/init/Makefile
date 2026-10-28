@@ -6,11 +6,9 @@ DEFINES=
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
 UTIL=../../library/util.c
 CFILES=$(UTIL)
-OBJECTS= \
+COMMON_OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
-	$(BUILDDIR)/b__init-driver.o \
 	$(BUILDDIR)/init-calls.o \
-	$(BUILDDIR)/init-driver.o \
 	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
@@ -37,8 +35,22 @@ OBJECTS= \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o
 
+# init is the boot disk's init, and init-install the install media's
+# (#373).  They share everything but their main programs.
+
+OBJECTS= \
+	$(BUILDDIR)/b__init-driver.o \
+	$(BUILDDIR)/init-driver.o \
+	$(COMMON_OBJECTS)
+
+INSTALL_OBJECTS= \
+	$(BUILDDIR)/b__init-install_driver.o \
+	$(BUILDDIR)/init-install_driver.o \
+	$(COMMON_OBJECTS)
+
 all: init $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/init $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/init-install $(INSTALL_OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 
 init:
 	mkdir -p build/obj

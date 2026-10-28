@@ -11,7 +11,7 @@ project Init is
 
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
-   for Main use ("init-driver.adb");
+   for Main use ("init-driver.adb", "init-install_driver.adb");
 
    package Builder is
       for Global_Configuration_Pragmas use "init-pragmas.config";

@@ -47,20 +47,50 @@ package body Init.Run is
    File_System_Priority   : constant := 10;
    Low_Priority           : constant := 12;
 
-   Console_Module    : constant := 2;
-   Mem_Module        : constant := 3;
-   PCI_Module        : constant := 4;
-   ATA_Module        : constant := 5;
-   Store_Module      : constant := 6;
-   ISOFS_Module      : constant := 7;
-   Restore_Module    : constant := 8;
-   Scan_Module       : constant := 9;
-   Partition_Module  : constant := 10;
-   Elf_Module        : constant := 11;
-   Timer_Module      : constant := 12;
-   Cap_Set_Module    : constant := 13;
-   Checkpoint_Module : constant := 14;
-   Log_Module        : constant := 15;
+   --  The boot modules' numbers, which are their positions in the GRUB
+   --  configuration that loads them.  Module 1 is init.
+
+   type Module_Table is
+      record
+         Console, Mem, PCI, ATA, Store, ISOFS, Restore, Scan,
+         Partition, Elf, Timer, Cap_Set, Checkpoint, Log : Rose.Words.Word;
+      end record;
+
+   Install_Modules : constant Module_Table :=
+                       (Console    => 2,
+                        Mem        => 3,
+                        PCI        => 4,
+                        ATA        => 5,
+                        Store      => 6,
+                        ISOFS      => 7,
+                        Restore    => 8,
+                        Scan       => 9,
+                        Partition  => 10,
+                        Elf        => 11,
+                        Timer      => 12,
+                        Cap_Set    => 13,
+                        Checkpoint => 14,
+                        Log        => 15);
+   --  The install media's images/iso/boot/grub/grub.cfg, which loads
+   --  init-install and restore-install.
+
+   Disk_Modules    : constant Module_Table :=
+                       (Console    => 2,
+                        Mem        => 3,
+                        PCI        => 4,
+                        ATA        => 5,
+                        Store      => 6,
+                        ISOFS      => 0,
+                        Restore    => 7,
+                        Scan       => 8,
+                        Partition  => 9,
+                        Elf        => 10,
+                        Timer      => 11,
+                        Cap_Set    => 12,
+                        Checkpoint => 13,
+                        Log        => 14);
+   --  The boot disk's configuration (#322), which loads init and
+   --  restore, and not isofs.
 
    --  The object ids of the boot servers.  A server has the same id on
    --  every boot, whichever servers are launched, so that the caps that
@@ -95,9 +125,12 @@ package body Init.Run is
    -- Run_Init --
    --------------
 
-   procedure Run_Init is
+   procedure Run_Init (Install : Boolean) is
       use Rose.Capabilities, Rose.Objects, Rose.Words;
       package Init_Caps renames Rose.Init_Capabilities;
+
+      Modules : constant Module_Table :=
+                  (if Install then Install_Modules else Disk_Modules);
 
       --  The caps the kernel gives init
 
@@ -153,7 +186,8 @@ package body Init.Run is
       Cap_Set_Cap          : Rose.Capabilities.Capability;
 
       Hd0_Cap              : Rose.Capabilities.Capability;
-      Hd1_Cap              : Rose.Capabilities.Capability;
+      Hd1_Cap              : Rose.Capabilities.Capability :=
+                               Null_Capability;
 
       Storage_Cap          : Rose.Capabilities.Capability;
       Add_Storage_Cap      : Rose.Capabilities.Capability;
@@ -174,7 +208,8 @@ package body Init.Run is
 
       Launch_Elf_Cap       : Rose.Capabilities.Capability;
       Launch_Command_Elf_Cap : Rose.Capabilities.Capability;
-      Install_Media_FS     : Rose.Capabilities.Capability;
+      Install_Media_FS     : Rose.Capabilities.Capability :=
+                               Null_Capability;
       Install_Receiver     : Rose.Capabilities.Capability;
       Install_Endpoint     : Rose.Capabilities.Capability;
 
@@ -343,7 +378,7 @@ package body Init.Run is
 
          Copy_Id_Cap :=
            Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Partition_Module,
+             (Boot_Cap, Modules.Partition,
               (if Is_Swap then Swap_Partition_Oid else Log_Partition_Oid),
               Device_Driver_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
@@ -391,7 +426,7 @@ package body Init.Run is
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Copy_Console_Cap :=
         Init.Calls.Launch_Boot_Module
-          (Boot_Cap, Console_Module, Console_Oid,
+          (Boot_Cap, Modules.Console, Console_Oid,
            Low_Priority,
            Create_Endpoint_Cap,
            Rose.Capabilities.Null_Capability,
@@ -420,7 +455,7 @@ package body Init.Run is
       declare
          Copy_Cap_Set_Cap : constant Rose.Capabilities.Capability :=
                         Init.Calls.Launch_Boot_Module
-                          (Boot_Cap, Cap_Set_Module, Cap_Set_Oid,
+                          (Boot_Cap, Modules.Cap_Set, Cap_Set_Oid,
                            Device_Driver_Priority,
                            Create_Endpoint_Cap,
                            Rose.Capabilities.Null_Capability,
@@ -435,7 +470,7 @@ package body Init.Run is
       declare
          Copy_Mem_Cap : constant Rose.Capabilities.Capability :=
                     Init.Calls.Launch_Boot_Module
-                      (Boot_Cap, Mem_Module, Mem_Oid,
+                      (Boot_Cap, Modules.Mem, Mem_Oid,
                        Memory_Priority,
                        Create_Endpoint_Cap,
                        Cap_Set_Cap,
@@ -462,7 +497,7 @@ package body Init.Run is
                              Init_Caps.Get_Ticks_Cap;
          Copy_Timeout_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Launch_Boot_Module
-                               (Boot_Cap, Timer_Module, Timer_Oid,
+                               (Boot_Cap, Modules.Timer, Timer_Oid,
                                 Device_Driver_Priority,
                                 Create_Endpoint_Cap, Cap_Set_Cap,
                                (Console_Interface_Cap,
@@ -508,7 +543,7 @@ package body Init.Run is
                                      16#0CFC#, 16#0CFC#);
          Copy_PCI_Cap         : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Launch_Boot_Module
-                                    (Boot_Cap, PCI_Module, PCI_Oid,
+                                    (Boot_Cap, Modules.PCI, PCI_Oid,
                                      Low_Priority,
                                      Create_Endpoint_Cap, Cap_Set_Cap,
                                      (Console_Interface_Cap,
@@ -549,7 +584,7 @@ package body Init.Run is
                                    Init.Grants.Interrupt (ATA_Oid, 47);
          Copy_Ata_Cap          : constant Rose.Capabilities.Capability :=
                                    Init.Calls.Launch_Boot_Module
-                                     (Boot_Cap, ATA_Module, ATA_Oid,
+                                     (Boot_Cap, Modules.ATA, ATA_Oid,
                                       Device_Driver_Priority,
                                       Create_Endpoint_Cap, Cap_Set_Cap,
                                       (Console_Interface_Cap,
@@ -570,18 +605,22 @@ package body Init.Run is
               Rose.Interfaces.Get_Interface_Endpoint,
               0);
 
-         Hd1_Cap :=
-           Copy_Cap_From_Process
-             (Copy_Ata_Cap,
-              Rose.Interfaces.Get_Interface_Endpoint,
-              1);
+         --  The install media is hd1, which only the install init uses.
+
+         if Install then
+            Hd1_Cap :=
+              Copy_Cap_From_Process
+                (Copy_Ata_Cap,
+                 Rose.Interfaces.Get_Interface_Endpoint,
+                 1);
+         end if;
 
       end;
 
       declare
          Copy_Store_Cap : constant Rose.Capabilities.Capability :=
                       Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, Store_Module, Store_Oid,
+                        (Boot_Cap, Modules.Store, Store_Oid,
                          Device_Driver_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Delete_Cap,
@@ -616,7 +655,7 @@ package body Init.Run is
                                 Init_Caps.Create_Process_Cap;
          Copy_Elf_Cap : constant Rose.Capabilities.Capability :=
                             Init.Calls.Launch_Boot_Module
-                              (Boot_Cap, Elf_Module, Elf_Oid,
+                              (Boot_Cap, Modules.Elf, Elf_Oid,
                                Device_Driver_Priority,
                                Create_Endpoint_Cap, Cap_Set_Cap,
                                (Delete_Cap, Rescind_Cap,
@@ -638,7 +677,7 @@ package body Init.Run is
          use Rose.Interfaces.Partitions;
          Copy_Scan_Cap : constant Rose.Capabilities.Capability :=
                      Init.Calls.Launch_Boot_Module
-                       (Boot_Cap, Scan_Module, Scan_Oid,
+                       (Boot_Cap, Modules.Scan, Scan_Oid,
                         File_System_Priority,
                         Create_Endpoint_Cap, Cap_Set_Cap,
                         (Console_Interface_Cap,
@@ -676,28 +715,28 @@ package body Init.Run is
          Install_Endpoint := Install_Caps (2);
       end;
 
-
-
-      declare
-         Copy_IsoFS_Cap : constant Rose.Capabilities.Capability :=
-                      Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, ISOFS_Module, ISOFS_Oid,
-                         File_System_Priority,
-                         Create_Endpoint_Cap, Cap_Set_Cap,
-                         (Console_Interface_Cap,
-                          Hd1_Cap));
-      begin
-         Install_Media_FS :=
-           Copy_Cap_From_Process
-             (Copy_IsoFS_Cap,
-              Rose.Interfaces.File_System.Root_Directory_Endpoint);
-      end;
+      if Install then
+         declare
+            Copy_IsoFS_Cap : constant Rose.Capabilities.Capability :=
+                               Init.Calls.Launch_Boot_Module
+                                 (Boot_Cap, Modules.ISOFS, ISOFS_Oid,
+                                  File_System_Priority,
+                                  Create_Endpoint_Cap, Cap_Set_Cap,
+                                  (Console_Interface_Cap,
+                                   Hd1_Cap));
+         begin
+            Install_Media_FS :=
+              Copy_Cap_From_Process
+                (Copy_IsoFS_Cap,
+                 Rose.Interfaces.File_System.Root_Directory_Endpoint);
+         end;
+      end if;
 
       declare
          use Rose.Interfaces.Kernel_Log;
          Copy_Cap : constant Rose.Capabilities.Capability :=
            Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Log_Module, Log_Oid,
+             (Boot_Cap, Modules.Log, Log_Oid,
               Log_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
               (Console_Interface_Cap, Start_Log_Cap));
@@ -717,9 +756,6 @@ package body Init.Run is
       end;
 
       declare
-         Write_System_Image_Cap : constant Rose.Capabilities.Capability :=
-                                    Init_Caps.Write_System_Image_Cap;
-
          --  The kernel's restore endpoints (Rose.Kernel.Capabilities
          --  .Kernel_Caps): restore a process, let it run, and restore an
          --  interrupt handler.
@@ -730,28 +766,36 @@ package body Init.Run is
          Restore_Interrupt_Cap  : constant Rose.Capabilities.Capability :=
                                     Init_Caps.Restore_Interrupt_Cap;
 
+         --  The restore server's caps, in the order Restore.Start takes
+         --  them.  Only restore-install has the last two, to install
+         --  from the install media and start a new log.
+
+         Restore_Caps     : constant Init.Calls.Array_Of_Capabilities :=
+                              (Console_Interface_Cap,
+                               Swap_Cap,
+                               Log_Cap,
+                               Add_Storage_Cap,
+                               Install_Endpoint,
+                               Add_Log_Device_Cap,
+                               Log_Reader_Cap,
+                               Restore_Process_Cap,
+                               Resume_Process_Cap,
+                               Restore_Interrupt_Cap,
+                               Store_Restore_Cap,
+                               Memory_Restore_Cap,
+                               Install_Media_FS,
+                               Log_Reset_Cap);
+         Last_Restore_Cap : constant Positive :=
+                              (if Install
+                               then Restore_Caps'Last
+                               else Restore_Caps'Last - 2);
+
          Copy_Restore_Cap : constant Rose.Capabilities.Capability :=
-                        Init.Calls.Launch_Boot_Module
-                          (Boot_Cap, Restore_Module, Restore_Oid,
-                           File_System_Priority,
-                           Create_Endpoint_Cap, Cap_Set_Cap,
-                           (Delete_Cap,
-                            Console_Interface_Cap,
-                            Swap_Cap,
-                            Log_Cap,
-                            Add_Storage_Cap,
-                            Reserve_Storage_Cap,
-                            Write_System_Image_Cap,
-                            Install_Media_FS,
-                            Install_Endpoint,
-                            Add_Log_Device_Cap,
-                            Log_Reader_Cap,
-                            Restore_Process_Cap,
-                            Resume_Process_Cap,
-                            Restore_Interrupt_Cap,
-                            Store_Restore_Cap,
-                            Memory_Restore_Cap,
-                            Log_Reset_Cap));
+                              Init.Calls.Launch_Boot_Module
+                                (Boot_Cap, Modules.Restore, Restore_Oid,
+                                 File_System_Priority,
+                                 Create_Endpoint_Cap, Cap_Set_Cap,
+                                 Restore_Caps (1 .. Last_Restore_Cap));
 
          pragma Unreferenced (Copy_Restore_Cap);
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -804,9 +848,13 @@ package body Init.Run is
             Rose.System_Calls.Receive_Buffer (Params, 4096);
             Rose.System_Calls.Invoke_Capability (Params);
             --  The restore server's last message has no caps.  Its first
-            --  data word is 1 if it restored a checkpoint.
+            --  data word is 1 if it restored a checkpoint.  The restore
+            --  init installs nothing, so that is the only message it
+            --  takes.
 
-            if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
+            if not Install
+              or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+            then
                Restored := Params.Control.Flags (Rose.Invocation.Send_Words)
                  and then Params.Data (0) = 1;
                Restore_Reply_Cap := Params.Reply_Cap;
@@ -1000,6 +1048,18 @@ package body Init.Run is
          end loop;
       end;
 
+      --  The restore init doesn't install.  If there was no checkpoint to
+      --  restore, the system stays as it is, with this message on the
+      --  screen (#373).
+
+      if not Install and then not Restored then
+         Init.Calls.Send_String
+           (Console_Stream_Cap,
+            "init: no system on this disk; boot the install media" & NL);
+         Init.Calls.Send (Exit_Cap);
+         return;
+      end if;
+
       declare
          Enter_Checkpoint_Cap : constant Rose.Capabilities.Capability :=
                                   Init_Caps.Enter_Checkpoint_Cap;
@@ -1007,7 +1067,7 @@ package body Init.Run is
                                   Init_Caps.Leave_Checkpoint_Cap;
          Copy_Checkpoint_Cap  : constant Rose.Capabilities.Capability :=
                                   Init.Calls.Launch_Boot_Module
-                                    (Boot_Cap, Checkpoint_Module,
+                                    (Boot_Cap, Modules.Checkpoint,
                                      Checkpoint_Oid,
                                      Checkpoint_Priority,
                                      Create_Endpoint_Cap, Cap_Set_Cap,

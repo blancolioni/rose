@@ -9,7 +9,6 @@ with Rose.Directories;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Rose.Devices.Checkpoints;
 with Rose.Interfaces.Stream_Reader;
 with Rose.Interfaces.Stream_Reader.Client;
 
@@ -25,9 +24,6 @@ package body Restore.Installer is
    function Get_Public_Interface_From_Process
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
-
-   procedure Write_Initial_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
 
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
@@ -150,8 +146,7 @@ package body Restore.Installer is
    -------------
 
    procedure Install
-     (To     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
-      Source : Step_Iterator)
+     (Source : Step_Iterator)
    is
       use type Rose.Directories.File_Kind;
       Install_Directory : constant String := "/rose/install";
@@ -209,7 +204,7 @@ package body Restore.Installer is
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
-         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+         Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
          Rose.System_Calls.Send_Cap (Params, Input_Stream_Cap);
          Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
@@ -217,10 +212,6 @@ package body Restore.Installer is
 
          Rose.System_Calls.Invoke_Capability (Params);
       end;
-
-      if False then
-         Write_Initial_System_Image (To);
-      end if;
 
    end Install;
 
@@ -298,7 +289,7 @@ package body Restore.Installer is
             Invoke_Buffer (Last) := Character'Pos (Ch);
          end loop;
 
-         Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+         Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Cap
            (Params, Get_Interface_Cap (Caps_Reader));
          Rose.System_Calls.Send_Cap
@@ -375,23 +366,11 @@ package body Restore.Installer is
    procedure Send_Console (Console_Cap : Rose.Capabilities.Capability) is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.System_Calls.Initialize_Send (Params, Install_Exec_Cap);
+      Rose.System_Calls.Initialize_Send (Params, Init_Cap);
       Rose.System_Calls.Send_Cap (Params, Console_Cap);
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(98));
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Console;
-
-   --------------------------------
-   -- Write_Initial_System_Image --
-   --------------------------------
-
-   procedure Write_Initial_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
-   is
-   begin
-      Rose.Devices.Checkpoints.Start_System_Image (Device);
-      Rose.Devices.Checkpoints.Finish_System_Image (Device);
-   end Write_Initial_System_Image;
 
 end Restore.Installer;
