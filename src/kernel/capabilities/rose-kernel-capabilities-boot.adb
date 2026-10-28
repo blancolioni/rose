@@ -1,3 +1,4 @@
+with Rose.Objects;
 with Rose.Words;
 
 with Rose.Kernel.Modules;
@@ -27,7 +28,7 @@ package body Rose.Kernel.Capabilities.Boot is
       use Rose.Invocation;
       use Rose.Words;
       use Rose.Environment_Pages;
-      Start : constant Parameter_Word_Index := 2;
+      Start : constant Parameter_Word_Index := 3;
 
       Value : String (1 .. 12);
       Length : Natural;
@@ -65,7 +66,7 @@ package body Rose.Kernel.Capabilities.Boot is
       end Set_Value;
 
       Argument_Count : constant Word :=
-                         Word (Params.Control.Last_Sent_Word) - 1;
+                         Word (Params.Control.Last_Sent_Word) - 2;
       Argument_Index : Parameter_Word_Index := Start;
    begin
       if Argument_Count = 0 then
@@ -102,10 +103,31 @@ package body Rose.Kernel.Capabilities.Boot is
       Current_Pid      : constant Rose.Kernel.Processes.Process_Id :=
                            Rose.Kernel.Processes.Current_Process_Id;
       New_Pid          : Rose.Kernel.Processes.Process_Id;
-      Have_Environment : constant Boolean :=
-                           Check_Environment (Params);
+      Oid              : constant Rose.Objects.Object_Id :=
+                           Rose.Objects.Object_Id (Params.Data (2));
+      Have_Environment : Boolean;
 
    begin
+
+      --  Data: the module, its priority, its object id, and its
+      --  arguments.  The object id is one of the boot modules', other
+      --  than idle's and init's, and no live process has it.
+
+      declare
+         use Rose.Kernel.Processes;
+         use type Rose.Objects.Object_Id;
+      begin
+         if Params.Control.Last_Sent_Word < 2
+           or else Oid not in Rose.Objects.Boot_Process_Object_Id
+           or else Oid <= Rose.Objects.Init_Object_Id
+           or else To_Process_Id (Oid) /= Null_Process_Id
+         then
+            Return_Error (Params, Request_Error);
+            return;
+         end if;
+      end;
+
+      Have_Environment := Check_Environment (Params);
 
       New_Pid :=
         Rose.Kernel.Processes.Init.Load_Boot_Module
@@ -114,6 +136,7 @@ package body Rose.Kernel.Capabilities.Boot is
            Module   =>
              Rose.Kernel.Modules.Module_Index
                (Params.Data (0)),
+           Oid         => Oid,
            Environment => (if Have_Environment
                            then Page'Access
                              else null));

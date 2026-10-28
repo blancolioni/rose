@@ -21,8 +21,8 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 2;
-   --  Version 2 added the interrupts.
+   Kernel_Table_Version : constant := 3;
+   --  Version 2 added the interrupts, and version 3 the next object id.
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -38,7 +38,7 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Interrupts) of Saved_Interrupt
      with Pack, Size => Max_Saved_Interrupts * 128;
 
-   Kernel_Header_Bytes : constant := 24 + Max_Saved_Interrupts * 16;
+   Kernel_Header_Bytes : constant := 32 + Max_Saved_Interrupts * 16;
 
    type Kernel_Table_Header is
       record
@@ -48,6 +48,10 @@ package Rose.Checkpoints is
          --  All of the kernel's pages, including this one.
          Process_Count   : Rose.Words.Word_32 := 0;
          Interrupt_Count : Rose.Words.Word_32 := 0;
+         Next_Object_Id  : Rose.Words.Word_64 := 0;
+         --  The object id the kernel gives the next process.  A restore
+         --  carries on from here, so that no process has the id of one
+         --  that a cap in the checkpoint names.
          Interrupts      : Saved_Interrupt_Array;
          Reserved        : System.Storage_Elements.Storage_Array
                              (1 .. Rose.Limits.Page_Size

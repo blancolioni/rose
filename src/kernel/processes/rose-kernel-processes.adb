@@ -87,13 +87,9 @@ package body Rose.Kernel.Processes is
 
    procedure Assign_Object_Id (Pid : Process_Id) is
       use type Rose.Objects.Object_Id;
-      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      if P.Oid = Rose.Objects.Null_Object_Id then
-         P.Oid := Rose.Objects.Object_Id (Pid);
-      else
-         P.Oid := P.Oid + Rose.Kernel.Limits.Max_Processes;
-      end if;
+      Process_Table (Pid).Oid := Next_Object_Id;
+      Next_Object_Id := Next_Object_Id + 1;
    end Assign_Object_Id;
 
    ------------------------
@@ -1300,20 +1296,6 @@ package body Rose.Kernel.Processes is
       return 0;
    end Next_Blocked_Sender;
 
-   -----------------
-   -- Object_Slot --
-   -----------------
-
-   function Object_Slot
-     (Oid : Rose.Objects.Object_Id)
-      return Process_Id
-   is
-      use type Rose.Objects.Object_Id;
-   begin
-      return Process_Id
-        ((Oid - 1) mod Rose.Kernel.Limits.Max_Processes + 1);
-   end Object_Slot;
-
    ----------------------
    -- Page_Fault_Count --
    ----------------------
@@ -1365,7 +1347,6 @@ package body Rose.Kernel.Processes is
       use type System.Address;
       P   : Kernel_Process_Entry renames Process_Table (Pid);
       Me  : constant Kernel_Process_Access := P'Access;
-      Oid : constant Rose.Objects.Object_Id := P.Oid;
    begin
       Rose.Kernel.Processes.Queue.Remove_Process (Pid);
 
@@ -1424,7 +1405,6 @@ package body Rose.Kernel.Processes is
       end;
 
       P.Pid := Pid;
-      P.Oid := Oid;
       P.State := Available;
       P.Name := (others => ' ');
    end Release_Entry;
@@ -2261,15 +2241,13 @@ package body Rose.Kernel.Processes is
          return Null_Process_Id;
       end if;
 
-      declare
-         Pid : constant Process_Id := Object_Slot (Oid);
-         P   : Kernel_Process_Entry renames Process_Table (Pid);
-      begin
-         if P.State = Available or else P.Oid /= Oid then
-            return Null_Process_Id;
+      for P of Process_Table.all loop
+         if P.Oid = Oid and then P.State /= Available then
+            return P.Pid;
          end if;
-         return Pid;
-      end;
+      end loop;
+
+      return Null_Process_Id;
    end To_Process_Id;
 
    ----------------------

@@ -28,6 +28,20 @@ package Rose.Objects is
    subtype Process_Object_Id is Object_Id range
      16#0000_0000_0000_0001# .. 16#0000_0000_FFFF_FFFF#;
 
+   subtype Boot_Process_Object_Id is Process_Object_Id range 1 .. 255;
+   --  The object ids of the boot modules.  The kernel gives idle and init
+   --  the first two, and init chooses one for each boot module it
+   --  launches, so that a boot server has the same object id on every
+   --  boot, whichever other modules are launched.  Other processes have
+   --  ids above these, which are never used again.
+
+   Idle_Object_Id : constant Object_Id := 1;
+   Init_Object_Id : constant Object_Id := 2;
+
+   First_Process_Object_Id : constant Object_Id :=
+                               Boot_Process_Object_Id'Last + 1;
+   --  The object id of the first process that is not a boot module.
+
    function Is_Page_Object_Id (Id : Object_Id) return Boolean
    is (Id in Page_Object_Id);
 

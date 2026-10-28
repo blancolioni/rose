@@ -22,16 +22,20 @@ package Rose.Kernel.Processes.Snapshot is
    --  Resume_Restored_Process.
 
    procedure Restore_Process
-     (Pages   : System.Storage_Elements.Storage_Array;
-      Pid     : out Process_Id;
-      Success : out Boolean);
+     (Pages          : System.Storage_Elements.Storage_Array;
+      Next_Object_Id : Rose.Objects.Object_Id;
+      Pid            : out Process_Id;
+      Success        : out Boolean);
    --  Recreate the process whose record page and capability pages are
-   --  Pages, with the object id, caps, endpoints and registers it had.
-   --  It is not runnable until Resume_Restored_Process.  A process that
-   --  was blocked in a call makes the call again when it runs, since
-   --  whatever it was waiting for was lost in the restart.  Success is
-   --  False if the record is not valid, or the process's slot is in
-   --  use.
+   --  Pages, with the object id, caps, endpoints and registers it had,
+   --  in any free entry.  It is not runnable until
+   --  Resume_Restored_Process.  A process that was blocked in a call
+   --  makes the call again when it runs, since whatever it was waiting
+   --  for was lost in the restart.  Next_Object_Id is the next object id
+   --  from the checkpoint's header, and new processes have ids from
+   --  there on.  Success is False if the record is not valid, its object
+   --  id is a boot module's or a live process's, or there is no free
+   --  entry.
 
    procedure Resume_Restored_Process
      (Pid     : Process_Id;

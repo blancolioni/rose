@@ -26,8 +26,7 @@ package Rose.Kernel.Processes is
      (Oid : Rose.Objects.Object_Id)
       return Process_Id;
    --  The process whose object id is Oid, or Null_Process_Id if there is
-   --  none: Oid is not a process's object id, or that process has gone
-   --  and its entry is free or holds another process.
+   --  none: Oid is not a process's object id, or that process has gone.
 
    function To_Object_Id
      (Pid : Process_Id)
@@ -391,18 +390,16 @@ private
    Next_Pid : Process_Id := 1;
    --  Where New_Process starts looking for a free entry.
 
-   function Object_Slot
-     (Oid : Rose.Objects.Object_Id)
-      return Process_Id;
-   --  The entry that holds, or held, the process with object id Oid. A
-   --  process's object id is its entry plus Max_Processes times the
-   --  number of processes that used the entry before it, so a process
-   --  keeps its entry when it is restored.
+   Next_Object_Id : Rose.Objects.Object_Id :=
+                      Rose.Objects.First_Process_Object_Id;
+   --  The object id of the next process that is not a boot module.  An
+   --  object id does not depend on the entry that holds the process, and
+   --  is never used again, so a cap naming a process that has gone does
+   --  not reach a later one.  A checkpoint saves it, and a restore
+   --  carries on from there.
 
    procedure Assign_Object_Id (Pid : Process_Id);
-   --  Give the new process in entry Pid an object id that no earlier
-   --  process has had, so that a cap naming an earlier process in the
-   --  same entry does not reach it.
+   --  Give the new process in entry Pid the next object id.
 
    Capability_Cache_Size : constant := 16;
    type Cached_Capability_Count is range 0 .. Capability_Cache_Size;

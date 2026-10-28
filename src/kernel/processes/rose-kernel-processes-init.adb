@@ -78,7 +78,7 @@ package body Rose.Kernel.Processes.Init is
       Current_Process.Priority := Process_Priority'Last;
       Current_Process.State := Ready;
       Current_Process.Name (1 .. 4) := "idle";
-      Current_Process.Oid := Rose.Objects.Object_Id (1);
+      Current_Process.Oid := Rose.Objects.Idle_Object_Id;
       Rose.Kernel.Processes.Queue.Queue_Process (1);
 
       declare
@@ -86,6 +86,7 @@ package body Rose.Kernel.Processes.Init is
                  Load_Boot_Module
                    (Priority    => Process_Priority'Last,
                     Module      => Rose.Kernel.Modules.Init_Module,
+                    Oid         => Rose.Objects.Init_Object_Id,
                     Environment => null);
       begin
          pragma Unreferenced (Pid);
@@ -106,6 +107,7 @@ package body Rose.Kernel.Processes.Init is
    function Load_Boot_Module
      (Priority    : Process_Priority;
       Module      : Rose.Kernel.Modules.Module_Index;
+      Oid         : Rose.Objects.Boot_Process_Object_Id;
       Environment : access Rose.Environment_Pages.Environment_Page)
       return Rose.Kernel.Processes.Process_Id
    is
@@ -379,7 +381,7 @@ package body Rose.Kernel.Processes.Init is
             Rose.Kernel.Panic.Panic ("boot module heap exhausted");
          end if;
 
-         Assign_Object_Id (Pid);
+         Proc.Oid := Oid;
          Proc.Flags (Boot_Module) := True;
 
          declare

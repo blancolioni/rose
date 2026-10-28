@@ -53,7 +53,7 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 8
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 2
+KERNEL_TABLE_VERSION = 3
 MAX_SAVED_INTERRUPTS = 32
 PROCESS_RECORD_MAGIC = 0x50524F4345535331
 CAPS_PER_PAGE = PAGE_SIZE // 20
@@ -136,7 +136,7 @@ def check_kernel_tables(log, first, last, verbose):
         return False, ("location %d: expected the kernel's tables, found %s"
                        % (first, describe_page(page))), 0, oids
     version = u32(page, 8)
-    if version != KERNEL_TABLE_VERSION:
+    if version not in (2, KERNEL_TABLE_VERSION):
         return False, "kernel tables version %d" % version, 0, oids
     page_count = u32(page, 12)
     process_count = u32(page, 16)
@@ -178,18 +178,35 @@ def check_kernel_tables(log, first, last, verbose):
     if interrupt_count > MAX_SAVED_INTERRUPTS:
         return False, "kernel tables: %d interrupts" % interrupt_count, \
             0, oids
+
+    # Version 3 has the next object id before the interrupts.  It must be
+    # a process's object id, past every saved process's.
+    next_oid = None
+    interrupts_offset = 24
+    if version >= 3:
+        next_oid = u64(page, 24)
+        interrupts_offset = 32
+        if not 0 < next_oid <= 0xFFFF_FFFF \
+           or any(oid >= next_oid for oid in oids):
+            return False, ("kernel tables: next object id %d is not past "
+                           "every process's" % next_oid), 0, oids
+
     for i in range(interrupt_count):
-        vector, cap, oid = struct.unpack_from("<IIQ", page, 24 + i * 16)
+        vector, cap, oid = struct.unpack_from("<IIQ", page,
+                                              interrupts_offset + i * 16)
         if oid not in oids:
             return False, ("interrupt %d goes to process %d, which is not "
                            "in the kernel tables" % (vector, oid)), 0, oids
         if verbose:
             print("    interrupt %d -> process %d cap %d" % (vector, oid, cap))
 
-    return True, ("kernel: %d process%s in %d pages, %d interrupt%s"
+    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s"
                   % (process_count, "" if process_count == 1 else "es",
                      page_count, interrupt_count,
-                     "" if interrupt_count == 1 else "s")), page_count, oids
+                     "" if interrupt_count == 1 else "s",
+                     "" if next_oid is None
+                     else ", next object id %d" % next_oid)), \
+        page_count, oids
 
 
 def check_store_tables(log, first, last, verbose):
