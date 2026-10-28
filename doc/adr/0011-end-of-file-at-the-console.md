@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** [ADR 0009](0009-files-open-readers.md) (files open readers), [ADR 0010](0010-resources.md) (resources), [ADR 0006](0006-signals.md) (signals), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), #395 (standard input for an omitted input argument), blancolioni/idle#52 (`Standard_Input` as a default), #331 (`cat`), #339 (`<`), #142 (background jobs)
+- **Related:** [ADR 0009](0009-files-open-readers.md) (files open readers), [ADR 0010](0010-resources.md) (resources), [ADR 0006](0006-signals.md) (signals), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), #395 (standard input for an omitted input argument), blancolioni/idle#52 (`Standard_Input` as a default), #397 (console control characters), #331 (`cat`), #339 (`<`), #142 (background jobs)
 
 ## Context
 
@@ -12,9 +12,9 @@ A `Stream_Reader` has no separate end-of-file operation. A `Read` that returns n
 
 The console can't produce that `Read` at the moment:
 
-- **Ctrl with a letter produces nothing.** The keyboard's key table has no entries for Control, so Ctrl-D gives a NUL, and the keyboard doesn't send it on.
+- **Ctrl with a letter produces a NUL.** The keyboard's key table has no entries for Control, so Ctrl-D gives a NUL, which the keyboard echoes and sends on.
 - **event-input-stream never answers a `Read` with nothing.** It is the console's line discipline. It collects characters until a line break, then completes the blocked `Read` with the line. If nothing has been typed, it blocks the `Read`.
-- **The keyboard echoes every character it produces,** before event-input-stream sees it.
+- **The keyboard echoes every character it produces,** before event-input-stream sees it, so the echo can't depend on what the line discipline does with a character.
 
 Every command that petal launches gets petal's own standard input: petal copies its cap to event-input-stream's `Stream_Reader` into the launch invocation. Ending the input for a command must not end it for petal.
 
@@ -24,11 +24,13 @@ On Unix, Ctrl-D is the terminal's `VEOF` character. The line discipline acts on 
 
 ### 1. Ctrl with a letter gives its control character
 
-With Control held, a letter key produces the letter's position modulo 32, so Ctrl-D is EOT (4) and Ctrl-C is ETX (3). The keyboard doesn't echo the control characters it adds. It still echoes line break, tab and backspace, as it does now.
+With Control held, a letter key produces the letter's position modulo 32, so Ctrl-D is EOT (4) and Ctrl-C is ETX (3).
+
+The keyboard stops echoing. Echo moves to event-input-stream, which knows what each character does to the line, and so what should appear on the screen. #397 covers this, and the other control characters.
 
 ### 2. The line discipline ends the input on EOT
 
-In cooked mode, event-input-stream acts on EOT and doesn't put it in its buffer:
+In cooked mode, event-input-stream acts on EOT, doesn't put it in its buffer, and echoes nothing for it:
 
 - **With an empty line,** the blocked `Read`, or the next `Read` if none is blocked, returns nothing.
 - **With part of a line typed,** that part is returned without a line break, as if Enter had been pressed. A second Ctrl-D then ends the input.
@@ -55,7 +57,7 @@ Petal is the console's only shell, and there is no login to return to, so it doe
 - **Ctrl-C produces ETX,** in the same place. The line discipline is where ADR 0006 can turn it into `Interrupt`.
 - **Input typed ahead goes to the next reader.** Lines typed while nothing is reading wait in event-input-stream, and the next `Read` takes them, whether it comes from a command or from petal. Petal's `Ada.Text_IO` reads everything that is waiting, so lines typed ahead of a command, before petal has read the command, stay in petal's buffer, and petal runs them as commands.
 - **Background jobs (#142) can't read the console.** A job and petal would take turns at its input. #142 decides what such a job gets as its standard input.
-- **Echo stays in the keyboard.** It belongs in the line discipline, which knows what a line is and could then handle backspace, but that is a separate change.
+- **event-input-stream writes to the console.** It needs a `Stream_Writer` cap for it, given to it when it is installed (#397).
 
 ## Alternatives considered
 
