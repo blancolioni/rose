@@ -325,6 +325,7 @@ package body Restore.Checkpoints is
       Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array;
       Interrupt_Count : Natural;
       Process_Count   : Natural;
+      Next_Object_Id  : Rose.Objects.Object_Id;
       Restored_Pages  : Natural := 0;
    begin
       Success := False;
@@ -355,6 +356,7 @@ package body Restore.Checkpoints is
       Process_Count := Natural (Kernel_Header.Process_Count);
       Interrupt_Count := Natural (Kernel_Header.Interrupt_Count);
       Interrupts := Kernel_Header.Interrupts;
+      Next_Object_Id := Rose.Objects.Object_Id (Kernel_Header.Next_Object_Id);
 
       --  The regions first: the memory server's segments use them.
 
@@ -446,6 +448,7 @@ package body Restore.Checkpoints is
                end loop;
 
                Rose.System_Calls.Initialize_Send (Params, Restore_Process_Cap);
+               Rose.System_Calls.Send_Object_Id (Params, Next_Object_Id);
                Rose.System_Calls.Send_Buffer
                  (Params, Storage_Count (1 + Cap_Pages) * Page_Size,
                   Process_Pages'Address, False);

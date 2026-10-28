@@ -289,6 +289,7 @@ package body Init.Calls is
    function Launch_Boot_Module
      (Cap             : Rose.Capabilities.Capability;
       Module_Index    : Rose.Words.Word;
+      Oid             : Rose.Objects.Object_Id;
       Priority        : Rose.Words.Word;
       Create_Cap      : Rose.Capabilities.Capability;
       Create_Cap_Set  : Rose.Capabilities.Capability;
@@ -298,7 +299,7 @@ package body Init.Calls is
       No_Words : Array_Of_Words (1 .. 0);
    begin
       return Launch_Boot_Module
-        (Cap, Module_Index, Priority,
+        (Cap, Module_Index, Oid, Priority,
          Create_Cap, Create_Cap_Set, Launch_Caps, No_Words);
    end Launch_Boot_Module;
 
@@ -309,6 +310,7 @@ package body Init.Calls is
    function Launch_Boot_Module
      (Cap            : Rose.Capabilities.Capability;
       Module_Index   : Rose.Words.Word;
+      Oid            : Rose.Objects.Object_Id;
       Priority       : Rose.Words.Word;
       Create_Cap     : Rose.Capabilities.Capability;
       Create_Cap_Set : Rose.Capabilities.Capability;
@@ -328,9 +330,10 @@ package body Init.Calls is
                                Block            => True,
                                Create_Reply_Cap => True,
                                others           => False);
-      Params.Control.Last_Sent_Word := 1;
+      Params.Control.Last_Sent_Word := 2;
       Params.Data (0) := Module_Index;
       Params.Data (1) := Priority;
+      Params.Data (2) := Rose.Words.Word (Oid);
 
       for W of Launch_Words loop
          Params.Control.Last_Sent_Word :=

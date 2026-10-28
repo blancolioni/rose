@@ -76,9 +76,10 @@ package body Rose.Kernel.Processes.Snapshot is
    ---------------------
 
    procedure Restore_Process
-     (Pages   : System.Storage_Elements.Storage_Array;
-      Pid     : out Process_Id;
-      Success : out Boolean)
+     (Pages          : System.Storage_Elements.Storage_Array;
+      Next_Object_Id : Rose.Objects.Object_Id;
+      Pid            : out Process_Id;
+      Success        : out Boolean)
    is
       use type Rose.Capabilities.Capability;
       Item : Rose.Checkpoints.Process_Record
@@ -101,15 +102,38 @@ package body Rose.Kernel.Processes.Snapshot is
          return;
       end if;
 
-      Pid := Object_Slot (Rose.Objects.Object_Id (Item.Oid));
+      declare
+         use type Rose.Objects.Object_Id;
+         Oid : constant Rose.Objects.Object_Id :=
+                 Rose.Objects.Object_Id (Item.Oid);
+      begin
+         if Oid < Rose.Objects.First_Process_Object_Id
+           or else not Rose.Objects.Is_Process_Object_Id (Oid)
+           or else not Rose.Objects.Is_Process_Object_Id (Next_Object_Id)
+           or else To_Process_Id (Oid) /= Null_Process_Id
+         then
+            return;
+         end if;
 
-      if Pid not in Process_Table'Range
-        or else Process_Table (Pid).State /= Available
-        or else Process_Table (Pid).Last_Cap /= 0
-      then
-         Pid := Null_Process_Id;
-         return;
-      end if;
+         for P of Process_Table.all loop
+            if P.State = Available then
+               Pid := P.Pid;
+               exit;
+            end if;
+         end loop;
+
+         if Pid = Null_Process_Id then
+            return;
+         end if;
+
+         if Processes.Next_Object_Id < Next_Object_Id then
+            Processes.Next_Object_Id := Next_Object_Id;
+         end if;
+
+         if Processes.Next_Object_Id <= Oid then
+            Processes.Next_Object_Id := Oid + 1;
+         end if;
+      end;
 
       declare
          Last : Natural := 0;
@@ -247,10 +271,6 @@ package body Rose.Kernel.Processes.Snapshot is
          P.Flags := Flags;
          P.State := (if State = Faulted then Faulted else Starting);
       end;
-
-      if Pid >= Next_Pid then
-         Next_Pid := Pid + 1;
-      end if;
 
       Success := True;
    end Restore_Process;
@@ -517,6 +537,7 @@ package body Rose.Kernel.Processes.Snapshot is
          Header.Version := Rose.Checkpoints.Kernel_Table_Version;
          Header.Page_Count := Word_32 (Page_Count);
          Header.Process_Count := Word_32 (Process_Count);
+         Header.Next_Object_Id := Word_64 (Next_Object_Id);
          Rose.Kernel.Interrupts.Iterate_Cap_Handlers (Save_Interrupt'Access);
          if not Success then
             Page_Count := 0;

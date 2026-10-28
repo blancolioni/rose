@@ -59,6 +59,27 @@ package body Init.Run is
    Checkpoint_Module : constant := 14;
    Log_Module        : constant := 15;
 
+   --  The object ids of the boot servers.  A server has the same id on
+   --  every boot, whichever servers are launched, so that the caps that
+   --  restored processes hold still name it (#372).  The kernel gives
+   --  idle and init ids 1 and 2.
+
+   Console_Oid        : constant := 3;
+   Mem_Oid            : constant := 4;
+   PCI_Oid            : constant := 5;
+   ATA_Oid            : constant := 6;
+   Store_Oid          : constant := 7;
+   ISOFS_Oid          : constant := 8;
+   Restore_Oid        : constant := 9;
+   Scan_Oid           : constant := 10;
+   Swap_Partition_Oid : constant := 11;
+   Elf_Oid            : constant := 12;
+   Timer_Oid          : constant := 13;
+   Cap_Set_Oid        : constant := 14;
+   Checkpoint_Oid     : constant := 15;
+   Log_Oid            : constant := 16;
+   Log_Partition_Oid  : constant := 17;
+
    Invoke_Buffer : System.Storage_Elements.Storage_Array
      (1 .. Rose.Limits.Page_Size)
      with Alignment => 4096;
@@ -322,7 +343,9 @@ package body Init.Run is
 
          Id :=
            Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Partition_Module, Device_Driver_Priority,
+             (Boot_Cap, Partition_Module,
+              (if Is_Swap then Swap_Partition_Oid else Log_Partition_Oid),
+              Device_Driver_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
               (Console_Interface_Cap,
                Device_Cap),
@@ -376,7 +399,8 @@ package body Init.Run is
       Init.Calls.Send (Reserve_Cap, (16#0000_1000#, 16#0009_F000#));
       Console_Id :=
         Init.Calls.Launch_Boot_Module
-          (Boot_Cap, Console_Module, Low_Priority,
+          (Boot_Cap, Console_Module, Console_Oid,
+           Low_Priority,
            Create_Endpoint_Cap,
            Rose.Capabilities.Null_Capability,
            (Console_Mem_Cap,
@@ -404,7 +428,7 @@ package body Init.Run is
       declare
          Cap_Set_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
-                          (Boot_Cap, Cap_Set_Module,
+                          (Boot_Cap, Cap_Set_Module, Cap_Set_Oid,
                            Device_Driver_Priority,
                            Create_Endpoint_Cap,
                            Rose.Capabilities.Null_Capability,
@@ -425,7 +449,8 @@ package body Init.Run is
       declare
          Mem_Id : constant Rose.Objects.Object_Id :=
                     Init.Calls.Launch_Boot_Module
-                      (Boot_Cap, Mem_Module, Memory_Priority,
+                      (Boot_Cap, Mem_Module, Mem_Oid,
+                       Memory_Priority,
                        Create_Endpoint_Cap,
                        Cap_Set_Cap,
                        (Console_Interface_Cap,
@@ -461,7 +486,8 @@ package body Init.Run is
                                 (7, 7, 0, 0));
          Timer_Id       : constant Rose.Objects.Object_Id :=
                             Init.Calls.Launch_Boot_Module
-                               (Boot_Cap, Timer_Module, Device_Driver_Priority,
+                               (Boot_Cap, Timer_Module, Timer_Oid,
+                                Device_Driver_Priority,
                                 Create_Endpoint_Cap, Cap_Set_Cap,
                                (Console_Interface_Cap,
                                 Set_Timeout_Cap, Get_Ticks_Cap));
@@ -518,7 +544,8 @@ package body Init.Run is
                                       16#0000_0000#));
          PCI_Id               : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
-                                    (Boot_Cap, PCI_Module, Low_Priority,
+                                    (Boot_Cap, PCI_Module, PCI_Oid,
+                                     Low_Priority,
                                      Create_Endpoint_Cap, Cap_Set_Cap,
                                      (Console_Interface_Cap,
                                       Command_Port_Out_Cap,
@@ -582,7 +609,7 @@ package body Init.Run is
                                       (6, 1, 47, 0));
          Ata_Id                : constant Rose.Objects.Object_Id :=
                                    Init.Calls.Launch_Boot_Module
-                                     (Boot_Cap, ATA_Module,
+                                     (Boot_Cap, ATA_Module, ATA_Oid,
                                       Device_Driver_Priority,
                                       Create_Endpoint_Cap, Cap_Set_Cap,
                                       (Console_Interface_Cap,
@@ -620,7 +647,8 @@ package body Init.Run is
       declare
          Store_Id : constant Rose.Objects.Object_Id :=
                       Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, Store_Module, Device_Driver_Priority,
+                        (Boot_Cap, Store_Module, Store_Oid,
+                         Device_Driver_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Delete_Cap,
                           Console_Interface_Cap,
@@ -662,7 +690,8 @@ package body Init.Run is
                                    (7, 4, 0, 0));
          Elf_Id       : constant Rose.Objects.Object_Id :=
                             Init.Calls.Launch_Boot_Module
-                              (Boot_Cap, Elf_Module, Device_Driver_Priority,
+                              (Boot_Cap, Elf_Module, Elf_Oid,
+                               Device_Driver_Priority,
                                Create_Endpoint_Cap, Cap_Set_Cap,
                                (Delete_Cap, Rescind_Cap,
                                 Console_Interface_Cap,
@@ -689,7 +718,8 @@ package body Init.Run is
          use Rose.Interfaces.Partitions;
          Scan_Id : constant Rose.Objects.Object_Id :=
                      Init.Calls.Launch_Boot_Module
-                       (Boot_Cap, Scan_Module, File_System_Priority,
+                       (Boot_Cap, Scan_Module, Scan_Oid,
+                        File_System_Priority,
                         Create_Endpoint_Cap, Cap_Set_Cap,
                         (Console_Interface_Cap,
                          Hd0_Cap));
@@ -737,7 +767,8 @@ package body Init.Run is
       declare
          IsoFS_Id : constant Rose.Objects.Object_Id :=
                       Init.Calls.Launch_Boot_Module
-                        (Boot_Cap, ISOFS_Module, File_System_Priority,
+                        (Boot_Cap, ISOFS_Module, ISOFS_Oid,
+                         File_System_Priority,
                          Create_Endpoint_Cap, Cap_Set_Cap,
                          (Console_Interface_Cap,
                           Hd1_Cap));
@@ -758,7 +789,8 @@ package body Init.Run is
          use Rose.Interfaces.Kernel_Log;
          Log_Id   : constant Rose.Objects.Object_Id :=
            Init.Calls.Launch_Boot_Module
-             (Boot_Cap, Log_Module, Log_Priority,
+             (Boot_Cap, Log_Module, Log_Oid,
+              Log_Priority,
               Create_Endpoint_Cap, Cap_Set_Cap,
               (Console_Interface_Cap, Start_Log_Cap));
          Copy_Cap : constant Rose.Capabilities.Capability :=
@@ -803,7 +835,8 @@ package body Init.Run is
 
          Restore_Id : constant Rose.Objects.Object_Id :=
                         Init.Calls.Launch_Boot_Module
-                          (Boot_Cap, Restore_Module, File_System_Priority,
+                          (Boot_Cap, Restore_Module, Restore_Oid,
+                           File_System_Priority,
                            Create_Endpoint_Cap, Cap_Set_Cap,
                            (Delete_Cap,
                             Console_Interface_Cap,
@@ -1080,6 +1113,7 @@ package body Init.Run is
          Checkpoint_Id        : constant Rose.Objects.Object_Id :=
                                   Init.Calls.Launch_Boot_Module
                                     (Boot_Cap, Checkpoint_Module,
+                                     Checkpoint_Oid,
                                      Checkpoint_Priority,
                                      Create_Endpoint_Cap, Cap_Set_Cap,
                                      (Console_Interface_Cap,

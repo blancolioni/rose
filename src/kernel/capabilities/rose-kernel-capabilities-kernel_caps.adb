@@ -382,7 +382,9 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Rose.Kernel.Processes.Ready);
 
          when Restore_Process_Endpoint =>
-            if not Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+            then
                Rose.Kernel.Processes.Return_Error
                  (Params, Rose.Invocation.Request_Error);
                return;
@@ -398,7 +400,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Success : Boolean;
             begin
                Rose.Kernel.Processes.Snapshot.Restore_Process
-                 (Pages, Pid, Success);
+                 (Pages          => Pages,
+                  Next_Object_Id =>
+                    Rose.Invocation.Get_Object_Id (Params.all, 0),
+                  Pid            => Pid,
+                  Success        => Success);
 
                if not Success then
                   Rose.Boot.Console.Put_Line

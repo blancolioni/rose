@@ -67,6 +67,7 @@ package Init.Calls is
    function Launch_Boot_Module
      (Cap            : Rose.Capabilities.Capability;
       Module_Index   : Rose.Words.Word;
+      Oid            : Rose.Objects.Object_Id;
       Priority       : Rose.Words.Word;
       Create_Cap     : Rose.Capabilities.Capability;
       Create_Cap_Set : Rose.Capabilities.Capability;
@@ -76,6 +77,7 @@ package Init.Calls is
    function Launch_Boot_Module
      (Cap            : Rose.Capabilities.Capability;
       Module_Index   : Rose.Words.Word;
+      Oid            : Rose.Objects.Object_Id;
       Priority       : Rose.Words.Word;
       Create_Cap     : Rose.Capabilities.Capability;
       Create_Cap_Set : Rose.Capabilities.Capability;
