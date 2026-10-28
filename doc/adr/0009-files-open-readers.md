@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users)
+- **Related:** [ADR 0010](0010-resources.md) (resources), #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users)
 
 ## Context
 
@@ -32,8 +32,7 @@ interface File is
    function Open_Seekable_Reader return interface Seekable_File_Reader;
 end File;
 
-interface File_Reader : Stream_Reader is
-   procedure Release;
+interface File_Reader : Stream_Reader, Resource is
 end File_Reader;
 
 interface Seekable_File_Reader : File_Reader, Seekable is
@@ -42,9 +41,7 @@ end Seekable_File_Reader;
 
 - **Each reader has its own position,** which starts at 0. Reading through one reader never moves another.
 - **A reader is sequential.** `File_Reader` is a `Stream_Reader` and nothing more, which is all that `cat`, petal and the installer need. A reader that can seek is a `Seekable_File_Reader`, opened with `Open_Seekable_Reader`. Code that takes a `File_Reader` can be given either.
-- **`Release` frees a reader.** The server holds each reader's position in a table, and nothing else tells it that a reader is no longer used. After `Release`, the reader's caps fail.
-  - It is not called `Close`, because each generated client already has a `Close`, which deletes the client's caps and has the same profile.
-  - If Rose gets a notice when the last cap to an endpoint is deleted, the server could free a reader without `Release`, but it does not have one now.
+- **A reader is a `Resource`** (ADR 0010). The server holds each reader's position in a table, and `Release` frees it. After that, the reader's caps fail. The generated client's `Close` calls `Release`.
 - **A reader sees the file as it is,** not a copy made when the reader was opened. What a reader sees while the file is being written is part of #390.
 
 ### 2. `Directory.Read_File` goes
