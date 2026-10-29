@@ -7,6 +7,8 @@ with Rose.Invocation;
 with Rose.Trace;
 with Rose.System_Calls.Server;
 
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Server;
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Region;
 with Rose.Interfaces.Region.Server;
@@ -14,18 +16,23 @@ with Rose.Interfaces.Stream_Reader;
 
 package body Store.Devices is
 
-   Max_Backing_Stores : constant := 16;
-   Max_Regions        : constant := 256;
-   Bank_Size_Bits     : constant := 2;
-   Store_Size_Bits    : constant := 21;
-   Minimum_Bank_Pages : constant := 2 ** Bank_Size_Bits;
-   Minimum_Bank_Size  : constant := Minimum_Bank_Pages * Rose.Limits.Page_Size;
-   Max_Open_Streams   : constant := 10;
+   Max_Backing_Stores  : constant := 16;
+   Max_Regions         : constant := 256;
+   Max_Banks           : constant := 64;
+   Block_Size_Bits     : constant := 2;
+   Store_Size_Bits     : constant := 21;
+   Minimum_Block_Pages : constant := 2 ** Block_Size_Bits;
+   Minimum_Block_Size  : constant :=
+                           Minimum_Block_Pages * Rose.Limits.Page_Size;
+   Max_Open_Streams    : constant := 10;
+
+   Root_Bank : constant := 1;
+   --  The bank that every other is below.
 
    Max_Store_Pages : constant := 2 ** (Store_Size_Bits - 1);
    --  The pages that Allocator can hand out, on all the backing stores
-   --  together: 4 GiB.  Its tree of 2 ** (Store_Size_Bits - Bank_Size_Bits)
-   --  blocks has half that many banks as leaves.
+   --  together: 4 GiB.  Its tree of 2 ** (Store_Size_Bits - Block_Size_Bits)
+   --  blocks has half that many leaves.
 
    Max_Fresh_Pages : constant := Max_Store_Pages;
    --  Every page that Allocator can hand out, on any backing store.
@@ -75,16 +82,18 @@ package body Store.Devices is
          Base, Bound    : Rose.Objects.Object_Id := 0;
          Access_Cap     : Rose.Capabilities.Capability := 0;
          Alloc_Index    : Natural := 0;
-         Alloc_Banks    : Natural := 0;
+         Alloc_Blocks   : Natural := 0;
          Reads          : Natural := 0;
          Zero_Reads     : Natural := 0;
          Writes         : Natural := 0;
          Restored       : Boolean := False;
+         Bank           : Natural := 0;
       end record;
-   --  A region, with the banks it was allocated, which a subregion does
+   --  A region, with the blocks it was allocated, which a subregion does
    --  not have: Alloc_Index is zero.  Restored is True for a region that
    --  Restore_Region recreated, whose fresh pages Restore_Table_Page
-   --  puts back.
+   --  puts back.  Bank is the bank that the region is charged to, which
+   --  is its parent's for a subregion.
 
    type Region_Array is
      array (1 .. Max_Regions) of Region_Record;
@@ -93,6 +102,27 @@ package body Store.Devices is
    Region_Count : Natural := 0;
    --  The highest region index used. A released region's index is used
    --  again.
+
+   type Bank_Record is
+      record
+         In_Use       : Boolean := False;
+         Parent       : Natural := 0;
+         Access_Cap   : Rose.Capabilities.Capability := 0;
+         Page_Limit   : Rose.Words.Word_64 := 0;
+         Region_Limit : Rose.Words.Word := 0;
+         Pages        : Rose.Words.Word_64 := 0;
+         Regions      : Rose.Words.Word := 0;
+      end record;
+   --  A bank (ADR 0014).  Parent is zero for the root bank.  A limit of
+   --  zero is no limit.  Pages and Regions are what has been reserved
+   --  from the bank and the banks below it: a region's pages are the
+   --  blocks it was allocated, and a subregion counts as a region but
+   --  has no pages of its own.
+
+   type Bank_Array is
+     array (1 .. Max_Banks) of Bank_Record;
+
+   Banks : Bank_Array;
 
    Table_Page   : System.Storage_Elements.Storage_Array
                     (1 .. Rose.Limits.Page_Size)
@@ -135,6 +165,39 @@ package body Store.Devices is
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
 
+   procedure Create_Root_Bank;
+   --  Make the root bank, if it doesn't exist yet.
+
+   function Is_Within
+     (Bank     : Natural;
+      Ancestor : Positive)
+      return Boolean;
+   --  True if Bank is Ancestor, or is below it.
+
+   function Within_Limits
+     (Bank    : Positive;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word)
+      return Boolean;
+   --  True if charging Pages and Regions to Bank would keep it, and every
+   --  bank above it, within its limits.
+
+   procedure Charge
+     (Bank    : Natural;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word);
+   --  Charge Pages and Regions to Bank and every bank above it.
+
+   procedure Uncharge
+     (Bank    : Natural;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word);
+
+   function Reserve_From
+     (Bank : Positive;
+      Size : Rose.Words.Word_64)
+      return Rose.Capabilities.Capability;
+
    function Is_Fresh
      (Page : Rose.Objects.Object_Id)
       return Boolean;
@@ -175,7 +238,7 @@ package body Store.Devices is
    Region_Streams : Region_Stream_Array;
 
    package Space_Allocators is
-     new Rose.Allocators (Store_Size_Bits - Bank_Size_Bits);
+     new Rose.Allocators (Store_Size_Bits - Block_Size_Bits);
 
    Allocator : Space_Allocators.Store;
 
@@ -233,7 +296,7 @@ package body Store.Devices is
                     Base, Bound);
 
          --  The store's page ids run to a power of two, but only the
-         --  banks that lie wholly on the device can be allocated: a page
+         --  blocks that lie wholly on the device can be allocated: a page
          --  beyond it would be read and written past the end of the
          --  partition (#321).
 
@@ -251,13 +314,34 @@ package body Store.Devices is
          Space_Allocators.Add_Range
            (Allocator => Allocator,
             Base      =>
-              Natural ((Base - Page_Object_Id'First) / Minimum_Bank_Pages) + 1,
+              Natural
+                ((Base - Page_Object_Id'First) / Minimum_Block_Pages) + 1,
             Bound     =>
-              Natural ((Bound - Page_Object_Id'First) / Minimum_Bank_Pages)
+              Natural ((Bound - Page_Object_Id'First) / Minimum_Block_Pages)
             + 1);
       end;
 
    end Add_Backing_Store;
+
+   ------------
+   -- Charge --
+   ------------
+
+   procedure Charge
+     (Bank    : Natural;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word)
+   is
+      use type Rose.Words.Word;
+      use type Rose.Words.Word_64;
+      Index : Natural := Bank;
+   begin
+      while Index in 1 .. Max_Banks loop
+         Banks (Index).Pages := Banks (Index).Pages + Pages;
+         Banks (Index).Regions := Banks (Index).Regions + Regions;
+         Index := Banks (Index).Parent;
+      end loop;
+   end Charge;
 
    ----------------
    -- Checkpoint --
@@ -330,7 +414,8 @@ package body Store.Devices is
                     Base        => Rose.Words.Word_64 (Region.Base),
                     Bound       => Rose.Words.Word_64 (Region.Bound),
                     Alloc_Index => Rose.Words.Word_32 (Region.Alloc_Index),
-                    Alloc_Banks => Rose.Words.Word_32 (Region.Alloc_Banks));
+                    Alloc_Blocks =>
+                      Rose.Words.Word_32 (Region.Alloc_Blocks));
                if Slot = Regions_Per_Page then
                   Append;
                   Slot := 0;
@@ -373,6 +458,61 @@ package body Store.Devices is
          Rose.System_Calls.Invoke_Capability (Params);
       end;
    end Checkpoint;
+
+   ----------------------
+   -- Create_Root_Bank --
+   ----------------------
+
+   procedure Create_Root_Bank is
+   begin
+      if not Banks (Root_Bank).In_Use then
+         Banks (Root_Bank) :=
+           (In_Use     => True,
+            Access_Cap =>
+              Rose.System_Calls.Server.Create_Endpoint
+                (Create_Endpoint_Cap,
+                 Rose.Interfaces.Bank.Bank_Interface,
+                 Rose.Objects.Capability_Identifier (Root_Bank)),
+            others     => <>);
+      end if;
+   end Create_Root_Bank;
+
+   ---------------------
+   -- Create_Sub_Bank --
+   ---------------------
+
+   function Create_Sub_Bank
+     (Id           : Rose.Objects.Capability_Identifier;
+      Page_Limit   : Rose.Words.Word_64;
+      Region_Limit : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+      Parent : constant Natural := Natural (Id);
+   begin
+      if Parent not in 1 .. Max_Banks or else not Banks (Parent).In_Use then
+         return 0;
+      end if;
+
+      for Index in Root_Bank + 1 .. Max_Banks loop
+         if not Banks (Index).In_Use then
+            Banks (Index) :=
+              (In_Use       => True,
+               Parent       => Parent,
+               Access_Cap   =>
+                 Rose.System_Calls.Server.Create_Endpoint
+                   (Create_Endpoint_Cap,
+                    Rose.Interfaces.Bank.Bank_Interface,
+                    Rose.Objects.Capability_Identifier (Index)),
+               Page_Limit   => Page_Limit,
+               Region_Limit => Region_Limit,
+               others       => <>);
+            return Banks (Index).Access_Cap;
+         end if;
+      end loop;
+
+      Rose.Console_IO.Put_Line ("store: out of banks");
+      return 0;
+   end Create_Sub_Bank;
 
    ----------------------
    -- Create_Subregion --
@@ -452,6 +592,11 @@ package body Store.Devices is
          Rose.Console_IO.New_Line;
       end if;
 
+      if not Within_Limits (Parent.Bank, 0, 1) then
+         Rose.Console_IO.Put_Line ("storage: bank region limit reached");
+         return 0;
+      end if;
+
       declare
          Index : constant Natural := New_Region;
       begin
@@ -468,7 +613,7 @@ package body Store.Devices is
          begin
             Child := (Parent with delta
                         Base => Base, Bound => Bound,
-                        Alloc_Index => 0, Alloc_Banks => 0,
+                        Alloc_Index => 0, Alloc_Blocks => 0,
                         Reads => 0, Zero_Reads => 0, Writes => 0,
                         Restored => False,
                         Access_Cap =>
@@ -477,11 +622,61 @@ package body Store.Devices is
                              Rose.Interfaces.Region.Region_Interface,
                              Capability_Identifier (Index)));
 
+            Charge (Child.Bank, 0, 1);
+
             return Child.Access_Cap;
          end;
       end;
 
    end Create_Subregion;
+
+   ------------------
+   -- Destroy_Bank --
+   ------------------
+
+   procedure Destroy_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      Bank   : constant Natural := Natural (Id);
+      Doomed : array (1 .. Max_Banks) of Boolean := (others => False);
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Bank not in Root_Bank + 1 .. Max_Banks
+        or else not Banks (Bank).In_Use
+      then
+         return;
+      end if;
+
+      --  Decide which banks go first: a bank's parent link is gone once
+      --  the bank is.
+
+      for Index in Doomed'Range loop
+         Doomed (Index) :=
+           Banks (Index).In_Use and then Is_Within (Index, Bank);
+      end loop;
+
+      for Index in 1 .. Region_Count loop
+         if Regions (Index).In_Use
+           and then Regions (Index).Bank in Doomed'Range
+           and then Doomed (Regions (Index).Bank)
+         then
+            Release (Rose.Objects.Capability_Identifier (Index));
+         end if;
+      end loop;
+
+      for Index in Doomed'Range loop
+         if Doomed (Index) then
+            Rose.System_Calls.Initialize_Send
+              (Params, Rose.System_Calls.Delete_Cap_Capability);
+            Rose.System_Calls.Send_Cap (Params, Banks (Index).Access_Cap);
+            Rose.System_Calls.Invoke_Capability (Params);
+
+            Rose.Interfaces.Bank.Server.Remove_Instance
+              (Rose.Objects.Capability_Identifier (Index));
+            Banks (Index) := (others => <>);
+         end if;
+      end loop;
+   end Destroy_Bank;
 
    -----------------
    -- Find_Region --
@@ -588,6 +783,46 @@ package body Store.Devices is
 
    end Get_Range;
 
+   -------------------
+   -- Get_Root_Bank --
+   -------------------
+
+   function Get_Root_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+   begin
+      Create_Root_Bank;
+      return Banks (Root_Bank).Access_Cap;
+   end Get_Root_Bank;
+
+   ---------------
+   -- Get_Usage --
+   ---------------
+
+   procedure Get_Usage
+     (Id           : in     Rose.Objects.Capability_Identifier;
+      Pages        :    out Rose.Words.Word_64;
+      Regions      :    out Rose.Words.Word;
+      Page_Limit   :    out Rose.Words.Word_64;
+      Region_Limit :    out Rose.Words.Word)
+   is
+      Bank : constant Natural := Natural (Id);
+   begin
+      Pages := 0;
+      Regions := 0;
+      Page_Limit := 0;
+      Region_Limit := 0;
+
+      if Bank in 1 .. Max_Banks and then Banks (Bank).In_Use then
+         Pages := Banks (Bank).Pages;
+         Regions := Banks (Bank).Regions;
+         Page_Limit := Banks (Bank).Page_Limit;
+         Region_Limit := Banks (Bank).Region_Limit;
+      end if;
+   end Get_Usage;
+
    --------------
    -- Is_Fresh --
    --------------
@@ -602,6 +837,27 @@ package body Store.Devices is
         and then Page - Page_Object_Id'First < Max_Fresh_Pages
         and then Fresh (Natural (Page - Page_Object_Id'First));
    end Is_Fresh;
+
+   ---------------
+   -- Is_Within --
+   ---------------
+
+   function Is_Within
+     (Bank     : Natural;
+      Ancestor : Positive)
+      return Boolean
+   is
+      Index : Natural := Bank;
+   begin
+      while Index in 1 .. Max_Banks loop
+         if Index = Ancestor then
+            return True;
+         end if;
+         Index := Banks (Index).Parent;
+      end loop;
+
+      return False;
+   end Is_Within;
 
    ----------------
    -- New_Region --
@@ -697,7 +953,7 @@ package body Store.Devices is
                New_Free_Store.Base := Store.Base + Request_Page_Count;
                New_Free_Store.Allocator_Base :=
                  Store.Allocator_Base
-                   + Natural (Request_Page_Count) / Minimum_Bank_Pages;
+                   + Natural (Request_Page_Count) / Minimum_Block_Pages;
                New_Free_Store.Bound := Store.Bound;
                New_Free_Store.Allocated := False;
                Store.Allocator_Bound := New_Free_Store.Allocator_Base;
@@ -901,6 +1157,7 @@ package body Store.Devices is
    procedure Release
      (Id : Rose.Objects.Capability_Identifier)
    is
+      use type Rose.Words.Word_64;
       Index : constant Natural := Natural (Id);
    begin
       if Index not in 1 .. Region_Count
@@ -937,7 +1194,7 @@ package body Store.Devices is
          if Region.Alloc_Index > 0 then
             Space_Allocators.Deallocate
               (Allocator, Region.Alloc_Index,
-               Region.Alloc_Index + Region.Alloc_Banks);
+               Region.Alloc_Index + Region.Alloc_Blocks);
          end if;
 
          Rose.System_Calls.Initialize_Send
@@ -945,50 +1202,66 @@ package body Store.Devices is
          Rose.System_Calls.Send_Cap (Params, Region.Access_Cap);
          Rose.System_Calls.Invoke_Capability (Params);
 
+         Uncharge
+           (Region.Bank,
+            Rose.Words.Word_64 (Region.Alloc_Blocks) * Minimum_Block_Pages,
+            1);
+
          Rose.Interfaces.Region.Server.Remove_Instance (Id);
          Region := (others => <>);
       end;
    end Release;
 
-   ---------------------
-   -- Reserve_Storage --
-   ---------------------
+   ------------------
+   -- Reserve_From --
+   ------------------
 
-   function Reserve_Storage
-     (Size : Rose.Words.Word_64)
+   function Reserve_From
+     (Bank : Positive;
+      Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability
    is
       Alloc_Index  : Natural;
       Alloc_Size   : Natural := Natural (Size);
-      Region_Index : constant Natural := New_Region;
+      Region_Index : Natural;
    begin
+      if Alloc_Size < Minimum_Block_Size then
+         Alloc_Size := Minimum_Block_Size;
+      elsif Alloc_Size mod Minimum_Block_Size /= 0 then
+         Alloc_Size := (Alloc_Size / Minimum_Block_Size + 1)
+           * Minimum_Block_Size;
+      end if;
+
+      if not Within_Limits
+        (Bank, Rose.Words.Word_64 (Alloc_Size / Rose.Limits.Page_Size), 1)
+      then
+         Rose.Console_IO.Put_Line ("store: bank limit reached");
+         return 0;
+      end if;
+
+      Region_Index := New_Region;
+
       if Region_Index = 0 then
          Rose.Console_IO.Put_Line ("store: out of regions");
          return 0;
       end if;
 
-      if Alloc_Size < Minimum_Bank_Size then
-         Alloc_Size := Minimum_Bank_Size;
-      elsif Alloc_Size mod Minimum_Bank_Size /= 0 then
-         Alloc_Size := (Alloc_Size / Minimum_Bank_Size + 1)
-           * Minimum_Bank_Size;
-      end if;
-
       Alloc_Index :=
         Space_Allocators.Allocate
-          (Allocator, Alloc_Size / Minimum_Bank_Size);
+          (Allocator, Alloc_Size / Minimum_Block_Size);
 
       if Alloc_Index = 0 then
          Rose.Console_IO.Put ("store: cannot allocate ");
          Rose.Console_IO.Put (Alloc_Size);
          Rose.Console_IO.Put (" bytes");
          Rose.Console_IO.New_Line;
+         Regions (Region_Index) := (others => <>);
          return 0;
       end if;
 
       declare
          use Rose.Objects;
-         New_Bank : Region_Record renames
+         Reserved : Region_Record renames
                       Regions (Region_Index);
          Store    : Positive := 1;
          Base     : Object_Id;
@@ -1007,23 +1280,29 @@ package body Store.Devices is
          Base :=
            Object_Id
              ((Alloc_Index - Backing_Stores (Store).Allocator_Base)
-              * Minimum_Bank_Pages)
+              * Minimum_Block_Pages)
            + Page_Object_Id'First;
          Bound :=
            Base + Object_Id (Alloc_Size / Rose.Limits.Page_Size);
 
-         New_Bank := Region_Record'
+         Reserved := Region_Record'
            (In_Use         => True,
             Backing_Device => Store,
             Base           => Base,
             Bound          => Bound,
             Access_Cap     => Cap,
             Alloc_Index    => Alloc_Index,
-            Alloc_Banks    => Alloc_Size / Minimum_Bank_Size,
+            Alloc_Blocks   => Alloc_Size / Minimum_Block_Size,
             Reads          => 0,
             Zero_Reads     => 0,
             Writes         => 0,
-            Restored       => False);
+            Restored       => False,
+            Bank           => Bank);
+
+         Charge
+           (Bank,
+            Rose.Words.Word_64 (Alloc_Size / Rose.Limits.Page_Size),
+            1);
 
          --  New storage holds nothing, whatever its device holds.
 
@@ -1031,6 +1310,37 @@ package body Store.Devices is
 
          return Cap;
       end;
+   end Reserve_From;
+
+   -----------------------
+   -- Reserve_From_Bank --
+   -----------------------
+
+   function Reserve_From_Bank
+     (Id   : Rose.Objects.Capability_Identifier;
+      Size : Rose.Words.Word_64)
+      return Rose.Capabilities.Capability
+   is
+      Bank : constant Natural := Natural (Id);
+   begin
+      if Bank not in 1 .. Max_Banks or else not Banks (Bank).In_Use then
+         return 0;
+      end if;
+
+      return Reserve_From (Bank, Size);
+   end Reserve_From_Bank;
+
+   ---------------------
+   -- Reserve_Storage --
+   ---------------------
+
+   function Reserve_Storage
+     (Size : Rose.Words.Word_64)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      Create_Root_Bank;
+      return Reserve_From (Root_Bank, Size);
    end Reserve_Storage;
 
    --------------------
@@ -1044,11 +1354,14 @@ package body Store.Devices is
       Base        : Rose.Objects.Object_Id;
       Bound       : Rose.Objects.Object_Id;
       Alloc_Index : Natural;
-      Alloc_Banks : Natural)
+      Alloc_Blocks : Natural)
    is
       pragma Unreferenced (Id);
       use Rose.Objects;
+      use type Rose.Words.Word_64;
    begin
+      Create_Root_Bank;
+
       if Index not in Regions'Range or else Regions (Index).In_Use then
          Rose.Console_IO.Put ("storage: restore: region ");
          Rose.Console_IO.Put (Index);
@@ -1067,7 +1380,7 @@ package body Store.Devices is
 
       if Alloc_Index > 0
         and then not Space_Allocators.Allocate_At
-          (Allocator, Alloc_Index, Alloc_Banks)
+          (Allocator, Alloc_Index, Alloc_Blocks)
       then
          Rose.Console_IO.Put ("storage: restore: space for region ");
          Rose.Console_IO.Put (Index);
@@ -1095,11 +1408,20 @@ package body Store.Devices is
                 Rose.Interfaces.Region.Region_Interface,
                 Capability_Identifier (Index)),
            Alloc_Index    => Alloc_Index,
-           Alloc_Banks    => Alloc_Banks,
+           Alloc_Blocks   => Alloc_Blocks,
            Reads          => 0,
            Zero_Reads     => 0,
            Writes         => 0,
-           Restored       => True);
+           Restored       => True,
+           Bank           => Root_Bank);
+
+      --  Banks aren't saved yet (ADR 0014), so every region is charged to
+      --  the root bank.
+
+      Charge
+        (Root_Bank,
+         Rose.Words.Word_64 (Alloc_Blocks) * Minimum_Block_Pages,
+         1);
 
       Region_Count := Natural'Max (Region_Count, Index);
    end Restore_Region;
@@ -1239,5 +1561,63 @@ package body Store.Devices is
          end if;
       end loop;
    end Set_Fresh;
+
+   --------------
+   -- Uncharge --
+   --------------
+
+   procedure Uncharge
+     (Bank    : Natural;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word)
+   is
+      use type Rose.Words.Word;
+      use type Rose.Words.Word_64;
+      Index : Natural := Bank;
+   begin
+      while Index in 1 .. Max_Banks loop
+         Banks (Index).Pages :=
+           (if Banks (Index).Pages > Pages
+            then Banks (Index).Pages - Pages else 0);
+         Banks (Index).Regions :=
+           (if Banks (Index).Regions > Regions
+            then Banks (Index).Regions - Regions else 0);
+         Index := Banks (Index).Parent;
+      end loop;
+   end Uncharge;
+
+   -------------------
+   -- Within_Limits --
+   -------------------
+
+   function Within_Limits
+     (Bank    : Positive;
+      Pages   : Rose.Words.Word_64;
+      Regions : Rose.Words.Word)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      use type Rose.Words.Word_64;
+      Index : Natural := Bank;
+   begin
+      while Index in 1 .. Max_Banks loop
+         declare
+            This : Bank_Record renames Banks (Index);
+         begin
+            if (This.Page_Limit /= 0
+                and then This.Pages + Pages > This.Page_Limit)
+              or else
+                (This.Region_Limit /= 0
+                 and then This.Regions + Regions > This.Region_Limit)
+            then
+               return False;
+            end if;
+
+            Index := This.Parent;
+         end;
+      end loop;
+
+      return True;
+   end Within_Limits;
 
 end Store.Devices;

@@ -15,7 +15,7 @@ interface Storage_Checkpoint is
       Base        : Object_Id;
       Bound       : Object_Id;
       Alloc_Index : Natural;
-      Alloc_Banks : Natural);
+      Alloc_Blocks : Natural);
    --  Recreate a region from a checkpoint, with the index, pages and
    --  backing store space it had.  Its pages are read from the device,
    --  except those that Restore_Table_Page marks fresh.

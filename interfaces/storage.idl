@@ -6,5 +6,10 @@ interface Storage is
    
    procedure Add_Backing_Store
      (Store  : interface Block_Device);
+
+   function Get_Root_Bank
+     return interface Bank;
+   --  The bank that every other is a sub-bank of. Reserve_Storage
+   --  reserves from it, until the callers use a bank of their own.
      
 end Storage;
