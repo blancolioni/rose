@@ -1,4 +1,8 @@
 with Ada.Containers.Doubly_Linked_Lists;
+with Ada.Containers.Generic_Array_Sort;
+with Ada.Containers.Generic_Constrained_Array_Sort;
+with Ada.Containers.Indefinite_Vectors;
+with Ada.Containers.Vectors;
 with Ada.Finalization;
 with Ada.Text_IO;
 
@@ -16,6 +20,26 @@ package body Tests.Containers is
    package Sorting is new Integer_Lists.Generic_Sorting;
 
    type Integer_Array is array (Positive range <>) of Integer;
+
+   subtype Four is Positive range 1 .. 4;
+   type Four_Integers is array (Four) of Integer;
+
+   procedure Sort is
+     new Ada.Containers.Generic_Array_Sort (Positive, Integer, Integer_Array);
+
+   procedure Sort is
+     new Ada.Containers.Generic_Constrained_Array_Sort
+       (Four, Integer, Four_Integers);
+
+   package Integer_Vectors is
+     new Ada.Containers.Vectors (Positive, Integer);
+
+   package Vector_Sorting is new Integer_Vectors.Generic_Sorting;
+
+   package String_Vectors is
+     new Ada.Containers.Indefinite_Vectors (Positive, String);
+
+   package String_Sorting is new String_Vectors.Generic_Sorting;
 
    subtype Element_Value is Natural range 0 .. 3;
 
@@ -37,6 +61,10 @@ package body Tests.Containers is
      new Ada.Containers.Doubly_Linked_Lists
        (Tracked_Elements.Tracked, Tracked_Elements."=");
 
+   function Array_Sort_Check return Boolean;
+   --  True if Generic_Array_Sort and Generic_Constrained_Array_Sort sort
+   --  an array.
+
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
 
@@ -54,6 +82,23 @@ package body Tests.Containers is
    function Tracked_Check return Boolean;
    --  True if the controlled elements of a list are finalized when the
    --  list is.
+
+   function Vector_Check return Boolean;
+   --  Check a vector of integers and a vector of strings, and report
+   --  the first thing that is wrong.
+
+   ----------------------
+   -- Array_Sort_Check --
+   ----------------------
+
+   function Array_Sort_Check return Boolean is
+      Items       : Integer_Array := (5, 2, 8, 1, 2);
+      Constrained : Four_Integers := (4, -1, 3, 0);
+   begin
+      Sort (Items);
+      Sort (Constrained);
+      return Items = (1, 2, 2, 5, 8) and then Constrained = (-1, 0, 3, 4);
+   end Array_Sort_Check;
 
    --------------------
    -- Container_Test --
@@ -120,6 +165,14 @@ package body Tests.Containers is
 
       if Boolean'Image (List.Is_Empty) /= "FALSE" then
          return Fail ("Boolean'Image");
+      end if;
+
+      if not Vector_Check then
+         return False;
+      end if;
+
+      if not Array_Sort_Check then
+         return Fail ("array sort");
       end if;
 
       return True;
@@ -230,5 +283,99 @@ package body Tests.Containers is
       end Finalize;
 
    end Tracked_Elements;
+
+   ------------------
+   -- Vector_Check --
+   ------------------
+
+   function Vector_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      Vector  : Integer_Vectors.Vector;
+      Strings : String_Vectors.Vector;
+      Sum     : Integer := 0;
+   begin
+      for Value in reverse 1 .. 10 loop
+         Vector.Append (Value);
+      end loop;
+
+      Vector_Sorting.Sort (Vector);
+      if not Vector_Sorting.Is_Sorted (Vector)
+        or else Vector.First_Element /= 1
+        or else Vector.Last_Element /= 10
+      then
+         return Fail ("vector sort");
+      end if;
+
+      --  Insert moves the elements after it up by one, through
+      --  overlapping storage.
+
+      Vector.Insert (Before => 5, New_Item => 42);
+      if Vector.Length /= 11
+        or else Vector (4) /= 4
+        or else Vector (5) /= 42
+        or else (for some Index in 6 .. 11 =>
+                   Vector (Index) /= Index - 1)
+      then
+         return Fail ("vector insert");
+      end if;
+
+      Vector.Delete (5);
+      for Item of Vector loop
+         Sum := Sum + Item;
+      end loop;
+      if Sum /= 55 or else Vector.Find_Index (7) /= 7 then
+         return Fail ("vector delete and iteration");
+      end if;
+
+      Vector.Reverse_Elements;
+      if Vector.First_Element /= 10
+        or else Integer_Vectors.Element (Vector.Last) /= 1
+      then
+         return Fail ("vector reverse");
+      end if;
+
+      --  Growing well past the first capacity moves the elements to
+      --  larger storage, more than once.
+
+      for Value in 11 .. 2_000 loop
+         Vector.Append (Value);
+      end loop;
+      if Vector.Length /= 2_000
+        or else Vector.Capacity < Vector.Length
+        or else Vector (1) /= 10
+        or else Vector (2_000) /= 2_000
+      then
+         return Fail ("vector growth");
+      end if;
+
+      begin
+         for Item of Vector loop
+            Vector.Append (Item);
+         end loop;
+         return Fail ("no vector tampering check");
+      exception
+         when Program_Error =>
+            null;
+      end;
+
+      Strings.Append ("pear");
+      Strings.Append ("fig");
+      Strings.Append ("banana");
+      String_Sorting.Sort (Strings);
+      if Strings.Length /= 3
+        or else Strings (1) /= "banana"
+        or else Strings (2) /= "fig"
+        or else Strings (3) /= "pear"
+      then
+         return Fail ("indefinite vector");
+      end if;
+
+      Strings.Replace_Element (2, "elderberry");
+      if Strings (2) /= "elderberry" or else Strings (3) /= "pear" then
+         return Fail ("indefinite vector replace");
+      end if;
+
+      return True;
+   end Vector_Check;
 
 end Tests.Containers;
