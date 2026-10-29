@@ -52,7 +52,11 @@ package Rose.Invocation is
       Operation_Not_Implemented,
       Missing_Data,
       Unknown_Error,
-      Undefined_Error);
+      Undefined_Error,
+      No_Invoke_Buffer);
+   --  No_Invoke_Buffer is reported by the user library, and never by the
+   --  kernel, when a process sends text or a storage array without having
+   --  set up an invoke buffer (#239).
 
    Max_Parameter_Words : constant := 16;
    Max_Capabilities    : constant := 16;
@@ -93,7 +97,7 @@ package Rose.Invocation is
          Identifier     : Rose.Objects.Capability_Identifier := 0;
          Unused         : Word_8 := 0;
          Error          : Invocation_Error := OK;
-         Extra_Errors   : Word_4 := 0;
+         Extra_Errors   : Word_3 := 0;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
          Buffer_Address : System.Address := System.Null_Address;

@@ -1,7 +1,7 @@
 with System.Machine_Code;               use System.Machine_Code;
 
 separate (Rose.System_Calls)
-procedure Invoke_Capability (Item : aliased in out Invocation_Record) is
+procedure Enter_Kernel (Item : aliased in out Invocation_Record) is
    type IR_Access is access all Invocation_Record;
    IR : constant IR_Access := Item'Access;
 begin
@@ -13,4 +13,4 @@ begin
    Asm ("1:int $0x30", Volatile => True);
    Asm ("popl %%ecx", Volatile => True);
 
-end Invoke_Capability;
+end Enter_Kernel;

@@ -27,6 +27,7 @@ package Tests.Suite is
                    Tests.Files.File_Test'Access,
                    Tests.Directories.Directory_Test'Access,
                    Tests.Users.User_Test'Access,
-                   Tests.Invalid_Caps.Invalid_Cap_Test'Access);
+                   Tests.Invalid_Caps.Invalid_Cap_Test'Access,
+                   Tests.Invalid_Caps.No_Buffer_Test'Access);
 
 end Tests.Suite;
