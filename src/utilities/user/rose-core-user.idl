@@ -5,7 +5,8 @@ command Rose.Core.User : Create_Endpoint
           user's name, and the user's home directory. It returns the
           interface, and then keeps serving it.
           """,
-       Server      => User_Server.Start_Server
+       Server      => User_Server.Start_Server,
+       Live
 is
    Name : String
      with Help => "the user's name";

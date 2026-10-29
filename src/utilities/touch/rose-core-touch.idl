@@ -1,0 +1,15 @@
+command Rose.Core.Touch : Standard_Error
+  with Summary     => "Create an empty file.",
+       Description => """
+          Touch creates an empty file called NAME in DIRECTORY, which is
+          home if it is not given. If NAME is already a file, it does
+          nothing. The command is live: the file is created as it runs
+          (ADR 0012).
+          """,
+       Live
+is
+   Name : String
+     with Help => "the name of the new file";
+   Directory : in Writable_Directory
+     with Help => "the directory to create it in";
+end Rose.Core.Touch;

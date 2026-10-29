@@ -21,8 +21,10 @@ package Petal.Signatures is
    --  An Interface_Type argument is a cap of the interface Interface_Name
    --  (ADR 0002, section 1).
 
-   type Argument_Mode is (In_Mode, Out_Mode, In_Out_Mode);
-   --  For an interface, the right that the shell grants to the cap.
+   type Argument_Mode is (In_Mode, Out_Mode);
+   --  The direction (ADR 0012): the shell supplies an in argument, and
+   --  the command returns an out one. What a command can do with an
+   --  interface is its type.
 
    type Place_Kind is (Word_Place, Item_Place, List_Place, Cap_Place);
    --  Where an argument goes in the launch invocation: a data word, a
@@ -35,6 +37,9 @@ package Petal.Signatures is
          Of_Type         : Argument_Type := String_Type;
          Interface_Name  : Slice;
          Mode            : Argument_Mode := In_Mode;
+         Versioned       : Boolean := False;
+         --  An in interface whose objects the shell can version and
+         --  commit (ADR 0012, section 2).
          Place           : Place_Kind := Word_Place;
          Index           : Natural := 0;
          Count_Word      : Natural := 0;
@@ -75,6 +80,10 @@ package Petal.Signatures is
          Help_Footer    : Slice;
          Summary        : Slice;
          Description    : Slice;
+         Live           : Boolean := False;
+         --  The command changes its Versioned arguments as it runs,
+         --  rather than being a transaction over them (ADR 0012,
+         --  section 3).
          Argument_Count : Natural := 0;
          Arguments      : Argument_Array;
          Stream_Count   : Natural := 0;

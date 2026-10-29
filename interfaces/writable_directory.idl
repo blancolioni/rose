@@ -1,4 +1,6 @@
-interface Writable_Directory : Directory is
+interface Writable_Directory : Directory
+  with Versioned
+is
 
    function Get_Writable_File
      (Index : Positive) return interface Writable_File;

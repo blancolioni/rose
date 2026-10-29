@@ -1,0 +1,16 @@
+command Rose.Core.Make_Directory : Standard_Error
+  with Summary     => "Create a directory.",
+       Description => """
+          Make_Directory creates an empty directory called
+          DIRECTORY_NAME in DIRECTORY, which is home if it is not given.
+          It fails if DIRECTORY_NAME is already an entry. The command is
+          live: the directory is created as it runs (ADR 0012).
+          """,
+       Name        => "mkdir",
+       Live
+is
+   Directory_Name : String
+     with Help => "the name of the new directory";
+   Directory : in Writable_Directory
+     with Help => "the directory to create it in";
+end Rose.Core.Make_Directory;
