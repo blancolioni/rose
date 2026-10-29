@@ -164,6 +164,7 @@ package body Rose.Command_Line.Launch is
 
       Rose.System_Calls.Initialize_Receive
         (Call.Params, Rose.Capabilities.Standard.Command_Endpoint_Cap);
+      Rose.System_Calls.Expect_Buffer (Call.Params);
       Rose.System_Calls.Receive_Words
         (Call.Params,
          Natural (Rose.Invocation.Parameter_Word_Index'Last) + 1);

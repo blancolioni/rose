@@ -221,6 +221,17 @@ package body Rose.System_Calls is
    is separate;
 
    -------------------
+   -- Expect_Buffer --
+   -------------------
+
+   procedure Expect_Buffer
+     (Params : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+   end Expect_Buffer;
+
+   -------------------
    -- Get_Local_Cap --
    -------------------
 

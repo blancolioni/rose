@@ -1545,6 +1545,12 @@ package body Rose.Kernel.Processes is
       use Rose.Invocation;
       From : Kernel_Process_Entry renames Process_Table (From_Process_Id);
       To   : Kernel_Process_Entry renames Process_Table (To_Process_Id);
+
+      Receiver_Expects_Buffer : constant Boolean :=
+                                  To.Current_Params.Control.Flags
+                                    (Rose.Invocation.Send_Buffer);
+      --  A process that receives with Send_Buffer set expects a buffer;
+      --  one that does not never sees the sender's (#2).
    begin
 
       To.Current_Params := Params;
@@ -1587,7 +1593,17 @@ package body Rose.Kernel.Processes is
          end loop;
       end if;
 
-      if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+      if Params.Control.Flags (Rose.Invocation.Send_Buffer)
+        and then not Receiver_Expects_Buffer
+      then
+         To.Current_Params.Control.Flags (Rose.Invocation.Send_Buffer) :=
+           False;
+         To.Current_Params.Control.Flags (Rose.Invocation.Writable_Buffer) :=
+           False;
+         To.Current_Params.Buffer_Address := System.Null_Address;
+         To.Current_Params.Buffer_Length := 0;
+
+      elsif Params.Control.Flags (Rose.Invocation.Send_Buffer) then
          declare
             use Rose.Words;
             Virtual   : constant Virtual_Address :=
