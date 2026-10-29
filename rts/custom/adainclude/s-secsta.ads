@@ -4,6 +4,11 @@
 --  Author          : Luke A. Guest
 --  Created On      : Wed Nov 16 17:06:11 2016
 --  Licence         : See LICENCE in the root directory.
+
+--  The kernel's secondary stack: one static pool, rather than GNAT's
+--  secondary stack, which allocates chunks from the heap. It provides the
+--  subprograms that GCC 15 calls (#416), including SS_Allocate's alignment.
+
 with System.Storage_Elements;
 
 package System.Secondary_Stack is
@@ -13,11 +18,12 @@ package System.Secondary_Stack is
 
    type Mark_Id is private;
 
-   --  Allocate Storage_Size + Maxium_Alignment amount of space on the stack
-   --  and return the address in Addr.
+   --  Allocate Storage_Size bytes on the stack, at an address that is a
+   --  multiple of Alignment, and return the address in Addr.
    procedure SS_Allocate
      (Addr         : out System.Address;
-      Storage_Size : SSE.Storage_Count);
+      Storage_Size : SSE.Storage_Count;
+      Alignment    : SSE.Storage_Count := Standard'Maximum_Alignment);
 
    --  Static stack, so we don't need to do anything here. In fact, it's,
    --  probably not even required.
@@ -31,20 +37,13 @@ package System.Secondary_Stack is
 private
    type Mark_Id is new SSE.Storage_Count;
 
-   --     SS_Pool : Integer;
-
-   --  type Pools is array (SSE.Storage_Count range <>) of SSE.Storage_Element;
-
    SS_Size : constant Mark_Id := Mark_Id (Default_Secondary_Stack_Size);
-   --     SS_Size : constant SSE.Storage_Count with
-   --       import        => True,
-   --       Convention    => Asm,
-   --       External_Name => "sec_stack_size";
 
    SS_First : constant Mark_Id := 0;
    SS_Top   : Mark_Id          := SS_First;
 
    type Pools is array (Mark_Id range <>) of aliased SSE.Storage_Element;
 
-   SS_Pool  : Pools (SS_First .. SS_Size);
+   SS_Pool  : Pools (SS_First .. SS_Size - 1)
+     with Alignment => Standard'Maximum_Alignment;
 end System.Secondary_Stack;

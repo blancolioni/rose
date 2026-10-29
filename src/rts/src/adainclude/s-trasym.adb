@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---                     Copyright (C) 1999-2018, AdaCore                     --
+--                     Copyright (C) 1999-2025, AdaCore                     --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -32,10 +32,6 @@
 --  This is the default implementation for platforms where the full capability
 --  is not supported. It returns tracebacks as lists of hexadecimal addresses
 --  of the form "0x...".
-
---  pragma Polling (Off);
---  We must turn polling off for this unit, because otherwise we can get
---  elaboration circularities when polling is turned on.
 
 with Ada.Exceptions.Traceback; use Ada.Exceptions.Traceback;
 with System.Address_Image;
@@ -73,7 +69,25 @@ package body System.Traceback.Symbolic is
             end loop;
 
             Result (Last) := ASCII.LF;
-            return Result (1 .. Last);
+
+            declare
+               function Executable_Load_Address return System.Address;
+               pragma Import
+                 (C, Executable_Load_Address,
+                  "__gnat_get_executable_load_address");
+
+               Load_Address : constant System.Address :=
+                 Executable_Load_Address;
+            begin
+               if Load_Address = System.Null_Address then
+                  return Result (1 .. Last);
+               else
+                  return "Load address: 0x"
+                    & System.Address_Image (Load_Address)
+                    & ASCII.LF
+                    & Result (1 .. Last);
+               end if;
+            end;
          end;
       end if;
    end Symbolic_Traceback;

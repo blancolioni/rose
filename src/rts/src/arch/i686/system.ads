@@ -5,9 +5,9 @@
 --                               S Y S T E M                                --
 --                                                                          --
 --                                 S p e c                                  --
---                         (GNU-Linux/x86 Version)                          --
+--                            (Rose/i686 Version)                           --
 --                                                                          --
---          Copyright (C) 1992-2016, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- This specification is derived from the Ada Reference Manual for use with --
 -- GNAT. The copyright notice above, and the license provisions that follow --
@@ -34,6 +34,22 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+--  The Rose version (#416): GCC 15's GNU-Linux/x86 System, with these
+--  changes to the target parameters in the private part:
+--
+--    Command_Line_Args and Exit_Status_Supported are False, because a Rose
+--    program gets its arguments from its command endpoint rather than from
+--    argc and argv, and the binder has no exit status to pass on.
+--
+--    Configurable_Run_Time is True, because the run-time system is still a
+--    subset of GNAT's.
+--
+--    Stack_Check_Probes is False, as in Rose's earlier System: Rose does
+--    not check for stack overflow with probes.
+--
+--    Run_Time_Name names the Rose run-time system in error messages about
+--    constructs that it does not support.
+
 package System is
    pragma Pure;
    --  Note that we take advantage of the implementation permission to make
@@ -48,16 +64,16 @@ package System is
 
    --  System-Dependent Named Numbers
 
-   Min_Int               : constant := Long_Long_Integer'First;
-   Max_Int               : constant := Long_Long_Integer'Last;
+   Min_Int             : constant := -2 ** (Standard'Max_Integer_Size - 1);
+   Max_Int             : constant :=  2 ** (Standard'Max_Integer_Size - 1) - 1;
 
-   Max_Binary_Modulus    : constant := 2 ** Long_Long_Integer'Size;
+   Max_Binary_Modulus    : constant := 2 ** Standard'Max_Integer_Size;
    Max_Nonbinary_Modulus : constant := 2 ** Integer'Size - 1;
 
    Max_Base_Digits       : constant := Long_Long_Float'Digits;
    Max_Digits            : constant := Long_Long_Float'Digits;
 
-   Max_Mantissa          : constant := 63;
+   Max_Mantissa          : constant := Standard'Max_Integer_Size - 1;
    Fine_Delta            : constant := 2.0 ** (-Max_Mantissa);
 
    Tick                  : constant := 0.000_001;
@@ -114,6 +130,8 @@ package System is
 private
 
    type Address is mod Memory_Size;
+   for Address'Size use Standard'Address_Size;
+
    Null_Address : constant Address := 0;
 
    --------------------------------------
@@ -133,8 +151,6 @@ private
    Denorm                    : constant Boolean := True;
    Duration_32_Bits          : constant Boolean := False;
    Exit_Status_Supported     : constant Boolean := False;
-   Fractional_Fixed_Ops      : constant Boolean := False;
-   Frontend_Layout           : constant Boolean := False;
    Machine_Overflows         : constant Boolean := False;
    Machine_Rounds            : constant Boolean := True;
    Preallocated_Stacks       : constant Boolean := False;
@@ -150,8 +166,7 @@ private
    Always_Compatible_Rep     : constant Boolean := False;
    Suppress_Standard_Library : constant Boolean := False;
    Use_Ada_Main_Program_Name : constant Boolean := False;
-   Frontend_Exceptions       : constant Boolean := False;
-   ZCX_By_Default            : constant Boolean := False;
+   ZCX_By_Default            : constant Boolean := True;
 
    Run_Time_Name : constant String := "Rose Run Time";
 
