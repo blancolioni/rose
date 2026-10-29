@@ -45,6 +45,38 @@ package body Rose.System_Calls is
    function Rescind_Cap_Capability return Rose.Capabilities.Capability
    is (Get_Local_Cap (Rescind_Cap));
 
+   procedure Enter_Kernel
+     (Item : aliased in out Rose.Invocation.Invocation_Record);
+   pragma No_Inline (Enter_Kernel);
+   pragma Machine_Attribute (Enter_Kernel, "noipa");
+   --  Its body jumps to the system call page, which takes the address of
+   --  Item from the stack, where a call puts it. Inlined, or cloned by
+   --  GCC without the parameter that the body does not name, the jump
+   --  would find whatever its caller has there (#399).
+
+   procedure Report_No_Buffer
+     (Params : in out Rose.Invocation.Invocation_Record);
+   --  Fail the invocation in Params, which needs an invoke buffer that
+   --  the process has not set up (#239).
+
+   --------------------
+   -- Buffer_Address --
+   --------------------
+
+   function Buffer_Address return System.Address is
+   begin
+      return Invoke_Buffer_Addr;
+   end Buffer_Address;
+
+   -------------------
+   -- Buffer_Length --
+   -------------------
+
+   function Buffer_Length return System.Storage_Elements.Storage_Count is
+   begin
+      return Invoke_Buffer_Len;
+   end Buffer_Length;
+
    --------------------------
    -- Copy_Received_Buffer --
    --------------------------
@@ -179,6 +211,14 @@ package body Rose.System_Calls is
          Invoke_Capability (Params);
       end if;
    end Delete_Cap;
+
+   ------------------
+   -- Enter_Kernel --
+   ------------------
+
+   procedure Enter_Kernel
+     (Item : aliased in out Rose.Invocation.Invocation_Record)
+   is separate;
 
    -------------------
    -- Get_Local_Cap --
@@ -425,7 +465,17 @@ package body Rose.System_Calls is
 
    procedure Invoke_Capability
      (Item : aliased in out Rose.Invocation.Invocation_Record)
-   is separate;
+   is
+      use type Rose.Invocation.Invocation_Error;
+   begin
+      if Item.Control.Flags (Rose.Invocation.Error)
+        and then Item.Error = Rose.Invocation.No_Invoke_Buffer
+      then
+         return;
+      end if;
+
+      Enter_Kernel (Item);
+   end Invoke_Capability;
 
    ------------------
    -- Invoke_Reply --
@@ -480,7 +530,7 @@ package body Rose.System_Calls is
             Local_Buffer := (others => 0);
          end;
       else
-         Params.Cap := 0;
+         Report_No_Buffer (Params);
       end if;
    end Receive_Buffer;
 
@@ -515,6 +565,22 @@ package body Rose.System_Calls is
            Rose.Invocation.Parameter_Word_Index (Count - 1);
       end if;
    end Receive_Words;
+
+   ----------------------
+   -- Report_No_Buffer --
+   ----------------------
+
+   procedure Report_No_Buffer
+     (Params : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      Params.Control.Flags (Rose.Invocation.Error) := True;
+      Params.Error := Rose.Invocation.No_Invoke_Buffer;
+
+      --  Invoke_Capability does not enter the kernel with this error, but
+      --  a caller that does gets Invalid_Capability, not a panic.
+      Params.Cap := 0;
+   end Report_No_Buffer;
 
    -----------------
    -- Rescind_Cap --
@@ -650,7 +716,7 @@ package body Rose.System_Calls is
                          Local_Buffer'Address, Writable);
          end;
       else
-         Params.Cap := 0;
+         Report_No_Buffer (Params);
       end if;
    end Send_Storage_Array;
 
@@ -696,7 +762,7 @@ package body Rose.System_Calls is
             end loop;
          end;
       else
-         Params.Cap := 0;
+         Report_No_Buffer (Params);
       end if;
    end Send_Text;
 

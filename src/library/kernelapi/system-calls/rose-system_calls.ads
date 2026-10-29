@@ -20,12 +20,9 @@ package Rose.System_Calls is
 
    procedure Invoke_Capability
      (Item : aliased in out Rose.Invocation.Invocation_Record);
-   pragma No_Inline (Invoke_Capability);
-   pragma Machine_Attribute (Invoke_Capability, "noipa");
-   --  Its body jumps to the system call page, which takes the address of
-   --  Item from the stack, where a call puts it. Inlined, or cloned by
-   --  GCC without the parameter that the body does not name, the jump
-   --  would find whatever its caller has there (#399).
+   --  If Item already has the error No_Invoke_Buffer, set by a send
+   --  routine that had no invoke buffer to use, it returns without
+   --  entering the kernel and Item keeps that error.
 
    procedure Invoke
      (Cap       : Rose.Capabilities.Capability;
@@ -194,5 +191,10 @@ package Rose.System_Calls is
       Buffer_Size    : System.Storage_Elements.Storage_Count);
 
    function Have_Buffer return Boolean;
+
+   function Buffer_Address return System.Address;
+   function Buffer_Length return System.Storage_Elements.Storage_Count;
+   --  The buffer given to Use_Buffer, so that it can be put back after
+   --  being replaced.
 
 end Rose.System_Calls;
