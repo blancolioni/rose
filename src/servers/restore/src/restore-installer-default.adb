@@ -39,7 +39,7 @@ package body Restore.Installer.Default is
       Process ("touch", "bin", Save, Default_Flags);
       Process ("mkdir", "bin", Save, Default_Flags);
       Process ("user", "bin", Save, Default_Flags);
-      Process ("tests", "bin", Save, Default_Flags);
+      Process ("run_self_tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,
                (Requires_Input_Stream => True,
                 others => False));

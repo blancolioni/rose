@@ -1,14 +1,15 @@
-interface Map is
+interface Map : Commands is
 
    procedure Add
      (Name : String;
       Cap  : interface Launch);
-      
+
    procedure Remove
      (Name : String);
-      
-   function Find
-     (Name : String)
-     return interface Launch;
-      
+
+   --  A cap for the registry's Commands interface alone, which finds
+   --  commands but cannot add or remove them (#460).
+
+   function Get_Commands return interface Commands;
+
 end Map;

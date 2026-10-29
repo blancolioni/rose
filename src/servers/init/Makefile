@@ -14,6 +14,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
+	$(BUILDDIR)/init-self_tests.o \
 	$(BUILDDIR)/init-users.o \
 	$(BUILDDIR)/init.o \
 	$(BUILDDIR)/rose.o \

@@ -103,6 +103,48 @@ package body Petal.Signatures is
                      end if;
                   end;
                end if;
+            elsif Key = "system" or else Key = "cap" then
+               if Result.Role_Cap_Count < Max_Role_Caps then
+                  Result.Role_Cap_Count := Result.Role_Cap_Count + 1;
+                  declare
+                     Role      : Role_Cap_Record renames
+                       Result.Role_Caps (Result.Role_Cap_Count);
+                     Name_Last : Natural := Field.Last;
+                     Number    : Positive := Field.First;
+                  begin
+                     --  "system <name> <index>", or "cap <role> <interface>
+                     --  <index>": the name is the first word, and the index
+                     --  the last.
+
+                     for I in Field.First .. Field.Last loop
+                        if Result.Text (I) = ' ' then
+                           if Name_Last = Field.Last then
+                              Name_Last := I - 1;
+                           end if;
+                           Number := I + 1;
+                        end if;
+                     end loop;
+
+                     Role.Name := (Field.First, Name_Last);
+                     Role.Cap_Index :=
+                       To_Natural (Result.Text (Number .. Field.Last));
+                     declare
+                        Name : String renames
+                          Result.Text (Field.First .. Name_Last);
+                     begin
+                        Role.Kind :=
+                          (if Key = "system" and then Name = "create-endpoint"
+                           then Create_Endpoint_Cap
+                           elsif Key = "system" and then Name = "delete-cap"
+                           then Delete_Cap
+                           elsif Key = "system" and then Name = "rescind-cap"
+                           then Rescind_Cap
+                           elsif Key = "cap" and then Name = "Find_Command"
+                           then Find_Command_Cap
+                           else Other_Role_Cap);
+                     end;
+                  end;
+               end if;
             elsif Key = "argument" then
                if Result.Argument_Count < Max_Arguments then
                   Result.Argument_Count := Result.Argument_Count + 1;
@@ -193,6 +235,7 @@ package body Petal.Signatures is
         Text (Text'First .. Text'First + Result.Length - 1);
       Result.Argument_Count := 0;
       Result.Stream_Count := 0;
+      Result.Role_Cap_Count := 0;
 
       Line_First := 1;
       for I in 1 .. Result.Length loop

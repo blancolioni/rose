@@ -7,6 +7,7 @@ package Petal.Signatures is
    Max_Text      : constant := 4096;
    Max_Arguments : constant := 16;
    Max_Streams   : constant := 3;
+   Max_Role_Caps : constant := 4;
 
    type Slice is
       record
@@ -65,6 +66,22 @@ package Petal.Signatures is
 
    type Stream_Array is array (1 .. Max_Streams) of Stream_Record;
 
+   type Role_Cap_Kind is
+     (Create_Endpoint_Cap, Delete_Cap, Rescind_Cap, Find_Command_Cap,
+      Other_Role_Cap);
+   --  A cap that one of the command's roles needs, other than a stream:
+   --  a system cap, the command registry's Commands interface for the
+   --  Find_Command role (#460), or a role the shell does not supply.
+
+   type Role_Cap_Record is
+      record
+         Kind      : Role_Cap_Kind := Other_Role_Cap;
+         Name      : Slice;
+         Cap_Index : Natural := 0;
+      end record;
+
+   type Role_Cap_Array is array (1 .. Max_Role_Caps) of Role_Cap_Record;
+
    type Signature is
       record
          Valid          : Boolean := False;
@@ -88,6 +105,8 @@ package Petal.Signatures is
          Arguments      : Argument_Array;
          Stream_Count   : Natural := 0;
          Streams        : Stream_Array;
+         Role_Cap_Count : Natural := 0;
+         Role_Caps      : Role_Cap_Array;
       end record;
 
    procedure Parse
