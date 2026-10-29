@@ -21,11 +21,7 @@ package body Rose.Arch.PIC is
    --------------------
 
    procedure Initialise_PIC is
-      Saved_Mask_1, Saved_Mask_2 : Word_8;
    begin
-      Saved_Mask_1 := Inb (PIC_1_Data);
-      Saved_Mask_2 := Inb (PIC_2_Data);
-
       --  start the initialization sequence (in cascade mode)
       Outb (PIC_1_Command, ICW1_INIT + ICW1_ICW4);
       Outb (PIC_2_Command, ICW1_INIT + ICW1_ICW4);
@@ -42,9 +38,13 @@ package body Rose.Arch.PIC is
       Outb (PIC_1_Data, ICW4_8086);
       Outb (PIC_2_Data, ICW4_8086);
 
-      --  Restore saved masks
-      Outb (PIC_1_Data, Saved_Mask_1);
-      Outb (PIC_2_Data, Saved_Mask_2);
+      --  Mask everything but the cascade, rather than keeping the
+      --  firmware's masks: an interrupt with no handler yet (the keyboard,
+      --  while a checkpoint is restored) would be dropped, and the device
+      --  won't raise another until it has been serviced. Masked, it stays
+      --  pending until Enable_IRQ.
+      Outb (PIC_1_Data, 16#FB#);
+      Outb (PIC_2_Data, 16#FF#);
 
    end Initialise_PIC;
 
