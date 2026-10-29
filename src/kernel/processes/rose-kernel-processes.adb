@@ -677,9 +677,14 @@ package body Rose.Kernel.Processes is
       if Active_Checkpoint
         and then Is_Mapped
         and then Write_Attempt
+        and then Process_Table (Pid).Flags (Persistent)
       then
          --  write attempt failed because of active checkpoint.
          --  record situation and return
+         --
+         --  Only a persistent process has its pages made read-only by a
+         --  checkpoint, and Leave_Checkpoint only resumes those, so any
+         --  other write fault goes to mem as usual (#231).
 
          Debug.Put (Pid);
          Rose.Boot.Console.Put (": checkpoint write blocked");
