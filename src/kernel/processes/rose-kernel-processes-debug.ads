@@ -6,4 +6,7 @@ package Rose.Kernel.Processes.Debug is
 
    procedure Put (Pid : Process_Id);
 
+   procedure Put_EIP (Pid : Process_Id);
+   --  Put the instruction pointer that Pid was interrupted at.
+
 end Rose.Kernel.Processes.Debug;

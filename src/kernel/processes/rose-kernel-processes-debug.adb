@@ -22,6 +22,15 @@ package body Rose.Kernel.Processes.Debug is
       Put_Entry (Pid);
    end Put;
 
+   -------------
+   -- Put_EIP --
+   -------------
+
+   procedure Put_EIP (Pid : Process_Id) is
+   begin
+      Rose.Boot.Console.Put (Process_Table (Pid).Stack.EIP);
+   end Put_EIP;
+
    ---------------
    -- Put_Entry --
    ---------------

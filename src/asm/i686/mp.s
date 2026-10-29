@@ -88,9 +88,11 @@ kernel_stack_top:
 .macro save_process_context displacement
     cld
     save_registers
+    movl    $0, interrupted_from_user
     testl   $3, Process_CS(%esp)         # CPL of saved CS: 0 = ring-0 (kernel), 3 = ring-3 (user)
     jz      1f                            # ring-0 interrupt: skip process structure update
 
+    movl    $1, interrupted_from_user    # the exception handler can't see the CPL once the kernel stack is back
     mov     current_process_ptr, %edi    # destination: process Stack_Frame
     mov     %esp, %esi                   # source: kernel stack (registers + CPU frame)
     movl    $15, %ecx                    # 15 dwords = 60 bytes
@@ -165,7 +167,11 @@ exception_code:
     
 exception_number:
     .long 0
-    
+
+.global interrupted_from_user
+interrupted_from_user:
+    .long 0
+
 kernel_reentry_count:
     .long -1
 
