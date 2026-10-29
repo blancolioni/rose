@@ -36,10 +36,13 @@ $(DRIVERS): %:
 	(cd src/drivers/$@; make)
 	cp src/drivers/$@/$@.driver images/iso/rose/install/drivers/$@.caps
 
+# The installed copy is stripped, so that every program fits in exec's
+# storage region; the build directory keeps the one with debug info.
+
 $(UTILITIES): %:
 	mkdir -p images/iso/rose/install/bin/
 	(cd src/utilities/$@; make)
-	(cp src/utilities/$@/build/bin/$@-driver images/iso/rose/install/bin/$@)
+	strip -o images/iso/rose/install/bin/$@ src/utilities/$@/build/bin/$@-driver
 	cp src/utilities/$@/$@.caps images/iso/rose/install/bin/$@.caps
 
 exports:
