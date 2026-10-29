@@ -66,16 +66,29 @@ package body Petal.Command_Launch is
    procedure Error (Message : String);
    --  Report Message on standard error.
 
-   function Is_In_Directory
+   function Is_Writable_Directory
      (Item     : Signature;
       Argument : Argument_Record)
       return Boolean
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
-       and then Value (Item, Argument.Interface_Name) = "Directory");
-   --  True if Argument is an in Directory. It names a directory in
-   --  petal's table, and is bound to home if it is not given (ADR 0003,
-   --  section 6).
+       and then Value (Item, Argument.Interface_Name)
+                  = "Writable_Directory");
+   --  True if Argument is an in Writable_Directory, which gets petal's
+   --  own writable cap (ADR 0012, section 4).
+
+   function Is_In_Directory
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Is_Writable_Directory (Item, Argument)
+       or else (Argument.Of_Type = Interface_Type
+                and then Argument.Mode = In_Mode
+                and then Value (Item, Argument.Interface_Name)
+                           = "Directory"));
+   --  True if Argument is an in Directory or an in Writable_Directory. It
+   --  names a directory in petal's table, and is bound to home if it is
+   --  not given (ADR 0003, section 6).
 
    function Is_In_File
      (Item     : Signature;
@@ -280,7 +293,9 @@ package body Petal.Command_Launch is
                   declare
                      Found : Boolean;
                   begin
-                     Petal.Session.Find_Grant (Text, Value.Cap, Found);
+                     Petal.Session.Find_Grant
+                       (Text, Is_Writable_Directory (Item, Argument),
+                        Value.Cap, Found);
                      if not Found then
                         Fail ("no directory named '" & Text & "'");
                      end if;
@@ -304,13 +319,26 @@ package body Petal.Command_Launch is
                   end;
                else
                   Fail ("cannot bind " & Argument_Name (Index)
-                        & ": only in Directory and in File arguments are "
-                        & "supported");
+                        & ": only in Directory, in Writable_Directory and"
+                        & " in File arguments are supported");
                end if;
          end case;
       end Set_Value;
 
    begin
+      --  A command that is not live is a transaction over its Versioned
+      --  arguments, which petal can't version until #141 (ADR 0012,
+      --  section 3). Running it live instead would change what it was
+      --  given without saying so.
+
+      if not Item.Live
+        and then (for some Index in 1 .. Item.Argument_Count =>
+                    Item.Arguments (Index).Versioned)
+      then
+         Fail ("petal cannot run a transactional command yet: it cannot"
+               & " version the command's arguments (#141)");
+      end if;
+
       --  Bind the words: options by name, then the positional arguments
       --  in declaration order, with a String_List taking the rest.
 
@@ -460,7 +488,9 @@ package body Petal.Command_Launch is
                   Found : Boolean;
                begin
                   Petal.Session.Find_Grant
-                    (Petal.Session.Home_Name, Values (Index).Cap, Found);
+                    (Petal.Session.Home_Name,
+                     Is_Writable_Directory (Item, Argument),
+                     Values (Index).Cap, Found);
                   if Found then
                      Values (Index).Is_Set := True;
                   else

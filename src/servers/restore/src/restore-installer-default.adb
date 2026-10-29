@@ -36,6 +36,8 @@ package body Restore.Installer.Default is
       Process ("echo", "bin", Save, Default_Flags);
       Process ("list", "bin", Save, Default_Flags);
       Process ("cat", "bin", Save, Default_Flags);
+      Process ("touch", "bin", Save, Default_Flags);
+      Process ("mkdir", "bin", Save, Default_Flags);
       Process ("user", "bin", Save, Default_Flags);
       Process ("tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,

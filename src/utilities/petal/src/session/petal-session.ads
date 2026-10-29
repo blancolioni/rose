@@ -34,13 +34,17 @@ package Petal.Session is
    --  The directory called Name in the table, if there is one.
 
    procedure Find_Grant
-     (Name  : String;
-      Grant : out Rose.Capabilities.Capability;
-      Found : out Boolean);
-   --  A read-only grant of the directory called Name, for an in Directory
-   --  argument: the interface cap of its Directory interface, which has
-   --  only the lookup operations (ADR 0003, section 1). It is made the
-   --  first time it is asked for, and then kept.
+     (Name     : String;
+      Writable : Boolean;
+      Grant    : out Rose.Capabilities.Capability;
+      Found    : out Boolean);
+   --  A grant of the directory called Name. For an in Directory argument
+   --  it is read-only: the interface cap of its Directory interface,
+   --  which has only the lookup operations (ADR 0003, section 1), made
+   --  the first time it is asked for and then kept. If Writable, for an
+   --  in Writable_Directory argument, it is the cap of petal's own
+   --  Writable_Directory interface, so the command's changes take
+   --  effect as it makes them (ADR 0012, section 3).
 
    type File_Lookup is (File_Found, No_Such_File, Not_A_File, No_Directory);
 

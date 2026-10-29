@@ -162,20 +162,25 @@ package body Petal.Session is
    ----------------
 
    procedure Find_Grant
-     (Name  : String;
-      Grant : out Rose.Capabilities.Capability;
-      Found : out Boolean)
+     (Name     : String;
+      Writable : Boolean;
+      Grant    : out Rose.Capabilities.Capability;
+      Found    : out Boolean)
    is
    begin
       for Item of Directories (1 .. Directory_Count) loop
          if Item.Name (1 .. Item.Name_Last) = Name then
-            if Item.Grant = Rose.Capabilities.Null_Capability then
-               Item.Grant :=
-                 Rose.Interfaces.Directory.Client.Get_Interface_Cap
-                   (Rose.Interfaces.Writable_Directory.Client.Conversions
-                    .To_Directory (Item.Directory));
+            if Writable then
+               Grant := Get_Interface_Cap (Item.Directory);
+            else
+               if Item.Grant = Rose.Capabilities.Null_Capability then
+                  Item.Grant :=
+                    Rose.Interfaces.Directory.Client.Get_Interface_Cap
+                      (Rose.Interfaces.Writable_Directory.Client.Conversions
+                       .To_Directory (Item.Directory));
+               end if;
+               Grant := Item.Grant;
             end if;
-            Grant := Item.Grant;
             Found := Grant /= Rose.Capabilities.Null_Capability;
             return;
          end if;

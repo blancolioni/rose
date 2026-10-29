@@ -1,2 +1,4 @@
-interface Writable_File : File, Stream_Writer is
+interface Writable_File : File, Stream_Writer
+  with Versioned
+is
 end Writable_File;
