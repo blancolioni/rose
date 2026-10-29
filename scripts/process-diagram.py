@@ -34,6 +34,8 @@ BOOT_BAND = "#eef0ec"
 PERSISTENT_BAND = "#fbeff0"
 BOX = "#ffffff"
 FADED = "#bcc2bb"
+EXITED = "#8f978f"   # the border of a process that has exited
+SUBTLE = "#a9b0a8"   # calls to and from a process that has exited
 
 
 class Box:
@@ -46,6 +48,7 @@ class Box:
         self.note = str(spec.get("note", ""))
         self.notes = spec.get("notes", {})
         self.when = spec.get("when")
+        self.exits = spec.get("exits", False)
 
     def left(self):
         return self.x - self.width / 2
@@ -78,11 +81,17 @@ def route(source, target, via):
         if source.left() < first[0] < source.right() \
            and first[1] > source.bottom():
             start = (first[0], source.bottom())
+        elif source.left() < first[0] < source.right() \
+             and first[1] < source.top():
+            start = (first[0], source.top())
         else:
             start = source.edge_toward(*first)
         if target.left() < last[0] < target.right() \
            and last[1] < target.top():
             end = (last[0], target.top())
+        elif target.left() < last[0] < target.right() \
+             and last[1] > target.bottom():
+            end = (last[0], target.bottom())
         else:
             end = target.edge_toward(*last)
         return [start] + [tuple(p) for p in via] + [end]
@@ -139,35 +148,51 @@ def draw(spec, variant):
              f'font-family="sans-serif">',
              f'<rect width="{width}" height="{height}" fill="#ffffff"/>']
 
-    def band(top, bottom, fill, title, colour):
+    def band(top, bottom, fill, title, colour, title_at_bottom=False):
         parts.append(f'<rect x="8" y="{top}" width="{width - 16}" '
                      f'height="{bottom - top}" rx="10" fill="{fill}"/>')
-        parts.append(f'<text x="24" y="{top + 24}" font-size="{FONT_SIZE}" '
+        title_y = bottom - 12 if title_at_bottom else top + 24
+        parts.append(f'<text x="24" y="{title_y}" font-size="{FONT_SIZE}" '
                      f'font-weight="bold" fill="{colour}">'
                      f'{escape(title)}</text>')
 
     band(persistent["top"], persistent["bottom"], PERSISTENT_BAND,
          spec["variants"][variant], ROSE)
-    band(boot["top"], boot["bottom"], BOOT_BAND, boot["title"], MUTED)
+    band(boot["top"], boot["bottom"], BOOT_BAND, boot["title"], MUTED,
+         boot.get("title_at_bottom", False))
 
-    labels = []
+    calls = []
     for call in spec["calls"]:
         if isinstance(call, list):
             call = {"from": call[0], "to": call[1]}
         when = call.get("when")
         if when and when != variant:
             continue
+        subtle = boxes[call["from"]].exits or boxes[call["to"]].exits
+        calls.append((subtle, call))
+
+    # Faint calls first, so that the others are drawn over them
+    labels = []
+    for subtle, call in sorted(calls, key=lambda c: not c[0]):
+        when = call.get("when")
         points = route(boxes[call["from"]], boxes[call["to"]],
                        call.get("via"))
-        colour = ROSE if when else INK
+        colour = SUBTLE if subtle else ROSE if when else INK
+        stroke_width = 1 if subtle else 1.2
         dash = ' stroke-dasharray="5 3"' if when else ""
         line = " ".join(f"{x:.1f},{y:.1f}" for x, y in shorten(points))
         parts.append(f'<polyline points="{line}" fill="none" '
-                     f'stroke="{colour}" stroke-width="1.2"{dash}/>')
+                     f'stroke="{colour}" stroke-width="{stroke_width}"'
+                     f'{dash}/>')
         parts.append(arrow_head(points, colour))
         if "label" in call:
-            x, y = label_at(points)
-            fill = BOOT_BAND if y > boot["top"] else PERSISTENT_BAND
+            x, y = call.get("label_at") or label_at(points)
+            if y < persistent["bottom"]:
+                fill = PERSISTENT_BAND
+            elif y > boot["top"]:
+                fill = BOOT_BAND
+            else:
+                fill = BOX
             labels.append((x, y, call["label"], fill))
 
     for x, y, text, fill in labels:
@@ -180,9 +205,20 @@ def draw(spec, variant):
 
     for box in boxes.values():
         faded = box.when and box.when != variant
-        stroke = FADED if faded else ROSE if box.kind == "persistent" else INK
-        stroke_width = 1.6 if box.kind == "persistent" else 1.2
-        dash = ' stroke-dasharray="5 3"' if box.when else ""
+        if faded:
+            stroke, stroke_width = FADED, 1.2
+        elif box.exits:
+            stroke, stroke_width = EXITED, 1.2
+        elif box.kind == "persistent":
+            stroke, stroke_width = ROSE, 1.6
+        else:
+            stroke, stroke_width = INK, 1.2
+        if box.exits:
+            dash = ' stroke-dasharray="2 3"'
+        elif box.when:
+            dash = ' stroke-dasharray="5 3"'
+        else:
+            dash = ""
         name_colour = FADED if faded else INK
         note_colour = FADED if faded else MUTED
         parts.append(f'<rect x="{box.left()}" y="{box.top()}" '
