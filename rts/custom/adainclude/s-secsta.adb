@@ -7,16 +7,25 @@
 package body System.Secondary_Stack is
    procedure SS_Allocate
      (Addr         : out System.Address;
-      Storage_Size : SSE.Storage_Count) is
+      Storage_Size : SSE.Storage_Count;
+      Alignment    : SSE.Storage_Count := Standard'Maximum_Alignment)
+   is
+      use type SSE.Integer_Address;
 
-      Align : constant Mark_Id := Mark_Id (Standard'Maximum_Alignment);
+      Base  : constant SSE.Integer_Address :=
+                SSE.To_Integer (SS_Pool (SS_First)'Address);
+      Align : constant SSE.Integer_Address :=
+                SSE.Integer_Address'Max (SSE.Integer_Address (Alignment), 1);
+      Start : constant Mark_Id :=
+                Mark_Id ((Base + SSE.Integer_Address (SS_Top) + Align - 1)
+                         / Align * Align - Base);
    begin
       --  Make sure this won't go over the end of the stack.
-      if SS_Top + Mark_Id (Storage_Size) + Align > Mark_Id (SS_Pool'Last) then
+      if Start + Mark_Id (Storage_Size) > SS_Size then
          raise Storage_Error;
       else
-         Addr   := SS_Pool (SS_Top)'Address;
-         SS_Top := SS_Top + Mark_Id (Storage_Size) + Align;
+         Addr   := SS_Pool (Start)'Address;
+         SS_Top := Start + Mark_Id (Storage_Size);
       end if;
    end SS_Allocate;
 
