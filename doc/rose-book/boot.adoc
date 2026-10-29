@@ -217,3 +217,41 @@ It then finds `tests` in the command registry and launches it, creates the first
 The shell's caps are passed by position in a cap set.
 ADR 0002 replaces this with roles, given in the launch invocation (see <<launch-sequence>>).
 ====
+
+[#running-processes]
+== Running Processes
+
+These two diagrams show the processes that are running once each boot has finished, and which of them call which.
+An arrow goes from a process to a process it holds a capability for and calls.
+
+* *Persistent processes* have a rose border.
+  They are in the checkpoint.
+  An install boot installs them, and a restore brings them back.
+* *Boot modules* have a black border.
+  `init` starts them again on every boot, and each has its fixed object id (see <<boot-modules>>).
+* *Dashed boxes and lines* are used only when booting from the install media.
+
+[#processes-after-install]
+.Processes after an install boot
+image::processes-install.svg[Processes after an install boot,pdfwidth=100%]
+
+After an install, `restore-install` has read the programs from `isofs` and written the boot loader through partition servers 18 to 20 (see <<writing-the-boot-loader>>).
+The boot console sends its output on to `vga-console` (see <<handing-over-the-console>>).
+
+[#processes-after-restore]
+.Processes after restoring from the boot disk
+image::processes-restore.svg[Processes after restoring from the boot disk,pdfwidth=100%]
+
+After a restore, the persistent processes are the same, and their capabilities reach the new boot modules through the fixed object ids.
+`isofs` and partition servers 18 to 20 are not started, and the boot console discards its output (see <<restore-boot>>).
+
+The diagrams leave out:
+
+* `init`, which exits at the end of both boots;
+* output: every boot module writes to the boot console, and every installed program writes to `vga-console` through the standard output that `exec` gives it;
+* paging: `mem` and `store` page the memory of every process;
+* the swap and log partitions that `restore` holds, which it gives to `store` and `log`;
+* `tests`, which runs once after an install and exits, and the commands that `petal` runs.
+
+When it has finished, `restore` waits for a message that never comes, and keeps the capabilities it was given.
+It should exit instead (#451).
