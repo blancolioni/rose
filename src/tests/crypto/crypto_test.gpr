@@ -1,0 +1,27 @@
+project Crypto_Test is
+
+   --  Rose.Crypto against published test vectors (#455), built and run
+   --  on the host: gprbuild -P crypto_test.gpr && obj/crypto_test
+
+   for Source_Dirs use ("src", "../../library/rose", "../../base");
+   for Source_Files use
+     ("crypto_test.adb",
+      "rose.ads",
+      "rose-crypto.ads",
+      "rose-crypto.adb",
+      "rose-crypto-sha_256.ads",
+      "rose-crypto-sha_256.adb",
+      "rose-crypto-hmac_sha_256.ads",
+      "rose-crypto-hmac_sha_256.adb",
+      "rose-crypto-pbkdf2_hmac_sha_256.ads",
+      "rose-crypto-pbkdf2_hmac_sha_256.adb");
+   for Object_Dir use "obj";
+   for Main use ("crypto_test.adb");
+
+   package Compiler is
+      for Switches ("ada") use
+        ("-g", "-gnata", "-gnato", "-gnatwae", "-gnatVa",
+         "-gnatyM79abcefhiklnoprst");
+   end Compiler;
+
+end Crypto_Test;

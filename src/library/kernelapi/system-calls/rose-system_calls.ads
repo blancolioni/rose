@@ -55,6 +55,35 @@ package Rose.System_Calls is
       Storage  : System.Storage_Elements.Storage_Array;
       Writable : Boolean);
 
+   --  Several strings and arrays travel in the one invoke buffer as
+   --  items (idle#58): each is its length in four bytes, little-endian,
+   --  then its bytes, padded to a multiple of four. A client starts the
+   --  items and sends each in turn, and a server finds each by its index.
+
+   procedure Start_Items
+     (Params : in out Rose.Invocation.Invocation_Record);
+
+   procedure Send_Text_Item
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String);
+
+   procedure Send_Storage_Item
+     (Params  : in out Rose.Invocation.Invocation_Record;
+      Storage : System.Storage_Elements.Storage_Array);
+
+   type Buffer_Item is
+      record
+         Address : System.Address := System.Null_Address;
+         Length  : System.Storage_Elements.Storage_Count := 0;
+      end record;
+
+   function Get_Buffer_Item
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Positive)
+      return Buffer_Item;
+   --  The item Index of the buffer of Params, or an empty one if there is
+   --  no such item.
+
    procedure Send_Cap
      (Params : in out Rose.Invocation.Invocation_Record;
       Cap    : Rose.Capabilities.Capability);

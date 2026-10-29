@@ -19,12 +19,15 @@ package body Memory is
 
       --        S : Convert.Object_Pointer := Convert.To_Pointer (Source);
       --        D : Convert.Object_Pointer := Convert.To_Pointer (Dest);
-      S : Byte_Array (0 .. Size) with
+      --  Size bytes: 0 .. Size copied one byte too many, past the end
+      --  of Dest (#455).
+
+      S : Byte_Array (0 .. Size - 1) with
         Address => Source;
 
       pragma Import (Convention => C, Entity => S);
 
-      D : Byte_Array (0 .. Size) with
+      D : Byte_Array (0 .. Size - 1) with
         Address => Dest;
 
       pragma Import (Convention => C, Entity => D);

@@ -226,9 +226,23 @@ The directory holds the entry's writable interface, and hands out read-only ones
 Serves one user: the user's name, and the user's home directory (ADR 0003).
 
 Provides:: `User`, whose `Name` is the user's name, and whose `Home_Directory` is a `Writable_Directory`.
-Used by:: `init`, which creates the first user, `fraser`, on a first boot, and gives it to the shell.
+Used by:: `auth`, which launches it for each user it creates; and the shell, which `init` gives the first user.
 
 `user` is installed with the commands, and launched once for each user, with the name and the home directory in its launch call.
+
+=== `auth`
+
+Keeps the users, and a salted hash of each one's password (#455).
+
+Provides:: `Auth`, whose `Login` returns a user's `User` interface for the right password; and `Auth_Admin`, whose `New_User` creates a user, with a home directory, and fails if the name is taken.
+Requests:: `Create_Endpoint` and `Find_Command`, as roles of its command declaration.
+Used by:: `init`, which launches it on a first boot and creates the first user, `fraser`, through `Auth_Admin`.
+
+* *Passwords are hashed with PBKDF2-HMAC-SHA-256,* from `Rose.Crypto`, with a 16-byte salt from `Rose.Random` and 100,000 iterations: a login takes about a second in QEMU.
+  Each user's record keeps its algorithm and iteration count, so that they can change without losing the users.
+* *`Login` takes as long for a name that doesn't exist,* and compares hashes in constant time, so that neither the time nor the comparison tells which names exist or how much of a password was right.
+* *The users are a list in the process's memory,* so they persist with it.
+* *Only `init` holds `Auth_Admin`* until the installer asks for the first user (#456).
 
 === `terminal`
 
