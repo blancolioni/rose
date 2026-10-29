@@ -67,7 +67,12 @@ package body Rose.Invocation is
       Oid    : Rose.Objects.Object_Id)
    is
    begin
-      Send_Word (Params, Word (Oid));
+
+      --  The low half, and then the high half. Converting Oid to a Word
+      --  fails a range check for an id of 2 ** 32 or more, which the
+      --  minimal run-time system, built without checks, let pass.
+
+      Send_Word (Params, Word (Word_64 (Oid) mod 2 ** 32));
       if not Object_Fits_In_Word then
          Send_Word (Params, Word (Word_64 (Oid) / 2 ** 32));
       end if;

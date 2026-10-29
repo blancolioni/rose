@@ -337,10 +337,13 @@ The rest of phase 1 is idle#39.
 
 ==== Which programs use it
 
-The two targets are not mixed in one program, and the run-time system decides which a program uses:
+The two targets are not mixed in one program.
+The kernel target needs only what the kernel run-time system (`rts`) has, so a program built with that run-time system uses it.
+A program built with the userland run-time system (`src/rts`) can use either:
 
-* *Kernel target:* programs built with the kernel run-time system (`rts`): the boot modules, the pager path (ADR 0008), and today every server and driver.
-* *User-mode target:* programs built with the userland run-time system (`src/rts`): commands, petal, and installed drivers that are not on the pager path, such as `vga-console`.
+* *Kernel run-time system, kernel target:* the boot modules and the pager path (ADR 0008).
+* *Userland run-time system, kernel target:* the installed drivers `exec`, `command`, `keyboard`, `directory` and `file` (#490), petal, the `user` and `auth` servers, and the commands other than `cat` and `echo`.
+* *Userland run-time system, user-mode target:* `vga-console`, `cat` and `echo`.
 
 The userland run-time system itself will use the user-mode `Rose.Interfaces.Process` and `Rose.Interfaces.Cap_Set`, once idle#41 generates them.
 Until then it uses the kernel target's, which is enough until a user-mode program needs the user-mode version of one of them, since it uses only their constants.
