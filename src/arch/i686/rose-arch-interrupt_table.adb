@@ -5,7 +5,9 @@ with Rose.Arch.PIC;
 with Rose.Boot.Console;
 
 with Rose.Kernel.Interrupts;
+with Rose.Kernel.Panic;
 
+with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
 
 package body Rose.Arch.Interrupt_Table is
@@ -129,6 +131,17 @@ package body Rose.Arch.Interrupt_Table is
    procedure IRQ_15;
    pragma Import (C, IRQ_15, "hwint15");
 
+   Interrupted_From_User_Word : Rose.Words.Word_32;
+   pragma Import (C, Interrupted_From_User_Word, "interrupted_from_user");
+   --  Set by the system's interrupt entry code: 1 if the interrupt came
+   --  from user mode, and 0 if it came from the kernel.
+
+   function Interrupted_From_User return Boolean
+   is (Interrupted_From_User_Word /= 0);
+
+   First_Hardware_Vector : constant := 32;
+   --  Vectors below this are processor exceptions.
+
    procedure Handle_Processor_Exception
      (Vector : Rose.Arch.Interrupts.Interrupt_Vector;
       Code   : Rose.Words.Word_32);
@@ -245,9 +258,35 @@ package body Rose.Arch.Interrupt_Table is
      (Vector : Rose.Arch.Interrupts.Interrupt_Vector;
       Code   : Rose.Words.Word_32)
    is
+      use type Rose.Arch.Interrupts.Interrupt_Vector;
       Interrupted_Process_Id : constant Rose.Kernel.Processes.Process_Id :=
                                  Rose.Kernel.Processes.Current_Process_Id;
    begin
+      if Vector < First_Hardware_Vector
+        and then not Rose.Kernel.Interrupts.Has_Handler (Vector)
+      then
+         if not Interrupted_From_User then
+            Rose.Kernel.Panic.Panic
+              ("cpu exception in the kernel", Rose.Words.Word (Vector));
+         end if;
+
+         --  Resuming would run the same instruction, and raise the same
+         --  exception, again (#428).
+
+         Rose.Kernel.Processes.Debug.Put (Interrupted_Process_Id);
+         Rose.Boot.Console.Put (": exception ");
+         Rose.Boot.Console.Put (Rose.Words.Word_8 (Vector));
+         Rose.Boot.Console.Put (" code ");
+         Rose.Boot.Console.Put (Code);
+         Rose.Boot.Console.Put (" at ");
+         Rose.Kernel.Processes.Debug.Put_EIP (Interrupted_Process_Id);
+         Rose.Boot.Console.New_Line;
+         Rose.Kernel.Processes.Set_Current_State
+           (Interrupted_Process_Id, Rose.Kernel.Processes.Faulted);
+         Rose.Kernel.Processes.Queue.Choose_Process;
+         return;
+      end if;
+
       Rose.Kernel.Processes.Set_Current_State
         (Interrupted_Process_Id,
          Rose.Kernel.Processes.Interrupted);
