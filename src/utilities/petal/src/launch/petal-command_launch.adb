@@ -4,6 +4,7 @@ with Ada_Text_IO;
 
 with Rose.Capabilities.Standard;
 with Rose.Interfaces.Cap_Set;
+with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Invocation;
 with Rose.Standard_Streams;
@@ -26,13 +27,19 @@ package body Petal.Command_Launch is
    Delete_Cap_Index      : constant := 6;
    Rescind_Cap_Index     : constant := 7;
    Create_Endpoint_Index : constant := 8;
-   Command_Map_Index     : constant := 10;
-   --  The command registry's Find (interfaces/map.idl).
+   Commands_Index        : constant := 10;
+   --  The command registry's Commands interface (#460).
    Trace_Index           : constant := 11;
    --  For trace events (Rose.Trace).
 
+   Commands_Cap : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   --  The command registry's Commands interface, which petal also gives
+   --  to a command that has the Find_Command role.
+
    Find_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
+   --  Its Find.
 
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
@@ -609,6 +616,29 @@ package body Petal.Command_Launch is
             Cap_Count := Natural'Max (Cap_Count, Stream.Cap_Index + 1);
          end loop;
 
+         --  The caps of the command's other roles, which petal has
+         --  itself (#460).
+
+         for Role of Item.Role_Caps (1 .. Item.Role_Cap_Count) loop
+            case Role.Kind is
+               when Create_Endpoint_Cap =>
+                  Caps (Role.Cap_Index + 1) :=
+                    Rose.System_Calls.Create_Endpoint_Capability;
+               when Delete_Cap =>
+                  Caps (Role.Cap_Index + 1) :=
+                    Rose.System_Calls.Delete_Cap_Capability;
+               when Rescind_Cap =>
+                  Caps (Role.Cap_Index + 1) :=
+                    Rose.System_Calls.Rescind_Cap_Capability;
+               when Find_Command_Cap =>
+                  Caps (Role.Cap_Index + 1) := Commands_Cap;
+               when Other_Role_Cap =>
+                  Fail ("petal cannot supply role "
+                        & Value (Item, Role.Name));
+            end case;
+            Cap_Count := Natural'Max (Cap_Count, Role.Cap_Index + 1);
+         end loop;
+
          if Failed then
             return;
          end if;
@@ -706,7 +736,13 @@ package body Petal.Command_Launch is
         (Create_Endpoint => Argument_Cap (Create_Endpoint_Index),
          Delete_Cap      => Argument_Cap (Delete_Cap_Index),
          Rescind_Cap     => Argument_Cap (Rescind_Cap_Index));
-      Find_Cap := Argument_Cap (Command_Map_Index);
+      Commands_Cap := Argument_Cap (Commands_Index);
+      declare
+         Registry : Rose.Interfaces.Commands.Client.Commands_Client;
+      begin
+         Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
+         Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
+      end;
       Rose.Trace.Set_Trace_Cap (Argument_Cap (Trace_Index));
    end Open_Registry;
 

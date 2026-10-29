@@ -1,0 +1,10 @@
+command Rose.Core.Run_Self_Tests
+  : Standard_Output, Create_Endpoint, Find_Command
+  with Summary     => "Run Rose's self tests.",
+       Description => """
+          Run_Self_Tests runs Rose's self tests, and writes each test's
+          name and result, and a summary, to standard output. It fails
+          if any test fails. Init runs it on a fresh install (#460).
+          """
+is
+end Rose.Core.Run_Self_Tests;

@@ -1,0 +1,10 @@
+--  Finding commands by name (#460): the part of the command registry
+--  that a shell or a command needs, without the right to change it.
+
+interface Commands is
+
+   function Find
+     (Name : String)
+     return interface Launch;
+
+end Commands;

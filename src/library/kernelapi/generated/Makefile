@@ -7,7 +7,7 @@ IDL=cap block_device file_system directory file \
     launch exec region executable memory memory_restore process segment \
     server \
     timeout timer constructor cap_set terminal event_source event_listener \
-    map heap receiver named kernel_process kernel_log log_reader \
+    commands map heap receiver named kernel_process kernel_log log_reader \
     command_endpoint restorable output_redirect
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
@@ -15,7 +15,7 @@ IDL=cap block_device file_system directory file \
 # nothing is generated for them here; each command generates its own units.
 
 COMMANDS=rose-core standard_input standard_output standard_error standard_io \
-    create_endpoint
+    create_endpoint find_command
 
 IDLE ?= idle
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)

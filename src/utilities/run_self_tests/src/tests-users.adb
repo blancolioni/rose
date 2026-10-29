@@ -99,7 +99,7 @@ package body Tests.Users is
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap
         (Params,
-         Tests.Registry.Argument_Cap (Tests.Registry.Create_Endpoint_Index));
+         Tests.Registry.Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Get_Interface_Cap (Home));
       Rose.System_Calls.Send_Buffer (Params, 8, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);

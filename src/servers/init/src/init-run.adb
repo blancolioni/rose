@@ -7,6 +7,7 @@ with Rose.Objects;
 with Rose.Words;
 
 with Rose.Interfaces.Exec;
+with Rose.Interfaces.Map;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -15,6 +16,7 @@ with Init.Boot;
 with Init.Boot_Steps;
 with Init.Calls;
 with Init.Installer;
+with Init.Self_Tests;
 with Init.Users;
 
 package body Init.Run is
@@ -83,6 +85,10 @@ package body Init.Run is
 
       Find_Cap    : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
+
+      Commands_Cap : Rose.Capabilities.Capability :=
+                       Rose.Capabilities.Null_Capability;
+      --  The command registry's Commands interface (#460).
 
       First_User : constant String := "fraser";
       User_Cap   : Rose.Capabilities.Capability;
@@ -260,16 +266,18 @@ package body Init.Run is
                                      Standard_Output => Console_Interface_Cap,
                                      Binary_Stream   => Params.Caps (1),
                                      Binary_Length   => Params.Data (0));
-                  Caps     : Init.Calls.Array_Of_Capabilities (1 .. 3);
+                  Caps     : Init.Calls.Array_Of_Capabilities
+                    (1 .. Rose.Interfaces.Map.Subprogram_Count);
                   Public_Cap : constant Rose.Capabilities.Capability :=
                                   Get_Public_Interface_From_Process
                                     (Command_Cap);
+                  No_Words   : Init.Calls.Array_Of_Words (1 .. 0);
                begin
                   Add_Cap := Null_Capability;
                   for I in 1 .. 4 loop
                      Init.Calls.Get_Interface (Public_Cap, Caps);
-                     Add_Cap := Caps (1);
-                     Find_Cap := Caps (3);
+                     Find_Cap := Caps (Rose.Interfaces.Map.Find_Index + 1);
+                     Add_Cap := Caps (Rose.Interfaces.Map.Add_Index + 1);
                      exit when Add_Cap /= Null_Capability;
                      Wait (500);
                   end loop;
@@ -283,6 +291,25 @@ package body Init.Run is
                      Init.Calls.Send_String
                        (Console_Stream_Cap,
                         "find cap was null" & NL);
+                  end if;
+
+                  --  The registry's Commands interface, which finds
+                  --  commands but cannot change the registry, for
+                  --  petal and the self tests (#460).
+
+                  declare
+                     Get_Commands : constant Rose.Capabilities.Capability :=
+                       Caps (Rose.Interfaces.Map.Get_Commands_Index + 1);
+                  begin
+                     if Get_Commands /= Null_Capability then
+                        Commands_Cap :=
+                          Init.Calls.Call (Get_Commands, No_Words);
+                     end if;
+                  end;
+                  if Commands_Cap = Null_Capability then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "commands cap was null" & NL);
                   end if;
                end;
             elsif Params.Data (1) = 99 then
@@ -456,62 +483,20 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to find 'cap_set'" & NL);
       end if;
 
-      declare
-         Launch_Tests_Cap : constant Rose.Capabilities.Capability :=
-                              Init.Calls.Find_In_Map
-                                (Find_Cap => Find_Cap,
-                                 Key      => "tests");
-         Standard_Caps    : constant Rose.Capabilities.Capability :=
-                              Init.Calls.Create_Cap_Set_With
-                                (Create_Cap_Set => Cap_Set_Cap,
-                                 Caps           =>
-                                 --  standard_input
-                                   (Console_Input_Stream_Cap,
+      --  The self tests run as a command, and init waits for them to
+      --  finish before it goes on (#460).
 
-                                    --  standard_output
-                                    Console_Stream_Cap,
-
-                                    --  standard_error
-                                    Console_Stream_Cap,
-
-                                    --  current_directory
-                                    Null_Capability,
-
-                                    --  clock
-                                    Null_Capability,
-
-                                    --  delete_cap
-                                    Delete_Cap,
-
-                                    --  rescind_cap
-                                    Rescind_Cap,
-
-                                    --  create_endpoint
-                                    Create_Endpoint_Cap,
-
-                                    --  create_cap_set
-                                    Cap_Set_Cap,
-
-                                    --  the command registry's Find, for
-                                    --  launching a file server
-                                    Find_Cap
-                                   ));
-         Tests_Object     : Rose.Objects.Object_Id with Unreferenced;
-      begin
-         if Launch_Tests_Cap = Rose.Capabilities.Null_Capability then
-            Init.Calls.Send_String
-              (Console_Stream_Cap, "init: unable to find 'tests'" & NL);
-         else
-            Init.Calls.Send_String
-              (Console_Stream_Cap,
-               "launching tests" & NL);
-            Tests_Object :=
-              Init.Calls.Launch
-                (Launch_Tests_Cap, Standard_Caps, "tests");
-         end if;
-      end;
-
-      Wait (2000);
+      Init.Calls.Send_String
+        (Console_Stream_Cap, "running self tests" & NL);
+      if not Init.Self_Tests.Run
+        (Find_Cap        => Find_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Commands        => Commands_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: self tests failed" & NL);
+      end if;
 
       --  The first user, with a home directory (ADR 0003). Init runs
       --  only on a fresh boot, so it is created once.
@@ -567,9 +552,10 @@ package body Init.Run is
                                     --  create_cap_set
                                     Cap_Set_Cap,
 
-                                    --  the command registry's Find, for
-                                    --  running commands (ADR 0002)
-                                    Find_Cap,
+                                    --  the command registry's Commands
+                                    --  interface, for running commands
+                                    --  (ADR 0002, #460)
+                                    Commands_Cap,
 
                                     --  trace events (Rose.Trace)
                                     Trace_Cap,
