@@ -76,6 +76,9 @@ package body Init.Run is
                                    with Unreferenced;
       Console_Input_Stream_Cap : Rose.Capabilities.Capability :=
                                    Null_Capability;
+      Console_Terminal_Cap     : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The console as a Terminal, for the console role (#454).
 
       Restored             : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -315,6 +318,7 @@ package body Init.Run is
             elsif Params.Data (1) = 99 then
                Keyboard_Interface_Cap := Params.Caps (0);
                Console_Input_Stream_Cap := Params.Caps (1);
+               Console_Terminal_Cap := Params.Caps (2);
                if Console_Input_Stream_Cap = Null_Capability then
                   Init.Calls.Send_String
                     (Console_Stream_Cap,
@@ -561,7 +565,11 @@ package body Init.Run is
                                     Trace_Cap,
 
                                     --  the user (interfaces/user.idl)
-                                    User_Cap
+                                    User_Cap,
+
+                                    --  the console, for the console role
+                                    --  (#454)
+                                    Console_Terminal_Cap
                                    ));
 
          Petal_Object     : Rose.Objects.Object_Id with Unreferenced;

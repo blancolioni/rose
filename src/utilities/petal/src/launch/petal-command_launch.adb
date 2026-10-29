@@ -31,6 +31,9 @@ package body Petal.Command_Launch is
    --  The command registry's Commands interface (#460).
    Trace_Index           : constant := 11;
    --  For trace events (Rose.Trace).
+   Terminal_Index        : constant := 13;
+   --  The console, which petal gives a command with the Console role
+   --  (#454).
 
    Commands_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -40,6 +43,10 @@ package body Petal.Command_Launch is
    Find_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  Its Find.
+
+   Terminal_Cap : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   --  The console's Terminal, for the Console role (#454).
 
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
@@ -632,6 +639,11 @@ package body Petal.Command_Launch is
                     Rose.System_Calls.Rescind_Cap_Capability;
                when Find_Command_Cap =>
                   Caps (Role.Cap_Index + 1) := Commands_Cap;
+               when Console_Cap =>
+                  if Terminal_Cap = Rose.Capabilities.Null_Capability then
+                     Fail ("petal has no console to give the command");
+                  end if;
+                  Caps (Role.Cap_Index + 1) := Terminal_Cap;
                when Other_Role_Cap =>
                   Fail ("petal cannot supply role "
                         & Value (Item, Role.Name));
@@ -744,6 +756,7 @@ package body Petal.Command_Launch is
          Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
       end;
       Rose.Trace.Set_Trace_Cap (Argument_Cap (Trace_Index));
+      Terminal_Cap := Argument_Cap (Terminal_Index);
    end Open_Registry;
 
    --------------

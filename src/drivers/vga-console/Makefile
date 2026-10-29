@@ -13,5 +13,8 @@ vga_console:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -o build/generated \
-	    $(INTERFACES)/stream_writer.idl $(INTERFACES)/restorable.idl
+	    $(INTERFACES)/stream_reader.idl $(INTERFACES)/stream_writer.idl \
+	    $(INTERFACES)/stream.idl $(INTERFACES)/terminal.idl \
+	    $(INTERFACES)/event_listener.idl $(INTERFACES)/event_source.idl \
+	    $(INTERFACES)/restorable.idl
 	gprbuild

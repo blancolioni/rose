@@ -15,18 +15,23 @@ package body Restore.Installer.Default is
    begin
       Process ("exec", "drivers", Launch, Default_Flags);
 
-      --  The persistent console comes straight after exec, so that
-      --  everything installed after it writes to it.
+      --  The keyboard comes first, because the console reads it. It
+      --  writes nothing, so it doesn't need the persistent console.
 
-      Process ("vga-console", "drivers", Launch,
-               (Provides_Console => True, others => False));
-      Process ("command", "drivers", Launch, Default_Flags);
       Process ("keyboard", "drivers", Launch,
                (Provides_Keyboard_Interface => True, others => False));
-      Process ("event-input-stream", "drivers", Launch,
+
+      --  The persistent console is the terminal (#454): it draws what it
+      --  is written, and its line discipline reads the keyboard. It comes
+      --  straight after the keyboard, so that everything installed after
+      --  it writes to it.
+
+      Process ("vga-console", "drivers", Launch,
                (Requires_Keyboard_Interface => True,
+                Provides_Console            => True,
                 Provides_Input_Stream       => True,
                 others                      => False));
+      Process ("command", "drivers", Launch, Default_Flags);
 
       --  Saved, not launched: each file and directory is its own
       --  process, launched when it is created (ADR 0003).
@@ -38,6 +43,7 @@ package body Restore.Installer.Default is
       Process ("cat", "bin", Save, Default_Flags);
       Process ("touch", "bin", Save, Default_Flags);
       Process ("mkdir", "bin", Save, Default_Flags);
+      Process ("clear", "bin", Save, Default_Flags);
       Process ("user", "bin", Save, Default_Flags);
       Process ("run_self_tests", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,

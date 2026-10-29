@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-26
 - **Related:** #269 (this decision), [ADR 0004](0004-restore-notification.md) and #268 (restore notification), #102 (restore at boot)
+- **Amended by:** #454, where vga-console is also the terminal: it reads the keyboard and is the line discipline, and `restore` installs the keyboard before it
 
 ## Context
 

@@ -22,8 +22,13 @@ package body Keyboard.Server is
    Key_Cap          : Rose.Capabilities.Capability;
 
    Have_Listener    : Boolean := False;
+   Listener_Open    : Boolean := False;
+   Listener_Cap     : Rose.Capabilities.Capability;
    Listener         : Rose.Interfaces.Event_Listener.Client
      .Event_Listener_Client;
+   --  The listener's interface cap, from Add_Listener. It is opened at
+   --  the first key, not in Add_Listener: the listener is waiting for that
+   --  call's reply, so it can't answer the invocation that opens it then.
 
    Keyboard_Pending   : constant := 16#01#;
 --     Keyboard_Not_Ready : constant := 16#02#;
@@ -124,9 +129,7 @@ package body Keyboard.Server is
             when Rose.Interfaces.Event_Source.Add_Listener_Endpoint =>
 
                if not Have_Listener then
-                  Rose.Interfaces.Event_Listener.Client.Open_Cap_Set
-                    (Client   => Listener,
-                     On_Event => Params.Caps (0));
+                  Listener_Cap := Params.Caps (0);
                   Have_Listener := True;
                end if;
 
@@ -142,13 +145,19 @@ package body Keyboard.Server is
                   begin
 
                      --  The keyboard only produces characters. The line
-                     --  discipline, event-input-stream, echoes them
-                     --  (#397).
+                     --  discipline, in vga-console, echoes them (#397,
+                     --  #454).
 
                      Keyboard.Codes.Handle_Key
                        (Scan_Code => Read_Key_Code,
                         Result    => Result,
                         Last      => Last);
+
+                     if Have_Listener and then not Listener_Open then
+                        Rose.Interfaces.Event_Listener.Client.Open
+                          (Listener, Listener_Cap);
+                        Listener_Open := True;
+                     end if;
 
                      if Have_Listener then
                         for Code of Result (1 .. Last) loop

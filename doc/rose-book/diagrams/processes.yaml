@@ -36,8 +36,6 @@ processes:
   user:       {at: [250, 165], kind: persistent, label: user, note: fraser}
   command:    {at: [660, 165], kind: persistent, label: command,
                note: registry}
-  eis:        {at: [860, 165], kind: persistent, label: event-input-,
-               note: stream}
   home:       {at: [250, 255], kind: persistent, label: directory,
                note: home}
   keyboard:   {at: [860, 255], kind: persistent, label: keyboard,
@@ -45,7 +43,7 @@ processes:
   file:       {at: [90, 345], kind: persistent, label: file, note: .petalrc}
   exec:       {at: [430, 345], kind: persistent, label: exec}
   vga:        {at: [1000, 345], kind: persistent, label: vga-console,
-               note: VGA page}
+               note: terminal}
 
   # Ran during the boot, then exited
   init:       {at: [170, 431], kind: boot, label: init, note: 2 · exited,
@@ -84,14 +82,13 @@ calls:
   - [petal, user]
   - {from: petal, to: home, label: cwd}
   - {from: petal, to: command, label: find}
-  - {from: petal, to: eis, label: stdin}
-  - {from: petal, to: vga, label: stdout, via: [[1000, 75]]}
+  - {from: petal, to: vga, label: stdin · stdout, via: [[1000, 75]]}
   - {from: petal, to: caps, label: cap sets}
   - {from: user, to: home, label: home}
   - {from: home, to: file, label: entry}
   - {from: home, to: exec, label: launch}
   - {from: command, to: exec, label: launch}
-  - {from: keyboard, to: eis, label: keys}
+  - {from: keyboard, to: vga, label: keys}
   - {from: exec, to: vga, label: stdout}
   - {from: exec, to: elf, label: launch}
   - {from: exec, to: store, label: binaries, label_at: [400, 405]}

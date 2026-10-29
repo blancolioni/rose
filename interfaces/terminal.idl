@@ -1,3 +1,14 @@
 interface Terminal : Stream is
 
+   --  A console: a stream whose input and output can be controlled.
+   --  The screen is cleared with escape sequences, written like any
+   --  other output: ESC [ 2 J clears it, and ESC [ H moves the cursor
+   --  home (#454).
+
+   procedure Enable_Echo;
+   --  Echo what is typed. This is the default.
+
+   procedure Disable_Echo;
+   --  Don't echo what is typed, for example while a password is typed.
+
 end Terminal;

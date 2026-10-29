@@ -141,6 +141,8 @@ package body Petal.Signatures is
                            then Rescind_Cap
                            elsif Key = "cap" and then Name = "Find_Command"
                            then Find_Command_Cap
+                           elsif Key = "cap" and then Name = "Console"
+                           then Console_Cap
                            else Other_Role_Cap);
                      end;
                   end;

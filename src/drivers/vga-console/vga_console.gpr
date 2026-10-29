@@ -12,6 +12,8 @@ project vga_console is
    for Source_Files use
       ("vga_console.ads",
        "vga_console-driver.adb",
+       "vga_console-line_discipline.ads",
+       "vga_console-line_discipline.adb",
        "vga_console-screen.ads",
        "vga_console-screen.adb",
        "vga_console-server.ads",
@@ -19,12 +21,21 @@ project vga_console is
        "rose-devices.ads",
        "rose-devices-port_io.ads",
        "rose-devices-port_io.adb",
+       "rose-interfaces-event_listener.ads",
+       "rose-interfaces-event_listener-server.ads",
+       "rose-interfaces-event_listener-server.adb",
+       "rose-interfaces-event_source.ads",
+       "rose-interfaces-event_source-client.ads",
+       "rose-interfaces-event_source-client.adb",
        "rose-interfaces-restorable.ads",
        "rose-interfaces-restorable-server.ads",
        "rose-interfaces-restorable-server.adb",
+       "rose-interfaces-stream.ads",
+       "rose-interfaces-stream_reader.ads",
        "rose-interfaces-stream_writer.ads",
-       "rose-interfaces-stream_writer-server.ads",
-       "rose-interfaces-stream_writer-server.adb");
+       "rose-interfaces-terminal.ads",
+       "rose-interfaces-terminal-server.ads",
+       "rose-interfaces-terminal-server.adb");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("vga_console-driver.adb");

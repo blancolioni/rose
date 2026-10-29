@@ -155,11 +155,11 @@ Used by:: `init`, which installs every program after `exec` itself, and sets its
 
 === `vga-console`
 
-The persistent console: it writes text to the screen, and survives a restore (ADR 0005).
+The persistent console, and the terminal: it writes text to the screen, reads what is typed on the keyboard, and survives a restore (ADR 0005).
 
-Provides:: `Stream_Writer`, and `Restorable`.
-Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`.
-Used by:: Everything installed after it, as its standard output, through `exec`; the boot console, which sends its output on to it; and the shell.
+Provides:: `Terminal`, which is a `Stream_Reader` and a `Stream_Writer` with `Enable_Echo` and `Disable_Echo`; `Event_Listener`, which it registers with the keyboard; and `Restorable`.
+Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`; and, from `restore`, the keyboard's `Event_Source`.
+Used by:: Everything installed after it, as its standard output, through `exec`; the boot console, which sends its output on to it; and the shell, as its standard input and output, and for commands with the console role.
 
 * *It keeps a copy of the screen in its own memory:* rows 1 to 24, as VGA cells, and the cursor position.
   Every write changes the copy and the VGA page.
@@ -170,8 +170,16 @@ Used by:: Everything installed after it, as its standard output, through `exec`;
 * *It redraws the screen after a restore.*
   When it is told that it has been restored (see <<restore-notification>>), it maps the VGA page again, copies its saved screen to rows 1 to 24, and puts the cursor back, so the screen is as it was at the checkpoint.
   Output written after the last checkpoint is lost from the screen, like everything else written since then.
+* *It acts on some control characters and escape sequences in what it writes.*
+  Backspace moves the cursor back, tab moves it to the next multiple of 8, and carriage return to the start of the line.
+  `ESC [ 2 J` clears the screen, and `ESC [ H` moves the cursor to its top left corner.
+  It draws nothing for other control characters and escape sequences.
+* *It is the console's line discipline.*
+  It echoes what is typed, unless echo is off, and acts on backspace, Ctrl-U, Ctrl-W, Ctrl-C and Ctrl-D (ADR 0011).
+  It buffers up to 4096 bytes, and a `Read` returns only whole lines: a `Read` that comes before a line is complete waits until it is.
 
-`restore` installs `vga-console` straight after `exec`, and sends its `Stream_Writer` to `init`, which hands the screen over to it (see <<Boot Sequence>>).
+`restore` installs `vga-console` straight after `keyboard`.
+It sends `init` the console's `Stream_Writer`, which hands the screen over to it (see <<Boot Sequence>>), its `Stream_Reader`, which `init` gives the shell as standard input, and its `Terminal`, which `init` gives the shell for the console role.
 
 === `command`
 
@@ -187,20 +195,10 @@ The driver for the PC keyboard.
 
 Provides:: `Event_Source`, whose `Add_Listener` registers the one listener that receives each key.
 Requests:: `create-endpoint`, `register-interrupt 33`, and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
-Used by:: `event-input-stream`.
+Used by:: `vga-console`.
 
-`keyboard` also echoes each key to the console itself.
-
-=== `event-input-stream`
-
-Turns keyboard events into a stream of input.
-
-Provides:: `Stream_Reader`, which returns a line of input at a time; and `Event_Listener`, which it registers with the keyboard.
-Requests:: `create-endpoint`.
-Used by:: The shell, as its standard input.
-
-`event-input-stream` buffers up to 4096 bytes, and releases them when a line is complete.
-`restore` sends its `Stream_Reader` to `init`, which gives it to the shell.
+`keyboard` only produces characters: Ctrl with a letter gives its control character, and the arrow and editing keys give escape sequences.
+It doesn't echo them; `vga-console` does.
 
 === `file`
 

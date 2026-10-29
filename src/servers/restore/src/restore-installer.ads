@@ -9,8 +9,10 @@ package Restore.Installer is
       Requires_Input_Stream,
       Provides_Console,
       Is_Driver);
-   --  Provides_Console: the program is the persistent console, which
-   --  init gives everything installed after it as standard output.
+   --  Provides_Console: the program is the persistent console, a
+   --  Terminal, whose Stream_Writer init gives everything installed after
+   --  it as standard output (#454). With Provides_Input_Stream as well,
+   --  its Stream_Reader is standard input.
    --  Is_Driver: the program is from the drivers directory, so init may
    --  give it more caps than other programs (#115).  Install sets it.
 
