@@ -135,14 +135,15 @@ A new system is installed when the install media boots on a disk with no checkpo
 `restore-install` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
 It then reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 
-* the drivers `exec`, `vga-console`, `command`, `keyboard` and `event-input-stream`, which are launched;
+* the drivers `exec`, `keyboard`, `vga-console` and `command`, which are launched;
 * the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
-* the commands `echo`, `list`, `cat`, `user`, `tests` and `petal`, which are saved in the command registry.
+* the commands `echo`, `list`, `cat`, `touch`, `mkdir`, `clear`, `user`, `tests` and `petal`, which are saved in the command registry.
 
 `init` serves the install endpoint while `restore-install` runs.
 The first program installed is `exec`, which installs every later program.
-The second is `vga-console`, the persistent console (see <<Servers>>), and the third is `command`, the command registry, whose `Find` operation `init` keeps.
-Once `event-input-stream` is running, `restore-install` sends `init` the keyboard input stream.
+The second is `keyboard`, which the console reads.
+The third is `vga-console`, the persistent console and terminal (see <<Servers>>), and the fourth is `command`, the command registry, whose `Find` operation `init` keeps.
+Once the console is running, `restore-install` sends `init` its input stream and its `Terminal`.
 
 Each program on the install media comes with a list of the capabilities it asks for, such as `create-endpoint`, `register-interrupt 33` or `port-in-8 96`.
 `init` grants each request that its policy allows, and leaves out the rest:

@@ -1,27 +1,10 @@
-with System.Storage_Elements;
+with VGA_Console.Screen;
 
-with Rose.Objects;
-with Rose.Words;
-
-with Rose.Invocation;
-
-with Rose.Console_IO;
-
-with Rose.Interfaces.Event_Listener.Server;
-with Rose.Interfaces.Stream_Reader.Server;
-
-with Rose.System_Calls;
-with Rose.Server;
-
-package body Event_Input_Stream.Server is
+package body VGA_Console.Line_Discipline is
 
    use System.Storage_Elements;
 
    Cooked_Mode  : constant Boolean := True;
-   --  In cooked mode, the stream is the console's line discipline: it
-   --  echoes what is typed, acts on control characters, and a Read
-   --  returns only whole lines (#397). In raw mode, every character is
-   --  data, and nothing is echoed.
 
    EOT : constant Storage_Element := 4;
    ETX : constant Storage_Element := 3;
@@ -33,10 +16,7 @@ package body Event_Input_Stream.Server is
    ESC : constant Storage_Element := 27;
    DEL : constant Storage_Element := 127;
 
-   Context         : Rose.Server.Server_Context;
-
-   Input_Buffer : Storage_Array (1 .. 4096)
-     with Alignment => 4096;
+   Input_Buffer : Storage_Array (1 .. 4096);
    Input_Last   : Storage_Count := 0;
    Line_Start   : Storage_Count := 0;
    --  Input_Buffer (1 .. Line_Start) are the lines that are complete and
@@ -46,43 +26,39 @@ package body Event_Input_Stream.Server is
    End_Of_File  : Boolean := False;
    --  An end of file that hasn't been read yet (ADR 0011, section 3).
 
+   Echo_Input   : Boolean := True;
+
    type Escape_State is (Ground, Escape, Sequence);
 
    Escape_Input : Escape_State := Ground;
    --  Where we are in an escape sequence, which cooked mode drops.
 
-   procedure On_Event
-     (Id   : Rose.Objects.Capability_Identifier;
-      Code : Rose.Words.Word);
-
-   procedure On_Read
-     (Id     : in     Rose.Objects.Capability_Identifier;
-      Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count);
-
-   procedure Append (Element : Storage_Element);
+   procedure Append
+     (Element  : Storage_Element;
+      Complete : in out Boolean);
    --  Add Element to the line being typed, and echo it in cooked mode.
+   --  Complete is set if that completes the line.
 
-   procedure Complete_Line;
-   --  The line being typed is complete: a Read can return it.
+   procedure Echo (Text : String);
 
    procedure Rub_Out;
    --  Remove the last character of the line being typed, and erase it
    --  from the screen.
 
-   procedure Echo (Element : Storage_Element);
-
    ------------
    -- Append --
    ------------
 
-   procedure Append (Element : Storage_Element) is
+   procedure Append
+     (Element  : Storage_Element;
+      Complete : in out Boolean)
+   is
    begin
       if Input_Last < Input_Buffer'Last then
          Input_Last := Input_Last + 1;
          Input_Buffer (Input_Last) := Element;
          if Cooked_Mode then
-            Echo (Element);
+            Echo ((1 => Character'Val (Element)));
          end if;
       end if;
 
@@ -90,45 +66,38 @@ package body Event_Input_Stream.Server is
         or else Element = LF
         or else Input_Last = Input_Buffer'Last
       then
-         Complete_Line;
+         Line_Start := Input_Last;
+         Complete := True;
       end if;
    end Append;
-
-   -------------------
-   -- Complete_Line --
-   -------------------
-
-   procedure Complete_Line is
-   begin
-      Line_Start := Input_Last;
-      Rose.Server.Unblock_Endpoint
-        (Context, Rose.Interfaces.Stream_Reader.Read_Endpoint);
-   end Complete_Line;
 
    ----------
    -- Echo --
    ----------
 
-   procedure Echo (Element : Storage_Element) is
+   procedure Echo (Text : String) is
    begin
-      Rose.Console_IO.Put (Character'Val (Element));
+      if Echo_Input then
+         VGA_Console.Screen.Put (Text);
+      end if;
    end Echo;
 
-   --------------
-   -- On_Event --
-   --------------
+   ------------
+   -- On_Key --
+   ------------
 
-   procedure On_Event
-     (Id   : Rose.Objects.Capability_Identifier;
-      Code : Rose.Words.Word)
+   procedure On_Key
+     (Code  : Rose.Words.Word;
+      Ready : out Boolean)
    is
-      pragma Unreferenced (Id);
       use type Rose.Words.Word;
       Element : constant Storage_Element :=
                   Storage_Element (Code mod 2 ** System.Storage_Unit);
    begin
+      Ready := False;
+
       if not Cooked_Mode then
-         Append (Element);
+         Append (Element, Ready);
          return;
       end if;
 
@@ -152,7 +121,7 @@ package body Event_Input_Stream.Server is
 
       case Element is
          when LF | HT | 32 .. 126 =>
-            Append (Element);
+            Append (Element, Ready);
 
          when BS | DEL =>
             Rub_Out;
@@ -180,8 +149,7 @@ package body Event_Input_Stream.Server is
             --  sends Interrupt to the job that is reading.
 
             Input_Last := Line_Start;
-            Rose.Console_IO.Put ("^C");
-            Rose.Console_IO.New_Line;
+            Echo ("^C" & Character'Val (10));
 
          when EOT =>
 
@@ -192,7 +160,8 @@ package body Event_Input_Stream.Server is
             if Input_Last = Line_Start then
                End_Of_File := True;
             end if;
-            Complete_Line;
+            Line_Start := Input_Last;
+            Ready := True;
 
          when ESC =>
             Escape_Input := Escape;
@@ -204,20 +173,46 @@ package body Event_Input_Stream.Server is
 
             null;
       end case;
+   end On_Key;
 
-      Rose.Console_IO.Flush;
-   end On_Event;
+   -----------
+   -- Ready --
+   -----------
+
+   function Ready return Boolean is
+   begin
+      return Line_Start > 0 or else End_Of_File;
+   end Ready;
 
    -------------
-   -- On_Read --
+   -- Rub_Out --
    -------------
 
-   procedure On_Read
-     (Id     : in     Rose.Objects.Capability_Identifier;
-      Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count)
+   procedure Rub_Out is
+   begin
+      if Input_Last > Line_Start then
+         Input_Last := Input_Last - 1;
+         Echo ((Character'Val (BS), ' ', Character'Val (BS)));
+      end if;
+   end Rub_Out;
+
+   --------------
+   -- Set_Echo --
+   --------------
+
+   procedure Set_Echo (Enabled : Boolean) is
+   begin
+      Echo_Input := Enabled;
+   end Set_Echo;
+
+   ----------
+   -- Take --
+   ----------
+
+   procedure Take
+     (Buffer : out System.Storage_Elements.Storage_Array;
+      Last   : out System.Storage_Elements.Storage_Count)
    is
-      pragma Unreferenced (Id);
    begin
       if Line_Start > 0 then
          declare
@@ -231,62 +226,13 @@ package body Event_Input_Stream.Server is
             Input_Last := Input_Last - Count;
             Line_Start := Line_Start - Count;
          end;
-      elsif End_Of_File then
+      else
 
          --  A Read that returns nothing is the end of the stream.
 
          End_Of_File := False;
          Last := Buffer'First - 1;
-      else
-         Rose.Server.Block_Current_Request (Context);
       end if;
-   end On_Read;
+   end Take;
 
-   -------------
-   -- Rub_Out --
-   -------------
-
-   procedure Rub_Out is
-   begin
-      if Input_Last > Line_Start then
-         Input_Last := Input_Last - 1;
-         Echo (BS);
-         Echo (Character'Pos (' '));
-         Echo (BS);
-      end if;
-   end Rub_Out;
-
-   ------------------
-   -- Start_Server --
-   ------------------
-
-   procedure Start_Server is
-   begin
-
-      Rose.Interfaces.Stream_Reader.Server.Publish_Interface
-        (Server_Context => Context,
-         Read           => On_Read'Access);
-
-      Rose.Interfaces.Event_Listener.Server.Attach_Interface
-        (Server_Context => Context,
-         On_Event       => On_Event'Access);
-
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Event_Source_Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-
-         Rose.System_Calls.Initialize_Send (Params, Params.Caps (0));
-         Rose.System_Calls.Send_Cap
-           (Params => Params,
-            Cap    =>
-              Rose.Interfaces.Event_Listener.Server.Get_On_Event_Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end;
-
-      Rose.Server.Start_Server (Context);
-
-   end Start_Server;
-
-end Event_Input_Stream.Server;
+end VGA_Console.Line_Discipline;

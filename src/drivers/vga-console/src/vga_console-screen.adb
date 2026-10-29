@@ -27,10 +27,39 @@ package body VGA_Console.Screen is
    Line, Column  : Natural := 0;
    Taken_Over    : Boolean := False;
 
+   type Escape_State is (Ground, Escape, Sequence);
+
+   Escape_Output : Escape_State := Ground;
+   Parameter     : Natural := 0;
+   --  Where we are in an escape sequence that is being written, and its
+   --  parameter so far (#454).
+
    procedure Take_Over;
    procedure New_Line;
    procedure Scroll;
    procedure Set_Cursor;
+
+   procedure Put_Character (Ch : Character);
+   --  Draw Ch, or act on it if it is a control character.
+
+   procedure End_Sequence (Final : Character);
+   --  Act on the escape sequence ESC [ Parameter Final. ESC [ 2 J clears
+   --  the screen, and ESC [ H moves the cursor home. Others do nothing.
+
+   ------------------
+   -- End_Sequence --
+   ------------------
+
+   procedure End_Sequence (Final : Character) is
+   begin
+      if Final = 'J' and then Parameter = 2 then
+         Saved_Screen := (others => Blank);
+         Screen_Memory := Saved_Screen;
+      elsif Final = 'H' then
+         Line := 0;
+         Column := 0;
+      end if;
+   end End_Sequence;
 
    ---------
    -- Map --
@@ -65,49 +94,77 @@ package body VGA_Console.Screen is
       end if;
 
       for Ch of Text loop
-         if Character'Pos (Ch) = 10 then
-            New_Line;
-         elsif Character'Pos (Ch) = 8 then
+         case Escape_Output is
+            when Ground =>
+               Put_Character (Ch);
 
-            --  Backspace moves the cursor back without erasing, and to
-            --  the end of the line above from the start of a line, so
-            --  that a line that wrapped can be erased (#397).
+            when Escape =>
+               Escape_Output := (if Ch = '[' then Sequence else Ground);
+               Parameter := 0;
 
-            if Column > 0 then
-               Column := Column - 1;
-            elsif Line > 0 then
-               Line := Line - 1;
-               Column := Num_Columns - 1;
-            end if;
-         elsif Character'Pos (Ch) = 9 then
-            Column := (Column / 8 + 1) * 8;
-            if Column >= Num_Columns then
-               New_Line;
-            end if;
-         elsif Character'Pos (Ch) = 13 then
-            Column := 0;
-         elsif Character'Pos (Ch) < 32 or else Character'Pos (Ch) = 127 then
-
-            --  Other control characters draw nothing.
-
-            null;
-         else
-            declare
-               Offset : constant Natural := Line * Num_Columns + Column;
-               Cell   : constant Word_16 := Colour + Character'Pos (Ch);
-            begin
-               Saved_Screen (Offset) := Cell;
-               Screen_Memory (Offset) := Cell;
-            end;
-            Column := Column + 1;
-            if Column = Num_Columns then
-               New_Line;
-            end if;
-         end if;
+            when Sequence =>
+               if Ch in '0' .. '9' then
+                  Parameter :=
+                    Natural'Min (Parameter * 10, 1000)
+                    + Character'Pos (Ch) - 48;
+               elsif Character'Pos (Ch) in 16#40# .. 16#7E# then
+                  End_Sequence (Ch);
+                  Escape_Output := Ground;
+               end if;
+         end case;
       end loop;
 
       Set_Cursor;
    end Put;
+
+   -------------------
+   -- Put_Character --
+   -------------------
+
+   procedure Put_Character (Ch : Character) is
+   begin
+      if Character'Pos (Ch) = 10 then
+         New_Line;
+      elsif Character'Pos (Ch) = 8 then
+
+         --  Backspace moves the cursor back without erasing, and to the
+         --  end of the line above from the start of a line, so that a
+         --  line that wrapped can be erased (#397).
+
+         if Column > 0 then
+            Column := Column - 1;
+         elsif Line > 0 then
+            Line := Line - 1;
+            Column := Num_Columns - 1;
+         end if;
+      elsif Character'Pos (Ch) = 9 then
+         Column := (Column / 8 + 1) * 8;
+         if Column >= Num_Columns then
+            New_Line;
+         end if;
+      elsif Character'Pos (Ch) = 13 then
+         Column := 0;
+      elsif Character'Pos (Ch) = 27 then
+         Escape_Output := Escape;
+      elsif Character'Pos (Ch) < 32 or else Character'Pos (Ch) = 127 then
+
+         --  Other control characters draw nothing.
+
+         null;
+      else
+         declare
+            Offset : constant Natural := Line * Num_Columns + Column;
+            Cell   : constant Word_16 := Colour + Character'Pos (Ch);
+         begin
+            Saved_Screen (Offset) := Cell;
+            Screen_Memory (Offset) := Cell;
+         end;
+         Column := Column + 1;
+         if Column = Num_Columns then
+            New_Line;
+         end if;
+      end if;
+   end Put_Character;
 
    ------------
    -- Redraw --

@@ -10,6 +10,5 @@ package Keyboard is
    Data_Cap            : constant Rose.Capabilities.Capability := 5;
    Read_Key_Cap        : constant Rose.Capabilities.Capability := 6;
    Read_Status_Cap     : constant Rose.Capabilities.Capability := 7;
-   Console_Cap         : constant Rose.Capabilities.Capability := 8;
 
 end Keyboard;

@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** [ADR 0009](0009-files-open-readers.md) (files open readers), [ADR 0010](0010-resources.md) (resources), [ADR 0006](0006-signals.md) (signals), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), #395 (standard input for an omitted input argument), blancolioni/idle#52 (`Standard_Input` as a default), #397 (console control characters), #331 (`cat`), #339 (`<`), #142 (background jobs)
+- **Amended by:** #454, where the line discipline moved from event-input-stream into vga-console, which is now the terminal
 
 ## Context
 

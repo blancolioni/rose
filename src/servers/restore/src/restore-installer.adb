@@ -25,9 +25,22 @@ package body Restore.Installer is
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
+   function Get_Ancestor_Interface
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Ancestor      : Positive)
+      return Rose.Capabilities.Capability;
+   --  The interface cap of an ancestor of the interface of Interface_Cap,
+   --  numbered as the generated server numbers them.
+
+   Stream_Reader_Ancestor : constant := 1;
+   Stream_Writer_Ancestor : constant := 2;
+   --  The ancestors of Terminal (interfaces/terminal.idl).
+
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
+   Terminal_Cap           : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array
@@ -72,6 +85,28 @@ package body Restore.Installer is
          To (Last) := Ch;
       end loop;
    end Append;
+
+   ----------------------------
+   -- Get_Ancestor_Interface --
+   ----------------------------
+
+   function Get_Ancestor_Interface
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Ancestor      : Positive)
+      return Rose.Capabilities.Capability
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Interface_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Ancestor));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return Rose.Capabilities.Null_Capability;
+      else
+         return Params.Caps (0);
+      end if;
+   end Get_Ancestor_Interface;
 
    -------------------
    -- Get_Interface --
@@ -207,6 +242,7 @@ package body Restore.Installer is
          Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
          Rose.System_Calls.Send_Cap (Params, Input_Stream_Cap);
+         Rose.System_Calls.Send_Cap (Params, Terminal_Cap);
          Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
          Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(99));
 
@@ -340,16 +376,29 @@ package body Restore.Installer is
                                (Reply.Caps (0));
                         end if;
 
-                        if Flags (Provides_Input_Stream) then
+                        if Flags (Provides_Console) then
+
+                           --  The console is a Terminal (#454). Init gets
+                           --  its Stream_Writer as the console, its
+                           --  Stream_Reader as standard input, and the
+                           --  Terminal itself.
+
+                           Terminal_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Reply.Caps (0));
+                           Send_Console
+                             (Get_Ancestor_Interface
+                                (Terminal_Cap, Stream_Writer_Ancestor));
+                           if Flags (Provides_Input_Stream) then
+                              Input_Stream_Cap :=
+                                Get_Ancestor_Interface
+                                  (Terminal_Cap, Stream_Reader_Ancestor);
+                           end if;
+
+                        elsif Flags (Provides_Input_Stream) then
                            Input_Stream_Cap :=
                              Get_Public_Interface_From_Process
                                (Reply.Caps (0));
-                        end if;
-
-                        if Flags (Provides_Console) then
-                           Send_Console
-                             (Get_Public_Interface_From_Process
-                                (Reply.Caps (0)));
                         end if;
 
                      when Save =>
