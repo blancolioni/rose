@@ -109,6 +109,10 @@ package body Rose.Kernel.Page_Table is
      (Directory      : in out Page_Table_Array;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address);
 
+   procedure Invalidate_Page
+     (Virtual_Page : Rose.Addresses.Virtual_Page_Address);
+   --  Drop the TLB entry for Virtual_Page in the current address space
+
    -----------------------------
    -- Activate_Page_Directory --
    -----------------------------
@@ -303,6 +307,26 @@ package body Rose.Kernel.Page_Table is
         Page_Directory (Kernel_Page_Directory_Index);
    end Init_User_Page_Directory;
 
+   ---------------------
+   -- Invalidate_Page --
+   ---------------------
+
+   procedure Invalidate_Page
+     (Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+   is
+      use System.Machine_Code;
+      use Rose.Words;
+   begin
+      --  The TLB is otherwise flushed only when cr3 is reloaded, so a
+      --  process that stays current would go on using the old mapping.
+      Asm ("invlpg (%0)",
+           Inputs   =>
+             Word_32'Asm_Input
+               ("r", Word_32 (Virtual_Page_To_Address (Virtual_Page))),
+           Clobber  => "memory",
+           Volatile => True);
+   end Invalidate_Page;
+
    ------------------
    -- Is_User_Page --
    ------------------
@@ -469,6 +493,7 @@ package body Rose.Kernel.Page_Table is
          end if;
       end;
 
+      Invalidate_Page (Virtual_Page);
    end Map_Page;
 
    --------------------------
@@ -674,6 +699,7 @@ package body Rose.Kernel.Page_Table is
       pragma Import (Ada, Table_Page);
    begin
       Table_Page (Table_Index) := (others => <>);
+      Invalidate_Page (Virtual_Page);
    end Unmap_Page;
 
 end Rose.Kernel.Page_Table;
