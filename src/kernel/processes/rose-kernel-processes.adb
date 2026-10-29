@@ -1497,6 +1497,11 @@ package body Rose.Kernel.Processes is
          Rose.Invocation.Send_Words => True,
          others                     => False);
       Params.Control.Last_Sent_Word := 0;
+      Params.Data (0) := Data;
+      Params.Error := Error;
+      --  Params is the kernel's copy of the invocation, which the caller
+      --  copies back over Current_Params when the invocation finishes, so
+      --  the error has to be in both.
       Current_Process.Current_Params.Data (0) := Data;
       Current_Process.Current_Params.Error := Error;
       Current_Process.Flags (Invoke_Reply) := True;

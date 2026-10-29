@@ -4,6 +4,7 @@ with Tests.Exceptions;
 with Tests.Files;
 with Tests.Finalization;
 with Tests.Heap;
+with Tests.Invalid_Caps;
 with Tests.Secondary_Stack;
 with Tests.Smoke;
 with Tests.Stack;
@@ -21,6 +22,7 @@ package Tests.Suite is
                    Tests.Finalization.Finalization_Test'Access,
                    Tests.Files.File_Test'Access,
                    Tests.Directories.Directory_Test'Access,
-                   Tests.Users.User_Test'Access);
+                   Tests.Users.User_Test'Access,
+                   Tests.Invalid_Caps.Invalid_Cap_Test'Access);
 
 end Tests.Suite;

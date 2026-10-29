@@ -322,8 +322,8 @@ package body Petal.Session is
       Get_Cap := Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
 
       --  A generated client invokes whatever cap it is opened with, and
-      --  invoking a null cap stops the kernel (#239), so missing caps
-      --  are not opened.
+      --  invoking a null cap fails with Invalid_Capability (#239), so
+      --  missing caps are not opened.
 
       declare
          Home_Cap : constant Rose.Capabilities.Capability :=
