@@ -221,7 +221,7 @@ ADR 0002 replaces this with roles, given in the launch invocation (see <<launch-
 [#running-processes]
 == Running Processes
 
-These two diagrams show the processes that are running once each boot has finished, and which of them call which.
+These two diagrams show the processes that are running once each boot has finished, the processes that ran during the boot and exited, and which of them call which.
 An arrow goes from a process to a process it holds a capability for and calls.
 
 * *Persistent processes* have a rose border.
@@ -229,13 +229,17 @@ An arrow goes from a process to a process it holds a capability for and calls.
   An install boot installs them, and a restore brings them back.
 * *Boot modules* have a black border.
   `init` starts them again on every boot, and each has its fixed object id (see <<boot-modules>>).
+* *Dotted grey boxes*, between the two bands, are processes that ran during the boot and then exited.
+  Their calls, made before they exited, and calls to them, are drawn in faint grey.
 * *Dashed boxes and lines* are used only when booting from the install media.
 
 [#processes-after-install]
 .Processes after an install boot
 image::processes-install.svg[Processes after an install boot,pdfwidth=100%]
 
-After an install, `restore-install` has read the programs from `isofs` and written the boot loader through partition servers 18 to 20 (see <<writing-the-boot-loader>>).
+After an install, `restore-install` has read the programs from `isofs`, sent them to `init` to install, and written the boot loader through partition servers 18 to 20 (see <<writing-the-boot-loader>>).
+`init` has installed `exec` and the command registry through `store` and `elf`, created the first user's home directory, and launched `tests` and `petal` through `exec`.
+`tests` has run its tests and exited.
 The boot console sends its output on to `vga-console` (see <<handing-over-the-console>>).
 
 [#processes-after-restore]
@@ -243,15 +247,16 @@ The boot console sends its output on to `vga-console` (see <<handing-over-the-co
 image::processes-restore.svg[Processes after restoring from the boot disk,pdfwidth=100%]
 
 After a restore, the persistent processes are the same, and their capabilities reach the new boot modules through the fixed object ids.
-`isofs` and partition servers 18 to 20 are not started, and the boot console discards its output (see <<restore-boot>>).
+`isofs` and partition servers 18 to 20 are not started, `tests` is not run, and the boot console discards its output (see <<restore-boot>>).
+`init` has only started the boot modules and read the partition table before `restore` told it that it had restored the system.
 
 The diagrams leave out:
 
-* `init`, which exits at the end of both boots;
 * output: every boot module writes to the boot console, and every installed program writes to `vga-console` through the standard output that `exec` gives it;
 * paging: `mem` and `store` page the memory of every process;
 * the swap and log partitions that `restore` holds, which it gives to `store` and `log`;
-* `tests`, which runs once after an install and exits, and the commands that `petal` runs.
+* `init` starting each boot module, which it does through the kernel;
+* the commands that `petal` runs, and the processes that `tests` creates.
 
 When it has finished, `restore` waits for a message that never comes, and keeps the capabilities it was given.
 It should exit instead (#451).

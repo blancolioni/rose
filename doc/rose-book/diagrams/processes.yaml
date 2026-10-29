@@ -8,10 +8,15 @@
 # install media's boot only: the other boot draws such a process faded,
 # and leaves out such a call.  'notes' gives a variant's own note.
 #
+# A process with 'exits: true' ran during the boot and then exited.  It
+# is drawn dotted, between the two bands, and its calls, made before it
+# exited, are drawn faintly, as are calls to it.
+#
 # A call goes from the caller to the process it holds a cap for.  It is
 # drawn straight between the two boxes, or through the points in 'via'.
+# Its label goes in the middle of its longest stretch, or at 'label_at'.
 
-size: [1100, 1000]
+size: [1100, 1070]
 
 variants:
   install: Persistent processes, installed from the install media
@@ -20,9 +25,10 @@ variants:
 bands:
   persistent: {top: 12, bottom: 387}
   boot:
-    top: 405
-    bottom: 992
+    top: 475
+    bottom: 1062
     title: Boot modules, started by init on every boot
+    title_at_bottom: true
 
 processes:
   # Persistent
@@ -41,32 +47,38 @@ processes:
   vga:        {at: [1000, 345], kind: persistent, label: vga-console,
                note: VGA page}
 
+  # Ran during the boot, then exited
+  init:       {at: [170, 431], kind: boot, label: init, note: 2 · exited,
+               exits: true}
+  tests:      {at: [790, 431], kind: persistent, label: tests,
+               note: exited, exits: true, when: install}
+
   # Boot modules, with their fixed object ids
-  checkpoint: {at: [250, 480], kind: boot, label: checkpoint, note: "15"}
-  elf:        {at: [550, 480], kind: boot, label: elf, note: "12"}
-  caps:       {at: [700, 480], kind: boot, label: caps, note: "14"}
-  restore:    {at: [850, 480], kind: boot, label: restore, note: "9"}
-  console:    {at: [1000, 480], kind: boot, label: console, note: "3",
+  checkpoint: {at: [250, 550], kind: boot, label: checkpoint, note: "15"}
+  elf:        {at: [550, 550], kind: boot, label: elf, note: "12"}
+  caps:       {at: [700, 550], kind: boot, label: caps, note: "14"}
+  restore:    {at: [850, 550], kind: boot, label: restore, note: "9"}
+  console:    {at: [1000, 550], kind: boot, label: console, note: "3",
                notes: {restore: "3 · output discarded"}}
-  log:        {at: [250, 585], kind: boot, label: log, note: "16"}
-  store:      {at: [400, 585], kind: boot, label: store, note: "7"}
-  mem:        {at: [550, 585], kind: boot, label: mem, note: "4"}
-  isofs:      {at: [625, 680], kind: boot, label: isofs, note: "8",
+  log:        {at: [250, 655], kind: boot, label: log, note: "16"}
+  store:      {at: [400, 655], kind: boot, label: store, note: "7"}
+  mem:        {at: [550, 655], kind: boot, label: mem, note: "4"}
+  isofs:      {at: [625, 750], kind: boot, label: isofs, note: "8",
                when: install}
-  p_log:      {at: [250, 770], kind: boot, label: partition, note: 17 · log}
-  p_swap:     {at: [400, 770], kind: boot, label: partition,
+  p_log:      {at: [250, 840], kind: boot, label: partition, note: 17 · log}
+  p_swap:     {at: [400, 840], kind: boot, label: partition,
                note: 11 · swap}
-  scan:       {at: [550, 770], kind: boot, label: scan, note: "10"}
-  p_mbr:      {at: [700, 770], kind: boot, label: partition,
+  scan:       {at: [550, 840], kind: boot, label: scan, note: "10"}
+  p_mbr:      {at: [700, 840], kind: boot, label: partition,
                note: 18 · block 0, when: install}
-  p_bios:     {at: [850, 770], kind: boot, label: partition,
+  p_bios:     {at: [850, 840], kind: boot, label: partition,
                note: 19 · bios-boot, when: install}
-  p_boot:     {at: [1000, 770], kind: boot, label: partition,
+  p_boot:     {at: [1000, 840], kind: boot, label: partition,
                note: 20 · rose-boot, when: install}
-  timer:      {at: [90, 865], kind: boot, label: timer, note: "13"}
-  ata:        {at: [625, 865], kind: boot, label: ata, note: "6",
+  timer:      {at: [90, 935], kind: boot, label: timer, note: "13"}
+  ata:        {at: [625, 935], kind: boot, label: ata, note: "6",
                width: 870}
-  pci:        {at: [625, 950], kind: boot, label: pci, note: "5"}
+  pci:        {at: [625, 1020], kind: boot, label: pci, note: "5"}
 
 calls:
   - [petal, user]
@@ -82,17 +94,17 @@ calls:
   - {from: keyboard, to: eis, label: keys}
   - {from: exec, to: vga, label: stdout}
   - {from: exec, to: elf, label: launch}
-  - {from: exec, to: store, label: binaries}
+  - {from: exec, to: store, label: binaries, label_at: [400, 405]}
   - {from: console, to: vga, label: redirect, when: install}
   - [elf, mem]
   - [elf, store]
   - [checkpoint, log]
   - [checkpoint, store]
   - [checkpoint, mem]
-  - {from: checkpoint, to: timer, via: [[90, 480]]}
-  - {from: restore, to: mem, via: [[810, 533], [570, 533]]}
-  - {from: restore, to: store, via: [[810, 533], [420, 533]]}
-  - {from: restore, to: log, via: [[810, 533], [270, 533]]}
+  - {from: checkpoint, to: timer, via: [[90, 550]]}
+  - {from: restore, to: mem, via: [[810, 603], [570, 603]]}
+  - {from: restore, to: store, via: [[810, 603], [420, 603]]}
+  - {from: restore, to: log, via: [[810, 603], [270, 603]]}
   - {from: restore, to: isofs, when: install}
   - {from: restore, to: p_mbr, when: install}
   - {from: restore, to: p_bios, when: install}
@@ -108,3 +120,31 @@ calls:
   - {from: p_boot, to: ata, when: install}
   - [ata, pci]
   - [ata, timer]
+
+  # init, on both boots: the boot console, cap sets for the boot
+  # servers, waits, and the partition table.  restore sends it the
+  # programs to install, and tells it when it has finished.
+  - {from: init, to: console, via: [[200, 463], [980, 463]]}
+  - {from: init, to: caps, via: [[200, 463], [650, 463]]}
+  - {from: init, to: timer, via: [[130, 900]]}
+  - {from: init, to: scan, via: [[200, 463], [475, 463], [475, 800],
+                                 [520, 800]]}
+  - {from: restore, to: init, via: [[820, 500], [150, 500]]}
+
+  # init, on the install media only: installing exec and the command
+  # registry through store and elf, installing the other programs, the
+  # first user's home directory, and the persistent console.
+  - {from: init, to: store, via: [[200, 463], [360, 463]], when: install}
+  - {from: init, to: elf, via: [[200, 463], [580, 463]], when: install}
+  - {from: init, to: exec, when: install}
+  - {from: init, to: command, via: [[320, 431], [320, 210], [620, 210]],
+     when: install}
+  - {from: init, to: home, when: install}
+  - {from: init, to: vga, via: [[320, 431], [320, 300], [970, 300]],
+     when: install}
+
+  # tests, after an install
+  - {from: tests, to: command, when: install}
+  - {from: tests, to: exec, when: install}
+  - {from: tests, to: caps, when: install}
+  - {from: tests, to: vga, when: install}
