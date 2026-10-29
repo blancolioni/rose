@@ -7,5 +7,7 @@ package Tests.Containers is
    --  list of controlled elements, which are finalized with the list.
    --  Vectors (#441): a vector of integers that grows past its first
    --  capacity, an indefinite vector of strings, and the array sorts.
+   --  Maps (#442): a hashed map with string keys that grows well past
+   --  its first capacity, and an ordered map iterated in key order.
 
 end Tests.Containers;

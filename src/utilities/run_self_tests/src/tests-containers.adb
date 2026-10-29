@@ -1,9 +1,12 @@
 with Ada.Containers.Doubly_Linked_Lists;
 with Ada.Containers.Generic_Array_Sort;
 with Ada.Containers.Generic_Constrained_Array_Sort;
+with Ada.Containers.Hashed_Maps;
 with Ada.Containers.Indefinite_Vectors;
+with Ada.Containers.Ordered_Maps;
 with Ada.Containers.Vectors;
 with Ada.Finalization;
+with Ada.Strings.Hash;
 with Ada.Text_IO;
 
 package body Tests.Containers is
@@ -41,6 +44,18 @@ package body Tests.Containers is
 
    package String_Sorting is new String_Vectors.Generic_Sorting;
 
+   subtype Key_Name is String (1 .. 4);
+
+   package Name_Maps is
+     new Ada.Containers.Hashed_Maps
+       (Key_Type        => Key_Name,
+        Element_Type    => Integer,
+        Hash            => Ada.Strings.Hash,
+        Equivalent_Keys => "=");
+
+   package Integer_Maps is
+     new Ada.Containers.Ordered_Maps (Integer, Integer);
+
    subtype Element_Value is Natural range 0 .. 3;
 
    Finalized : array (Element_Value) of Boolean := (others => False);
@@ -74,6 +89,10 @@ package body Tests.Containers is
       return Boolean;
    --  True if List holds Expected, in order. The list is walked forwards
    --  and backwards with cursors.
+
+   function Map_Check return Boolean;
+   --  Check a hashed map and an ordered map, and report the first thing
+   --  that is wrong.
 
    function Tamper_Check return Boolean;
    --  True if appending to a list while "for ... of" iterates over it
@@ -175,6 +194,10 @@ package body Tests.Containers is
          return Fail ("array sort");
       end if;
 
+      if not Map_Check then
+         return False;
+      end if;
+
       return True;
    end Container_Test;
 
@@ -223,6 +246,106 @@ package body Tests.Containers is
 
       return not Has_Element (Position);
    end Has_Elements;
+
+   ---------------
+   -- Map_Check --
+   ---------------
+
+   function Map_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      use type Name_Maps.Cursor;
+      Names    : Name_Maps.Map;
+      Numbers  : Integer_Maps.Map;
+      Sum      : Integer := 0;
+      Previous : Integer := Integer'First;
+
+      function Generated (Index : Natural) return Key_Name
+      is ('k'
+          & Character'Val (Character'Pos ('0') + Index / 100 mod 10)
+          & Character'Val (Character'Pos ('0') + Index / 10 mod 10)
+          & Character'Val (Character'Pos ('0') + Index mod 10));
+      --  A key for Index, from "k000" to "k999".
+
+   begin
+      Names.Insert ("pear", 1);
+      Names.Insert ("plum", 2);
+      Names.Insert ("kiwi", 3);
+      Names.Insert ("lime", 4);
+      Names.Replace ("plum", 20);
+      Names.Delete ("kiwi");
+
+      if Names.Length /= 3
+        or else not Names.Contains ("pear")
+        or else Names.Element ("plum") /= 20
+        or else Names.Find ("kiwi") /= Name_Maps.No_Element
+      then
+         return Fail ("hashed map");
+      end if;
+
+      for Item of Names loop
+         Sum := Sum + Item;
+      end loop;
+      if Sum /= 25 then
+         return Fail ("hashed map iteration");
+      end if;
+
+      begin
+         Names.Insert ("pear", 5);
+         return Fail ("hashed map took a duplicate key");
+      exception
+         when Constraint_Error =>
+            null;
+      end;
+
+      --  Many more keys make the map grow its table, and rehash.
+
+      for Index in 0 .. 999 loop
+         Names.Insert (Generated (Index), Index);
+      end loop;
+      if Names.Length /= 1_003
+        or else Names.Element ("k123") /= 123
+        or else Names.Element ("k999") /= 999
+        or else Names.Element ("lime") /= 4
+      then
+         return Fail ("hashed map growth");
+      end if;
+
+      for Key of Integer_Array'(50, 10, 30, 20, 40) loop
+         Numbers.Insert (Key, Key * 2);
+      end loop;
+      Numbers.Delete (30);
+
+      for Position in Numbers.Iterate loop
+         if Integer_Maps.Key (Position) <= Previous
+           or else Integer_Maps.Element (Position)
+                     /= 2 * Integer_Maps.Key (Position)
+         then
+            return Fail ("ordered map order");
+         end if;
+         Previous := Integer_Maps.Key (Position);
+      end loop;
+
+      if Numbers.Length /= 4
+        or else Numbers.First_Key /= 10
+        or else Numbers.Last_Key /= 50
+        or else Integer_Maps.Key (Numbers.Floor (35)) /= 20
+        or else Integer_Maps.Key (Numbers.Ceiling (35)) /= 40
+      then
+         return Fail ("ordered map");
+      end if;
+
+      begin
+         for Item of Numbers loop
+            Numbers.Include (Item + 1, Item);
+         end loop;
+         return Fail ("no ordered map tampering check");
+      exception
+         when Program_Error =>
+            null;
+      end;
+
+      return True;
+   end Map_Check;
 
    ------------------
    -- Tamper_Check --
