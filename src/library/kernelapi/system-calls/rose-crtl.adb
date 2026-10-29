@@ -75,6 +75,11 @@ package body Rose.CRTL is
    WC_Encoding : Character := ' ';
    pragma Export (C, WC_Encoding, "__gl_wc_encoding");
 
+   Xdr_Stream : Integer := 0;
+   pragma Export (C, Xdr_Stream, "__gl_xdr_stream");
+   --  Zero: stream attributes use GNAT's native representation rather
+   --  than XDR (#360).
+
    --  The binder sets the following globals, and calls the operations
    --  below at the start and end of the program, since the run-time system
    --  does not suppress the standard library (#359). There is no tasking
