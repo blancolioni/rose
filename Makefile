@@ -12,7 +12,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console
-UTILITIES=echo list cat touch mkdir clear user run_self_tests petal
+UTILITIES=echo list cat touch mkdir clear user auth run_self_tests petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk hdd iso finished

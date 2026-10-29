@@ -1,0 +1,14 @@
+interface Auth_Admin is
+
+   --  Creating users (#455). New_User creates a user called Name, with a
+   --  home directory and the password Password, and returns the user's
+   --  User interface. It fails if there is already a user called Name.
+   --  Until method-typed arguments (#422), this is an interface of its
+   --  own, so that it can be given separately from Auth.
+
+   function New_User
+     (Name     : String;
+      Password : String)
+     return interface User;
+
+end Auth_Admin;

@@ -137,7 +137,7 @@ It then reads the install media through `isofs`, and installs each program on it
 
 * the drivers `exec`, `keyboard`, `vga-console` and `command`, which are launched;
 * the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
-* the commands `echo`, `list`, `cat`, `touch`, `mkdir`, `clear`, `user`, `tests` and `petal`, which are saved in the command registry.
+* the commands `echo`, `list`, `cat`, `touch`, `mkdir`, `clear`, `user`, `auth`, `run_self_tests` and `petal`, which are saved in the command registry.
 
 `init` serves the install endpoint while `restore-install` runs.
 The first program installed is `exec`, which installs every later program.
@@ -207,7 +207,7 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 == Starting the Shell
 
 When a new system has been installed, `init` launches `checkpoint`.
-It then finds `tests` in the command registry and launches it, creates the first user, `fraser`, with a home directory (ADR 0003), and launches `petal`.
+It then finds `tests` in the command registry and launches it, launches `auth`, creates the first user, `fraser`, with a home directory (ADR 0003), through `auth`, checks that `fraser` can log in, and launches `petal`.
 `tests` and `petal` each receive a cap set with the standard streams, using the persistent console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
 `petal` also receives the registry's `Find`, for running commands, a capability for trace events, the user, and the user's home directory as its current directory.
 

@@ -93,8 +93,12 @@ package body Init.Run is
                        Rose.Capabilities.Null_Capability;
       --  The command registry's Commands interface (#460).
 
-      First_User : constant String := "fraser";
-      User_Cap   : Rose.Capabilities.Capability;
+      First_User     : constant String := "fraser";
+      First_Password : constant String := "rose";
+      --  Until the installer asks for them (#456).
+      Auth_Cap       : Rose.Capabilities.Capability;
+      Auth_Admin_Cap : Rose.Capabilities.Capability;
+      User_Cap       : Rose.Capabilities.Capability;
       Home_Cap   : Rose.Capabilities.Capability;
       --  The first user, and its home directory, created on first boot.
 
@@ -502,21 +506,46 @@ package body Init.Run is
            (Console_Stream_Cap, "init: self tests failed" & NL);
       end if;
 
+      --  The auth server, which keeps the users and their passwords
+      --  (#455).
+
+      Init.Users.Start_Auth
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Commands        => Commands_Cap,
+         Auth            => Auth_Cap,
+         Admin           => Auth_Admin_Cap);
+      if Auth_Cap = Null_Capability
+        or else Auth_Admin_Cap = Null_Capability
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: unable to start auth" & NL);
+      end if;
+
       --  The first user, with a home directory (ADR 0003). Init runs
       --  only on a fresh boot, so it is created once.
 
       Init.Calls.Send_String
         (Console_Stream_Cap, "creating user " & First_User & NL);
       Init.Users.Create_First_User
-        (Name            => First_User,
-         Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         User            => User_Cap,
-         Home            => Home_Cap);
+        (Name     => First_User,
+         Password => First_Password,
+         Admin    => Auth_Admin_Cap,
+         User     => User_Cap,
+         Home     => Home_Cap);
       if User_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
            (Console_Stream_Cap,
             "init: unable to create user " & First_User & NL);
+      elsif Init.Users.Check_Login (Auth_Cap, First_User, First_Password)
+        and then not Init.Users.Check_Login
+          (Auth_Cap, First_User, First_Password & "x")
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "auth: login checked" & NL);
+      else
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: login check failed" & NL);
       end if;
 
       declare

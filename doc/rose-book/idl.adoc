@@ -286,7 +286,10 @@ The generated client fills them in the order the parameters are declared, and th
 * *A `String` or `Storage_Array`* goes in the shared buffer.
   The server does not copy it: its handler sees the client's buffer in place, through `Buffer_Address` and `Buffer_Length`.
   For an `out` parameter the server writes into that buffer directly.
-  Since there is one buffer, a method can have at most one such parameter; all current interfaces keep to this.
+  Since there is one buffer, a method can have only one such parameter, unless they are all `in` parameters.
+  Then each is an item in the buffer, in order: its length in four bytes, little-endian, and then its bytes, padded to a multiple of four.
+  The client sends them with `Start_Items`, `Send_Text_Item` and `Send_Storage_Item`, and the server finds each with `Get_Buffer_Item`.
+  `Auth.Login (Name, Password)` is one such method.
 * *Results.* A scalar result is returned in the reply's data words.
   A `String` result is written into the buffer, and its last index (`Last`) is returned in word 0.
   An interface result is returned as one capability, which the client opens with `Open`.

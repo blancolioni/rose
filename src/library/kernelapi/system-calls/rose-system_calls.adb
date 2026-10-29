@@ -231,6 +231,51 @@ package body Rose.System_Calls is
       Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
    end Expect_Buffer;
 
+   ---------------------
+   -- Get_Buffer_Item --
+   ---------------------
+
+   function Get_Buffer_Item
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Positive)
+      return Buffer_Item
+   is
+      use System.Storage_Elements;
+   begin
+      if not Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+         return (others => <>);
+      end if;
+
+      declare
+         Buffer : Storage_Array (1 .. Params.Buffer_Length);
+         pragma Import (Ada, Buffer);
+         for Buffer'Address use Params.Buffer_Address;
+         Next   : Storage_Offset := 1;
+      begin
+         for Item in 1 .. Index loop
+            exit when Next + 3 > Buffer'Last;
+            declare
+               Length : Storage_Count := 0;
+            begin
+               for I in reverse Storage_Offset range 0 .. 3 loop
+                  Length := Length * 256 + Storage_Count (Buffer (Next + I));
+               end loop;
+
+               exit when Length > Buffer'Last - Next - 3;
+
+               if Item = Index then
+                  return (Address => Buffer (Next + 4)'Address,
+                          Length  => Length);
+               end if;
+
+               Next := Next + 4 + (Length + 3) / 4 * 4;
+            end;
+         end loop;
+      end;
+
+      return (others => <>);
+   end Get_Buffer_Item;
+
    -------------------
    -- Get_Local_Cap --
    -------------------
@@ -480,7 +525,8 @@ package body Rose.System_Calls is
       use type Rose.Invocation.Invocation_Error;
    begin
       if Item.Control.Flags (Rose.Invocation.Error)
-        and then Item.Error = Rose.Invocation.No_Invoke_Buffer
+        and then Item.Error in Rose.Invocation.No_Invoke_Buffer
+                             | Rose.Invocation.Buffer_Too_Small
       then
          return;
       end if;
@@ -731,6 +777,48 @@ package body Rose.System_Calls is
       end if;
    end Send_Storage_Array;
 
+   -----------------------
+   -- Send_Storage_Item --
+   -----------------------
+
+   procedure Send_Storage_Item
+     (Params  : in out Rose.Invocation.Invocation_Record;
+      Storage : System.Storage_Elements.Storage_Array)
+   is
+      use System.Storage_Elements;
+      Start  : constant Storage_Offset := Params.Buffer_Length;
+      Length : constant Storage_Count := Storage'Length;
+      Size   : constant Storage_Count := 4 + (Length + 3) / 4 * 4;
+   begin
+      if not Have_Invoke_Buffer then
+         Report_No_Buffer (Params);
+         return;
+      elsif Params.Control.Flags (Rose.Invocation.Error) then
+         return;
+      elsif Size > Invoke_Buffer_Len - Start then
+         Params.Control.Flags (Rose.Invocation.Error) := True;
+         Params.Error := Rose.Invocation.Buffer_Too_Small;
+         Params.Cap := 0;
+         return;
+      end if;
+
+      declare
+         Local_Buffer : Storage_Array (1 .. Invoke_Buffer_Len);
+         pragma Import (Ada, Local_Buffer);
+         for Local_Buffer'Address use Invoke_Buffer_Addr;
+         Rest         : Storage_Count := Length;
+      begin
+         for I in Storage_Offset range 1 .. 4 loop
+            Local_Buffer (Start + I) := Storage_Element (Rest mod 256);
+            Rest := Rest / 256;
+         end loop;
+         Local_Buffer (Start + 5 .. Start + 4 + Length) := Storage;
+         Local_Buffer (Start + 5 + Length .. Start + Size) := (others => 0);
+      end;
+
+      Params.Buffer_Length := Start + Size;
+   end Send_Storage_Item;
+
    -------------------------
    -- Send_Storage_Offset --
    -------------------------
@@ -776,6 +864,22 @@ package body Rose.System_Calls is
          Report_No_Buffer (Params);
       end if;
    end Send_Text;
+
+   --------------------
+   -- Send_Text_Item --
+   --------------------
+
+   procedure Send_Text_Item
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Text   : String)
+   is
+      use System.Storage_Elements;
+      Storage : Storage_Array (1 .. Text'Length);
+      pragma Import (Ada, Storage);
+      for Storage'Address use Text'Address;
+   begin
+      Send_Storage_Item (Params, Storage);
+   end Send_Text_Item;
 
    ---------------
    -- Send_Word --
@@ -831,6 +935,23 @@ package body Rose.System_Calls is
          Send_Word (Params, Rose.Words.Word_64 (Value));
       end if;
    end Send_Word;
+
+   -----------------
+   -- Start_Items --
+   -----------------
+
+   procedure Start_Items
+     (Params : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      if Have_Invoke_Buffer then
+         Params.Control.Flags (Rose.Invocation.Send_Buffer) := True;
+         Params.Buffer_Address := Invoke_Buffer_Addr;
+         Params.Buffer_Length := 0;
+      else
+         Report_No_Buffer (Params);
+      end if;
+   end Start_Items;
 
    ----------------
    -- Use_Buffer --

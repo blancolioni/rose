@@ -20,6 +20,10 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-auth.o \
+	$(BUILDDIR)/rose-interfaces-auth-client.o \
+	$(BUILDDIR)/rose-interfaces-auth_admin.o \
+	$(BUILDDIR)/rose-interfaces-auth_admin-client.o \
 	$(BUILDDIR)/rose-interfaces-directory-client.o \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \
@@ -31,6 +35,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-user.o \
+	$(BUILDDIR)/rose-interfaces-user-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
 	$(BUILDDIR)/rose-interfaces-file_reader.o \

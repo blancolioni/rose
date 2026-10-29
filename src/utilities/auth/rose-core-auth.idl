@@ -1,0 +1,17 @@
+command Rose.Core.Auth : Create_Endpoint, Find_Command
+  with Summary     => "Serve logging in and creating users.",
+       Description => """
+          Auth keeps the users' names and a salted hash of each password
+          (#455). It returns its Auth interface, whose Login gives a
+          user's User interface for the right password, and its
+          Auth_Admin interface, whose New_User creates a user, with a
+          home directory. It then keeps serving them.
+          """,
+       Server      => Auth_Server.Start_Server,
+       Live
+is
+   Auth : out Auth
+     with Help => "the Auth interface, for logging in";
+   Admin : out Auth_Admin
+     with Help => "the Auth_Admin interface, for creating users";
+end Rose.Core.Auth;

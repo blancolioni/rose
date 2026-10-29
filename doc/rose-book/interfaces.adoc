@@ -140,6 +140,8 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 | `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory` | `directory`
 | `File_System` | | `Root_Directory` | `isofs`
 | `User` | `Named` | `Home_Directory` | `user`
+| `Auth` | | `Login` | `auth`
+| `Auth_Admin` | | `New_User` | `auth`
 |===
 
 `Output_Redirect.Redirect` sends everything written to a stream from then on to another `Stream_Writer`, or discards it if that is null.
