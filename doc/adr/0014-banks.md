@@ -62,7 +62,8 @@ The book's old Memory chapter (#126) described hierarchical space banks. Each pr
 Physical memory remains a cache that mem manages for everyone. A bank's limit counts pages that have backing blocks on the store, not resident ones.
 
 - **Today that is every reserved page,** because the store allocates a region's blocks when the region is reserved. A bank's page limit is then a guarantee: a bank within its limit can't fail to write, and the root bank can't be charged more than the partition holds.
-- **If blocks are allocated on first write (#305), pages are charged when their blocks are allocated.** Reserving address space is cheap and can overcommit, as the sum of the banks' limits may be more than the partition. A write that would take a bank over its limit fails, and the failure is the fault of the bank that was charged, not of whichever process wrote last. A region still counts against the region limit when it is reserved.
+- **If blocks are allocated on first write (#305), pages are charged when their blocks are allocated.** Reserving address space is cheap and can overcommit, as the sum of the banks' limits may be more than the partition. A write that would take a bank over its limit fails, and the failure is the fault of the bank that was charged. A region still counts against the region limit when it is reserved.
+- **A process's writes don't reach a region's blocks yet.** Mem appends a process's dirty pages to the checkpoint log, and only a loader or installer writing a region's initial contents calls `Put`. So a process's stack costs no blocks and no bank pages. Blocks are allocated for a process's data when the log is consolidated into regions (#356), a long way from the write that dirtied the page, so the limit would not stop a process dirtying memory.
 - **Charging reserved pages instead would not help #305.** The root bank's limit would be the partition, and the 34th 1 MiB stack would fail as it does now, though more cleanly.
 - **`Get_Usage` can report reserved and committed pages separately,** once they differ.
 
@@ -77,7 +78,7 @@ Banks, their limits and the regions charged to them are saved in the store's che
 - **Store gains the bank table and the registration of dependent objects,** and saves both in its checkpoint.
 - **Process ownership (ADR 0015) is built on this:** a process depends on its own bank, and ending it destroys that bank.
 - **ADR 0010's `Release` stays.** A client that releases a resource gives it back early, and destroying the client's bank is the backstop for a client that doesn't.
-- **Allocating blocks lazily (#305) fits, and moves the charge.** A bank's page limit counts pages with backing blocks (see 6). `Destroy` frees the blocks a region has, not a contiguous range. The page-to-block map and the banks go into the checkpoint in one format version, and a write that fails needs the store to report errors (#230) and mem to handle them on a page fault.
+- **Allocating blocks lazily (#305) fits, and moves the charge.** A bank's page limit counts pages with backing blocks (see 6). `Destroy` frees the blocks a region has, not a contiguous range. The page-to-block map and the banks go into the checkpoint in one format version, and a write that fails needs the store to report errors (#230).
 
 ## Alternatives considered
 
@@ -93,6 +94,7 @@ Banks, their limits and the regions charged to them are saved in the store's che
 - **Moving storage between banks,** for example handing a file to another user. Is it a new reservation and a copy, or can a region be transferred?
 - **Reading a bank's usage,** for a shell command that reports what a job or a user is using.
 - **Destroying a dependent object.** If the server that registered the object doesn't answer, how long does the store wait before carrying on?
+- **Charging dirty memory.** Should mem tell the store when a page is first dirtied, with a call that allocates its block and charges its bank, and is a no-op once the block exists? A process over its limit would then fail at the write, in mem's fault path. The alternative is to charge when the log is consolidated (#356), where a failed `Put` leaves the data in the log and the limit doesn't stop a process dirtying memory.
 
 ## Follow-up work
 
