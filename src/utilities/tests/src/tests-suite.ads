@@ -1,3 +1,4 @@
+with Tests.Containers;
 with Tests.Directories;
 with Tests.Dispatching;
 with Tests.Exceptions;
@@ -21,6 +22,7 @@ package Tests.Suite is
                    Tests.Dispatching.Dispatching_Test'Access,
                    Tests.Exceptions.Exception_Test'Access,
                    Tests.Streams.Stream_Test'Access,
+                   Tests.Containers.Container_Test'Access,
                    Tests.Finalization.Finalization_Test'Access,
                    Tests.Files.File_Test'Access,
                    Tests.Directories.Directory_Test'Access,
