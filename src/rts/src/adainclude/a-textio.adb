@@ -153,6 +153,11 @@ package body Ada.Text_IO is
                FCB.At_End := True;
                return;
             end if;
+
+            --  An end of file is an event, not a state: reading after
+            --  one carries on (ADR 0011, section 3).
+
+            FCB.At_End := False;
             Index := 1;
          end if;
 

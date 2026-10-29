@@ -94,12 +94,16 @@ package body Petal.Read is
          Put ("petal> ");
          Flush;
 
+         Get_Line (Line.all, Last);
+
+         --  An end of file at the prompt starts a new line, and petal
+         --  prompts again (ADR 0011, section 4). Once the console runs
+         --  login, it logs out instead (#458).
+
          if End_Of_File then
-            Put_Line ("logout");
-            exit;
+            New_Line;
          end if;
 
-         Get_Line (Line.all, Last);
          Execute (Line (1 .. Last));
       end loop;
    end Reader_Loop;

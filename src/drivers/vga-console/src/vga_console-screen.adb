@@ -67,6 +67,30 @@ package body VGA_Console.Screen is
       for Ch of Text loop
          if Character'Pos (Ch) = 10 then
             New_Line;
+         elsif Character'Pos (Ch) = 8 then
+
+            --  Backspace moves the cursor back without erasing, and to
+            --  the end of the line above from the start of a line, so
+            --  that a line that wrapped can be erased (#397).
+
+            if Column > 0 then
+               Column := Column - 1;
+            elsif Line > 0 then
+               Line := Line - 1;
+               Column := Num_Columns - 1;
+            end if;
+         elsif Character'Pos (Ch) = 9 then
+            Column := (Column / 8 + 1) * 8;
+            if Column >= Num_Columns then
+               New_Line;
+            end if;
+         elsif Character'Pos (Ch) = 13 then
+            Column := 0;
+         elsif Character'Pos (Ch) < 32 or else Character'Pos (Ch) = 127 then
+
+            --  Other control characters draw nothing.
+
+            null;
          else
             declare
                Offset : constant Natural := Line * Num_Columns + Column;

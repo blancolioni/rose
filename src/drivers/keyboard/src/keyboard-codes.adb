@@ -7,15 +7,27 @@ package body Keyboard.Codes is
 
    type Modified_Key_Value is array (Key_Modifier) of Character;
 
+   NUL : constant Character := Character'Val (0);
+
    type Key_Entry is
       record
          Modifier   : Key_Modifier := None;
          Fn_Key     : Natural := 0;
-         Key_Value  : Modified_Key_Value := (others => Character'Val (0));
+         Cursor_Key : Character := NUL;
+         Edit_Key   : Natural := 0;
+         Key_Value  : Modified_Key_Value := (others => NUL);
       end record;
 
    function Fn (N : Natural) return Key_Entry
    is ((Fn_Key => N, others => <>));
+
+   function Cursor (Final : Character) return Key_Entry
+   is ((Cursor_Key => Final, others => <>));
+   --  A key that produces ESC [ Final.
+
+   function Edit (N : Natural) return Key_Entry
+   is ((Edit_Key => N, others => <>));
+   --  A key that produces ESC [ N ~.
 
    function Modifier (M : Key_Modifier) return Key_Entry
    is (Modifier => M, others => <>);
@@ -43,8 +55,8 @@ package body Keyboard.Codes is
       16#42# => Fn (8),
       16#43# => Fn (9),
       16#44# => Fn (10),
-      16#D9# => Fn (11),
-      16#DA# => Fn (12),
+      16#57# => Fn (11),
+      16#58# => Fn (12),
       16#01# => Asc (ESC, ESC),
       16#02# => Asc ('1', '!'),
       16#03# => Asc ('2', '@'),
@@ -98,20 +110,49 @@ package body Keyboard.Codes is
       16#35# => Asc ('/', '?'),
       others => <>);
 
+   --  The keys that follow an E0 prefix. Right Control and right Alt are
+   --  modifiers, as the left ones are.
+
+   Extended_Key_Code : constant array (Rose.Words.Word_8) of Key_Entry :=
+     (16#1D# => Modifier (Control),
+      16#38# => Modifier (Alt),
+      16#1C# => Asc (Character'Val (10)),
+      16#35# => Asc ('/', '/'),
+      16#47# => Cursor ('H'),
+      16#48# => Cursor ('A'),
+      16#49# => Edit (5),
+      16#4B# => Cursor ('D'),
+      16#4D# => Cursor ('C'),
+      16#4F# => Cursor ('F'),
+      16#50# => Cursor ('B'),
+      16#51# => Edit (6),
+      16#52# => Edit (2),
+      16#53# => Edit (3),
+      others => <>);
+
    Current_Mod : array (Key_Modifier) of Boolean := (others => False);
+
+   Extended    : Boolean := False;
+   --  The last byte was the E0 prefix.
 
    ----------------
    -- Handle_Key --
    ----------------
 
    procedure Handle_Key
-     (Code    : Rose.Words.Word;
-      Pressed : Boolean;
-      Result  : out System.Storage_Elements.Storage_Array;
-      Last    : out System.Storage_Elements.Storage_Count)
+     (Scan_Code : Rose.Words.Word_8;
+      Result    : out System.Storage_Elements.Storage_Array;
+      Last      : out System.Storage_Elements.Storage_Count)
    is
+      use type Rose.Words.Word_8;
       use type System.Storage_Elements.Storage_Offset;
-      Key : Key_Entry renames Key_Code (Rose.Words.Word_8 (Code));
+
+      Code    : constant Rose.Words.Word_8 := Scan_Code and 16#7F#;
+      Pressed : constant Boolean := Scan_Code < 16#80#;
+      Key     : constant Key_Entry :=
+                  (if Extended
+                   then Extended_Key_Code (Code)
+                   else Key_Code (Code));
 
       procedure Copy (Sequence : String);
 
@@ -141,8 +182,42 @@ package body Keyboard.Codes is
          Copy ((1 => '~'));
       end Escape_Sequence;
 
+      function Key_Value (Modifier : Key_Modifier) return Character;
+      --  The character the key gives with Modifier held, or NUL if it
+      --  gives none.
+
+      ---------------
+      -- Key_Value --
+      ---------------
+
+      function Key_Value (Modifier : Key_Modifier) return Character is
+         Base  : constant Character := Key.Key_Value (None);
+         Value : constant Character := Key.Key_Value (Modifier);
+      begin
+         if Value /= NUL then
+            return Value;
+         elsif Modifier = Shift then
+            return Base;
+         elsif Modifier = Control and then Base in 'a' .. 'z' then
+
+            --  Ctrl with a letter gives the letter's position modulo 32,
+            --  so Ctrl-D is EOT (ADR 0011, section 1).
+
+            return Character'Val (Character'Pos (Base) mod 32);
+         else
+            return NUL;
+         end if;
+      end Key_Value;
+
    begin
       Last := Result'First - 1;
+
+      if Scan_Code = 16#E0# then
+         Extended := True;
+         return;
+      end if;
+
+      Extended := False;
 
       if not Pressed then
          if Key.Modifier /= None then
@@ -163,7 +238,11 @@ package body Keyboard.Codes is
          begin
             Escape_Sequence (Sequence);
          end;
-      elsif Key.Key_Value (None) /= Character'Val (0) then
+      elsif Key.Cursor_Key /= NUL then
+         Copy ((ESC, '[', Key.Cursor_Key));
+      elsif Key.Edit_Key /= 0 then
+         Escape_Sequence ((1 => Character'Val (Key.Edit_Key + 48)));
+      elsif Key.Key_Value (None) /= NUL then
          declare
             Modifier : Key_Modifier := None;
          begin
@@ -173,7 +252,14 @@ package body Keyboard.Codes is
                   exit;
                end if;
             end loop;
-            Copy ((1 => Key.Key_Value (Modifier)));
+
+            declare
+               Value : constant Character := Key_Value (Modifier);
+            begin
+               if Value /= NUL then
+                  Copy ((1 => Value));
+               end if;
+            end;
          end;
       end if;
    end Handle_Key;

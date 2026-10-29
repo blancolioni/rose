@@ -4,8 +4,6 @@ with Rose.Invocation;
 with Rose.System_Calls.Server;
 with Rose.Words;
 
-with Rose.Console_IO;
-
 with Rose.Interfaces.Interrupt_Handler;
 with Rose.Interfaces.Event_Listener.Client;
 with Rose.Interfaces.Event_Source;
@@ -139,23 +137,18 @@ package body Keyboard.Server is
                while Key_Code_Available loop
                   declare
                      use System.Storage_Elements;
-                     Code  : constant Rose.Words.Word_8 :=
-                               Read_Key_Code;
                      Result : Storage_Array (1 .. 10);
                      Last   : Storage_Count;
                   begin
-                     Keyboard.Codes.Handle_Key
-                       (Code    => Word (Code and 16#7F#),
-                        Pressed => Code < 16#80#,
-                        Result  => Result,
-                        Last    => Last);
 
-                     if Last > 0 then
-                        for Code of Result (1 .. Last) loop
-                           Rose.Console_IO.Put (Character'Val (Code));
-                        end loop;
-                        Rose.Console_IO.Flush;
-                     end if;
+                     --  The keyboard only produces characters. The line
+                     --  discipline, event-input-stream, echoes them
+                     --  (#397).
+
+                     Keyboard.Codes.Handle_Key
+                       (Scan_Code => Read_Key_Code,
+                        Result    => Result,
+                        Last      => Last);
 
                      if Have_Listener then
                         for Code of Result (1 .. Last) loop
