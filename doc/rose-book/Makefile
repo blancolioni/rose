@@ -4,8 +4,11 @@ LAYOUT_CHECK := --check \
 	--ada-arg=-m32 --ada-arg=--RTS=$(ROSE)/src/rts/build/i686-rose \
 	-I $(ROSE)/src/base -I $(ROSE)/src/library/capabilities
 
+PROCESS_DIAGRAM := python3 $(ROSE)/scripts/process-diagram.py -o build/layouts
+
 layouts:
 	$(BITLAYOUT) layouts/*.yaml
+	$(PROCESS_DIAGRAM) diagrams/processes.yaml
 
 check-layouts:
 	$(BITLAYOUT) $(LAYOUT_CHECK) layouts/*.yaml

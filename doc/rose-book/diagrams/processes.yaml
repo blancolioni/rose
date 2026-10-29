@@ -1,0 +1,110 @@
+# The processes running after each boot, and which of them call which
+# (see the Boot Sequence chapter).  scripts/process-diagram.py draws one
+# SVG for each variant, called processes-VARIANT.svg.
+#
+# A process has a centre ('at'), a kind (persistent, for the processes
+# in the checkpoint, or boot, for boot modules), a label and an optional
+# note under it.  A process or a call with 'when: install' belongs to the
+# install media's boot only: the other boot draws such a process faded,
+# and leaves out such a call.  'notes' gives a variant's own note.
+#
+# A call goes from the caller to the process it holds a cap for.  It is
+# drawn straight between the two boxes, or through the points in 'via'.
+
+size: [1100, 1000]
+
+variants:
+  install: Persistent processes, installed from the install media
+  restore: Persistent processes, restored from the checkpoint
+
+bands:
+  persistent: {top: 12, bottom: 387}
+  boot:
+    top: 405
+    bottom: 992
+    title: Boot modules, started by init on every boot
+
+processes:
+  # Persistent
+  petal:      {at: [520, 75], kind: persistent, label: petal, note: shell}
+  user:       {at: [250, 165], kind: persistent, label: user, note: fraser}
+  command:    {at: [660, 165], kind: persistent, label: command,
+               note: registry}
+  eis:        {at: [860, 165], kind: persistent, label: event-input-,
+               note: stream}
+  home:       {at: [250, 255], kind: persistent, label: directory,
+               note: home}
+  keyboard:   {at: [860, 255], kind: persistent, label: keyboard,
+               note: IRQ 33}
+  file:       {at: [90, 345], kind: persistent, label: file, note: .petalrc}
+  exec:       {at: [430, 345], kind: persistent, label: exec}
+  vga:        {at: [1000, 345], kind: persistent, label: vga-console,
+               note: VGA page}
+
+  # Boot modules, with their fixed object ids
+  checkpoint: {at: [250, 480], kind: boot, label: checkpoint, note: "15"}
+  elf:        {at: [550, 480], kind: boot, label: elf, note: "12"}
+  caps:       {at: [700, 480], kind: boot, label: caps, note: "14"}
+  restore:    {at: [850, 480], kind: boot, label: restore, note: "9"}
+  console:    {at: [1000, 480], kind: boot, label: console, note: "3",
+               notes: {restore: "3 · output discarded"}}
+  log:        {at: [250, 585], kind: boot, label: log, note: "16"}
+  store:      {at: [400, 585], kind: boot, label: store, note: "7"}
+  mem:        {at: [550, 585], kind: boot, label: mem, note: "4"}
+  isofs:      {at: [625, 680], kind: boot, label: isofs, note: "8",
+               when: install}
+  p_log:      {at: [250, 770], kind: boot, label: partition, note: 17 · log}
+  p_swap:     {at: [400, 770], kind: boot, label: partition,
+               note: 11 · swap}
+  scan:       {at: [550, 770], kind: boot, label: scan, note: "10"}
+  p_mbr:      {at: [700, 770], kind: boot, label: partition,
+               note: 18 · block 0, when: install}
+  p_bios:     {at: [850, 770], kind: boot, label: partition,
+               note: 19 · bios-boot, when: install}
+  p_boot:     {at: [1000, 770], kind: boot, label: partition,
+               note: 20 · rose-boot, when: install}
+  timer:      {at: [90, 865], kind: boot, label: timer, note: "13"}
+  ata:        {at: [625, 865], kind: boot, label: ata, note: "6",
+               width: 870}
+  pci:        {at: [625, 950], kind: boot, label: pci, note: "5"}
+
+calls:
+  - [petal, user]
+  - {from: petal, to: home, label: cwd}
+  - {from: petal, to: command, label: find}
+  - {from: petal, to: eis, label: stdin}
+  - {from: petal, to: vga, label: stdout, via: [[1000, 75]]}
+  - {from: petal, to: caps, label: cap sets}
+  - {from: user, to: home, label: home}
+  - {from: home, to: file, label: entry}
+  - {from: home, to: exec, label: launch}
+  - {from: command, to: exec, label: launch}
+  - {from: keyboard, to: eis, label: keys}
+  - {from: exec, to: vga, label: stdout}
+  - {from: exec, to: elf, label: launch}
+  - {from: exec, to: store, label: binaries}
+  - {from: console, to: vga, label: redirect, when: install}
+  - [elf, mem]
+  - [elf, store]
+  - [checkpoint, log]
+  - [checkpoint, store]
+  - [checkpoint, mem]
+  - {from: checkpoint, to: timer, via: [[90, 480]]}
+  - {from: restore, to: mem, via: [[810, 533], [570, 533]]}
+  - {from: restore, to: store, via: [[810, 533], [420, 533]]}
+  - {from: restore, to: log, via: [[810, 533], [270, 533]]}
+  - {from: restore, to: isofs, when: install}
+  - {from: restore, to: p_mbr, when: install}
+  - {from: restore, to: p_bios, when: install}
+  - {from: restore, to: p_boot, when: install}
+  - {from: store, to: p_swap, label: backing}
+  - {from: log, to: p_log, label: device}
+  - {from: scan, to: ata, label: hd0}
+  - {from: isofs, to: ata, label: hd1, when: install}
+  - [p_log, ata]
+  - [p_swap, ata]
+  - {from: p_mbr, to: ata, when: install}
+  - {from: p_bios, to: ata, when: install}
+  - {from: p_boot, to: ata, when: install}
+  - [ata, pci]
+  - [ata, timer]
