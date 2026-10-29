@@ -1,7 +1,14 @@
+with Ada.Containers.Bounded_Doubly_Linked_Lists;
+with Ada.Containers.Bounded_Hashed_Maps;
+with Ada.Containers.Bounded_Ordered_Maps;
+with Ada.Containers.Bounded_Vectors;
 with Ada.Containers.Doubly_Linked_Lists;
 with Ada.Containers.Generic_Array_Sort;
 with Ada.Containers.Generic_Constrained_Array_Sort;
 with Ada.Containers.Hashed_Maps;
+with Ada.Containers.Indefinite_Doubly_Linked_Lists;
+with Ada.Containers.Indefinite_Hashed_Maps;
+with Ada.Containers.Indefinite_Ordered_Maps;
 with Ada.Containers.Indefinite_Vectors;
 with Ada.Containers.Ordered_Maps;
 with Ada.Containers.Vectors;
@@ -56,6 +63,42 @@ package body Tests.Containers is
    package Integer_Maps is
      new Ada.Containers.Ordered_Maps (Integer, Integer);
 
+   package String_Lists is
+     new Ada.Containers.Indefinite_Doubly_Linked_Lists (String);
+
+   package String_Maps is
+     new Ada.Containers.Indefinite_Hashed_Maps
+       (Key_Type        => String,
+        Element_Type    => String,
+        Hash            => Ada.Strings.Hash,
+        Equivalent_Keys => "=");
+
+   package Ordered_String_Maps is
+     new Ada.Containers.Indefinite_Ordered_Maps (String, Integer);
+
+   function Integer_Hash
+     (Item : Integer)
+      return Ada.Containers.Hash_Type
+   is (Ada.Containers.Hash_Type'Mod (Item));
+
+   package Bounded_Lists is
+     new Ada.Containers.Bounded_Doubly_Linked_Lists (Integer);
+
+   package Bounded_Integer_Vectors is
+     new Ada.Containers.Bounded_Vectors (Positive, Integer);
+
+   package Bounded_Hashed_Integer_Maps is
+     new Ada.Containers.Bounded_Hashed_Maps
+       (Key_Type        => Integer,
+        Element_Type    => Integer,
+        Hash            => Integer_Hash,
+        Equivalent_Keys => "=");
+
+   package Bounded_Ordered_Integer_Maps is
+     new Ada.Containers.Bounded_Ordered_Maps (Integer, Integer);
+
+   Bounded_Capacity : constant := 4;
+
    subtype Element_Value is Natural range 0 .. 3;
 
    Finalized : array (Element_Value) of Boolean := (others => False);
@@ -80,6 +123,11 @@ package body Tests.Containers is
    --  True if Generic_Array_Sort and Generic_Constrained_Array_Sort sort
    --  an array.
 
+   function Bounded_Check return Boolean;
+   --  Check that each bounded form holds its capacity, and that one more
+   --  element raises Capacity_Error; report the first thing that is
+   --  wrong.
+
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
 
@@ -89,6 +137,10 @@ package body Tests.Containers is
       return Boolean;
    --  True if List holds Expected, in order. The list is walked forwards
    --  and backwards with cursors.
+
+   function Indefinite_Check return Boolean;
+   --  Check an indefinite list, hashed map and ordered map of strings of
+   --  different lengths, and report the first thing that is wrong.
 
    function Map_Check return Boolean;
    --  Check a hashed map and an ordered map, and report the first thing
@@ -118,6 +170,75 @@ package body Tests.Containers is
       Sort (Constrained);
       return Items = (1, 2, 2, 5, 8) and then Constrained = (-1, 0, 3, 4);
    end Array_Sort_Check;
+
+   -------------------
+   -- Bounded_Check --
+   -------------------
+
+   function Bounded_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      List    : Bounded_Lists.List (Capacity => Bounded_Capacity);
+      Vector  : Bounded_Integer_Vectors.Vector (Capacity => Bounded_Capacity);
+      Hashed  : Bounded_Hashed_Integer_Maps.Map
+        (Capacity => Bounded_Capacity,
+         Modulus  =>
+           Bounded_Hashed_Integer_Maps.Default_Modulus (Bounded_Capacity));
+      Ordered : Bounded_Ordered_Integer_Maps.Map
+        (Capacity => Bounded_Capacity);
+   begin
+      for Value in 1 .. Bounded_Capacity loop
+         List.Append (Value);
+         Vector.Append (Value);
+         Hashed.Insert (Value, Value);
+         Ordered.Insert (Value, Value);
+      end loop;
+
+      if List.Length /= Bounded_Capacity
+        or else Vector.Length /= Bounded_Capacity
+        or else Hashed.Length /= Bounded_Capacity
+        or else Ordered.Length /= Bounded_Capacity
+        or else List.Last_Element /= Bounded_Capacity
+        or else Vector.Last_Element /= Bounded_Capacity
+        or else Hashed.Element (Bounded_Capacity) /= Bounded_Capacity
+        or else Ordered.Last_Key /= Bounded_Capacity
+      then
+         return Fail ("bounded containers");
+      end if;
+
+      begin
+         List.Append (0);
+         return Fail ("bounded list over capacity");
+      exception
+         when Ada.Containers.Capacity_Error =>
+            null;
+      end;
+
+      begin
+         Vector.Append (0);
+         return Fail ("bounded vector over capacity");
+      exception
+         when Ada.Containers.Capacity_Error =>
+            null;
+      end;
+
+      begin
+         Hashed.Insert (0, 0);
+         return Fail ("bounded hashed map over capacity");
+      exception
+         when Ada.Containers.Capacity_Error =>
+            null;
+      end;
+
+      begin
+         Ordered.Insert (0, 0);
+         return Fail ("bounded ordered map over capacity");
+      exception
+         when Ada.Containers.Capacity_Error =>
+            null;
+      end;
+
+      return True;
+   end Bounded_Check;
 
    --------------------
    -- Container_Test --
@@ -198,6 +319,10 @@ package body Tests.Containers is
          return False;
       end if;
 
+      if not Indefinite_Check or else not Bounded_Check then
+         return False;
+      end if;
+
       return True;
    end Container_Test;
 
@@ -246,6 +371,49 @@ package body Tests.Containers is
 
       return not Has_Element (Position);
    end Has_Elements;
+
+   ----------------------
+   -- Indefinite_Check --
+   ----------------------
+
+   function Indefinite_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      Words   : String_Lists.List;
+      Names   : String_Maps.Map;
+      Lengths : Ordered_String_Maps.Map;
+   begin
+      Words.Append ("a");
+      Words.Append ("bcd");
+      Words.Prepend ("efghij");
+      if Words.Length /= 3
+        or else Words.First_Element /= "efghij"
+        or else Words.Last_Element /= "bcd"
+      then
+         return Fail ("indefinite list");
+      end if;
+
+      Names.Insert ("one", "1");
+      Names.Insert ("three", "333");
+      Names.Replace ("one", "uno");
+      if Names.Element ("three") /= "333"
+        or else Names.Element ("one") /= "uno"
+      then
+         return Fail ("indefinite hashed map");
+      end if;
+
+      for Word of Words loop
+         Lengths.Insert (Word, Word'Length);
+      end loop;
+      Lengths.Insert ("pear", 4);
+      if Lengths.First_Key /= "a"
+        or else Lengths.Last_Key /= "pear"
+        or else Lengths.Element ("efghij") /= 6
+      then
+         return Fail ("indefinite ordered map");
+      end if;
+
+      return True;
+   end Indefinite_Check;
 
    ---------------
    -- Map_Check --

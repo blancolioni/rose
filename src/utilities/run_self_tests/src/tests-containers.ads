@@ -9,5 +9,8 @@ package Tests.Containers is
    --  capacity, an indefinite vector of strings, and the array sorts.
    --  Maps (#442): a hashed map with string keys that grows well past
    --  its first capacity, and an ordered map iterated in key order.
+   --  Indefinite and bounded forms (#443): a list and maps of strings
+   --  of different lengths, and each bounded form filled to its
+   --  capacity.
 
 end Tests.Containers;
