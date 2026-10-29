@@ -128,7 +128,8 @@ package body Tests.Directories is
 
       --  The subdirectory is a directory. Asking for it as a file would
       --  return a null cap, and a generated client opens what it is
-      --  given, which invokes cap zero (#239), so that is not tested.
+      --  given, which invokes cap zero and fails with Invalid_Capability
+      --  (#239), so that is not tested.
 
       if Directory_Entry_Kind (Top, 2)
         /= Rose.Interfaces.Directory.Directory
