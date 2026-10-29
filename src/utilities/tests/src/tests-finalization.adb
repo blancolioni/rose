@@ -131,7 +131,29 @@ package body Tests.Finalization is
          end if;
       end;
 
-      return Counts_Are (2, 0, 2);
+      if not Counts_Are (2, 0, 2) then
+         return False;
+      end if;
+
+      --  An object in a block that an exception leaves is finalized on
+      --  the way out (#170).
+
+      Reset;
+      begin
+         declare
+            A : Counted;
+         begin
+            if A.Value = 1 then
+               raise Program_Error;
+            end if;
+         end;
+         return False;
+      exception
+         when Program_Error =>
+            null;
+      end;
+
+      return Counts_Are (1, 0, 1);
    end Finalization_Test;
 
    -----------

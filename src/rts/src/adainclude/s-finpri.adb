@@ -29,28 +29,36 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
+with Ada.Exceptions;           use Ada.Exceptions;
 with Ada.Unchecked_Conversion;
+
+with System.Soft_Links; use System.Soft_Links;
 
 package body System.Finalization_Primitives is
 
+   procedure Raise_From_Controlled_Operation (X : Exception_Occurrence);
+   pragma Import (Ada, Raise_From_Controlled_Operation,
+                              "__gnat_raise_from_controlled_operation");
+
    function To_Collection_Node_Ptr is
      new Ada.Unchecked_Conversion (Address, Collection_Node_Ptr);
-
-   function To_Collection_Ptr is
-     new Ada.Unchecked_Conversion (Address, Finalization_Collection_Ptr);
-
-   --  The run-time system is compiled with No_Unchecked_Access, so the
-   --  references to a collection and its head are made from addresses.
-
-   function Head_Of
-     (Collection : Finalization_Collection) return Collection_Node_Ptr
-   is (To_Collection_Node_Ptr (Collection.Head'Address));
-   --  The dummy head of Collection
 
    procedure Detach_Node_From_Collection (Node : not null Collection_Node_Ptr);
    --  Remove a collection node from its associated finalization collection.
    --  Calls to the procedure with a Node that has already been detached have
    --  no effects.
+
+   procedure Lock_Collection (Collection : in out Finalization_Collection);
+   --  Lock the finalization collection. Upon return, the caller owns the lock
+   --  to the collection and no other call with the same actual parameter will
+   --  return until a corresponding call to Unlock_Collection has been made by
+   --  the caller. This means that it is not possible to call Lock_Collection
+   --  more than once on a collection without a call to Unlock_Collection in
+   --  between.
+
+   procedure Unlock_Collection (Collection : in out Finalization_Collection);
+   --  Unlock the finalization collection, i.e. relinquish ownership of the
+   --  lock to the collection.
 
    ---------------------------------
    -- Attach_Object_To_Collection --
@@ -65,20 +73,44 @@ package body System.Finalization_Primitives is
                To_Collection_Node_Ptr (Object_Address - Header_Size);
 
    begin
+      Lock_Collection (Collection);
+
       --  Do not allow the attachment of controlled objects while the
       --  associated collection is being finalized.
+
+      --  Synchronization:
+      --    Read  - attachment, finalization
+      --    Write - finalization
 
       if Collection.Finalization_Started then
          raise Program_Error with "attachment after finalization started";
       end if;
 
-      Node.Enclosing_Collection := To_Collection_Ptr (Collection'Address);
+      --  Check whether primitive Finalize_Address is available. If it is
+      --  not, then either the expansion of the designated type failed or
+      --  the expansion of the allocator failed. This is a compiler bug.
+
+      pragma Assert
+        (Finalize_Address /= null, "primitive Finalize_Address not available");
+
+      Node.Enclosing_Collection := Collection'Unrestricted_Access;
       Node.Finalize_Address     := Finalize_Address;
-      Node.Prev                 := Head_Of (Collection);
+      Node.Prev                 := Collection.Head'Unchecked_Access;
       Node.Next                 := Collection.Head.Next;
 
       Collection.Head.Next.Prev := Node;
       Collection.Head.Next      := Node;
+
+      Unlock_Collection (Collection);
+
+   exception
+      when others =>
+
+         --  Unlock the collection in case the attachment failed and reraise
+         --  the exception.
+
+         Unlock_Collection (Collection);
+         raise;
    end Attach_Object_To_Collection;
 
    -----------------------------
@@ -106,6 +138,9 @@ package body System.Finalization_Primitives is
       Node             : in out Master_Node)
    is
    begin
+      pragma Assert (Node.Object_Address = Null_Address
+        and then Node.Finalize_Address = null);
+
       Node.Object_Address   := Object_Address;
       Node.Finalize_Address := Finalize_Address;
    end Attach_Object_To_Node;
@@ -150,7 +185,11 @@ package body System.Finalization_Primitives is
                To_Collection_Node_Ptr (Object_Address - Header_Size);
 
    begin
+      Lock_Collection (Node.Enclosing_Collection.all);
+
       Detach_Node_From_Collection (Node);
+
+      Unlock_Collection (Node.Enclosing_Collection.all);
    end Detach_Object_From_Collection;
 
    --------------
@@ -158,8 +197,10 @@ package body System.Finalization_Primitives is
    --------------
 
    procedure Finalize (Collection : in out Finalization_Collection) is
-      Curr_Ptr : Collection_Node_Ptr;
-      Obj_Addr : Address;
+      Curr_Ptr                      : Collection_Node_Ptr;
+      Exc_Occur                     : Exception_Occurrence;
+      Finalization_Exception_Raised : Boolean := False;
+      Obj_Addr                      : Address;
 
       function Is_Empty_List (L : not null Collection_Node_Ptr) return Boolean;
       --  Determine whether a list contains only one element, the dummy head
@@ -175,13 +216,29 @@ package body System.Finalization_Primitives is
       end Is_Empty_List;
 
    begin
+      Lock_Collection (Collection);
+
+      --  Synchronization:
+      --    Read  - attachment, finalization
+      --    Write - finalization
+
       if Collection.Finalization_Started then
+         Unlock_Collection (Collection);
 
          --  Double finalization may occur during the handling of stand-alone
          --  libraries or the finalization of a pool with subpools.
 
          return;
       end if;
+
+      --  Lock the collection to prevent any attachment while the objects are
+      --  being finalized. The collection remains locked because either it is
+      --  explicitly deallocated or the associated access type is about to go
+      --  out of scope.
+
+      --  Synchronization:
+      --    Read  - attachment, finalization
+      --    Write - finalization
 
       Collection.Finalization_Started := True;
 
@@ -191,8 +248,11 @@ package body System.Finalization_Primitives is
       --  Instead, we empty the list by repeatedly finalizing the first
       --  element (after the dummy head) and detaching it from the list.
 
-      while not Is_Empty_List (Head_Of (Collection)) loop
+      while not Is_Empty_List (Collection.Head'Unchecked_Access) loop
          Curr_Ptr := Collection.Head.Next;
+
+         --  Synchronization:
+         --    Write - attachment, detachment, finalization
 
          Detach_Node_From_Collection (Curr_Ptr);
 
@@ -201,8 +261,33 @@ package body System.Finalization_Primitives is
 
          Obj_Addr := Curr_Ptr.all'Address + Header_Size;
 
-         Curr_Ptr.Finalize_Address (Obj_Addr);
+         --  Temporarily release the lock because the call to Finalize_Address
+         --  may ultimately invoke Detach_Object_From_Collection.
+
+         Unlock_Collection (Collection);
+
+         begin
+            Curr_Ptr.Finalize_Address (Obj_Addr);
+         exception
+            when Fin_Occur : others =>
+               if not Finalization_Exception_Raised then
+                  Finalization_Exception_Raised := True;
+                  Save_Occurrence (Exc_Occur, Fin_Occur);
+               end if;
+         end;
+
+         --  Retake the lock for the next iteration
+
+         Lock_Collection (Collection);
       end loop;
+
+      Unlock_Collection (Collection);
+
+      --  If one of the finalization actions raised an exception, reraise it
+
+      if Finalization_Exception_Raised then
+         Raise_From_Controlled_Operation (Exc_Occur);
+      end if;
    end Finalize;
 
    ---------------------
@@ -210,21 +295,64 @@ package body System.Finalization_Primitives is
    ---------------------
 
    procedure Finalize_Master (Master : in out Finalization_Master) is
-      Node : Master_Node_Ptr;
+      Exc_Occur                     : Exception_Occurrence;
+      Finalization_Exception_Raised : Boolean := False;
+      Node                          : Master_Node_Ptr;
 
    begin
       Node := Master.Head;
 
-      --  Without exception handlers, the finalization procedures are called
-      --  without protection, whether or not Master.Exceptions_OK.
+      --  If exceptions are enabled, we catch them locally and reraise one
+      --  once all the finalization actions have been completed.
 
-      while Node /= null loop
-         Finalize_Object (Node.all, Node.Finalize_Address);
+      if Master.Exceptions_OK then
+         while Node /= null loop
+            begin
+               Finalize_Object (Node.all, Node.Finalize_Address);
 
-         Node := Node.Next;
-      end loop;
+            exception
+               when Exc : others =>
+                  if not Finalization_Exception_Raised then
+                     Finalization_Exception_Raised := True;
+
+                     if Master.Library_Level then
+                        if Master.Extra_Info then
+                           Save_Library_Occurrence (Exc'Unrestricted_Access);
+                        else
+                           Save_Library_Occurrence (null);
+                        end if;
+
+                     elsif Master.Extra_Info then
+                        Save_Occurrence (Exc_Occur, Exc);
+                     end if;
+                  end if;
+            end;
+
+            Node := Node.Next;
+         end loop;
+
+      --  Otherwise we call finalization procedures without protection
+
+      else
+         while Node /= null loop
+            Finalize_Object (Node.all, Node.Finalize_Address);
+
+            Node := Node.Next;
+         end loop;
+      end if;
 
       Master.Head := null;
+
+      --  If one of the finalization actions raised an exception, and we are
+      --  not at library level, then reraise the exception.
+
+      if Finalization_Exception_Raised and then not Master.Library_Level then
+         if Master.Extra_Info then
+            Raise_From_Controlled_Operation (Exc_Occur);
+         else
+            raise Program_Error with "finalize/adjust raised exception";
+         end if;
+      end if;
    end Finalize_Master;
 
    ---------------------
@@ -241,6 +369,7 @@ package body System.Finalization_Primitives is
       if Addr /= Null_Address then
          Node.Object_Address := Null_Address;
 
+         pragma Assert (Node.Finalize_Address = Finalize_Address);
          Finalize_Address (Addr);
       end if;
    end Finalize_Object;
@@ -253,11 +382,22 @@ package body System.Finalization_Primitives is
    begin
       --  The dummy head must point to itself in both directions
 
-      Collection.Head.Prev := Head_Of (Collection);
-      Collection.Head.Next := Head_Of (Collection);
+      Collection.Head.Prev := Collection.Head'Unchecked_Access;
+      Collection.Head.Next := Collection.Head'Unchecked_Access;
+
+      Initialize_RTS_Lock (Collection.Lock'Address);
 
       Collection.Finalization_Started := False;
    end Initialize;
+
+   ---------------------
+   -- Lock_Collection --
+   ---------------------
+
+   procedure Lock_Collection (Collection : in out Finalization_Collection) is
+   begin
+      Acquire_RTS_Lock (Collection.Lock'Address);
+   end Lock_Collection;
 
    -------------------------------------
    -- Suppress_Object_Finalize_At_End --
@@ -267,5 +407,14 @@ package body System.Finalization_Primitives is
    begin
       Node.Object_Address := Null_Address;
    end Suppress_Object_Finalize_At_End;
+
+   -----------------------
+   -- Unlock_Collection --
+   -----------------------
+
+   procedure Unlock_Collection (Collection : in out Finalization_Collection) is
+   begin
+      Release_RTS_Lock (Collection.Lock'Address);
+   end Unlock_Collection;
 
 end System.Finalization_Primitives;

@@ -319,6 +319,15 @@ continue:
     cmp     $0, %ebp
     jnz     idle                               # zero indicates idle state
     mov     current_process_ptr, %ebp          # may or may not be the same process
+
+    cmp     fpu_owner_ptr, %ebp                # does it own the FPU and SSE state?
+    je      1f
+    mov     %cr0, %eax                         # if not, set TS, so that its first FPU or
+    or      $0x08, %eax                        # SSE instruction switches the state
+    mov     %eax, %cr0
+    jmp     2f
+1:  clts
+2:
     mov Process_Directory_Page(%ebp), %eax     # copy scheduled process page directory
     mov %eax, %cr3                             # to global page directory register
 

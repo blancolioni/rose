@@ -376,6 +376,10 @@ package Rose.Kernel.Processes is
    procedure Enter_Checkpoint;
    procedure Leave_Checkpoint;
 
+   procedure Switch_FPU_State;
+   --  Device_Not_Available: save the FPU owner's state, and load the
+   --  current process's, or a clean state if it has none (#170).
+
 private
 
    type Process_Flag is
@@ -562,6 +566,10 @@ private
          --  The command endpoint of a command (ADR 0002), or zero.
          Faults_At_Create  : Natural := 0;
          --  The page fault count when the process was created.
+         FPU_State         : Rose.Kernel.Arch.FPU_State;
+         FPU_Valid         : Boolean := False;
+         --  The process's FPU and SSE registers, valid once it has used
+         --  them and another process has used them since (#170).
       end record;
 
    type Kernel_Process_Table is
@@ -596,6 +604,12 @@ private
 
    Interrupted_Resume : Words.Word_32 := 0;
    pragma Export (C, Interrupted_Resume, "interrupt_resume");
+
+   FPU_Owner : Kernel_Process_Access := null;
+   pragma Export (C, FPU_Owner, "fpu_owner_ptr");
+   --  The process whose FPU and SSE state is in the registers. Returning
+   --  to any other process sets CR0.TS (mp.s), so that its first FPU or
+   --  SSE instruction calls Switch_FPU_State.
 
    Process_Invocation_Record : aliased Rose.Invocation.Invocation_Record;
    pragma Export (C, Process_Invocation_Record, "invocation_record");

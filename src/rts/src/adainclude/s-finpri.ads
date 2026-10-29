@@ -29,12 +29,7 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
---  The Rose version: the userland run-time system has no tasking, so a
---  collection has no lock, and no exception handlers (#359), so an
---  exception raised by a finalization action is not caught here: it goes
---  to the last chance handler. Finalization after an exception has passed
---  through a scope comes with exception propagation (#170).
-
+with System.OS_Locks;
 with System.Storage_Elements;
 
 --  This package encapsulates the types and operations used by the compiler
@@ -145,7 +140,6 @@ package System.Finalization_Primitives with Preelaborate is
 
    type Finalization_Collection_Ptr is access all Finalization_Collection;
    for Finalization_Collection_Ptr'Storage_Size use 0;
-   pragma No_Strict_Aliasing (Finalization_Collection_Ptr);
    --  A reference to a collection. Since this type may not be used to
    --  allocate objects, its storage size is zero.
 
@@ -252,6 +246,9 @@ private
    type Finalization_Collection is limited record
       Head : aliased Collection_Node;
       --  The head of the circular doubly-linked list of collection nodes
+
+      Lock : aliased System.OS_Locks.RTS_Lock;
+      --  A lock to synchronize concurrent accesses to the collection
 
       Finalization_Started : Boolean;
       --  A flag used to detect allocations which occur during the finalization

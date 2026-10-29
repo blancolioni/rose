@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2018, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -109,15 +109,6 @@ package body Stream_Attributes is
          Raise_Exception
            (Program_Error'Identity,
             "bad exception occurrence in stream input");
-
-         --  The following junk raise of Program_Error is required because
-         --  this is a No_Return procedure, and unfortunately Raise_Exception
-         --  can return (this particular call can't, but the back end is not
-         --  clever enough to know that)
-
-         pragma Warnings (Off);
-         raise Program_Error;
-         pragma Warnings (On);
       end Bad_EO;
 
       procedure Next_String is
@@ -257,6 +248,11 @@ package body Stream_Attributes is
             end;
          end loop;
       end if;
+
+      --  The occurrence we're crafting is not currently being
+      --  propagated.
+
+      X.Machine_Occurrence := System.Null_Address;
 
       --  If an exception was converted to a string, it must have
       --  already been raised, so flag it accordingly and we are done.
