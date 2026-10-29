@@ -1,16 +1,25 @@
 with Ada.Containers.Bounded_Doubly_Linked_Lists;
+with Ada.Containers.Bounded_Holders;
 with Ada.Containers.Bounded_Hashed_Maps;
 with Ada.Containers.Bounded_Ordered_Maps;
+with Ada.Containers.Bounded_Ordered_Sets;
 with Ada.Containers.Bounded_Vectors;
 with Ada.Containers.Doubly_Linked_Lists;
 with Ada.Containers.Generic_Array_Sort;
 with Ada.Containers.Generic_Constrained_Array_Sort;
 with Ada.Containers.Hashed_Maps;
+with Ada.Containers.Hashed_Sets;
 with Ada.Containers.Indefinite_Doubly_Linked_Lists;
 with Ada.Containers.Indefinite_Hashed_Maps;
+with Ada.Containers.Indefinite_Holders;
+with Ada.Containers.Indefinite_Multiway_Trees;
 with Ada.Containers.Indefinite_Ordered_Maps;
+with Ada.Containers.Indefinite_Ordered_Sets;
 with Ada.Containers.Indefinite_Vectors;
+with Ada.Containers.Multiway_Trees;
 with Ada.Containers.Ordered_Maps;
+with Ada.Containers.Ordered_Multisets;
+with Ada.Containers.Ordered_Sets;
 with Ada.Containers.Vectors;
 with Ada.Finalization;
 with Ada.Strings.Hash;
@@ -99,6 +108,54 @@ package body Tests.Containers is
 
    Bounded_Capacity : constant := 4;
 
+   package Integer_Sets is new Ada.Containers.Ordered_Sets (Integer);
+
+   package Hashed_Integer_Sets is
+     new Ada.Containers.Hashed_Sets
+       (Element_Type        => Integer,
+        Hash                => Integer_Hash,
+        Equivalent_Elements => "=");
+
+   package Integer_Multisets is
+     new Ada.Containers.Ordered_Multisets (Integer);
+
+   package String_Sets is
+     new Ada.Containers.Indefinite_Ordered_Sets (String);
+
+   package Bounded_Integer_Sets is
+     new Ada.Containers.Bounded_Ordered_Sets (Integer);
+
+   package String_Holders is
+     new Ada.Containers.Indefinite_Holders (String);
+
+   package Shapes is
+
+      type Shape is tagged
+         record
+            Size : Natural := 0;
+         end record;
+
+      type Circle is new Shape with
+         record
+            Radius : Natural := 0;
+         end record;
+
+   end Shapes;
+   --  A bounded holder holds a class-wide object; it cannot hold an
+   --  unconstrained array such as String.
+
+   package Small_Shape_Holders is
+     new Ada.Containers.Bounded_Holders
+       (Element_Type                 => Shapes.Shape'Class,
+        Max_Size_In_Storage_Elements => 64,
+        "="                          => Shapes."=");
+
+   package Integer_Trees is
+     new Ada.Containers.Multiway_Trees (Integer);
+
+   package String_Trees is
+     new Ada.Containers.Indefinite_Multiway_Trees (String);
+
    subtype Element_Value is Natural range 0 .. 3;
 
    Finalized : array (Element_Value) of Boolean := (others => False);
@@ -138,6 +195,10 @@ package body Tests.Containers is
    --  True if List holds Expected, in order. The list is walked forwards
    --  and backwards with cursors.
 
+   function Holder_Check return Boolean;
+   --  True if an indefinite and a bounded holder hold, replace and clear
+   --  their elements.
+
    function Indefinite_Check return Boolean;
    --  Check an indefinite list, hashed map and ordered map of strings of
    --  different lengths, and report the first thing that is wrong.
@@ -146,6 +207,10 @@ package body Tests.Containers is
    --  Check a hashed map and an ordered map, and report the first thing
    --  that is wrong.
 
+   function Set_Check return Boolean;
+   --  Check set operations, a multiset, an indefinite set and a bounded
+   --  set, and report the first thing that is wrong.
+
    function Tamper_Check return Boolean;
    --  True if appending to a list while "for ... of" iterates over it
    --  raises Program_Error.
@@ -153,6 +218,10 @@ package body Tests.Containers is
    function Tracked_Check return Boolean;
    --  True if the controlled elements of a list are finalized when the
    --  list is.
+
+   function Tree_Check return Boolean;
+   --  Check a multiway tree, built and walked depth first, and an
+   --  indefinite one, and report the first thing that is wrong.
 
    function Vector_Check return Boolean;
    --  Check a vector of integers and a vector of strings, and report
@@ -323,6 +392,14 @@ package body Tests.Containers is
          return False;
       end if;
 
+      if not Set_Check or else not Tree_Check then
+         return False;
+      end if;
+
+      if not Holder_Check then
+         return Fail ("holders");
+      end if;
+
       return True;
    end Container_Test;
 
@@ -371,6 +448,35 @@ package body Tests.Containers is
 
       return not Has_Element (Position);
    end Has_Elements;
+
+   ------------------
+   -- Holder_Check --
+   ------------------
+
+   function Holder_Check return Boolean is
+      package Small renames Small_Shape_Holders;
+      Holder : String_Holders.Holder := String_Holders.To_Holder ("abc");
+      Shape  : Small.Holder := Small.To_Holder (Shapes.Shape'(Size => 1));
+   begin
+      if Holder.Element /= "abc"
+        or else Small.Get (Shape) in Shapes.Circle
+        or else Small.Get (Shape).Size /= 1
+      then
+         return False;
+      end if;
+
+      Holder.Replace_Element ("defgh");
+      Small.Set (Shape, Shapes.Circle'(Size => 2, Radius => 3));
+      if Holder.Element /= "defgh"
+        or else Small.Get (Shape) not in Shapes.Circle
+        or else Shapes.Circle (Small.Get (Shape)).Radius /= 3
+      then
+         return False;
+      end if;
+
+      Holder.Clear;
+      return Holder.Is_Empty;
+   end Holder_Check;
 
    ----------------------
    -- Indefinite_Check --
@@ -515,6 +621,82 @@ package body Tests.Containers is
       return True;
    end Map_Check;
 
+   ---------------
+   -- Set_Check --
+   ---------------
+
+   function Set_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      use type Integer_Sets.Set;
+      A, B     : Integer_Sets.Set;
+      Hashed   : Hashed_Integer_Sets.Set;
+      Multiset : Integer_Multisets.Set;
+      Words    : String_Sets.Set;
+      Bounded  : Bounded_Integer_Sets.Set (Capacity => Bounded_Capacity);
+      Sum      : Integer := 0;
+      Previous : Integer := Integer'First;
+   begin
+      for Value in 1 .. 6 loop
+         A.Insert (Value);
+         B.Insert (Value + 3);
+      end loop;
+
+      if Integer_Sets.Union (A, B).Length /= 9
+        or else Integer_Sets.Difference (A, B).Length /= 3
+        or else Integer_Sets.Symmetric_Difference (A, B).Length /= 6
+        or else not Integer_Sets.Is_Subset
+                      (Integer_Sets.Intersection (A, B), A)
+        or else (A and B) /= Integer_Sets.Intersection (A, B)
+      then
+         return Fail ("set operations");
+      end if;
+
+      for Item of Integer_Sets.Intersection (A, B) loop
+         if Item <= Previous then
+            return Fail ("ordered set order");
+         end if;
+         Previous := Item;
+         Sum := Sum + Item;
+      end loop;
+      if Sum /= 15 then
+         return Fail ("ordered set iteration");
+      end if;
+
+      for Value of Integer_Array'(3, 1, 3, 2, 1) loop
+         Hashed.Include (Value);
+         Multiset.Insert (Value);
+      end loop;
+      if Hashed.Length /= 3
+        or else not Hashed.Contains (2)
+        or else Multiset.Length /= 5
+        or else Multiset.First_Element /= 1
+        or else Multiset.Last_Element /= 3
+      then
+         return Fail ("hashed set or multiset");
+      end if;
+
+      Words.Insert ("pear");
+      Words.Insert ("fig");
+      Words.Insert ("banana");
+      if Words.First_Element /= "banana" or else Words.Last_Element /= "pear"
+      then
+         return Fail ("indefinite set");
+      end if;
+
+      for Value in 1 .. Bounded_Capacity loop
+         Bounded.Insert (Value);
+      end loop;
+      begin
+         Bounded.Insert (0);
+         return Fail ("bounded set over capacity");
+      exception
+         when Ada.Containers.Capacity_Error =>
+            null;
+      end;
+
+      return True;
+   end Set_Check;
+
    ------------------
    -- Tamper_Check --
    ------------------
@@ -574,6 +756,59 @@ package body Tests.Containers is
       end Finalize;
 
    end Tracked_Elements;
+
+   ----------------
+   -- Tree_Check --
+   ----------------
+
+   function Tree_Check return Boolean is
+      use type Ada.Containers.Count_Type;
+      use Integer_Trees;
+      Tree     : Integer_Trees.Tree;
+      First    : Integer_Trees.Cursor;
+      Names    : String_Trees.Tree;
+      Expected : constant Integer_Array := (1, 2, 3, 4);
+      Next     : Positive := Expected'First;
+   begin
+      --  Root
+      --  +- 1
+      --  |  +- 2
+      --  |  +- 3
+      --  +- 4
+
+      Tree.Append_Child (Tree.Root, 1);
+      First := First_Child (Tree.Root);
+      Tree.Append_Child (First, 2);
+      Tree.Append_Child (First, 3);
+      Tree.Append_Child (Tree.Root, 4);
+
+      if Tree.Node_Count /= 5
+        or else Child_Count (Tree.Root) /= 2
+        or else Child_Count (First) /= 2
+        or else not Is_Leaf (Last_Child (Tree.Root))
+        or else Element (Last_Child (First)) /= 3
+      then
+         return Fail ("multiway tree");
+      end if;
+
+      for Item of Tree loop
+         if Next > Expected'Last or else Item /= Expected (Next) then
+            return Fail ("multiway tree order");
+         end if;
+         Next := Next + 1;
+      end loop;
+
+      Names.Append_Child (Names.Root, "a");
+      Names.Append_Child (String_Trees.First_Child (Names.Root), "bcd");
+      if String_Trees.Element
+           (String_Trees.First_Child
+              (String_Trees.First_Child (Names.Root))) /= "bcd"
+      then
+         return Fail ("indefinite multiway tree");
+      end if;
+
+      return Next = Expected'Last + 1;
+   end Tree_Check;
 
    ------------------
    -- Vector_Check --

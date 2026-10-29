@@ -12,5 +12,9 @@ package Tests.Containers is
    --  Indefinite and bounded forms (#443): a list and maps of strings
    --  of different lengths, and each bounded form filled to its
    --  capacity.
+   --  Sets, holders and trees (#444): set operations on ordered and
+   --  hashed sets, an ordered multiset, an indefinite and a bounded set,
+   --  an indefinite holder of strings and a bounded holder of a
+   --  class-wide type, and a multiway tree walked depth first.
 
 end Tests.Containers;
