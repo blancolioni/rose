@@ -319,6 +319,18 @@ package body Rose.Kernel.Heap is
          return;
       end if;
 
+      --  A page table added past the boot mapping would be in the master
+      --  directory only, and processes created before it would fault when
+      --  the kernel touched the heap (#264).
+
+      if Virtual_Page_To_Address (Bound_Virtual_Page)
+        > Virtual_Address (Boot_Mapped_Bound) + Kernel_Virtual_Base
+      then
+         Kernel.Panic.Panic
+           ("kernel heap would pass the boot mapping: ",
+            Virtual_Page_To_Address (Bound_Virtual_Page));
+      end if;
+
       Next_Region := Next_Region + 1;
 
       Heap_Regions (Region_Index) :=
