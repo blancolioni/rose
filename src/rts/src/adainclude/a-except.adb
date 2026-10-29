@@ -6,7 +6,7 @@
 --                                                                          --
 --                                 B o d y                                  --
 --                                                                          --
---          Copyright (C) 1992-2018, Free Software Foundation, Inc.         --
+--          Copyright (C) 1992-2025, Free Software Foundation, Inc.         --
 --                                                                          --
 -- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
@@ -32,10 +32,6 @@
 pragma Style_Checks (All_Checks);
 --  No subprogram ordering check, due to logical grouping
 
---  pragma Polling (Off);
---  We must turn polling off for this unit, because otherwise we get
---  elaboration circularities with System.Exception_Tables.
-
 with System;                  use System;
 with System.Exceptions;       use System.Exceptions;
 with System.Exceptions_Debug; use System.Exceptions_Debug;
@@ -52,7 +48,6 @@ with System.Traceback.Symbolic;
 --  it will install symbolic tracebacks as the default decorator. Otherwise,
 --  symbolic tracebacks are not supported, and we fall back to hexadecimal
 --  addresses.
-with Rose.System_Calls.Client;
 pragma Warnings (On);
 
 package body Ada.Exceptions is
@@ -70,29 +65,32 @@ package body Ada.Exceptions is
    --  from C clients using the given external name, even though they are not
    --  technically visible in the Ada sense.
 
-   function Code_Address_For_AAA return System.Address;
-   function Code_Address_For_ZZZ return System.Address;
-   --  Return start and end of procedures in this package
+   procedure AAA;
+   procedure ZZZ;
+   --  Start and end of procedures in this package
    --
-   --  These procedures are used to provide exclusion bounds in
-   --  calls to Call_Chain at exception raise points from this unit. The
-   --  purpose is to arrange for the exception tracebacks not to include
-   --  frames from subprograms involved in the raise process, as these are
-   --  meaningless from the user's standpoint.
+   --  These procedures are used to provide exclusion bounds in calls to
+   --  Call_Chain at exception raise points from this unit. The purpose is
+   --  to arrange for the exception tracebacks not to include frames from
+   --  subprograms involved in the raise process, as these are meaningless
+   --  from the user's standpoint.
    --
    --  For these bounds to be meaningful, we need to ensure that the object
-   --  code for the subprograms involved in processing a raise is located
-   --  after the object code Code_Address_For_AAA and before the object
-   --  code Code_Address_For_ZZZ. This will indeed be the case as long as
-   --  the following rules are respected:
+   --  code for the subprograms involved in processing a raise is located after
+   --  the object code AAA and before the object code ZZZ. This will indeed be
+   --  the case as long as the following rules are respected:
    --
    --  1) The bodies of the subprograms involved in processing a raise
-   --     are located after the body of Code_Address_For_AAA and before the
-   --     body of Code_Address_For_ZZZ.
+   --     are located after the body of AAA and before the body of ZZZ.
    --
    --  2) No pragma Inline applies to any of these subprograms, as this
    --     could delay the corresponding assembly output until the end of
    --     the unit.
+   --
+   --  To obtain the address of AAA and ZZZ, use the Code_Address attribute
+   --  instead of the Address attribute as the latter will return the address
+   --  of a stub or descriptor on some platforms. This include IA-64,
+   --  PowerPC/AIX, big-endian PowerPC64 and HPUX.
 
    procedure Call_Chain (Excep : EOA);
    --  Store up to Max_Tracebacks in Excep, corresponding to the current
@@ -229,8 +227,9 @@ package body Ada.Exceptions is
       function Allocate_Occurrence return EOA;
       --  Allocate an exception occurrence (as well as the machine occurrence)
 
-      procedure Propagate_Exception (Excep : EOA);
+      procedure Propagate_Exception (Excep : Exception_Occurrence);
       pragma No_Return (Propagate_Exception);
+      pragma Machine_Attribute (Propagate_Exception, "expected_throw");
       --  This procedure propagates the exception represented by Excep
 
    end Exception_Propagation;
@@ -258,6 +257,8 @@ package body Ada.Exceptions is
 
    procedure Complete_And_Propagate_Occurrence (X : EOA);
    pragma No_Return (Complete_And_Propagate_Occurrence);
+   pragma Machine_Attribute (Complete_And_Propagate_Occurrence,
+                             "expected_throw");
    --  This is a simple wrapper to Complete_Occurrence and
    --  Exception_Propagation.Propagate_Exception.
 
@@ -282,10 +283,30 @@ package body Ada.Exceptions is
     (Ada, Raise_Exception_No_Defer,
      "ada__exceptions__raise_exception_no_defer");
    pragma No_Return (Raise_Exception_No_Defer);
+   pragma Machine_Attribute (Raise_Exception_No_Defer, "expected_throw");
    --  Similar to Raise_Exception, but with no abort deferral
+
+   procedure Raise_From_Signal_Handler
+     (E : Exception_Id;
+      M : System.Address);
+   pragma Export
+     (C, Raise_From_Signal_Handler, "__gnat_raise_from_signal_handler");
+   pragma No_Return (Raise_From_Signal_Handler);
+   pragma Machine_Attribute (Raise_From_Signal_Handler, "expected_throw");
+   --  This routine is used to raise an exception from a signal handler. The
+   --  signal handler has already stored the machine state (i.e. the state that
+   --  corresponds to the location at which the signal was raised). E is the
+   --  Exception_Id specifying what exception is being raised, and M is a
+   --  pointer to a null-terminated string which is the message to be raised.
+   --  Note that this routine never returns, so it is permissible to simply
+   --  jump to this routine, rather than call it. This may be appropriate for
+   --  systems where the right way to get out of signal handler is to alter the
+   --  PC value in the machine state or in some other way ask the operating
+   --  system to return here rather than to the original location.
 
    procedure Raise_With_Msg (E : Exception_Id);
    pragma No_Return (Raise_With_Msg);
+   pragma Machine_Attribute (Raise_With_Msg, "expected_throw");
    pragma Export (C, Raise_With_Msg, "__gnat_raise_with_msg");
    --  Raises an exception with given exception id value. A message
    --  is associated with the raise, and has already been stored in the
@@ -299,6 +320,7 @@ package body Ada.Exceptions is
       C : Integer := 0;
       M : System.Address := System.Null_Address);
    pragma No_Return (Raise_With_Location_And_Msg);
+   pragma Machine_Attribute (Raise_With_Location_And_Msg, "expected_throw");
    --  Raise an exception with given exception id value. A filename and line
    --  number is associated with the raise and is stored in the exception
    --  occurrence and in addition a column and a string message M may be
@@ -306,6 +328,7 @@ package body Ada.Exceptions is
 
    procedure Raise_Constraint_Error (File : System.Address; Line : Integer);
    pragma No_Return (Raise_Constraint_Error);
+   pragma Machine_Attribute (Raise_Constraint_Error, "expected_throw");
    pragma Export (C, Raise_Constraint_Error, "__gnat_raise_constraint_error");
    --  Raise constraint error with file:line information
 
@@ -315,12 +338,14 @@ package body Ada.Exceptions is
       Column : Integer;
       Msg    : System.Address);
    pragma No_Return (Raise_Constraint_Error_Msg);
+   pragma Machine_Attribute (Raise_Constraint_Error_Msg, "expected_throw");
    pragma Export
      (C, Raise_Constraint_Error_Msg, "__gnat_raise_constraint_error_msg");
    --  Raise constraint error with file:line:col + msg information
 
    procedure Raise_Program_Error (File : System.Address; Line : Integer);
    pragma No_Return (Raise_Program_Error);
+   pragma Machine_Attribute (Raise_Program_Error, "expected_throw");
    pragma Export (C, Raise_Program_Error, "__gnat_raise_program_error");
    --  Raise program error with file:line information
 
@@ -329,12 +354,14 @@ package body Ada.Exceptions is
       Line : Integer;
       Msg  : System.Address);
    pragma No_Return (Raise_Program_Error_Msg);
+   pragma Machine_Attribute (Raise_Program_Error_Msg, "expected_throw");
    pragma Export
      (C, Raise_Program_Error_Msg, "__gnat_raise_program_error_msg");
    --  Raise program error with file:line + msg information
 
    procedure Raise_Storage_Error (File : System.Address; Line : Integer);
    pragma No_Return (Raise_Storage_Error);
+   pragma Machine_Attribute (Raise_Storage_Error, "expected_throw");
    pragma Export (C, Raise_Storage_Error, "__gnat_raise_storage_error");
    --  Raise storage error with file:line information
 
@@ -343,6 +370,7 @@ package body Ada.Exceptions is
       Line : Integer;
       Msg  : System.Address);
    pragma No_Return (Raise_Storage_Error_Msg);
+   pragma Machine_Attribute (Raise_Storage_Error_Msg, "expected_throw");
    pragma Export
      (C, Raise_Storage_Error_Msg, "__gnat_raise_storage_error_msg");
    --  Raise storage error with file:line + reason msg information
@@ -370,6 +398,7 @@ package body Ada.Exceptions is
 
    procedure Reraise;
    pragma No_Return (Reraise);
+   pragma Machine_Attribute (Reraise, "expected_throw");
    pragma Export (C, Reraise, "__gnat_reraise");
    --  Reraises the exception referenced by the Current_Excep field
    --  of the TSD (all fields of this exception occurrence are set).
@@ -452,6 +481,8 @@ package body Ada.Exceptions is
    procedure Rcheck_PE_Overlaid_Controlled_Object
      (File : System.Address; Line : Integer);
    procedure Rcheck_PE_Potentially_Blocking_Operation
+     (File : System.Address; Line : Integer);
+   procedure Rcheck_PE_Raise_Check
      (File : System.Address; Line : Integer);
    procedure Rcheck_PE_Stubbed_Subprogram_Called
      (File : System.Address; Line : Integer);
@@ -545,6 +576,8 @@ package body Ada.Exceptions is
                   "__gnat_rcheck_PE_Overlaid_Controlled_Object");
    pragma Export (C, Rcheck_PE_Potentially_Blocking_Operation,
                   "__gnat_rcheck_PE_Potentially_Blocking_Operation");
+   pragma Export (C, Rcheck_PE_Raise_Check,
+                  "__gnat_rcheck_PE_Raise_Check");
    pragma Export (C, Rcheck_PE_Stream_Operation_Not_Allowed,
                   "__gnat_rcheck_PE_Stream_Operation_Not_Allowed");
    pragma Export (C, Rcheck_PE_Stubbed_Subprogram_Called,
@@ -603,6 +636,7 @@ package body Ada.Exceptions is
    pragma No_Return (Rcheck_PE_Non_Transportable_Actual);
    pragma No_Return (Rcheck_PE_Overlaid_Controlled_Object);
    pragma No_Return (Rcheck_PE_Potentially_Blocking_Operation);
+   pragma No_Return (Rcheck_PE_Raise_Check);
    pragma No_Return (Rcheck_PE_Stream_Operation_Not_Allowed);
    pragma No_Return (Rcheck_PE_Stubbed_Subprogram_Called);
    pragma No_Return (Rcheck_PE_Unchecked_Union_Restriction);
@@ -616,6 +650,188 @@ package body Ada.Exceptions is
    pragma No_Return (Rcheck_CE_Index_Check_Ext);
    pragma No_Return (Rcheck_CE_Invalid_Data_Ext);
    pragma No_Return (Rcheck_CE_Range_Check_Ext);
+
+   --  These procedures are all expected to raise an exception.
+   --  These attributes are not visible to callers; they are made
+   --  visible in trans.c:build_raise_check.
+
+   pragma Machine_Attribute (Rcheck_CE_Access_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Null_Access_Parameter,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Discriminant_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Divide_By_Zero,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Explicit_Raise,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Index_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Invalid_Data,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Length_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Null_Exception_Id,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Null_Not_Allowed,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Overflow_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Partition_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Range_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Tag_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Access_Before_Elaboration,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Accessibility_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Address_Of_Intrinsic,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Aliased_Parameters,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_All_Guards_Closed,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Bad_Predicated_Generic_Type,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Build_In_Place_Mismatch,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Current_Task_In_Entry_Body,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Duplicated_Entry_Address,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Explicit_Raise,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Implicit_Return,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Misaligned_Address_Value,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Missing_Return,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Non_Transportable_Actual,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Overlaid_Controlled_Object,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Potentially_Blocking_Operation,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Raise_Check,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Stream_Operation_Not_Allowed,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Stubbed_Subprogram_Called,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Unchecked_Union_Restriction,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_PE_Finalize_Raised_Exception,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_SE_Empty_Storage_Pool,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_SE_Explicit_Raise,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_SE_Infinite_Recursion,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_SE_Object_Too_Large,
+                             "expected_throw");
+
+   pragma Machine_Attribute (Rcheck_CE_Access_Check_Ext,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Index_Check_Ext,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Invalid_Data_Ext,
+                             "expected_throw");
+   pragma Machine_Attribute (Rcheck_CE_Range_Check_Ext,
+                             "expected_throw");
+
+   --  Make all of these procedures callable from strub contexts.
+   --  These attributes are not visible to callers; they are made
+   --  visible in trans.c:build_raise_check.
+
+   pragma Machine_Attribute (Rcheck_CE_Access_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Null_Access_Parameter,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Discriminant_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Divide_By_Zero,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Explicit_Raise,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Index_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Invalid_Data,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Length_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Null_Exception_Id,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Null_Not_Allowed,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Overflow_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Partition_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Range_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Tag_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Access_Before_Elaboration,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Accessibility_Check,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Address_Of_Intrinsic,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Aliased_Parameters,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_All_Guards_Closed,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Bad_Predicated_Generic_Type,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Build_In_Place_Mismatch,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Current_Task_In_Entry_Body,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Duplicated_Entry_Address,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Explicit_Raise,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Implicit_Return,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Misaligned_Address_Value,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Missing_Return,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Non_Transportable_Actual,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Overlaid_Controlled_Object,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Potentially_Blocking_Operation,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Stream_Operation_Not_Allowed,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Stubbed_Subprogram_Called,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Unchecked_Union_Restriction,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_PE_Finalize_Raised_Exception,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_SE_Empty_Storage_Pool,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_SE_Explicit_Raise,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_SE_Infinite_Recursion,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_SE_Object_Too_Large,
+                             "strub", "callable");
+
+   pragma Machine_Attribute (Rcheck_CE_Access_Check_Ext,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Index_Check_Ext,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Invalid_Data_Ext,
+                             "strub", "callable");
+   pragma Machine_Attribute (Rcheck_CE_Range_Check_Ext,
+                             "strub", "callable");
 
    ---------------------------------------------
    -- Reason Strings for Run-Time Check Calls --
@@ -668,40 +884,17 @@ package body Ada.Exceptions is
    Rmsg_35 : constant String := "object too large"                 & NUL;
    Rmsg_36 : constant String := "stream operation not allowed"     & NUL;
    Rmsg_37 : constant String := "build-in-place mismatch"          & NUL;
+   Rmsg_38 : constant String := "raise check failed"               & NUL;
 
-   -----------------------
-   -- Polling Interface --
-   -----------------------
-
-   type Unsigned is mod 2 ** 32;
-
-   Counter : Unsigned := 0;
-   pragma Warnings (Off, Counter);
-   --  This counter is provided for convenience. It can be used in Poll to
-   --  perform periodic but not systematic operations.
-
-   procedure Poll is separate;
-   --  The actual polling routine is separate, so that it can easily be
-   --  replaced with a target dependent version.
-
-   --------------------------
-   -- Code_Address_For_AAA --
-   --------------------------
+   ---------
+   -- AAA --
+   ---------
 
    --  This function gives us the start of the PC range for addresses within
    --  the exception unit itself. We hope that gigi/gcc keep all the procedures
    --  in their original order.
 
-   function Code_Address_For_AAA return System.Address is
-   begin
-      --  We are using a label instead of Code_Address_For_AAA'Address because
-      --  on some platforms the latter does not yield the address we want, but
-      --  the address of a stub or of a descriptor instead. This is the case at
-      --  least on PA-HPUX.
-
-      <<Start_Of_AAA>>
-      return Start_Of_AAA'Address;
-   end Code_Address_For_AAA;
+   procedure AAA is null;
 
    ----------------
    -- Call_Chain --
@@ -941,7 +1134,7 @@ package body Ada.Exceptions is
    procedure Complete_And_Propagate_Occurrence (X : EOA) is
    begin
       Complete_Occurrence (X);
-      Exception_Propagation.Propagate_Exception (X);
+      Exception_Propagation.Propagate_Exception (X.all);
    end Complete_And_Propagate_Occurrence;
 
    ---------------------
@@ -962,20 +1155,7 @@ package body Ada.Exceptions is
 
       --  Go ahead and raise appropriate exception
 
-      Rose.System_Calls.Client.Send_String
-        (Cap     => 6,
-         Message => Message);
-      Rose.System_Calls.Client.Send_String
-        (Cap     => 6,
-         Message => (1 => Character'Val (10)));
-
-      if True then
-         loop
-            null;
-         end loop;
-      else
-         Raise_Exception_Always (EF, Message);
-      end if;
+      Raise_Exception_Always (EF, Message);
    end Raise_Exception;
 
    ----------------------------
@@ -990,11 +1170,6 @@ package body Ada.Exceptions is
 
    begin
       Exception_Data.Set_Exception_Msg (X, E, Message);
-
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
-
       Complete_And_Propagate_Occurrence (X);
    end Raise_Exception_Always;
 
@@ -1041,7 +1216,7 @@ package body Ada.Exceptions is
 
       else
          declare
-            New_Msg  : constant String := Prefix & Exception_Name (X);
+            New_Msg : constant String := Prefix & Exception_Name (X);
 
          begin
             --  No message present, just provide our own
@@ -1074,11 +1249,6 @@ package body Ada.Exceptions is
 
    begin
       Exception_Data.Set_Exception_C_Msg (X, E, M);
-
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
-
       Complete_Occurrence (X);
       return X;
    end Create_Occurrence_From_Signal_Handler;
@@ -1105,7 +1275,7 @@ package body Ada.Exceptions is
    is
    begin
       Exception_Propagation.Propagate_Exception
-        (Create_Occurrence_From_Signal_Handler (E, M));
+        (Create_Occurrence_From_Signal_Handler (E, M).all);
    end Raise_From_Signal_Handler;
 
    -------------------------
@@ -1174,11 +1344,6 @@ package body Ada.Exceptions is
       X : constant EOA := Exception_Propagation.Allocate_Occurrence;
    begin
       Exception_Data.Set_Exception_C_Msg (X, E, F, L, C, M);
-
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
-
       Complete_And_Propagate_Occurrence (X);
    end Raise_With_Location_And_Msg;
 
@@ -1200,13 +1365,6 @@ package body Ada.Exceptions is
 
       Excep.Msg_Length                  := Ex.Msg_Length;
       Excep.Msg (1 .. Excep.Msg_Length) := Ex.Msg (1 .. Ex.Msg_Length);
-
-      --  The following is a common pattern, should be abstracted
-      --  into a procedure call ???
-
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
 
       Complete_And_Propagate_Occurrence (Excep);
    end Raise_With_Msg;
@@ -1425,6 +1583,13 @@ package body Ada.Exceptions is
       Raise_Program_Error_Msg (File, Line, Rmsg_28'Address);
    end Rcheck_PE_Potentially_Blocking_Operation;
 
+   procedure Rcheck_PE_Raise_Check
+     (File : System.Address; Line : Integer)
+   is
+   begin
+      Raise_Program_Error_Msg (File, Line, Rmsg_38'Address);
+   end Rcheck_PE_Raise_Check;
+
    procedure Rcheck_PE_Stream_Operation_Not_Allowed
      (File : System.Address; Line : Integer)
    is
@@ -1540,10 +1705,6 @@ package body Ada.Exceptions is
       Saved_MO : constant System.Address := Excep.Machine_Occurrence;
 
    begin
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
-
       Save_Occurrence (Excep.all, Get_Current_Excep.all.all);
       Excep.Machine_Occurrence := Saved_MO;
       Complete_And_Propagate_Occurrence (Excep);
@@ -1589,10 +1750,6 @@ package body Ada.Exceptions is
 
    procedure Reraise_Occurrence_Always (X : Exception_Occurrence) is
    begin
-      if not ZCX_By_Default then
-         Abort_Defer.all;
-      end if;
-
       Reraise_Occurrence_No_Defer (X);
    end Reraise_Occurrence_Always;
 
@@ -1601,12 +1758,25 @@ package body Ada.Exceptions is
    ---------------------------------
 
    procedure Reraise_Occurrence_No_Defer (X : Exception_Occurrence) is
-      Excep    : constant EOA := Exception_Propagation.Allocate_Occurrence;
-      Saved_MO : constant System.Address := Excep.Machine_Occurrence;
    begin
-      Save_Occurrence (Excep.all, X);
-      Excep.Machine_Occurrence := Saved_MO;
-      Complete_And_Propagate_Occurrence (Excep);
+      --  If we have a Machine_Occurrence at hand already, e.g. when we are
+      --  reraising a foreign exception, just repropagate. Otherwise, e.g.
+      --  when reraising a GNAT exception or an occurrence read back from a
+      --  stream, set up a new occurrence with its own Machine block first.
+
+      if X.Machine_Occurrence /= System.Null_Address then
+         Exception_Propagation.Propagate_Exception (X);
+      else
+         declare
+            Excep : constant EOA :=
+              Exception_Propagation.Allocate_Occurrence;
+            Saved_MO : constant System.Address := Excep.Machine_Occurrence;
+         begin
+            Save_Occurrence (Excep.all, X);
+            Excep.Machine_Occurrence := Saved_MO;
+            Complete_And_Propagate_Occurrence (Excep);
+         end;
+      end if;
    end Reraise_Occurrence_No_Defer;
 
    ---------------------
@@ -1625,6 +1795,7 @@ package body Ada.Exceptions is
       Target.Machine_Occurrence := System.Null_Address;
       Target.Msg_Length         := Source.Msg_Length;
       Target.Num_Tracebacks     := Source.Num_Tracebacks;
+      Target.Exception_Raised   := Source.Exception_Raised;
       Target.Pid                := Source.Pid;
 
       Target.Msg (1 .. Target.Msg_Length) :=
@@ -1660,10 +1831,10 @@ package body Ada.Exceptions is
    ---------------
 
    procedure To_Stderr (C : Character) is
-      procedure Put_Char_Stderr (C : Character);
+      procedure Put_Char_Stderr (C : Integer);
       pragma Import (C, Put_Char_Stderr, "put_char_stderr");
    begin
-      Put_Char_Stderr (C);
+      Put_Char_Stderr (Character'Pos (C));
    end To_Stderr;
 
    procedure To_Stderr (S : String) is
@@ -1702,7 +1873,7 @@ package body Ada.Exceptions is
    -- Wide_Exception_Name --
    -------------------------
 
-   WC_Encoding : Character;
+   WC_Encoding : constant Character;
    pragma Import (C, WC_Encoding, "__gl_wc_encoding");
    --  Encoding method for source, as exported by binder
 
@@ -1758,18 +1929,14 @@ package body Ada.Exceptions is
       return W (1 .. L);
    end Wide_Wide_Exception_Name;
 
-   --------------------------
-   -- Code_Address_For_ZZZ --
-   --------------------------
+   ---------
+   -- ZZZ --
+   ---------
 
    --  This function gives us the end of the PC range for addresses
    --  within the exception unit itself. We hope that gigi/gcc keeps all the
    --  procedures in their original order.
 
-   function Code_Address_For_ZZZ return System.Address is
-   begin
-      <<Start_Of_ZZZ>>
-      return Start_Of_ZZZ'Address;
-   end Code_Address_For_ZZZ;
+   procedure ZZZ is null;
 
 end Ada.Exceptions;

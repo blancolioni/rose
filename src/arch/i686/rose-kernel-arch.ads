@@ -24,6 +24,9 @@ package Rose.Kernel.Arch is
       end record
    with Pack, Size => 15 * 32;
 
+   type FPU_State is array (1 .. 512) of Word_8;
+   --  A process's FPU and SSE registers, as FXSAVE writes them.
+
    function Process_Stack_Frame
      (Start_EIP       : Word_32;
       Start_ESP       : Word_32 := Process_Stack_Bound;

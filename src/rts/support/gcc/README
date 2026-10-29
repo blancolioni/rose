@@ -1,0 +1,16 @@
+GNAT's exception personality routine, for the userland run-time system
+(#170).
+
+raise-gcc.c, raise.h and runtime.h are from GCC's gcc/ada directory, and
+unwind-pe.h from libgcc, on the releases/gcc-15 branch, to match the GCC 15
+compiler that builds Rose. They are unchanged. GCC installs the Ada run-time
+system's Ada sources, but not these.
+
+raise-gcc.c is compiled freestanding, with STANDALONE (which uses
+runtime.h, and no C library), IN_RTS, and without C++ exception
+interoperability (GXX_EH_INTEROP=0). stdlib.h is Rose's: the little of the
+C library that raise-gcc.c includes.
+
+The unwinder itself (unwind-dw2.o and unwind-dw2-fde-dip.o) comes from the
+installed GCC's 32-bit libgcc_eh.a, and ../rose-unwind.c provides what it
+needs from the C library.

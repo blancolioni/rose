@@ -2,14 +2,13 @@
 --                                                                          --
 --                 GNAT RUN-TIME LIBRARY (GNARL) COMPONENTS                 --
 --                                                                          --
---                   A D A . E X C E P T I O N S . P O L L                  --
+--                       S Y S T E M . O S _ L O C K S                      --
 --                                                                          --
---                                  B o d y                                 --
---                 (dummy version where polling is not used)                --
+--                                 S p e c                                  --
 --                                                                          --
---          Copyright (C) 1992-2018, Free Software Foundation, Inc.         --
+--         Copyright (C) 2024-2025, Free Software Foundation, Inc.          --
 --                                                                          --
--- GNARL is free software; you can  redistribute it  and/or modify it under --
+-- GNAT is free software;  you can  redistribute it  and/or modify it under --
 -- terms of the  GNU General Public License as published  by the Free Soft- --
 -- ware  Foundation;  either version 3,  or (at your option) any later ver- --
 -- sion.  GNAT is distributed in the hope that it will be useful, but WITH- --
@@ -30,13 +29,22 @@
 --                                                                          --
 ------------------------------------------------------------------------------
 
-separate (Ada.Exceptions)
+--  This is a POSIX-like version of this package
 
-----------
--- Poll --
-----------
+--  The Rose version: the userland run-time system has no tasking, so a lock
+--  holds nothing, and the soft links that operate on locks do nothing
+--  (#170).
 
-procedure Poll is
-begin
-   null;
-end Poll;
+package System.OS_Locks is
+   pragma Preelaborate;
+
+   type RTS_Lock is limited private;
+   --  Should be used inside the runtime system. The difference between Lock
+   --  and the RTS_Lock is that the latter serves only as a semaphore so that
+   --  we do not check for ceiling violations.
+
+private
+
+   type RTS_Lock is null record;
+
+end System.OS_Locks;

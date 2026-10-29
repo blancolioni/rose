@@ -1,5 +1,6 @@
 with Rose.Boot.Console;
 
+with Rose.Arch;
 with Rose.Arch.Interrupts;
 with Rose.Arch.Interrupt_Table;
 
@@ -14,6 +15,23 @@ with Rose.Kernel.Processes.Init;
 with Rose.Kernel.Modules.Init;
 
 package body Rose.Kernel.Init is
+
+   function Device_Not_Available
+     return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
+   --  A process used the FPU or SSE after another process did: switch
+   --  the state, and run the instruction again.
+
+   --------------------------
+   -- Device_Not_Available --
+   --------------------------
+
+   function Device_Not_Available
+     return Rose.Kernel.Interrupts.Interrupt_Handler_Status
+   is
+   begin
+      Rose.Kernel.Processes.Switch_FPU_State;
+      return Rose.Kernel.Interrupts.Finished;
+   end Device_Not_Available;
 
    Low_RAM_Base  : constant := 16#0000_0000#;
    Low_RAM_Bound : constant := 16#0009_F000#;
@@ -132,6 +150,18 @@ package body Rose.Kernel.Init is
       Rose.Kernel.Interrupts.Set_Handler
         (Rose.Arch.Interrupts.Clock_Interrupt,
          Rose.Kernel.Clock.Handle_Clock_Tick'Access);
+
+      --  Processes can use the FPU and SSE; the state of each is switched
+      --  when it first uses them after another process has (#170).
+
+      if Rose.Arch.Has_SSE then
+         Rose.Kernel.Interrupts.Set_Handler
+           (Rose.Arch.Interrupts.Device_Not_Available,
+            Device_Not_Available'Access);
+         Rose.Arch.Enable_SSE;
+      else
+         Rose.Boot.Console.Put_Line ("kernel: no SSE");
+      end if;
 
       Rose.Arch.Interrupt_Table.Enable_Interrupt
         (Rose.Arch.Interrupts.Clock_Interrupt);

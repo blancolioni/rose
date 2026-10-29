@@ -53,6 +53,28 @@ package Rose.Arch is
    procedure Enable_Interrupts;
    procedure Disable_Interrupts;
 
+   function Has_SSE return Boolean;
+   --  True if the processor has SSE and FXSAVE (CPUID).
+
+   procedure Enable_SSE;
+   --  Let processes use the FPU and SSE: clear CR0.EM, set CR0.MP and
+   --  CR0.NE, set CR4.OSFXSR and CR4.OSXMMEXCPT, and set CR0.TS, so that
+   --  a process's first FPU or SSE instruction raises Device_Not_Available
+   --  (#170).
+
+   procedure Clear_Task_Switched;
+   --  Clear CR0.TS, so that FPU and SSE instructions run.
+
+   procedure Save_FPU_State (Area : System.Address);
+   --  FXSAVE to Area, which must be 512 bytes, aligned to 16.
+
+   procedure Restore_FPU_State (Area : System.Address);
+   --  FXRSTOR from Area, which must be 512 bytes, aligned to 16.
+
+   procedure Initialize_FPU_State;
+   --  A clean FPU and SSE state: FNINIT, and the default MXCSR, with all
+   --  SSE exceptions masked.
+
    procedure Halt;
 
    procedure Copy_Memory

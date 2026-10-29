@@ -15,7 +15,14 @@ with Rose.Kernel.Heap;
 with Rose.Kernel.Panic;
 with Rose.Invocation.Trace;
 
+with Rose.Arch;
+
 package body Rose.Kernel.Processes is
+
+   FPU_Buffer : Rose.Kernel.Arch.FPU_State
+     with Alignment => 16;
+   --  FXSAVE and FXRSTOR need an area aligned to 16, which a process
+   --  table entry is not, so the state passes through here.
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
@@ -286,6 +293,13 @@ package body Rose.Kernel.Processes is
       if Proc.Directory_Page /= 0 then
          Release_Entry (Pid);
       end if;
+
+      --  A new process starts with a clean FPU and SSE state.
+
+      if FPU_Owner = Process_Table (Pid)'Access then
+         FPU_Owner := null;
+      end if;
+      Proc.FPU_Valid := False;
 
       Assign_Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
@@ -2226,6 +2240,34 @@ package body Rose.Kernel.Processes is
    begin
       Process_Table (Process).Flags (Trace) := False;
    end Stop_Trace;
+
+   ----------------------
+   -- Switch_FPU_State --
+   ----------------------
+
+   procedure Switch_FPU_State is
+   begin
+      Rose.Arch.Clear_Task_Switched;
+
+      if FPU_Owner = Current_Process then
+         return;
+      end if;
+
+      if FPU_Owner /= null then
+         Rose.Arch.Save_FPU_State (FPU_Buffer'Address);
+         FPU_Owner.FPU_State := FPU_Buffer;
+         FPU_Owner.FPU_Valid := True;
+      end if;
+
+      if Current_Process.FPU_Valid then
+         FPU_Buffer := Current_Process.FPU_State;
+         Rose.Arch.Restore_FPU_State (FPU_Buffer'Address);
+      else
+         Rose.Arch.Initialize_FPU_State;
+      end if;
+
+      FPU_Owner := Current_Process;
+   end Switch_FPU_State;
 
    -------------------
    -- To_Process_Id --
