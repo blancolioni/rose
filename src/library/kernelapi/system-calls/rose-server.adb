@@ -142,6 +142,7 @@ package body Rose.Server is
       Rose.System_Calls.Receive_Caps
         (Params, Natural (Rose.Invocation.Capability_Index'Last) + 1);
 
+      Rose.System_Calls.Expect_Buffer (Params);
       if Rose.System_Calls.Have_Buffer then
          Rose.System_Calls.Receive_Buffer (Params);
       end if;

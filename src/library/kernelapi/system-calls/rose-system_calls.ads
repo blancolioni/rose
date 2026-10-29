@@ -70,6 +70,13 @@ package Rose.System_Calls is
 --        Buffer   : System.Address;
 --        Writable : Boolean);
 
+   procedure Expect_Buffer
+     (Params : in out Rose.Invocation.Invocation_Record);
+   --  Params, a receive, expects the sender's buffer, if it has one. The
+   --  kernel gives a process the buffer of a message it receives only if
+   --  it receives with Send_Buffer set (#2), and Params.Buffer_Address and
+   --  Params.Buffer_Length then describe the buffer that arrived.
+
    procedure Receive_Buffer
      (Params : in out Rose.Invocation.Invocation_Record);
 

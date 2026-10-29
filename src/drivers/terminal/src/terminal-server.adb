@@ -136,6 +136,7 @@ package body Terminal.Server is
          Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
          Params.Control.Last_Recv_Word :=
            Rose.Invocation.Parameter_Word_Index'Last;
+         Rose.System_Calls.Expect_Buffer (Params);
          Params.Cap := Receive_Cap;
 
          Rose.System_Calls.Invoke_Capability (Params);

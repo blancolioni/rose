@@ -34,6 +34,10 @@ package body Rose.Kernel.Capabilities.Receive is
       elsif Rose.Kernel.Processes.Has_Queued_Message
         (Receiver_Id, Cap.Header.Endpoint)
       then
+         --  Send_Cap looks in the receiver's current invocation to see
+         --  whether it expects a buffer (#2).
+
+         Rose.Kernel.Processes.Set_Current_Invocation (Params.all);
          Rose.Kernel.Processes.Send_Queued_Message (Receiver_Id);
          Rose.Kernel.Processes.Get_Current_Invocation
            (Receiver_Id, Params.all);
@@ -51,6 +55,7 @@ package body Rose.Kernel.Capabilities.Receive is
                     (Params, Rose.Invocation.Request_Would_Block);
                end if;
             else
+               Rose.Kernel.Processes.Set_Current_Invocation (Params.all);
                Rose.Kernel.Processes.Unblock_And_Send
                  (From_Process_Id => Next_Sender,
                   To_Process_Id   => Receiver_Id,
