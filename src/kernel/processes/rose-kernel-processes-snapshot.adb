@@ -153,6 +153,8 @@ package body Rose.Kernel.Processes.Snapshot is
            with Import, Address => P.Stack'Address;
          Current   : Storage_Array (1 .. P.Current_Params'Size / 8)
            with Import, Address => P.Current_Params'Address;
+         FPU_Bytes : Storage_Array (1 .. P.FPU_State'Size / 8)
+           with Import, Address => P.FPU_State'Address;
          State     : constant Process_State :=
                        Process_State'Val (Item.State);
          Flags     : Process_Flag_Array := (others => False);
@@ -168,6 +170,12 @@ package body Rose.Kernel.Processes.Snapshot is
          P.Command_Endpoint :=
            Rose.Objects.Endpoint_Index (Item.Command_Endpoint);
          Registers := Item.Registers (1 .. Registers'Length);
+
+         --  The process's first FPU or SSE instruction loads this state
+         --  (Switch_FPU_State), or starts it clean if it had none.
+
+         P.FPU_Valid := Item.FPU_Valid = 1;
+         FPU_Bytes := Item.FPU_State;
 
          for I in Page_Range_Index loop
             declare
@@ -371,6 +379,8 @@ package body Rose.Kernel.Processes.Snapshot is
         with Import, Address => P.Current_Params'Address;
       Queued    : Storage_Array (1 .. P.Queued_Params'Size / 8)
         with Import, Address => P.Queued_Params'Address;
+      FPU_Bytes : Storage_Array (1 .. P.FPU_State'Size / 8)
+        with Import, Address => P.FPU_State'Address;
       Flags     : Word_32 := 0;
       Caps      : constant Natural := Active_Cap_Count (P);
       Waiting   : Kernel_Process_Access := P.Waiting_First;
@@ -416,6 +426,8 @@ package body Rose.Kernel.Processes.Snapshot is
       Item.Registers (1 .. Registers'Length) := Registers;
       Item.Current_Params (1 .. Current'Length) := Current;
       Item.Queued_Params (1 .. Queued'Length) := Queued;
+      Item.FPU_Valid := (if P.FPU_Valid then 1 else 0);
+      Item.FPU_State := FPU_Bytes;
 
       for I in Page_Range_Index loop
          declare
@@ -475,6 +487,10 @@ package body Rose.Kernel.Processes.Snapshot is
                    + Storage_Offset (Index - 1) * Page_Bytes)'Address);
 
    begin
+      --  The FPU owner's state is in the registers, not its entry.
+
+      Save_Owner_FPU_State;
+
       Page_Count := 1;
       for P of Process_Table.all loop
          if Is_Saved (P) then
