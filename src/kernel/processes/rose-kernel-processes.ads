@@ -376,6 +376,11 @@ package Rose.Kernel.Processes is
    procedure Enter_Checkpoint;
    procedure Leave_Checkpoint;
 
+   procedure Save_Owner_FPU_State;
+   --  Save the registers of the FPU owner into its process table entry,
+   --  without changing the owner, so that the entry's state is current
+   --  (#429).
+
    procedure Switch_FPU_State;
    --  Device_Not_Available: save the FPU owner's state, and load the
    --  current process's, or a clean state if it has none (#170).

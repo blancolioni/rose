@@ -21,8 +21,9 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 3;
-   --  Version 2 added the interrupts, and version 3 the next object id.
+   Kernel_Table_Version : constant := 4;
+   --  Version 2 added the interrupts, version 3 the next object id, and
+   --  version 4 each process's FPU and SSE state.
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -68,6 +69,7 @@ package Rose.Checkpoints is
 
    Saved_Register_Bytes   : constant := 64;
    Saved_Invocation_Bytes : constant := 160;
+   Saved_FPU_Bytes        : constant := 512;
 
    --  Page range flags.
    Range_Valid         : constant := 16#01#;
@@ -106,7 +108,7 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Endpoints) of Saved_Endpoint
      with Pack, Size => Max_Saved_Endpoints * 128;
 
-   Process_Record_Bytes : constant := 1216;
+   Process_Record_Bytes : constant := 1216 + 4 + Saved_FPU_Bytes;
    --  The bytes of a process record page that are in use.
 
    --  State is the kernel's Process_State'Pos, and bit N of Flags is set
@@ -148,6 +150,12 @@ package Rose.Checkpoints is
                                 (others => 0);
          Page_Ranges      : Saved_Range_Array;
          Endpoints        : Saved_Endpoint_Array;
+         FPU_Valid        : Rose.Words.Word_32 := 0;
+         --  1 if FPU_State is the process's FPU and SSE state, in the
+         --  FXSAVE layout, and 0 if it has none and starts clean.
+         FPU_State        : System.Storage_Elements.Storage_Array
+                              (1 .. Saved_FPU_Bytes) :=
+                                (others => 0);
          Reserved         : System.Storage_Elements.Storage_Array
                               (1 .. Rose.Limits.Page_Size
                                    - Process_Record_Bytes) :=

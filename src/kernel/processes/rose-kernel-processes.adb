@@ -1507,6 +1507,23 @@ package body Rose.Kernel.Processes is
       Current_Process.Flags (Invoke_Reply) := True;
    end Return_Error;
 
+   --------------------------
+   -- Save_Owner_FPU_State --
+   --------------------------
+
+   procedure Save_Owner_FPU_State is
+   begin
+      if FPU_Owner /= null then
+         --  TS is set while a process other than the owner runs, and
+         --  FXSAVE would fault. The kernel sets it again as it returns
+         --  to a process.
+         Rose.Arch.Clear_Task_Switched;
+         Rose.Arch.Save_FPU_State (FPU_Buffer'Address);
+         FPU_Owner.FPU_State := FPU_Buffer;
+         FPU_Owner.FPU_Valid := True;
+      end if;
+   end Save_Owner_FPU_State;
+
    --------------
    -- Send_Cap --
    --------------
