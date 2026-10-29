@@ -13,6 +13,39 @@ package Store.Devices is
    function Reserve_Storage
      (Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability;
+   --  Reserve a region from the root bank.
+
+   function Get_Root_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+   --  The cap for the root bank, which every other bank is below.
+
+   function Reserve_From_Bank
+     (Id   : Rose.Objects.Capability_Identifier;
+      Size : Rose.Words.Word_64)
+      return Rose.Capabilities.Capability;
+   --  Reserve a region from bank Id, and charge it to the bank and every
+   --  bank above it.  Fails, with the null cap, if that would take one of
+   --  them over a limit.
+
+   function Create_Sub_Bank
+     (Id           : Rose.Objects.Capability_Identifier;
+      Page_Limit   : Rose.Words.Word_64;
+      Region_Limit : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+   --  A bank below bank Id, with limits that are zero if it has none.
+
+   procedure Get_Usage
+     (Id           : in     Rose.Objects.Capability_Identifier;
+      Pages        :    out Rose.Words.Word_64;
+      Regions      :    out Rose.Words.Word;
+      Page_Limit   :    out Rose.Words.Word_64;
+      Region_Limit :    out Rose.Words.Word);
+
+   procedure Destroy_Bank
+     (Id : Rose.Objects.Capability_Identifier);
+   --  Release every region charged to bank Id or below it, and destroy
+   --  them.  The root bank stays.
 
    procedure Get_Range
      (Id    : Rose.Objects.Capability_Identifier;
@@ -62,7 +95,7 @@ package Store.Devices is
       Base        : Rose.Objects.Object_Id;
       Bound       : Rose.Objects.Object_Id;
       Alloc_Index : Natural;
-      Alloc_Banks : Natural);
+      Alloc_Blocks : Natural);
    --  Recreate a region from a checkpoint.  The backing stores must have
    --  been added again first, in the same order.
 

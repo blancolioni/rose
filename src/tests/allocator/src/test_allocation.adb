@@ -20,7 +20,7 @@ package body Test_Allocation is
 
    package Small_Allocators is new Rose.Allocators (12);
    --  2048 blocks: room for the store's case, a 28 MB partition of
-   --  16 KiB banks (1792 blocks), and small enough to fill.
+   --  16 KiB blocks (1792 blocks), and small enough to fill.
 
    Capacity : constant := 2 ** 11;
 
@@ -148,7 +148,7 @@ package body Test_Allocation is
    -- Test_One_MiB_Blocks --
    -------------------------
 
-   --  A 1 MiB reservation is 64 banks, so the 28 MB partition holds 28.
+   --  A 1 MiB reservation is 64 blocks, so the 28 MB partition holds 28.
 
    procedure Test_One_MiB_Blocks is
       Allocator : Small_Allocators.Store;
@@ -299,7 +299,7 @@ package body Test_Allocation is
    -- Test_Store_Partition --
    --------------------------
 
-   --  The store's partition is 1792 banks, which is not a power of two.
+   --  The store's partition is 1792 blocks, which is not a power of two.
    --  Deallocate rounded it up to 2048 (#249); Add_Range gives exactly
    --  1792, all inside the partition.
 

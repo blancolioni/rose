@@ -393,7 +393,7 @@ package body Restore.Checkpoints is
                   Base        => Rose.Objects.Object_Id (Region.Base),
                   Bound       => Rose.Objects.Object_Id (Region.Bound),
                   Alloc_Index => Natural (Region.Alloc_Index),
-                  Alloc_Banks => Natural (Region.Alloc_Banks));
+                  Alloc_Blocks => Natural (Region.Alloc_Blocks));
             end;
          end loop;
 

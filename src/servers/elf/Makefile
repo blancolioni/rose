@@ -26,6 +26,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-memory-client.o \
 	$(BUILDDIR)/rose-interfaces-process-client.o \
+	$(BUILDDIR)/rose-interfaces-bank.o \
+	$(BUILDDIR)/rose-interfaces-bank-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-client.o \

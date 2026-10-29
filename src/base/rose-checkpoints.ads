@@ -229,7 +229,7 @@ package Rose.Checkpoints is
          Base        : Rose.Words.Word_64 := 0;
          Bound       : Rose.Words.Word_64 := 0;
          Alloc_Index : Rose.Words.Word_32 := 0;
-         Alloc_Banks : Rose.Words.Word_32 := 0;
+         Alloc_Blocks : Rose.Words.Word_32 := 0;
       end record
      with Pack, Size => 256;
 

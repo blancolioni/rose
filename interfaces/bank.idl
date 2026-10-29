@@ -1,0 +1,32 @@
+interface Bank is
+
+   --  A source of storage (ADR 0014). Every region is reserved from one
+   --  bank and charged to it, and to every bank above it. A limit of zero
+   --  is no limit.
+
+   function Reserve_Storage
+     (Size : Word_64)
+      return interface Region;
+   --  Fails, with a null cap, if the reservation would take the bank, or
+   --  any bank above it, over a limit.
+
+   function Create_Sub_Bank
+     (Page_Limit   : Word_64;
+      Region_Limit : Word)
+      return interface Bank;
+
+   procedure Get_Usage
+     (Pages        : out Word_64;
+      Regions      : out Word;
+      Page_Limit   : out Word_64;
+      Region_Limit : out Word);
+   --  What has been reserved from the bank and its sub-banks, and the
+   --  bank's limits.
+
+   --  Release every region reserved from the bank and its sub-banks, and
+   --  destroy the sub-banks. Neither the bank, nor anything reserved from
+   --  it, can be used afterwards. The root bank can't be destroyed.
+
+   procedure Destroy;
+
+end Bank;
