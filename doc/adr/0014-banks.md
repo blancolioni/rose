@@ -38,12 +38,12 @@ The book's old Memory chapter (#126) described hierarchical space banks. Each pr
 ### 2. Banks form a tree
 
 - **A bank can create sub-banks.** Each bank has exactly one parent, except the root bank, which the store holds.
-- **A sub-bank can have a limit,** in pages. A reservation fails if it would take the bank, or any bank above it, over its limit. Storage reserved from a sub-bank counts against every bank above it.
+- **A sub-bank can have a limit,** in pages, and a limit on the number of regions. A reservation fails if it would take the bank, or any bank above it, over a limit. Storage reserved from a sub-bank counts against every bank above it. Pages count when the store has backing blocks for them (see 6), which today is when they are reserved.
 - **The system's banks follow who is responsible.** Init receives a system bank at boot. The user server creates a bank for each user, and each session gets a sub-bank of its user's bank.
 
 ### 3. Destroying a bank reclaims everything reserved from it
 
-- **`Destroy` on a bank destroys its sub-banks, deepest first, and releases every region reserved from them.** The bank's caps then fail cleanly, as caps of a released region do.
+- **`Destroy` on a bank destroys its sub-banks, deepest first, and releases every region reserved from them.** The bank's caps then stop working, as caps of a released region do. Today a released region reports an empty range, because a handler can't fail a request yet (#230).
 - **Nobody needs to cooperate.** The store does the releasing, so destroying a bank works whatever the processes that reserved from it are doing.
 - **Objects can depend on a bank.** A server that creates an object on a client's behalf, such as mem with a process or a server with a slot for its client (ADR 0010), registers the object with the client's bank, giving a cap that the store invokes when the bank is destroyed. The server then removes the object. This is how a bank reclaims things that aren't storage, and how a client's bank pays for what a server keeps for it.
 
@@ -59,7 +59,12 @@ The book's old Memory chapter (#126) described hierarchical space banks. Each pr
 
 ### 6. Physical memory isn't charged, for now
 
-Physical memory remains a cache that mem manages for everyone. A bank's limit counts reserved pages, not resident ones.
+Physical memory remains a cache that mem manages for everyone. A bank's limit counts pages that have backing blocks on the store, not resident ones.
+
+- **Today that is every reserved page,** because the store allocates a region's blocks when the region is reserved. A bank's page limit is then a guarantee: a bank within its limit can't fail to write, and the root bank can't be charged more than the partition holds.
+- **If blocks are allocated on first write (#305), pages are charged when their blocks are allocated.** Reserving address space is cheap and can overcommit, as the sum of the banks' limits may be more than the partition. A write that would take a bank over its limit fails, and the failure is the fault of the bank that was charged, not of whichever process wrote last. A region still counts against the region limit when it is reserved.
+- **Charging reserved pages instead would not help #305.** The root bank's limit would be the partition, and the 34th 1 MiB stack would fail as it does now, though more cleanly.
+- **`Get_Usage` can report reserved and committed pages separately,** once they differ.
 
 ### 7. Persistence
 
@@ -72,14 +77,14 @@ Banks, their limits and the regions charged to them are saved in the store's che
 - **Store gains the bank table and the registration of dependent objects,** and saves both in its checkpoint.
 - **Process ownership (ADR 0015) is built on this:** a process depends on its own bank, and ending it destroys that bank.
 - **ADR 0010's `Release` stays.** A client that releases a resource gives it back early, and destroying the client's bank is the backstop for a client that doesn't.
-- **Reserving lazily (#305) fits.** A bank's limit counts reserved pages, whether or not backing blocks have been allocated for them.
+- **Allocating blocks lazily (#305) fits, and moves the charge.** A bank's page limit counts pages with backing blocks (see 6). `Destroy` frees the blocks a region has, not a contiguous range. The page-to-block map and the banks go into the checkpoint in one format version, and a write that fails needs the store to report errors (#230) and mem to handle them on a page fault.
 
 ## Alternatives considered
 
 - **A bank is a range of page object ids,** as in the old book chapter. Every bank would need to know its size when it is created, a sub-bank would have to be carved out of its parent's range, and free space would fragment. Recording the regions reserved from a bank keeps the store's allocation as it is.
 - **Mem serves banks.** Mem owns processes and physical memory, but it doesn't reserve or release storage, so releasing a bank's regions would take a call to the store for each one. Mem is one of the servers whose objects depend on a bank instead.
 - **A separate bank server.** It would sit between every reservation and the store and add a hop, with no gain in authority, since the store has to trust it anyway.
-- **Charging physical memory too.** It would bound a process's working set as well, but mem would need to charge every page fault to a bank, and to account for pages that several processes share. Counting reserved pages is enough to stop one process using up the store.
+- **Charging physical memory too.** It would bound a process's working set as well, but mem would need to charge every page fault to a bank, and to account for pages that several processes share. Counting pages with backing blocks is enough to stop one process using up the store.
 
 ## Open questions
 
