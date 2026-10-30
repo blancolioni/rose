@@ -1,3 +1,6 @@
+with Ada.Containers.Hashed_Maps;
+with Ada.Containers.Vectors;
+
 with Rose.Capabilities;
 with Rose.Invocation;
 with Rose.Objects;
@@ -74,25 +77,31 @@ private
    Max_Handled_Endpoints  : constant := 32;
    --  As many as the kernel registers for a process
    --  (Rose.Kernel.Processes.Max_Registered_Endpoints).
-   Max_Endpoint_Instances : constant := 1024;
-   --  An instanced server such as mem has a cap for each endpoint and
-   --  object, so this bounds how many objects it can serve: mem uses
-   --  eight for each process. When the table is full, the caps of new
-   --  objects are null.
+
+   --  A userland process has a heap, so the table of an instanced server
+   --  has no fixed size: it holds the caps of each object, found by the
+   --  object's identifier, and grows with the objects the server serves.
 
    type Instanced_Handler_Record is
       record
          Endpoint   : Rose.Objects.Endpoint_Id;
-         Identifier : Rose.Objects.Capability_Identifier;
          Capability : Rose.Capabilities.Capability;
       end record;
 
-   type Instanced_Handler_Array is
-     array (1 .. Max_Endpoint_Instances) of Instanced_Handler_Record;
-   pragma Suppress_Initialization (Instanced_Handler_Array);
-   --  Entries past Instance_Count are never read, so the table is not
-   --  initialized: under Normalize_Scalars that would write every page
-   --  of it in every server when it starts.
+   package Handler_Vectors is
+     new Ada.Containers.Vectors (Positive, Instanced_Handler_Record);
+
+   function Hash_Identifier
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Ada.Containers.Hash_Type;
+
+   package Instance_Maps is
+     new Ada.Containers.Hashed_Maps
+       (Key_Type        => Rose.Objects.Capability_Identifier,
+        Element_Type    => Handler_Vectors.Vector,
+        Hash            => Hash_Identifier,
+        Equivalent_Keys => Rose.Objects."=",
+        "="             => Handler_Vectors."=");
 
    type Endpoint_Record is
       record
@@ -116,8 +125,7 @@ private
 
    type Server_Instance is limited
       record
-         Instances      : Instanced_Handler_Array;
-         Instance_Count : Natural := 0;
+         Instances : Instance_Maps.Map;
       end record;
 
 end Rose.Server;

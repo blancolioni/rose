@@ -52,19 +52,19 @@ package body Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
+      use Instance_Maps;
+      use type Rose.Objects.Endpoint_Id;
+      Position : constant Cursor := Instance.Instances.Find (Identifier);
    begin
-      for I in 1 .. Instance.Instance_Count loop
-         declare
-            use Rose.Objects;
-            Item : Instanced_Handler_Record renames Instance.Instances (I);
-         begin
-            if Item.Endpoint = Endpoint
-              and then Item.Identifier = Identifier
-            then
+      if Has_Element (Position) then
+         for Item of
+           Instance.Instances.Constant_Reference (Position).Element.all
+         loop
+            if Item.Endpoint = Endpoint then
                return Item.Capability;
             end if;
-         end;
-      end loop;
+         end loop;
+      end if;
       return Rose.Capabilities.Null_Capability;
    end Get_Instance_Cap;
 
@@ -78,21 +78,33 @@ package body Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier)
       return Boolean
    is
+      use Instance_Maps;
+      use type Rose.Objects.Endpoint_Id;
+      Position : constant Cursor := Instance.Instances.Find (Identifier);
    begin
-      for I in 1 .. Instance.Instance_Count loop
-         declare
-            use Rose.Objects;
-            Item : Instanced_Handler_Record renames Instance.Instances (I);
-         begin
-            if Item.Endpoint = Endpoint
-              and then Item.Identifier = Identifier
-            then
+      if Has_Element (Position) then
+         for Item of
+           Instance.Instances.Constant_Reference (Position).Element.all
+         loop
+            if Item.Endpoint = Endpoint then
                return True;
             end if;
-         end;
-      end loop;
+         end loop;
+      end if;
       return False;
    end Has_Instance;
+
+   ---------------------
+   -- Hash_Identifier --
+   ---------------------
+
+   function Hash_Identifier
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Ada.Containers.Hash_Type
+   is
+   begin
+      return Ada.Containers.Hash_Type (Identifier);
+   end Hash_Identifier;
 
    -----------------------
    -- Publish_Interface --
@@ -241,23 +253,17 @@ package body Rose.Server is
      (Instance   : in out Server_Instance;
       Identifier : Rose.Objects.Capability_Identifier)
    is
-      use type Rose.Objects.Capability_Identifier;
-      Kept : Natural := 0;
+      use Instance_Maps;
+      Position : Cursor := Instance.Instances.Find (Identifier);
    begin
-      for I in 1 .. Instance.Instance_Count loop
-         declare
-            Item : constant Instanced_Handler_Record :=
-              Instance.Instances (I);
-         begin
-            if Item.Identifier = Identifier then
-               Rose.System_Calls.Delete_Cap (Item.Capability);
-            else
-               Kept := Kept + 1;
-               Instance.Instances (Kept) := Item;
-            end if;
-         end;
-      end loop;
-      Instance.Instance_Count := Kept;
+      if Has_Element (Position) then
+         for Item of
+           Instance.Instances.Constant_Reference (Position).Element.all
+         loop
+            Rose.System_Calls.Delete_Cap (Item.Capability);
+         end loop;
+         Instance.Instances.Delete (Position);
+      end if;
    end Remove_Instance;
 
    ----------------------
@@ -270,16 +276,29 @@ package body Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier;
       Cap        : Rose.Capabilities.Capability)
    is
+      use Instance_Maps;
+      Position : Cursor;
+      Inserted : Boolean;
    begin
-      if Instance.Instance_Count < Max_Endpoint_Instances then
-         Instance.Instance_Count :=
-           Instance.Instance_Count + 1;
-         Instance.Instances (Instance.Instance_Count) :=
-           Instanced_Handler_Record'
-             (Endpoint   => Endpoint,
-              Identifier => Identifier,
-              Capability => Cap);
+      --  A server asks Has_Instance first, so an endpoint that is already
+      --  there is left as it is: the first cap set is the one found.
+
+      if Has_Instance (Instance, Endpoint, Identifier) then
+         return;
       end if;
+
+      Instance.Instances.Insert
+        (Identifier, Handler_Vectors.Empty_Vector, Position, Inserted);
+      Instance.Instances.Reference (Position).Append
+        (Instanced_Handler_Record'
+           (Endpoint   => Endpoint,
+            Capability => Cap));
+
+   exception
+      when Storage_Error =>
+         --  The heap is full: as with a full table in a boot module, the
+         --  caps of the new object are null. A server cannot do more.
+         null;
    end Set_Instance_Cap;
 
    ------------------
