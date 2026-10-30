@@ -3,7 +3,6 @@ with System.Storage_Elements;
 with Rose.Capabilities;
 with Rose.Init_Capabilities;
 with Rose.Limits;
-with Rose.Objects;
 with Rose.Words;
 
 with Rose.Interfaces.Exec;
@@ -548,73 +547,24 @@ package body Init.Run is
            (Console_Stream_Cap, "init: login check failed" & NL);
       end if;
 
-      declare
-         Launch_Petal_Cap : constant Rose.Capabilities.Capability :=
-                              Init.Calls.Find_In_Map
-                                (Find_Cap => Find_Cap,
-                                 Key      => "petal");
-         Standard_Caps    : constant Rose.Capabilities.Capability :=
-                              Init.Calls.Create_Cap_Set_With
-                                (Create_Cap_Set => Cap_Set_Cap,
-                                 Caps           =>
-                                 --  standard_input
-                                   (Console_Input_Stream_Cap,
+      --  The console runs login, which asks for a user name and password
+      --  and runs petal for the user (#457, #458).
 
-                                    --  standard_output
-                                    Console_Stream_Cap,
-
-                                    --  standard_error
-                                    Console_Stream_Cap,
-
-                                    --  current_directory: the
-                                    --  user's home directory
-                                    Home_Cap,
-
-                                    --  clock
-                                    Null_Capability,
-
-                                    --  delete_cap
-                                    Delete_Cap,
-
-                                    --  rescind_cap
-                                    Rescind_Cap,
-
-                                    --  create_endpoint
-                                    Create_Endpoint_Cap,
-
-                                    --  create_cap_set
-                                    Cap_Set_Cap,
-
-                                    --  the command registry's Commands
-                                    --  interface, for running commands
-                                    --  (ADR 0002, #460)
-                                    Commands_Cap,
-
-                                    --  trace events (Rose.Trace)
-                                    Trace_Cap,
-
-                                    --  the user (interfaces/user.idl)
-                                    User_Cap,
-
-                                    --  the console, for the console role
-                                    --  (#454)
-                                    Console_Terminal_Cap
-                                   ));
-
-         Petal_Object     : Rose.Objects.Object_Id with Unreferenced;
-      begin
-         if Launch_Petal_Cap = Rose.Capabilities.Null_Capability then
-            Init.Calls.Send_String
-              (Console_Stream_Cap, "init: unable to find 'petal'" & NL);
-         else
-            Init.Calls.Send_String
-              (Console_Stream_Cap,
-               "launching petal" & NL);
-            Petal_Object :=
-              Init.Calls.Launch
-                (Launch_Petal_Cap, Standard_Caps, "petal");
-         end if;
-      end;
+      Init.Calls.Send_String
+        (Console_Stream_Cap, "launching login" & NL);
+      if not Init.Users.Start_Login
+        (Find_Cap        => Find_Cap,
+         Console         => Console_Terminal_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Cap,
+         Rescind_Cap     => Rescind_Cap,
+         Commands        => Commands_Cap,
+         Timer           => Init.Boot.Timer_Interface_Cap,
+         Auth            => Auth_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: unable to launch login" & NL);
+      end if;
 
       Init.Calls.Send_String
         (Console_Stream_Cap, "init: exiting" & NL);

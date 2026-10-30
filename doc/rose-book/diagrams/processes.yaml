@@ -32,7 +32,9 @@ bands:
 
 processes:
   # Persistent
+  login:      {at: [250, 75], kind: persistent, label: login}
   petal:      {at: [520, 75], kind: persistent, label: petal, note: shell}
+  auth:       {at: [90, 165], kind: persistent, label: auth}
   user:       {at: [250, 165], kind: persistent, label: user, note: fraser}
   command:    {at: [660, 165], kind: persistent, label: command,
                note: registry}
@@ -79,6 +81,9 @@ processes:
   pci:        {at: [625, 1020], kind: boot, label: pci, note: "5"}
 
 calls:
+  - {from: login, to: petal, label: runs}
+  - {from: login, to: auth, label: Login}
+  - [auth, user]
   - [petal, user]
   - {from: petal, to: home, label: cwd}
   - {from: petal, to: command, label: find}

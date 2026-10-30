@@ -1,0 +1,17 @@
+command Rose.Core.Login
+  : Console, Create_Endpoint, Delete_Cap, Rescind_Cap, Find_Command,
+    Timer_Service
+  with Summary     => "Log users in at the console.",
+       Description => """
+          Login asks for a user name and a password at the console, and
+          checks them with Auth (#457). For the right password, it runs
+          petal for the user, and when petal logs out, it asks again.
+          For a wrong one, it waits a few seconds, says that the login
+          failed, and asks again. It never completes.
+          """,
+       Server      => Login_Loop.Run,
+       Live
+is
+   Auth : in Auth
+     with Help => "the Auth interface, which checks a user's password";
+end Rose.Core.Login;

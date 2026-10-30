@@ -2,12 +2,9 @@ with System.Storage_Elements;
 
 with Ada_Text_IO;
 
-with Rose.Capabilities.Standard;
 with Rose.Invocation;
-with Rose.System_Calls.Client;
-with Rose.Words;
+with Rose.System_Calls;
 
-with Rose.Interfaces.Cap_Set;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Reader.Client;
@@ -22,11 +19,6 @@ package body Petal.Session is
 
    --  Petal's argument cap set: the caps it uses here.
 
-   Home_Index : constant := 4;
-   --  The current_directory slot, which holds the user's home directory,
-   --  a Writable_Directory.
-   User_Index : constant := 12;
-   --  The user's User interface (interfaces/user.idl).
 
    Startup_File_Name : constant String := ".petalrc";
 
@@ -304,44 +296,15 @@ package body Petal.Session is
    -- Start --
    -----------
 
-   procedure Start is
-      Params  : aliased Rose.Invocation.Invocation_Record;
-      Get_Cap : Rose.Capabilities.Capability;
-
-      function Argument_Cap
-        (Index : Rose.Words.Word)
-         return Rose.Capabilities.Capability
-      is (Rose.System_Calls.Client.Get_Capability (Get_Cap, (1 => Index)));
-
+   procedure Start (User : Rose.Interfaces.User.Client.User_Client) is
+      Home : constant Writable_Directory_Client :=
+        Rose.Interfaces.User.Client.Home_Directory (User);
    begin
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-      Get_Cap := Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
-
-      --  A generated client invokes whatever cap it is opened with, and
-      --  invoking a null cap fails with Invalid_Capability (#239), so
-      --  missing caps are not opened.
-
-      declare
-         Home_Cap : constant Rose.Capabilities.Capability :=
-           Argument_Cap (Home_Index);
-         User_Cap : constant Rose.Capabilities.Capability :=
-           Argument_Cap (User_Index);
-         Home     : Writable_Directory_Client;
-      begin
-         if Home_Cap /= Rose.Capabilities.Null_Capability then
-            Open (Home, Home_Cap);
-            Add_Directory (Home_Name, Home);
-         end if;
-
-         if User_Cap /= Rose.Capabilities.Null_Capability then
-            Rose.Interfaces.User.Client.Open (Session_User, User_Cap);
-            Have_User := True;
-         end if;
-      end;
+      Session_User := User;
+      Have_User := True;
+      if Get_Interface_Cap (Home) /= Rose.Capabilities.Null_Capability then
+         Add_Directory (Home_Name, Home);
+      end if;
    end Start;
 
 end Petal.Session;

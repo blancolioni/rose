@@ -10,7 +10,8 @@ package Petal.Session is
    --  first entry is the user's home directory, home (ADR 0002,
    --  section 5).
 
-   procedure Start;
+   procedure Start (User : Rose.Interfaces.User.Client.User_Client);
+   --  Start the session of User, with User's home directory as home.
    --  Take the user and the home directory from petal's argument cap
    --  set. Either can be missing, as when petal is not started for a
    --  user.

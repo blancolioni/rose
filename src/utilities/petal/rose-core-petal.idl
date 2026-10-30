@@ -1,0 +1,15 @@
+command Rose.Core.Petal
+  : Standard_IO, Create_Endpoint, Delete_Cap, Rescind_Cap, Find_Command,
+    Console
+  with Summary     => "Run the shell for a user.",
+       Description => """
+          Petal is the shell. It runs the user's .petalrc, then reads
+          commands from standard input and runs them, until the input
+          ends, when it logs out and the command completes (#458).
+          login runs it for each user who logs in (#457).
+          """,
+       Live
+is
+   User : in User
+     with Help => "the user whose session this is";
+end Rose.Core.Petal;
