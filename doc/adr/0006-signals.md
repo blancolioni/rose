@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-26
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking)
+- **Amended by:** #512, where a call can be made pausable, so that a signal reaches a process blocked in it without cancelling it (section 5)
 
 ## Context
 
@@ -80,7 +81,22 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - **One message carries every pending bit,** in its first word, and clears them. It comes from the kernel and has no reply cap, as interrupts do.
 - **It comes before any queued message or blocked sender,** as the restore notice does now (ADR 0004).
 - **`Rose.Server` dispatches each bit** to the handler registered for it, and ignores bits with no handler. When a handler for a named signal is registered, `Rose.Server` tells the kernel that the process handles that signal. A process that registers none sees no change.
-- **A process blocked in a call doesn't see them** until the call returns and it next receives.
+- **A process blocked in a call doesn't see them** until the call returns and it next receives, unless the call is pausable.
+
+#### Pausable calls
+
+Amended by #512. Some processes must hear of a signal while they wait for a long call, and then go on waiting for it. The console supervisor (#512) waits for the user's session to end, in its launch call to petal, and must handle `Restored` while it waits. A shell waits in the same way for a job in the foreground. Cancelling the call, as `Interrupt` does, doesn't do: the reply is lost, and making the call again would make the request again, a second launch.
+
+- **A call can be made pausable,** with a new invocation flag. The run-time system sets it only where a handler may safely run, such as the supervisor's wait for petal. A call without the flag is not paused, so a process that doesn't ask sees no change.
+- **A signal that the process handles pauses a pausable call that is waiting for its reply.** The call returns at once with a new status, `Signalled`, which isn't an error, and the pending bits in its first word, as at a receive. The bits are cleared.
+- **The call stays open.** The server still holds its reply cap and answers it as usual. If the reply arrives before the process waits again, the kernel holds it for the process.
+- **The process waits again with a new operation, `Wait_Reply`,** which returns the held reply at once, or blocks until it arrives. `Wait_Reply` is pausable too.
+- **A call that hasn't reached the server yet is withdrawn instead.** The caller is taken off the server's waiting list, and the call returns `Signalled` marked as not sent. The run-time system makes it again after the handlers, which is safe, since the server never saw it.
+- **The run-time system makes it look like one call.** It dispatches the bits to their handlers (`Rose.Server`), then calls `Wait_Reply`, and the caller sees only the reply.
+- **A process has at most one paused call.** The calls that its handlers make aren't pausable, and signals that arrive during a handler wait until it returns to `Wait_Reply`. The kernel tells the paused call's reply from the replies to the handlers' calls by a call number in the reply cap.
+- **A paused call is saved in checkpoints,** with any reply that is held for it. After a restore, a process in `Wait_Reply` goes on waiting for the server it called, as any blocked caller does (ADR 0004, section 4).
+
+`Interrupt` is unchanged: it cancels the call (section 4).
 
 ### 6. Signal caps
 
@@ -93,6 +109,7 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 
 - **`Set_Timer` is given a signal cap.** The timer invokes the cap it is given when the time is up. With a signal cap, an expiry can't be lost. The timer's interface doesn't change, but it should refuse caps that aren't signal caps, so the old, lossy path goes away.
 - **`Restored` replaces the `Restore_Notice` flag.** The kernel sets the `Restored` bit on every process that restore resumes, and `Rose.Server` calls the process's `Restored` handler. A process that implements `Restorable` sees no change. ADR 0004's guarantee holds: the notice arrives before anything else the process receives.
+- **A process blocked in a pausable call hears of a restore at once,** not when the call returns (section 5). This is what the console supervisor needs (#512).
 - **`Kernel_Process.Notify` is removed.** Signal caps replace it.
 
 ## Consequences
@@ -110,6 +127,7 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - **Signals carry no data.** A process that uses one bit for several things, such as many timers, must work out which one happened.
 - **24 bits for each process's own use.** A process with more sources than that must share bits between them.
 - **Cancelling an invocation is new.** A server may already be working on the cancelled request, and its reply then has nowhere to go. The kernel must discard it safely.
+- **Pausable calls are new kernel state:** an open call that outlives the system call that made it, a held reply, a call number in reply caps, and `Wait_Reply`, all saved in checkpoints.
 
 ## Alternatives considered
 
@@ -117,6 +135,10 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - **Counting signals.** A counter instead of a bit says how many times a signal was sent. It costs more space, and the senders that need a count can say so in a call.
 - **Kill, suspend and resume as signals.** They would never set a bit, since the kernel carries them out at once, so a signal gives nothing that an operation on the process cap doesn't.
 - **More named signals, following POSIX,** such as a child exiting, a hangup or a resized terminal. Each is better as a reply, an error, or one of the process's own bits (section 2).
+- **Signals cancel every blocked call, as `Interrupt` does.** The caller would have to make the call again, which makes the request again. A launch would start a second process.
+- **Asynchronous calls.** A call made without waiting, whose reply comes later as a message on one of the caller's endpoints. It is more general, but it changes how every reply is delivered. A pausable call keeps the call as it is, and adds only the pause.
+- **A process that waits for each long call.** A helper makes the call and signals the caller when it returns. It needs no kernel change, but costs a process for each wait.
+- **A contract for the program being waited for,** for example a petal that answers its launch at once and sends a message when it ends. It works only for programs that follow it.
 - **Suspension that the process can see.** A process told that it is being suspended could refuse or delay it. Suspension is the shell's decision, not the job's.
 
 ## Open questions
@@ -124,6 +146,8 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - **Handlers that break into running code.** The scheduler could check a process's urgent signals each time it schedules the process, and act there: save the process's state and start it at a handler, as Unix signals do. A process computing without invoking anything would then see `Interrupt` straight away. But servers run without tasking, so a handler that runs in the middle of other code needs a run-time system that copes with it, and the kernel needs a way to return to the interrupted code. For now, cancelling the current invocation (section 4) covers the common case.
 - **Hardware interrupts as signals.** An interrupt could set a bit instead of being sent as a message. That would remove the one-message slot that ADR 0004 works around, but a driver would lose the interrupt code that comes with the message.
 - **Masking.** Should a process be able to hold off its own signals for a while, for example while it updates state that a handler reads?
+- **More than one paused call.** A handler that itself makes a long call, and should be paused in it, would need paused calls to nest.
+- **`Interrupt` and pausable calls.** `Interrupt` could pause a pausable call instead of cancelling it, and leave the handler to cancel it, through a new `Cancel_Call` operation.
 - **Which caps petal gets.** Exec could give petal every named signal cap and process operation for a job, or only `Interrupt`, `Terminate` and kill, with `Stop`, suspend and resume for job control later.
 
 ## Follow-up work
@@ -133,6 +157,7 @@ The ordinary named signals that a process handles, and its own bits, are deliver
 - Kernel: which named signals a process handles, and the default actions of the ones it doesn't (new issue).
 - Kernel and run-time system: `Interrupt`, the `Interrupted` error, cancelling a blocked invocation, and the exception (new issue).
 - `Rose.Server`: dispatch signal bits to handlers (new issue).
+- Kernel and run-time system: pausable calls, `Signalled`, `Wait_Reply`, call numbers in reply caps, and saving a paused call in checkpoints (new issue).
 - `Restored` as a signal, replacing the `Restore_Notice` flag (new issue).
 - Timer: accept only signal caps (new issue).
 - Exec: signal the launcher, through a signal cap it gives, when a process it launched ends, for background jobs (#142).
