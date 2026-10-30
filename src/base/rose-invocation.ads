@@ -54,12 +54,15 @@ package Rose.Invocation is
       Unknown_Error,
       Undefined_Error,
       No_Invoke_Buffer,
-      Buffer_Too_Small);
+      Buffer_Too_Small,
+      Exception_Raised);
    --  No_Invoke_Buffer is reported by the user library, and never by the
    --  kernel, when a process sends text or a storage array without having
    --  set up an invoke buffer (#239). Buffer_Too_Small is reported by the
    --  user library too, when the items of an invocation do not fit in the
-   --  invoke buffer (idle#58).
+   --  invoke buffer (idle#58). Exception_Raised is sent by a generated
+   --  server when the handler of an operation raises an exception
+   --  (idle#60).
 
    Max_Parameter_Words : constant := 16;
    Max_Capabilities    : constant := 16;
