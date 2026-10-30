@@ -111,7 +111,30 @@ If it finds one, it brings back the persistent processes as they were at that ch
 
 When `init` has started the last boot modules and replied, `restore` resumes the processes (see <<restore-boot>>).
 A restored process continues from where it was.
-A process that was blocked in a system call makes the call again.
+
+[#restore-blocked-calls]
+=== Blocked Calls
+
+A process that was blocked in a system call when the checkpoint was taken can't simply carry on: the boot that saved its state is gone.
+When `restore` resumes it, the kernel decides from what it was waiting for (ADR 0004, section 4; #519):
+
+* *A receive, or a call to a boot module or the kernel.*
+  It makes the call again.
+  A boot module starts fresh at each boot, so it has no record of the call.
+* *A call that a restored server had not received yet.*
+  The checkpoint holds the server's list of waiting callers.
+  The caller makes the call again, and the kernel deletes the reply cap that the server already had for it.
+* *A call that a restored server had received.*
+  The server holds a reply cap for the caller, and may be working on the request or holding it, as `vga-console` holds a `Read` until a line is typed.
+  The caller goes on waiting, and the server's reply resumes it, as before the restart.
+  If the call carries a buffer, the kernel maps it into the server's shared slots again, where the server's request expects it.
+  The checkpoint holds the slots, and `restore` has mapped the caller's pages before it resumes anything.
+
+So a call is handled once: a launch isn't sent twice, and a server's held request is still the caller's call.
+Each decision is in the kernel log, as `restore: waits for reply from` or `restore: makes its call again`.
+
+A queued message that is a call is restored with its process, so that its caller isn't left waiting.
+Anything else that was queued, such as an interrupt, belongs to the boot before the restart, and is dropped.
 
 If there is no checkpoint, or it cannot be restored, `restore` starts a new log and installs the system instead.
 
@@ -140,7 +163,7 @@ end Restorable;
   The message comes from the kernel, and has no reply cap.
 * The notice comes once for each restore.
   If a checkpoint is taken while it is still pending, the flag is saved with the process, and a restore from that checkpoint sets it again.
-* It does not make a blocked call safe: a process that was blocked in a call makes the call again first, and receives the notice at its next receive.
+* A process that was blocked in a call receives the notice at its next receive, after the call returns (see <<restore-blocked-calls>>).
 
 `vga-console` is the first process to use it: when it is told that it has been restored, it maps the VGA page again and redraws the screen as it was at the checkpoint (see <<Servers>>).
 

@@ -205,7 +205,8 @@ The restored processes cannot run yet.
 It replies to `restore`, and exits without launching anything else: the programs it would launch are running already, as they were at the checkpoint.
 
 When `init`'s reply arrives, `restore` resumes the restored processes.
-A process that was blocked in a system call makes the call again when it runs, so most servers are back in a receive almost at once.
+A process that was blocked in a receive receives again when it runs, so most servers are back in a receive almost at once.
+A process that was blocked in a call goes on waiting for the reply if a restored server holds the call, and makes the call again otherwise (see <<restore-blocked-calls>>).
 A process that depends on state a checkpoint cannot hold, such as a device or the screen, is told that it has been restored (see <<restore-notification>>).
 
 == Starting the Shell

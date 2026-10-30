@@ -1,9 +1,11 @@
 with Rose.Arch.Interrupt_Table;
+with Rose.Boot.Console;
 with Rose.Checkpoints;
 with Rose.Interfaces.Restorable;
 with Rose.Limits;
 
 with Rose.Kernel.Interrupts;
+with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
 
 package body Rose.Kernel.Processes.Snapshot is
@@ -17,6 +19,69 @@ package body Rose.Kernel.Processes.Snapshot is
    is (P.State /= Available and then P.Flags (Persistent));
 
    function Active_Cap_Count (P : Kernel_Process_Entry) return Natural;
+
+   --  The callers that were waiting for a restored process to receive
+   --  when the checkpoint was taken, from the waiting lists saved with
+   --  the processes. Their calls were never delivered (#519).
+
+   Max_Undelivered : constant := 64;
+
+   Undelivered          : array (1 .. Max_Undelivered)
+     of Rose.Objects.Object_Id;
+   Undelivered_Count    : Natural := 0;
+   Undelivered_Overflow : Boolean := False;
+
+   function Is_Undelivered (Oid : Rose.Objects.Object_Id) return Boolean;
+
+   --  The shared slots that the restored processes had, as servers: the
+   --  slot's page, and the caller whose buffer was mapped there. A caller
+   --  that goes on waiting has its buffer mapped there again.
+
+   Max_Restored_Shares : constant := 64;
+
+   type Restored_Share is
+      record
+         Server : Rose.Objects.Object_Id;
+         Page   : Rose.Addresses.Virtual_Page_Address;
+         Caller : Rose.Objects.Object_Id;
+      end record;
+
+   Restored_Shares     : array (1 .. Max_Restored_Shares) of Restored_Share;
+   Restored_Share_Count : Natural := 0;
+
+   procedure Restore_Shared_Buffer
+     (Caller  : Process_Id;
+      Server  : Process_Id;
+      Success : out Boolean);
+   --  Map the buffer of Caller's current invocation into the slots of
+   --  Server that it had at the checkpoint. Success is False, and nothing
+   --  is mapped, if they aren't known, or a page of the buffer isn't
+   --  mapped in Caller.
+
+   function Called_Server (Pid : Process_Id) return Process_Id;
+   --  The process that Pid's current invocation was sent to, or
+   --  Null_Process_Id if it wasn't sent to a process's endpoint.
+
+   function Holds_Reply_Cap
+     (Pid    : Process_Id;
+      Caller : Rose.Objects.Object_Id)
+      return Boolean;
+   --  True if Pid has a reply cap for Caller.
+
+   procedure Delete_Reply_Caps
+     (Pid    : Process_Id;
+      Caller : Rose.Objects.Object_Id);
+   --  Delete the reply caps that Pid has for Caller.
+
+   procedure Resume_Blocked_Call
+     (Pid     : Process_Id;
+      Waiting : out Boolean);
+   --  Decide what happens to the call that the restored process Pid was
+   --  blocked in: Waiting is True if it goes on waiting for the reply,
+   --  and False if it makes the call again.
+
+   procedure Restart_Call (P : in out Kernel_Process_Entry);
+   --  Make P's call again when it runs.
 
    function Cap_Page_Count (Cap_Count : Natural) return Natural
    is ((Cap_Count + Rose.Checkpoints.Caps_Per_Page - 1)
@@ -46,6 +111,121 @@ package body Rose.Kernel.Processes.Snapshot is
       end loop;
       return Count;
    end Active_Cap_Count;
+
+   -------------------
+   -- Called_Server --
+   -------------------
+
+   function Called_Server (Pid : Process_Id) return Process_Id is
+      use Rose.Capabilities.Layout;
+      P   : Kernel_Process_Entry renames Process_Table (Pid);
+      Cap : constant Rose.Capabilities.Capability := P.Current_Params.Cap;
+   begin
+      if Cap not in 1 .. P.Last_Cap or else not P.Is_Active (Cap) then
+         return Null_Process_Id;
+      end if;
+
+      declare
+         Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
+      begin
+         if Layout.Header.Cap_Type = Endpoint_Cap
+           and then Rose.Objects.Is_Process_Object_Id (Layout.Payload)
+         then
+            return To_Process_Id (Layout.Payload);
+         else
+            return Null_Process_Id;
+         end if;
+      end;
+   end Called_Server;
+
+   -----------------------
+   -- Delete_Reply_Caps --
+   -----------------------
+
+   procedure Delete_Reply_Caps
+     (Pid    : Process_Id;
+      Caller : Rose.Objects.Object_Id)
+   is
+      use Rose.Capabilities.Layout;
+      use type Rose.Objects.Object_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Cap in 1 .. P.Last_Cap loop
+         if P.Is_Active (Cap) then
+            declare
+               Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
+            begin
+               if Layout.Header.Cap_Type = Reply_Cap
+                 and then Layout.Payload = Caller
+               then
+                  Delete_Cap (Pid, Cap);
+               end if;
+            end;
+         end if;
+      end loop;
+   end Delete_Reply_Caps;
+
+   ---------------------
+   -- Holds_Reply_Cap --
+   ---------------------
+
+   function Holds_Reply_Cap
+     (Pid    : Process_Id;
+      Caller : Rose.Objects.Object_Id)
+      return Boolean
+   is
+      use Rose.Capabilities.Layout;
+      use type Rose.Objects.Object_Id;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      for Cap in 1 .. P.Last_Cap loop
+         if P.Is_Active (Cap) then
+            declare
+               Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
+            begin
+               if Layout.Header.Cap_Type = Reply_Cap
+                 and then Layout.Payload = Caller
+               then
+                  return True;
+               end if;
+            end;
+         end if;
+      end loop;
+      return False;
+   end Holds_Reply_Cap;
+
+   --------------------
+   -- Is_Undelivered --
+   --------------------
+
+   function Is_Undelivered (Oid : Rose.Objects.Object_Id) return Boolean is
+      use type Rose.Objects.Object_Id;
+   begin
+      for I in 1 .. Undelivered_Count loop
+         if Undelivered (I) = Oid then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Is_Undelivered;
+
+   ------------------
+   -- Restart_Call --
+   ------------------
+
+   procedure Restart_Call (P : in out Kernel_Process_Entry) is
+   begin
+      --  The system call page pushed three words before entering the
+      --  kernel, and starts at FFFF_0000.
+
+      P.Stack.EIP := 16#FFFF_0000#;
+      P.Stack.ESP := P.Stack.ESP + 12;
+      P.Flags (Receive_Any) := False;
+      P.Flags (Receive_Cap) := False;
+      P.Flags (Invoke_Reply) := False;
+      P.Flags (Wait_Reply) := False;
+      P.Flags (Interrupt_Resume) := False;
+   end Restart_Call;
 
    -----------------------
    -- Restore_Interrupt --
@@ -153,6 +333,8 @@ package body Rose.Kernel.Processes.Snapshot is
            with Import, Address => P.Stack'Address;
          Current   : Storage_Array (1 .. P.Current_Params'Size / 8)
            with Import, Address => P.Current_Params'Address;
+         Queued    : Storage_Array (1 .. P.Queued_Params'Size / 8)
+           with Import, Address => P.Queued_Params'Address;
          FPU_Bytes : Storage_Array (1 .. P.FPU_State'Size / 8)
            with Import, Address => P.FPU_State'Address;
          State     : constant Process_State :=
@@ -243,20 +425,16 @@ package body Rose.Kernel.Processes.Snapshot is
             end;
          end loop;
 
-         --  Whatever a blocked process was waiting for was lost in the
-         --  restart: a server that is not persistent has no record of
-         --  its request, and one that is was restarted at its own call.
-         --  So it makes its call again: the system call page pushed three
-         --  words before entering the kernel, and starts at FFFF_0000.
+         --  Whether a blocked process goes on waiting or makes its call
+         --  again depends on the server it called, which may not be
+         --  restored yet, so Resume_Restored_Process decides (#519).
+         --  The saved call is kept until then.
 
          case State is
             when Blocked =>
-               P.Stack.EIP := 16#FFFF_0000#;
-               P.Stack.ESP := P.Stack.ESP + 12;
-               Flags (Receive_Any) := False;
-               Flags (Receive_Cap) := False;
+               Current := Item.Current_Params (1 .. Current'Length);
+               Flags (Restored_Blocked) := True;
                Flags (Invoke_Reply) := False;
-               Flags (Wait_Reply) := False;
                Flags (Interrupt_Resume) := False;
             when Interrupted =>
                Flags (Interrupt_Resume) := True;
@@ -271,7 +449,54 @@ package body Rose.Kernel.Processes.Snapshot is
                return;
          end case;
 
-         Flags (Message_Queued) := False;
+         --  A queued call is kept, since its caller may go on waiting
+         --  for the reply. Anything else, such as an interrupt, belongs
+         --  to the boot before the restart.
+
+         Queued := Item.Queued_Params (1 .. Queued'Length);
+         P.Queued_Endpoint :=
+           Rose.Objects.Endpoint_Index (Item.Queued_Endpoint);
+         P.Queued_Cap_Id :=
+           Rose.Objects.Capability_Identifier (Item.Queued_Cap_Id);
+         Flags (Message_Queued) := Flags (Message_Queued)
+           and then P.Queued_Params.Control.Flags
+             (Rose.Invocation.Create_Reply_Cap);
+
+         --  The buffers of the calls that this process had received.
+
+         for Saved of Item.Shared loop
+            if Saved.Caller /= 0
+              and then Restored_Share_Count < Max_Restored_Shares
+            then
+               Restored_Share_Count := Restored_Share_Count + 1;
+               Restored_Shares (Restored_Share_Count) :=
+                 (Server => Rose.Objects.Object_Id (Item.Oid),
+                  Page   =>
+                    Rose.Addresses.Virtual_Page_Address (Saved.Page),
+                  Caller => Rose.Objects.Object_Id (Saved.Caller));
+            end if;
+         end loop;
+
+         --  The callers that were waiting for this process to receive
+         --  make their calls again.
+
+         for I in 1 .. Natural'Min (Natural (Item.Waiting_Count),
+                                    Rose.Checkpoints.Max_Saved_Waiting)
+         loop
+            if Undelivered_Count = Max_Undelivered then
+               if not Undelivered_Overflow then
+                  Rose.Boot.Console.Put_Line
+                    ("restore: too many waiting callers;"
+                     & " every blocked call is made again");
+               end if;
+               Undelivered_Overflow := True;
+            else
+               Undelivered_Count := Undelivered_Count + 1;
+               Undelivered (Undelivered_Count) :=
+                 Rose.Objects.Object_Id (Item.Waiting (I));
+            end if;
+         end loop;
+
          Flags (Checkpoint_Page_Fault) := False;
          Flags (Fault_Pending) := False;
          Flags (Boot_Module) := False;
@@ -282,6 +507,195 @@ package body Rose.Kernel.Processes.Snapshot is
 
       Success := True;
    end Restore_Process;
+
+   ---------------------------
+   -- Restore_Shared_Buffer --
+   ---------------------------
+
+   procedure Restore_Shared_Buffer
+     (Caller  : Process_Id;
+      Server  : Process_Id;
+      Success : out Boolean)
+   is
+      use Rose.Addresses;
+      use type Rose.Objects.Object_Id;
+      P         : Kernel_Process_Entry renames Process_Table (Caller);
+      S         : Kernel_Process_Entry renames Process_Table (Server);
+      Params    : Rose.Invocation.Invocation_Record renames
+                    P.Current_Params;
+      First     : constant Virtual_Page_Address :=
+                    Virtual_Address_To_Page
+                      (To_Virtual_Address (Params.Buffer_Address));
+      Count     : constant Natural :=
+                    Natural ((Params.Buffer_Length + Page_Bytes - 1)
+                             / Page_Bytes);
+      Base      : constant Virtual_Page_Address :=
+                    S.Page_Ranges (Invocation_Range_Index).Base;
+      Writable  : constant Boolean :=
+                    Params.Control.Flags (Rose.Invocation.Writable_Buffer);
+
+      procedure Iterate
+        (Process : not null access procedure
+           (Slot : Shared_Page_Index;
+            Page : Virtual_Page_Address;
+            Index : Natural));
+      --  Call Process for each of Server's saved slots that holds a page
+      --  of Caller's buffer, with the buffer's Index'th page, from 0.
+
+      procedure Check
+        (Slot  : Shared_Page_Index;
+         Page  : Virtual_Page_Address;
+         Index : Natural);
+
+      procedure Map
+        (Slot  : Shared_Page_Index;
+         Page  : Virtual_Page_Address;
+         Index : Natural);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check
+        (Slot  : Shared_Page_Index;
+         Page  : Virtual_Page_Address;
+         Index : Natural)
+      is
+         pragma Unreferenced (Page);
+      begin
+         if S.Shared_Pages (Slot).Pid /= Null_Process_Id
+           or else Mapped_Physical_Page
+             (Caller, First + Virtual_Page_Address (Index)) = 0
+         then
+            Success := False;
+         end if;
+      end Check;
+
+      -------------
+      -- Iterate --
+      -------------
+
+      procedure Iterate
+        (Process : not null access procedure
+           (Slot : Shared_Page_Index;
+            Page : Virtual_Page_Address;
+            Index : Natural))
+      is
+         Index : Natural := 0;
+      begin
+         for Share of Restored_Shares (1 .. Restored_Share_Count) loop
+            if Share.Server = S.Oid and then Share.Caller = P.Oid then
+               if Share.Page < Base
+                 or else Share.Page - Base >= Max_Shared_Pages
+               then
+                  Success := False;
+               else
+                  Process
+                    (Shared_Page_Index (Share.Page - Base + 1),
+                     Share.Page, Index);
+               end if;
+               Index := Index + 1;
+            end if;
+         end loop;
+         if Index /= Count then
+            Success := False;
+         end if;
+      end Iterate;
+
+      ---------
+      -- Map --
+      ---------
+
+      procedure Map
+        (Slot  : Shared_Page_Index;
+         Page  : Virtual_Page_Address;
+         Index : Natural)
+      is
+      begin
+         S.Shared_Pages (Slot) := (Page => Page, Pid => Caller);
+         Map_Page
+           (Pid           => Server,
+            Virtual_Page  => Page,
+            Physical_Page =>
+              Mapped_Physical_Page
+                (Caller, First + Virtual_Page_Address (Index)),
+            Readable      => True,
+            Writable      => Writable,
+            Executable    => False,
+            User          => True);
+      end Map;
+
+   begin
+      Success := Count > 0;
+      if Success then
+         Iterate (Check'Access);
+      end if;
+      if Success then
+         Iterate (Map'Access);
+      end if;
+   end Restore_Shared_Buffer;
+
+   -------------------------
+   -- Resume_Blocked_Call --
+   -------------------------
+
+   procedure Resume_Blocked_Call
+     (Pid     : Process_Id;
+      Waiting : out Boolean)
+   is
+      P      : Kernel_Process_Entry renames Process_Table (Pid);
+      Server : constant Process_Id :=
+                 (if P.Flags (Wait_Reply)
+                  then Called_Server (Pid)
+                  else Null_Process_Id);
+   begin
+      Waiting := False;
+
+      --  A call that is waiting for its reply has a reply cap in the
+      --  server. If the server is restored and the call was delivered,
+      --  the server answers it. If it wasn't delivered, the call is made
+      --  again, and gets a new reply cap.
+
+      if Server /= Null_Process_Id
+        and then Process_Table (Server).State /= Available
+        and then Process_Table (Server).Flags (Persistent)
+        and then not Undelivered_Overflow
+      then
+         if Is_Undelivered (P.Oid) then
+            Delete_Reply_Caps (Server, P.Oid);
+         else
+            Waiting := Holds_Reply_Cap (Server, P.Oid);
+         end if;
+
+         --  The server's request has the address of the caller's buffer
+         --  in its shared slots, which the restart unmapped. If it can't
+         --  be mapped there again, the call is made again, and the
+         --  server's reply to the first one goes nowhere.
+
+         if Waiting
+           and then P.Current_Params.Control.Flags
+             (Rose.Invocation.Send_Buffer)
+         then
+            Restore_Shared_Buffer (Pid, Server, Waiting);
+            if not Waiting then
+               Debug.Put (Pid);
+               Rose.Boot.Console.Put_Line
+                 (": restore: cannot map its buffer again");
+               Delete_Reply_Caps (Server, P.Oid);
+            end if;
+         end if;
+      end if;
+
+      Debug.Put (Pid);
+      if Waiting then
+         Rose.Boot.Console.Put (": restore: waits for reply from ");
+         Debug.Put (Server);
+         Rose.Boot.Console.New_Line;
+      else
+         Rose.Boot.Console.Put_Line (": restore: makes its call again");
+         Restart_Call (P);
+      end if;
+   end Resume_Blocked_Call;
 
    -----------------------------
    -- Resume_Restored_Process --
@@ -304,15 +718,13 @@ package body Rose.Kernel.Processes.Snapshot is
 
          declare
             use type Rose.Objects.Endpoint_Index;
-            P                : Kernel_Process_Entry renames
-                                 Process_Table (Pid);
-            Invoke_Reply_Set : constant Boolean := P.Flags (Invoke_Reply);
-            Interrupted_Set  : constant Boolean :=
-                                 P.Flags (Interrupt_Resume);
+            P       : Kernel_Process_Entry renames Process_Table (Pid);
+            Waiting : Boolean := False;
          begin
-            Set_Current_State (Pid, Ready);
-            P.Flags (Invoke_Reply) := Invoke_Reply_Set;
-            P.Flags (Interrupt_Resume) := Interrupted_Set;
+            if P.Flags (Restored_Blocked) then
+               P.Flags (Restored_Blocked) := False;
+               Resume_Blocked_Call (Pid, Waiting);
+            end if;
 
             --  A process with a Restorable interface is told, the next
             --  time it receives, that it has been restored.
@@ -320,6 +732,28 @@ package body Rose.Kernel.Processes.Snapshot is
             P.Flags (Restore_Notice) :=
               Find_Endpoint
                 (Pid, Rose.Interfaces.Restorable.Restored_Endpoint) /= 0;
+
+            if Waiting then
+
+               --  The server's reply makes it ready, as before the
+               --  restart. The scheduler's queue holds blocked processes
+               --  too.
+
+               P.State := Blocked;
+               Rose.Kernel.Processes.Queue.Queue_Process (Pid);
+               return;
+            end if;
+
+            declare
+               Invoke_Reply_Set : constant Boolean :=
+                                    P.Flags (Invoke_Reply);
+               Interrupted_Set  : constant Boolean :=
+                                    P.Flags (Interrupt_Resume);
+            begin
+               Set_Current_State (Pid, Ready);
+               P.Flags (Invoke_Reply) := Invoke_Reply_Set;
+               P.Flags (Interrupt_Resume) := Interrupted_Set;
+            end;
          end;
 
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);
@@ -453,6 +887,16 @@ package body Rose.Kernel.Processes.Snapshot is
               or (if Range_Flags.Fixed_Address
                   then Rose.Checkpoints.Range_Fixed_Address else 0);
          end;
+      end loop;
+
+      for I in Shared_Page_Index loop
+         if P.Shared_Pages (I).Pid /= Null_Process_Id then
+            Item.Shared (Positive (I)) :=
+              (Page   => Word_32 (P.Shared_Pages (I).Page),
+               Unused => 0,
+               Caller =>
+                 Word_64 (Process_Table (P.Shared_Pages (I).Pid).Oid));
+         end if;
       end loop;
 
       for I in Registered_Endpoint_Index loop
