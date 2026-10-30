@@ -1,22 +1,48 @@
 # rose
 Persistent capability-based kernel
 
+Website: [rose-os.org](https://rose-os.org)
+
 ## Requirements
 
-The build process requires [alix](https://github.com/blancolioni/alix) to generate source files from .idl specifications.
+Rose requires gcc 15, and is known to build on Fedora 43.  The run-time
+system is built from the GNAT 15 sources, which `rts/copy-runtime.sh` copies
+from the installed compiler.  Rose will probably build against newer major
+versions of gcc if you change `GCCVERSION` in that script.
 
-On Fedora, you'll need the following packages: qemu-img gcc-gnat gprbuild make xorriso 
+The build scripts assume Fedora's file layout.  Install
+[Alire](https://alire.ada.dev) for the Ada toolchain (GNAT and gprbuild), and
+these packages:
 
-To test under Bochs as well as QEMU, install bochs and run `sh bochs/run-bochs.sh`.
+```
+sudo dnf install make binutils python3 xorriso grub2-tools grub2-pc-modules \
+    mtools qemu-img
+```
 
-Building Rose requires gcc 10 or gcc 11.  Earlier versions might also work.
+To boot the result you'll want `qemu-system-x86`.  To test under Bochs as
+well, install bochs and run `sh bochs/run-bochs.sh`.
+
+`clean-build.sh` also builds the book, which needs:
+
+```
+sudo dnf install python3-pyyaml asciidoctor rubygem-asciidoctor-pdf
+gem install --user-install asciidoctor-epub3
+```
 
 ## Build
+
+Rose's interfaces are written in IDL and compiled to Ada by
+[idle](https://github.com/blancolioni/idle), which isn't on Alire yet, so you
+build it first.  idle needs [syn](https://github.com/blancolioni/syn) next to
+it.
 
 ```
 git clone https://github.com/blancolioni/rose.git
 cd rose
-sh ./clean-build.sh
+git clone https://github.com/blancolioni/syn
+git clone https://github.com/blancolioni/idle
+(cd idle; alr build)
+IDLE=$PWD/idle/bin/idle sh ./clean-build.sh
 ```
 
 A bootable iso is created in the images directory.
@@ -29,8 +55,26 @@ you would call ready for production.
 
 ## Screenshots
 
-<img width="361" alt="rose-boot" src="https://user-images.githubusercontent.com/53253609/158064366-a33f056f-e68d-43de-aa72-92bda9d55517.png">
+<img src="doc/images/install-scan.png" alt="the installer scanning the disk">
 
-The bar at the top contains a beautiful rose, the amount of allocated kernel memory, the total available memory, the currently running process, the number of page faults, and the up time.
+The first boot from the iso.  The bar at the top contains the name of the system, the amount of allocated kernel memory, the total available memory, the currently running process, the number of page faults, and the up time.  The PCI and ATA servers find the disk, and `scan` partitions it.
 
-At the end of the boot, a petal shell is launched.  At the prompt I typed a command, and received a result.
+<img src="doc/images/install-restore.png" alt="restore installing the system image">
+
+`restore` creates the system image on the new store, installing each driver and utility.
+
+<img src="doc/images/install-bootloader.png" alt="restore writing the boot loader">
+
+When it has finished, it writes the boot loader to the disk.
+
+<img src="doc/images/restore-checkpoint.png" alt="booting from the checkpoint">
+
+On the next boot, from the disk, the log is consistent and the system is restored from its checkpoint.
+
+<img src="doc/images/petal.png" alt="logging in and running petal">
+
+After login, a petal shell starts.  I typed a few commands, and received results.  `ls` isn't a command; `list` is.
+
+<img src="doc/images/petal-power-cycle.png" alt="the same screen after a power cycle">
+
+The same screen after a power cycle.  Look at the up time: the machine has just started again, but the session, including the screen, is exactly as it was, because Rose is persistent.
