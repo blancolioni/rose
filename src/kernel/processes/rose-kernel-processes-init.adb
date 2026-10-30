@@ -120,7 +120,9 @@ package body Rose.Kernel.Processes.Init is
                      Init_Caps.First_Device_Vector
                      + Init_Caps.Last_Device_Vector * 2 ** 32),
            Init_Caps.Device_Pages_Cap       =>
-             Layout (Physical_Memory_Cap, Memory.Device_Page));
+             Layout (Physical_Memory_Cap, Memory.Device_Page),
+           Init_Caps.Restart_Cap            =>
+             Kernel (Kernel_Caps.Restart_Endpoint));
 
    begin
       for Index in Layouts'Range loop

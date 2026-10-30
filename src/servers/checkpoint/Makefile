@@ -21,6 +21,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-interfaces-timer.o \
 	$(BUILDDIR)/rose-interfaces-timer-client.o \
+	$(BUILDDIR)/rose-interfaces-checkpointer.o \
+	$(BUILDDIR)/rose-interfaces-checkpointer-server.o \
 	$(BUILDDIR)/rose-interfaces-timeout.o \
 	$(BUILDDIR)/rose-interfaces-timeout-server.o \
 	$(BUILDDIR)/rose-server.o \

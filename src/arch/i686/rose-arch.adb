@@ -237,6 +237,51 @@ package body Rose.Arch is
            Volatile => True);
    end Port_Out_32;
 
+   -------------
+   -- Restart --
+   -------------
+
+   procedure Restart is
+      Keyboard_Status  : constant Word_16 := 16#64#;
+      Keyboard_Command : constant Word_16 := 16#64#;
+      Input_Full       : constant Word_8 := 16#02#;
+      Pulse_Reset      : constant Word_8 := 16#FE#;
+      Reset_Control    : constant Word_16 := 16#CF9#;
+      Descriptor       : array (1 .. 3) of Word_16 := (0, 0, 0)
+        with Volatile;
+      --  An interrupt descriptor table with a limit of zero: any interrupt
+      --  then faults, the fault faults, and the processor resets.
+   begin
+      Disable_Interrupts;
+
+      --  The keyboard controller pulses the reset line once its input
+      --  buffer is empty.
+
+      for I in 1 .. 100_000 loop
+         exit when (Port_In_8 (Keyboard_Status) and Input_Full) = 0;
+      end loop;
+      Port_Out_8 (Keyboard_Command, Pulse_Reset);
+
+      for I in 1 .. 100_000 loop
+         exit when (Port_In_8 (Keyboard_Status) and Input_Full) = 0;
+      end loop;
+
+      --  A hard reset through the reset control register.
+
+      Port_Out_8 (Reset_Control, 16#02#);
+      Port_Out_8 (Reset_Control, 16#06#);
+
+      --  A triple fault.
+
+      Asm ("lidt (%0)" & ASCII.LF & ASCII.HT & "int3",
+           Inputs   => System.Address'Asm_Input ("r", Descriptor'Address),
+           Volatile => True);
+
+      loop
+         Halt;
+      end loop;
+   end Restart;
+
    -----------------------
    -- Restore_FPU_State --
    -----------------------

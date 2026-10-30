@@ -35,6 +35,10 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  Send interrupt data word 0 to the endpoint cap data word 3 of the
    --  restored process whose object id is in data words 1 and 2.
 
+   Restart_Endpoint           : constant Rose.Objects.Endpoint_Index := 15;
+   --  Restart the machine (#413). Only init has this cap: it restarts
+   --  after an install, once the first checkpoint is in the log.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

@@ -8,6 +8,7 @@ with Rose.Words;
 with Rose.Console_IO;
 with Rose.System_Calls.Client;
 
+with Rose.Interfaces.Checkpointer.Server;
 with Rose.Interfaces.Timeout.Server;
 
 with Rose.Interfaces.Cap.Client;
@@ -40,6 +41,15 @@ package body Checkpoint.Server is
 
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier);
+
+   function Take_Checkpoint
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural;
+   --  Checkpointer.Take_Checkpoint (#413).
+
+   function Checkpoint return Boolean;
+   --  Take a checkpoint: False if the kernel could not take its snapshot,
+   --  and there is none.
 
    function Enter_Checkpoint (Page_Count : out Natural) return Boolean;
    --  Enter checkpoint mode, with the kernel's tables in Kernel_Tables.
@@ -79,6 +89,34 @@ package body Checkpoint.Server is
       end loop;
    end Append_Kernel_Tables;
 
+   ----------------
+   -- Checkpoint --
+   ----------------
+
+   function Checkpoint return Boolean is
+      Page_Count : Natural;
+   begin
+
+      --  The kernel's tables come first in the log entry, then the
+      --  storage server's region table, then the memory server's tables
+      --  and pages.  Without the kernel's tables the entry would be
+      --  no use for a restore, so if the kernel can't take its snapshot
+      --  there is no checkpoint this time, and the memory server keeps
+      --  its dirty pages for the next one.
+
+      if Enter_Checkpoint (Page_Count) then
+         Append_Kernel_Tables (Page_Count);
+         Store_Checkpoint;
+         Execute_Checkpoint;
+         Leave_Checkpoint;
+         return True;
+      else
+         Rose.Console_IO.Put_Line
+           ("checkpoint: kernel tables not saved; skipping checkpoint");
+         return False;
+      end if;
+   end Checkpoint;
+
    -------------------
    -- Create_Server --
    -------------------
@@ -111,6 +149,9 @@ package body Checkpoint.Server is
       Rose.Interfaces.Timeout.Server.Create_Server
         (Server_Context => Server_Context,
          On_Timeout     => On_Timeout'Access);
+      Rose.Interfaces.Checkpointer.Server.Attach_Interface
+        (Server_Context  => Server_Context,
+         Take_Checkpoint => Take_Checkpoint'Access);
 
       Timeout_Cap :=
         Rose.Interfaces.Timer.Client.Set_Timer
@@ -178,27 +219,12 @@ package body Checkpoint.Server is
      (Id    : in     Rose.Objects.Capability_Identifier)
    is
       pragma Unreferenced (Id);
-      Page_Count : Natural;
+      Taken : Boolean with Unreferenced;
    begin
       Rose.Interfaces.Cap.Client.Destroy (Timeout_Cap);
       Rose.Interfaces.Cap.Client.Close (Timeout_Cap);
 
-      --  The kernel's tables come first in the log entry, then the
-      --  storage server's region table, then the memory server's tables
-      --  and pages.  Without the kernel's tables the entry would be
-      --  no use for a restore, so if the kernel can't take its snapshot
-      --  there is no checkpoint this time, and the memory server keeps
-      --  its dirty pages for the next one.
-
-      if Enter_Checkpoint (Page_Count) then
-         Append_Kernel_Tables (Page_Count);
-         Store_Checkpoint;
-         Execute_Checkpoint;
-         Leave_Checkpoint;
-      else
-         Rose.Console_IO.Put_Line
-           ("checkpoint: kernel tables not saved; skipping checkpoint");
-      end if;
+      Taken := Checkpoint;
 
       Timeout_Cap :=
         Rose.Interfaces.Timer.Client.Set_Timer
@@ -228,5 +254,18 @@ package body Checkpoint.Server is
       Rose.System_Calls.Send_Cap (Params, Append_Log_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end Store_Checkpoint;
+
+   ---------------------
+   -- Take_Checkpoint --
+   ---------------------
+
+   function Take_Checkpoint
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      pragma Unreferenced (Id);
+   begin
+      return (if Checkpoint then 1 else 0);
+   end Take_Checkpoint;
 
 end Checkpoint.Server;
