@@ -14,7 +14,6 @@ with Rose.System_Calls;
 with Init.Boot;
 with Init.Boot_Steps;
 with Init.Calls;
-with Init.Clock_Checks;
 with Init.Installer;
 with Init.Self_Tests;
 with Init.Users;
@@ -539,9 +538,6 @@ package body Init.Run is
       if Clock_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: no clock" & NL);
-      elsif not Init.Clock_Checks.Run (Clock_Cap) then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: clock check failed" & NL);
       end if;
 
       --  The self tests run as a command, and init waits for them to
@@ -553,7 +549,8 @@ package body Init.Run is
         (Find_Cap        => Find_Cap,
          Standard_Output => Console_Stream_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
-         Commands        => Commands_Cap)
+         Commands        => Commands_Cap,
+         Clock           => Clock_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);
@@ -614,6 +611,7 @@ package body Init.Run is
          Rescind_Cap     => Rescind_Cap,
          Commands        => Commands_Cap,
          Timer           => Init.Boot.Timer_Interface_Cap,
+         Clock           => Clock_Cap,
          Auth            => Auth_Cap)
       then
          Init.Calls.Send_String

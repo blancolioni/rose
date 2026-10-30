@@ -1,0 +1,1 @@
+role Clock_Service : Clock;

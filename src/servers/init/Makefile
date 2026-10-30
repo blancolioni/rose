@@ -11,7 +11,6 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/init-boot.o \
 	$(BUILDDIR)/init-boot_steps.o \
 	$(BUILDDIR)/init-calls.o \
-	$(BUILDDIR)/init-clock_checks.o \
 	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \
@@ -25,8 +24,6 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-auth-client.o \
 	$(BUILDDIR)/rose-interfaces-auth_admin.o \
 	$(BUILDDIR)/rose-interfaces-auth_admin-client.o \
-	$(BUILDDIR)/rose-interfaces-clock.o \
-	$(BUILDDIR)/rose-interfaces-clock-client.o \
 	$(BUILDDIR)/rose-interfaces-directory-client.o \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \

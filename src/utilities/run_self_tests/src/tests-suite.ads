@@ -1,3 +1,4 @@
+with Tests.Clock;
 with Tests.Containers;
 with Tests.Directories;
 with Tests.Dispatching;
@@ -32,6 +33,8 @@ package Tests.Suite is
                    Tests.Files.File_Test'Access,
                    Tests.Directories.Directory_Test'Access,
                    Tests.Users.User_Test'Access,
+                   Tests.Clock.Calendar_Test'Access,
+                   Tests.Clock.Clock_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
                    Tests.Memory.Copy_Test'Access);

@@ -32,6 +32,10 @@ package body Login_Loop is
    Timer    : Rose.Interfaces.Timer.Client.Timer_Client;
    Auth     : Rose.Interfaces.Auth.Client.Auth_Client;
 
+   Clock_Interface_Cap : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  The clock's Clock interface, for petal.
+
    Pending      : Storage_Array (1 .. 4096);
    Pending_Last : Storage_Count := 0;
    --  What the console has given that Get_Line hasn't returned yet.
@@ -220,6 +224,7 @@ package body Login_Loop is
         (Params, Rose.System_Calls.Rescind_Cap_Capability);
       Rose.System_Calls.Send_Cap (Params, Commands.Commands_Cap);
       Rose.System_Calls.Send_Cap (Params, Console.Terminal_Cap);
+      Rose.System_Calls.Send_Cap (Params, Clock_Interface_Cap);
       Rose.System_Calls.Send_Cap (Params, User.User_Cap);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -235,9 +240,11 @@ package body Login_Loop is
      (Console  : Rose.Capabilities.Capability;
       Commands : Rose.Capabilities.Capability;
       Timer    : Rose.Capabilities.Capability;
+      Clock    : Rose.Capabilities.Capability;
       Auth     : Rose.Capabilities.Capability)
    is
    begin
+      Clock_Interface_Cap := Clock;
       Rose.Interfaces.Terminal.Client.Open (Login_Loop.Console, Console);
       Rose.Interfaces.Commands.Client.Open (Login_Loop.Commands, Commands);
       Rose.Interfaces.Timer.Client.Open (Login_Loop.Timer, Timer);
