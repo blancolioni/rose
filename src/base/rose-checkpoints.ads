@@ -66,6 +66,7 @@ package Rose.Checkpoints is
    Max_Saved_Waiting   : constant := 16;
    Max_Saved_Ranges    : constant := 8;
    Max_Saved_Endpoints : constant := 32;
+   Max_Saved_Shared    : constant := 8;
 
    Saved_Register_Bytes   : constant := 64;
    Saved_Invocation_Bytes : constant := 160;
@@ -96,6 +97,23 @@ package Rose.Checkpoints is
       end record
      with Pack, Size => 128;
 
+   --  A page of another process's buffer, which the kernel mapped into
+   --  this process's shared slot at Page when it delivered a call from
+   --  Caller (#519). An entry with Caller 0 is free; the records of older
+   --  checkpoints have only free entries.
+
+   type Saved_Shared_Page is
+      record
+         Page   : Rose.Words.Word_32 := 0;
+         Unused : Rose.Words.Word_32 := 0;
+         Caller : Rose.Words.Word_64 := 0;
+      end record
+     with Pack, Size => 128;
+
+   type Saved_Shared_Array is
+     array (1 .. Max_Saved_Shared) of Saved_Shared_Page
+     with Pack, Size => Max_Saved_Shared * 128;
+
    type Saved_Waiting_Array is
      array (1 .. Max_Saved_Waiting) of Rose.Words.Word_64
      with Pack, Size => Max_Saved_Waiting * 64;
@@ -108,7 +126,9 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Endpoints) of Saved_Endpoint
      with Pack, Size => Max_Saved_Endpoints * 128;
 
-   Process_Record_Bytes : constant := 1216 + 4 + Saved_FPU_Bytes;
+   Process_Record_Bytes : constant :=
+                            1216 + 4 + Saved_FPU_Bytes
+                            + Max_Saved_Shared * 16;
    --  The bytes of a process record page that are in use.
 
    --  State is the kernel's Process_State'Pos, and bit N of Flags is set
@@ -156,6 +176,7 @@ package Rose.Checkpoints is
          FPU_State        : System.Storage_Elements.Storage_Array
                               (1 .. Saved_FPU_Bytes) :=
                                 (others => 0);
+         Shared           : Saved_Shared_Array;
          Reserved         : System.Storage_Elements.Storage_Array
                               (1 .. Rose.Limits.Page_Size
                                    - Process_Record_Bytes) :=

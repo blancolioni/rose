@@ -29,9 +29,8 @@ package Rose.Kernel.Processes.Snapshot is
    --  Recreate the process whose record page and capability pages are
    --  Pages, with the object id, caps, endpoints and registers it had,
    --  in any free entry.  It is not runnable until
-   --  Resume_Restored_Process.  A process that was blocked in a call
-   --  makes the call again when it runs, since whatever it was waiting
-   --  for was lost in the restart.  Next_Object_Id is the next object id
+   --  Resume_Restored_Process, which decides what happens to a call
+   --  that it was blocked in.  Next_Object_Id is the next object id
    --  from the checkpoint's header, and new processes have ids from
    --  there on.  Success is False if the record is not valid, its object
    --  id is a boot module's or a live process's, or there is no free
@@ -40,7 +39,11 @@ package Rose.Kernel.Processes.Snapshot is
    procedure Resume_Restored_Process
      (Pid     : Process_Id;
       Success : out Boolean);
-   --  Let the restored process Pid run.
+   --  Let the restored process Pid run.  If it was blocked in a call,
+   --  and a restored server holds the call, it goes on waiting for the
+   --  reply; otherwise it makes the call again, since the server has no
+   --  record of it (ADR 0004, section 4).  Every process must have been
+   --  restored before any is resumed.
 
    procedure Restore_Interrupt
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
