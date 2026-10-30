@@ -11,7 +11,7 @@ User-mode code can't read a clock. `Ada.Calendar` can't be built (`No_Calendar` 
 ### What exists today
 
 - **A tick counter.** `boot.s` programs the PIT with a divisor of 11932, so a tick is 11932 / 1193181.8 s, which is 10.00015 ms, and `Rose.Kernel.Clock` counts them in a 32-bit word that wraps after about 16 months. It starts at zero at every boot.
-- **Caps for it.** `Get_Current_Ticks` and `Set_Timeout` are kernel caps that only init holds. `timer` and `ata` get them from init, and the pager path uses them directly (ADR 0008). `Timer.Set_Timer` counts a tick as 10 ms.
+- **Caps for it.** `Get_Current_Ticks` and `Set_Timeout` are kernel caps that only init holds. `timer` gets both from init, and is the only reader of the tick cap. `ata` gets only `Set_Timeout`. `Timer.Set_Timer` counts a tick as 10 ms.
 - **No wall clock.** Nothing reads the CMOS real-time clock (RTC).
 - **A restore is the normal reboot.** Every unclean boot restores a checkpoint, so whatever time a process saw before the checkpoint is a time that the restored process still remembers, and the machine has run, or been off, for some time since (ADR 0004).
 - **The RTC can be wrong.** A flat battery, a fresh virtual machine and a copied disk all give an RTC that is far from the real time, usually early.
@@ -85,7 +85,7 @@ The server keeps, in its own memory, the values that make a reading from the tic
 - **The RTC is read only to set the offset.** It has a resolution of one second, so it is read at the start, at a restore and never again (see Consequences for drift).
 - **The read finds the edge of a second.** The server polls the RTC until its seconds field changes, and takes the tick counter at that moment. The offset is then accurate to a tick, not to a second. The wait is up to a second, once at the start and once at each restore. The same helper serves `Set_Realtime` (section 5).
 - **Reading the RTC** waits for the update-in-progress flag to clear, reads the registers twice until two reads agree, and follows the status register for BCD or binary and for 12 or 24 hours. The year is taken as 20yy, because the century register is not reliable. The NMI bit of port `70` is left alone. Register D's valid bit and the range of the fields decide whether the reading can be trusted.
-- **The counter is widened.** The kernel's tick counter is 32 bits and wraps. The kernel gets a 64-bit counter, and `Get_Current_Ticks` is replaced by `Get_Current_Ticks_64`, which replies with the low and high words. The old endpoint and its constants are removed, not kept, so that `timer`, `ata` and the pager path fail to build until each is moved over, and none reads half a counter by mistake. This is the only kernel change. The alternative, in the server, is to notice wraps, and that needs something that calls it at least every 16 months.
+- **The counter is widened.** The kernel's tick counter is 32 bits and wraps. The kernel gets a 64-bit counter, and `Get_Current_Ticks` is replaced by `Get_Current_Ticks_64`, which replies with the low and high words. The old endpoint and its constants are removed, not kept, so that anything that still uses it fails to build, and nothing reads half a counter by mistake. `timer` is the only user today. This is the only kernel change. The alternative, in the server, is to notice wraps, and that needs something that calls it at least every 16 months.
 
 ### 4. Restore
 
@@ -129,7 +129,7 @@ What follows from it:
 - **Boot and restore wait for up to a second** for the RTC's edge. That has to be measured, and if it matters the wait can move to a background step, with `Realtime_Is_Trusted` False until it is done.
 - **A wrong RTC is a clock that is early or stopped,** and `Realtime_Is_Trusted` says so when the server can tell. A dead battery that still reports a valid bit can't be told from a correct one.
 - **A call to `Set_Realtime` blocks the server for up to a second,** which is acceptable for something that is called rarely, and means that readings wait.
-- **The kernel changes by one endpoint.** `Get_Current_Ticks` is replaced, and its three callers change with it. There is no RTC code in the kernel.
+- **The kernel changes by one endpoint.** `Get_Current_Ticks` is replaced, and its one caller, `timer`, changes with it. There is no RTC code in the kernel.
 - **Every reading is a round trip,** as every call to a server is.
 - **ADR 0016's restore handler** mixes in "the real-time clock". It should mix in `Clock`'s two readings instead, and the random server should be given a `Clock` cap. That ADR is amended separately.
 
@@ -157,7 +157,7 @@ What follows from it:
 - The two interfaces, and the generated clients and servers.
 - The `clock` server: the RTC, the offset, `Restored` and `Set_Realtime`.
 - The boot description, the object id, the kernel's module lists, and the caps that init grants (ticks and ports).
-- The kernel's 64-bit counter and `Get_Current_Ticks_64`, replacing `Get_Current_Ticks`, with `timer`, `ata` and the pager path moved over.
+- The kernel's 64-bit counter and `Get_Current_Ticks_64`, replacing `Get_Current_Ticks`, with `timer` moved over.
 - `Rose.Clock` in the run-time system. `Ada.Calendar` and removing `No_Calendar` from the userland restrictions are #497, which is blocked on this.
 - A test: read the clock twice with a delay between, check that `Monotonic` advanced and that `Realtime` is within a second of the host's, and cover a restore (a checkpoint, a delay, a restore, and a check that neither reading went backwards and that real time includes the downtime).
 - A test for `Set_Realtime`, including that the RTC has the new time after a reboot.

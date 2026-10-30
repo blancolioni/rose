@@ -280,24 +280,32 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
-         when Get_Current_Ticks_Endpoint =>
-            if not Params.Control.Flags (Rose.Invocation.Recv_Words) then
-               Rose.Kernel.Processes.Return_Error
-                 (Params, Rose.Invocation.Invalid_Operation);
-               return;
-            end if;
+         when Get_Current_Ticks_64_Endpoint =>
+            declare
+               use type Rose.Invocation.Parameter_Word_Index;
+               Low, High : Rose.Words.Word;
+            begin
+               if not Params.Control.Flags (Rose.Invocation.Recv_Words)
+                 or else Params.Control.Last_Recv_Word < 1
+               then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Invalid_Operation);
+                  return;
+               end if;
 
-            Params.all :=
-              (Control =>
-                 (Flags          =>
-                      (Rose.Invocation.Reply => True,
-                       others                     => False),
-                  others         => <>),
-               others  => <>);
+               Rose.Kernel.Clock.Current_Ticks_64 (Low, High);
 
-            Rose.Invocation.Send_Word
-              (Params.all,
-               Rose.Kernel.Clock.Current_Ticks);
+               Params.all :=
+                 (Control =>
+                    (Flags          =>
+                         (Rose.Invocation.Reply => True,
+                          others                     => False),
+                     others         => <>),
+                  others  => <>);
+
+               Rose.Invocation.Send_Word (Params.all, Low);
+               Rose.Invocation.Send_Word (Params.all, High);
+            end;
 
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,

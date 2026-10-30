@@ -93,8 +93,8 @@ package body Rose.Kernel.Processes.Init is
              Kernel (Kernel_Caps.Create_Process_Endpoint),
            Init_Caps.Set_Timeout_Cap        =>
              Kernel (Kernel_Caps.Set_Timeout_Endpoint),
-           Init_Caps.Get_Ticks_Cap          =>
-             Kernel (Kernel_Caps.Get_Current_Ticks_Endpoint),
+           Init_Caps.Get_Ticks_64_Cap       =>
+             Kernel (Kernel_Caps.Get_Current_Ticks_64_Endpoint),
            Init_Caps.Enter_Checkpoint_Cap   =>
              Kernel (Kernel_Caps.Enter_Checkpoint_Endpoint),
            Init_Caps.Leave_Checkpoint_Cap   =>
