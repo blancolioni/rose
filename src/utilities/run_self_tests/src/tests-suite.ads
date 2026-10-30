@@ -8,6 +8,7 @@ with Tests.Heap;
 with Tests.Invalid_Caps;
 with Tests.Memory;
 with Tests.Secondary_Stack;
+with Tests.Server;
 with Tests.Smoke;
 with Tests.Stack;
 with Tests.Streams;
@@ -19,6 +20,7 @@ package Tests.Suite is
                   (Tests.Smoke.Smoke_Test'Access,
                    Tests.Stack.Stack_Test'Access,
                    Tests.Secondary_Stack.Secondary_Stack_Test'Access,
+                   Tests.Server.Instance_Test'Access,
                    Tests.Heap.Heap_Test'Access,
                    Tests.Dispatching.Dispatching_Test'Access,
                    Tests.Exceptions.Exception_Test'Access,
