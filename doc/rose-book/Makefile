@@ -19,21 +19,13 @@ check-layouts:
 BOOK := rose-book.adoc
 ADOC_ATTRS := -a imagesdir=build/layouts
 
-# The HTML (self-contained, with embedded SVGs) is also copied to the
-# website, as rose-book.html and index.html.  Run "make adoc PUBLISH_DIR="
-# to skip the copy.
-PUBLISH_DIR ?= /var/www/rose-os.org/html/rose-book
+# This only builds the book.  The website's copy is published from the
+# main branch by the rose-book timer in the rose-os.org repository.
 
 adoc: layouts
 	asciidoctor $(ADOC_ATTRS) -a data-uri -D build $(BOOK)
 	asciidoctor-pdf $(ADOC_ATTRS) -D build $(BOOK)
 	asciidoctor-epub3 $(ADOC_ATTRS) -D build $(BOOK)
-	if [ -n "$(PUBLISH_DIR)" ]; then \
-	  cp build/rose-book.html $(PUBLISH_DIR)/; \
-	  cp build/rose-book.html $(PUBLISH_DIR)/index.html; \
-	  cp build/rose-book.pdf $(PUBLISH_DIR)/; \
-	  cp build/rose-book.epub $(PUBLISH_DIR)/; \
-	fi
 
 .PHONY: layouts check-layouts adoc
 
