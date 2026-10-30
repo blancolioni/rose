@@ -26,12 +26,14 @@ PUBLISH_DIR ?= /var/www/rose-os.org/html/rose-book
 
 adoc: layouts
 	asciidoctor $(ADOC_ATTRS) -a data-uri -D build $(BOOK)
+	asciidoctor-pdf $(ADOC_ATTRS) -D build $(BOOK)
+	asciidoctor-epub3 $(ADOC_ATTRS) -D build $(BOOK)
 	if [ -n "$(PUBLISH_DIR)" ]; then \
 	  cp build/rose-book.html $(PUBLISH_DIR)/; \
 	  cp build/rose-book.html $(PUBLISH_DIR)/index.html; \
+	  cp build/rose-book.pdf $(PUBLISH_DIR)/; \
+	  cp build/rose-book.epub $(PUBLISH_DIR)/; \
 	fi
-	asciidoctor-pdf $(ADOC_ATTRS) -D build $(BOOK)
-	asciidoctor-epub3 $(ADOC_ATTRS) -D build $(BOOK)
 
 .PHONY: layouts check-layouts adoc
 

@@ -4,4 +4,4 @@ make idl
 (cd rts; make)
 (cd src/rts; make)
 make
-make doc
+(cd doc/rose-book/; make adoc)
