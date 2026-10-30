@@ -1,25 +1,30 @@
 with System.Storage_Elements;
 
-with Rose.Objects;
 with Rose.Server;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Directory;
 with Rose.Interfaces.Directory.Client;
+with Rose.Interfaces.File;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Writable_Directory.Client.Conversions;
+with Rose.Interfaces.Objects;
+with Rose.Interfaces.Process;
+with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_Directory.Server;
-with Rose.Interfaces.Writable_File.Client.Conversions;
+with Rose.Interfaces.Writable_File;
+with Rose.Interfaces.Writable_File.Client;
 
 package body Directory.Server is
 
    use type Rose.Capabilities.Capability;
    use type Rose.Interfaces.Directory.File_Kind;
 
-   use Rose.Interfaces.Writable_Directory.Client;
-   use Rose.Interfaces.Writable_File.Client;
+   package Directory_Clients renames
+     Rose.Interfaces.Writable_Directory.Client;
+   package File_Clients renames Rose.Interfaces.Writable_File.Client;
+
+   subtype Writable_Directory_Class is
+     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
 
    Max_Entries     : constant := 64;
    Max_Name_Length : constant := 64;
@@ -30,13 +35,82 @@ package body Directory.Server is
          Name      : String (1 .. Max_Name_Length);
          Name_Last : Natural := 0;
          Kind      : Rose.Interfaces.Directory.File_Kind;
-         File      : Writable_File_Client;
-         Child     : Writable_Directory_Client;
+         File      : File_Clients.Writable_File_Client;
+         Child     : Directory_Clients.Writable_Directory_Client;
          Read_Only : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
          --  The read-only interface of the file or directory, made the
          --  first time it is asked for.
       end record;
+
+   --  The directory is one object, served through Writable_Directory
+   --  with the user-mode IDL target (#528).
+
+   type Directory_Object is limited new
+     Rose.Interfaces.Writable_Directory.Server.Writable_Directory_Interface
+     with null record;
+
+   overriding function Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Writable_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Directory_Entry_Count
+     (Item : in out Directory_Object)
+      return Natural;
+
+   overriding function Directory_Entry_Name
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return String;
+
+   overriding function Directory_Entry_Kind
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Directory.File_Kind;
+
+   overriding function Directory_Entry_Size
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return System.Storage_Elements.Storage_Count;
+
+   overriding function Find_Entry
+     (Item : in out Directory_Object;
+      Name : String)
+      return Natural;
+
+   overriding function Get_Ordinary_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.File.File_Object'Class;
+
+   overriding function Get_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Directory.Directory_Object'Class;
+
+   overriding function Get_Writable_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+
+   overriding function Get_Writable_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Writable_Directory_Class;
+
+   overriding function Create_File
+     (Item : in out Directory_Object;
+      Name : String)
+      return Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+
+   overriding function Create_Directory
+     (Item : in out Directory_Object;
+      Name : String)
+      return Writable_Directory_Class;
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
@@ -44,6 +118,7 @@ package body Directory.Server is
    --  one, Send_Storage_Array clears the cap of the invocation.
 
    Context          : Rose.Server.Server_Context;
+   The_Directory    : aliased Directory_Object;
    Entries          : array (1 .. Max_Entries) of Entry_Record;
    Entry_Count      : Natural := 0;
    File_Launch      : Rose.Interfaces.Launch.Client.Launch_Client;
@@ -58,66 +133,20 @@ package body Directory.Server is
    --  the same kind. Null if Name is another kind, too long, or there
    --  is no room, or the launch fails.
 
-   function Create_Directory
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String)
-      return Rose.Capabilities.Capability;
-
-   function Create_File
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String)
-      return Rose.Capabilities.Capability;
-
-   function Directory_Entry_Count
-     (Id : Rose.Objects.Capability_Identifier)
-      return Natural;
-
-   function Directory_Entry_Kind
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Interfaces.Directory.File_Kind;
-
-   procedure Directory_Entry_Name
-     (Id     : Rose.Objects.Capability_Identifier;
-      Index  : Positive;
-      Result : out String;
-      Last   : out Natural);
-
-   function Directory_Entry_Size
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return System.Storage_Elements.Storage_Count;
-
-   function Find_Entry
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String)
-      return Natural;
-
-   function Get_Directory
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability;
-
-   function Get_Ordinary_File
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability;
-
-   function Get_Writable_Directory
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability;
-
-   function Get_Writable_File
-     (Id    : Rose.Objects.Capability_Identifier;
-      Index : Positive)
-      return Rose.Capabilities.Capability;
+   function Find (Name : String) return Natural;
+   --  The index of the entry Name, or 0 if there is none.
 
    function Is_Kind
      (Index : Positive;
       Kind  : Rose.Interfaces.Directory.File_Kind)
       return Boolean
    is (Index <= Entry_Count and then Entries (Index).Kind = Kind);
+
+   function Launch
+     (Kind : Rose.Interfaces.Directory.File_Kind)
+      return Rose.Interfaces.Process.Process_Object'Class;
+   --  Launch a file or directory process. It raises Invocation_Error if
+   --  the launch fails.
 
    ---------------
    -- Add_Entry --
@@ -128,21 +157,18 @@ package body Directory.Server is
       Kind : Rose.Interfaces.Directory.File_Kind)
       return Rose.Capabilities.Capability
    is
-      No_Environment : System.Storage_Elements.Storage_Array (1 .. 0);
-      No_Caps        : Rose.Capabilities.Capability_Array (1 .. 0);
-      Existing       : constant Natural := Find_Entry (0, Name);
-      Process        : Rose.Interfaces.Process.Client.Process_Client;
-      Interface_Cap  : Rose.Capabilities.Capability;
-      Saved_Name     : String (1 .. Max_Name_Length);
-      Saved_Last     : Natural;
+      Existing      : constant Natural := Find (Name);
+      Interface_Cap : Rose.Capabilities.Capability;
+      Saved_Name    : String (1 .. Max_Name_Length);
+      Saved_Last    : Natural;
    begin
       if Existing > 0 then
          if Entries (Existing).Kind /= Kind then
             return Rose.Capabilities.Null_Capability;
          elsif Kind = Rose.Interfaces.Directory.Ordinary_File then
-            return Get_Interface_Cap (Entries (Existing).File);
+            return Entries (Existing).File.Writable_File_Cap;
          else
-            return Get_Interface_Cap (Entries (Existing).Child);
+            return Entries (Existing).Child.Writable_Directory_Cap;
          end if;
       end if;
 
@@ -158,25 +184,15 @@ package body Directory.Server is
       Saved_Name (1 .. Name'Length) := Name;
       Saved_Last := Name'Length;
 
-      if Kind = Rose.Interfaces.Directory.Ordinary_File then
-         Process :=
-           Rose.Interfaces.Launch.Client.Launch
-             (File_Launch, No_Caps, No_Environment);
-      else
-         --  A subdirectory can create files and directories too.
-         Process :=
-           Rose.Interfaces.Launch.Client.Launch
-             (Directory_Launch,
-              (File_Launch_Cap, Directory_Launch_Cap),
-              No_Environment);
-      end if;
-
-      if Rose.Interfaces.Launch.Client.Has_Error then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      Interface_Cap :=
-        Rose.Interfaces.Process.Client.Published_Interface (Process);
+      declare
+         Process : Rose.Interfaces.Process.Process_Object'Class :=
+           Launch (Kind);
+      begin
+         Interface_Cap := Process.Published_Interface;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Rose.Capabilities.Null_Capability;
+      end;
 
       if Interface_Cap = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
@@ -190,9 +206,9 @@ package body Directory.Server is
          New_Entry.Name_Last := Saved_Last;
          New_Entry.Kind := Kind;
          if Kind = Rose.Interfaces.Directory.Ordinary_File then
-            Open (New_Entry.File, Interface_Cap);
+            New_Entry.File.Open (Interface_Cap);
          else
-            Open (New_Entry.Child, Interface_Cap);
+            New_Entry.Child.Open (Interface_Cap);
          end if;
       end;
 
@@ -203,28 +219,30 @@ package body Directory.Server is
    -- Create_Directory --
    ----------------------
 
-   function Create_Directory
-     (Id   : Rose.Objects.Capability_Identifier;
+   overriding function Create_Directory
+     (Item : in out Directory_Object;
       Name : String)
-      return Rose.Capabilities.Capability
+      return Writable_Directory_Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
-      return Add_Entry (Name, Rose.Interfaces.Directory.Directory);
+      return Directory_Clients.From_Cap
+        (Add_Entry (Name, Rose.Interfaces.Directory.Directory));
    end Create_Directory;
 
    -----------------
    -- Create_File --
    -----------------
 
-   function Create_File
-     (Id   : Rose.Objects.Capability_Identifier;
+   overriding function Create_File
+     (Item : in out Directory_Object;
       Name : String)
-      return Rose.Capabilities.Capability
+      return Rose.Interfaces.Writable_File.Writable_File_Object'Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
-      return Add_Entry (Name, Rose.Interfaces.Directory.Ordinary_File);
+      return File_Clients.From_Cap
+        (Add_Entry (Name, Rose.Interfaces.Directory.Ordinary_File));
    end Create_File;
 
    -------------------
@@ -236,34 +254,32 @@ package body Directory.Server is
       Rose.System_Calls.Use_Buffer
         (Invoke_Buffer'Address, Invoke_Buffer'Last);
 
-      Rose.Interfaces.Launch.Client.Open (File_Launch, File_Launch_Cap);
-      Rose.Interfaces.Launch.Client.Open
-        (Directory_Launch, Directory_Launch_Cap);
+      File_Launch.Open (File_Launch_Cap);
+      Directory_Launch.Open (Directory_Launch_Cap);
 
-      Rose.Interfaces.Writable_Directory.Server.Publish_Interface
-        (Server_Context         => Context,
-         Directory_Entry_Count  => Directory_Entry_Count'Access,
-         Directory_Entry_Name   => Directory_Entry_Name'Access,
-         Directory_Entry_Kind   => Directory_Entry_Kind'Access,
-         Directory_Entry_Size   => Directory_Entry_Size'Access,
-         Find_Entry             => Find_Entry'Access,
-         Get_Ordinary_File      => Get_Ordinary_File'Access,
-         Get_Directory          => Get_Directory'Access,
-         Get_Writable_File      => Get_Writable_File'Access,
-         Get_Writable_Directory => Get_Writable_Directory'Access,
-         Create_File            => Create_File'Access,
-         Create_Directory       => Create_Directory'Access);
+      Rose.Interfaces.Writable_Directory.Server.Publish
+        (Context, The_Directory'Access);
    end Create_Server;
+
+   -------------------
+   -- Directory_Cap --
+   -------------------
+
+   overriding function Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Writable_Directory.Server.Cap_Of
+         (Item, Rose.Interfaces.Writable_Directory.Directory_Interface));
 
    ---------------------------
    -- Directory_Entry_Count --
    ---------------------------
 
-   function Directory_Entry_Count
-     (Id : Rose.Objects.Capability_Identifier)
+   overriding function Directory_Entry_Count
+     (Item : in out Directory_Object)
       return Natural
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       return Entry_Count;
    end Directory_Entry_Count;
@@ -272,12 +288,12 @@ package body Directory.Server is
    -- Directory_Entry_Kind --
    --------------------------
 
-   function Directory_Entry_Kind
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Directory_Entry_Kind
+     (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Directory.File_Kind
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if Index > Entry_Count then
          return Rose.Interfaces.Directory.Special_File;
@@ -290,57 +306,43 @@ package body Directory.Server is
    -- Directory_Entry_Name --
    --------------------------
 
-   procedure Directory_Entry_Name
-     (Id     : Rose.Objects.Capability_Identifier;
-      Index  : Positive;
-      Result : out String;
-      Last   : out Natural)
+   overriding function Directory_Entry_Name
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return String
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if Index > Entry_Count then
-         Last := Result'First - 1;
-         return;
+         return "";
+      else
+         return Entries (Index).Name (1 .. Entries (Index).Name_Last);
       end if;
-
-      declare
-         Item   : Entry_Record renames Entries (Index);
-         Length : constant Natural :=
-           Natural'Min (Item.Name_Last, Result'Length);
-      begin
-         Last := Result'First + Length - 1;
-         Result (Result'First .. Last) := Item.Name (1 .. Length);
-      end;
    end Directory_Entry_Name;
 
    --------------------------
    -- Directory_Entry_Size --
    --------------------------
 
-   function Directory_Entry_Size
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Directory_Entry_Size
+     (Item  : in out Directory_Object;
       Index : Positive)
       return System.Storage_Elements.Storage_Count
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
-         return Size (Entries (Index).File);
+         return Entries (Index).File.Size;
       else
          return 0;
       end if;
    end Directory_Entry_Size;
 
-   ----------------
-   -- Find_Entry --
-   ----------------
+   ----------
+   -- Find --
+   ----------
 
-   function Find_Entry
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String)
-      return Natural
-   is
-      pragma Unreferenced (Id);
+   function Find (Name : String) return Natural is
    begin
       for Index in 1 .. Entry_Count loop
          if Entries (Index).Name (1 .. Entries (Index).Name_Last) = Name then
@@ -348,71 +350,84 @@ package body Directory.Server is
          end if;
       end loop;
       return 0;
+   end Find;
+
+   ----------------
+   -- Find_Entry --
+   ----------------
+
+   overriding function Find_Entry
+     (Item : in out Directory_Object;
+      Name : String)
+      return Natural
+   is
+      pragma Unreferenced (Item);
+   begin
+      return Find (Name);
    end Find_Entry;
 
    -------------------
    -- Get_Directory --
    -------------------
 
-   function Get_Directory
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Get_Directory
+     (Item  : in out Directory_Object;
       Index : Positive)
-      return Rose.Capabilities.Capability
+      return Rose.Interfaces.Directory.Directory_Object'Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if not Is_Kind (Index, Rose.Interfaces.Directory.Directory) then
-         return Rose.Capabilities.Null_Capability;
+         return Rose.Interfaces.Directory.Client.From_Cap
+           (Rose.Capabilities.Null_Capability);
       end if;
 
       if Entries (Index).Read_Only = Rose.Capabilities.Null_Capability then
-         Entries (Index).Read_Only :=
-           Rose.Interfaces.Directory.Client.Get_Interface_Cap
-             (Rose.Interfaces.Writable_Directory.Client.Conversions
-              .To_Directory (Entries (Index).Child));
+         Entries (Index).Read_Only := Entries (Index).Child.Directory_Cap;
       end if;
-      return Entries (Index).Read_Only;
+      return Rose.Interfaces.Directory.Client.From_Cap
+        (Entries (Index).Read_Only);
    end Get_Directory;
 
    -----------------------
    -- Get_Ordinary_File --
    -----------------------
 
-   function Get_Ordinary_File
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Get_Ordinary_File
+     (Item  : in out Directory_Object;
       Index : Positive)
-      return Rose.Capabilities.Capability
+      return Rose.Interfaces.File.File_Object'Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if not Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
-         return Rose.Capabilities.Null_Capability;
+         return Rose.Interfaces.File.Client.From_Cap
+           (Rose.Capabilities.Null_Capability);
       end if;
 
       if Entries (Index).Read_Only = Rose.Capabilities.Null_Capability then
-         Entries (Index).Read_Only :=
-           Rose.Interfaces.File.Client.Get_Interface_Cap
-             (Rose.Interfaces.Writable_File.Client.Conversions.To_File
-                (Entries (Index).File));
+         Entries (Index).Read_Only := Entries (Index).File.File_Cap;
       end if;
-      return Entries (Index).Read_Only;
+      return Rose.Interfaces.File.Client.From_Cap (Entries (Index).Read_Only);
    end Get_Ordinary_File;
 
    ----------------------------
    -- Get_Writable_Directory --
    ----------------------------
 
-   function Get_Writable_Directory
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Get_Writable_Directory
+     (Item  : in out Directory_Object;
       Index : Positive)
-      return Rose.Capabilities.Capability
+      return Writable_Directory_Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Directory) then
-         return Get_Interface_Cap (Entries (Index).Child);
+         return Directory_Clients.From_Cap
+           (Entries (Index).Child.Writable_Directory_Cap);
       else
-         return Rose.Capabilities.Null_Capability;
+         return Directory_Clients.From_Cap
+           (Rose.Capabilities.Null_Capability);
       end if;
    end Get_Writable_Directory;
 
@@ -420,19 +435,40 @@ package body Directory.Server is
    -- Get_Writable_File --
    -----------------------
 
-   function Get_Writable_File
-     (Id    : Rose.Objects.Capability_Identifier;
+   overriding function Get_Writable_File
+     (Item  : in out Directory_Object;
       Index : Positive)
-      return Rose.Capabilities.Capability
+      return Rose.Interfaces.Writable_File.Writable_File_Object'Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
-         return Get_Interface_Cap (Entries (Index).File);
+         return File_Clients.From_Cap
+           (Entries (Index).File.Writable_File_Cap);
       else
-         return Rose.Capabilities.Null_Capability;
+         return File_Clients.From_Cap (Rose.Capabilities.Null_Capability);
       end if;
    end Get_Writable_File;
+
+   ------------
+   -- Launch --
+   ------------
+
+   function Launch
+     (Kind : Rose.Interfaces.Directory.File_Kind)
+      return Rose.Interfaces.Process.Process_Object'Class
+   is
+      No_Environment : System.Storage_Elements.Storage_Array (1 .. 0);
+      No_Caps        : Rose.Capabilities.Capability_Array (1 .. 0);
+   begin
+      if Kind = Rose.Interfaces.Directory.Ordinary_File then
+         return File_Launch.Launch (No_Caps, No_Environment);
+      else
+         --  A subdirectory can create files and directories too.
+         return Directory_Launch.Launch
+           ((File_Launch_Cap, Directory_Launch_Cap), No_Environment);
+      end if;
+   end Launch;
 
    ------------------
    -- Start_Server --
@@ -442,5 +478,14 @@ package body Directory.Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   ----------------------------
+   -- Writable_Directory_Cap --
+   ----------------------------
+
+   overriding function Writable_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Writable_Directory.Server.Cap_Of (Item));
 
 end Directory.Server;

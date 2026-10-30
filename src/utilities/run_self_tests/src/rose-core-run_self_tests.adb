@@ -4,7 +4,7 @@ with Tests.Registry;
 with Tests.Suite;
 
 procedure Rose.Core.Run_Self_Tests
-  (Find_Command : Rose.Interfaces.Commands.Client.Commands_Client)
+  (Find_Command : in out Rose.Interfaces.Commands.Commands_Object'Class)
 is
    Self_Tests_Failed : exception;
    --  Raised when a test fails, so that the command fails, and its
