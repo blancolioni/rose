@@ -261,3 +261,16 @@ a-rbtgso.ads
 a-rbtgso.adb
 a-btgbso.ads
 a-btgbso.adb
+
+# Ada.Strings.Fixed, Bounded and Unbounded (#495), with Search and
+# Superbounded, which they use.
+a-strsea.ads
+a-strsea.adb
+a-strfix.ads
+a-strfix.adb
+a-strsup.ads
+a-strsup.adb
+a-strbou.ads
+a-strbou.adb
+a-strunb.ads
+a-strunb.adb
