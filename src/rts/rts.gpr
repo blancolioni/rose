@@ -13,6 +13,7 @@ library project rts is
       "../base",
       "../library/capabilities",
       "../library/kernelapi/system-calls",
+      "../library/kernelapi/system-calls-user",
       "../library/kernelapi/arch/" & Arch,
       "build/gnat-src",
       "build/interfaces");

@@ -8,6 +8,7 @@ project Elf is
        "../../library/kernelapi/console",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
+       "../../library/kernelapi/system-calls-boot",
        "../../library/kernelapi/arch/i686",
        "../../library/rose");
    for Object_Dir use "./build/obj";
