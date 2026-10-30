@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-30
-- **Related:** #494 (this decision), [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking, time after a restore), [ADR 0008](0008-install-boot-and-pager-path.md) (the pager path uses the kernel's tick caps), [ADR 0016](0016-random-numbers.md) (random numbers, which mixes in the clock), #372 (fixed object ids), #42 (SPARK)
+- **Related:** #494 (this decision), [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking, time after a restore), [ADR 0008](0008-install-boot-and-pager-path.md) (the pager path uses the kernel's tick caps), [ADR 0016](0016-random-numbers.md) (random numbers, which mixes in the clock), #372 (fixed object ids), #497 (`Ada.Calendar`), #363 (tasking, `Ada.Real_Time`), #193 (the tick, and a finer clock), #42 (SPARK)
 
 ## Context
 
@@ -115,7 +115,7 @@ What follows from it:
 ### 6. Clients
 
 - **The run-time system gets a `Rose.Clock` package** over a `Clock` cap: `Monotonic` and `Realtime` as `Word_64`, and conversions.
-- **`Ada.Calendar` is built on it,** and `No_Calendar` goes from the userland restrictions. `Ada.Calendar.Clock` is `Realtime` converted to `Time`, and the zone is UTC (section 1). `Ada.Real_Time` can be built on `Monotonic` later.
+- **`Ada.Calendar` is built on it** (#497), and `No_Calendar` goes from the userland restrictions. `Ada.Calendar.Clock` is `Realtime` converted to `Time`, and the zone is UTC (section 1). It returns the reading when `Realtime_Is_Trusted` is False, since it can't fail. `Ada.Real_Time` and `delay until` can be built on `Monotonic` with the tasking work (#363).
 - **A command asks for a clock in its declaration,** as it asks for any other cap (ADR 0002), and the shell binds the system's `Clock` unless a user binds another. A test binds a fixed one, which is any server that implements `Clock`.
 - **A server that needs timestamps** (`checkpoint`, a file server) takes a `Clock` cap from init, as the random server will.
 - **`timer` doesn't change.** It still counts in ticks. A later change could let it take a `Monotonic` deadline.
@@ -158,9 +158,10 @@ What follows from it:
 - The `clock` server: the RTC, the offset, `Restored` and `Set_Realtime`.
 - The boot description, the object id, the kernel's module lists, and the caps that init grants (ticks and ports).
 - The kernel's 64-bit counter and `Get_Current_Ticks_64`, replacing `Get_Current_Ticks`, with `timer`, `ata` and the pager path moved over.
-- `Rose.Clock` in the run-time system, `Ada.Calendar`, and removing `No_Calendar` from the userland restrictions.
+- `Rose.Clock` in the run-time system. `Ada.Calendar` and removing `No_Calendar` from the userland restrictions are #497, which is blocked on this.
 - A test: read the clock twice with a delay between, check that `Monotonic` advanced and that `Realtime` is within a second of the host's, and cover a restore (a checkpoint, a delay, a restore, and a check that neither reading went backwards and that real time includes the downtime).
 - A test for `Set_Realtime`, including that the RTC has the new time after a reboot.
 - A proof plan under #42: the conversions from RTC fields to nanoseconds and back are small, and need no heap.
 - Amend ADR 0016 to use `Clock`.
 - A section in the Rose Book.
+- The TSC, calibrated against the PIT, is #193. It can serve `Monotonic` at a finer resolution behind the same interface.
