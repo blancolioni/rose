@@ -50,6 +50,7 @@ package body Restore.Installer.Default is
       Process ("touch", "bin", Save, Default_Flags);
       Process ("mkdir", "bin", Save, Default_Flags);
       Process ("clear", "bin", Save, Default_Flags);
+      Process ("date", "bin", Save, Default_Flags);
       Process ("user", "bin", Save, Default_Flags);
       Process ("auth", "bin", Save, Default_Flags);
       Process ("login", "bin", Save, Default_Flags);

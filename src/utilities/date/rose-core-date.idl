@@ -1,0 +1,15 @@
+command Rose.Core.Date : Standard_Output, Standard_Error, Clock_Service
+  with Summary     => "Write the date and time.",
+       Description => """
+          Date writes the current date and time, in UTC, from the system's
+          clock (ADR 0020), as in Fri Oct 30 18:12:03 UTC 2026, or with
+          -I as 2026-10-30T18:12:03Z. If the clock has not been set, or
+          the system was restored onto a machine whose clock is earlier,
+          the time is a guess, and date says so on standard error.
+          """
+is
+   ISO_8601 : Boolean := False
+     with Short_Name  => 'I',
+          Short_Value => True,
+          Help        => "write the date and time as 2026-10-30T18:12:03Z";
+end Rose.Core.Date;
