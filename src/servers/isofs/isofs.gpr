@@ -8,6 +8,7 @@ project IsoFS is
        "../../library/kernelapi/devices",
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
+       "../../library/kernelapi/system-calls-boot",
        "../../library/kernelapi/arch/i686",
        "../../library/rose");
    for Object_Dir use "./build/obj";

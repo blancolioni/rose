@@ -6,6 +6,7 @@ project Mem is
        "../../library/capabilities",
        "../../library/kernelapi/console",
        "../../library/kernelapi/system-calls",
+       "../../library/kernelapi/system-calls-boot",
        "../../library/kernelapi/arch/i686",
        "../../library/kernelapi/generated");
    for Object_Dir use "./build/obj";

@@ -2,7 +2,7 @@
 ARCH=i686
 OS=rose
 TARGET=$ARCH-$OS
-DIRS="src/adainclude src/arch/$ARCH ../base ../library/capabilities ../library/kernelapi/system-calls ../library/kernelapi/arch/$ARCH"
+DIRS="src/adainclude src/arch/$ARCH ../base ../library/capabilities ../library/kernelapi/system-calls ../library/kernelapi/system-calls-user ../library/kernelapi/arch/$ARCH"
 
 # The GNAT units that the RTS takes unchanged from the installed GCC: those
 # listed in gnat-units (#416).
