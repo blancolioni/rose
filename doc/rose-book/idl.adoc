@@ -4,7 +4,7 @@
 [NOTE]
 ====
 This chapter is a draft (#146).
-It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target. It marks the planned changes: command declarations (idle#2) and ADR 0002.
+It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target, and idle adds a second target, for programs built with the userland run-time system (<<user-mode-target>>). It marks the planned changes: command declarations (idle#2) and ADR 0002.
 References written idle#N are to issues in the compiler's own repository, https://github.com/blancolioni/idle[blancolioni/idle].
 ====
 
@@ -234,9 +234,10 @@ The build runs it before generating any code.
 == Generation targets
 
 [#kernel-target]
-=== Kernel target (current)
+=== Kernel target
 
-This is the only target the current compiler generates.
+This is one of the two targets that the compiler generates, and the only one that programs built with the kernel run-time system can use.
+The other is the <<user-mode-target,user-mode target>>, for programs built with the userland run-time system.
 Its output uses the subset of Ada available to kernel-level code: no tagged types, no interfaces and no `Ada.Streams`.
 For an interface `X` declared in `x.idl`, it writes three packages:
 
