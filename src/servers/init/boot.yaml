@@ -123,7 +123,7 @@ stages:
     - launch: timer
       oid: 13
       priority: device_driver
-      caps: [console_interface, set_timeout, get_ticks]
+      caps: [console_interface, set_timeout, get_ticks_64]
       exports:
         timer: Timer.Set_Timer_Endpoint
         timer_interface: Timer.Timer_Interface

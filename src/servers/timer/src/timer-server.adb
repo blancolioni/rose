@@ -13,7 +13,7 @@ with Rose.System_Calls.Server;
 
 package body Timer.Server is
 
-   type Ticks_Type is new Rose.Words.Word;
+   type Ticks_Type is new Rose.Words.Word_64;
 
    type Timeout_Entry is
       record
@@ -96,9 +96,10 @@ package body Timer.Server is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Get_Current_Ticks_Cap);
-      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Words (Params, 2);
       Rose.System_Calls.Invoke_Capability (Params);
-      return Ticks_Type (Params.Data (0));
+      return Ticks_Type (Params.Data (0))
+        + Ticks_Type (Params.Data (1)) * 2 ** 32;
    end Current_Ticks;
 
    -------------------

@@ -12,7 +12,10 @@ package body Rose.Kernel.Clock is
 
    use Rose.Words;
 
-   Ticks : Word := 0;
+   Ticks      : Word := 0;
+   High_Ticks : Word := 0;
+   --  The count is High_Ticks * 2**32 + Ticks. Two words, not a 64-bit
+   --  type, so that the kernel needs no 64-bit arithmetic support.
 
    Remaining_Ticks : Word := 0;
    Timeout_Object  : Rose.Objects.Object_Id;
@@ -32,6 +35,20 @@ package body Rose.Kernel.Clock is
       return Ticks;
    end Current_Ticks;
 
+   ----------------------
+   -- Current_Ticks_64 --
+   ----------------------
+
+   procedure Current_Ticks_64 (Low, High : out Rose.Words.Word) is
+   begin
+
+      --  The kernel runs with interrupts off (only the idle loop enables
+      --  them), so a tick can't arrive between the two reads.
+
+      Low  := Ticks;
+      High := High_Ticks;
+   end Current_Ticks_64;
+
    -----------------------
    -- Handle_Clock_Tick --
    -----------------------
@@ -43,6 +60,9 @@ package body Rose.Kernel.Clock is
                       Rose.Kernel.Processes.Current_Process_Id;
    begin
       Ticks := Ticks + 1;
+      if Ticks = 0 then
+         High_Ticks := High_Ticks + 1;
+      end if;
 
       if Ticks mod 20 = 0 then
          declare

@@ -6,7 +6,9 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    Create_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 4;
    Add_Heap_Memory            : constant Rose.Objects.Endpoint_Index := 5;
    Set_Timeout_Endpoint       : constant Rose.Objects.Endpoint_Index := 6;
-   Get_Current_Ticks_Endpoint : constant Rose.Objects.Endpoint_Index := 7;
+   Get_Current_Ticks_64_Endpoint : constant Rose.Objects.Endpoint_Index := 7;
+   --  Reply with the tick count in two data words: the low 32 bits, then
+   --  the high 32 bits. The caller has to ask for two words.
 
    Enter_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 8;
    Leave_Checkpoint_Endpoint  : constant Rose.Objects.Endpoint_Index := 9;

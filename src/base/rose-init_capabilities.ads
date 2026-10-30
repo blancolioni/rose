@@ -19,7 +19,7 @@ package Rose.Init_Capabilities is
    Write_System_Image_Cap : constant := 10;
    Create_Process_Cap     : constant := 11;
    Set_Timeout_Cap        : constant := 12;
-   Get_Ticks_Cap          : constant := 13;
+   Get_Ticks_64_Cap       : constant := 13;
    Enter_Checkpoint_Cap   : constant := 14;
    Leave_Checkpoint_Cap   : constant := 15;
    Start_Log_Cap          : constant := 16;
