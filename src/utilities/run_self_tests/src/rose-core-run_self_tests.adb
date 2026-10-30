@@ -4,7 +4,8 @@ with Tests.Registry;
 with Tests.Suite;
 
 procedure Rose.Core.Run_Self_Tests
-  (Find_Command : in out Rose.Interfaces.Commands.Commands_Object'Class)
+  (Find_Command  : in out Rose.Interfaces.Commands.Commands_Object'Class;
+   Clock_Service : in out Rose.Interfaces.Clock.Clock_Object'Class)
 is
    Self_Tests_Failed : exception;
    --  Raised when a test fails, so that the command fails, and its
@@ -28,6 +29,7 @@ is
 
 begin
    Tests.Registry.Set_Commands (Find_Command);
+   Tests.Registry.Set_Clock (Clock_Service.Clock_Cap);
 
    Ada.Text_IO.Put_Line ("Starting tests");
 

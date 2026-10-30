@@ -8,9 +8,11 @@ package Login_Loop is
      (Console  : Rose.Capabilities.Capability;
       Commands : Rose.Capabilities.Capability;
       Timer    : Rose.Capabilities.Capability;
+      Clock    : Rose.Capabilities.Capability;
       Auth     : Rose.Capabilities.Capability);
    --  The interfaces of the console (Terminal), the command registry
-   --  (Commands), the timer (Timer) and auth (Auth).
+   --  (Commands), the timer (Timer), the clock (Clock, which petal gives
+   --  to the commands that want it) and auth (Auth).
 
    procedure Run
      with No_Return;

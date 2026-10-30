@@ -17,6 +17,7 @@ run_self_tests:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-run_self_tests.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands.idl \
+	    $(INTERFACES)/clock.idl \
 	    $(INTERFACES)/launch.idl \
 	    $(INTERFACES)/user.idl \
 	    $(INTERFACES)/named.idl \

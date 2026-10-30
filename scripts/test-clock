@@ -1,0 +1,128 @@
+#!/bin/sh
+# Boot test of the clock (ADR 0020, #494), under QEMU.
+#
+#   scripts/test-clock [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test:
+#
+#   1. installs Rose on a new disk, and waits for the install to finish;
+#   2. boots from the disk, which restores the checkpoint, logs in as the
+#      first user, and runs date, which has to agree with the host's clock
+#      to within three seconds;
+#   3. waits for a checkpoint, stops the machine, boots from the disk
+#      again, and runs date again. This is a restore of a system that
+#      has run before: the time has to agree with the host's, and not be
+#      earlier than the time before.
+#
+# It takes about ten minutes, and needs qemu-system-i386, qemu-img and
+# python3. It exits with 0 if everything passed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+WORK=$(mktemp -d /tmp/rose-test-clock.XXXXXX)
+DISK=$WORK/disk.img
+MONITOR=$WORK/monitor
+first_user=fraser
+first_password=rose
+tolerance=3
+
+fail () {
+    echo "FAIL: $1"
+    echo "The screen:"
+    python3 "$HERE/qemu-screen.py" "$MONITOR" 2> /dev/null | tail -12
+    stop_qemu
+    exit 1
+}
+
+start_qemu () {
+    rm -f "$MONITOR"
+    qemu-system-i386 -m 32 -display none -serial file:"$WORK/serial" \
+        -monitor unix:"$MONITOR",server,nowait -pidfile "$WORK/pid" \
+        -drive file="$DISK",index=0,if=ide,format=raw "$@" \
+        > "$WORK/qemu.log" 2>&1 &
+    sleep 2
+}
+
+stop_qemu () {
+    [ -f "$WORK/pid" ] && kill "$(cat "$WORK/pid")" 2> /dev/null
+    rm -f "$WORK/pid"
+    sleep 2
+}
+
+screen () {
+    python3 "$HERE/qemu-screen.py" "$MONITOR"
+}
+
+type_text () {
+    python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
+}
+
+wait_for () {
+    # wait_for TEXT SECONDS: wait until TEXT is on the screen
+    waited=0
+    while [ $waited -lt "$2" ]; do
+        screen | grep -q -- "$1" && return 0
+        sleep 5
+        waited=$((waited + 5))
+    done
+    return 1
+}
+
+read_date () {
+    # The last ISO 8601 time on the screen, as seconds since 1970.
+    time=$(screen | grep -o '[0-9]\{4\}-[0-9][0-9]-[0-9][0-9]T[0-9:]\{8\}Z' \
+        | tail -1)
+    [ -n "$time" ] && date -u -d "$time" +%s
+}
+
+check_date () {
+    # check_date NOT_BEFORE: run date -I, and check what it says
+    type_text "date -I
+"
+    host=$(date -u +%s)
+    sleep 5
+    shown=$(read_date) || fail "date wrote no time"
+    difference=$((host - shown))
+    [ $difference -lt 0 ] && difference=$((0 - difference))
+    echo "date says $shown, the host says $host"
+    [ $difference -le $tolerance ] \
+        || fail "date is $difference seconds from the host's clock"
+    [ "$shown" -ge "$1" ] || fail "date went back from $1 to $shown"
+    last=$shown
+}
+
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+qemu-img create -f raw "$DISK" 6G > /dev/null
+
+echo "Installing"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+wait_for "install complete" 400 || fail "the install did not finish"
+sleep 15
+stop_qemu
+
+echo "Booting from the disk, which restores the install's checkpoint"
+start_qemu
+wait_for "login:" 200 || fail "no login prompt"
+sleep 45
+type_text "$first_user
+"
+wait_for "password:" 20 || fail "no password prompt"
+type_text "$first_password
+"
+wait_for "petal>" 60 || fail "could not log in"
+last=0
+check_date 0
+
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Booting from the disk again"
+start_qemu
+wait_for "petal>" 200 || fail "petal was not restored"
+sleep 45
+check_date "$last"
+
+stop_qemu
+rm -rf "$WORK"
+echo "PASS"

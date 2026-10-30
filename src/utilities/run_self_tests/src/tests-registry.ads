@@ -11,6 +11,13 @@ package Tests.Registry is
    --  interface, which Run_Self_Tests is given for its Find_Command role
    --  (#460).
 
+   procedure Set_Clock (Clock : Rose.Capabilities.Capability);
+   --  The clock's Clock interface, which Run_Self_Tests is given for its
+   --  Clock_Service role (ADR 0020).
+
+   function Clock return Rose.Capabilities.Capability;
+   --  The clock's Clock interface.
+
    function Create_Endpoint return Rose.Capabilities.Capability;
    --  The create endpoint cap that Run_Self_Tests is given for its
    --  Create_Endpoint role.
