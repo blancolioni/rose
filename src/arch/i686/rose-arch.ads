@@ -77,6 +77,12 @@ package Rose.Arch is
 
    procedure Halt;
 
+   procedure Restart
+     with No_Return;
+   --  Restart the machine: through the keyboard controller's reset line,
+   --  then the reset control register at port 16#CF9#, and if neither
+   --  works, a triple fault (#413).
+
    procedure Copy_Memory
      (From   : Virtual_Address;
       To     : Virtual_Address;

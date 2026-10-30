@@ -45,7 +45,10 @@ package Rose.Init_Capabilities is
    --  Data: a physical page number.  Replies with a cap that maps that
    --  page at the same address, if the page is not RAM.
 
-   Last_Cap               : constant := 23;
+   Restart_Cap            : constant := 24;
+   --  Restarts the machine (#413).
+
+   Last_Cap               : constant := 24;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

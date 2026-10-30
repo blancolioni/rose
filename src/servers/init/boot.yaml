@@ -256,3 +256,5 @@ stages:
       priority: checkpoint
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
              delete, memory_checkpoint, append_to_log, store_checkpoint]
+      exports:
+        checkpointer: Checkpointer.Take_Checkpoint_Endpoint

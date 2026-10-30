@@ -5,7 +5,9 @@
 Rose boots in one of two ways: from the install media, or from the boot disk, hd0.
 In both, GRUB loads the kernel and the boot modules, and the kernel starts the first boot module, `init`, which starts the others in a fixed order.
 The `restore` server then restores the system from its last checkpoint, if there is one.
-`init` starts the checkpoint server, launches the shell if this boot installed a new system, and exits.
+`init` starts the checkpoint server.
+If this boot installed a new system, it launches `login`, takes the new system's first checkpoint, and restarts the machine, which then boots from hd0 (#413).
+Otherwise it exits.
 
 The two boots differ in their boot modules and in what they do when there is no checkpoint to restore (#373):
 
@@ -188,6 +190,8 @@ Updating the kernel and boot modules on a disk that already has a checkpoint is 
 == Restore Boot
 
 Both boots restore the system if hd0 has a checkpoint, so booting the install media on an installed disk restores the system rather than installing it again.
+The install media's GRUB menu goes further: when hd0's boot partition has a GRUB menu, its default entry loads that menu, so the machine boots hd0's own modules even with the install media still in (#413).
+Installing again is its next entry, `Install Rose`.
 `restore` brings back the persistent processes as they were at the checkpoint, in this order:
 
 . the storage server's regions;
@@ -216,7 +220,15 @@ For the right password, it runs `petal`, which is also a command, with the conso
 The call to `petal` returns when `petal` logs out, at the end of its input (#458), and `login` asks again.
 For a wrong name or password, `login` waits three seconds, says `Login failed`, and asks again.
 
-`init` then exits.
+The new system is then complete, and `init` restarts the machine so that it boots from hd0 (#413):
+
+* it says "install complete; restarting from hd0";
+* it asks the checkpoint server for a checkpoint at once, through `Checkpointer.Take_Checkpoint`, rather than waiting for the timer's.
+  The call returns when the log entry is committed, and `init` tries again, up to five times, if the kernel couldn't take its snapshot;
+* after three seconds, it invokes its restart cap, and the kernel resets the machine: through the keyboard controller, the reset control register, or a triple fault.
+
+The install media's GRUB menu then boots hd0, which restores the checkpoint, with `login` asking for a user.
+If there is no checkpoint after five tries, `init` says so and exits, without restarting.
 
 [NOTE]
 ====

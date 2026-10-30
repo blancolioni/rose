@@ -493,6 +493,10 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Set_Current_State (Current_Process_Id, Ready);
             end;
 
+         when Restart_Endpoint =>
+            Rose.Boot.Console.Put_Line ("kernel: restarting");
+            Rose.Arch.Restart;
+
          when others =>
             Rose.Kernel.Panic.Panic
               ("bad kernel cap endpoint");

@@ -47,6 +47,7 @@ package body Init.Run is
       Delete_Cap           : constant Capability := Init_Caps.Delete_Cap;
       Rescind_Cap          : constant Capability := Init_Caps.Rescind_Cap;
       Exit_Cap             : constant Capability := Init_Caps.Exit_Cap;
+      Restart_Cap          : constant Capability := Init_Caps.Restart_Cap;
       Trace_Cap            : constant Capability := Init_Caps.Trace_Cap;
       --  For trace events (Rose.Trace), given to the processes that
       --  launch commands.
@@ -108,6 +109,11 @@ package body Init.Run is
       procedure Wait (Milliseconds : Natural)
                       renames Init.Boot_Steps.Wait;
 
+      function Take_Checkpoint return Boolean;
+      --  Take the new system's first checkpoint, through the checkpoint
+      --  server (#413), trying again if the kernel can't take its
+      --  snapshot.  False, and a message, if there is none.
+
       ---------------------------------------
       -- Get_Public_Interface_From_Process --
       ---------------------------------------
@@ -137,6 +143,35 @@ package body Init.Run is
 
          return Interface_Cap;
       end Get_Public_Interface_From_Process;
+
+      ---------------------
+      -- Take_Checkpoint --
+      ---------------------
+
+      function Take_Checkpoint return Boolean is
+      begin
+         for Attempt in 1 .. 5 loop
+            declare
+               Params : aliased Rose.Invocation.Invocation_Record;
+            begin
+               Rose.System_Calls.Initialize_Send
+                 (Params, Init.Boot.Checkpointer_Cap);
+               Rose.System_Calls.Receive_Words (Params, 1);
+               Rose.System_Calls.Invoke_Capability (Params);
+               if not Params.Control.Flags (Rose.Invocation.Error)
+                 and then Params.Control.Flags (Rose.Invocation.Send_Words)
+                 and then Params.Data (0) = 1
+               then
+                  return True;
+               end if;
+            end;
+            Wait (1000);
+         end loop;
+
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: no checkpoint; not restarting" & NL);
+         return False;
+      end Take_Checkpoint;
 
    begin
 
@@ -564,6 +599,17 @@ package body Init.Run is
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: unable to launch login" & NL);
+      end if;
+
+      --  The new system is complete.  Once its first checkpoint is in
+      --  the log, restart, so that the machine boots it from hd0 (#413).
+      --  The install media's GRUB menu boots hd0 when it has Rose.
+
+      Init.Calls.Send_String
+        (Console_Stream_Cap, "install complete; restarting from hd0" & NL);
+      if Take_Checkpoint then
+         Wait (3000);
+         Init.Calls.Send (Restart_Cap);
       end if;
 
       Init.Calls.Send_String
