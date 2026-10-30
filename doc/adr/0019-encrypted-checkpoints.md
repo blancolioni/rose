@@ -16,7 +16,9 @@ A disk that is stolen, or a machine that is repaired or resold, gives all of tha
 
 ### What shapes the answer
 
-- **There is one path to the disks.** ADR 0008 names the pager path: `mem`, `store`, `partition`, `ata`, `log`, `checkpoint` and `restore`. Pages go from `mem` to `log`, then through `partition` and `ata`. The store reaches its device through `partition` and `ata` too. Both partitions that matter, the log's and the store's, are block devices (`Block_Device`) served from the same place.
+- **There is one path to the disks.** ADR 0008 names the pager path: `mem`, `store`, `partition`, `ata`, `log`, `checkpoint` and `restore`. Pages go from `mem` to `log`, then through `partition` and `ata`. The store reaches its device through `partition` and `ata` too.
+- **`log` and `store` use nothing of a device but `Block_Device`.** Each is given its device as a cap (`Add_Log_Device`, `Add_Backing_Store`), opens a `Block_Device` client on it, and calls only `Get_Parameters`, `Read_Blocks` and `Write_Blocks`. Neither names a partition or the ATA driver. A cap to another `Block_Device` can be given in its place.
+- **The two use different block sizes.** The store requires blocks of 4096 bytes (`Block_Size = Page_Size`) and reads and writes one at a time. The log's device has blocks of 512 bytes and reads and writes them in groups of 4096 bytes (its `Multiplier`).
 - **Boot modules aren't persistent.** A checkpoint holds no memory of a pager-path process, and a restore starts each of them afresh with only the state it is given again (ADR 0008). A key held by one of them is never written to the log.
 - **A restore needs the key before it can start.** `restore` reads the log to find the last checkpoint. Nothing persistent runs yet, so nothing can ask the user, except through the boot console.
 - **A long key typed at every restart isn't acceptable.** Restores follow every reboot.
@@ -64,7 +66,7 @@ The provider that returns a key is a separate module for each kind, so that `cry
 
 ### 6. The cipher
 
-The cipher is a tweakable one, keyed by the address of the block, with 4 KiB blocks (the store's block size, and a page). It has to build for both targets, have no tables that depend on the key in a way that leaks through timing, be small enough to prove under #42, and be fast enough on a processor without AES instructions.
+The cipher is a tweakable one, keyed by the address of the block, and it encrypts in units of 4096 bytes (a page, which is the store's block and the log's group of blocks). `crypt` presents each device with the block size that the underlying one has, so `log` and `store` see no difference, and it encrypts the aligned 4096 bytes that contain what is read or written. It has to build for both targets, have no tables that depend on the key in a way that leaks through timing, be small enough to prove under #42, and be fast enough on a processor without AES instructions.
 
 The first candidates are a ChaCha20-based wide-block mode (as Adiantum is), which shares its primitive with the random number service, and AES-XTS, which needs hardware support to be fast and constant time. This is an open question, and the decision to make before the code.
 
@@ -93,7 +95,8 @@ The first candidates are a ChaCha20-based wide-block mode (as Adiantum is), whic
 - **The cipher,** as in 6, and what to do about authentication.
 - **Freshness.** Whether a rollback of the disk to an older state needs detecting, for example with a counter in the TPM, and what a rollback costs a persistent system (the whole machine goes back, as a restore from a checkpoint does).
 - **TPM support.** What drivers it needs, whether QEMU's emulated TPM is enough to develop against, and what has to be measured for a seal to mean something.
-- **Where the header lives,** and how a copy is kept.
+- **Where the header lives,** and how a copy is kept. `crypt` can hide it by presenting a device that is smaller than the one underneath, so `log` and `store` never see it. With two encrypted partitions, whether they share one data key and one header, or each has its own, is not decided.
+- **Access smaller than 4096 bytes.** `log` reads and writes in groups of 4096 bytes, but the first block of the log's device may be read on its own. A read or write smaller than the unit would need `crypt` to read, decrypt, change and re-encrypt the unit.
 - **Recovery.** A recovery key shown at install, and what to do if the passphrase and the other slots are lost.
 - **Per-user keys.** Whether a user's own data, perhaps their home directory, is encrypted under a key from their login password, so that unlocking a session (ADR 0018) also unlocks that user's data, and one user can't read another's even with the machine unlocked. It makes a forgotten password a data loss.
 - **A key provider as a cap.** How `crypt` is given the cap for each provider, and by whom, since it has to be before `restore` runs.
