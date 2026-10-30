@@ -143,6 +143,9 @@ package body Petal.Signatures is
                            then Find_Command_Cap
                            elsif Key = "cap" and then Name = "Console"
                            then Console_Cap
+                           elsif Key = "cap"
+                             and then Name = "Clock_Service"
+                           then Clock_Service_Cap
                            else Other_Role_Cap);
                      end;
                   end;

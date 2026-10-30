@@ -22,7 +22,8 @@ package body Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Commands        : Rose.Capabilities.Capability)
+      Commands        : Rose.Capabilities.Capability;
+      Clock           : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -50,6 +51,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Standard_Output);
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
+      Rose.System_Calls.Send_Cap (Params, Clock);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 

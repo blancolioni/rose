@@ -1,5 +1,5 @@
 command Rose.Core.Run_Self_Tests
-  : Standard_Output, Create_Endpoint, Find_Command
+  : Standard_Output, Create_Endpoint, Find_Command, Clock_Service
   with Summary     => "Run Rose's self tests.",
        Description => """
           Run_Self_Tests runs Rose's self tests, and writes each test's

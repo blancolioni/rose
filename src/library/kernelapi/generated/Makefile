@@ -16,7 +16,7 @@ IDL=cap block_device file_system directory file \
 # nothing is generated for them here; each command generates its own units.
 
 COMMANDS=rose-core standard_input standard_output standard_error standard_io \
-    create_endpoint delete_cap rescind_cap find_command console timer_service
+    create_endpoint delete_cap rescind_cap find_command console timer_service clock_service
 
 IDLE ?= idle
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)

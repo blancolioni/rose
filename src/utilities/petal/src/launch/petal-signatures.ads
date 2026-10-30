@@ -68,7 +68,7 @@ package Petal.Signatures is
 
    type Role_Cap_Kind is
      (Create_Endpoint_Cap, Delete_Cap, Rescind_Cap, Find_Command_Cap,
-      Console_Cap, Other_Role_Cap);
+      Console_Cap, Clock_Service_Cap, Other_Role_Cap);
    --  A cap that one of the command's roles needs, other than a stream:
    --  a system cap, the command registry's Commands interface for the
    --  Find_Command role (#460), the console's Terminal for the Console

@@ -4,6 +4,7 @@ procedure Rose.Core.Login
   (Console       : in out Rose.Interfaces.Terminal.Terminal_Object'Class;
    Find_Command  : in out Rose.Interfaces.Commands.Commands_Object'Class;
    Timer_Service : in out Rose.Interfaces.Timer.Timer_Object'Class;
+   Clock_Service : in out Rose.Interfaces.Clock.Clock_Object'Class;
    Auth          : in out Rose.Interfaces.Auth.Auth_Object'Class)
 is
 begin
@@ -14,5 +15,6 @@ begin
      (Console  => Console.Terminal_Cap,
       Commands => Find_Command.Commands_Cap,
       Timer    => Timer_Service.Timer_Cap,
+      Clock    => Clock_Service.Clock_Cap,
       Auth     => Auth.Auth_Cap);
 end Rose.Core.Login;

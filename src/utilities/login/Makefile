@@ -24,6 +24,7 @@ login:
 	    $(INTERFACES)/stream_reader.idl \
 	    $(INTERFACES)/stream_writer.idl \
 	    $(INTERFACES)/timer.idl \
+	    $(INTERFACES)/clock.idl \
 	    $(INTERFACES)/cap.idl \
 	    $(INTERFACES)/timeout.idl \
 	    $(INTERFACES)/commands.idl \

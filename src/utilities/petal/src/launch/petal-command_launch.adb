@@ -33,6 +33,10 @@ package body Petal.Command_Launch is
      Rose.Capabilities.Null_Capability;
    --  The console's Terminal, for the Console role (#454).
 
+   Clock_Cap : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   --  The clock's Clock interface, for the Clock_Service role (ADR 0020).
+
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
    --  The words of a command line.
@@ -628,6 +632,11 @@ package body Petal.Command_Launch is
                      Fail ("petal has no console to give the command");
                   end if;
                   Caps (Role.Cap_Index + 1) := Terminal_Cap;
+               when Clock_Service_Cap =>
+                  if Clock_Cap = Rose.Capabilities.Null_Capability then
+                     Fail ("petal has no clock to give the command");
+                  end if;
+                  Caps (Role.Cap_Index + 1) := Clock_Cap;
                when Other_Role_Cap =>
                   Fail ("petal cannot supply role "
                         & Value (Item, Role.Name));
@@ -875,7 +884,8 @@ package body Petal.Command_Launch is
 
    procedure Set_Registry
      (Commands : Rose.Capabilities.Capability;
-      Terminal : Rose.Capabilities.Capability)
+      Terminal : Rose.Capabilities.Capability;
+      Clock    : Rose.Capabilities.Capability)
    is
       Registry : Rose.Interfaces.Commands.Client.Commands_Client;
    begin
@@ -883,6 +893,7 @@ package body Petal.Command_Launch is
       Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
       Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
       Terminal_Cap := Terminal;
+      Clock_Cap := Clock;
    end Set_Registry;
 
    -----------
