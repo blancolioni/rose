@@ -301,10 +301,9 @@ The client and the server agree on all of these, which is checked by Rose bootin
 * Each method has a handler access type, with an extra first parameter `Id : Rose.Objects.Capability_Identifier`, the identifier of the capability that was invoked.
   A server that serves many instances through one endpoint, such as one per device or per timer, uses `Id` to tell them apart.
 * Interface arguments and results are plain `Capability` values in a handler: a handler receives an interface argument as a `Capability`, and returns an interface result as one.
-* A handler that raises an exception fails the call.
-  The generated code that calls the handler, and reads its arguments, replies with the error `Rose.Invocation.Exception_Raised` instead of the results.
-  The reply carries no name or message for the exception.
-  This is the same on the user-mode target, for the methods of an object.
+* A handler can't raise an exception that the caller sees.
+  The kernel target is for programs that can't propagate exceptions, such as the boot modules, so its servers have no handler for one.
+  Failing by raising is for the user-mode target.
 * `Create_Server` creates the endpoints for the interface's methods and registers the handlers in a `Rose.Server.Server_Context`.
   `Attach_Interface` adds the interface to an existing context, and `Publish_Interface` also publishes it as the server's public interface.
 * The `Instanced` parameter, described next, selects whether one set of method capabilities is shared by every client, or each resource the server manages gets its own.
@@ -369,7 +368,8 @@ Handwritten libraries are either for one target, because they use its generated 
   Objects are `limited`, so copying one cannot duplicate a capability, and closing one is explicit.
 * *Errors are exceptions.*
   A failed call raises `Rose.Interfaces.Objects.Invocation_Error`, where the kernel target sets `Has_Error`.
-  A method that raises an exception in the server fails its call this way, with the error `Exception_Raised`, so an operation can fail by raising on both sides of the call.
+  A method that raises an exception in the server fails its call this way: the generated server replies with the error `Rose.Invocation.Exception_Raised` instead of the results, with no name or message for the exception, and the client raises `Invocation_Error`.
+  An operation can then fail by raising on both sides of the call.
 
 ==== Generated packages
 
