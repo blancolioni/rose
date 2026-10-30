@@ -3,8 +3,12 @@ project Exec is
    --  Built with the userland run-time system (#490), which has Rose's
    --  base, capability and system call packages.
 
+   --  The RTS's own interface specs come first, so that the program
+   --  uses them and not the other copies on its path (#538).
+
    for Source_Dirs use
-      ("src",
+      ("../../rts/build/interfaces",
+       "src",
        "../../library/kernelapi/console",
        "../../library/rose",
        "../../library/kernelapi/generated");

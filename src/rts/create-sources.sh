@@ -16,14 +16,25 @@ done
 chmod 644 build/gnat-src/*
 DIRS="$DIRS build/gnat-src"
 
-# The generated interface packages that the RTS uses: only these, because
-# every unit in the RTS's source directories goes into the library.
+# The generated interface packages that the RTS uses, from the user target
+# (#538): only their top-level specs, because every unit in the RTS's
+# source directories goes into the library. Process needs the specs of
+# its parents, and of the interfaces that its operations name. Programs
+# built with the RTS put build/interfaces first in their source
+# directories, so that they use these specs and not other copies.
 
-INTERFACES="process heap cap_set"
-mkdir -p build/interfaces
+IDLE=${IDLE:-idle}
+INTERFACES="process heap cap_set segment server cap region stream_reader"
+mkdir -p build/idl build/interfaces
+IDL_FILES=""
 for name in $INTERFACES
 do
-    ln -sf `pwd`/../library/kernelapi/generated/rose-interfaces-$name.ads build/interfaces/
+    IDL_FILES="$IDL_FILES ../../interfaces/$name.idl"
+done
+$IDLE --target user -I ../../interfaces -o build/idl $IDL_FILES || exit 1
+for name in $INTERFACES
+do
+    cp build/idl/rose-interfaces-$name.ads build/interfaces/ || exit 1
 done
 DIRS="$DIRS build/interfaces"
 
