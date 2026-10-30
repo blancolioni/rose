@@ -80,7 +80,10 @@ package body Rose.Kernel.Processes is
      (From_Process : Rose.Kernel.Processes.Process_Id;
       To_Process   : Rose.Kernel.Processes.Process_Id;
       Address      : Rose.Addresses.Virtual_Page_Address;
-      Writable     : Boolean);
+      Writable     : Boolean;
+      Shared       : out Rose.Addresses.Virtual_Page_Address);
+   --  Map From_Process's page Address into the first free shared slot of
+   --  To_Process, and set Shared to the slot's page.
 
    procedure Disable_Write_Pages
      (Process : in out Kernel_Process_Entry);
@@ -1616,19 +1619,27 @@ package body Rose.Kernel.Processes is
             Writable  : constant Boolean :=
                           Params.Control.Flags
                             (Rose.Invocation.Writable_Buffer);
+            First     : Rose.Addresses.Virtual_Page_Address := 0;
+            Shared    : Rose.Addresses.Virtual_Page_Address;
          begin
             while Remaining > 0 loop
-               Share_Page (From_Process_Id, To_Process_Id, Page, Writable);
+               Share_Page
+                 (From_Process_Id, To_Process_Id, Page, Writable, Shared);
+               if First = 0 then
+                  First := Shared;
+               end if;
                Page := Page + 1;
                Remaining := Remaining
                  - Word'Min (Remaining, Virtual_Page_Bytes);
             end loop;
-         end;
 
-         To.Current_Params.Buffer_Address :=
-           To_System_Address
-             (Virtual_Page_To_Address
-              (To.Page_Ranges (Invocation_Range_Index).Base));
+            --  The buffer is where its first page was mapped, which is
+            --  not the first slot if the server holds another buffered
+            --  request (#529).
+
+            To.Current_Params.Buffer_Address :=
+              To_System_Address (Virtual_Page_To_Address (First));
+         end;
 
       end if;
 
@@ -2164,7 +2175,8 @@ package body Rose.Kernel.Processes is
      (From_Process : Rose.Kernel.Processes.Process_Id;
       To_Process   : Rose.Kernel.Processes.Process_Id;
       Address      : Rose.Addresses.Virtual_Page_Address;
-      Writable     : Boolean)
+      Writable     : Boolean;
+      Shared       : out Rose.Addresses.Virtual_Page_Address)
    is
       use Rose.Words;
       Physical_Page      : constant Physical_Page_Address :=
@@ -2205,6 +2217,7 @@ package body Rose.Kernel.Processes is
       P.Shared_Pages (Index) := Shared_Page_Record'
         (Page => Virtual_Page,
          Pid  => From_Process);
+      Shared := Virtual_Page;
 
       Map_Page
         (Pid           => To_Process,
