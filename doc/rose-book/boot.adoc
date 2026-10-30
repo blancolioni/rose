@@ -207,9 +207,14 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 == Starting the Shell
 
 When a new system has been installed, `init` launches `checkpoint`.
-It then finds `tests` in the command registry and launches it, launches `auth`, creates the first user, `fraser`, with a home directory (ADR 0003), through `auth`, checks that `fraser` can log in, and launches `petal`.
-`tests` and `petal` each receive a cap set with the standard streams, using the persistent console for output and the keyboard input stream for input, and the system caps for deleting and rescinding caps, creating endpoints and creating cap sets.
-`petal` also receives the registry's `Find`, for running commands, a capability for trace events, the user, and the user's home directory as its current directory.
+It then runs the self tests, launches `auth`, creates the first user, `fraser`, with a home directory (ADR 0003), through `auth`, checks that `fraser` can log in, and launches `login`.
+
+`login` is a command (#457).
+Its roles give it the console, the system caps, the command registry and the timer, and its argument is `auth`.
+It completes its launch call, so that `init` can go on, and then keeps running: it asks for a user name and a password at the console, and checks them with `auth`.
+For the right password, it runs `petal`, which is also a command, with the console's streams, the system caps, the command registry, the console's `Terminal`, and the user, whose home directory is `petal`'s.
+The call to `petal` returns when `petal` logs out, at the end of its input (#458), and `login` asks again.
+For a wrong name or password, `login` waits three seconds, says `Login failed`, and asks again.
 
 `init` then exits.
 
@@ -239,7 +244,7 @@ An arrow goes from a process to a process it holds a capability for and calls.
 image::processes-install.svg[Processes after an install boot,pdfwidth=100%]
 
 After an install, `restore-install` has read the programs from `isofs`, sent them to `init` to install, and written the boot loader through partition servers 18 to 20 (see <<writing-the-boot-loader>>).
-`init` has installed `exec` and the command registry through `store` and `elf`, created the first user's home directory, and launched `tests` and `petal` through `exec`.
+`init` has installed `exec` and the command registry through `store` and `elf`, created the first user through `auth`, and launched the self tests and `login` through `exec`.
 `tests` has run its tests and exited.
 The boot console sends its output on to `vga-console` (see <<handing-over-the-console>>).
 

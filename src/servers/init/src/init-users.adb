@@ -155,4 +155,57 @@ package body Init.Users is
       Admin := Params.Caps (1);
    end Start_Auth;
 
+   -----------------
+   -- Start_Login --
+   -----------------
+
+   function Start_Login
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Console         : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Timer           : Rose.Capabilities.Capability;
+      Auth            : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "login");
+      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
+      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps and its Auth argument, as
+      --  src/utilities/login/rose-core-login.idl declares them.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Console);
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Delete_Cap);
+      Rose.System_Calls.Send_Cap (Params, Rescind_Cap);
+      Rose.System_Calls.Send_Cap (Params, Commands);
+      Rose.System_Calls.Send_Cap (Params, Timer);
+      Rose.System_Calls.Send_Cap (Params, Auth);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      return not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Params.Data (0) = Completed;
+   end Start_Login;
+
 end Init.Users;

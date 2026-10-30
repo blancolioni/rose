@@ -2,13 +2,11 @@ with System.Storage_Elements;
 
 with Ada_Text_IO;
 
-with Rose.Capabilities.Standard;
-with Rose.Interfaces.Cap_Set;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Invocation;
+with Rose.System_Calls;
 with Rose.Standard_Streams;
-with Rose.System_Calls.Client;
 with Rose.Trace;
 with Rose.Words;
 
@@ -21,19 +19,6 @@ package body Petal.Command_Launch is
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word;
-
-   --  Petal's argument cap set: the caps it uses here.
-
-   Delete_Cap_Index      : constant := 6;
-   Rescind_Cap_Index     : constant := 7;
-   Create_Endpoint_Index : constant := 8;
-   Commands_Index        : constant := 10;
-   --  The command registry's Commands interface (#460).
-   Trace_Index           : constant := 11;
-   --  For trace events (Rose.Trace).
-   Terminal_Index        : constant := 13;
-   --  The console, which petal gives a command with the Console role
-   --  (#454).
 
    Commands_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -126,7 +111,6 @@ package body Petal.Command_Launch is
 
    function Lower (Text : String) return String;
 
-   procedure Open_Registry;
    --  Find the registry, and the caps for deleting caps, the first time.
 
    procedure Put_Help (Item : Signature);
@@ -719,45 +703,6 @@ package body Petal.Command_Launch is
       return Result;
    end Lower;
 
-   -------------------
-   -- Open_Registry --
-   -------------------
-
-   procedure Open_Registry is
-      Params  : aliased Rose.Invocation.Invocation_Record;
-      Get_Cap : Rose.Capabilities.Capability;
-
-      function Argument_Cap
-        (Index : Rose.Words.Word)
-         return Rose.Capabilities.Capability
-      is (Rose.System_Calls.Client.Get_Capability (Get_Cap, (1 => Index)));
-
-   begin
-      if Find_Cap /= Rose.Capabilities.Null_Capability then
-         return;
-      end if;
-
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-      Get_Cap := Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
-
-      Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Argument_Cap (Create_Endpoint_Index),
-         Delete_Cap      => Argument_Cap (Delete_Cap_Index),
-         Rescind_Cap     => Argument_Cap (Rescind_Cap_Index));
-      Commands_Cap := Argument_Cap (Commands_Index);
-      declare
-         Registry : Rose.Interfaces.Commands.Client.Commands_Client;
-      begin
-         Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
-         Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
-      end;
-      Rose.Trace.Set_Trace_Cap (Argument_Cap (Trace_Index));
-      Terminal_Cap := Argument_Cap (Terminal_Index);
-   end Open_Registry;
 
    --------------
    -- Put_Help --
@@ -878,8 +823,6 @@ package body Petal.Command_Launch is
          return;
       end if;
 
-      Open_Registry;
-
       declare
          Name   : constant String :=
            Lower (Line (Words (1).First .. Words (1).Last));
@@ -925,6 +868,22 @@ package body Petal.Command_Launch is
          Rose.Interfaces.Launch.Client.Close (Client);
       end;
    end Run;
+
+   ------------------
+   -- Set_Registry --
+   ------------------
+
+   procedure Set_Registry
+     (Commands : Rose.Capabilities.Capability;
+      Terminal : Rose.Capabilities.Capability)
+   is
+      Registry : Rose.Interfaces.Commands.Client.Commands_Client;
+   begin
+      Commands_Cap := Commands;
+      Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
+      Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
+      Terminal_Cap := Terminal;
+   end Set_Registry;
 
    -----------
    -- Split --

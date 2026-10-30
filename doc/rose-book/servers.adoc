@@ -230,6 +230,20 @@ Used by:: `auth`, which launches it for each user it creates; and the shell, whi
 
 `user` is installed with the commands, and launched once for each user, with the name and the home directory in its launch call.
 
+=== `login`
+
+Logs users in at the console (#457).
+
+Requests:: `Console`, `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap`, `Find_Command` and `Timer_Service`, as roles of its command declaration, and `Auth`, as its argument.
+Used by:: `init`, which launches it on a first boot, after it creates the first user.
+
+* *It asks for a user name, and then a password with echo off* (#454).
+* *For the right password, it runs `petal` for the user,* as a command, and waits for the call to return, which it does when `petal` logs out at the end of its input (#458).
+  It then clears the screen and asks again.
+* *For a wrong one, it waits three seconds,* through the timer, says `Login failed`, and asks again.
+* *It never completes,* so that the console always has something reading it.
+  An exception is reported on the console, and `login` carries on.
+
 === `auth`
 
 Keeps the users, and a salted hash of each one's password (#455).

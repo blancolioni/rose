@@ -29,4 +29,17 @@ package Init.Users is
       return Boolean;
    --  True if Auth.Login gives a user for Name and Password.
 
+   function Start_Login
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Console         : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Timer           : Rose.Capabilities.Capability;
+      Auth            : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Launch login as a command on the console (#457). It completes its
+   --  launch call and then keeps running. False if it can't be launched.
+
 end Init.Users;

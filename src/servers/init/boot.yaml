@@ -126,6 +126,7 @@ stages:
       caps: [console_interface, set_timeout, get_ticks]
       exports:
         timer: Timer.Set_Timer_Endpoint
+        timer_interface: Timer.Timer_Interface
 
     - endpoint: Timeout.On_Timeout_Endpoint
       receiver: receive_timeout
