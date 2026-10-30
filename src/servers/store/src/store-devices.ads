@@ -91,11 +91,9 @@ package Store.Devices is
    procedure Restore_Region
      (Id          : Rose.Objects.Capability_Identifier;
       Index       : Natural;
-      Device      : Natural;
       Base        : Rose.Objects.Object_Id;
       Bound       : Rose.Objects.Object_Id;
-      Alloc_Index : Natural;
-      Alloc_Blocks : Natural);
+      Root        : Natural);
    --  Recreate a region from a checkpoint.  The backing stores must have
    --  been added again first, in the same order.
 
@@ -104,8 +102,8 @@ package Store.Devices is
       Index : Natural;
       Page  : System.Storage_Elements.Storage_Array);
    --  Read back page Index of the tables that Checkpoint appended, after
-   --  the regions have been recreated: the fresh pages of the restored
-   --  regions are marked fresh again.
+   --  the regions have been recreated: the blocks of the restored
+   --  regions that had space on a device get it back.
 
    function Find_Region
      (Id    : Rose.Objects.Capability_Identifier;

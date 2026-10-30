@@ -389,11 +389,9 @@ package body Restore.Checkpoints is
                Restore_Region
                  (Item        => Store,
                   Index       => Natural (Region.Index),
-                  Device      => Natural (Region.Device),
                   Base        => Rose.Objects.Object_Id (Region.Base),
                   Bound       => Rose.Objects.Object_Id (Region.Bound),
-                  Alloc_Index => Natural (Region.Alloc_Index),
-                  Alloc_Blocks => Natural (Region.Alloc_Blocks));
+                  Root        => Natural (Region.Root));
             end;
          end loop;
 
@@ -403,7 +401,8 @@ package body Restore.Checkpoints is
       end;
 
       --  Then the storage server is given its tables back, to read the
-      --  rest of its state from them: which pages are fresh (#327).
+      --  rest of its state from them: which blocks have space on a device
+      --  and which of their pages are fresh (#305).
 
       for I in 1 .. Store_Pages loop
          if not Read (Reader, Checkpoint, Kernel_Pages + I) then

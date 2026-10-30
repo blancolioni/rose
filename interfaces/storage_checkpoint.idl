@@ -10,15 +10,14 @@ interface Storage_Checkpoint is
    --  through Append_Page (see Rose.Checkpoints).
 
    procedure Restore_Region
-     (Index       : Natural;
-      Device      : Natural;
-      Base        : Object_Id;
-      Bound       : Object_Id;
-      Alloc_Index : Natural;
-      Alloc_Blocks : Natural);
-   --  Recreate a region from a checkpoint, with the index, pages and
-   --  backing store space it had.  Its pages are read from the device,
-   --  except those that Restore_Table_Page marks fresh.
+     (Index : Natural;
+      Base  : Object_Id;
+      Bound : Object_Id;
+      Root  : Natural);
+   --  Recreate a region from a checkpoint, with the index and pages it
+   --  had.  Root is the index of the region that its pages were reserved
+   --  for, which is its own unless it is a subregion.  Restore_Table_Page
+   --  gives back the blocks of its pages that have space on a device.
 
    procedure Restore_Table_Page
      (Index : Natural;

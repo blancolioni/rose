@@ -16,6 +16,10 @@ with Rose.Interfaces.Stream_Reader;
 
 package body Store.Devices is
 
+   use type Rose.Objects.Object_Id;
+   use type Rose.Words.Word_32;
+   use type Rose.Words.Word_64;
+
    Max_Backing_Stores  : constant := 16;
    Max_Regions         : constant := 256;
    Max_Banks           : constant := 64;
@@ -34,21 +38,46 @@ package body Store.Devices is
    --  together: 4 GiB.  Its tree of 2 ** (Store_Size_Bits - Block_Size_Bits)
    --  blocks has half that many leaves.
 
-   Max_Fresh_Pages : constant := Max_Store_Pages;
-   --  Every page that Allocator can hand out, on any backing store.
+   Next_Page : Rose.Objects.Object_Id := Rose.Objects.Page_Object_Id'First;
+   --  The first page id that no region has had.  A region's pages are
+   --  the next ones, which are never used again, so a page id is
+   --  persistent whatever happens to the region (#305).
 
-   type Fresh_Page_Array is
-     array (0 .. Max_Fresh_Pages - 1) of Boolean
-     with Pack;
+   Max_Mapped_Blocks : constant := 2 ** 14;
+   --  The blocks that can have space on a device at once: 256 MiB.
 
-   Fresh : Fresh_Page_Array;
-   --  True for a page that has been reserved and not written since, which
-   --  reads as zeroes without a read from the device (#203), indexed from
-   --  Page_Object_Id'First. Everything else is read. Only the pages of
-   --  regions are kept: Reserve_Storage marks a new region's pages fresh,
-   --  Restore_Region marks a restored region's pages not fresh, and
-   --  Restore_Table_Page then puts back the ones a checkpoint saved as
-   --  fresh (#327). Other pages may hold anything.
+   type Map_Entry is
+      record
+         Page  : Rose.Objects.Object_Id;
+         Next  : Rose.Words.Word_32;
+         Block : Rose.Words.Word_32;
+         Fresh : Rose.Words.Word_32;
+      end record;
+   --  A block of a region that has space on a device, found by the id of
+   --  its first page.  Block is the index that Allocator gave it, and
+   --  bit I of Fresh is set while page I of the block has not been
+   --  written, so reads as zeroes without a read from the device (#203).
+   --  Page is zero for an entry that isn't in use, and Next links the
+   --  entries of a bucket, or the unused ones.
+
+   type Map_Array is array (1 .. Max_Mapped_Blocks) of Map_Entry;
+   type Bucket_Array is
+     array (0 .. Max_Mapped_Blocks - 1) of Rose.Words.Word_32;
+
+   Map          : Map_Array :=
+                    (others => (Page => 0, Next => 0, Block => 0, Fresh => 0));
+   Buckets      : Bucket_Array := (others => 0);
+   Map_High     : Natural := 0;
+   Map_Count    : Natural := 0;
+   Free_Entries : Rose.Words.Word_32 := 0;
+   --  A block of a region has space on a device from the first write to
+   --  one of its pages (#305), and the map says where.  Map_High is the
+   --  highest entry used, Map_Count the entries in use, and Free_Entries
+   --  the unused ones below Map_High.  The pages of a block that isn't in
+   --  the map are all fresh.  The tables are written when the store
+   --  starts, so every page of them is mapped before it is used: a page
+   --  fault in the store while the memory server is waiting for it would
+   --  deadlock them both.
 
    type Backing_Store_Record is
       record
@@ -78,22 +107,20 @@ package body Store.Devices is
    type Region_Record is
       record
          In_Use         : Boolean := False;
-         Backing_Device : Natural := 0;
          Base, Bound    : Rose.Objects.Object_Id := 0;
          Access_Cap     : Rose.Capabilities.Capability := 0;
-         Alloc_Index    : Natural := 0;
-         Alloc_Blocks   : Natural := 0;
+         Root           : Natural := 0;
+         Mapped_Blocks  : Natural := 0;
          Reads          : Natural := 0;
          Zero_Reads     : Natural := 0;
          Writes         : Natural := 0;
-         Restored       : Boolean := False;
          Bank           : Natural := 0;
       end record;
-   --  A region, with the blocks it was allocated, which a subregion does
-   --  not have: Alloc_Index is zero.  Restored is True for a region that
-   --  Restore_Region recreated, whose fresh pages Restore_Table_Page
-   --  puts back.  Bank is the bank that the region is charged to, which
-   --  is its parent's for a subregion.
+   --  A region.  Root is the region that its page ids were reserved for,
+   --  which is the region itself unless it is a subregion, and
+   --  Mapped_Blocks the blocks of its pages that have space on a device,
+   --  which only a root region keeps.  Bank is the bank that the region
+   --  is charged to, which is its parent's for a subregion.
 
    type Region_Array is
      array (1 .. Max_Regions) of Region_Record;
@@ -115,9 +142,8 @@ package body Store.Devices is
       end record;
    --  A bank (ADR 0014).  Parent is zero for the root bank.  A limit of
    --  zero is no limit.  Pages and Regions are what has been reserved
-   --  from the bank and the banks below it: a region's pages are the
-   --  blocks it was allocated, and a subregion counts as a region but
-   --  has no pages of its own.
+   --  from the bank and the banks below it: its pages are the blocks that
+   --  have space on a device, and a subregion counts as a region.
 
    type Bank_Array is
      array (1 .. Max_Banks) of Bank_Record;
@@ -131,36 +157,19 @@ package body Store.Devices is
      with Import, Address => Table_Page'Address;
    Region_Table : Rose.Checkpoints.Region_Page
      with Import, Address => Table_Page'Address;
-   Fresh_Table  : Rose.Checkpoints.Fresh_Page
+   Map_Table    : Rose.Checkpoints.Map_Page
      with Import, Address => Table_Page'Address;
    --  The page in which Checkpoint builds the region table.
 
    Restore_Region_Count : Natural := 0;
    Restore_Last_Region  : Natural := 0;
-   Restore_First_Fresh  : Natural := 0;
-   Restore_Last_Fresh   : Natural := 0;
+   Restore_First_Map    : Natural := 0;
+   Restore_Last_Map     : Natural := 0;
+   Restore_Entry_Count  : Natural := 0;
    --  While a restore gives the tables back: the regions they hold, the
-   --  last table page that holds regions, and the table pages that hold
-   --  fresh pages (zero if there are none).
-
-   type Saved_Space_Record is
-      record
-         Index       : Natural := 0;
-         Base, Bound : Rose.Objects.Object_Id := 0;
-      end record;
-
-   type Saved_Space_Array is
-     array (1 .. Max_Regions) of Saved_Space_Record;
-
-   Saved_Spaces      : Saved_Space_Array;
-   Saved_Space_Count : Natural := 0;
-   --  The regions with space of their own in the tables a restore gives
-   --  back, in the order their fresh pages are saved.
-
-   Restore_Space     : Natural := 0;
-   Restore_Next_Page : Rose.Objects.Object_Id := 0;
-   --  The next page whose freshness a restore gives back, and the space
-   --  it is in; Restore_Space is zero before the first.
+   --  last table page that holds regions, the table pages that hold the
+   --  map (zero if there are none), and the entries of the map still to
+   --  come.
 
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
@@ -198,22 +207,60 @@ package body Store.Devices is
       Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability;
 
+   function Find_Entry
+     (Page : Rose.Objects.Object_Id)
+      return Natural;
+   --  The map entry of the block that Page is in, or zero if the block
+   --  has no space on a device.
+
+   function Insert_Entry
+     (Page  : Rose.Objects.Object_Id;
+      Block : Rose.Words.Word_32;
+      Fresh : Rose.Words.Word_32)
+      return Natural;
+   --  Add the block that Page is in to the map, or return zero if the
+   --  map is full.
+
+   function Map_Block
+     (Root : in out Region_Record;
+      Page : Rose.Objects.Object_Id)
+      return Natural;
+   --  Give the block that Page is in space on a device, charge it to the
+   --  bank of Root, the region that has the page, and add it to the map.
+   --  Zero if there is no space or the bank is full.
+
+   procedure Remove_Entry (Index : Positive);
+   --  Take an entry out of the map.
+
+   function Device_Page
+     (Entry_Index : Positive;
+      Page        : Rose.Objects.Object_Id;
+      Store       : out Positive)
+      return Rose.Interfaces.Block_Device.Block_Address_Type;
+   --  The page of the device that holds Page, which is in the block of
+   --  an entry of the map, and the backing store that the device is.
+
    function Is_Fresh
      (Page : Rose.Objects.Object_Id)
       return Boolean;
-   --  True if Page has been reserved and not written since.
+   --  True if Page has not been written.
 
-   procedure Set_Fresh
-     (Base, Bound : Rose.Objects.Object_Id;
-      Value       : Boolean);
-   --  Mark the pages Base .. Bound - 1 fresh or not.
+   function Page_Bit
+     (Page : Rose.Objects.Object_Id)
+      return Rose.Words.Word_32
+   is (Rose.Words.Word_32'(2) ** Natural (Page mod Minimum_Block_Pages));
+   --  The bit of a map entry's Fresh that is for Page.
 
-   procedure Next_Restored_Page
-     (Page  : out Rose.Objects.Object_Id;
-      Space : out Natural);
-   --  The next page of the saved regions with space of their own, in the
-   --  order Checkpoint saves them, and its index in Saved_Spaces; zero if
-   --  there are no more.
+   function Is_Zero
+     (Data : System.Storage_Elements.Storage_Array)
+      return Boolean;
+   --  True if every element of Data is zero.
+
+   procedure Restore_Entry
+     (Page  : Rose.Objects.Object_Id;
+      Block : Rose.Words.Word_32;
+      Fresh : Rose.Words.Word_32);
+   --  Give back the entry of a block that had space on a device.
 
    Stream_Buffer_Length : constant := 4096;
 
@@ -332,8 +379,6 @@ package body Store.Devices is
       Pages   : Rose.Words.Word_64;
       Regions : Rose.Words.Word)
    is
-      use type Rose.Words.Word;
-      use type Rose.Words.Word_64;
       Index : Natural := Bank;
    begin
       while Index in 1 .. Max_Banks loop
@@ -353,12 +398,10 @@ package body Store.Devices is
    is
       pragma Unreferenced (Id);
       use Rose.Checkpoints;
-      use type Rose.Objects.Object_Id;
       Count       : Natural := 0;
       Slot        : Natural := 0;
-      Fresh_Bits  : Natural := 0;
-      Fresh_Pages : Natural;
-      Bit         : Natural := 0;
+      Map_Pages   : Natural;
+      Entry_Slot  : Natural := 0;
 
       procedure Append;
       --  Append Table_Page to the log, and clear it.
@@ -381,24 +424,22 @@ package body Store.Devices is
       for Region of Regions (1 .. Region_Count) loop
          if Region.In_Use then
             Count := Count + 1;
-            if Region.Alloc_Index > 0 then
-               Fresh_Bits := Fresh_Bits + Natural (Region.Bound - Region.Base);
-            end if;
          end if;
       end loop;
 
-      Fresh_Pages :=
-        (Fresh_Bits + Fresh_Bits_Per_Page - 1) / Fresh_Bits_Per_Page;
+      Map_Pages := (Map_Count + Entries_Per_Page - 1) / Entries_Per_Page;
 
       Table_Page := (others => 0);
       Table_Header.Magic := Store_Table_Magic;
       Table_Header.Version := Store_Table_Version;
+      Table_Header.Next_Page := Rose.Words.Word_64 (Next_Page);
       Table_Header.Page_Count :=
         Rose.Words.Word_32
           (1 + (Count + Regions_Per_Page - 1) / Regions_Per_Page
-           + Fresh_Pages);
+           + Map_Pages);
       Table_Header.Region_Count := Rose.Words.Word_32 (Count);
-      Table_Header.Fresh_Page_Count := Rose.Words.Word_32 (Fresh_Pages);
+      Table_Header.Map_Page_Count := Rose.Words.Word_32 (Map_Pages);
+      Table_Header.Map_Entry_Count := Rose.Words.Word_32 (Map_Count);
       Append;
 
       for Index in 1 .. Region_Count loop
@@ -409,13 +450,12 @@ package body Store.Devices is
                Slot := Slot + 1;
                Region_Table.Regions (Slot) :=
                  Saved_Region'
-                   (Index       => Rose.Words.Word_32 (Index),
-                    Device      => Rose.Words.Word_32 (Region.Backing_Device),
-                    Base        => Rose.Words.Word_64 (Region.Base),
-                    Bound       => Rose.Words.Word_64 (Region.Bound),
-                    Alloc_Index => Rose.Words.Word_32 (Region.Alloc_Index),
-                    Alloc_Blocks =>
-                      Rose.Words.Word_32 (Region.Alloc_Blocks));
+                   (Index  => Rose.Words.Word_32 (Index),
+                    Root   => Rose.Words.Word_32 (Region.Root),
+                    Base   => Rose.Words.Word_64 (Region.Base),
+                    Bound  => Rose.Words.Word_64 (Region.Bound),
+                    Blocks => Rose.Words.Word_32 (Region.Mapped_Blocks),
+                    Reserved => 0);
                if Slot = Regions_Per_Page then
                   Append;
                   Slot := 0;
@@ -428,22 +468,24 @@ package body Store.Devices is
          Append;
       end if;
 
-      --  Then the fresh pages of each region with space of its own.
+      --  Then the map.
 
-      for Region of Regions (1 .. Region_Count) loop
-         if Region.In_Use and then Region.Alloc_Index > 0 then
-            for Page in Region.Base .. Region.Bound - 1 loop
-               Bit := Bit + 1;
-               Fresh_Table (Bit) := Is_Fresh (Page);
-               if Bit = Fresh_Bits_Per_Page then
-                  Append;
-                  Bit := 0;
-               end if;
-            end loop;
+      for Index in 1 .. Map_High loop
+         if Map (Index).Page /= 0 then
+            Entry_Slot := Entry_Slot + 1;
+            Map_Table.Entries (Entry_Slot) :=
+              Saved_Map_Entry'
+                (Page  => Rose.Words.Word_64 (Map (Index).Page),
+                 Block => Map (Index).Block,
+                 Fresh => Map (Index).Fresh);
+            if Entry_Slot = Entries_Per_Page then
+               Append;
+               Entry_Slot := 0;
+            end if;
          end if;
       end loop;
 
-      if Bit > 0 then
+      if Entry_Slot > 0 then
          Append;
       end if;
 
@@ -613,9 +655,8 @@ package body Store.Devices is
          begin
             Child := (Parent with delta
                         Base => Base, Bound => Bound,
-                        Alloc_Index => 0, Alloc_Blocks => 0,
+                        Mapped_Blocks => 0,
                         Reads => 0, Zero_Reads => 0, Writes => 0,
-                        Restored => False,
                         Access_Cap =>
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
@@ -679,6 +720,54 @@ package body Store.Devices is
    end Destroy_Bank;
 
    -----------------
+   -- Device_Page --
+   -----------------
+
+   function Device_Page
+     (Entry_Index : Positive;
+      Page        : Rose.Objects.Object_Id;
+      Store       : out Positive)
+      return Rose.Interfaces.Block_Device.Block_Address_Type
+   is
+      Block : constant Natural := Natural (Map (Entry_Index).Block);
+   begin
+      Store := 1;
+      while Backing_Stores (Store).Allocator_Bound <= Block loop
+         Store := Store + 1;
+      end loop;
+
+      return Rose.Interfaces.Block_Device.Block_Address_Type
+        ((Block - Backing_Stores (Store).Allocator_Base)
+         * Minimum_Block_Pages
+         + Natural (Page mod Minimum_Block_Pages));
+   end Device_Page;
+
+   ----------------
+   -- Find_Entry --
+   ----------------
+
+   function Find_Entry
+     (Page : Rose.Objects.Object_Id)
+      return Natural
+   is
+      Key   : constant Rose.Objects.Object_Id :=
+                Page - Page mod Minimum_Block_Pages;
+      Index : Rose.Words.Word_32 :=
+                Buckets (Natural ((Key / Minimum_Block_Pages)
+                                  mod Max_Mapped_Blocks));
+   begin
+      while Index /= 0 loop
+         if Map (Natural (Index)).Page = Key then
+            return Natural (Index);
+         end if;
+
+         Index := Map (Natural (Index)).Next;
+      end loop;
+
+      return 0;
+   end Find_Entry;
+
+   -----------------
    -- Find_Region --
    -----------------
 
@@ -689,7 +778,6 @@ package body Store.Devices is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
-      use type Rose.Objects.Object_Id;
    begin
       for Region of Regions (1 .. Region_Count) loop
          if Region.In_Use
@@ -715,7 +803,6 @@ package body Store.Devices is
       Page : in     Rose.Objects.Object_Id;
       Data :    out System.Storage_Elements.Storage_Array)
    is
-      use type Rose.Objects.Object_Id;
       Region_Index : constant Natural := Natural (Id);
    begin
       if Region_Index not in 1 .. Region_Count
@@ -732,27 +819,28 @@ package body Store.Devices is
       end if;
 
       declare
-         Region : Region_Record renames Regions (Region_Index);
-         Store      : Backing_Store_Record renames
-                        Backing_Stores (Region.Backing_Device);
-         Start      : constant Natural := Rose.Trace.Ticks;
+         Region      : Region_Record renames Regions (Region_Index);
+         Entry_Index : constant Natural := Find_Entry (Page);
+         Start       : constant Natural := Rose.Trace.Ticks;
+         Store       : Positive;
+         Address     : Rose.Interfaces.Block_Device.Block_Address_Type;
       begin
-         if Is_Fresh (Page) then
+         if Entry_Index = 0 or else Is_Fresh (Page) then
             Data := (others => 0);
-            Store.Zero_Reads := Store.Zero_Reads + 1;
             Region.Zero_Reads := Region.Zero_Reads + 1;
             return;
          end if;
 
+         Address := Device_Page (Entry_Index, Page, Store);
+
          Rose.Interfaces.Block_Device.Client.Read_Blocks
-           (Item   => Store.Client,
-            Start  =>
-              Rose.Interfaces.Block_Device.Block_Address_Type
-                (Page - Store.Base),
+           (Item   => Backing_Stores (Store).Client,
+            Start  => Address,
             Count  => 1,
             Blocks => Data);
-         Store.Reads := Store.Reads + 1;
-         Store.Read_Ticks := Store.Read_Ticks + (Rose.Trace.Ticks - Start);
+         Backing_Stores (Store).Reads := Backing_Stores (Store).Reads + 1;
+         Backing_Stores (Store).Read_Ticks :=
+           Backing_Stores (Store).Read_Ticks + (Rose.Trace.Ticks - Start);
          Region.Reads := Region.Reads + 1;
       end;
 
@@ -823,6 +911,42 @@ package body Store.Devices is
       end if;
    end Get_Usage;
 
+   ------------------
+   -- Insert_Entry --
+   ------------------
+
+   function Insert_Entry
+     (Page  : Rose.Objects.Object_Id;
+      Block : Rose.Words.Word_32;
+      Fresh : Rose.Words.Word_32)
+      return Natural
+   is
+      Key    : constant Rose.Objects.Object_Id :=
+                 Page - Page mod Minimum_Block_Pages;
+      Bucket : constant Natural :=
+                 Natural ((Key / Minimum_Block_Pages) mod Max_Mapped_Blocks);
+      Index  : Natural;
+   begin
+      if Free_Entries /= 0 then
+         Index := Natural (Free_Entries);
+         Free_Entries := Map (Index).Next;
+      elsif Map_High < Max_Mapped_Blocks then
+         Map_High := Map_High + 1;
+         Index := Map_High;
+      else
+         return 0;
+      end if;
+
+      Map (Index) :=
+        (Page  => Key,
+         Next  => Buckets (Bucket),
+         Block => Block,
+         Fresh => Fresh);
+      Buckets (Bucket) := Rose.Words.Word_32 (Index);
+      Map_Count := Map_Count + 1;
+      return Index;
+   end Insert_Entry;
+
    --------------
    -- Is_Fresh --
    --------------
@@ -831,11 +955,11 @@ package body Store.Devices is
      (Page : Rose.Objects.Object_Id)
       return Boolean
    is
-      use Rose.Objects;
+      Index : constant Natural := Find_Entry (Page);
    begin
-      return Page >= Page_Object_Id'First
-        and then Page - Page_Object_Id'First < Max_Fresh_Pages
-        and then Fresh (Natural (Page - Page_Object_Id'First));
+      return Index = 0
+        or else (Map (Index).Fresh
+                 and Page_Bit (Page)) /= 0;
    end Is_Fresh;
 
    ---------------
@@ -858,6 +982,65 @@ package body Store.Devices is
 
       return False;
    end Is_Within;
+
+   -------------
+   -- Is_Zero --
+   -------------
+
+   function Is_Zero
+     (Data : System.Storage_Elements.Storage_Array)
+      return Boolean
+   is
+      use type System.Storage_Elements.Storage_Element;
+   begin
+      for Item of Data loop
+         if Item /= 0 then
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   end Is_Zero;
+
+   ---------------
+   -- Map_Block --
+   ---------------
+
+   function Map_Block
+     (Root : in out Region_Record;
+      Page : Rose.Objects.Object_Id)
+      return Natural
+   is
+      Block       : Natural;
+      Entry_Index : Natural;
+   begin
+      if not Within_Limits (Root.Bank, Minimum_Block_Pages, 0) then
+         Rose.Console_IO.Put_Line ("store: bank limit reached");
+         return 0;
+      end if;
+
+      Block := Space_Allocators.Allocate (Allocator, 1);
+
+      if Block = 0 then
+         Rose.Console_IO.Put_Line ("store: out of space");
+         return 0;
+      end if;
+
+      Entry_Index :=
+        Insert_Entry
+          (Page, Rose.Words.Word_32 (Block),
+           Rose.Words.Word_32'(2) ** Minimum_Block_Pages - 1);
+
+      if Entry_Index = 0 then
+         Space_Allocators.Deallocate (Allocator, Block, Block + 1);
+         Rose.Console_IO.Put_Line ("store: out of space for the block map");
+         return 0;
+      end if;
+
+      Charge (Root.Bank, Minimum_Block_Pages, 0);
+      Root.Mapped_Blocks := Root.Mapped_Blocks + 1;
+      return Entry_Index;
+   end Map_Block;
 
    ----------------
    -- New_Region --
@@ -978,37 +1161,6 @@ package body Store.Devices is
 
    end New_Store;
 
-   ------------------------
-   -- Next_Restored_Page --
-   ------------------------
-
-   procedure Next_Restored_Page
-     (Page  : out Rose.Objects.Object_Id;
-      Space : out Natural)
-   is
-      use type Rose.Objects.Object_Id;
-   begin
-      while Restore_Space = 0
-        or else (Restore_Space <= Saved_Space_Count
-                 and then Restore_Next_Page
-                   >= Saved_Spaces (Restore_Space).Bound)
-      loop
-         Restore_Space := Restore_Space + 1;
-         exit when Restore_Space > Saved_Space_Count;
-         Restore_Next_Page := Saved_Spaces (Restore_Space).Base;
-      end loop;
-
-      if Restore_Space > Saved_Space_Count then
-         Page := 0;
-         Space := 0;
-         return;
-      end if;
-
-      Page := Restore_Next_Page;
-      Space := Restore_Space;
-      Restore_Next_Page := Restore_Next_Page + 1;
-   end Next_Restored_Page;
-
    ---------
    -- Put --
    ---------
@@ -1018,7 +1170,6 @@ package body Store.Devices is
       Page : in     Rose.Objects.Object_Id;
       Data : in     System.Storage_Elements.Storage_Array)
    is
-      use type Rose.Objects.Object_Id;
       Region_Index : constant Natural := Natural (Id);
    begin
       if Region_Index not in 1 .. Region_Count
@@ -1028,23 +1179,46 @@ package body Store.Devices is
          return;
       end if;
 
+      if Regions (Region_Index).Root not in 1 .. Region_Count
+        or else not Regions (Regions (Region_Index).Root).In_Use
+      then
+         return;
+      end if;
+
       declare
-         Region : Region_Record renames Regions (Region_Index);
-         Store      : Backing_Store_Record renames
-                        Backing_Stores (Region.Backing_Device);
-         Start      : constant Natural := Rose.Trace.Ticks;
+         Region      : Region_Record renames Regions (Region_Index);
+         Root        : Region_Record renames Regions (Region.Root);
+         Entry_Index : Natural := Find_Entry (Page);
+         Start       : constant Natural := Rose.Trace.Ticks;
+         Store       : Positive;
+         Address     : Rose.Interfaces.Block_Device.Block_Address_Type;
       begin
+         if Entry_Index = 0 then
+
+            --  A page of zeroes is what an unwritten page reads as.
+
+            if Is_Zero (Data) then
+               return;
+            end if;
+
+            Entry_Index := Map_Block (Root, Page);
+            if Entry_Index = 0 then
+               return;
+            end if;
+         end if;
+
+         Address := Device_Page (Entry_Index, Page, Store);
+
          Rose.Interfaces.Block_Device.Client.Write_Blocks
-           (Item   => Store.Client,
-            Start  =>
-              Rose.Interfaces.Block_Device.Block_Address_Type
-                (Page - Store.Base),
+           (Item   => Backing_Stores (Store).Client,
+            Start  => Address,
             Count  => 1,
             Blocks => Data);
-         Set_Fresh (Page, Page + 1, False);
-         Store.Writes := Store.Writes + 1;
-         Store.Write_Ticks :=
-           Store.Write_Ticks + (Rose.Trace.Ticks - Start);
+         Map (Entry_Index).Fresh :=
+           Map (Entry_Index).Fresh and not Page_Bit (Page);
+         Backing_Stores (Store).Writes := Backing_Stores (Store).Writes + 1;
+         Backing_Stores (Store).Write_Ticks :=
+           Backing_Stores (Store).Write_Ticks + (Rose.Trace.Ticks - Start);
          Region.Writes := Region.Writes + 1;
       end;
 
@@ -1060,7 +1234,6 @@ package body Store.Devices is
       Last    : out System.Storage_Elements.Storage_Count)
    is
       use System.Storage_Elements;
-      use type Rose.Objects.Object_Id;
       Rec  : Region_Stream_Record renames
                Region_Streams (Id);
    begin
@@ -1157,7 +1330,6 @@ package body Store.Devices is
    procedure Release
      (Id : Rose.Objects.Capability_Identifier)
    is
-      use type Rose.Words.Word_64;
       Index : constant Natural := Natural (Id);
    begin
       if Index not in 1 .. Region_Count
@@ -1169,32 +1341,37 @@ package body Store.Devices is
       declare
          Region : Region_Record renames Regions (Index);
          Params : aliased Rose.Invocation.Invocation_Record;
+         Freed  : Rose.Words.Word_64 := 0;
       begin
          Rose.Trace.Event
            ("store: region released: reads ", Region.Reads,
             ", writes ", Region.Writes);
          Rose.Trace.Event
            ("store: region released: zero reads ", Region.Zero_Reads);
-         if Region.Backing_Device in 1 .. Backing_Store_Count then
-            declare
-               Store : Backing_Store_Record renames
-                 Backing_Stores (Region.Backing_Device);
-            begin
-               Rose.Trace.Event
-                 ("store: total reads ", Store.Reads,
-                  ", ticks ", Store.Read_Ticks);
-               Rose.Trace.Event
-                 ("store: total zero reads ", Store.Zero_Reads);
-               Rose.Trace.Event
-                 ("store: total writes ", Store.Writes,
-                  ", ticks ", Store.Write_Ticks);
-            end;
-         end if;
+         for Store of Backing_Stores (1 .. Backing_Store_Count) loop
+            Rose.Trace.Event
+              ("store: total reads ", Store.Reads,
+               ", ticks ", Store.Read_Ticks);
+            Rose.Trace.Event
+              ("store: total writes ", Store.Writes,
+               ", ticks ", Store.Write_Ticks);
+         end loop;
 
-         if Region.Alloc_Index > 0 then
-            Space_Allocators.Deallocate
-              (Allocator, Region.Alloc_Index,
-               Region.Alloc_Index + Region.Alloc_Blocks);
+         --  A root region's blocks that have space on a device give it back.
+
+         if Region.Root = Index and then Region.Mapped_Blocks > 0 then
+            for Entry_Index in 1 .. Map_High loop
+               if Map (Entry_Index).Page >= Region.Base
+                 and then Map (Entry_Index).Page < Region.Bound
+               then
+                  Space_Allocators.Deallocate
+                    (Allocator,
+                     Natural (Map (Entry_Index).Block),
+                     Natural (Map (Entry_Index).Block) + 1);
+                  Remove_Entry (Entry_Index);
+                  Freed := Freed + 1;
+               end if;
+            end loop;
          end if;
 
          Rose.System_Calls.Initialize_Send
@@ -1202,15 +1379,40 @@ package body Store.Devices is
          Rose.System_Calls.Send_Cap (Params, Region.Access_Cap);
          Rose.System_Calls.Invoke_Capability (Params);
 
-         Uncharge
-           (Region.Bank,
-            Rose.Words.Word_64 (Region.Alloc_Blocks) * Minimum_Block_Pages,
-            1);
+         Uncharge (Region.Bank, Freed * Minimum_Block_Pages, 1);
 
          Rose.Interfaces.Region.Server.Remove_Instance (Id);
          Region := (others => <>);
       end;
    end Release;
+
+   ------------------
+   -- Remove_Entry --
+   ------------------
+
+   procedure Remove_Entry (Index : Positive) is
+      Bucket : constant Natural :=
+                 Natural ((Map (Index).Page / Minimum_Block_Pages)
+                          mod Max_Mapped_Blocks);
+      This   : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Index);
+      Link   : Rose.Words.Word_32 := Buckets (Bucket);
+   begin
+      if Link = This then
+         Buckets (Bucket) := Map (Index).Next;
+      else
+         while Link /= 0 and then Map (Natural (Link)).Next /= This loop
+            Link := Map (Natural (Link)).Next;
+         end loop;
+
+         if Link /= 0 then
+            Map (Natural (Link)).Next := Map (Index).Next;
+         end if;
+      end if;
+
+      Map (Index) := (Page => 0, Next => Free_Entries, others => 0);
+      Free_Entries := This;
+      Map_Count := Map_Count - 1;
+   end Remove_Entry;
 
    ------------------
    -- Reserve_From --
@@ -1221,21 +1423,29 @@ package body Store.Devices is
       Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability
    is
-      Alloc_Index  : Natural;
-      Alloc_Size   : Natural := Natural (Size);
+      Blocks       : constant Rose.Words.Word_64 :=
+                       (if Size = 0 then 1
+                        else (Size + Minimum_Block_Size - 1)
+                          / Minimum_Block_Size);
+      Pages        : constant Rose.Words.Word_64 :=
+                       Blocks * Minimum_Block_Pages;
       Region_Index : Natural;
    begin
-      if Alloc_Size < Minimum_Block_Size then
-         Alloc_Size := Minimum_Block_Size;
-      elsif Alloc_Size mod Minimum_Block_Size /= 0 then
-         Alloc_Size := (Alloc_Size / Minimum_Block_Size + 1)
-           * Minimum_Block_Size;
+
+      --  The region's pages are the next page ids.  Nothing is allocated
+      --  on a device until a page is written (#305), so a reservation is
+      --  limited by the bank's region limit, and by the page ids, but not
+      --  by how much space the devices have.
+
+      if not Within_Limits (Bank, 0, 1) then
+         Rose.Console_IO.Put_Line ("store: bank limit reached");
+         return 0;
       end if;
 
-      if not Within_Limits
-        (Bank, Rose.Words.Word_64 (Alloc_Size / Rose.Limits.Page_Size), 1)
+      if Pages > Rose.Words.Word_64 (Rose.Objects.Page_Object_Id'Last
+                                     - Next_Page)
       then
-         Rose.Console_IO.Put_Line ("store: bank limit reached");
+         Rose.Console_IO.Put_Line ("store: out of page ids");
          return 0;
       end if;
 
@@ -1246,26 +1456,11 @@ package body Store.Devices is
          return 0;
       end if;
 
-      Alloc_Index :=
-        Space_Allocators.Allocate
-          (Allocator, Alloc_Size / Minimum_Block_Size);
-
-      if Alloc_Index = 0 then
-         Rose.Console_IO.Put ("store: cannot allocate ");
-         Rose.Console_IO.Put (Alloc_Size);
-         Rose.Console_IO.Put (" bytes");
-         Rose.Console_IO.New_Line;
-         Regions (Region_Index) := (others => <>);
-         return 0;
-      end if;
-
       declare
          use Rose.Objects;
          Reserved : Region_Record renames
                       Regions (Region_Index);
-         Store    : Positive := 1;
-         Base     : Object_Id;
-         Bound    : Object_Id;
+         Base     : constant Object_Id := Next_Page;
          Cap      : constant Rose.Capabilities.Capability :=
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
@@ -1273,40 +1468,21 @@ package body Store.Devices is
                  Capability_Identifier (Region_Index));
 
       begin
-         while Backing_Stores (Store).Allocator_Bound <= Alloc_Index loop
-            Store := Store + 1;
-         end loop;
-
-         Base :=
-           Object_Id
-             ((Alloc_Index - Backing_Stores (Store).Allocator_Base)
-              * Minimum_Block_Pages)
-           + Page_Object_Id'First;
-         Bound :=
-           Base + Object_Id (Alloc_Size / Rose.Limits.Page_Size);
+         Next_Page := Base + Object_Id (Pages);
 
          Reserved := Region_Record'
            (In_Use         => True,
-            Backing_Device => Store,
             Base           => Base,
-            Bound          => Bound,
+            Bound          => Next_Page,
             Access_Cap     => Cap,
-            Alloc_Index    => Alloc_Index,
-            Alloc_Blocks   => Alloc_Size / Minimum_Block_Size,
+            Root           => Region_Index,
+            Mapped_Blocks  => 0,
             Reads          => 0,
             Zero_Reads     => 0,
             Writes         => 0,
-            Restored       => False,
             Bank           => Bank);
 
-         Charge
-           (Bank,
-            Rose.Words.Word_64 (Alloc_Size / Rose.Limits.Page_Size),
-            1);
-
-         --  New storage holds nothing, whatever its device holds.
-
-         Set_Fresh (Base, Bound, True);
+         Charge (Bank, 0, 1);
 
          return Cap;
       end;
@@ -1343,6 +1519,62 @@ package body Store.Devices is
       return Reserve_From (Root_Bank, Size);
    end Reserve_Storage;
 
+   -------------------
+   -- Restore_Entry --
+   -------------------
+
+   procedure Restore_Entry
+     (Page  : Rose.Objects.Object_Id;
+      Block : Rose.Words.Word_32;
+      Fresh : Rose.Words.Word_32)
+   is
+      Owner       : Natural := 0;
+      Entry_Index : Natural;
+   begin
+      for Index in 1 .. Region_Count loop
+         if Regions (Index).In_Use
+           and then Regions (Index).Root = Index
+           and then Page >= Regions (Index).Base
+           and then Page < Regions (Index).Bound
+         then
+            Owner := Index;
+            exit;
+         end if;
+      end loop;
+
+      if Owner = 0 then
+         Rose.Console_IO.Put ("storage: restore: no region for page ");
+         Rose.Console_IO.Put (Page);
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      if Natural (Block) = 0
+        or else not Space_Allocators.Allocate_At
+          (Allocator, Natural (Block), 1)
+      then
+         Rose.Console_IO.Put ("storage: restore: space for page ");
+         Rose.Console_IO.Put (Page);
+         Rose.Console_IO.Put_Line (" is not free");
+         return;
+      end if;
+
+      Entry_Index := Insert_Entry (Page, Block, Fresh);
+
+      if Entry_Index = 0 then
+         Space_Allocators.Deallocate
+           (Allocator, Natural (Block), Natural (Block) + 1);
+         Rose.Console_IO.Put_Line ("storage: restore: the block map is full");
+         return;
+      end if;
+
+      --  Banks aren't saved yet (ADR 0014), so the blocks are charged to
+      --  the root bank, like the regions.
+
+      Charge (Root_Bank, Minimum_Block_Pages, 0);
+      Regions (Owner).Mapped_Blocks := Regions (Owner).Mapped_Blocks + 1;
+   end Restore_Entry;
+
    --------------------
    -- Restore_Region --
    --------------------
@@ -1350,15 +1582,12 @@ package body Store.Devices is
    procedure Restore_Region
      (Id          : Rose.Objects.Capability_Identifier;
       Index       : Natural;
-      Device      : Natural;
       Base        : Rose.Objects.Object_Id;
       Bound       : Rose.Objects.Object_Id;
-      Alloc_Index : Natural;
-      Alloc_Blocks : Natural)
+      Root        : Natural)
    is
       pragma Unreferenced (Id);
       use Rose.Objects;
-      use type Rose.Words.Word_64;
    begin
       Create_Root_Bank;
 
@@ -1369,37 +1598,9 @@ package body Store.Devices is
          return;
       end if;
 
-      if Device not in 1 .. Backing_Store_Count then
-         Rose.Console_IO.Put ("storage: restore: no backing store ");
-         Rose.Console_IO.Put (Device);
-         Rose.Console_IO.New_Line;
-         return;
-      end if;
-
-      --  A subregion has no space of its own.
-
-      if Alloc_Index > 0
-        and then not Space_Allocators.Allocate_At
-          (Allocator, Alloc_Index, Alloc_Blocks)
-      then
-         Rose.Console_IO.Put ("storage: restore: space for region ");
-         Rose.Console_IO.Put (Index);
-         Rose.Console_IO.Put_Line (" is not free");
-         return;
-      end if;
-
-      --  The region's pages are not fresh until Restore_Table_Page gives
-      --  back the ones that were: the others hold what was written to
-      --  them before the restart.
-
-      if Alloc_Index > 0 then
-         Set_Fresh (Base, Bound, False);
-      end if;
-
       Regions (Index) :=
         Region_Record'
           (In_Use         => True,
-           Backing_Device => Device,
            Base           => Base,
            Bound          => Bound,
            Access_Cap     =>
@@ -1407,21 +1608,17 @@ package body Store.Devices is
                (Create_Endpoint_Cap,
                 Rose.Interfaces.Region.Region_Interface,
                 Capability_Identifier (Index)),
-           Alloc_Index    => Alloc_Index,
-           Alloc_Blocks   => Alloc_Blocks,
+           Root           => (if Root in Regions'Range then Root else Index),
+           Mapped_Blocks  => 0,
            Reads          => 0,
            Zero_Reads     => 0,
            Writes         => 0,
-           Restored       => True,
            Bank           => Root_Bank);
 
       --  Banks aren't saved yet (ADR 0014), so every region is charged to
       --  the root bank.
 
-      Charge
-        (Root_Bank,
-         Rose.Words.Word_64 (Alloc_Blocks) * Minimum_Block_Pages,
-         1);
+      Charge (Root_Bank, 0, 1);
 
       Region_Count := Natural'Max (Region_Count, Index);
    end Restore_Region;
@@ -1437,8 +1634,6 @@ package body Store.Devices is
    is
       pragma Unreferenced (Id);
       use Rose.Checkpoints;
-      use type Rose.Objects.Object_Id;
-      use type Rose.Words.Word_32, Rose.Words.Word_64;
    begin
       if Page'Length /= Rose.Limits.Page_Size then
          Rose.Console_IO.Put ("storage: restore: table page ");
@@ -1454,113 +1649,52 @@ package body Store.Devices is
          begin
             Restore_Region_Count := 0;
             Restore_Last_Region := 0;
-            Restore_First_Fresh := 0;
-            Restore_Last_Fresh := 0;
-            Saved_Space_Count := 0;
-            Restore_Space := 0;
-
-            --  A checkpoint before version 2 has no fresh pages.
+            Restore_First_Map := 0;
+            Restore_Last_Map := 0;
+            Restore_Entry_Count := 0;
 
             if Header.Magic = Store_Table_Magic
-              and then Header.Version >= 2
-              and then Header.Fresh_Page_Count > 0
+              and then Header.Version = Store_Table_Version
               and then Natural (Header.Region_Count) <= Max_Regions
             then
+               Next_Page :=
+                 Rose.Objects.Object_Id'Max
+                   (Next_Page, Rose.Objects.Object_Id (Header.Next_Page));
                Restore_Region_Count := Natural (Header.Region_Count);
                Restore_Last_Region :=
                  1 + (Restore_Region_Count + Regions_Per_Page - 1)
                  / Regions_Per_Page;
-               Restore_First_Fresh := Restore_Last_Region + 1;
-               Restore_Last_Fresh :=
-                 Restore_Last_Region + Natural (Header.Fresh_Page_Count);
+               Restore_First_Map := Restore_Last_Region + 1;
+               Restore_Last_Map :=
+                 Restore_Last_Region + Natural (Header.Map_Page_Count);
+               Restore_Entry_Count := Natural (Header.Map_Entry_Count);
             end if;
          end;
 
-      elsif Index in 2 .. Restore_Last_Region then
-
-         --  The regions, to find the ones whose fresh pages are saved.
-
+      elsif Index in Restore_First_Map .. Restore_Last_Map then
          declare
-            Table : Region_Page
+            Table : Map_Page
               with Import, Address => Page'Address;
-            First : constant Natural := (Index - 2) * Regions_Per_Page + 1;
             Last  : constant Natural :=
-                      Natural'Min (Restore_Region_Count,
-                                   First + Regions_Per_Page - 1);
+                      Natural'Min (Restore_Entry_Count, Entries_Per_Page);
          begin
-            for I in First .. Last loop
-               declare
-                  Region : Saved_Region renames
-                             Table.Regions (I - First + 1);
-               begin
-                  if Region.Alloc_Index > 0 then
-                     Saved_Space_Count := Saved_Space_Count + 1;
-                     Saved_Spaces (Saved_Space_Count) :=
-                       (Index => Natural (Region.Index),
-                        Base  => Rose.Objects.Object_Id (Region.Base),
-                        Bound => Rose.Objects.Object_Id (Region.Bound));
-                  end if;
-               end;
-            end loop;
-         end;
-
-      elsif Index in Restore_First_Fresh .. Restore_Last_Fresh then
-         declare
-            Bits     : Fresh_Page
-              with Import, Address => Page'Address;
-            Next     : Rose.Objects.Object_Id;
-            Space    : Natural;
-            Restored : Natural := 0;
-         begin
-            for Bit of Bits loop
-               Next_Restored_Page (Next, Space);
-               exit when Space = 0;
-
-               --  Only the pages of a region that was recreated as it
-               --  was saved.
-
-               declare
-                  Saved : Saved_Space_Record renames Saved_Spaces (Space);
-               begin
-                  if Saved.Index in 1 .. Region_Count
-                    and then Regions (Saved.Index).In_Use
-                    and then Regions (Saved.Index).Restored
-                    and then Regions (Saved.Index).Base = Saved.Base
-                    and then Regions (Saved.Index).Bound = Saved.Bound
-                  then
-                     Set_Fresh (Next, Next + 1, Bit);
-                     if Bit then
-                        Restored := Restored + 1;
-                     end if;
-                  end if;
-               end;
+            for I in 1 .. Last loop
+               Restore_Entry
+                 (Page  => Rose.Objects.Object_Id (Table.Entries (I).Page),
+                  Block => Table.Entries (I).Block,
+                  Fresh => Table.Entries (I).Fresh);
             end loop;
 
-            Rose.Console_IO.Put ("storage: restore: fresh pages: ");
-            Rose.Console_IO.Put (Restored);
-            Rose.Console_IO.New_Line;
+            Restore_Entry_Count := Restore_Entry_Count - Last;
+
+            if Index = Restore_Last_Map then
+               Rose.Console_IO.Put ("storage: restore: blocks: ");
+               Rose.Console_IO.Put (Map_Count);
+               Rose.Console_IO.New_Line;
+            end if;
          end;
       end if;
    end Restore_Table_Page;
-
-   ---------------
-   -- Set_Fresh --
-   ---------------
-
-   procedure Set_Fresh
-     (Base, Bound : Rose.Objects.Object_Id;
-      Value       : Boolean)
-   is
-      use Rose.Objects;
-   begin
-      for Page in Base .. Bound - 1 loop
-         if Page >= Page_Object_Id'First
-           and then Page - Page_Object_Id'First < Max_Fresh_Pages
-         then
-            Fresh (Natural (Page - Page_Object_Id'First)) := Value;
-         end if;
-      end loop;
-   end Set_Fresh;
 
    --------------
    -- Uncharge --
@@ -1571,8 +1705,6 @@ package body Store.Devices is
       Pages   : Rose.Words.Word_64;
       Regions : Rose.Words.Word)
    is
-      use type Rose.Words.Word;
-      use type Rose.Words.Word_64;
       Index : Natural := Bank;
    begin
       while Index in 1 .. Max_Banks loop
@@ -1596,8 +1728,6 @@ package body Store.Devices is
       Regions : Rose.Words.Word)
       return Boolean
    is
-      use type Rose.Words.Word;
-      use type Rose.Words.Word_64;
       Index : Natural := Bank;
    begin
       while Index in 1 .. Max_Banks loop

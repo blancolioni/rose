@@ -192,44 +192,52 @@ package Rose.Checkpoints is
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
    --  The storage server's part comes next: a header page, then its
-   --  regions, Regions_Per_Page to a page.  A region is saved with its
-   --  index, which the caps for it carry as their identifier, the
-   --  backing store it is on, its pages Base .. Bound - 1, and the
-   --  space it was allocated, which a subregion doesn't have: its
-   --  Alloc_Index is zero.
+   --  regions, Regions_Per_Page to a page, then its map.  A region is
+   --  saved with its index, which the caps for it carry as their
+   --  identifier, its pages Base .. Bound - 1, and Root, the index of the
+   --  region that the pages were reserved for, which is its own unless
+   --  it is a subregion.  A region's pages are the page ids from the
+   --  header's Next_Page on, never used again.
    --
-   --  Version 2 adds Fresh_Page_Count pages after the regions (#327).
-   --  They hold a bit for each page of each region with space of its
-   --  own, in the order of the regions, packed together: True for a
-   --  page that has been reserved and not written since, which reads as
-   --  zeroes.  The storage server reads them back itself
-   --  (Storage_Checkpoint.Restore_Table_Page).
+   --  The map is Map_Page_Count pages, which hold Map_Entry_Count
+   --  entries, Entries_Per_Page to a page, in no order.  An entry is a
+   --  block of 4 pages that has space on a backing store, from the first
+   --  write to one of them (#305): Page is the first of them, Block is
+   --  the space the allocator gave it, and bit I of Fresh is set while
+   --  page I has not been written, so reads as zeroes.  The blocks that
+   --  aren't in the map are all fresh.  The storage server reads the map
+   --  back itself (Storage_Checkpoint.Restore_Table_Page).
+   --
+   --  Version 3 replaced the space of each region and its fresh pages
+   --  with the map.
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 2;
+   Store_Table_Version : constant := 3;
 
    type Store_Table_Header is
       record
          Magic            : Rose.Words.Word_64 := Store_Table_Magic;
+         Next_Page        : Rose.Words.Word_64 := 0;
          Version          : Rose.Words.Word_32 := Store_Table_Version;
          Page_Count       : Rose.Words.Word_32 := 0;
          --  All of the storage server's pages, including this one.
          Region_Count     : Rose.Words.Word_32 := 0;
-         Fresh_Page_Count : Rose.Words.Word_32 := 0;
+         Map_Page_Count   : Rose.Words.Word_32 := 0;
+         Map_Entry_Count  : Rose.Words.Word_32 := 0;
          Reserved         : System.Storage_Elements.Storage_Array
-                              (1 .. Rose.Limits.Page_Size - 24) :=
+                              (1 .. Rose.Limits.Page_Size - 36) :=
                                 (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
    type Saved_Region is
       record
-         Index       : Rose.Words.Word_32 := 0;
-         Device      : Rose.Words.Word_32 := 0;
-         Base        : Rose.Words.Word_64 := 0;
-         Bound       : Rose.Words.Word_64 := 0;
-         Alloc_Index : Rose.Words.Word_32 := 0;
-         Alloc_Blocks : Rose.Words.Word_32 := 0;
+         Index    : Rose.Words.Word_32 := 0;
+         Root     : Rose.Words.Word_32 := 0;
+         Base     : Rose.Words.Word_64 := 0;
+         Bound    : Rose.Words.Word_64 := 0;
+         Blocks   : Rose.Words.Word_32 := 0;
+         Reserved : Rose.Words.Word_32 := 0;
       end record
      with Pack, Size => 256;
 
@@ -245,10 +253,24 @@ package Rose.Checkpoints is
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
-   Fresh_Bits_Per_Page : constant := Rose.Limits.Page_Size * 8;
+   type Saved_Map_Entry is
+      record
+         Page  : Rose.Words.Word_64 := 0;
+         Block : Rose.Words.Word_32 := 0;
+         Fresh : Rose.Words.Word_32 := 0;
+      end record
+     with Pack, Size => 128;
 
-   type Fresh_Page is
-     array (1 .. Fresh_Bits_Per_Page) of Boolean
+   Entries_Per_Page : constant := Rose.Limits.Page_Size / 16;
+
+   type Saved_Map_Entry_Array is
+     array (1 .. Entries_Per_Page) of Saved_Map_Entry
+     with Pack, Size => Entries_Per_Page * 128;
+
+   type Map_Page is
+      record
+         Entries : Saved_Map_Entry_Array;
+      end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
    --  The memory server's part of a checkpoint log entry starts with its

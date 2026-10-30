@@ -365,10 +365,9 @@ package body Restore.Checkpoint_Log is
       Store_Pages : out Natural)
       return Boolean
    is
-      Count       : Natural;
-      Version     : Rose.Words.Word_32;
-      Fresh_Pages : Natural := 0;
-      Space_Pages : Natural := 0;
+      Count     : Natural;
+      Map_Pages : Natural;
+      Entries   : Natural;
    begin
       Store_Pages := 0;
       Region_Count := 0;
@@ -387,25 +386,24 @@ package body Restore.Checkpoint_Log is
          return False;
       end if;
 
-      --  Version 1 has no fresh pages.
-
-      Version := Store_Header.Version;
-      if Version not in 1 .. Rose.Checkpoints.Store_Table_Version then
+      if Store_Header.Version /= Rose.Checkpoints.Store_Table_Version then
          Report_Bad_Entry (Location, "unknown storage tables version");
          return False;
       end if;
 
       Store_Pages := Natural (Store_Header.Page_Count);
       Count := Natural (Store_Header.Region_Count);
-      if Version >= 2 then
-         Fresh_Pages := Natural (Store_Header.Fresh_Page_Count);
-      end if;
+      Map_Pages := Natural (Store_Header.Map_Page_Count);
+      Entries := Natural (Store_Header.Map_Entry_Count);
 
       if Count > Max_Regions
         or else Store_Pages
           /= 1 + (Count + Rose.Checkpoints.Regions_Per_Page - 1)
                / Rose.Checkpoints.Regions_Per_Page
-               + Fresh_Pages
+               + Map_Pages
+        or else Map_Pages
+          /= (Entries + Rose.Checkpoints.Entries_Per_Page - 1)
+             / Rose.Checkpoints.Entries_Per_Page
         or else First + Store_Pages - 1 > Pages
       then
          Report_Bad_Entry (Location, "storage tables page count is wrong");
@@ -429,7 +427,7 @@ package body Restore.Checkpoint_Log is
                          ((I - 1) mod Rose.Checkpoints.Regions_Per_Page + 1);
          begin
             if Region.Index = 0
-              or else Region.Device = 0
+              or else Region.Root = 0
               or else Region.Bound < Region.Base
             then
                Report_Bad_Entry (Location, "bad storage region");
@@ -438,21 +436,8 @@ package body Restore.Checkpoint_Log is
 
             Region_Count := Region_Count + 1;
             Regions (Region_Count) := (Region.Base, Region.Bound);
-            if Region.Alloc_Index > 0 then
-               Space_Pages :=
-                 Space_Pages + Natural (Region.Bound - Region.Base);
-            end if;
          end;
       end loop;
-
-      if Version >= 2
-        and then Fresh_Pages
-          /= (Space_Pages + Rose.Checkpoints.Fresh_Bits_Per_Page - 1)
-             / Rose.Checkpoints.Fresh_Bits_Per_Page
-      then
-         Report_Bad_Entry (Location, "storage fresh page count is wrong");
-         return False;
-      end if;
 
       return True;
    end Check_Store_Tables;
