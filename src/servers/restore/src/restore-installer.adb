@@ -36,6 +36,9 @@ package body Restore.Installer is
    Stream_Writer_Ancestor : constant := 2;
    --  The ancestors of Terminal (interfaces/terminal.idl).
 
+   Clock_Ancestor         : constant := 1;
+   --  The ancestor of Clock_Admin (interfaces/clock_admin.idl).
+
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
@@ -69,6 +72,11 @@ package body Restore.Installer is
    --  Give init the persistent console's Stream_Writer interface, so
    --  that it replaces the boot console before anything else is
    --  installed.
+
+   procedure Send_Clock (Admin_Cap : Rose.Capabilities.Capability);
+   --  Give init the clock's Clock_Admin interface, and its Clock
+   --  ancestor. Nothing is sent if there is no Clock_Admin, because a
+   --  message with no caps is the restore server's last.
 
    ------------
    -- Append --
@@ -376,6 +384,12 @@ package body Restore.Installer is
                                (Reply.Caps (0));
                         end if;
 
+                        if Flags (Provides_Clock) then
+                           Send_Clock
+                             (Get_Public_Interface_From_Process
+                                (Reply.Caps (0)));
+                        end if;
+
                         if Flags (Provides_Console) then
 
                            --  The console is a Terminal (#454). Init gets
@@ -416,6 +430,31 @@ package body Restore.Installer is
       Release (Caps_Reader);
       Release (Binary_Reader);
    end Install_Executable;
+
+   ----------------
+   -- Send_Clock --
+   ----------------
+
+   procedure Send_Clock (Admin_Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Clock_Cap : constant Rose.Capabilities.Capability :=
+                    (if Admin_Cap = Rose.Capabilities.Null_Capability
+                     then Rose.Capabilities.Null_Capability
+                     else Get_Ancestor_Interface (Admin_Cap, Clock_Ancestor));
+      Params    : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Clock_Cap = Rose.Capabilities.Null_Capability then
+         Rose.Console_IO.Put_Line ("restore: no clock interface");
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+      Rose.System_Calls.Send_Cap (Params, Admin_Cap);
+      Rose.System_Calls.Send_Cap (Params, Clock_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(97));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Send_Clock;
 
    ------------------
    -- Send_Console --

@@ -33,6 +33,12 @@ package body Restore.Installer.Default is
                 others                      => False));
       Process ("command", "drivers", Launch, Default_Flags);
 
+      --  The clock is persistent, so that a restore carries its time on
+      --  (ADR 0020).
+
+      Process ("clock", "drivers", Launch,
+               (Provides_Clock => True, others => False));
+
       --  Saved, not launched: each file and directory is its own
       --  process, launched when it is created (ADR 0003).
 

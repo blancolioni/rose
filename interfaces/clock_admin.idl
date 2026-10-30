@@ -1,0 +1,11 @@
+interface Clock_Admin : Clock is
+
+   --  A cap to Clock_Admin can also read the clock. The Clock cap that
+   --  the rest of the system gets is its ancestor (ADR 0020).
+
+   procedure Set_Realtime (Nanoseconds : Word_64);
+   --  Sets the real time, and writes it to the RTC at the next whole
+   --  second. Fails if the RTC can't hold the time (before 2000 or from
+   --  2100).
+
+end Clock_Admin;

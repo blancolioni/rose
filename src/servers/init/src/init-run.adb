@@ -14,6 +14,7 @@ with Rose.System_Calls;
 with Init.Boot;
 with Init.Boot_Steps;
 with Init.Calls;
+with Init.Clock_Checks;
 with Init.Installer;
 with Init.Self_Tests;
 with Init.Users;
@@ -80,7 +81,11 @@ package body Init.Run is
                                    Null_Capability;
       --  The console as a Terminal, for the console role (#454).
 
-      Restored             : Boolean := False;
+      Clock_Cap                : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The clock's Clock interface, from the installer (ADR 0020).
+
+      Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
       --  the programs it would have installed are running already.
       Restore_Reply_Cap    : Rose.Capabilities.Capability := 0;
@@ -365,6 +370,12 @@ package body Init.Run is
                   Init.Calls.Send_String
                     (Console_Stream_Cap, "received input stream cap" & NL);
                end if;
+            elsif Params.Data (1) = 97 then
+
+               --  The clock is running. Its Clock_Admin interface is cap
+               --  0, and its Clock interface is cap 1.
+
+               Clock_Cap := Params.Caps (1);
             elsif Params.Data (1) = 98 then
 
                --  The persistent console is running.  The boot console
@@ -523,6 +534,14 @@ package body Init.Run is
       if Cap_Set_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: unable to find 'cap_set'" & NL);
+      end if;
+
+      if Clock_Cap = Rose.Capabilities.Null_Capability then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: no clock" & NL);
+      elsif not Init.Clock_Checks.Run (Clock_Cap) then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: clock check failed" & NL);
       end if;
 
       --  The self tests run as a command, and init waits for them to

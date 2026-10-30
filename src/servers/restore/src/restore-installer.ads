@@ -8,13 +8,17 @@ package Restore.Installer is
       Provides_Input_Stream,
       Requires_Input_Stream,
       Provides_Console,
-      Is_Driver);
+      Is_Driver,
+      Provides_Clock);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Stream_Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
    --  its Stream_Reader is standard input.
    --  Is_Driver: the program is from the drivers directory, so init may
    --  give it more caps than other programs (#115).  Install sets it.
+   --  Provides_Clock: the program is the clock (ADR 0020), a Clock_Admin
+   --  whose ancestor, Clock, init gets. Is_Driver stays where it is in
+   --  the flag word, because init reads that bit.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 
