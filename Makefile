@@ -11,7 +11,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=command keyboard exec file directory vga-console
+DRIVERS=command keyboard exec file directory vga-console clock
 UTILITIES=echo list cat touch mkdir clear user auth login run_self_tests petal
 BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 

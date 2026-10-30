@@ -8,7 +8,8 @@ IDL=cap block_device file_system directory file \
     server \
     timeout timer constructor cap_set terminal event_source event_listener \
     commands map heap receiver named kernel_process kernel_log log_reader \
-    command_endpoint restorable output_redirect auth auth_admin checkpointer
+    command_endpoint restorable output_redirect auth auth_admin checkpointer \
+    clock clock_admin
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
 # package of the core commands. They are checked with the interfaces, but

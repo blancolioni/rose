@@ -1,0 +1,4 @@
+create-endpoint
+get-ticks                  # the kernel's 64-bit tick count
+port-out-8         112 113 # the RTC's index and data ports, 16#70# and 16#71#
+port-in-8          113     # the RTC's data port

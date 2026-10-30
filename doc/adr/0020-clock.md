@@ -41,15 +41,16 @@ interface Clock is
 
    function Realtime return Word_64;
 
-   --  False when Realtime is known to be a guess: the RTC's battery bit
-   --  is clear, its fields are out of range, or the clock is held at the
-   --  checkpoint's time (section 4). True again after Set_Realtime.
+   --  0 when Realtime is known to be a guess: the RTC's battery bit is
+   --  clear, its fields are out of range, or the clock is held at the
+   --  checkpoint's time (section 4). 1 otherwise, and again after
+   --  Set_Realtime. (A function can't return a Boolean in IDL yet.)
 
-   function Realtime_Is_Trusted return Boolean;
+   function Realtime_Is_Trusted return Word;
 
 end Clock;
 
-interface Clock_Admin is
+interface Clock_Admin : Clock is
 
    --  Sets the real time, and writes it to the RTC.
    --  Fails if the RTC can't hold the time (before 2000 or after 2099).
@@ -61,7 +62,7 @@ end Clock_Admin;
 
 - **Two readings, because they answer two questions.** `Monotonic` measures how long something took, and is what timeouts, `Ada.Real_Time` and retransmission timers want. `Realtime` says what the time is, and is what `Ada.Calendar`, file timestamps and lease lifetimes want. A caller that wants an interval must not use `Realtime`, since someone can set it.
 - **`Clock` can be given to anyone.** It is read only. A job's membrane can still remove it (ADR 0001), which also removes a way to measure timings.
-- **`Clock_Admin` is a separate cap.** init holds it, and hands it only to a service or a command that may set the time. A failing `Set_Realtime` fails by raising, as the other operations do.
+- **`Clock_Admin` is a separate cap, and extends `Clock`.** One object serves both, as the console serves `Terminal` and its ancestors. A cap to `Clock_Admin` can also read, and the `Clock` cap that everyone else gets is its ancestor, which has no `Set_Realtime`. init holds the admin cap, and hands it only to a service or a command that may set the time. A failing `Set_Realtime` fails by raising, as the other operations do.
 - **A `Word_64` is enough.** In nanoseconds it reaches the year 2554 for `Realtime`, and 584 years of uptime for `Monotonic`.
 - **The resolution is one tick,** 10 ms. A reading is quantised to a tick. A finer clock (the TSC, calibrated against the PIT) can be added behind the same interfaces later.
 - **The tick is 10 000 150 ns.** The server converts with the real period, not 10 ms, because 10 ms would lose 15 parts per million, which is more than a second a day.
@@ -69,10 +70,10 @@ end Clock_Admin;
 
 ### 2. A persistent `clock` server
 
-- **A new server, `src/servers/clock`,** laid out like `timer`. It is one persistent process with a fixed object id (#372), so that the caps that other persistent processes hold to it stay valid across a restore.
+- **A new driver, `src/drivers/clock`,** installed from the install image like the keyboard and the console. It is persistent, as every installed program is, so the caps that other persistent processes hold to it stay valid across a restore, and it needs no fixed object id (#372). It is built with the userland run-time system and the user-mode IDL target.
 - **It is not in the kernel.** The kernel keeps its counter and gets no time of day, no RTC driver and no offset to checkpoint.
-- **It holds three things:** the kernel's get-ticks cap, a port cap for the RTC's two ports (`70` and `71`), derived by init the way other drivers get theirs, and its own state (section 3).
-- **init launches it early,** before the servers that use it, and publishes `Clock` and `Clock_Admin` through `Server.Published_Interface`. Its entries are in the boot description and in the kernel's module lists.
+- **It holds three things:** the kernel's get-ticks cap, a port cap for the RTC's two ports (`70` and `71`), and its own state (section 3). Its `.driver` file asks for them, as `get-ticks` and `port-out-8`, `port-in-8`. `get-ticks` is a new request, which only drivers may make.
+- **restore installs it,** straight after `command`, and sends init its `Clock_Admin` interface and the `Clock` ancestor. It is not a boot module, so the boot description and the kernel's module lists don't change. After a restore, init is not running, and the clients that hold the caps are restored with it.
 - **A read is a round trip.** That is the cost of the first version. A page that the kernel shares read-only, which a client reads without a call, is a later option, and needs the offsets to be there.
 
 ### 3. How a reading is made

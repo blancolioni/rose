@@ -218,6 +218,8 @@ package body Init.Installer is
                Cap := Init_Caps.Delete_Cap;
             elsif N = "rescind-endpoint" and then Count = 0 then
                Cap := Init_Caps.Rescind_Cap;
+            elsif N = "get-ticks" and then Count = 0 then
+               Cap := Init_Caps.Get_Ticks_64_Cap;
             elsif N = "register-interrupt" and then Count = 1 then
                Cap := Init.Grants.Interrupt (Owner, Values (1));
             elsif N = "device-page" and then Count = 1 then
