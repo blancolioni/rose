@@ -664,11 +664,12 @@ package body Petal.Command_Launch is
          for I in 1 .. Cap_Count loop
             Rose.System_Calls.Send_Cap (Params, Caps (I));
          end loop;
-         if Buffer_Last > 0 then
-            Rose.System_Calls.Send_Buffer
-              (Params, Buffer_Last, Argument_Buffer'Address, False);
-         end if;
-         Rose.System_Calls.Receive_Words (Params, 1);
+         --  The whole buffer is lent writable, so that the command can
+         --  write its failure message into it (#431).
+
+         Rose.System_Calls.Send_Buffer
+           (Params, Argument_Buffer'Length, Argument_Buffer'Address, True);
+         Rose.System_Calls.Receive_Words (Params, 2);
          Rose.System_Calls.Invoke_Capability (Params);
          Rose.Trace.Event ("reply received");
 
@@ -677,11 +678,13 @@ package body Petal.Command_Launch is
          elsif Params.Control.Flags (Rose.Invocation.Send_Words)
            and then Params.Data (0) /= 0
          then
-            if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+            if Natural (Params.Control.Last_Sent_Word) >= 1 then
                declare
-                  Message : constant String
-                    (1 .. Natural (Params.Buffer_Length))
-                    with Import, Address => Params.Buffer_Address;
+                  Length  : constant Natural :=
+                    Natural'Min
+                      (Natural (Params.Data (1)), Argument_Buffer'Length);
+                  Message : String (1 .. Length)
+                    with Import, Address => Argument_Buffer'Address;
                begin
                   Fail (Message);
                end;
