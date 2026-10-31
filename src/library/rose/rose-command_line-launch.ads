@@ -29,11 +29,17 @@ package Rose.Command_Line.Launch is
    --  multiple of four bytes.
    --
    --  The reply's first data word is zero if the command completed, and
-   --  one if it failed, in which case the buffer holds a message. A reply
-   --  that completes the call also holds the command's results: its out
-   --  and in out scalars in data words 1 onwards, and its out and in out
-   --  strings as buffer items, in the format of the launch buffer, and
-   --  its cap results as caps from 0, each in declaration order.
+   --  one if it failed. A reply that completes the call also holds the
+   --  command's results: its out and in out scalars in data words 1
+   --  onwards, and its cap results as caps from 0, each in declaration
+   --  order.
+   --
+   --  The reply's text goes into the caller's buffer, if the caller lent
+   --  it writable, since the command's own buffer goes when the command
+   --  ends (#431). When the command fails, the text is its message, and
+   --  data word 1 is the message's length. When it completes, the text
+   --  is its out and in out strings, as items in the format of the launch
+   --  buffer, if they fit.
 
    Max_Buffer_Length : constant := 4096;
    --  The most argument text a call can carry, and the most result text

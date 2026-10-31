@@ -11,6 +11,15 @@ package body Rose.Command_Line.Launch is
      Rose.Capabilities.Null_Capability;
    --  The reply cap of the launch invocation, until the command replies.
 
+   Lent_Address : System.Address := System.Null_Address;
+   Lent_Length  : Storage_Count := 0;
+   --  The buffer that the caller lent writable with the launch
+   --  invocation, for the reply's text. The kernel keeps it mapped until
+   --  the command replies to the caller.
+
+   procedure Write_Lent (Text : Storage_Array);
+   --  Write Text at the start of the lent buffer.
+
    Completed : constant Rose.Words.Word := 0;
    Failed    : constant Rose.Words.Word := 1;
 
@@ -105,9 +114,10 @@ package body Rose.Command_Line.Launch is
       for Cap of Call.Result_Caps (0 .. Call.Cap_Count - 1) loop
          Rose.System_Calls.Send_Cap (Params, Cap);
       end loop;
-      if Call.Results_Length > 0 then
-         Rose.System_Calls.Send_Storage_Array
-           (Params, Call.Results (1 .. Call.Results_Length), False);
+      if Call.Results_Length > 0
+        and then Call.Results_Length <= Lent_Length
+      then
+         Write_Lent (Call.Results (1 .. Call.Results_Length));
       end if;
       Reply_Cap := Rose.Capabilities.Null_Capability;
       Rose.System_Calls.Invoke_Capability (Params);
@@ -182,6 +192,11 @@ package body Rose.Command_Line.Launch is
          begin
             Call.Buffer (1 .. Call.Buffer_Length) := Received;
          end;
+
+         if Call.Params.Control.Flags (Rose.Invocation.Writable_Buffer) then
+            Lent_Address := Call.Params.Buffer_Address;
+            Lent_Length := Call.Params.Buffer_Length;
+         end if;
       end if;
 
       Reply_Cap := Call.Params.Reply_Cap;
@@ -207,8 +222,16 @@ package body Rose.Command_Line.Launch is
 
       Rose.System_Calls.Initialize_Reply (Params, Reply_Cap);
       Rose.System_Calls.Send_Word (Params, Status);
-      if Message'Length > 0 then
-         Rose.System_Calls.Send_Text (Params, Message);
+      if Message'Length > 0 and then Lent_Length > 0 then
+         declare
+            Length : constant Storage_Count :=
+              Storage_Count'Min (Message'Length, Lent_Length);
+            Text   : constant Storage_Array (1 .. Message'Length)
+              with Import, Address => Message'Address;
+         begin
+            Write_Lent (Text (1 .. Length));
+            Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Length));
+         end;
       end if;
       Reply_Cap := Rose.Capabilities.Null_Capability;
       Rose.System_Calls.Invoke_Capability (Params);
@@ -345,5 +368,16 @@ package body Rose.Command_Line.Launch is
       Rose.Standard_Streams.Set_Standard_Output
         (Cap_Argument (Call, Cap_Index));
    end Use_Standard_Output;
+
+   ----------------
+   -- Write_Lent --
+   ----------------
+
+   procedure Write_Lent (Text : Storage_Array) is
+      Target : Storage_Array (1 .. Text'Length)
+        with Import, Address => Lent_Address;
+   begin
+      Target := Text;
+   end Write_Lent;
 
 end Rose.Command_Line.Launch;
