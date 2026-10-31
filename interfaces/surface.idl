@@ -1,0 +1,59 @@
+interface Surface : Resource is
+
+   --  A window's pixels, and its input (ADR 0022). A client draws only
+   --  into its own surface, and sees only the input sent to it. The
+   --  display server's root surface has this interface too, so that one
+   --  server can run on a surface of another. Release destroys the
+   --  surface, and the window with it.
+
+   type Cursor_Shape is (Arrow, Text, Crosshair, Busy);
+
+   procedure Get_Size
+     (Width  : out Word;
+      Height : out Word);
+   --  The surface's size in pixels. It changes only when a Size event
+   --  has been sent, and the old buffer is no longer the surface's then.
+
+   function Get_Buffer return interface Region;
+   --  The pixels, one 32-bit word each, XRGB (the top byte is unused),
+   --  row by row from the top left, with no padding between rows: Width
+   --  by Height words. The client and the server share it, and map it
+   --  with the operation that #593 adds to Region. Ask again after a
+   --  Size event.
+
+   procedure Damage
+     (X      : Word;
+      Y      : Word;
+      Width  : Word;
+      Height : Word);
+   --  The client has changed this region of the buffer, and the server is
+   --  to draw it. A region outside the surface is cut to the surface.
+
+   function Events return interface Stream_Reader;
+   --  The surface's input, as a stream of fixed-size events, in the
+   --  order they happened. Each event is four words, written as a
+   --  stream's bytes in the machine's byte order:
+   --
+   --     Kind 1, Key:      Kind, Code, State, 0
+   --        Code and State are those of Keyboard_Handler.Handle_Key.
+   --     Kind 2, Pointer:  Kind, X, Y, Buttons
+   --        X and Y are in the surface's pixels, as 32-bit two's
+   --        complement values. During a grab they can be negative, or
+   --        past the surface's size, when the pointer has left the
+   --        surface. Buttons is a mask with bit 0 the first button, bit 1
+   --        the second, and so on.
+   --     Kind 3, Focus:    Kind, Focused, 0, 0
+   --        Focused is 1 when the surface has the keyboard, and 0 when
+   --        it has lost it.
+   --     Kind 4, Size:     Kind, Width, Height, 0
+   --
+   --  A Read returns the whole events that are ready, and waits only if
+   --  there are none. This is a byte stream until typed streams exist
+   --  (ADR 0013, #140), when it becomes a stream of an event type with
+   --  the same fields.
+
+   procedure Set_Cursor (Shape : Cursor_Shape);
+   --  The cursor to show while the pointer is over this surface. A
+   --  surface chooses among the shapes, and can't supply an image.
+
+end Surface;

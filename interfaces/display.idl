@@ -1,0 +1,15 @@
+interface Display is
+
+   --  The display server (ADR 0022). It owns the screen, the keyboard and
+   --  the pointer, and gives each client only a surface of its own.
+
+   function Create_Surface
+     (Width  : Word;
+      Height : Word)
+     return interface Surface;
+   --  A new surface, as close to Width by Height pixels as the layout
+   --  allows. The server decides where the surface goes and how big it
+   --  is: the client reads its size with Get_Size, and is told when it
+   --  changes. Fails if the server has no room for another surface.
+
+end Display;
