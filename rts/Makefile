@@ -1,4 +1,6 @@
-ARCH=i686
+ROOT=..
+include $(ROOT)/mk/common.mk
+
 BUILD=./build/$(ARCH)
 ADAINCLUDE=$(BUILD)/adainclude
 ADALIB=$(BUILD)/adalib

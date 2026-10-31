@@ -1,11 +1,8 @@
-ARCH=i686
+ROOT=../../..
+include $(ROOT)/mk/common.mk
+
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/partition.reloc.o
-GCC=gcc
-DEFINES=
-GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
-UTIL=../../library/util.c
-CFILES=$(UTIL)
 ENVIRONMENT_OBJECTS= \
 	$(BUILDDIR)/rose-environment.o \
 	$(BUILDDIR)/rose-environment_pages.o \
@@ -43,7 +40,7 @@ all: partition $(RELOC)
 partition:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild --RTS=../../../rts/build/i686
+	gprbuild --RTS=$(KERNEL_RTS)
 
 $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g

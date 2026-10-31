@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: date
 	cp ./build/bin/date-driver ../../../build/$(ARCH)/drivers/date

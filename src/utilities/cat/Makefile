@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: cat
 	cp ./build/bin/cat-driver ../../../build/$(ARCH)/drivers/cat
