@@ -13,18 +13,34 @@ NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock
 UTILITIES=echo list cat touch mkdir clear date user auth rights login run_self_tests petal
-BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
 
-rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk hdd iso finished
+# The boot modules are the ones boot.yaml lists (#374), which is also where
+# the GRUB menus' module2 lines come from.
+BOOT_MODULES := $(shell python3 scripts/make-init --list-modules src/servers/init/boot.yaml)
+ifeq ($(BOOT_MODULES),)
+$(error no boot modules: scripts/make-init --list-modules printed nothing)
+endif
 
-all: idl rts rose doc
+# The default target builds a bootable ISO.  The hard disk image (hdd), the
+# book (doc) and publishing (publish-iso) are separate; all does the lot.
+
+rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk iso finished
+
+all: idl rts rose hdd doc
+
+# None of these targets is a file.  Three of them (rts, interfaces and doc)
+# are also directory names, so without this make thinks they are up to date
+# and skips their recipes.
+
+.PHONY: all rose rts interfaces idl config kernel boot exports stripped \
+    bootdisk hdd iso floppy finished doc clean publish-iso \
+    $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
 rts:
 	(cd rts; make)
 	(cd src/rts; make)
 
-interfaces:
-	(cd src/library/kernelapi/generated; make)
+interfaces: idl
 
 $(PROJECT):
 	sed s/ARCH/$(ARCH)/g projects/kernel-template.gpr > $(PROJECT)
@@ -73,8 +89,6 @@ publish-iso:
 	mv -f $(ISO_PUBLISH_DIR)/.rose.iso.new $(ISO_PUBLISH_DIR)/rose.iso
 	sed -n 's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
 	  src/base/rose-version.ads > $(ISO_PUBLISH_DIR)/rose.iso.version
-
-.PHONY: publish-iso
 
 floppy:
 	sh ./scripts/rose-floppy-install

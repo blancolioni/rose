@@ -6,11 +6,10 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Process.Client;
+with Rose.Interfaces.Launch;
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Writable_File;
 
 with Tests.Registry;
 
@@ -107,49 +106,30 @@ package body Tests.Users is
    ---------------
 
    function User_Test return Boolean is
-      use Rose.Interfaces.Writable_Directory.Client;
-      package Users renames Rose.Interfaces.User.Client;
-      package Writable_Files renames Rose.Interfaces.Writable_File.Client;
-
-      File_Launch : constant Rose.Interfaces.Launch.Client.Launch_Client :=
-        Tests.Registry.Launcher ("file");
-      Directory_Launch : constant
-        Rose.Interfaces.Launch.Client.Launch_Client :=
-          Tests.Registry.Launcher ("directory");
-      User_Launch : constant Rose.Interfaces.Launch.Client.Launch_Client :=
-        Tests.Registry.Launcher ("user");
       User_Name   : constant String := "test";
       No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
-      No_Words    : Storage_Array (1 .. 0);
-      Process     : Rose.Interfaces.Process.Client.Process_Client;
-      Home        : Writable_Directory_Client;
+      User_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
+        Tests.Registry.Launcher ("user");
+      Home        : Rose.Interfaces.Writable_Directory.Client
+        .Writable_Directory_Client;
       Endpoint    : Rose.Capabilities.Capability;
       Params      : aliased Rose.Invocation.Invocation_Record;
-      User        : Users.User_Client;
-      User_Home   : Writable_Directory_Client;
-      Created     : Writable_Files.Writable_File_Client;
-      Name        : String (1 .. 16);
-      Name_Last   : Natural;
+      User        : Rose.Interfaces.User.Client.User_Client;
    begin
       Ada.Text_IO.Put ("User test");
 
-      Process :=
-        Rose.Interfaces.Launch.Client.Launch
-          (Directory_Launch,
-           (Rose.Interfaces.Launch.Client.Get_Interface_Cap (File_Launch),
-            Rose.Interfaces.Launch.Client.Get_Interface_Cap
-              (Directory_Launch)),
-           No_Words);
-      Open (Home, Rose.Interfaces.Process.Client.Published_Interface
-                    (Process));
+      Home.Open
+        (Tests.Registry.Launch
+           ("directory",
+            (Tests.Registry.Launcher_Cap ("file"),
+             Tests.Registry.Launcher_Cap ("directory"))));
 
       --  The user is launched as a command, and its launch call gives it
       --  a create endpoint cap, its home directory and its name, as one
       --  buffer item: the length, little-endian, then the text, padded
       --  to four bytes.
 
-      Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (User_Launch, No_Caps);
+      Endpoint := User_Launch.Launch_Command (No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch a user");
       end if;
@@ -163,7 +143,7 @@ package body Tests.Users is
       Rose.System_Calls.Send_Cap
         (Params,
          Tests.Registry.Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Get_Interface_Cap (Home));
+      Rose.System_Calls.Send_Cap (Params, Home.Get_Interface_Cap);
       Rose.System_Calls.Send_Buffer (Params, 8, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Receive_Caps (Params, 1);
@@ -180,26 +160,31 @@ package body Tests.Users is
          return Fail ("no user interface in the reply");
       end if;
 
-      Users.Open (User, Params.Caps (0));
+      User.Open (Params.Caps (0));
 
-      Users.Name (User, Name, Name_Last);
-      if Name (1 .. Name_Last) /= User_Name then
+      if User.Name /= User_Name then
          return Fail ("wrong name");
       end if;
 
       --  A file created through the user's home directory is in the
       --  directory that the user was given.
 
-      User_Home := Users.Home_Directory (User);
-      Created := Create_File (User_Home, ".petalrc");
-      if Writable_Files.Get_Interface_Cap (Created)
-        = Rose.Capabilities.Null_Capability
-      then
-         return Fail ("cannot create a file in the home directory");
-      end if;
+      declare
+         User_Home : Rose.Interfaces.Writable_Directory
+           .Writable_Directory_Object'Class :=
+             User.Home_Directory;
+         Created   : Rose.Interfaces.Writable_File
+           .Writable_File_Object'Class :=
+             User_Home.Create_File (".petalrc");
+      begin
+         if Created.Writable_File_Cap = Rose.Capabilities.Null_Capability
+         then
+            return Fail ("cannot create a file in the home directory");
+         end if;
+      end;
 
-      if Directory_Entry_Count (Home) /= 1
-        or else Find_Entry (Home, ".petalrc") /= 1
+      if Home.Directory_Entry_Count /= 1
+        or else Home.Find_Entry (".petalrc") /= 1
       then
          return Fail ("the home directory is not the one given");
       end if;

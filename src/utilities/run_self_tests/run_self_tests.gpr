@@ -1,14 +1,17 @@
 project Run_Self_Tests is
 
-   --  The RTS's own interface specs come first, so that the program
-   --  uses them and not the other copies on its path (#538).
+   --  The user-mode IDL target's packages are generated in
+   --  build/generated (#528). The kernel target's packages, in
+   --  kernelapi/generated, must not be on the path: the two targets have
+   --  units with the same names. The RTS's own interface specs come
+   --  first, so that the program uses them and not the other copies on
+   --  its path (#538).
 
    for Source_Dirs use
       ("../../rts/build/interfaces",
        "src",
        "build/generated",
-       "../../library/rose",
-       "../../library/kernelapi/generated");
+       "../../library/rose");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("rose-core-run_self_tests_main.adb");

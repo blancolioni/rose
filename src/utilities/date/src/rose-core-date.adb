@@ -2,10 +2,8 @@ with Ada.Text_IO;
 
 with Rose.Clock.Calendar;
 
-with Rose.Interfaces.Clock.Client;
-
 procedure Rose.Core.Date
-  (Clock_Service : Rose.Interfaces.Clock.Client.Clock_Client;
+  (Clock_Service : in out Rose.Interfaces.Clock.Clock_Object'Class;
    ISO_8601      : Boolean := False)
 is
    use Rose.Clock.Calendar;
@@ -45,8 +43,7 @@ is
    end Image;
 
 begin
-   Rose.Clock.Open
-     (Rose.Interfaces.Clock.Client.Get_Interface_Cap (Clock_Service));
+   Rose.Clock.Open (Clock_Service.Clock_Cap);
 
    declare
       Time : constant Date_Time := To_Date_Time (Rose.Clock.Realtime);

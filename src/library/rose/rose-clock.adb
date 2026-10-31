@@ -1,8 +1,12 @@
 with Rose.Interfaces.Clock.Client;
+with Rose.Interfaces.Objects;
 
 package body Rose.Clock is
 
    use type Rose.Words.Word;
+
+   --  The user-mode IDL target's client (#554): a reading that fails
+   --  raises Invocation_Error, which is reported as Program_Error.
 
    Source : Rose.Interfaces.Clock.Client.Clock_Client;
    Opened : Boolean := False;
@@ -21,13 +25,11 @@ package body Rose.Clock is
    ---------------
 
    function Monotonic return Rose.Words.Word_64 is
-      Result : constant Rose.Words.Word_64 :=
-                 Rose.Interfaces.Clock.Client.Monotonic (Source);
    begin
-      if Rose.Interfaces.Clock.Client.Has_Error then
+      return Source.Monotonic;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
          raise Program_Error with "Rose.Clock: the clock can't be reached";
-      end if;
-      return Result;
    end Monotonic;
 
    ----------
@@ -36,7 +38,7 @@ package body Rose.Clock is
 
    procedure Open (Clock : Rose.Capabilities.Capability) is
    begin
-      Rose.Interfaces.Clock.Client.Open (Source, Clock);
+      Source.Open (Clock);
       Opened := True;
    end Open;
 
@@ -45,13 +47,11 @@ package body Rose.Clock is
    --------------
 
    function Realtime return Rose.Words.Word_64 is
-      Result : constant Rose.Words.Word_64 :=
-                 Rose.Interfaces.Clock.Client.Realtime (Source);
    begin
-      if Rose.Interfaces.Clock.Client.Has_Error then
+      return Source.Realtime;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
          raise Program_Error with "Rose.Clock: the clock can't be reached";
-      end if;
-      return Result;
    end Realtime;
 
    -------------------------
@@ -59,13 +59,11 @@ package body Rose.Clock is
    -------------------------
 
    function Realtime_Is_Trusted return Boolean is
-      Result : constant Rose.Words.Word :=
-                 Rose.Interfaces.Clock.Client.Realtime_Is_Trusted (Source);
    begin
-      if Rose.Interfaces.Clock.Client.Has_Error then
+      return Source.Realtime_Is_Trusted /= 0;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
          raise Program_Error with "Rose.Clock: the clock can't be reached";
-      end if;
-      return Result /= 0;
    end Realtime_Is_Trusted;
 
 end Rose.Clock;
