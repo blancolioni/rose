@@ -24,7 +24,7 @@ A `display` server is installed like the other drivers, and its `.driver` file a
 
 The boot code asks GRUB for a 32-bit graphics mode and passes the framebuffer's address, pitch and size on to the driver (#582). If no framebuffer is offered, there is no display server, and `vga-console` runs as it does today.
 
-**The server draws on a root surface.** It is written against one surface, which it draws into and takes its input from, and that surface has the same interface as the ones it gives to its clients (section 2). On the hardware, the server makes the root itself, from the framebuffer cap and the keyboard and pointer streams (sections 3 and 4). A display server can also be given a surface from another display server, and then it draws into that, and takes keys and pointer events from the surface's event stream. That is nesting. It gives:
+**The server draws on a root surface.** It is written against one surface, which it draws into and takes its input from, and that surface has the same interface as the ones it gives to its clients (section 2). On the hardware, the server makes the root itself, from the framebuffer cap and the keyboard and pointer streams (sections 3 and 4). A display server can also be given a surface from another display server, and then it draws into that, and takes keys and pointer events from the surface's event stream. That is nesting. The nested server has a *virtual* pointer: its position is the one in the pointer events that arrive on the root surface, in that surface's coordinates, so it always sits where the parent's pointer is, relative to the surface. The nested server doesn't draw a cursor, because the parent draws the only one. A cursor-shape request from a nested client is passed up to the parent through the root surface, like any other client's. Nesting gives:
 
 - **Headless tests** (#587): a surface backed by plain memory, with scripted events, stands in for the screen.
 - **Sandboxing:** the windows of an untrusted client can live in a surface of their own. The client sees a screen, and the parent sees one surface.
@@ -97,8 +97,7 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 ## Open questions
 
 - **The pixel format** if the mode GRUB gives isn't 32-bit. The server could convert, or refuse the mode.
-- **Who creates a window.** The key chord for a new window has to start something. The server probably holds a cap to a launcher, which makes the environment and starts what manages the window. What the launcher is, and where it comes from, is not decided here.
-- **Nested cursors.** The parent draws a cursor over the surface, and the nested server draws its own inside it.
+- **Who starts what runs in a window.** The server creates a window on request, for example from the key chord for a new window, and the request has to name or reach whatever receives the surface and manages it. The server might hold a cap to a launcher for this, or the request might carry one. Which, and where that cap comes from, is not decided here.
 - **The cursor.** A software cursor needs the pixels under it saved and restored, or redrawn with each composed frame. Which is simpler depends on how the server composes.
 - **Other pointers.** USB mice and touch need a USB stack, which Rose doesn't have. The pointer interface should not assume PS/2.
 - **Vsync and tearing.** Copying while the display scans out can tear, and nothing in Rose gives a vertical blank.
