@@ -263,8 +263,12 @@ package body Rose.System_Calls is
 
                exit when Length > Buffer'Last - Next - 3;
 
+               --  The text follows the length. An empty last item's
+               --  text would be just past the buffer, so its address
+               --  is worked out, not taken from an element (#604).
+
                if Item = Index then
-                  return (Address => Buffer (Next + 4)'Address,
+                  return (Address => Params.Buffer_Address + (Next + 3),
                           Length  => Length);
                end if;
 
