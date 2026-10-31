@@ -7,8 +7,9 @@ with Rose.Capabilities;
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File;
 with Rose.Interfaces.File_Reader;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File;
+with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Registry;
 
@@ -32,8 +33,24 @@ package body Tests.Directories is
    function Directory_Test return Boolean is
       Top    : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
-      Buffer : Storage_Array (1 .. 16);
-      Last   : Storage_Count;
+      Buffer    : Storage_Array (1 .. 16);
+      Last      : Storage_Count;
+      Notes_Cap : Rose.Capabilities.Capability;
+      Held      : Rose.Interfaces.Writable_File.Client
+        .Writable_File_Client;
+
+      function Refused (From, To : String) return Boolean;
+      --  True if Top refuses to rename From to To.
+
+      function Refused (From, To : String) return Boolean is
+      begin
+         Top.Rename (From, To);
+         return False;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return True;
+      end Refused;
+
    begin
       Ada.Text_IO.Put ("Directory test");
 
@@ -57,6 +74,7 @@ package body Tests.Directories is
             return Fail ("cannot create a file");
          end if;
          Notes.Write (Hello);
+         Notes_Cap := Notes.Writable_File_Cap;
       end;
 
       if Top.Directory_Entry_Count /= 1
@@ -118,6 +136,51 @@ package body Tests.Directories is
         /= Rose.Interfaces.Directory.Directory
       then
          return Fail ("the subdirectory is not a directory");
+      end if;
+
+      --  Renaming changes only the entry. The file is the same, so a
+      --  cap that was taken for it before still writes to it (#425).
+
+      begin
+         Top.Rename ("notes", "memo");
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Fail ("cannot rename");
+      end;
+
+      if Top.Directory_Entry_Count /= 2
+        or else Top.Find_Entry ("memo") /= 1
+        or else Top.Find_Entry ("notes") /= 0
+        or else Top.Directory_Entry_Name (1) /= "memo"
+      then
+         return Fail ("wrong entries after a rename");
+      end if;
+
+      begin
+         Held.Open (Notes_Cap);
+         Held.Write (Hello);
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Fail ("cannot write through a held cap");
+      end;
+      if Top.Directory_Entry_Size (1) /= 2 * Hello'Length then
+         return Fail ("a held cap does not reach the renamed file");
+      end if;
+
+      --  A rename fails, and changes nothing, if From is not an entry,
+      --  or if To is one already, or is empty.
+
+      if not Refused ("notes", "other")
+        or else not Refused ("memo", "sub")
+        or else not Refused ("memo", "")
+      then
+         return Fail ("a bad rename was not refused");
+      end if;
+
+      if Top.Find_Entry ("memo") /= 1
+        or else Top.Find_Entry ("sub") /= 2
+      then
+         return Fail ("a refused rename changed the entries");
       end if;
 
       return True;

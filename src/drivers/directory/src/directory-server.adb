@@ -112,6 +112,11 @@ package body Directory.Server is
       Name : String)
       return Writable_Directory_Class;
 
+   overriding procedure Rename
+     (Item : in out Directory_Object;
+      From : String;
+      To   : String);
+
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
    --  Launch sends its environment through the invoke buffer; without
@@ -469,6 +474,35 @@ package body Directory.Server is
            ((File_Launch_Cap, Directory_Launch_Cap), No_Environment);
       end if;
    end Launch;
+
+   ------------
+   -- Rename --
+   ------------
+
+   --  Only the entry's name changes, so the file or directory process is
+   --  the same, and the caps that clients hold to it keep working (#425).
+   --  A failure raises, which the generated server sends back as an
+   --  error.
+
+   overriding procedure Rename
+     (Item : in out Directory_Object;
+      From : String;
+      To   : String)
+   is
+      pragma Unreferenced (Item);
+      Index : constant Natural := Find (From);
+   begin
+      if Index = 0 then
+         raise Constraint_Error with "rename: no such entry";
+      elsif To'Length = 0 or else To'Length > Max_Name_Length then
+         raise Constraint_Error with "rename: bad name";
+      elsif Find (To) /= 0 then
+         raise Constraint_Error with "rename: the name is in use";
+      end if;
+
+      Entries (Index).Name (1 .. To'Length) := To;
+      Entries (Index).Name_Last := To'Length;
+   end Rename;
 
    ------------------
    -- Start_Server --
