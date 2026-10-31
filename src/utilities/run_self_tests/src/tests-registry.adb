@@ -1,4 +1,9 @@
+with System.Storage_Elements;
+
 with Rose.System_Calls;
+
+with Rose.Interfaces.Commands.Client;
+with Rose.Interfaces.Process;
 
 package body Tests.Registry is
 
@@ -24,17 +29,49 @@ package body Tests.Registry is
       return Rose.System_Calls.Create_Endpoint_Capability;
    end Create_Endpoint;
 
+   ------------
+   -- Launch --
+   ------------
+
+   function Launch
+     (Name : String;
+      Caps : Rose.Capabilities.Capability_Array)
+      return Rose.Capabilities.Capability
+   is
+      No_Words : System.Storage_Elements.Storage_Array (1 .. 0);
+      Program  : Rose.Interfaces.Launch.Launch_Object'Class :=
+        Launcher (Name);
+      Process  : Rose.Interfaces.Process.Process_Object'Class :=
+        Program.Launch (Caps, No_Words);
+   begin
+      return Process.Published_Interface;
+   end Launch;
+
    --------------
    -- Launcher --
    --------------
 
    function Launcher
      (Name : String)
-      return Rose.Interfaces.Launch.Client.Launch_Client
+      return Rose.Interfaces.Launch.Launch_Object'Class
    is
    begin
-      return Rose.Interfaces.Commands.Client.Find (Registry, Name);
+      return Registry.Find (Name);
    end Launcher;
+
+   ------------------
+   -- Launcher_Cap --
+   ------------------
+
+   function Launcher_Cap
+     (Name : String)
+      return Rose.Capabilities.Capability
+   is
+      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+        Launcher (Name);
+   begin
+      return Program.Launch_Cap;
+   end Launcher_Cap;
 
    ---------------
    -- Set_Clock --
@@ -50,10 +87,10 @@ package body Tests.Registry is
    ------------------
 
    procedure Set_Commands
-     (Commands : Rose.Interfaces.Commands.Client.Commands_Client)
+     (Commands : in out Rose.Interfaces.Commands.Commands_Object'Class)
    is
    begin
-      Registry := Commands;
+      Registry.Open (Commands.Commands_Cap);
    end Set_Commands;
 
 end Tests.Registry;

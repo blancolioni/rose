@@ -1,7 +1,10 @@
 project Directory is
 
    --  Built with the userland run-time system (#490), which has Rose's
-   --  base, capability and system call packages.
+   --  base, capability and system call packages, and the user-mode IDL
+   --  target, whose packages the Makefile generates in build/generated
+   --  (#528). The kernel target's packages, in kernelapi/generated, must
+   --  not be on the path: the two targets have units with the same names.
 
    --  The RTS's own interface specs come first, so that the program
    --  uses them and not the other copies on its path (#538).
@@ -9,8 +12,8 @@ project Directory is
    for Source_Dirs use
       ("../../rts/build/interfaces",
        "src",
-       "../../library/kernelapi/console",
-       "../../library/kernelapi/generated");
+       "build/generated",
+       "../../library/rose");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("directory-driver.adb");
