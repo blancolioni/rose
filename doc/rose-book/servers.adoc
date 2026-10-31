@@ -200,6 +200,33 @@ Used by:: `vga-console`.
 `keyboard` only produces characters: Ctrl with a letter gives its control character, and the arrow and editing keys give escape sequences.
 It doesn't echo them; `vga-console` does.
 
+=== `clock`
+
+Serves the system's time (ADR 0020, #494).
+
+Provides:: `Clock_Admin`, whose ancestor `Clock` has `Monotonic`, `Realtime` and `Realtime_Is_Trusted`, and which adds `Set_Realtime`; and `Restorable`.
+Requests:: `create-endpoint`, `get-ticks`, the kernel's 64-bit tick count, and the ports `112` and `113` (`70` and `71` hexadecimal) of the CMOS clock.
+Used by:: `init`, which gets both interfaces from the installer; `login`, `petal` and every command with the `Clock_Service` role (`date`, `uptime` and `run_self_tests`), which get `Clock` through each other; and `rights`, which holds `Clock_Admin`.
+
+* *`Monotonic` is nanoseconds since the system was first started,* not counting the time that it was off.
+  It never goes backwards, including across a restore.
+  `uptime` writes it.
+* *`Realtime` is nanoseconds since 1970-01-01 00:00:00 UTC,* with no leap seconds (`date` writes it).
+  A reading is quantised to a tick, 10 ms.
+* *Both come from the tick count.* A tick is 10,000,150 ns, because the PIT's divisor is 11932, and 10 ms would lose more than a second a day.
+  The tick count is a 64-bit number that the kernel keeps as two words, so that it doesn't wrap.
+  The real time is the monotonic time plus an offset, which the driver sets from the CMOS clock.
+* *The CMOS clock is read at the edge of a second,* at the start and at each restore, and then not again, so the real time drifts as the PIT does.
+  The wait for the edge takes up to a second.
+* *A restore carries on from the last readings.* The tick count starts again at zero after a reboot, so the driver takes a new base for it, and the monotonic time continues from the last value that it returned.
+  The real time is the later of the CMOS clock and the last value.
+  If the CMOS clock is more than a second behind that value, the real time is held at the checkpoint's time and `Realtime_Is_Trusted` is 0.
+* *`Realtime_Is_Trusted` is 0 or 1.* It is 0 when the CMOS clock's battery bit is clear, its fields are out of range, or the clock is held at the checkpoint's time.
+  It is 1 again after `Set_Realtime`.
+* *`Set_Realtime` writes the CMOS clock at the next whole second,* and fails for a time before 2000 or from 2100.
+  It is the only way that the real time goes backwards.
+  Only `init` and the rights broker hold `Clock_Admin`, and nothing calls `Set_Realtime` yet (#552).
+
 === `file`
 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
