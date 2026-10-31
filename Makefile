@@ -19,12 +19,19 @@ rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports 
 
 all: idl rts rose doc
 
+# None of these targets is a file.  Three of them (rts, interfaces and doc)
+# are also directory names, so without this make thinks they are up to date
+# and skips their recipes.
+
+.PHONY: all rose rts interfaces idl config kernel boot exports stripped \
+    bootdisk hdd iso floppy finished doc clean publish-iso \
+    $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
+
 rts:
 	(cd rts; make)
 	(cd src/rts; make)
 
-interfaces:
-	(cd src/library/kernelapi/generated; make)
+interfaces: idl
 
 $(PROJECT):
 	sed s/ARCH/$(ARCH)/g projects/kernel-template.gpr > $(PROJECT)
@@ -73,8 +80,6 @@ publish-iso:
 	mv -f $(ISO_PUBLISH_DIR)/.rose.iso.new $(ISO_PUBLISH_DIR)/rose.iso
 	sed -n 's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
 	  src/base/rose-version.ads > $(ISO_PUBLISH_DIR)/rose.iso.version
-
-.PHONY: publish-iso
 
 floppy:
 	sh ./scripts/rose-floppy-install
