@@ -123,17 +123,23 @@ package body Tests.Rights is
       Rights.Open (Params.Caps (0));
       Admin.Open (Params.Caps (1));
 
-      --  The users share a home directory, which saves a process.
+      --  Each user has a home directory of their own. This is where the
+      --  test would stall when mem's page table was too small (#591).
 
       declare
-         Home : constant Rose.Capabilities.Capability :=
-                  Tests.Registry.Launch
-                    ("directory",
-                     (Tests.Registry.Launcher_Cap ("file"),
-                      Tests.Registry.Launcher_Cap ("directory")));
+         Alice_Home : constant Rose.Capabilities.Capability :=
+                        Tests.Registry.Launch
+                          ("directory",
+                           (Tests.Registry.Launcher_Cap ("file"),
+                            Tests.Registry.Launcher_Cap ("directory")));
+         Bob_Home   : constant Rose.Capabilities.Capability :=
+                        Tests.Registry.Launch
+                          ("directory",
+                           (Tests.Registry.Launcher_Cap ("file"),
+                            Tests.Registry.Launcher_Cap ("directory")));
       begin
-         Alice.Open (Tests.Users.Create_User ("alice", Home));
-         Bob.Open (Tests.Users.Create_User ("bob", Home));
+         Alice.Open (Tests.Users.Create_User ("alice", Alice_Home));
+         Bob.Open (Tests.Users.Create_User ("bob", Bob_Home));
       end;
 
       --  With no policy, nobody gets anything.

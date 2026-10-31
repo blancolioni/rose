@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: run_self_tests
 	cp ./build/bin/run_self_tests-driver ../../../build/$(ARCH)/drivers/run_self_tests

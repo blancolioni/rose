@@ -11,6 +11,7 @@ with Tests.Memory;
 with Tests.Rights;
 with Tests.Secondary_Stack;
 with Tests.Server;
+with Tests.Signed;
 with Tests.Smoke;
 with Tests.Stack;
 with Tests.Strings;
@@ -39,6 +40,7 @@ package Tests.Suite is
                    Tests.Rights.Rights_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
-                   Tests.Memory.Copy_Test'Access);
+                   Tests.Memory.Copy_Test'Access,
+                   Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

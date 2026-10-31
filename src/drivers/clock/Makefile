@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: clock
 	cp ./build/bin/clock ../../../build/$(ARCH)/drivers/clock

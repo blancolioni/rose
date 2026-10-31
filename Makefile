@@ -1,18 +1,19 @@
-ARCH=i686
+ROOT=.
+include $(ROOT)/mk/common.mk
+
 TARGET=$(ARCH)-unknown-rose
 ROSE=./build/$(TARGET)
 BUILDDIR=./build/$(ARCH)/kernel/obj
 MODULEDIR=./build/$(ARCH)/modules
 DRIVERDIR=./build/$(ARCH)/drivers
 RELOC=$(BUILDDIR)/rose.reloc.o
-GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock
-UTILITIES=echo list cat touch mkdir clear date user auth rights login run_self_tests petal
+UTILITIES=echo list cat touch mkdir clear date uptime user auth rights login run_self_tests petal
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
 # the GRUB menus' module2 lines come from.

@@ -14,6 +14,10 @@
 #      has run before: the time has to agree with the host's, and not be
 #      earlier than the time before.
 #
+# It also runs uptime in each boot. The monotonic time doesn't count the
+# time that the machine was off, so across the restore it must not go
+# back, and must not grow by more than the real time that passed.
+#
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed.
 
@@ -45,6 +49,33 @@ check_date () {
     last=$shown
 }
 
+read_uptime () {
+    # The last line on the screen that is only a number, which is what
+    # uptime -s writes.
+    screen | grep -E '^ *[0-9]+ *$' | tail -1 | tr -d ' '
+}
+
+check_uptime () {
+    # check_uptime SECONDS HOST: run uptime, which has to say at least
+    # SECONDS, and at most the real time since HOST (0 for any) later.
+    type_text "uptime -s
+"
+    host=$(date -u +%s)
+    sleep 5
+    now=$(read_uptime)
+    [ -n "$now" ] || fail "uptime wrote no time"
+    echo "uptime says $now seconds"
+    [ "$now" -ge "$1" ] || fail "uptime went back from $1 to $now"
+    if [ "$2" -gt 0 ]; then
+        grew=$((now - $1))
+        passed=$((host - $2))
+        [ $grew -le $passed ] \
+            || fail "uptime grew by $grew seconds in $passed real ones"
+    fi
+    up_last=$now
+    up_host=$host
+}
+
 install_rose "$ISO"
 
 echo "Booting from the disk, which restores the install's checkpoint"
@@ -52,6 +83,7 @@ start_qemu
 log_in
 last=0
 check_date 0
+check_uptime 0 0
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45
@@ -62,6 +94,7 @@ start_qemu
 wait_for "petal>" 200 || fail "petal was not restored"
 sleep 45
 check_date "$last"
+check_uptime "$up_last" "$up_host"
 
 stop_qemu
 rm -rf "$WORK"

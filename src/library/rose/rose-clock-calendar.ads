@@ -20,6 +20,16 @@ package Rose.Clock.Calendar is
          Nanosecond : Natural range 0 .. 999_999_999;
       end record;
 
+   type Elapsed_Time is
+      record
+         Days       : Natural;
+         Hours      : Natural range 0 .. 23;
+         Minutes    : Natural range 0 .. 59;
+         Seconds    : Natural range 0 .. 59;
+         Nanosecond : Natural range 0 .. 999_999_999;
+      end record;
+   --  A length of time, such as a reading of Rose.Clock.Monotonic.
+
    Last_Year : constant := 2553;
    --  The last full year that a 64-bit count of nanoseconds holds.
 
@@ -28,6 +38,12 @@ package Rose.Clock.Calendar is
 
    function To_Date_Time (Nanoseconds : Rose.Words.Word_64) return Date_Time;
    --  The date and time of a reading of real time.
+
+   function To_Elapsed
+     (Nanoseconds : Rose.Words.Word_64)
+      return Elapsed_Time;
+   --  A length of time, in nanoseconds, as days, hours, minutes and
+   --  seconds.
 
    function To_Nanoseconds (Time : Date_Time) return Rose.Words.Word_64
      with Pre => Is_Valid (Time);

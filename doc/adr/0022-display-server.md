@@ -73,7 +73,7 @@ There is no stacking and no overlap to begin with, so the server needs no clippi
 
 ### 7. Interfaces
 
-The interfaces are declared in `interfaces/` (#581): the display server (create a surface, with the size it asks for), the surface (get its buffer, report damage, get its event stream, ask for a cursor shape), and the event type (key, pointer, focus, size). Operations that can fail are procedures that raise, not functions that return `Boolean` (idle#60).
+The interfaces are declared in `interfaces/` (#581): the display server (create a surface, with the size it asks for), the surface (get its buffer, report damage, get its event stream, read the pointer's position, ask for a cursor shape), and the event type (key, pointer, focus, size). Operations that can fail are procedures that raise, not functions that return `Boolean` (idle#60).
 
 ## Consequences
 

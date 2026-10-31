@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: mkdir
 	cp ./build/bin/mkdir-driver ../../../build/$(ARCH)/drivers/mkdir
