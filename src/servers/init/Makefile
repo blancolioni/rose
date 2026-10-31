@@ -69,7 +69,7 @@ init:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	python3 ../../../scripts/make-init -o build/generated --root ../../.. boot.yaml
-	gprbuild --RTS=$(KERNEL_RTS)
+	gprbuild --RTS=$(KERNEL_RTS) $(GPRBUILD_CARGS)
 
 $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g

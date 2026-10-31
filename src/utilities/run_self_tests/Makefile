@@ -38,4 +38,4 @@ run_self_tests:
 	    $(INTERFACES)/cap.idl \
 	    $(INTERFACES)/heap.idl \
 	    $(INTERFACES)/region.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

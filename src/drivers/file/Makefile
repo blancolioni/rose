@@ -9,4 +9,4 @@ all: file
 file:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

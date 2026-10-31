@@ -14,7 +14,7 @@ clock:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    $(INTERFACES)/clock.idl $(INTERFACES)/clock_admin.idl \
 	    $(INTERFACES)/restorable.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)
 
 # The calendar arithmetic is plain Ada, so it is tested on the host.
 

@@ -13,4 +13,4 @@ petal:
 	mkdir -p build/generated
 	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
 	    rose-core-petal.idl $(INTERFACES)/rose-core.idl
-	gprbuild petal.gpr
+	gprbuild petal.gpr $(GPRBUILD_CARGS)

@@ -16,4 +16,4 @@ vga_console:
 	    $(INTERFACES)/stream.idl $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/event_listener.idl $(INTERFACES)/event_source.idl \
 	    $(INTERFACES)/restorable.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

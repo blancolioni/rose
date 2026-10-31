@@ -13,4 +13,4 @@ mkdir:
 	mkdir -p build/generated
 	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
 	    rose-core-make_directory.idl $(INTERFACES)/rose-core.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

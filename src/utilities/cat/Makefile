@@ -18,4 +18,4 @@ cat:
 	    $(INTERFACES)/file.idl $(INTERFACES)/file_reader.idl \
 	    $(INTERFACES)/seekable_file_reader.idl $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/stream_reader.idl $(INTERFACES)/seekable.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)
