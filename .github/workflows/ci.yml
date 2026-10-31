@@ -1,0 +1,72 @@
+name: CI
+
+# Builds Rose from scratch and boot-tests the ISO under QEMU (make test), on
+# every pull request and every push to main.  Fedora 43 is what the build is
+# known to work on (see the README).  QEMU has no KVM on a hosted runner, so
+# the boot test is slow.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-boot:
+    runs-on: ubuntu-latest
+    container: fedora:43
+    timeout-minutes: 90
+    env:
+      ALIRE_VERSION: 2.1.0
+      # idle and Syn are built from these refs.  Set them to commits to pin
+      # them.
+      SYN_REF: main
+      IDLE_REF: main
+    steps:
+      - name: Install the build requirements
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+              git-core make gcc gcc-gnat gprbuild binutils findutils gawk sed \
+              python3 python3-pyyaml xorriso grub2-tools grub2-tools-extra \
+              grub2-pc-modules mtools qemu-img qemu-system-x86-core \
+              curl unzip
+
+      - uses: actions/checkout@v4
+
+      # idle needs Syn next to it.  Alire builds idle with the GNAT that is
+      # installed above.
+      - name: Build idle
+        run: |
+          curl -sSfL -o alr.zip "https://github.com/alire-project/alire/releases/download/v${ALIRE_VERSION}/alr-${ALIRE_VERSION}-bin-x86_64-linux.zip"
+          unzip -q alr.zip -d "$HOME/alire"
+          export PATH="$HOME/alire/bin:$PATH"
+          alr settings --global --set toolchain.assistant false
+          git clone https://github.com/blancolioni/syn ../syn
+          git -C ../syn checkout "$SYN_REF"
+          git clone https://github.com/blancolioni/idle ../idle
+          git -C ../idle checkout "$IDLE_REF"
+          (cd ../idle && alr --non-interactive build)
+          echo "IDLE=$(realpath ../idle)/bin/idle" >> "$GITHUB_ENV"
+
+      - name: Check the build requirements
+        run: make check-env
+
+      - name: Build
+        run: ./clean-build.sh
+
+      - name: Boot test
+        run: make test
+
+      - name: Keep the logs of a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: |
+            logs
+            /tmp/rose-test.*/serial
+            /tmp/rose-test.*/qemu.log
+          if-no-files-found: ignore

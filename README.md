@@ -17,7 +17,7 @@ these packages:
 
 ```
 sudo dnf install make binutils python3 python3-pyyaml xorriso grub2-tools \
-    grub2-pc-modules mtools qemu-img
+    grub2-tools-extra grub2-pc-modules mtools qemu-img
 ```
 
 To boot the result you'll want `qemu-system-x86`.  To test under Bochs as
