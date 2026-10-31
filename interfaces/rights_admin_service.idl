@@ -1,0 +1,2 @@
+role Rights_Admin_Service : Rights_Admin
+  with Category => "rights";

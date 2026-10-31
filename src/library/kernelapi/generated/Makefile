@@ -9,14 +9,15 @@ IDL=cap block_device file_system directory file \
     timeout timer constructor cap_set terminal event_source event_listener \
     commands map heap receiver named kernel_process kernel_log log_reader \
     command_endpoint restorable output_redirect auth auth_admin checkpointer \
-    clock clock_admin
+    clock clock_admin rights rights_admin
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
 # package of the core commands. They are checked with the interfaces, but
 # nothing is generated for them here; each command generates its own units.
 
 COMMANDS=rose-core standard_input standard_output standard_error standard_io \
-    create_endpoint delete_cap rescind_cap find_command console timer_service clock_service
+    create_endpoint delete_cap rescind_cap find_command console timer_service clock_service \
+    clock_admin_service rights_admin_service
 
 IDLE ?= idle
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)

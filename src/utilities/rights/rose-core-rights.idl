@@ -1,0 +1,19 @@
+command Rose.Core.Rights
+  : Create_Endpoint, Standard_Output, Clock_Admin_Service
+  with Summary     => "Serve the rights broker.",
+       Description => """
+          Rights is the rights broker (ADR 0021). It holds the caps that
+          grant authority, which init gives it as the roles that it
+          declares, and gives one out only if its policy allows the user
+          who asks for it. It returns its Rights interface, which petal
+          asks for authority, and its Rights_Admin interface, which sets
+          the policy. It then keeps serving them.
+          """,
+       Server      => Rights_Server.Start_Server,
+       Live
+is
+   Rights : out Rights
+     with Help => "the Rights interface, for asking for authority";
+   Admin : out Rights_Admin
+     with Help => "the Rights_Admin interface, for setting the policy";
+end Rose.Core.Rights;

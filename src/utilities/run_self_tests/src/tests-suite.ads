@@ -8,6 +8,7 @@ with Tests.Finalization;
 with Tests.Heap;
 with Tests.Invalid_Caps;
 with Tests.Memory;
+with Tests.Rights;
 with Tests.Secondary_Stack;
 with Tests.Server;
 with Tests.Smoke;
@@ -35,6 +36,7 @@ package Tests.Suite is
                    Tests.Users.User_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
+                   Tests.Rights.Rights_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
                    Tests.Memory.Copy_Test'Access);

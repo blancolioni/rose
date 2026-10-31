@@ -258,6 +258,28 @@ Used by:: `init`, which launches it on a first boot and creates the first user, 
 * *The users are a list in the process's memory,* so they persist with it.
 * *Only `init` holds `Auth_Admin`* until the installer asks for the first user (#456).
 
+=== `rights`
+
+The rights broker (ADR 0021, #549): it holds the caps that grant authority, and gives one out only if its policy allows the user who asks.
+
+Provides:: `Rights`, whose `Request` asks for the authority of a role and `Finish` ends a grant; and `Rights_Admin`, whose `Allow` sets the policy.
+Requests:: `Create_Endpoint`, `Standard_Output` and the privileged roles that it holds (`Clock_Admin_Service`, so far), as roles of its command declaration.
+Used by:: nothing yet. `init` will launch it and give the first user their policy (#550), and `petal` will ask it for a command's privileged roles (#551).
+
+* *A policy is a mode for a user and a category:* `none` (the default), `elevate`, which is for a launch under `sudo`, and `granted`, for any launch.
+  A policy for a category covers the categories below it (`hardware` covers `hardware.ports`), `*` covers all of them, and the most specific policy wins.
+* *The user is who the `User` cap says.* The broker asks the cap its name.
+  A cap can't be forged, and holding it is being that user.
+* *A grant is a proxy that the broker serves.* There is no operation yet to derive a revocable cap from an arbitrary one, so the cap that `Request` returns is the broker's own endpoint for the role's interface, which forwards each call to the cap that it holds.
+  `Finish` marks the grant revoked, and a call through a revoked grant answers 0 and does nothing.
+  Grants are never numbered again, so a copy of a revoked grant stays dead.
+* *Failures are results, not exceptions.* A server of the kernel target has no exception handler, so an exception in an operation ends the server.
+  `Request` returns no cap, `Allow` returns 0, and a revoked proxy answers 0.
+* *Only the user that a grant was made to can end it.*
+* *A restore revokes every grant,* because elevation comes from an authentication, and a restore ends authentication (ADR 0018).
+* *It writes a line to standard output for every request,* with the user, the role, its category, whether it was under `sudo`, and whether it was granted.
+* *The policy and the grants are in the process's memory,* so they persist with it.
+
 === `terminal`
 
 The source of this driver is in `src/drivers`, but the build does not include it.

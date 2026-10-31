@@ -2,6 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-30
+- **Amended by:** #549, where the grants are proxies and not derived caps, a server of the kernel target can't fail a call by raising, and `*` covers every category (sections 3 and 4)
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands and roles), [ADR 0003](0003-directories-files-and-users.md) (users), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes), [ADR 0018](0018-credentials-after-restore.md) (credentials after a restore), [ADR 0020](0020-clock.md) (the clock), #494 (the clock), #455 (auth), #457 (login), #458 (petal), blancolioni/idle#63 (`Boolean` in operations)
 
 ## Context
@@ -36,7 +37,7 @@ role Clock_Admin_Service : Clock_Admin with Category => "time";
 ```
 
 - **A role with no category is public.** It is what every role is today. Anyone's command can have it, and petal binds it from the caps it holds.
-- **A category is a name, with dots for parts.** `time`, `accounts`, `hardware.ports`, `storage.log`. A policy for a category covers the names below it (`hardware` covers `hardware.ports`), and the most specific policy wins. A role has one category.
+- **A category is a name, with dots for parts.** `time`, `accounts`, `hardware.ports`, `storage.log`. A policy for a category covers the names below it (`hardware` covers `hardware.ports`), a policy for `*` covers every category, and the most specific policy wins. A role has one category.
 - **The IDL compiler records it** in the command's metadata, as a `category` line for the role next to its `cap` line, so that petal, `--help` and anything else that reads a signature can see it before launch.
 - **The compiler doesn't know what a category means.** It checks the syntax. What a category allows is the policy's business (section 4).
 - **A command that inherits a role inherits its category.** A command with two categorised roles has both.
@@ -51,14 +52,14 @@ Petal binds a public role from the caps it holds, as now. For a categorised role
 - **`sudo COMMAND ARGUMENTS` is a petal built-in.** It removes `sudo`, finds `COMMAND` as usual, and launches it exactly as it would, but asks the broker with `Elevate` true for each categorised role. A command with only public roles runs as it would without it.
 - **`sudo` is not a program,** so there is nothing that holds more authority than petal and runs on behalf of a user, and the command is launched by the same code that launches every command.
 - **Petal hands the caps to the command and deletes its own copies.** They are held by the job and nowhere else in the session, and cross its membrane like any other cap (ADR 0002).
-- **When the command exits,** petal tells the broker, which rescinds the derived cap (ADR 0001). A copy that the command passed on stops working too.
+- **When the command exits,** petal tells the broker, which revokes the grant. A copy that the command passed on stops working too, because the proxy refuses it.
 
 ### 3. The broker
 
 A new persistent server, **rights**, holds the caps that grant authority and decides who gets them.
 
 - **It is a command, launched by init like `auth`.** It declares the categorised roles that it holds: `Clock_Admin_Service`, and later one for each privileged cap. Init is the only process that has the originals, from the installer and the kernel, so privileged caps go from their source to init to the broker, and no further.
-- **Its table is its declaration.** Each role's interface and category come from the IDL, so they are checked when it is built.
+- **Its roles are its declaration.** Each role's interface and category are in the IDL, where petal reads them. The metadata that holds them is a section of the executable that isn't loaded into the process, so the broker has its own table of roles and categories in its code. The broker's table is the one that decides, and petal's reading is only for early refusal and help.
 - **Persistent,** so that its policy and its table of grants are in each checkpoint, and the caps that other persistent processes hold to it stay valid.
 
 It has two interfaces, with different holders.
@@ -66,27 +67,33 @@ It has two interfaces, with different holders.
 ```
 interface Rights is
 
-   function Request
-     (User    : interface User;
-      Role    : String;
-      Elevate : Word)
-      return Capability;
-   --  A cap for Role, derived from the broker's own, or none.
+   procedure Request
+     (User      : interface User;
+      Role_Name : String;
+      Elevate   : Word;
+      Grant     : out Word;
+      Granted   : out Capability);
+   --  A cap for the role, or none, and which grant it is.
    --  Elevate is 1 under sudo. (A Boolean when blancolioni/idle#63 is
    --  done.)
 
-   procedure Release (Grant : Capability);
-   --  The command that was given Grant has finished.
+   procedure Finish
+     (User  : interface User;
+      Grant : Word);
+   --  The command that was given Grant has finished. It does nothing
+   --  unless User is who the grant was made to.
 
 end Rights;
 
 interface Rights_Admin is
 
-   procedure Allow
+   function Allow
      (User     : String;
       Category : String;
-      Mode     : Word);
-   --  Set how a user may get a category (section 4).
+      Mode     : Word)
+      return Word;
+   --  Set how a user may get a category (section 4). The result is 1 if
+   --  it was set.
 
 end Rights_Admin;
 ```
@@ -94,7 +101,8 @@ end Rights_Admin;
 - **`Rights` goes to petal,** through login, as the clock cap does. It is a public role.
 - **`Rights_Admin` is a categorised role,** `Category => "rights"`, so changing who may do what is itself something that a user has to be allowed to do, and has to elevate for.
 - **The user is who `User` says.** The broker asks the `User` cap its name. A cap can't be forged, and holding it is being that user (ADR 0003), so petal doesn't have to be trusted about who is asking.
-- **A grant is a derived cap** (ADR 0001, layer 1). The broker keeps the list of live grants, so that it can rescind each of them.
+- **A grant is a proxy that the broker serves.** There is no operation yet to derive a revocable cap from an arbitrary one (only ports and interrupts have a derive), so the cap that `Request` returns is the broker's own endpoint for the role's interface, with an identifier for the grant, and it forwards each call to the cap that the broker holds. The broker keeps the list of live grants, and revokes one by refusing its calls. Identifiers are never used again, so a copy of a revoked grant stays dead. This needs a proxy in the broker for each privileged interface, which for now is written by hand.
+- **Failures are results, not exceptions.** A server of the kernel target has no exception handler, so an exception in an operation ends the server. `Request` returns no cap, `Allow` returns 0, and a call through a revoked grant answers 0 and does nothing. A server of the user target turns an exception into an error reply, but its objects are fixed in number, which doesn't suit a grant for each command.
 
 ### 4. Policy
 
@@ -113,7 +121,7 @@ A policy is a **mode** for a user and a category:
 
 ### 5. Restore ends elevation
 
-The broker is `Restorable` (ADR 0004). On `Restored` it rescinds every live grant, before it handles any other request.
+The broker is `Restorable` (ADR 0004). On `Restored` it revokes every live grant, before it handles any other request.
 
 - **Elevation is derived from an authentication,** and a restore ends authentication (ADR 0018), so the authority that it granted ends too.
 - **A job that was running under `sudo` loses its privileged caps.** Its next use of one fails with `Invalid_Capability`. A long job has to be run again under `sudo`.
