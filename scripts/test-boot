@@ -1,0 +1,59 @@
+#!/bin/sh
+# Boot test of the whole system, under QEMU.
+#
+#   scripts/test-boot [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test:
+#
+#   1. installs Rose on a new disk, and waits for the install to finish;
+#   2. boots from the disk, which restores the checkpoint, logs in as the
+#      first user, and runs run_self_tests, which has to pass every test;
+#   3. waits for a checkpoint, stops the machine, and runs check-log.py on
+#      the disk, which has to find the checkpoint log consistent.
+#
+# It takes about ten minutes, and needs qemu-system-i386, qemu-img and
+# python3. It exits with 0 if everything passed, and keeps the disk image
+# and QEMU's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+install_rose "$ISO"
+
+echo "Booting from the disk, which restores the install's checkpoint"
+start_qemu
+log_in
+
+echo "Running the self tests"
+# The restored screen can still show the install's test result.
+type_text "clear
+"
+sleep 5
+type_text "run_self_tests
+"
+wait_for "Test result:" 120 || fail "the self tests did not finish"
+result=$(screen | grep "Test result:" | tail -1)
+echo "$result"
+set -- $(echo "$result" \
+    | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+[ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
+    || fail "not every self test passed"
+
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" || {
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "PASS"
