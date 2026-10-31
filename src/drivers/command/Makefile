@@ -1,4 +1,5 @@
-ARCH=i686
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: command
 	cp ./build/bin/command ../../../build/$(ARCH)/drivers/command

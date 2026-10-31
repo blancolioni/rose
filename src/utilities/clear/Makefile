@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: clear
 	cp ./build/bin/clear-driver ../../../build/$(ARCH)/drivers/clear

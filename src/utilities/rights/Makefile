@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: rights
 	cp ./build/bin/rights-driver ../../../build/$(ARCH)/drivers/rights
