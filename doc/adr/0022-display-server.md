@@ -24,15 +24,22 @@ A `display` server is installed like the other drivers, and its `.driver` file a
 
 The boot code asks GRUB for a 32-bit graphics mode and passes the framebuffer's address, pitch and size on to the driver (#582). If no framebuffer is offered, there is no display server, and `vga-console` runs as it does today.
 
+**The server draws on a root surface.** It is written against one surface, which it draws into and takes its input from, and that surface has the same interface as the ones it gives to its clients (section 2). On the hardware, the server makes the root itself, from the framebuffer cap and the keyboard and pointer streams (sections 3 and 4). A display server can also be given a surface from another display server, and then it draws into that, and takes keys and pointer events from the surface's event stream. That is nesting. It gives:
+
+- **Headless tests** (#587): a surface backed by plain memory, with scripted events, stands in for the screen.
+- **Sandboxing:** the windows of an untrusted client can live in a surface of their own. The client sees a screen, and the parent sees one surface.
+
 ### 2. Clients draw into surfaces
 
 A client asks the display server for a *surface* and gets a cap to it. A surface is:
 
 - **A pixel buffer**, always 32-bit XRGB, in memory that the client and the server both map. The client draws into it with whatever it likes (the drawing library, #579). The server converts if the framebuffer's format differs.
 - **`Damage (X, Y, Width, Height)`**, a call by which the client says that it has changed a region. The server copies that region to the screen. A surface that never calls it is never redrawn after the first time.
-- **An event stream** (ADR 0013), from the server to the client. It carries key events, a change of focus, and a change of size. After a size change the client asks the surface for its buffer again.
+- **An event stream** (ADR 0013), from the server to the client. It carries key events, pointer events (section 4), a change of focus, and a change of size. After a size change the client asks the surface for its buffer again.
 
 A client holds the caps to its own surface, so it can draw only there and can't see another client's pixels. How the buffer is shared depends on banks (ADR 0014). Until they exist, the server creates the buffer with the memory server and gives the client a cap that maps it.
+
+**A window has an environment, and the display server doesn't look inside it.** The environment is a set of caps: the surface, which the display server provides, and whatever else the creator of the window adds (a directory, say). The creator gives the environment to whatever manages the window. That might be a terminal client running petal, a drawing program, or anything else that can use a surface. The display server doesn't know which, and nothing about a surface mentions petal or commands.
 
 ### 3. The server owns the keyboard
 
@@ -82,7 +89,7 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 
 - **Port X (Xfbdev) or Nano-X.** Both need sockets and `fork`, and X gives every client the screen and the keyboard.
 - **Port Wayland.** It is closer to this design, since clients render into buffers, and it still wants sockets, `mmap` and `dmabuf`.
-- **A Plan 9 style draw device.** Clients send drawing commands, and the server draws. This keeps the drawing code in one place, and the interface to it is large. Drawing into a shared buffer is simpler, and leaves clients free to use any renderer.
+- **A Plan 9 style draw device** (`/dev/draw`, with rio on top). Clients send drawing commands, and the server holds the images and does the drawing and the fonts. The structure is close to this one: a server multiplexes the screen, the keyboard and the pointer, and a window sees only what it is given. It differs in where the pixels live. A draw-command server keeps every image in the server, so the checkpoint would have to save them, and it needs masks, compositing and fonts in the server. Pixel buffers in client memory come back with the client at restore, and the client can use any renderer. What this ADR takes from Plan 9 is that a window gets only its own slice of the devices, and that a window system can run inside another one (nesting, section 1). A draw-command layer for remote clients could be added later on top of the shared buffer.
 - **Let clients draw straight to the framebuffer,** with the server arbitrating regions. A client would then hold a cap to the whole framebuffer, so one client could draw over the others.
 - **Overlapping windows now.** They need clipping, damage tracking between windows and a stacking order. A tiled layout needs none, and floating windows can be added on the same surface interface.
 - **A pointer cap for clients.** It would let every client read the pointer's position everywhere, as X does.
@@ -90,6 +97,8 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 ## Open questions
 
 - **The pixel format** if the mode GRUB gives isn't 32-bit. The server could convert, or refuse the mode.
+- **Who creates a window.** The key chord for a new window has to start something. The server probably holds a cap to a launcher, which makes the environment and starts what manages the window. What the launcher is, and where it comes from, is not decided here.
+- **Nested cursors.** The parent draws a cursor over the surface, and the nested server draws its own inside it.
 - **The cursor.** A software cursor needs the pixels under it saved and restored, or redrawn with each composed frame. Which is simpler depends on how the server composes.
 - **Other pointers.** USB mice and touch need a USB stack, which Rose doesn't have. The pointer interface should not assume PS/2.
 - **Vsync and tearing.** Copying while the display scans out can tear, and nothing in Rose gives a vertical blank.
