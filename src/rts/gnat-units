@@ -274,3 +274,13 @@ a-strbou.ads
 a-strbou.adb
 a-strunb.ads
 a-strunb.adb
+
+# Ada.Text_IO (#557), with System.File_IO, which it uses. Rose's own
+# Interfaces.C_Streams and System.OS_Lib, in src/adainclude, are what they
+# stand on.
+a-textio.ads
+a-textio.adb
+s-fileio.ads
+s-fileio.adb
+s-ficobl.ads
+a-tigeli.adb

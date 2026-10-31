@@ -94,21 +94,17 @@ package body Petal.Read is
          Put ("petal> ");
          Flush;
 
-         Get_Line (Line.all, Last);
-
          --  An end of file ends the session: petal logs out, and its
          --  command completes, so that login asks for the next user
-         --  (#458). A line typed before it is run first.
+         --  (#458).
 
          if End_Of_File then
             New_Line;
-            if Last > 0 then
-               Execute (Line (1 .. Last));
-            end if;
             Put_Line ("logout");
             exit;
          end if;
 
+         Get_Line (Line.all, Last);
          Execute (Line (1 .. Last));
       end loop;
    end Reader_Loop;
