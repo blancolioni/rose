@@ -32,13 +32,19 @@ all: idl rts rose hdd doc
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose check-env rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose check-env test rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso floppy finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
 # Check the tools before building anything; clean-build.sh does this first.
 check-env:
 	sh ./scripts/check-env
+
+# Boot the ISO under QEMU, run the self tests, and check the checkpoint log.
+# This doesn't build anything, so run "make" first.  It takes about ten
+# minutes.
+test:
+	sh ./scripts/test-boot
 
 rts:
 	(cd rts; make)

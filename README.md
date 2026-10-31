@@ -46,9 +46,10 @@ git clone https://github.com/blancolioni/idle
 IDLE=$PWD/idle/bin/idle sh ./clean-build.sh
 ```
 
-A bootable iso is created in the images directory.  `make hdd` creates a
-blank hard disk image there too, and `make all` builds everything,
-including the book.
+A bootable iso is created in the images directory.  `make test` boots it
+under QEMU, runs the self tests, and checks the checkpoint log; it needs
+`qemu-system-x86`.  `make hdd` creates a blank hard disk image there too, and
+`make all` builds everything, including the book.
 
 ## Status
 

@@ -43,9 +43,10 @@ CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 2
+STORE_TABLE_VERSION = 3
 REGIONS_PER_PAGE = PAGE_SIZE // 32
-FRESH_BITS_PER_PAGE = PAGE_SIZE * 8
+MAP_ENTRIES_PER_PAGE = PAGE_SIZE // 16
+PAGES_PER_BLOCK = 4
 
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 1
@@ -53,7 +54,7 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 8
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 3
+KERNEL_TABLE_VERSION = 4
 MAX_SAVED_INTERRUPTS = 32
 PROCESS_RECORD_MAGIC = 0x50524F4345535331
 CAPS_PER_PAGE = PAGE_SIZE // 20
@@ -136,7 +137,7 @@ def check_kernel_tables(log, first, last, verbose):
         return False, ("location %d: expected the kernel's tables, found %s"
                        % (first, describe_page(page))), 0, oids
     version = u32(page, 8)
-    if version not in (2, KERNEL_TABLE_VERSION):
+    if not 2 <= version <= KERNEL_TABLE_VERSION:
         return False, "kernel tables version %d" % version, 0, oids
     page_count = u32(page, 12)
     process_count = u32(page, 16)
@@ -179,7 +180,8 @@ def check_kernel_tables(log, first, last, verbose):
         return False, "kernel tables: %d interrupts" % interrupt_count, \
             0, oids
 
-    # Version 3 has the next object id before the interrupts.  It must be
+    # Version 3 has the next object id before the interrupts, and version 4
+    # the FPU state in each process record, which isn't checked.  It must be
     # a process's object id, past every saved process's.
     next_oid = None
     interrupts_offset = 24
@@ -210,68 +212,66 @@ def check_kernel_tables(log, first, last, verbose):
 
 
 def check_store_tables(log, first, last, verbose):
-    """Check the storage server's region table, which starts at page
-    first.
+    """Check the storage server's region table and map, which start at
+    page first.
 
     Returns (ok, description, page count, set of (base, bound))."""
     regions = set()
     page = log.page(first)
     if page is None or first > last or u64(page, 0) != STORE_TABLE_MAGIC:
         return False, ("location %d: expected the storage server's tables, "
-                       "found %s" % (first, describe_page(page or b""))), \
-            0, regions
-    version = u32(page, 8)
-    if version not in (1, STORE_TABLE_VERSION):
+                       "found %s" % (first, describe_page(page or b""))),             0, regions
+    next_page = u64(page, 8)
+    version, page_count, region_count, map_pages, map_entries =         struct.unpack_from("<IIIII", page, 16)
+    if version != STORE_TABLE_VERSION:
         return False, "storage tables version %d" % version, 0, regions
-    page_count = u32(page, 12)
-    region_count = u32(page, 16)
-    fresh_pages = u32(page, 20) if version >= 2 else 0
     region_pages = (region_count + REGIONS_PER_PAGE - 1) // REGIONS_PER_PAGE
-    if page_count != 1 + region_pages + fresh_pages \
-            or first + page_count - 1 > last:
+    if map_pages != (map_entries + MAP_ENTRIES_PER_PAGE - 1)             // MAP_ENTRIES_PER_PAGE             or page_count != 1 + region_pages + map_pages             or first + page_count - 1 > last:
         return False, ("storage tables: %d pages for %d regions and %d "
-                       "fresh pages"
-                       % (page_count, region_count, fresh_pages)), 0, regions
+                       "map entries (%d map pages)"
+                       % (page_count, region_count, map_entries,
+                          map_pages)), 0, regions
 
     indices = set()
-    space_pages = 0
+    roots = {}
     for i in range(region_count):
         record = log.page(first + 1 + i // REGIONS_PER_PAGE)
-        index, device, base, bound, alloc_index, alloc_banks = \
-            struct.unpack_from("<IIQQII", record,
+        index, root, base, bound, blocks, _ =             struct.unpack_from("<IIQQII", record,
                                (i % REGIONS_PER_PAGE) * 32)
-        if index == 0 or index in indices or bound < base or device == 0:
-            return False, ("storage region %d of %d: index %d, device %d, "
-                           "pages %x..%x"
-                           % (i + 1, region_count, index, device, base,
-                              bound)), 0, regions
+        if index == 0 or index in indices or bound < base or bound > next_page:
+            return False, ("storage region %d of %d: index %d, pages "
+                           "%x..%x, next page %x"
+                           % (i + 1, region_count, index, base, bound,
+                              next_page)), 0, regions
         indices.add(index)
+        roots[index] = root
         regions.add((base, bound))
-        if alloc_index:
-            space_pages += bound - base
         if verbose:
-            print("    region %3d: %x..%x%s"
-                  % (index, base, bound,
-                     " space %d+%d" % (alloc_index, alloc_banks)
-                     if alloc_index else " subregion"))
+            print("    region %3d: %x..%x, %d blocks%s"
+                  % (index, base, bound, blocks,
+                     "" if root == index else " subregion of %d" % root))
+    for index, root in roots.items():
+        if root not in indices:
+            return False, ("storage region %d is a subregion of region %d, "
+                           "which is not in the tables" % (index, root)),                 0, regions
 
-    fresh = ""
-    if version >= 2:
-        if fresh_pages != (space_pages + FRESH_BITS_PER_PAGE - 1) \
-                // FRESH_BITS_PER_PAGE:
-            return False, ("storage tables: %d fresh pages for %d pages "
-                           "of regions" % (fresh_pages, space_pages)), \
-                0, regions
-        count = 0
-        for i in range(fresh_pages):
-            bits = log.page(first + 1 + region_pages + i)
-            count += sum(bin(b).count("1") for b in bits)
-        fresh = ", %d of %d pages fresh" % (count, space_pages)
+    mapped = set()
+    for i in range(map_entries):
+        record = log.page(first + 1 + region_pages
+                          + i // MAP_ENTRIES_PER_PAGE)
+        page_id, block, fresh = struct.unpack_from(
+            "<QII", record, (i % MAP_ENTRIES_PER_PAGE) * 16)
+        if page_id in mapped                 or fresh >= 1 << PAGES_PER_BLOCK                 or not any(base <= page_id < bound
+                           for base, bound in regions):
+            return False, ("storage map entry %d of %d: page %x, block %d, "
+                           "fresh %x"
+                           % (i + 1, map_entries, page_id, block,
+                              fresh)), 0, regions
+        mapped.add(page_id)
 
-    return True, ("storage: %d region%s%s"
+    return True, ("storage: %d region%s, %d mapped block%s"
                   % (region_count, "" if region_count == 1 else "s",
-                     fresh)), \
-        page_count, regions
+                     map_entries, "" if map_entries == 1 else "s")),         page_count, regions
 
 
 def check_mem_tables(log, first, last, regions, verbose):
