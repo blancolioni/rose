@@ -11,4 +11,12 @@ is
    function Create_Directory
      (Name : String) return interface Writable_Directory;
 
+   procedure Rename
+     (From : String;
+      To   : String);
+   --  Give the entry From the name To. Only the entry changes: the file
+   --  or directory is the same, so caps to it keep working. It fails if
+   --  From is not an entry, or if To is already one, or is empty or too
+   --  long.
+
 end Writable_Directory;
