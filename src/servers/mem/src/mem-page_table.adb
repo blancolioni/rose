@@ -1,5 +1,7 @@
 with Rose.Console_IO;
+with Rose.Limits;
 with Rose.Objects;
+with Rose.Trace;
 
 with Mem.Calls;
 with Mem.Page_Cache;
@@ -7,8 +9,6 @@ with Mem.Physical_Map;
 with Mem.Processes;
 
 package body Mem.Page_Table is
-
-   --  Max_Mapped_Pages : constant := 65536;
 
    type Mapped_Page_Record is
       record
@@ -27,12 +27,11 @@ package body Mem.Page_Table is
    type Mapped_Page_Array is array (Cursor range <>) of Mapped_Page_Record
      with Pack;
 
-   Mapped_Pages     : Mapped_Page_Array (1 .. 2000);
-   --  Sorted_Pages     : array (1 .. 2000) of Cursor;
+   Mapped_Pages     : Mapped_Page_Array (1 .. Rose.Limits.Max_Mapped_Pages);
    Mapped_Page_Last : Cursor := 0;
    Free_Count       : Natural := 0;
 
-   Dirty_Pages     : array (1 .. 2000) of Cursor;
+   Dirty_Pages     : array (1 .. Rose.Limits.Max_Mapped_Pages) of Cursor;
    Dirty_Page_Last : Natural := 0;
 
    -----------------------
@@ -153,6 +152,14 @@ package body Mem.Page_Table is
       if Position = 0 then
          if Mapped_Page_Last = Mapped_Pages'Last then
             Rose.Console_IO.Put_Line ("mem: too many mapped pages");
+
+            --  The page is mapped already, so it is now one that mem
+            --  doesn't track, and a later fault on it will fail its
+            --  process. Say so in the kernel's log, which the console
+            --  messages of a restored system don't reach.
+
+            Rose.Trace.Event
+              ("mem: too many mapped pages, process", Natural (Process));
             return;
          end if;
 
