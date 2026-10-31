@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: vga_console
 	cp ./build/bin/vga-console ../../../build/$(ARCH)/drivers/vga-console

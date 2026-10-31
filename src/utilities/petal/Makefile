@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: petal
 	cp ./build/bin/petal-driver ../../../build/$(ARCH)/drivers/petal

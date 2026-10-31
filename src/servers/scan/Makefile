@@ -1,11 +1,8 @@
-ARCH=i686
+ROOT=../../..
+include $(ROOT)/mk/common.mk
+
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/scan.reloc.o
-GCC=gcc
-DEFINES=
-GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
-UTIL=../../library/util.c
-CFILES=$(UTIL)
 STREAM_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o
@@ -53,7 +50,7 @@ all: scan $(RELOC)
 scan:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild --RTS=../../../rts/build/i686
+	gprbuild --RTS=$(KERNEL_RTS)
 
 $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g

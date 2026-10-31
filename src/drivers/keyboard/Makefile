@@ -1,4 +1,5 @@
-ARCH=i686
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: keyboard
 	cp ./build/bin/keyboard ../../../build/$(ARCH)/drivers/keyboard

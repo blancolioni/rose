@@ -1,6 +1,5 @@
-ARCH=i686
-IDLE ?= idle
-INTERFACES=../../../interfaces
+ROOT=../../..
+include $(ROOT)/mk/common.mk
 
 all: touch
 	cp ./build/bin/touch-driver ../../../build/$(ARCH)/drivers/touch
