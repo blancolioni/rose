@@ -148,6 +148,30 @@ package body Rose.Clock.Calendar is
       end;
    end To_Date_Time;
 
+   ----------------
+   -- To_Elapsed --
+   ----------------
+
+   function To_Elapsed
+     (Nanoseconds : Rose.Words.Word_64)
+      return Elapsed_Time
+   is
+      Total_Seconds : Word_64;
+      Nanosecond    : Word_32;
+      Days          : Word_64;
+      Day_Seconds   : Word_32;
+   begin
+      Divide (Nanoseconds, Nanoseconds_Per_Second, Total_Seconds, Nanosecond);
+      Divide (Total_Seconds, Seconds_Per_Day, Days, Day_Seconds);
+
+      return
+        (Days       => Natural (Days),
+         Hours      => Natural (Day_Seconds) / 3_600,
+         Minutes    => Natural (Day_Seconds) mod 3_600 / 60,
+         Seconds    => Natural (Day_Seconds) mod 60,
+         Nanosecond => Natural (Nanosecond));
+   end To_Elapsed;
+
    --------------------
    -- To_Nanoseconds --
    --------------------

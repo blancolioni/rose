@@ -84,6 +84,17 @@ package body Tests.Clock is
       Check (13_574_563_200, (2400, 2, 29, 0, 0, 0, 0), Tuesday);
       Check (18_429_292_799, (2553, 12, 31, 23, 59, 59, 0), Monday);
 
+      --  A length of time, as days, hours, minutes and seconds.
+
+      if To_Elapsed (0) /= (0, 0, 0, 0, 0)
+        or else To_Elapsed (59_999_999_999) /= (0, 0, 0, 59, 999_999_999)
+        or else To_Elapsed (90_061_500_000_000) /= (1, 1, 1, 1, 500_000_000)
+        or else To_Elapsed (Nanoseconds (86_400 * 365)).Days /= 365
+      then
+         Passed := False;
+         Ada.Text_IO.Put (": elapsed time");
+      end if;
+
       --  A fraction of a second is kept.
 
       if To_Date_Time (Nanoseconds (1) + 123_456_789).Nanosecond
