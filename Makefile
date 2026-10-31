@@ -13,7 +13,13 @@ NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock
 UTILITIES=echo list cat touch mkdir clear date user auth login run_self_tests petal
-BOOT_MODULES=init console store mem pci ata isofs restore scan partition elf timer caps checkpoint log
+
+# The boot modules are the ones boot.yaml lists (#374), which is also where
+# the GRUB menus' module2 lines come from.
+BOOT_MODULES := $(shell python3 scripts/make-init --list-modules src/servers/init/boot.yaml)
+ifeq ($(BOOT_MODULES),)
+$(error no boot modules: scripts/make-init --list-modules printed nothing)
+endif
 
 rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk hdd iso finished
 

@@ -8,6 +8,10 @@ rewritten to load the description's modules in its order; a file is
 only written if it changes.
 
 Usage: make-init -o OUTDIR [--root DIR] [--no-grub] DESCRIPTION
+       make-init --list-modules DESCRIPTION
+
+--list-modules prints the names of the boot modules, which the Makefile
+uses to know which servers to build.
 """
 
 import argparse
@@ -573,7 +577,10 @@ def rewrite_grub(path, modules):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("-o", dest="outdir", required=True)
+    parser.add_argument("-o", dest="outdir")
+    parser.add_argument("--list-modules", action="store_true",
+                        help="print the names of the boot modules, "
+                        "one per line, and stop")
     parser.add_argument("--root", default=".",
                         help="the Rose tree, for paths in the description")
     parser.add_argument("--no-grub", action="store_true",
@@ -583,6 +590,14 @@ def main():
 
     with open(args.description) as f:
         description = yaml.safe_load(f)
+
+    if args.list_modules:
+        for entry in description["modules"]:
+            print(Module(entry).name)
+        return
+
+    if args.outdir is None:
+        parser.error("-o is required")
 
     init_caps = read_init_caps(
         os.path.join(args.root, "src/base/rose-init_capabilities.ads"))

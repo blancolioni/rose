@@ -1,14 +1,14 @@
 #!/bin/sh
+# Dump the kernel, and everything the build put in the modules and drivers
+# directories, to logs/.  The drivers directory also holds the utilities.
+# There are no lists here: a program that is built is dumped, and a file
+# that can't be dumped stops the script.
+set -e
 objdump -d -S -f -h -t build/i686/i686-unknown-rose > ./logs/rose-objdump.txt
-for module in init console mem pci ata isofs restore scan store partition elf checkpoint log
-do objdump -d -S -f -h -t build/i686/modules/$module > ./logs/rose-$module-objdump.txt
-   readelf -a build/i686/modules/$module > ./logs/rose-$module-elf.txt
-done
-for driver in exec command keyboard
-do objdump -d -S -f -h -t build/i686/drivers/$driver > ./logs/rose-$driver-objdump.txt
-   readelf -a build/i686/drivers/$driver > ./logs/rose-$driver-elf.txt
-done
-for binary in echo petal
-do objdump -d -S -f -h -t src/utilities/$binary/build/bin/$binary-driver > ./logs/rose-$binary-objdump.txt
-   readelf -a src/utilities/$binary/build/bin/$binary-driver > ./logs/rose-$binary-elf.txt
+for path in build/i686/modules/* build/i686/drivers/*
+do
+    test -f "$path" || { echo "export-elf-trace: no $path" >&2; exit 1; }
+    name=`basename $path`
+    objdump -d -S -f -h -t $path > ./logs/rose-$name-objdump.txt
+    readelf -a $path > ./logs/rose-$name-elf.txt
 done
