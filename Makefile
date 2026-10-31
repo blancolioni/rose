@@ -1,11 +1,12 @@
-ARCH=i686
+ROOT=.
+include $(ROOT)/mk/common.mk
+
 TARGET=$(ARCH)-unknown-rose
 ROSE=./build/$(TARGET)
 BUILDDIR=./build/$(ARCH)/kernel/obj
 MODULEDIR=./build/$(ARCH)/modules
 DRIVERDIR=./build/$(ARCH)/drivers
 RELOC=$(BUILDDIR)/rose.reloc.o
-GCC=gcc
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
 

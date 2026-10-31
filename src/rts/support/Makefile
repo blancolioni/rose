@@ -1,13 +1,12 @@
-ARCH=i686
+ROOT=../../..
+include $(ROOT)/mk/common.mk
+
 OS=rose
 TARGET=$(ARCH)-$(OS)
 BUILD=../build/$(TARGET)
 ADAINCLUDE=$(BUILD)/adainclude
 ADALIB=$(BUILD)/adalib
 OBJ=$(BUILD)/obj
-GCC=gcc
-DEFINES=
-GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib
 SOURCES=memchr.c memcmp.c memcpy.c memmove.c memset.c strlen.c rose-unwind.c
 OBJECTS=$(SOURCES:%.c=%.o) raise-gcc.o $(UNWIND_OBJECTS)
 
