@@ -276,6 +276,49 @@ package body Rose.System_Calls is
       return (others => <>);
    end Get_Buffer_Item;
 
+   --------------------
+   -- Get_Integer_32 --
+   --------------------
+
+   function Get_Integer_32
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Standard.Interfaces.Integer_32
+   is
+      use Rose.Words;
+      use type Standard.Interfaces.Integer_32;
+      Word : constant Word_32 := Get_Word_32 (Params, Index);
+   begin
+      --  A word above Integer_32'Last is negative: -Word is 2**32 - Word,
+      --  and one less than that is the magnitude, less one, which cannot
+      --  overflow.
+      if Word <= 16#7FFF_FFFF# then
+         return Standard.Interfaces.Integer_32 (Word);
+      else
+         return -Standard.Interfaces.Integer_32 (-Word - 1) - 1;
+      end if;
+   end Get_Integer_32;
+
+   --------------------
+   -- Get_Integer_64 --
+   --------------------
+
+   function Get_Integer_64
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Standard.Interfaces.Integer_64
+   is
+      use Rose.Words;
+      use type Standard.Interfaces.Integer_64;
+      Word : constant Word_64 := Get_Word_64 (Params, Index);
+   begin
+      if Word <= 16#7FFF_FFFF_FFFF_FFFF# then
+         return Standard.Interfaces.Integer_64 (Word);
+      else
+         return -Standard.Interfaces.Integer_64 (-Word - 1) - 1;
+      end if;
+   end Get_Integer_64;
+
    -------------------
    -- Get_Local_Cap --
    -------------------
@@ -716,6 +759,30 @@ package body Rose.System_Calls is
       Params.Control.Flags (Rose.Invocation.Error) := True;
       Params.Error := Error;
    end Send_Error;
+
+   ---------------------
+   -- Send_Integer_32 --
+   ---------------------
+
+   procedure Send_Integer_32
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Standard.Interfaces.Integer_32)
+   is
+   begin
+      Send_Word (Params, Rose.Words.Word_32'Mod (Value));
+   end Send_Integer_32;
+
+   ---------------------
+   -- Send_Integer_64 --
+   ---------------------
+
+   procedure Send_Integer_64
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Standard.Interfaces.Integer_64)
+   is
+   begin
+      Send_Word (Params, Rose.Words.Word_64'Mod (Value));
+   end Send_Integer_64;
 
    ----------------------
    -- Send_Native_Word --
