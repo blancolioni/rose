@@ -37,11 +37,9 @@ interface Surface : Resource is
    --     Kind 1, Key:      Kind, Code, State, 0
    --        Code and State are those of Keyboard_Handler.Handle_Key.
    --     Kind 2, Pointer:  Kind, X, Y, Buttons
-   --        X and Y are in the surface's pixels, as 32-bit two's
-   --        complement values. During a grab they can be negative, or
-   --        past the surface's size, when the pointer has left the
-   --        surface. Buttons is a mask with bit 0 the first button, bit 1
-   --        the second, and so on.
+   --        X and Y are as Get_Pointer gives them: in the surface's
+   --        pixels, as Integer_32 words. Buttons is the mask that
+   --        Get_Pointer gives.
    --     Kind 3, Focus:    Kind, Focused, 0, 0
    --        Focused is 1 when the surface has the keyboard, and 0 when
    --        it has lost it.
@@ -51,6 +49,21 @@ interface Surface : Resource is
    --  there are none. This is a byte stream until typed streams exist
    --  (ADR 0013, #140), when it becomes a stream of an event type with
    --  the same fields.
+
+   procedure Get_Pointer
+     (Over    : out Word;
+      X       : out Integer_32;
+      Y       : out Integer_32;
+      Buttons : out Word);
+   --  The pointer's position now, in the surface's pixels from its top
+   --  left, and the buttons that are down: a mask with bit 0 the first
+   --  button, bit 1 the second, and so on. Over is 1 if the pointer is
+   --  over the surface, or if the surface has a grab (a button went down
+   --  on it and is still down), and 0 if not. During a grab, X and Y can
+   --  be negative, or past the surface's size, when the pointer has left
+   --  the surface. If Over is 0, X, Y and Buttons are zero: a surface
+   --  can't learn where the pointer is when it is somewhere else. (Over is
+   --  a Boolean once the code that idle generates for one compiles.)
 
    procedure Set_Cursor (Shape : Cursor_Shape);
    --  The cursor to show while the pointer is over this surface. A
