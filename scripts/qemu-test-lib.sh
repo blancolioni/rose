@@ -56,6 +56,17 @@ wait_for () {
     return 1
 }
 
+wait_for_serial () {
+    # wait_for_serial TEXT SECONDS: wait until TEXT is in the serial log
+    waited=0
+    while [ $waited -lt "$2" ]; do
+        grep -q -- "$1" "$WORK/serial" 2> /dev/null && return 0
+        sleep 5
+        waited=$((waited + 5))
+    done
+    return 1
+}
+
 install_rose () {
     # install_rose ISO: install Rose on a new disk, and wait for the
     # install to finish
@@ -64,7 +75,13 @@ install_rose () {
 
     echo "Installing"
     start_qemu -boot d -drive file="$1",if=ide,index=1,media=cdrom
-    wait_for "install complete" 400 || fail "the install did not finish"
+
+    # When the install is complete, the system restarts from the disk.
+    # It says "install complete" on the screen first, but login can clear
+    # the screen before the message is seen, so wait for the kernel's
+    # restart in the serial log instead.
+    wait_for_serial "kernel: restarting" 400 \
+        || fail "the install did not finish"
     sleep 15
     stop_qemu
 }
