@@ -21,9 +21,12 @@ ifeq ($(BOOT_MODULES),)
 $(error no boot modules: scripts/make-init --list-modules printed nothing)
 endif
 
-rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk hdd iso finished
+# The default target builds a bootable ISO.  The hard disk image (hdd), the
+# book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-all: idl rts rose doc
+rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk iso finished
+
+all: idl rts rose hdd doc
 
 # None of these targets is a file.  Three of them (rts, interfaces and doc)
 # are also directory names, so without this make thinks they are up to date

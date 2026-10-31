@@ -15,17 +15,17 @@ The build scripts assume Fedora's file layout.  Install
 these packages:
 
 ```
-sudo dnf install make binutils python3 xorriso grub2-tools grub2-pc-modules \
-    mtools qemu-img
+sudo dnf install make binutils python3 python3-pyyaml xorriso grub2-tools \
+    grub2-pc-modules mtools qemu-img
 ```
 
 To boot the result you'll want `qemu-system-x86`.  To test under Bochs as
 well, install bochs and run `sh bochs/run-bochs.sh`.
 
-`clean-build.sh` also builds the book, which needs:
+`clean-build.sh --book` also builds the book, which needs:
 
 ```
-sudo dnf install python3-pyyaml asciidoctor rubygem-asciidoctor-pdf
+sudo dnf install asciidoctor rubygem-asciidoctor-pdf
 gem install --user-install asciidoctor-epub3
 ```
 
@@ -45,7 +45,9 @@ git clone https://github.com/blancolioni/idle
 IDLE=$PWD/idle/bin/idle sh ./clean-build.sh
 ```
 
-A bootable iso is created in the images directory.
+A bootable iso is created in the images directory.  `make hdd` creates a
+blank hard disk image there too, and `make all` builds everything,
+including the book.
 
 ## Status
 
