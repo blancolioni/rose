@@ -7,7 +7,7 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.Clock.Client;
-with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Launch;
 with Rose.Interfaces.Rights.Client;
 with Rose.Interfaces.Rights_Admin.Client;
 with Rose.Interfaces.User.Client;
@@ -22,9 +22,9 @@ package body Tests.Rights is
 
    Role : constant String := "Clock_Admin_Service";
 
-   None     : constant Rose.Words.Word := 0;
-   Elevate  : constant Rose.Words.Word := 1;
-   Granted  : constant Rose.Words.Word := 2;
+   None    : constant Rose.Words.Word := 0;
+   Elevate : constant Rose.Words.Word := 1;
+   Granted : constant Rose.Words.Word := 2;
    --  The modes of Rights_Admin.Allow.
 
    function Fail (Message : String) return Boolean;
@@ -41,30 +41,27 @@ package body Tests.Rights is
       return False;
    end Fail;
 
-   ----------------
+   -----------------
    -- Rights_Test --
-   ----------------
+   -----------------
 
    function Rights_Test return Boolean is
-      package Users renames Rose.Interfaces.User.Client;
-      package Policy renames Rose.Interfaces.Rights_Admin.Client;
-
-      Launcher : constant Rose.Interfaces.Launch.Client.Launch_Client :=
+      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Tests.Registry.Launcher ("rights");
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Endpoint : Rose.Capabilities.Capability;
       Params   : aliased Rose.Invocation.Invocation_Record;
 
       Rights   : Rose.Interfaces.Rights.Client.Rights_Client;
-      Admin    : Policy.Rights_Admin_Client;
-      Alice    : Users.User_Client;
-      Bob      : Users.User_Client;
+      Admin    : Rose.Interfaces.Rights_Admin.Client.Rights_Admin_Client;
+      Alice    : Rose.Interfaces.User.Client.User_Client;
+      Bob      : Rose.Interfaces.User.Client.User_Client;
 
       Grant    : Rose.Words.Word;
       Cap      : Rose.Capabilities.Capability;
 
       function Ask
-        (User : Users.User_Client;
+        (User : in out Rose.Interfaces.User.User_Object'Class;
          Sudo : Rose.Words.Word;
          Name : String := Role)
          return Boolean;
@@ -76,14 +73,14 @@ package body Tests.Rights is
       ---------
 
       function Ask
-        (User : Users.User_Client;
+        (User : in out Rose.Interfaces.User.User_Object'Class;
          Sudo : Rose.Words.Word;
          Name : String := Role)
          return Boolean
       is
       begin
-         Rose.Interfaces.Rights.Client.Request
-           (Rights, User, Name, Sudo, Grant, Cap);
+         Cap := Rose.Capabilities.Null_Capability;
+         Rights.Request (User, Name, Sudo, Grant, Cap);
          return Cap /= Rose.Capabilities.Null_Capability;
       end Ask;
 
@@ -99,8 +96,7 @@ package body Tests.Rights is
       --  clock's Clock interface stands for the admin one: it reads, and
       --  can't set the time.
 
-      Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+      Endpoint := Launcher.Launch_Command (No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch the broker");
       end if;
@@ -124,11 +120,21 @@ package body Tests.Rights is
          return Fail ("the broker did not start");
       end if;
 
-      Rose.Interfaces.Rights.Client.Open (Rights, Params.Caps (0));
-      Policy.Open (Admin, Params.Caps (1));
+      Rights.Open (Params.Caps (0));
+      Admin.Open (Params.Caps (1));
 
-      Users.Open (Alice, Tests.Users.Create_User ("alice"));
-      Users.Open (Bob, Tests.Users.Create_User ("bob"));
+      --  The users share a home directory, which saves a process.
+
+      declare
+         Home : constant Rose.Capabilities.Capability :=
+                  Tests.Registry.Launch
+                    ("directory",
+                     (Tests.Registry.Launcher_Cap ("file"),
+                      Tests.Registry.Launcher_Cap ("directory")));
+      begin
+         Alice.Open (Tests.Users.Create_User ("alice", Home));
+         Bob.Open (Tests.Users.Create_User ("bob", Home));
+      end;
 
       --  With no policy, nobody gets anything.
 
@@ -139,9 +145,9 @@ package body Tests.Rights is
       --  Alice may elevate to the time category, and so can't without it,
       --  and Bob can't at all. A role that doesn't exist is refused.
 
-      if Policy.Allow (Admin, "alice", "time", 3) /= 0 then
+      if Admin.Allow ("alice", "time", 3) /= 0 then
          return Fail ("a mode that doesn't exist");
-      elsif Policy.Allow (Admin, "alice", "time", Elevate) /= 1 then
+      elsif Admin.Allow ("alice", "time", Elevate) /= 1 then
          return Fail ("cannot set a policy");
       end if;
 
@@ -158,31 +164,30 @@ package body Tests.Rights is
       --  The grant works: it is the clock, through the broker.
 
       declare
-         Clock   : Rose.Interfaces.Clock.Client.Clock_Client;
-         Before  : Rose.Words.Word_64;
-         After   : Rose.Words.Word_64;
+         Clock        : Rose.Interfaces.Clock.Client.Clock_Client;
+         Before       : Rose.Words.Word_64;
+         After        : Rose.Words.Word_64;
          Alices_Grant : constant Rose.Words.Word := Grant;
-         Grant_Cap    : constant Rose.Capabilities.Capability := Cap;
          use type Rose.Words.Word_64;
       begin
-         Rose.Interfaces.Clock.Client.Open (Clock, Grant_Cap);
-         Before := Rose.Interfaces.Clock.Client.Monotonic (Clock);
-         if Rose.Interfaces.Clock.Client.Has_Error or else Before = 0 then
+         Clock.Open (Cap);
+         Before := Clock.Monotonic;
+         if Before = 0 then
             return Fail ("the grant does not reach the clock");
          end if;
 
          --  Bob can't end Alice's grant.
 
-         Rose.Interfaces.Rights.Client.Finish (Rights, Bob, Alices_Grant);
-         After := Rose.Interfaces.Clock.Client.Monotonic (Clock);
-         if Rose.Interfaces.Clock.Client.Has_Error or else After < Before then
+         Rights.Finish (Bob, Alices_Grant);
+         After := Clock.Monotonic;
+         if After < Before then
             return Fail ("another user ended the grant");
          end if;
 
          --  Alice can, and then the grant is dead, and so is any copy.
 
-         Rose.Interfaces.Rights.Client.Finish (Rights, Alice, Alices_Grant);
-         After := Rose.Interfaces.Clock.Client.Monotonic (Clock);
+         Rights.Finish (Alice, Alices_Grant);
+         After := Clock.Monotonic;
          if After /= 0 then
             return Fail ("the grant works after it was finished");
          end if;
@@ -191,14 +196,14 @@ package body Tests.Rights is
       --  The most specific policy wins: Bob may have everything in an
       --  ordinary launch, except the time, which he may not have at all.
 
-      if Policy.Allow (Admin, "bob", "*", Granted) /= 1 then
+      if Admin.Allow ("bob", "*", Granted) /= 1 then
          return Fail ("cannot set a policy for every category");
       elsif not Ask (Bob, 0) then
          return Fail ("no grant for a policy that covers everything");
       end if;
-      Rose.Interfaces.Rights.Client.Finish (Rights, Bob, Grant);
+      Rights.Finish (Bob, Grant);
 
-      if Policy.Allow (Admin, "bob", "time", None) /= 1 then
+      if Admin.Allow ("bob", "time", None) /= 1 then
          return Fail ("cannot set a policy against a category");
       elsif Ask (Bob, 1) then
          return Fail ("a grant against the most specific policy");

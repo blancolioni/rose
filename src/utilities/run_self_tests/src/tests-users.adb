@@ -30,31 +30,20 @@ package body Tests.Users is
    -- Create_User --
    -----------------
 
-   function Create_User (Name : String) return Rose.Capabilities.Capability
+   function Create_User
+     (Name : String;
+      Home : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
    is
-      File_Launch      : constant Rose.Interfaces.Launch.Client
-        .Launch_Client := Tests.Registry.Launcher ("file");
-      Directory_Launch : constant Rose.Interfaces.Launch.Client
-        .Launch_Client := Tests.Registry.Launcher ("directory");
-      User_Launch      : constant Rose.Interfaces.Launch.Client
-        .Launch_Client := Tests.Registry.Launcher ("user");
-      No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
-      No_Words         : Storage_Array (1 .. 0);
-      Padded           : constant Storage_Count :=
-                           Storage_Count ((Name'Length + 3) / 4 * 4);
-      Process          : Rose.Interfaces.Process.Client.Process_Client;
-      Endpoint         : Rose.Capabilities.Capability;
-      Params           : aliased Rose.Invocation.Invocation_Record;
+      User_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
+                      Tests.Registry.Launcher ("user");
+      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
+      Padded      : constant Storage_Count :=
+                      Storage_Count ((Name'Length + 3) / 4 * 4);
+      Endpoint    : constant Rose.Capabilities.Capability :=
+                      User_Launch.Launch_Command (No_Caps);
+      Params      : aliased Rose.Invocation.Invocation_Record;
    begin
-      Process :=
-        Rose.Interfaces.Launch.Client.Launch
-          (Directory_Launch,
-           (Rose.Interfaces.Launch.Client.Get_Interface_Cap (File_Launch),
-            Rose.Interfaces.Launch.Client.Get_Interface_Cap
-              (Directory_Launch)),
-           No_Words);
-      Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (User_Launch, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
       end if;
@@ -71,8 +60,7 @@ package body Tests.Users is
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
-      Rose.System_Calls.Send_Cap
-        (Params, Rose.Interfaces.Process.Client.Published_Interface (Process));
+      Rose.System_Calls.Send_Cap (Params, Home);
       Rose.System_Calls.Send_Buffer
         (Params, 4 + Padded, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);

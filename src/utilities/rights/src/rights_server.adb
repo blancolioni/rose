@@ -385,6 +385,7 @@ package body Rights_Server is
             Ada.Text_IO.Put (" with sudo");
          end if;
          Ada.Text_IO.Put_Line (": " & Outcome);
+         Ada.Text_IO.Flush;
       end Report;
 
    begin

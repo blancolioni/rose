@@ -18,6 +18,8 @@ run_self_tests:
 	    rose-core-run_self_tests.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands.idl \
 	    $(INTERFACES)/clock.idl \
+	    $(INTERFACES)/rights.idl \
+	    $(INTERFACES)/rights_admin.idl \
 	    $(INTERFACES)/launch.idl \
 	    $(INTERFACES)/user.idl \
 	    $(INTERFACES)/named.idl \
