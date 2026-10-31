@@ -9,7 +9,7 @@
 
 `cat` with no file should copy standard input to standard output, until the user ends the input with Ctrl-D. Under ADR 0009, petal can give a command either a reader that it opened on a file or the job's standard input. Both are `Stream_Reader`s, so `cat` reads either one in the same way (#395).
 
-A `Stream_Reader` has no separate end-of-file operation. A `Read` that returns nothing (`Last < Buffer'First`) is the end of the stream. `cat` stops when it gets one, and Rose's `Ada.Text_IO` sets `At_End` when it gets one.
+A `Stream_Reader` has no separate end-of-file operation. A `Read` that returns nothing (`Last < Buffer'First`) is the end of the stream. `cat` stops when it gets one, and `Ada.Text_IO` (GCC's, over Rose's `Interfaces.C_Streams`, #557) sees it as the end of the input.
 
 The console can't produce that `Read` at the moment:
 
@@ -44,13 +44,13 @@ The stream isn't closed, and nothing is released:
 
 - **event-input-stream keeps one flag,** an end of file that hasn't been read yet. The `Read` that returns nothing clears it, and the `Read` after that blocks for input as usual.
 - **The stream is not a `Resource`** (ADR 0010). It lives as long as event-input-stream, and a command that closes its client only deletes its own copy of the cap. Petal's copy still works.
-- **What remembers the end of file is the reader.** `At_End` is in the command's own `Ada.Text_IO`, so it ends with the command. Petal's `Ada.Text_IO` never saw that `Read`.
+- **Nothing remembers the end of file.** `Interfaces.C_Streams.fgetc` returns `EOF` when a `Read` returns nothing, and the next call asks the stream again. `Ada.Text_IO` keeps no flag of its own, and `feof` is true only until the next `ungetc` or `clearerr`. Petal's `Ada.Text_IO` never saw the command's `Read`.
 
 ### 4. Petal ignores an end of file at its prompt
 
 A Ctrl-D that no command reads goes to petal. That happens when the user presses Ctrl-D at the prompt, or a command ends before it reads one.
 
-Petal is the console's only shell, and there is no login to return to, so it doesn't log out. It starts a new line and prompts again. `Ada.Text_IO` clears `At_End` when a `Get_Line` reads something, so an interactive reader can carry on after an end of file.
+Petal is the console's only shell, and there is no login to return to, so it doesn't log out. It starts a new line and prompts again. An end of file doesn't stick in `Ada.Text_IO`: the next `End_Of_File` or `Get_Line` asks the console again, so an interactive reader can carry on after one.
 
 ## Consequences
 
