@@ -1,3 +1,5 @@
+with Interfaces;
+
 with System;
 
 with System.Storage_Elements;
@@ -144,6 +146,20 @@ package Rose.System_Calls is
       Index  : Rose.Invocation.Parameter_Word_Index)
       return Rose.Words.Word_64;
 
+   function Get_Integer_32
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Standard.Interfaces.Integer_32;
+   --  The word at Index as a two's complement value, for the IDL type
+   --  Integer_32 (blancolioni/idle#68).
+
+   function Get_Integer_64
+     (Params : Rose.Invocation.Invocation_Record;
+      Index  : Rose.Invocation.Parameter_Word_Index)
+      return Standard.Interfaces.Integer_64;
+   --  The words from Index as a two's complement value, for the IDL type
+   --  Integer_64. It takes the same words as Get_Word_64.
+
    function Get_Object_Id
      (Params : Rose.Invocation.Invocation_Record;
       Index  : Rose.Invocation.Parameter_Word_Index)
@@ -173,6 +189,16 @@ package Rose.System_Calls is
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word_64);
+
+   procedure Send_Integer_32
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Standard.Interfaces.Integer_32);
+   --  Send Value in one word, as its two's complement.
+
+   procedure Send_Integer_64
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Value  : Standard.Interfaces.Integer_64);
+   --  Send Value as Send_Word sends a Word_64, as its two's complement.
 
    procedure Send_Endpoint
      (Params   : in out Rose.Invocation.Invocation_Record;
