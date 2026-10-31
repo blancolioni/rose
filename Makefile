@@ -12,7 +12,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock
-UTILITIES=echo list cat touch mkdir clear date user auth login run_self_tests petal
+UTILITIES=echo list cat touch mkdir clear date user auth rights login run_self_tests petal
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
 # the GRUB menus' module2 lines come from.

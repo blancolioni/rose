@@ -15,8 +15,15 @@ package body Tests.Clock is
    Tick : constant Word_64 := 10_000_150;
    --  Nanoseconds in a tick.
 
-   function Difference (A, B : Word_64) return Word_64;
-   --  The distance between A and B.
+   type Sample is
+      record
+         Before : Word_64;
+         Real   : Word_64;
+         After  : Word_64;
+      end record;
+   --  A reading of the real time, between two of the monotonic time.
+
+   function Take_Sample return Sample;
 
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
@@ -127,19 +134,18 @@ package body Tests.Clock is
       Rose.Clock.Open (Tests.Registry.Clock);
 
       declare
-         Mono_1  : constant Word_64 := Rose.Clock.Monotonic;
-         Real_1  : constant Word_64 := Rose.Clock.Realtime;
-         Mono    : Word_64 := Mono_1;
-         Spins   : Natural := 0;
+         First : constant Sample := Take_Sample;
+         Mono  : Word_64 := First.After;
+         Spins : Natural := 0;
       begin
-         if Real_1 < Year_2000 then
+         if First.Real < Year_2000 then
             return Fail ("the real time is before 2000");
          end if;
 
          --  Wait for a fifth of a second of the clock's own time. It
          --  never goes backwards while we do.
 
-         while Mono - Mono_1 < 200_000_000 loop
+         while Mono - First.After < 200_000_000 loop
             declare
                Next : constant Word_64 := Rose.Clock.Monotonic;
             begin
@@ -155,15 +161,25 @@ package body Tests.Clock is
          end loop;
 
          declare
-            Mono_2 : constant Word_64 := Rose.Clock.Monotonic;
-            Real_2 : constant Word_64 := Rose.Clock.Realtime;
+            Second : constant Sample := Take_Sample;
+
+            --  The real time minus the monotonic time is the same at any
+            --  moment, but each is a call of its own, and this process can
+            --  be stopped between them. A sample's real time was read
+            --  between its two monotonic ones, so the difference is
+            --  somewhere between Real - After and Real - Before, and the
+            --  two samples' ranges have to meet, within a tick.
+
+            Low_1  : constant Word_64 := First.Real - First.After;
+            High_1 : constant Word_64 := First.Real - First.Before;
+            Low_2  : constant Word_64 := Second.Real - Second.After;
+            High_2 : constant Word_64 := Second.Real - Second.Before;
          begin
-            if Mono_2 - Mono_1 > 2_000_000_000 then
+            if Second.After - First.Before > 2_000_000_000 then
                return Fail ("the monotonic time jumped");
-            elsif Real_2 < Real_1 then
+            elsif Second.Real < First.Real then
                return Fail ("the real time went backwards");
-            elsif Difference (Real_2 - Real_1, Mono_2 - Mono_1) > 2 * Tick
-            then
+            elsif Low_2 > High_1 + Tick or else Low_1 > High_2 + Tick then
                return Fail ("the real and monotonic times disagree");
             end if;
          end;
@@ -174,13 +190,6 @@ package body Tests.Clock is
       end if;
       return True;
    end Clock_Test;
-
-   ----------------
-   -- Difference --
-   ----------------
-
-   function Difference (A, B : Word_64) return Word_64
-   is (if A > B then A - B else B - A);
 
    ----------
    -- Fail --
@@ -199,5 +208,17 @@ package body Tests.Clock is
 
    function Nanoseconds (Seconds : Word_64) return Word_64
    is (Seconds * 1_000_000_000);
+
+   -----------------
+   -- Take_Sample --
+   -----------------
+
+   function Take_Sample return Sample is
+      Before : constant Word_64 := Rose.Clock.Monotonic;
+      Real   : constant Word_64 := Rose.Clock.Realtime;
+      After  : constant Word_64 := Rose.Clock.Monotonic;
+   begin
+      return (Before => Before, Real => Real, After => After);
+   end Take_Sample;
 
 end Tests.Clock;

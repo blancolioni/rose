@@ -1,0 +1,27 @@
+interface Rights is
+
+   --  Asking the rights broker for authority (ADR 0021). The broker holds
+   --  the caps that grant authority, and gives one out only if its policy
+   --  allows the user to have it.
+
+   procedure Request
+     (User      : interface User;
+      Role_Name : String;
+      Elevate   : Word;
+      Grant     : out Word;
+      Granted   : out Capability);
+   --  User asks for the authority of the role called Role_Name. Elevate
+   --  is 1 if the user asked for it with sudo, and 0 if not. If the
+   --  policy allows it, Granted is a cap for the role's interface that
+   --  the broker can revoke, and Grant says which grant it is. If not,
+   --  Granted is null. (Elevate is a Boolean when blancolioni/idle#63 is
+   --  done.)
+
+   procedure Finish
+     (User  : interface User;
+      Grant : Word);
+   --  The command that was given Grant has finished, so the broker revokes
+   --  it. It does nothing unless User is the user that the grant was made
+   --  to.
+
+end Rights;

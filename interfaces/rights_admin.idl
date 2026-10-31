@@ -1,0 +1,20 @@
+interface Rights_Admin is
+
+   --  Changing who may have what (ADR 0021). It is a separate interface,
+   --  so that it can be given separately from Rights.
+
+   function Allow
+     (User     : String;
+      Category : String;
+      Mode     : Word)
+     return Word;
+   --  Set how the user called User may get the category Category: 0 for
+   --  not at all, 1 under sudo, and 2 in an ordinary launch. The policy
+   --  covers the categories below Category as well (hardware covers
+   --  hardware.ports), and "*" covers all of them. The most specific
+   --  policy wins. It returns 1 if it set the policy, and 0 if not,
+   --  because the mode is not one of those, or there is no room for
+   --  another policy. (A server of the kernel target can't fail a call by
+   --  raising, so the result says.)
+
+end Rights_Admin;

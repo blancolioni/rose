@@ -1,0 +1,2 @@
+role Clock_Admin_Service : Clock_Admin
+  with Category => "time";

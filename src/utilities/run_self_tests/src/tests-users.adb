@@ -2,7 +2,6 @@ with Ada.Text_IO;
 
 with System.Storage_Elements;
 
-with Rose.Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
@@ -26,6 +25,70 @@ package body Tests.Users is
 
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
+
+   -----------------
+   -- Create_User --
+   -----------------
+
+   function Create_User (Name : String) return Rose.Capabilities.Capability
+   is
+      File_Launch      : constant Rose.Interfaces.Launch.Client
+        .Launch_Client := Tests.Registry.Launcher ("file");
+      Directory_Launch : constant Rose.Interfaces.Launch.Client
+        .Launch_Client := Tests.Registry.Launcher ("directory");
+      User_Launch      : constant Rose.Interfaces.Launch.Client
+        .Launch_Client := Tests.Registry.Launcher ("user");
+      No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
+      No_Words         : Storage_Array (1 .. 0);
+      Padded           : constant Storage_Count :=
+                           Storage_Count ((Name'Length + 3) / 4 * 4);
+      Process          : Rose.Interfaces.Process.Client.Process_Client;
+      Endpoint         : Rose.Capabilities.Capability;
+      Params           : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Process :=
+        Rose.Interfaces.Launch.Client.Launch
+          (Directory_Launch,
+           (Rose.Interfaces.Launch.Client.Get_Interface_Cap (File_Launch),
+            Rose.Interfaces.Launch.Client.Get_Interface_Cap
+              (Directory_Launch)),
+           No_Words);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command (User_Launch, No_Caps);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      --  The name is one buffer item: its length, little-endian, then
+      --  the text, padded to four bytes.
+
+      Name_Buffer (1 .. 4 + Padded) := (others => 0);
+      Name_Buffer (1) := Storage_Element (Name'Length);
+      for Index in Name'Range loop
+         Name_Buffer (4 + Storage_Offset (Index - Name'First + 1)) :=
+           Character'Pos (Name (Index));
+      end loop;
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
+      Rose.System_Calls.Send_Cap
+        (Params, Rose.Interfaces.Process.Client.Published_Interface (Process));
+      Rose.System_Calls.Send_Buffer
+        (Params, 4 + Padded, Name_Buffer'Address, False);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else Params.Data (0) /= 0
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Params.Caps (0);
+   end Create_User;
 
    ----------
    -- Fail --
