@@ -32,7 +32,7 @@ need mmd mtools
 need mcopy mtools
 need xorriso xorriso
 need "$IDLE" "idle; see the README, or set IDLE"
-need "$GRUB_MKRESCUE" "grub2-tools; or set GRUB_MKRESCUE"
+need "$GRUB_MKRESCUE" "grub2-tools-extra; or set GRUB_MKRESCUE"
 need "$GRUB_MKIMAGE" "grub2-tools; or set GRUB_MKIMAGE"
 
 [ -f "$GRUB_DIR/boot.img" ] ||
