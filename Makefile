@@ -32,9 +32,13 @@ all: idl rts rose hdd doc
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose check-env rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso floppy finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
+
+# Check the tools before building anything; clean-build.sh does this first.
+check-env:
+	sh ./scripts/check-env
 
 rts:
 	(cd rts; make)
@@ -85,6 +89,7 @@ ISO_PUBLISH_DIR ?= /var/www/rose-os.org/html
 
 publish-iso:
 	test -f images/rose.iso
+	test -d $(ISO_PUBLISH_DIR)
 	cp images/rose.iso $(ISO_PUBLISH_DIR)/.rose.iso.new
 	mv -f $(ISO_PUBLISH_DIR)/.rose.iso.new $(ISO_PUBLISH_DIR)/rose.iso
 	sed -n 's/.*Version_String *: constant String := "\(.*\)";/\1/p' \

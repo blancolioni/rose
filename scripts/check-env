@@ -1,0 +1,60 @@
+#!/bin/sh
+# Check that what the build needs is installed, and say everything that
+# isn't, so that it doesn't fail halfway through.  Run from the top of the
+# tree, by clean-build.sh and "make check-env".
+
+. ./scripts/build-env.sh
+
+MIN_GCC=15
+failed=no
+
+problem () {
+    echo "check-env: $*" >&2
+    failed=yes
+}
+
+# need COMMAND [WHERE]: WHERE says what provides it
+need () {
+    command -v "$1" >/dev/null 2>&1 || problem "$1 not found${2:+ ($2)}"
+}
+
+need make
+need gcc
+need gnatmake "GNAT"
+need gprbuild "GNAT"
+need objdump binutils
+need readelf binutils
+need strip binutils
+need truncate coreutils
+need qemu-img qemu-img
+need mformat mtools
+need mmd mtools
+need mcopy mtools
+need xorriso xorriso
+need "$IDLE" "idle; see the README, or set IDLE"
+need "$GRUB_MKRESCUE" "grub2-tools; or set GRUB_MKRESCUE"
+need "$GRUB_MKIMAGE" "grub2-tools; or set GRUB_MKIMAGE"
+
+[ -f "$GRUB_DIR/boot.img" ] ||
+    problem "no $GRUB_DIR/boot.img (grub2-pc-modules; or set GRUB_DIR)"
+
+if command -v gcc >/dev/null 2>&1; then
+    version=`gcc -dumpversion | cut -d. -f1`
+    [ "$version" -ge $MIN_GCC ] 2>/dev/null ||
+        problem "gcc is version $version; Rose needs $MIN_GCC or later"
+    [ -d "`gcc -print-file-name=adainclude`" ] ||
+        problem "gcc has no Ada run-time sources (adainclude); GNAT's gcc is needed"
+fi
+
+if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import yaml' 2>/dev/null ||
+        problem "python3 has no yaml module (python3-pyyaml)"
+else
+    problem "python3 not found"
+fi
+
+if [ $failed = yes ]; then
+    echo "check-env: the build can't run until these are fixed" >&2
+    exit 1
+fi
+echo "check-env: ok"

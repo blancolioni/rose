@@ -5,10 +5,11 @@ Website: [rose-os.org](https://rose-os.org)
 
 ## Requirements
 
-Rose requires gcc 15, and is known to build on Fedora 43.  The run-time
-system is built from the GNAT 15 sources, which `rts/copy-runtime.sh` copies
-from the installed compiler.  Rose will probably build against newer major
-versions of gcc if you change `GCCVERSION` in that script.
+Rose requires gcc 15 or later, and is known to build on Fedora 43.  The
+run-time system is built from the GNAT sources, which `rts/copy-runtime.sh`
+and `src/rts/create-sources.sh` copy from the installed compiler.
+`make check-env` checks that everything the build needs is installed, and
+`clean-build.sh` runs it first.
 
 The build scripts assume Fedora's file layout.  Install
 [Alire](https://alire.ada.dev) for the Ada toolchain (GNAT and gprbuild), and
