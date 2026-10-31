@@ -10,6 +10,7 @@ do
         *) echo "usage: clean-build.sh [--book]" >&2; exit 1 ;;
     esac
 done
+make check-env
 make clean
 make idl
 (cd rts; make)

@@ -1,7 +1,8 @@
 #!/bin/sh
+. ./scripts/build-env.sh
 rm -f ./images/rose.iso
 cp images/tmp/* ./images/iso/boot
 mkdir -p ./images/iso/rose/install/drivers
 rm -f images/iso/drivers/*
 cp images/drivers/* ./images/iso/rose/install/drivers
-grub2-mkrescue -o ./images/rose.iso ./images/iso > ./logs/rose-iso.log 2>&1
+"$GRUB_MKRESCUE" -o ./images/rose.iso ./images/iso > ./logs/rose-iso.log 2>&1

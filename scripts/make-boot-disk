@@ -14,7 +14,8 @@
 
 set -e
 
-GRUB_DIR=/usr/lib/grub/i386-pc
+. ./scripts/build-env.sh
+
 OUT=images/iso/rose/install/boot
 TMP=images/tmp
 
@@ -47,7 +48,7 @@ put_word_64 $OUT/boot.img $BIOS_BOOT_START $((0x5c))
 # core.img's first sector loads the rest of it from the block list at
 # its end (0x1f4), which starts at block 2 by default.
 
-grub2-mkimage -O i386-pc -o $OUT/core.img \
+"$GRUB_MKIMAGE" -O i386-pc -o $OUT/core.img \
     -p '(hd0,gpt2)/boot/grub' biosdisk part_gpt fat
 put_word_64 $OUT/core.img $((BIOS_BOOT_START + 1)) $((0x1f4))
 

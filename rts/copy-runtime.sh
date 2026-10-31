@@ -1,5 +1,6 @@
 #!/bin/sh
-GCCVERSION=15
+set -e
+GNAT_INCLUDE=`gcc -print-file-name=adainclude`
 for f in "ada.ads" "a-unccon.ads" "a-uncdea.ads" "gnat.ads" "g-souinf.ads" \
    interfac.ads s-atacco.adb s-atacco.ads s-maccod.ads s-stoele.adb \
    s-stoele.ads i-c.ads s-addima.ads s-addope.ads s-imgint.ads \
@@ -7,7 +8,7 @@ for f in "ada.ads" "a-unccon.ads" "a-uncdea.ads" "gnat.ads" "g-souinf.ads" \
 do
     mkdir -p ./gnat-src
     rm -f ./gnat-src/$f
-    cp /usr/lib/gcc/x86_64-redhat-linux/$GCCVERSION/adainclude/$f ./gnat-src
+    cp $GNAT_INCLUDE/$f ./gnat-src
     rm -f ./build/i686/adainclude/$f
     ln -s `pwd`/gnat-src/$f `pwd`/build/i686/adainclude/$f
 done
