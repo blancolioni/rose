@@ -357,6 +357,8 @@ package body Mem.Processes is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
       Rose.Console_IO.Put_Line (Message);
+      Rose.Trace.Event
+        ("mem: fault, " & Message & ", process", Natural (Process));
       Fault (P.Process);
       P.State := Faulted;
    end Fault_Process;

@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-29
-- **Related:** [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking, the timer can lose expiries), [ADR 0010](0010-resources.md) (resources), [ADR 0011](0011-end-of-file-at-the-console.md) (end of file), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes), [ADR 0013](0013-typed-streams.md) (typed streams), #419 (buffer types of `Stream_Reader`), #42 (SPARK)
+- **Related:** [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking, the timer can lose expiries), [ADR 0010](0010-resources.md) (resources), [ADR 0020](0020-clock.md) (the clock), [ADR 0011](0011-end-of-file-at-the-console.md) (end of file), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes), [ADR 0013](0013-typed-streams.md) (typed streams), #419 (buffer types of `Stream_Reader`), #42 (SPARK)
 
 ## Context
 
@@ -106,7 +106,7 @@ end Entropy_Source;
 The service implements `Restorable` (ADR 0004). The kernel delivers `Restored` before the service handles any other message, so no `Read` can reach it first. The handler:
 
 1. **Clears the seeded flag** and sets the credit to zero.
-2. **Adds one to the generation number,** and replaces the key with BLAKE2s of the old key, the generation number and fresh input: the processor's generator, a cycle counter and the real-time clock.
+2. **Adds one to the generation number,** and replaces the key with BLAKE2s of the old key, the generation number and fresh input: the processor's generator, a cycle counter and the clock's two readings, `Monotonic` and `Realtime` (ADR 0020). The clock's own restore has run before it answers, so they are the restored clock's. Neither is credited: a clock can be set, and the time is public.
 3. **Starts the pool again,** and sets the reseed timer again, since a timer isn't in the checkpoint's memory.
 4. **Leaves the service unseeded,** unless the processor's generator has just given it enough credit. Until it is seeded again, `Read` fails with `Not_Seeded`.
 
@@ -120,7 +120,7 @@ What follows from it:
 ### 6. The service
 
 - **A new server, `src/servers/random`,** laid out like `timer`. It is one persistent process with a fixed object id (#372). Persistence keeps the caps that other persistent processes hold to it valid across a restore, which a server that was started fresh at every boot would not.
-- **init launches it early,** before the servers that use it, and gives it a cap to the timer. Its entries are in the boot description and in the kernel's module lists, which the kernel checks against each other.
+- **init launches it early,** before the servers that use it, and gives it a cap to the timer and a `Clock` cap (ADR 0020), which the restore handler reads. Its entries are in the boot description and in the kernel's module lists, which the kernel checks against each other.
 - **It publishes `Random`, `Entropy_Sink` and `Entropy_Source`** through `Server.Published_Interface`. init holds the cap that makes them, and it hands out each one separately: `Random` to the shell and to servers that ask for it, `Entropy_Sink` freely, `Entropy_Source` to the drivers in section 4 and no one else.
 - **ChaCha20 and BLAKE2s** have no heap and no generics, so the same code builds for either target. Both have published test vectors, and both are good candidates for the SPARK work (#42).
 

@@ -1,0 +1,14 @@
+command Rose.Core.Uptime : Standard_Output, Clock_Service
+  with Summary     => "Write how long the system has run.",
+       Description => """
+          Uptime writes how long the system has run, from the clock's
+          monotonic time (ADR 0020), as in up 1 day, 2:03:04. The time
+          that the machine was off is not counted, so after a restore it
+          carries on from where it was, and never goes back.
+          """
+is
+   Seconds : Boolean := False
+     with Short_Name  => 's',
+          Short_Value => True,
+          Help        => "write whole seconds only, for a script";
+end Rose.Core.Uptime;
