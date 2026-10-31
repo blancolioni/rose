@@ -6,4 +6,4 @@ if [ "$branch" != main ]; then
     exit 1
 fi
 git pull --ff-only
-./clean-build.sh
+./clean-build.sh "$@"
