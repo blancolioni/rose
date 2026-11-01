@@ -54,9 +54,6 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-capabilities-create.o \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-console.o \
-	$(BUILDDIR)/rose-environment.o \
-	$(BUILDDIR)/rose-environment-internal.o \
-	$(BUILDDIR)/rose-environment-supplied_environment.o \
 	$(BUILDDIR)/rose-formats-elf.o \
 	$(BUILDDIR)/rose-kernel.o \
 	$(BUILDDIR)/rose-kernel-command_line.o \

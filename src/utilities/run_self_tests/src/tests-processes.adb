@@ -30,11 +30,10 @@ package body Tests.Processes is
 
    function End_Process_Test return Boolean is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      No_Words : Storage_Array (1 .. 0);
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("file");
       First    : Rose.Interfaces.Process.Process_Object'Class :=
-        Launcher.Launch (No_Caps, No_Words);
+        Launcher.Launch (No_Caps);
       File     : Files.Writable_File_Client;
    begin
       Ada.Text_IO.Put ("End process test");
@@ -64,7 +63,7 @@ package body Tests.Processes is
 
       declare
          Second      : Rose.Interfaces.Process.Process_Object'Class :=
-           Launcher.Launch (No_Caps, No_Words);
+           Launcher.Launch (No_Caps);
          Second_File : Files.Writable_File_Client;
       begin
          Second_File.Open (Second.Published_Interface);

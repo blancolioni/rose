@@ -6,89 +6,7 @@ with Rose.Kernel.Processes.Init;
 
 with Rose.Boot.Console;
 
-with Rose.Environment_Pages;
-
 package body Rose.Kernel.Capabilities.Boot is
-
-   Page : aliased Rose.Environment_Pages.Environment_Page;
-
-   function Check_Environment
-     (Params : Rose.Invocation.Invocation_Access)
-      return Boolean;
-   --  Return True if environment was created
-
-   ------------------------
-   -- Create_Environment --
-   ------------------------
-
-   function Check_Environment
-     (Params : Rose.Invocation.Invocation_Access)
-      return Boolean
-   is
-      use Rose.Invocation;
-      use Rose.Words;
-      use Rose.Environment_Pages;
-      Start : constant Parameter_Word_Index := 3;
-
-      Value : String (1 .. 12);
-      Length : Natural;
-
-      procedure Set_Value (X : Word);
-
-      ---------------
-      -- Set_Value --
-      ---------------
-
-      procedure Set_Value (X : Word) is
-         It : Word := X;
-      begin
-         if X = 0 then
-            Length := 1;
-            Value (Length) := '0';
-            return;
-         end if;
-
-         Length := 0;
-         while It > 0 loop
-            Length := Length + 1;
-            Value (Length) := Character'Val (It mod 10 + 48);
-            It := It / 10;
-         end loop;
-
-         for I in 1 .. Length / 2 loop
-            declare
-               Ch : constant Character := Value (I);
-            begin
-               Value (I) := Value (Length - I + 1);
-               Value (Length - I + 1) := Ch;
-            end;
-         end loop;
-      end Set_Value;
-
-      Argument_Count : constant Word :=
-                         Word (Params.Control.Last_Sent_Word) - 2;
-      Argument_Index : Parameter_Word_Index := Start;
-   begin
-      if Argument_Count = 0 then
-         return False;
-      end if;
-
-      Set_Value (Argument_Count);
-      Set_Environment_Value (Page, "@arg-count", Value (1 .. Length));
-
-      for I in 1 .. Argument_Count loop
-         declare
-            Name : String := "@arg00";
-         begin
-            Name (Name'Last) := Character'Val (I mod 10 + 48);
-            Name (Name'Last - 1) := Character'Val (I / 10 mod 10 + 48);
-            Set_Value (Params.Data (Argument_Index));
-            Set_Environment_Value (Page, Name, Value (1 .. Length));
-            Argument_Index := Argument_Index + 1;
-         end;
-      end loop;
-      return True;
-   end Check_Environment;
 
    ------------
    -- Handle --
@@ -105,13 +23,12 @@ package body Rose.Kernel.Capabilities.Boot is
       New_Pid          : Rose.Kernel.Processes.Process_Id;
       Oid              : constant Rose.Objects.Object_Id :=
                            Rose.Objects.Object_Id (Params.Data (2));
-      Have_Environment : Boolean;
 
    begin
 
-      --  Data: the module, its priority, its object id, and its
-      --  arguments.  The object id is one of the boot modules', other
-      --  than idle's and init's, and no live process has it.
+      --  Data: the module, its priority, and its object id.  The object
+      --  id is one of the boot modules', other than idle's and init's,
+      --  and no live process has it.
 
       declare
          use Rose.Kernel.Processes;
@@ -127,8 +44,6 @@ package body Rose.Kernel.Capabilities.Boot is
          end if;
       end;
 
-      Have_Environment := Check_Environment (Params);
-
       New_Pid :=
         Rose.Kernel.Processes.Init.Load_Boot_Module
           (Priority => Rose.Kernel.Processes.Process_Priority
@@ -136,10 +51,7 @@ package body Rose.Kernel.Capabilities.Boot is
            Module   =>
              Rose.Kernel.Modules.Module_Index
                (Params.Data (0)),
-           Oid         => Oid,
-           Environment => (if Have_Environment
-                           then Page'Access
-                             else null));
+           Oid         => Oid);
 
       Rose.Boot.Console.Put ("boot module ");
       Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Data (0)));

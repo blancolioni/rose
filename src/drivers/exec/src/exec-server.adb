@@ -25,9 +25,8 @@ package body Exec.Server is
       return Rose.Capabilities.Capability;
 
    function On_Launch
-     (Id          : Rose.Objects.Capability_Identifier;
-      Caps        : Rose.Capabilities.Capability_Array;
-      Environment : System.Storage_Elements.Storage_Array)
+     (Id   : Rose.Objects.Capability_Identifier;
+      Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
    function On_Launch_Command
@@ -159,9 +158,8 @@ package body Exec.Server is
    ---------------
 
    function On_Launch
-     (Id          : Rose.Objects.Capability_Identifier;
-      Caps        : Rose.Capabilities.Capability_Array;
-      Environment : System.Storage_Elements.Storage_Array)
+     (Id   : Rose.Objects.Capability_Identifier;
+      Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       use Rose.System_Calls;
@@ -176,7 +174,6 @@ package body Exec.Server is
       end loop;
 
       Send_Cap (Params, Standard_Output);
-      Rose.System_Calls.Send_Storage_Array (Params, Environment, False);
 
       Invoke_Capability (Params);
 

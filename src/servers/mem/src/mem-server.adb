@@ -1,4 +1,4 @@
-with System.Storage_Elements;
+with System;
 
 with Rose.Addresses;
 with Rose.Capabilities;
@@ -54,8 +54,7 @@ package body Mem.Server is
       Data_Base   : Rose.Words.Word;
       Data_Bound  : Rose.Words.Word;
       Stack_Base  : Rose.Words.Word;
-      Stack_Bound : Rose.Words.Word;
-      Environment : System.Storage_Elements.Storage_Array);
+      Stack_Bound : Rose.Words.Word);
 
    procedure Take_Physical_Memory
      (Id     : in     Rose.Objects.Capability_Identifier;
@@ -642,8 +641,7 @@ package body Mem.Server is
       Data_Base   : Rose.Words.Word;
       Data_Bound  : Rose.Words.Word;
       Stack_Base  : Rose.Words.Word;
-      Stack_Bound : Rose.Words.Word;
-      Environment : System.Storage_Elements.Storage_Array)
+      Stack_Bound : Rose.Words.Word)
    is
       pragma Unreferenced (Id);
       Pid : constant Process_Id :=
@@ -694,7 +692,6 @@ package body Mem.Server is
          Writable      => True,
          Executable    => False,
          Resizable     => False);
-      Mem.Processes.Add_Environment (Pid, Environment);
    end Register_Process;
 
    ----------------------
