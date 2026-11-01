@@ -10,7 +10,7 @@ import socket
 import sys
 import time
 
-NAMES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot",
+NAMES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", ",": "comma",
          "_": "shift-minus", ":": "shift-semicolon", "/": "slash"}
 
 

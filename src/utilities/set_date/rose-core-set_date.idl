@@ -1,0 +1,15 @@
+command Rose.Core.Set_Date : Standard_Error, Clock_Admin_Service
+  with Summary     => "Set the date and time.",
+       Description => """
+          Set_Date sets the system's clock (ADR 0020) to TIME, in UTC, in
+          the form that date -I writes, as in 2026-10-30T18:12:03Z. The
+          time is written to the machine's own clock too, so it is
+          still right after a restart. The year has to be from 2000 to
+          2099, which is what that clock can hold. Setting the clock needs
+          the authority of the time category (ADR 0021), so run it as
+          sudo time set_date TIME.
+          """
+is
+   Time : String
+     with Help => "the new time, as 2026-10-30T18:12:03Z";
+end Rose.Core.Set_Date;

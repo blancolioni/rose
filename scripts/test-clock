@@ -14,6 +14,14 @@
 #      has run before: the time has to agree with the host's, and not be
 #      earlier than the time before.
 #
+# Between them it sets the clock two minutes ahead of the host's with
+# sudo time set_date (ADR 0021, #552), which also writes the RTC. QEMU
+# starts its RTC again from the host's time, as a real machine's keeps
+# the time that it was given, so the second boot is told the RTC's new
+# time. Date has to agree with the host's clock plus two minutes then,
+# and not say that the clock is a guess: if set_date had not written the
+# RTC, the restore would find it two minutes behind the checkpoint.
+#
 # It also runs uptime in each boot. The monotonic time doesn't count the
 # time that the machine was off, so across the restore it must not go
 # back, and must not grow by more than the real time that passed.
@@ -25,6 +33,8 @@ ISO=${1:-images/rose.iso}
 HERE=$(cd "$(dirname "$0")" && pwd)
 . "$HERE/qemu-test-lib.sh"
 tolerance=3
+offset=0
+# How far ahead of the host's clock the system's is, in seconds.
 
 read_date () {
     # The last ISO 8601 time on the screen, as seconds since 1970.
@@ -37,7 +47,7 @@ check_date () {
     # check_date NOT_BEFORE: run date -I, and check what it says
     type_text "date -I
 "
-    host=$(date -u +%s)
+    host=$(($(date -u +%s) + offset))
     sleep 5
     shown=$(read_date) || fail "date wrote no time"
     difference=$((host - shown))
@@ -47,6 +57,31 @@ check_date () {
         || fail "date is $difference seconds from the host's clock"
     [ "$shown" -ge "$1" ] || fail "date went back from $1 to $shown"
     last=$shown
+}
+
+check_set_date () {
+    # check_set_date: set the clock two minutes ahead of the host's with
+    # set_date, and check that date says so. A category that set_date
+    # doesn't need has to give a warning, and not stop it, and an ordinary
+    # user has to be refused without sudo.
+    target=$(($(date -u +%s) + 120))
+    time=$(date -u -d "@$target" +%Y-%m-%dT%H:%M:%SZ)
+
+    type_text "set_date $time
+"
+    sleep 6
+    screen | grep -q "needs elevation (time)" \
+        || fail "set_date was not refused without sudo"
+
+    type_text "sudo time,network set_date $time
+"
+    # The clock was set a moment after the Return, so this is how far
+    # ahead of the host's clock it is, to within a second or two.
+    offset=$((target - $(date -u +%s)))
+    sleep 8
+    screen | grep -q "set_date does not need network" \
+        || fail "sudo did not warn of a category set_date doesn't need"
+    check_date 0
 }
 
 read_uptime () {
@@ -84,16 +119,20 @@ log_in
 last=0
 check_date 0
 check_uptime 0 0
+check_set_date
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45
 stop_qemu
 
 echo "Booting from the disk again"
-start_qemu
+start_qemu -rtc base="$(date -u -d "@$(($(date -u +%s) + offset))" \
+    +%Y-%m-%dT%H:%M:%S)"
 wait_for "petal>" 200 || fail "petal was not restored"
 sleep 45
 check_date "$last"
+screen | grep -q "the clock has not been set" \
+    && fail "date says the clock is a guess after the restore"
 check_uptime "$up_last" "$up_host"
 
 stop_qemu
