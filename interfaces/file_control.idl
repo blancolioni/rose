@@ -1,0 +1,23 @@
+--  The interface that a file's process publishes. Only the file's
+--  directory holds it (#141): everyone else is given the file's
+--  Writable_File, or its read-only File.
+
+interface File_Control is
+
+   function Writable return interface Writable_File;
+   --  The file itself.
+
+   function New_Version return interface Writable_File;
+   --  A version of the file, which starts as a copy of it. Writing to
+   --  the version doesn't change the file until Commit_Version. A file
+   --  has at most one version at a time, and this returns a null
+   --  interface if it already has one.
+
+   procedure Commit_Version;
+   --  Make the version the file's contents. The file keeps its process
+   --  and its caps, and the version's caps stop working.
+
+   procedure Discard_Version;
+   --  Drop the version, and leave the file as it was.
+
+end File_Control;

@@ -23,6 +23,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-auth_admin-client.o \
 	$(BUILDDIR)/rose-interfaces-directory-client.o \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
+	$(BUILDDIR)/rose-interfaces-file_version-client.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \

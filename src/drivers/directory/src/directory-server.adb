@@ -6,6 +6,10 @@ with Rose.System_Calls;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File;
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.File_Control.Client;
+with Rose.Interfaces.File_Version;
+with Rose.Interfaces.File_Version.Client;
+with Rose.Interfaces.File_Version.Server;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
@@ -26,6 +30,8 @@ package body Directory.Server is
 
    subtype Writable_Directory_Class is
      Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
+   subtype Writable_File_Class is
+     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
 
    Max_Entries     : constant := 64;
    Max_Name_Length : constant := 64;
@@ -38,6 +44,8 @@ package body Directory.Server is
          Name_Last : Natural := 0;
          Kind      : Rose.Interfaces.Directory.File_Kind;
          File      : File_Clients.Writable_File_Client;
+         Control   : Rose.Interfaces.File_Control.Client.File_Control_Client;
+         --  A file's File_Control, which only the directory holds (#141).
          Child     : Directory_Clients.Writable_Directory_Client;
          Read_Only : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
@@ -131,6 +139,55 @@ package body Directory.Server is
      (Item : in out Directory_Object;
       Name : String);
 
+   overriding function New_File_Version
+     (Item : in out Directory_Object;
+      Name : String)
+      return Rose.Interfaces.File_Version.File_Version_Object'Class;
+
+   --  Versions of files (#141, ADR 0012). Each is an object served
+   --  through File_Version, which New_File_Version returns to the shell.
+   --  The user-mode target attaches objects for good, so there is a
+   --  fixed set of them, and one is used again once its version has
+   --  been committed or discarded. The shell closes its caps to a
+   --  version then.
+
+   Max_Versions : constant := 8;
+
+   type Version_Object is limited new
+     Rose.Interfaces.File_Version.Server.File_Version_Interface with
+      record
+         Used          : Boolean := False;
+         Slot          : Natural := 0;
+         --  The entry of the file that this is a version of, or 0 for a
+         --  new file.
+         Gone          : Boolean := False;
+         --  The file was deleted while its version was pending.
+         Name          : String (1 .. Max_Name_Length);
+         Name_Last     : Natural := 0;
+         Interface_Cap : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         Process_Cap   : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         --  A new file's name, its File_Control and its process. The
+         --  directory launched it, and lists it only when the version
+         --  is committed.
+         Writable_Cap  : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         --  The version's Writable_File.
+      end record;
+
+   overriding function File_Version_Cap
+     (Item : in out Version_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Writable
+     (Item : in out Version_Object)
+      return Writable_File_Class;
+
+   overriding procedure Commit (Item : in out Version_Object);
+
+   overriding procedure Discard (Item : in out Version_Object);
+
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
    --  Storage arrays, and strings in requests, go through the invoke
@@ -149,6 +206,7 @@ package body Directory.Server is
    --  moves the slot numbers after it down, and not the entries (#346).
    File_Launch      : Rose.Interfaces.Launch.Client.Launch_Client;
    Directory_Launch : Rose.Interfaces.Launch.Client.Launch_Client;
+   Versions         : array (1 .. Max_Versions) of aliased Version_Object;
 
    function Add_Entry
      (Name : String;
@@ -161,6 +219,18 @@ package body Directory.Server is
 
    function Find (Name : String) return Natural;
    --  The index of the entry Name, or 0 if there is none.
+
+   procedure Free (Item : in out Version_Object);
+   --  Delete the directory's cap for the version Item, and make Item
+   --  free for another.
+
+   procedure Insert_Entry
+     (Name          : String;
+      Kind          : Rose.Interfaces.Directory.File_Kind;
+      Interface_Cap : Rose.Capabilities.Capability;
+      Process_Cap   : Rose.Capabilities.Capability);
+   --  Add the entry Name for the process Process_Cap, which publishes
+   --  Interface_Cap. There must be room.
 
    function Is_Kind
      (Index : Positive;
@@ -231,34 +301,52 @@ package body Directory.Server is
          return Rose.Capabilities.Null_Capability;
       end if;
 
-      --  The first free slot: there is one, since Entry_Count is less
-      --  than Max_Entries.
-
-      for Slot in Slot_Index loop
-         if not Entries (Slot).Used then
-            Entry_Count := Entry_Count + 1;
-            Order (Entry_Count) := Slot;
-            exit;
-         end if;
-      end loop;
+      Insert_Entry
+        (Saved_Name (1 .. Saved_Last), Kind, Interface_Cap, Process_Cap);
 
       declare
-         New_Entry : Entry_Record renames Entries (Order (Entry_Count));
+         Added : Entry_Record renames Entries (Order (Entry_Count));
       begin
-         New_Entry.Used := True;
-         New_Entry.Name := Saved_Name;
-         New_Entry.Name_Last := Saved_Last;
-         New_Entry.Kind := Kind;
-         New_Entry.Process.Open (Process_Cap);
          if Kind = Rose.Interfaces.Directory.Ordinary_File then
-            New_Entry.File.Open (Interface_Cap);
+            return Added.File.Writable_File_Cap;
          else
-            New_Entry.Child.Open (Interface_Cap);
+            return Added.Child.Writable_Directory_Cap;
          end if;
       end;
-
-      return Interface_Cap;
    end Add_Entry;
+
+   ------------
+   -- Commit --
+   ------------
+
+   overriding procedure Commit (Item : in out Version_Object) is
+   begin
+      if not Item.Used then
+         raise Constraint_Error with "commit: no version";
+      elsif Item.Gone then
+         raise Constraint_Error with "commit: the file was deleted";
+      elsif Item.Slot /= 0 then
+         Entries (Item.Slot).Control.Commit_Version;
+      else
+         declare
+            Name : constant String := Item.Name (1 .. Item.Name_Last);
+         begin
+            if Find (Name) /= 0 then
+               raise Constraint_Error with "commit: the name is in use";
+            elsif Entry_Count = Max_Entries then
+               raise Constraint_Error with "commit: the directory is full";
+            end if;
+
+            --  The entry takes over the new file's caps.
+
+            Insert_Entry
+              (Name, Rose.Interfaces.Directory.Ordinary_File,
+               Item.Interface_Cap, Item.Process_Cap);
+         end;
+      end if;
+
+      Free (Item);
+   end Commit;
 
    ----------------------
    -- Create_Directory --
@@ -304,6 +392,11 @@ package body Directory.Server is
 
       Rose.Interfaces.Writable_Directory.Server.Publish
         (Context, The_Directory'Access);
+
+      for Index in Versions'Range loop
+         Rose.Interfaces.File_Version.Server.Attach
+           (Context, Versions (Index)'Access);
+      end loop;
    end Create_Server;
 
    ----------------------
@@ -433,6 +526,44 @@ package body Directory.Server is
       end if;
    end Directory_Entry_Size;
 
+   -------------
+   -- Discard --
+   -------------
+
+   --  A new file's process is ended. A version of a file that has been
+   --  deleted has gone with it.
+
+   overriding procedure Discard (Item : in out Version_Object) is
+   begin
+      if not Item.Used then
+         raise Constraint_Error with "discard: no version";
+      elsif Item.Gone then
+         null;
+      elsif Item.Slot /= 0 then
+         Entries (Item.Slot).Control.Discard_Version;
+      else
+         declare
+            Process : Rose.Interfaces.Process.Client.Process_Client;
+         begin
+            Process.Open (Item.Process_Cap);
+            Process.Destroy;
+            Process.Close;
+         end;
+         Rose.System_Calls.Delete_Cap (Item.Interface_Cap);
+      end if;
+
+      Free (Item);
+   end Discard;
+
+   ----------------------
+   -- File_Version_Cap --
+   ----------------------
+
+   overriding function File_Version_Cap
+     (Item : in out Version_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.File_Version.Server.Cap_Of (Item));
+
    ----------
    -- Find --
    ----------
@@ -464,6 +595,24 @@ package body Directory.Server is
    begin
       return Find (Name);
    end Find_Entry;
+
+   ----------
+   -- Free --
+   ----------
+
+   procedure Free (Item : in out Version_Object) is
+   begin
+      if Item.Writable_Cap /= Rose.Capabilities.Null_Capability then
+         Rose.System_Calls.Delete_Cap (Item.Writable_Cap);
+      end if;
+      Item.Writable_Cap := Rose.Capabilities.Null_Capability;
+      Item.Interface_Cap := Rose.Capabilities.Null_Capability;
+      Item.Process_Cap := Rose.Capabilities.Null_Capability;
+      Item.Slot := 0;
+      Item.Name_Last := 0;
+      Item.Gone := False;
+      Item.Used := False;
+   end Free;
 
    -------------------
    -- Get_Directory --
@@ -556,6 +705,52 @@ package body Directory.Server is
       end if;
    end Get_Writable_File;
 
+   ------------------
+   -- Insert_Entry --
+   ------------------
+
+   --  A file's process publishes its File_Control, which gives the file
+   --  itself (#141).
+
+   procedure Insert_Entry
+     (Name          : String;
+      Kind          : Rose.Interfaces.Directory.File_Kind;
+      Interface_Cap : Rose.Capabilities.Capability;
+      Process_Cap   : Rose.Capabilities.Capability)
+   is
+   begin
+      --  The first free slot: there is one, since Entry_Count is less
+      --  than Max_Entries.
+
+      for Slot in Slot_Index loop
+         if not Entries (Slot).Used then
+            Entry_Count := Entry_Count + 1;
+            Order (Entry_Count) := Slot;
+            exit;
+         end if;
+      end loop;
+
+      declare
+         New_Entry : Entry_Record renames Entries (Order (Entry_Count));
+      begin
+         New_Entry.Used := True;
+         New_Entry.Name (1 .. Name'Length) := Name;
+         New_Entry.Name_Last := Name'Length;
+         New_Entry.Kind := Kind;
+         New_Entry.Process.Open (Process_Cap);
+         if Kind = Rose.Interfaces.Directory.Ordinary_File then
+            New_Entry.Control.Open (Interface_Cap);
+            declare
+               File : Writable_File_Class := New_Entry.Control.Writable;
+            begin
+               New_Entry.File.Open (File.Writable_File_Cap);
+            end;
+         else
+            New_Entry.Child.Open (Interface_Cap);
+         end if;
+      end;
+   end Insert_Entry;
+
    ------------
    -- Launch --
    ------------
@@ -575,6 +770,92 @@ package body Directory.Server is
       end if;
    end Launch;
 
+   ----------------------
+   -- New_File_Version --
+   ----------------------
+
+   --  A failure raises, which the generated server sends back as an
+   --  error.
+
+   overriding function New_File_Version
+     (Item : in out Directory_Object;
+      Name : String)
+      return Rose.Interfaces.File_Version.File_Version_Object'Class
+   is
+      pragma Unreferenced (Item);
+      Index : constant Natural := Find (Name);
+      Spare : Natural := 0;
+   begin
+      for Version in Versions'Range loop
+         if not Versions (Version).Used then
+            Spare := Version;
+            exit;
+         end if;
+      end loop;
+
+      if Spare = 0 then
+         raise Constraint_Error with "version: too many versions";
+      elsif Index /= 0
+        and then Entries (Order (Index)).Kind
+          /= Rose.Interfaces.Directory.Ordinary_File
+      then
+         raise Constraint_Error with "version: not a file";
+      elsif Index = 0
+        and then (Name'Length = 0 or else Name'Length > Max_Name_Length)
+      then
+         raise Constraint_Error with "version: bad name";
+      end if;
+
+      declare
+         Version : Version_Object renames Versions (Spare);
+      begin
+         if Index /= 0 then
+            declare
+               File : Writable_File_Class :=
+                 Entries (Order (Index)).Control.New_Version;
+            begin
+               Version.Writable_Cap := File.Writable_File_Cap;
+            end;
+            if Version.Writable_Cap = Rose.Capabilities.Null_Capability then
+               raise Constraint_Error
+                 with "version: the file already has a version";
+            end if;
+            Version.Slot := Order (Index);
+         else
+
+            --  Name is in the invoke buffer, which Launch overwrites
+            --  when it sends the environment.
+
+            Version.Name (1 .. Name'Length) := Name;
+            Version.Name_Last := Name'Length;
+
+            declare
+               Process : Rose.Interfaces.Process.Process_Object'Class :=
+                 Launch (Rose.Interfaces.Directory.Ordinary_File);
+            begin
+               Version.Interface_Cap := Process.Published_Interface;
+               Version.Process_Cap := Process.Process_Cap;
+            end;
+
+            declare
+               Control : Rose.Interfaces.File_Control.Client
+                 .File_Control_Client :=
+                   Rose.Interfaces.File_Control.Client.From_Cap
+                     (Version.Interface_Cap);
+               File    : Writable_File_Class := Control.Writable;
+            begin
+               Version.Writable_Cap := File.Writable_File_Cap;
+            end;
+            Version.Slot := 0;
+         end if;
+
+         Version.Used := True;
+         Version.Gone := False;
+         return Rose.Interfaces.File_Version.Client.From_Cap
+           (Rose.Interfaces.File_Version.Server.Cap_Of (Version));
+      end;
+   end New_File_Version;
+
    ------------------
    -- Remove_Entry --
    ------------------
@@ -584,12 +865,21 @@ package body Directory.Server is
    begin
       Item.Process.Destroy;
 
+      --  A pending version of the file can no longer be committed.
+
+      for Version of Versions loop
+         if Version.Used and then Version.Slot = Order (Index) then
+            Version.Gone := True;
+         end if;
+      end loop;
+
       --  Closing the clients deletes their caps, including the read-only
       --  interface, which is the one the client fetched.
 
       Item.Process.Close;
       if Item.Kind = Rose.Interfaces.Directory.Ordinary_File then
          Item.File.Close;
+         Item.Control.Close;
       else
          Item.Child.Close;
       end if;
@@ -638,6 +928,21 @@ package body Directory.Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   --------------
+   -- Writable --
+   --------------
+
+   overriding function Writable
+     (Item : in out Version_Object)
+      return Writable_File_Class
+   is
+   begin
+      if not Item.Used then
+         raise Constraint_Error with "version: no version";
+      end if;
+      return File_Clients.From_Cap (Item.Writable_Cap);
+   end Writable;
 
    ----------------------------
    -- Writable_Directory_Cap --

@@ -1,0 +1,21 @@
+--  A version of a file in a directory, which New_File_Version makes
+--  (#141, ADR 0012). The shell holds it, and gives a command only its
+--  Writable_File, so the command can't commit or discard what it was
+--  given.
+
+interface File_Version is
+
+   function Writable return interface Writable_File;
+   --  The version, to write.
+
+   procedure Commit;
+   --  Make the version the file's contents, or, for a new name, add the
+   --  file to the directory. It fails if the new name was taken in the
+   --  meantime, or the file was deleted; the version is then still
+   --  pending, and can be discarded.
+
+   procedure Discard;
+   --  Drop the version. A file that existed is left as it was, and a
+   --  new one is never added.
+
+end File_Version;
