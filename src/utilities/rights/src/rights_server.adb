@@ -98,7 +98,7 @@ package body Rights_Server is
 
    function Proxy_Realtime_Is_Trusted
      (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Words.Word;
+      return Boolean;
 
    procedure Proxy_Set_Realtime
      (Id          : Rose.Objects.Capability_Identifier;
@@ -312,14 +312,11 @@ package body Rights_Server is
 
    function Proxy_Realtime_Is_Trusted
      (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Words.Word
+      return Boolean
    is
    begin
-      if Is_Live (Id) then
-         return Clock_Admin_Client.Realtime_Is_Trusted (Real_Clock);
-      else
-         return 0;
-      end if;
+      return Is_Live (Id)
+        and then Clock_Admin_Client.Realtime_Is_Trusted (Real_Clock);
    end Proxy_Realtime_Is_Trusted;
 
    ------------------------
