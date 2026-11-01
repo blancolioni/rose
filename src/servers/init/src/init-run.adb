@@ -83,6 +83,10 @@ package body Init.Run is
       Clock_Cap                : Rose.Capabilities.Capability :=
                                    Null_Capability;
       --  The clock's Clock interface, from the installer (ADR 0020).
+      Clock_Admin_Cap          : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The clock's Clock_Admin interface, which init gives to the rights
+      --  broker and then deletes (ADR 0021).
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -105,6 +109,10 @@ package body Init.Run is
       User_Cap       : Rose.Capabilities.Capability;
       Home_Cap   : Rose.Capabilities.Capability;
       --  The first user, and its home directory, created on first boot.
+      Rights_Cap       : Rose.Capabilities.Capability := Null_Capability;
+      Rights_Admin_Cap : Rose.Capabilities.Capability := Null_Capability;
+      --  The rights broker's Rights and Rights_Admin interfaces
+      --  (ADR 0021).
 
       function Get_Public_Interface_From_Process
         (Process_Cap : Rose.Capabilities.Capability)
@@ -374,6 +382,7 @@ package body Init.Run is
                --  The clock is running. Its Clock_Admin interface is cap
                --  0, and its Clock interface is cap 1.
 
+               Clock_Admin_Cap := Params.Caps (0);
                Clock_Cap := Params.Caps (1);
             elsif Params.Data (1) = 98 then
 
@@ -572,6 +581,26 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to start auth" & NL);
       end if;
 
+      --  The rights broker, which holds the clock's Clock_Admin interface
+      --  and decides who may have it (ADR 0021). Init hands the interface
+      --  over, and keeps no copy of it.
+
+      Init.Users.Start_Rights
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Console         => Console_Stream_Cap,
+         Clock_Admin     => Clock_Admin_Cap,
+         Rights          => Rights_Cap,
+         Admin           => Rights_Admin_Cap);
+      if Rights_Cap = Null_Capability
+        or else Rights_Admin_Cap = Null_Capability
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: unable to start rights" & NL);
+      end if;
+      Rose.System_Calls.Delete_Cap (Clock_Admin_Cap);
+      Clock_Admin_Cap := Null_Capability;
+
       --  The first user, with a home directory (ADR 0003). Init runs
       --  only on a fresh boot, so it is created once.
 
@@ -597,6 +626,32 @@ package body Init.Run is
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: login check failed" & NL);
       end if;
+
+      --  The first user may have every category of authority, under sudo
+      --  (ADR 0021). Every later user starts with none. Check that the
+      --  broker has it: it refuses an ordinary request for the clock's
+      --  admin role, and grants one under sudo. Init needs the broker's
+      --  Rights_Admin interface no more after that.
+
+      if User_Cap /= Null_Capability then
+         if not Init.Users.Allow
+           (Rights_Admin_Cap, First_User, "*", Init.Users.Mode_Elevate)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap,
+               "init: unable to set the policy of " & First_User & NL);
+         elsif Init.Users.Check_Rights
+           (Rights_Cap, User_Cap, "Clock_Admin_Service")
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "rights: policy checked" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: rights check failed" & NL);
+         end if;
+      end if;
+      Rose.System_Calls.Delete_Cap (Rights_Admin_Cap);
+      Rights_Admin_Cap := Null_Capability;
 
       --  The console runs login, which asks for a user name and password
       --  and runs petal for the user (#457, #458).

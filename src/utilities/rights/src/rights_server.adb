@@ -137,16 +137,34 @@ package body Rights_Server is
       return Rose.Words.Word
    is
       pragma Unreferenced (Id);
-      Success : Boolean := False;
+
+      --  User and Category are the request's buffer, so copy them before
+      --  this process makes an invocation of its own, which writing the
+      --  audit line does.
+
+      Who           : constant String (1 .. User'Length) := User;
+      Category_Name : constant String (1 .. Category'Length) := Category;
+      Success       : Boolean := False;
    begin
       if Mode <= Rights_Policy.Mode'Pos (Rights_Policy.Mode'Last) then
-
-         --  User and Category are the request's buffer, so use them
-         --  before this process makes an invocation of its own.
-
          Rights_Policy.Allow
-           (User, Category, Rights_Policy.Mode'Val (Mode), Success);
+           (Who, Category_Name, Rights_Policy.Mode'Val (Mode), Success);
       end if;
+
+      --  A change of policy is audited as a request is (ADR 0021,
+      --  section 6).
+
+      Ada.Text_IO.Put ("rights: allow " & Who & " " & Category_Name & ": ");
+      if not Success then
+         Ada.Text_IO.Put_Line ("refused");
+      else
+         Ada.Text_IO.Put_Line
+           (case Rights_Policy.Mode'Val (Mode) is
+               when Rights_Policy.None    => "none",
+               when Rights_Policy.Elevate => "elevate",
+               when Rights_Policy.Granted => "granted");
+      end if;
+      Ada.Text_IO.Flush;
 
       return (if Success then 1 else 0);
    end Allow;
