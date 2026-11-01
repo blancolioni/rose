@@ -13,7 +13,7 @@ src/library/kernelapi/generated/*
 !src/library/kernelapi/generated/Makefile
 src/tools/idl/idl.gpr
 src/tools/idl/src/idl-paths.ads
-rts/gnat-src
+rts/kernel/gnat-src
 *~
 make.log
 src/tests/*/obj

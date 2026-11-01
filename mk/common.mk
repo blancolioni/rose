@@ -36,5 +36,5 @@ GPRBUILD_CARGS=-cargs -gno-record-gcc-switches
 
 # The run-time system that the servers are built with, and the userland
 # one, which the other programs name in their project files.
-KERNEL_RTS=$(ROOT)/rts/build/$(ARCH)
-USER_RTS=$(ROOT)/src/rts/build/$(ARCH)-rose
+KERNEL_RTS=$(ROOT)/rts/kernel/build/$(ARCH)
+USER_RTS=$(ROOT)/rts/user/build/$(ARCH)-rose

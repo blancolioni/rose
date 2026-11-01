@@ -1,7 +1,7 @@
 ROSE := $(abspath ../..)
 BITLAYOUT := python3 $(ROSE)/scripts/bitlayout.py -o build/layouts
 LAYOUT_CHECK := --check \
-	--ada-arg=-m32 --ada-arg=--RTS=$(ROSE)/src/rts/build/i686-rose \
+	--ada-arg=-m32 --ada-arg=--RTS=$(ROSE)/rts/user/build/i686-rose \
 	-I $(ROSE)/src/base -I $(ROSE)/src/library/capabilities
 
 PROCESS_DIAGRAM := python3 $(ROSE)/scripts/process-diagram.py -o build/layouts
