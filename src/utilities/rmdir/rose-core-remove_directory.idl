@@ -1,0 +1,17 @@
+command Rose.Core.Remove_Directory : Standard_Error
+  with Summary     => "Remove an empty directory.",
+       Description => """
+          Remove_Directory removes the directory DIRECTORY_NAME from
+          DIRECTORY, which is home if it is not given, and ends the
+          directory's process. It fails if DIRECTORY_NAME is not a
+          directory, or if it has entries. The command is live: the
+          directory is removed as it runs (ADR 0012).
+          """,
+       Name        => "rmdir",
+       Live
+is
+   Directory_Name : String
+     with Help => "the directory to remove";
+   Directory : in Writable_Directory
+     with Help => "the directory that holds it";
+end Rose.Core.Remove_Directory;
