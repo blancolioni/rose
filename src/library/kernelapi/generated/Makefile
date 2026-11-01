@@ -1,7 +1,8 @@
 ROOT=../../../..
 include $(ROOT)/mk/common.mk
 
-IDL=cap block_device file_system directory file \
+IDL=cap block_device file_system directory file file_control \
+    file_version \
     writable_directory writable_file user \
     resource file_reader seekable_file_reader \
     stream_reader stream_writer stream seekable storage storage_checkpoint \
