@@ -8,13 +8,13 @@ vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest.bin
 
 # 128M raw disk: 512 * 16 * 32 * 512 bytes.
 ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
-ata0-master: type=disk, path="rose-hd0.img", mode=flat, cylinders=512, heads=16, spt=32
+ata0-master: type=disk, path="images/rose-hd0.img", mode=flat, cylinders=512, heads=16, spt=32
 ata0-slave: type=cdrom, path="images/rose.iso", status=inserted
 
 boot: cdrom
 
-com1: enabled=1, mode=file, dev=bochs-port-1.txt
+com1: enabled=1, mode=file, dev=logs/bochs-port-1.txt
 
 clock: sync=realtime, time0=local
 
-log: bochs.log
+log: logs/bochs.log

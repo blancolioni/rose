@@ -51,6 +51,10 @@ under QEMU, runs the self tests, and checks the checkpoint log; it needs
 `qemu-system-x86`.  `make hdd` creates a blank hard disk image there too, and
 `make all` builds everything, including the book.
 
+The scripts in `qemu` and `bochs` use the disk `images/rose-hd0.img`, which
+`make hdd` makes (`qemu/init-qemu.sh` makes it if it isn't there), and write
+their serial output to `logs`.
+
 `clean-build.sh` runs `make -j` with a job for each processor (set `JOBS` to
 change that), and so can you.  `make` builds the run-time systems if they are
 missing, but doesn't rebuild them when their sources change: `make rts` does
