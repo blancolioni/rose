@@ -1,6 +1,6 @@
 command Rose.Core.Petal
   : Standard_IO, Create_Endpoint, Delete_Cap, Rescind_Cap, Find_Command,
-    Console, Clock_Service
+    Console, Clock_Service, Rights_Service
   with Summary     => "Run the shell for a user.",
        Description => """
           Petal is the shell. It runs the user's .petalrc, then reads

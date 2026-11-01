@@ -150,6 +150,23 @@ package body Petal.Signatures is
                      end;
                   end;
                end if;
+            elsif Key = "category" then
+               --  "category <role> <category>": for the role of that name.
+
+               for I in Field.First .. Field.Last loop
+                  if Result.Text (I) = ' ' then
+                     for Role of
+                       Result.Role_Caps (1 .. Result.Role_Cap_Count)
+                     loop
+                        if Result.Text (Role.Name.First .. Role.Name.Last)
+                          = Result.Text (Field.First .. I - 1)
+                        then
+                           Role.Category := (I + 1, Field.Last);
+                        end if;
+                     end loop;
+                     exit;
+                  end if;
+               end loop;
             elsif Key = "argument" then
                if Result.Argument_Count < Max_Arguments then
                   Result.Argument_Count := Result.Argument_Count + 1;
