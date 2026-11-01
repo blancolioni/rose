@@ -667,6 +667,7 @@ package body Init.Run is
          Commands        => Commands_Cap,
          Timer           => Init.Boot.Timer_Interface_Cap,
          Clock           => Clock_Cap,
+         Rights          => Rights_Cap,
          Auth            => Auth_Cap)
       then
          Init.Calls.Send_String

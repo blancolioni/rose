@@ -45,6 +45,7 @@ package Init.Users is
       Commands        : Rose.Capabilities.Capability;
       Timer           : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
+      Rights          : Rose.Capabilities.Capability;
       Auth            : Rose.Capabilities.Capability)
       return Boolean;
    --  Launch login as a command on the console (#457). It completes its

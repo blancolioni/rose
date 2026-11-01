@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-30
-- **Amended by:** #549, where the grants are proxies and not derived caps, a server of the kernel target can't fail a call by raising, and `*` covers every category (sections 3 and 4); and a change to `sudo`, which now names the categories that it grants (sections 2 and 7)
+- **Amended by:** #549, where the grants are proxies and not derived caps, a server of the kernel target can't fail a call by raising, and `*` covers every category (sections 3 and 4); and a change to `sudo`, which now names the categories that it grants, and warns when one isn't needed (sections 2 and 7)
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands and roles), [ADR 0003](0003-directories-files-and-users.md) (users), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes), [ADR 0018](0018-credentials-after-restore.md) (credentials after a restore), [ADR 0020](0020-clock.md) (the clock), #494 (the clock), #455 (auth), #457 (login), #458 (petal), blancolioni/idle#63 (`Boolean` in operations)
 
 ## Context
@@ -50,13 +50,13 @@ Petal binds a public role from the caps it holds, as now. For a categorised role
 
 - **Without `sudo`,** petal asks for a role with `Elevate` false. The broker grants it only if the user's policy for the category is `granted` (section 4). Otherwise petal refuses, before launching the command: `date: needs elevation (time)`.
 - **`sudo CATEGORIES COMMAND ARGUMENTS` is a petal built-in,** and the user says what is granted. `CATEGORIES` is one word: a category, or several separated by commas (`network`, or `network,time`). A category covers the ones below it, so `network` covers `network.dns`. Petal finds `COMMAND` as usual and launches it exactly as it would, but asks the broker with `Elevate` true for each categorised role that a named category covers. There is no form without the categories.
-- **Petal refuses a `sudo` that doesn't fit the command,** before it launches it, because the command's categories are in its metadata (section 1):
-  - a categorised role that no named category covers: `ifconfig: needs elevation (time)`;
-  - a named category that covers none of the command's roles: `ifconfig: does not need time`;
-  - a command with no categorised role at all: `date: needs no elevation`.
+- **Petal checks a `sudo` against the command,** before it launches it, because the command's categories are in its metadata (section 1):
+  - a categorised role that no named category covers is refused: `ifconfig: needs elevation (time)`;
+  - a named category that covers none of the command's roles is a warning, and the command still runs: `petal: warning: ifconfig does not need time`;
+  - a command with no categorised role at all is a warning too: `petal: warning: date needs no elevation`.
 
-  So what the user grants is what the command needs, no less, since it wouldn't run, and no more.
-- **The broker isn't told which categories were named.** Petal is the user's own process, so the broker couldn't rely on what it says, and it decides by role and policy, as before. The names are for the user, for the refusals above, and for the password prompt (see the open questions).
+  So what the user grants covers what the command needs, since it wouldn't run otherwise. A grant that the command doesn't need is said aloud and not refused, because a refusal would stop a command that is safe to run, and a warning costs nothing. Whether it should be a refusal is for use to decide.
+- **The broker isn't told which categories were named.** Petal is the user's own process, so the broker couldn't rely on what it says, and it decides by role and policy, as before. The names are for the user, for the refusals and warnings above, and for the password prompt (see the open questions).
 - **`sudo` is not a program,** so there is nothing that holds more authority than petal and runs on behalf of a user, and the command is launched by the same code that launches every command.
 - **Petal hands the caps to the command and deletes its own copies.** They are held by the job and nowhere else in the session, and cross its membrane like any other cap (ADR 0002).
 - **When the command exits,** petal tells the broker, which revokes the grant. A copy that the command passed on stops working too, because the proxy refuses it.
@@ -149,8 +149,8 @@ The broker writes a line to the log for every request, with the user, the role, 
 
 - **The kernel doesn't change.** There is no superuser flag and no uid. Everything is caps, derived and rescinded, as before.
 - **Privileged caps are in three places:** their source, init, and the broker. Not in petal, login, or any user's session.
-- **A privilege is visible before a command runs.** `--help` shows the category, and petal refuses early with the name of what is missing.
-- **A user says what they grant.** `sudo network ifconfig` grants `network` and nothing else, and a command that needs more, or less, is refused.
+- **A privilege is visible before a command runs.** `--help` shows the category, and petal refuses early with the name of what is missing, and warns of what is not needed.
+- **A user says what they grant.** `sudo network ifconfig` grants `network` and nothing else, and a command that needs more is refused, and one that needs less gets a warning.
 - **Finer than "root".** A user can be allowed `time` and not `accounts`, and a later `network.dns` can be given apart from `network`.
 - **`sudo` is petal's, not a program.** Another shell would need its own, which is a reason to keep the code in a library when there is another.
 - **A restore ends every elevated job.** That is the strictest choice, and the cost is that someone who ran a long job under `sudo` has to run it again.
@@ -184,7 +184,7 @@ The broker writes a line to the log for every request, with the user, the role, 
 - idle: a `Category` aspect on roles, and a `category` line in command metadata.
 - The `rights` server, with `Rights` and `Rights_Admin`, and a policy that survives a checkpoint.
 - Init: keep the `Clock_Admin` cap from the installer, start `rights` with it, and set the first user's policy.
-- Petal: ask the broker for a categorised role, refuse a launch that lacks it, and the `sudo CATEGORIES COMMAND` built-in, with its refusals.
+- Petal: ask the broker for a categorised role, refuse a launch that lacks it, and the `sudo CATEGORIES COMMAND` built-in, with its refusals and warnings.
 - A command that sets the time, with the role `Clock_Admin_Service`, and a boot test that sets the time, reads it, and reads it again after a restore (the RTC write, which nothing covers yet).
 - A password check before a grant, when the console can prompt (ADR 0018, #507).
 - A section in the Rose Book.

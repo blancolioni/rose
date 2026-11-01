@@ -79,6 +79,10 @@ package Petal.Signatures is
          Kind      : Role_Cap_Kind := Other_Role_Cap;
          Name      : Slice;
          Cap_Index : Natural := 0;
+         Category  : Slice;
+         --  The role's category (ADR 0021), empty if it has none. The
+         --  authority of a categorised role comes from the rights
+         --  broker, and not from petal.
       end record;
 
    type Role_Cap_Array is array (1 .. Max_Role_Caps) of Role_Cap_Record;
@@ -115,6 +119,10 @@ package Petal.Signatures is
       Result : out Signature);
    --  The signature in the metadata Text. Result.Valid is False if Text is
    --  not command metadata.
+
+   function Is_Categorised (Role : Role_Cap_Record) return Boolean
+   is (Role.Category.Last >= Role.Category.First);
+   --  True if Role has a category.
 
    function Value
      (Item  : Signature;
