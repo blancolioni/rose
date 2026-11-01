@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Clock is
 
    --  Built with the userland run-time system and the user-mode IDL
@@ -45,7 +47,7 @@ project Clock is
    --  them (#170). GNAT warns about each such raise.
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatw.X", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib");
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatw.X", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
    end Compiler;
 
    package Binder is

@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Cat is
 
    --  Built with the userland run-time system and the user-mode IDL
@@ -28,7 +30,7 @@ project Cat is
    --  them (#170). GNAT warns about each such raise.
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatw.X", "-gnatyM79abcefhiklnoprst");
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatw.X", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
    end Compiler;
 
    package Binder is
