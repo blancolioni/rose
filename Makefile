@@ -174,17 +174,20 @@ config:
 	mkdir -p ./images/iso/rose/install/drivers
 
 
+# What the build makes, and nothing else: the generated interfaces, the run-time
+# systems (which clean themselves), the programs' build directories, the
+# images, and the logs.  What is in git stays, such as logs/rose-log-files.txt
+# and images/iso/boot/grub, and so does a disk image (rose-hd0.img): that is
+# data.
 clean:
 	$(MAKE) -C src/library/kernelapi/generated clean
 	$(MAKE) -C rts clean
 	$(MAKE) -C src/rts clean
 	$(MAKE) -C doc clean
 	rm -rf build/*
-	rm -rf `find src -name build -print`
-	rm -f `find src -name "*.o" -print`
-	rm -f images/rose-boot-floppy.img
-	rm -f $(ROSE)
-	rm -f `find . -name "*~" -print`
-	rm -f `find . -name "b~*" -print`
-	rm -f src/rts/support/librose-util.a
+	rm -rf src/servers/*/build src/drivers/*/build src/utilities/*/build
+	rm -rf images/tmp images/drivers images/iso/rose images/rose.iso images/rose-boot-floppy.img
+	find images/iso/boot -maxdepth 1 -type f -delete
+	rm -f logs/rose-objdump.txt logs/rose-*-objdump.txt logs/rose-*-elf.txt logs/rose-*.sha1 logs/rose-iso.log
+	find src rts projects -name "b~*" -delete
 

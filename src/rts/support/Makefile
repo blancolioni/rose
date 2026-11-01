@@ -21,7 +21,7 @@ RAISE_OPTS=-isystem $(GCC_INCLUDE) -Igcc -DIN_RTS -DSTANDALONE -DGXX_EH_INTEROP=
 all: librose-util
 
 clean:
-	rm librose-util.a $(OBJECTS)
+	rm -f librose-util.a $(OBJECTS)
 
 librose-util: $(OBJECTS)
 	ar cr librose-util.a $(OBJECTS)
