@@ -45,4 +45,13 @@ package body System.OS_Lib is
       Last_Errno := Err;
    end Set_Errno;
 
+   ------------
+   -- To_Ada --
+   ------------
+
+   function To_Ada (Time : Long_Long_Integer) return OS_Time is
+   begin
+      return OS_Time (Time);
+   end To_Ada;
+
 end System.OS_Lib;
