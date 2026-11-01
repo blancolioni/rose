@@ -1,0 +1,15 @@
+command Rose.Core.Copy : Standard_Error
+  with Summary     => "Copy a file.",
+       Description => """
+          Copy writes the contents of SOURCE to TARGET, a file in the home
+          directory, which is replaced if it exists and made if it
+          doesn't. The command is a transaction (ADR 0012): TARGET
+          changes only if the copy completes, so a copy that fails leaves
+          TARGET as it was, or leaves no TARGET.
+          """
+is
+   Source : in File
+     with Help => "the file to copy";
+   Target : in Writable_File
+     with Help => "the file to write";
+end Rose.Core.Copy;
