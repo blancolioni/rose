@@ -62,6 +62,7 @@ end Writable_File;
   - `X : in Versioned` would be a legal argument that means nothing.
   - If the interface carried the versioning protocol, every command given a version could commit or discard it itself, which defeats section 3.
   - If #141 needs a uniform protocol for versions, it goes on a separate interface that only the shell and the persistence layer hold.
+  - **Amended by #141:** a version of a file is a `File_Version`, which `Writable_Directory.New_File_Version` returns. A command given a `Writable_Directory` can make versions, which gives it no power it didn't have, but it never holds the `File_Version` of a version the shell made for it, so it can't commit or discard what it was given.
 - **It replaces the names `File` and `Directory`** in idle's `Grants_Right`, which treats those two interfaces and their descendants specially. With section 1, interface arguments need no special case for direction. `Versioned` only decides which arguments a transaction covers (section 3).
 
 ### 3. The command is the transaction
