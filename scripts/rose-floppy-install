@@ -1,9 +1,0 @@
-#!/bin/sh
-rm -f images/rose-boot-floppy.img
-gunzip -c images/bootgrub.gz > images/rose-boot-floppy.img
-mount /mnt/rose/rose-fd0/
-cp images/floppy/grub/menu.lst /mnt/rose/rose-fd0/boot/grub
-cp images/tmp/* /mnt/rose/rose-fd0
-df /mnt/rose/rose-fd0
-umount /mnt/rose/rose-fd0
-chown fraser images/rose-boot-floppy.img

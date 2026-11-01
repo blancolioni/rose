@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Keyboard is
 
    --  Built with the userland run-time system (#490), which has Rose's
@@ -22,7 +24,7 @@ project Keyboard is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib");
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
    end Compiler;
 
    package Binder is

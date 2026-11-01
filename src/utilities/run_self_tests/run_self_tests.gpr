@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Run_Self_Tests is
 
    --  The user-mode IDL target's packages are generated in
@@ -24,7 +26,7 @@ project Run_Self_Tests is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst");
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
    end Compiler;
 
    package Binder is
