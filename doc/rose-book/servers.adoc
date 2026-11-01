@@ -220,9 +220,9 @@ Used by:: `init`, which gets both interfaces from the installer; `login`, `petal
   The wait for the edge takes up to a second.
 * *A restore carries on from the last readings.* The tick count starts again at zero after a reboot, so the driver takes a new base for it, and the monotonic time continues from the last value that it returned.
   The real time is the later of the CMOS clock and the last value.
-  If the CMOS clock is more than a second behind that value, the real time is held at the checkpoint's time and `Realtime_Is_Trusted` is 0.
-* *`Realtime_Is_Trusted` is 0 or 1.* It is 0 when the CMOS clock's battery bit is clear, its fields are out of range, or the clock is held at the checkpoint's time.
-  It is 1 again after `Set_Realtime`.
+  If the CMOS clock is more than a second behind that value, the real time is held at the checkpoint's time and `Realtime_Is_Trusted` is false.
+* *`Realtime_Is_Trusted` is false* when the CMOS clock's battery bit is clear, its fields are out of range, or the clock is held at the checkpoint's time.
+  It is true again after `Set_Realtime`.
 * *`Set_Realtime` writes the CMOS clock at the next whole second,* and fails for a time before 2000 or from 2100.
   It is the only way that the real time goes backwards.
   Only `init` and the rights broker hold `Clock_Admin`, and nothing calls `Set_Realtime` yet (#552).

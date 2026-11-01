@@ -45,7 +45,7 @@ package body Clock.Server is
 
    overriding function Realtime_Is_Trusted
      (Item : in out Clock_Object)
-      return Rose.Words.Word;
+      return Boolean;
 
    overriding procedure Set_Realtime
      (Item        : in out Clock_Object;
@@ -245,11 +245,11 @@ package body Clock.Server is
 
    overriding function Realtime_Is_Trusted
      (Item : in out Clock_Object)
-      return Rose.Words.Word
+      return Boolean
    is
       pragma Unreferenced (Item);
    begin
-      return (if Trusted then 1 else 0);
+      return Trusted;
    end Realtime_Is_Trusted;
 
    --------------------
