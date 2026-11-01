@@ -3,16 +3,14 @@ include $(ROOT)/mk/common.mk
 
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/partition.reloc.o
-ENVIRONMENT_OBJECTS= \
-	$(BUILDDIR)/rose-environment.o \
-	$(BUILDDIR)/rose-environment_pages.o \
-	$(BUILDDIR)/rose-environment-arguments.o
-
-LIBROSE_OBJECTS=$(BUILDDIR)/rose-strings.o
 BLOCK_DEVICE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-block_device-server.o
+
+PARTITION_SETUP_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-partition_setup.o \
+	$(BUILDDIR)/rose-interfaces-partition_setup-server.o
 
 OBJECTS= \
 	$(BUILDDIR)/partition.o \
@@ -30,9 +28,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o \
-	$(ENVIRONMENT_OBJECTS) \
-	$(LIBROSE_OBJECTS) \
-	$(BLOCK_DEVICE_OBJECTS)
+	$(BLOCK_DEVICE_OBJECTS) \
+	$(PARTITION_SETUP_OBJECTS)
 
 all: partition $(RELOC)
 	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/partition $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
