@@ -1,0 +1,16 @@
+command Rose.Core.Remove : Standard_Error
+  with Summary     => "Remove a file from a directory.",
+       Description => """
+          Remove removes the file NAME from DIRECTORY, which is home if it
+          is not given, and ends the file's process. Anything that still
+          holds the file finds that it has gone. It fails if NAME is not a
+          file; rmdir removes a directory. The command is live: the file
+          is removed as it runs (ADR 0012).
+          """,
+       Live
+is
+   Name : String
+     with Help => "the file to remove";
+   Directory : in Writable_Directory
+     with Help => "the directory that holds it";
+end Rose.Core.Remove;
