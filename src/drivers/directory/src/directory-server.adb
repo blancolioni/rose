@@ -9,6 +9,7 @@ with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
+with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_Directory.Server;
 with Rose.Interfaces.Writable_File;
@@ -41,6 +42,10 @@ package body Directory.Server is
            Rose.Capabilities.Null_Capability;
          --  The read-only interface of the file or directory, made the
          --  first time it is asked for.
+         Process   : Rose.Interfaces.Process.Client.Process_Client;
+         --  The file or directory's process, which Launch returned. Its
+         --  Destroy ends the process when the entry is deleted (#424,
+         --  #346).
       end record;
 
    --  The directory is one object, served through Writable_Directory
@@ -164,6 +169,7 @@ package body Directory.Server is
    is
       Existing      : constant Natural := Find (Name);
       Interface_Cap : Rose.Capabilities.Capability;
+      Process_Cap   : Rose.Capabilities.Capability;
       Saved_Name    : String (1 .. Max_Name_Length);
       Saved_Last    : Natural;
    begin
@@ -194,6 +200,7 @@ package body Directory.Server is
            Launch (Kind);
       begin
          Interface_Cap := Process.Published_Interface;
+         Process_Cap := Process.Process_Cap;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
             return Rose.Capabilities.Null_Capability;
@@ -210,6 +217,7 @@ package body Directory.Server is
          New_Entry.Name := Saved_Name;
          New_Entry.Name_Last := Saved_Last;
          New_Entry.Kind := Kind;
+         New_Entry.Process.Open (Process_Cap);
          if Kind = Rose.Interfaces.Directory.Ordinary_File then
             New_Entry.File.Open (Interface_Cap);
          else
