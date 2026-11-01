@@ -15,10 +15,9 @@ package body File.Server is
    use type Rose.Objects.Capability_Identifier;
 
    Max_Size : constant := 2 ** 16;
-   --  User-mode malloc can't grow (#229), so the contents are a fixed
-   --  buffer. Only the pages that are written use memory, but elf
-   --  reserves store for the whole of .bss when the process starts, so
-   --  the buffer is kept small.
+   --  A file holds at most 64 KiB for now (#215), in a fixed buffer. A
+   --  page of it uses memory only once it is written, and space on a
+   --  device only once it is written back (#305).
 
    Context  : Rose.Server.Server_Context;
    Contents : Storage_Array (1 .. Max_Size);
@@ -84,6 +83,10 @@ package body File.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Storage_Count;
 
+   procedure Truncate
+     (Id   : Rose.Objects.Capability_Identifier;
+      Size : Storage_Count);
+
    procedure Write
      (Id     : Rose.Objects.Capability_Identifier;
       Buffer : Storage_Array);
@@ -99,7 +102,8 @@ package body File.Server is
          Size                 => Size'Access,
          Open_Reader          => Open_Reader'Access,
          Open_Seekable_Reader => Open_Seekable_Reader'Access,
-         Write                => Write'Access);
+         Write                => Write'Access,
+         Truncate             => Truncate'Access);
       Rose.Interfaces.Seekable_File_Reader.Server.Attach_Interface
         (Server_Context => Context,
          Read           => Read'Access,
@@ -267,6 +271,29 @@ package body File.Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   --------------
+   -- Truncate --
+   --------------
+
+   --  A reader past the new end moves back to it, as a seek past the end
+   --  does (#215).
+
+   procedure Truncate
+     (Id   : Rose.Objects.Capability_Identifier;
+      Size : Storage_Count)
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Size < Length then
+         Length := Size;
+         for Reader of Readers loop
+            if Reader.Position > Length then
+               Reader.Position := Length;
+            end if;
+         end loop;
+      end if;
+   end Truncate;
 
    -----------
    -- Write --
