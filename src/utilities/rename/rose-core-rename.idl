@@ -1,0 +1,18 @@
+command Rose.Core.Rename : Standard_Error
+  with Summary     => "Rename an entry in a directory.",
+       Description => """
+          Rename gives the entry FROM in DIRECTORY, which is home if it is
+          not given, the name TO. Only the entry changes: the file or
+          directory is the same, so anything that holds it keeps it. It
+          fails if FROM is not an entry, or if TO is already one. The
+          command is live: the entry is renamed as it runs (ADR 0012).
+          """,
+       Live
+is
+   From : String
+     with Help => "the entry's name";
+   To : String
+     with Help => "its new name";
+   Directory : in Writable_Directory
+     with Help => "the directory that holds it";
+end Rose.Core.Rename;
