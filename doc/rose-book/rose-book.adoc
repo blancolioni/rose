@@ -27,5 +27,7 @@ include::boot.adoc[leveloffset=+1]
 
 include::petal.adoc[leveloffset=+1]
 
+include::verification.adoc[leveloffset=+1]
+
 [appendix]
 include::architectures.adoc[leveloffset=+1]
