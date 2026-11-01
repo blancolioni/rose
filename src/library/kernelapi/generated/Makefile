@@ -6,7 +6,7 @@ IDL=cap block_device file_system directory file \
     resource file_reader seekable_file_reader \
     stream_reader stream_writer stream seekable storage storage_checkpoint \
     bank state \
-    ata partitions keyboard_handler interrupt_handler \
+    ata partitions partition_setup keyboard_handler interrupt_handler \
     launch exec region executable memory memory_restore process segment \
     server \
     timeout timer constructor cap_set terminal event_source event_listener \

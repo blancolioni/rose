@@ -106,6 +106,30 @@ package body Tests.Files is
          Ada.Text_IO.Put (": wrong contents after a seek");
          return False;
       end if;
+
+      --  Truncating shortens the file, and moves a reader that was past
+      --  the new end back to it, so that it reads what is written next
+      --  (#347). A larger size leaves the file as it is.
+
+      Seekable.Seek (Rose.Words.Word_64'(4));
+      File.Truncate (2);
+      if File.Size /= 2 then
+         Ada.Text_IO.Put (": wrong size after truncate");
+         return False;
+      end if;
+
+      File.Truncate (Hello'Length);
+      if File.Size /= 2 then
+         Ada.Text_IO.Put (": truncate made the file longer");
+         return False;
+      end if;
+
+      File.Write (Hello (3 .. 5));
+      Seekable.Read (Buffer, Last);
+      if Last /= 3 or else Buffer (1 .. 3) /= Hello (3 .. 5) then
+         Ada.Text_IO.Put (": a reader past the end did not move back");
+         return False;
+      end if;
       Seekable.Close;
 
       --  A read-only client opens readers too, and has no write cap to

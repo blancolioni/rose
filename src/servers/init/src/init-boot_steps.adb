@@ -4,6 +4,7 @@ with Rose.Words;
 with Rose.Devices.Partitions;
 
 with Rose.Interfaces.Block_Device;
+with Rose.Interfaces.Partition_Setup.Client;
 with Rose.Interfaces.Partitions.Client;
 
 with Init.Boot;
@@ -19,9 +20,9 @@ package body Init.Boot_Steps is
       Bound      : Rose.Words.Word_64;
       Block_Size : Rose.Words.Word)
       return Rose.Capabilities.Capability;
-   --  Launch a partition server for hd0's blocks Start .. Bound - 1, in
-   --  512-byte blocks, and return its block device interface, which has
-   --  blocks of Block_Size bytes.
+   --  Launch a partition server for hd0's blocks Start .. Bound, in
+   --  512-byte blocks, tell it so with Partition_Setup, and return its
+   --  block device interface, which has blocks of Block_Size bytes.
 
    ----------
    -- Copy --
@@ -88,11 +89,22 @@ package body Init.Boot_Steps is
                          Rose.Init_Capabilities.Create_Endpoint_Cap,
                          Init.Boot.Cap_Set_Cap,
                          (Init.Boot.Console_Interface_Cap,
-                          Init.Boot.Hd0_Cap),
-                         (Rose.Words.Word (Start),
-                          Rose.Words.Word (Bound),
-                          Block_Size));
+                          Init.Boot.Hd0_Cap));
+      Setup       : Rose.Interfaces.Partition_Setup.Client
+                      .Partition_Setup_Client;
    begin
+      --  The server refuses every block request until it has its range,
+      --  and nothing has the block device interface before this returns.
+
+      Rose.Interfaces.Partition_Setup.Client.Open
+        (Setup,
+         Copy
+           (Copy_Id_Cap,
+            Rose.Interfaces.Partition_Setup.Partition_Setup_Interface));
+      Rose.Interfaces.Partition_Setup.Client.Set_Range
+        (Setup, Start, Bound, Block_Size);
+      Rose.Interfaces.Partition_Setup.Client.Close (Setup);
+
       return Copy
         (Copy_Id_Cap,
          Rose.Interfaces.Block_Device.Block_Device_Interface);
