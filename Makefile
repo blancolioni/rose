@@ -63,14 +63,14 @@ KERNEL_RTS_LIB=$(KERNEL_RTS)/adalib/libgnat.a
 USER_RTS_LIB=$(USER_RTS)/adalib/libgnat.a
 
 $(KERNEL_RTS_LIB):
-	$(MAKE) -C rts
+	$(MAKE) -C rts/kernel
 
 $(USER_RTS_LIB): $(KERNEL_RTS_LIB)
-	$(MAKE) -C src/rts
+	$(MAKE) -C rts/user
 
 rts:
-	$(MAKE) -C rts
-	$(MAKE) -C src/rts
+	$(MAKE) -C rts/kernel
+	$(MAKE) -C rts/user
 
 interfaces: idl
 
@@ -178,8 +178,8 @@ config:
 # data.
 clean:
 	$(MAKE) -C src/library/kernelapi/generated clean
-	$(MAKE) -C rts clean
-	$(MAKE) -C src/rts clean
+	$(MAKE) -C rts/kernel clean
+	$(MAKE) -C rts/user clean
 	$(MAKE) -C doc clean
 	rm -rf build/*
 	rm -rf src/servers/*/build src/drivers/*/build src/utilities/*/build
