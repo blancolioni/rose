@@ -42,7 +42,7 @@ all:
 # and skips their recipes.
 
 .PHONY: all rose programs check-env test rts interfaces idl config kernel boot exports stripped \
-    bootdisk hdd iso floppy finished doc clean publish-iso \
+    bootdisk hdd iso finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
 # Check the tools before building anything; clean-build.sh does this first.
@@ -123,9 +123,6 @@ publish-iso:
 	sed -n 's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
 	  src/base/rose-version.ads > $(ISO_PUBLISH_DIR)/rose.iso.version
 
-floppy:
-	sh ./scripts/rose-floppy-install
-
 finished:
 	@echo Build finished at `date`
 
@@ -186,7 +183,7 @@ clean:
 	$(MAKE) -C doc clean
 	rm -rf build/*
 	rm -rf src/servers/*/build src/drivers/*/build src/utilities/*/build
-	rm -rf images/tmp images/drivers images/iso/rose images/rose.iso images/rose-boot-floppy.img
+	rm -rf images/tmp images/drivers images/iso/rose images/rose.iso
 	find images/iso/boot -maxdepth 1 -type f -delete
 	rm -f logs/rose-objdump.txt logs/rose-*-objdump.txt logs/rose-*-elf.txt logs/rose-*.sha1 logs/rose-iso.log
 	find src rts projects -name "b~*" -delete
