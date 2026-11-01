@@ -78,17 +78,6 @@ package Init.Calls is
       Create_Cap_Set  : Rose.Capabilities.Capability;
       Launch_Caps     : Array_Of_Capabilities)
       return Rose.Capabilities.Capability;
-
-   function Launch_Boot_Module
-     (Cap             : Rose.Capabilities.Capability;
-      Module_Index    : Rose.Words.Word;
-      Oid             : Rose.Objects.Object_Id;
-      Priority        : Rose.Words.Word;
-      Create_Endpoint : Rose.Capabilities.Capability;
-      Create_Cap_Set  : Rose.Capabilities.Capability;
-      Launch_Caps     : Array_Of_Capabilities;
-      Launch_Words    : Array_Of_Words)
-      return Rose.Capabilities.Capability;
    --  Launch a boot module with object id Oid, and return a copy cap for
    --  it, or the null cap if the launch failed.  The module's first cap
    --  is Create_Endpoint.

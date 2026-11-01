@@ -150,10 +150,6 @@ package Mem.Processes is
       Executable    : Boolean;
       Resizable     : Boolean);
 
-   procedure Add_Environment
-     (Process       : Process_Id;
-      Environment   : System.Storage_Elements.Storage_Array);
-
    procedure Resize_Segment
      (Process           : Process_Id;
       New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address);

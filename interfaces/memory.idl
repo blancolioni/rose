@@ -15,8 +15,7 @@ interface Memory is
       Data_Base   : Word;
       Data_Bound  : Word;
       Stack_Base  : Word;
-      Stack_Bound : Word;
-      Environment : Storage_Array);
+      Stack_Bound : Word);
       
    procedure Page_Fault
      (Faulting_Object : Object_Id;

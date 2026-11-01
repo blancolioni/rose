@@ -14,9 +14,8 @@ package Rose.Kernel.Page_Table is
    --  Give the page tables that a process's page directory has of its
    --  own back to the kernel heap, and clear the entries that held them.
    --  That is every entry not shared with the kernel's directory: the
-   --  user range, and the process's mappings above it, such as its stack
-   --  and environment page. The pages they mapped are not the kernel's,
-   --  and are not freed.
+   --  user range, and the process's mappings above it, such as its stack.
+   --  The pages they mapped are not the kernel's, and are not freed.
 
    procedure Activate_Page_Directory
      (Directory_Page : Rose.Addresses.Virtual_Page_Address);
@@ -32,8 +31,8 @@ package Rose.Kernel.Page_Table is
       Managed        : Boolean := False);
    --  Managed is true for a page the memory server maps.  Only those are
    --  part of a checkpoint, so Disable_Page_Writes leaves every other
-   --  page writable: device pages such as the VGA text page, shared
-   --  invocation buffers, and environment pages.
+   --  page writable: device pages such as the VGA text page, and shared
+   --  invocation buffers.
 
    procedure Unmap_Page
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;

@@ -559,7 +559,7 @@ private
          Code_Page         : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
-         Env_Page          : Rose.Addresses.Physical_Page_Address;
+         Invocation_Page   : Rose.Addresses.Physical_Page_Address;
          Checkpoint_Fault  : Rose.Addresses.Virtual_Page_Address;
          Pending_Fault_Page    : Rose.Addresses.Virtual_Page_Address := 0;
          Pending_Fault_Mapped  : Boolean := False;
@@ -592,7 +592,7 @@ private
      (Pid : Rose.Kernel.Processes.Process_Id;
       Name : String);
    --  Set up the entry for a new process Pid, with its page directory,
-   --  environment page and standard page ranges, ready to start.
+   --  invocation buffer page and standard page ranges, ready to start.
 
    Process_Table_Heap_Size : constant Rose.Addresses.Physical_Bytes :=
                                Kernel_Process_Table'Size / 8
