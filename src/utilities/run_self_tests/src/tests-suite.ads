@@ -1,3 +1,4 @@
+with Tests.Ada_Calendar;
 with Tests.Clock;
 with Tests.Containers;
 with Tests.Directories;
@@ -39,6 +40,7 @@ package Tests.Suite is
                    Tests.Users.User_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
+                   Tests.Ada_Calendar.Ada_Calendar_Test'Access,
                    Tests.Rights.Rights_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,

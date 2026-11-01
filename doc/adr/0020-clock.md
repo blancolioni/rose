@@ -116,7 +116,7 @@ What follows from it:
 ### 6. Clients
 
 - **The run-time system gets a `Rose.Clock` package** over a `Clock` cap: `Monotonic` and `Realtime` as `Word_64`, and conversions.
-- **`Ada.Calendar` is built on it** (#497), and `No_Calendar` goes from the userland restrictions. `Ada.Calendar.Clock` is `Realtime` converted to `Time`, and the zone is UTC (section 1). It returns the reading when `Realtime_Is_Trusted` is False, since it can't fail. `Ada.Real_Time` and `delay until` can be built on `Monotonic` with the tasking work (#363).
+- **`Ada.Calendar` is built on it** (#497), and `No_Calendar` goes from the userland restrictions. `Ada.Calendar.Clock` is `Realtime` converted to `Time`, and the zone is UTC (section 1). It returns the reading when `Realtime_Is_Trusted` is False, since it can't fail on that account. The run-time system has no cap of its own, so `Rose.Clock.Open` registers a reader with it (`Rose.Clock_Source`), and `Clock` raises `Program_Error` in a program that hasn't opened the clock. `Ada.Real_Time` and `delay until` can be built on `Monotonic` with the tasking work (#363).
 - **A command asks for a clock in its declaration,** as it asks for any other cap (ADR 0002), and the shell binds the system's `Clock` unless a user binds another. A test binds a fixed one, which is any server that implements `Clock`.
 - **A server that needs timestamps** (`checkpoint`, a file server) takes a `Clock` cap from init, as the random server will.
 - **`timer` doesn't change.** It still counts in ticks. A later change could let it take a `Monotonic` deadline.
@@ -159,7 +159,7 @@ What follows from it:
 - The `clock` server: the RTC, the offset, `Restored` and `Set_Realtime`.
 - The boot description, the object id, the kernel's module lists, and the caps that init grants (ticks and ports).
 - The kernel's 64-bit counter and `Get_Current_Ticks_64`, replacing `Get_Current_Ticks`, with `timer` moved over.
-- `Rose.Clock` in the run-time system. `Ada.Calendar` and removing `No_Calendar` from the userland restrictions are #497, which is blocked on this.
+- `Rose.Clock` in the run-time system. `Ada.Calendar` is #497, and `No_Calendar` is gone from the userland restrictions. It is GCC's package, with a Rose `System.OS_Primitives` that reads the registered clock, a time zone of zero, and 64-bit division from libgcc.
 - A test: read the clock twice with a delay between, check that `Monotonic` advanced and that `Realtime` is within a second of the host's, and cover a restore (a checkpoint, a delay, a restore, and a check that neither reading went backwards and that real time includes the downtime).
 - A test for `Set_Realtime`, including that the RTC has the new time after a reboot.
 - A proof plan under #42: the conversions from RTC fields to nanoseconds and back are small, and need no heap.

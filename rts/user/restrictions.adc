@@ -1,5 +1,4 @@
 --  pragma Restrictions (No_Allocators);
-pragma Restrictions (No_Calendar);
 pragma Restrictions (No_Implicit_Dynamic_Code);
 pragma Restrictions (No_Initialize_Scalars);
 pragma Restrictions (No_Tasking);

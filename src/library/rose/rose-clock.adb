@@ -1,3 +1,4 @@
+with Rose.Clock_Source;
 with Rose.Interfaces.Clock.Client;
 with Rose.Interfaces.Objects;
 
@@ -8,6 +9,9 @@ package body Rose.Clock is
 
    Source : Rose.Interfaces.Clock.Client.Clock_Client;
    Opened : Boolean := False;
+
+   function Read_Realtime return Rose.Words.Word_64;
+   --  Realtime, for Rose.Clock_Source, which can't have a precondition.
 
    -------------
    -- Is_Open --
@@ -38,7 +42,21 @@ package body Rose.Clock is
    begin
       Source.Open (Clock);
       Opened := True;
+
+      --  Ada.Calendar.Clock reads the clock through the run-time system,
+      --  which has no cap of its own (#497).
+
+      Rose.Clock_Source.Set (Read_Realtime'Access);
    end Open;
+
+   -------------------
+   -- Read_Realtime --
+   -------------------
+
+   function Read_Realtime return Rose.Words.Word_64 is
+   begin
+      return Realtime;
+   end Read_Realtime;
 
    --------------
    -- Realtime --
