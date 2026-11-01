@@ -291,8 +291,10 @@ The rights broker (ADR 0021, #549): it holds the caps that grant authority, and 
 
 Provides:: `Rights`, whose `Request` asks for the authority of a role and `Finish` ends a grant; and `Rights_Admin`, whose `Allow` sets the policy.
 Requests:: `Create_Endpoint`, `Standard_Output` and the privileged roles that it holds (`Clock_Admin_Service`, so far), as roles of its command declaration.
-Used by:: nothing yet. `init` will launch it and give the first user their policy (#550), and `petal` will ask it for a command's privileged roles (#551).
+Used by:: `init`, which launches it on a first boot, with the clock's `Clock_Admin` interface as the role `Clock_Admin_Service`, and gives the first user, `fraser`, a policy of `elevate` for every category (#550). `petal` will ask it for a command's privileged roles (#551).
 
+* *Init keeps no privileged cap.* It deletes its copies of `Clock_Admin` once the broker has it, and of `Rights_Admin` once the first user's policy is set.
+  Before that it checks the policy, through the first user's `User` cap: an ordinary request for the clock's admin role is refused, and one under `sudo` is granted (`rights: policy checked` on the console).
 * *A policy is a mode for a user and a category:* `none` (the default), `elevate`, which is for a launch under `sudo`, and `granted`, for any launch.
   A policy for a category covers the categories below it (`hardware` covers `hardware.ports`), `*` covers all of them, and the most specific policy wins.
 * *The user is who the `User` cap says.* The broker asks the cap its name.

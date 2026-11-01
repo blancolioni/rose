@@ -29,6 +29,10 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
 	$(BUILDDIR)/rose-interfaces-process-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \
+	$(BUILDDIR)/rose-interfaces-rights.o \
+	$(BUILDDIR)/rose-interfaces-rights-client.o \
+	$(BUILDDIR)/rose-interfaces-rights_admin.o \
+	$(BUILDDIR)/rose-interfaces-rights_admin-client.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader.o \
 	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
