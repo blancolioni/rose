@@ -37,6 +37,7 @@ package Tests.Suite is
                    Tests.Files.File_Test'Access,
                    Tests.Processes.End_Process_Test'Access,
                    Tests.Directories.Directory_Test'Access,
+                   Tests.Directories.Version_Test'Access,
                    Tests.Users.User_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,

@@ -6,6 +6,7 @@ with Rose.Capabilities;
 with Rose.Words;
 
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.File_Reader.Client;
 with Rose.Interfaces.Seekable_File_Reader.Client;
 with Rose.Interfaces.Writable_File.Client;
@@ -25,6 +26,9 @@ package body Tests.Files is
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
+   subtype Writable_File_Class is
+     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+
    function Reader_Cap
      (File : in out Rose.Interfaces.File.File_Object'Class)
       return Rose.Capabilities.Capability;
@@ -42,6 +46,7 @@ package body Tests.Files is
 
    function File_Test return Boolean is
       No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
+      Control   : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File      : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Read_Only : Rose.Interfaces.File.Client.File_Client;
       First     : Readers.File_Reader_Client;
@@ -52,12 +57,21 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("File test");
 
-      File.Open (Tests.Registry.Launch ("file", No_Caps));
+      --  The file's process publishes File_Control, which gives the file
+      --  itself (#141).
 
-      if File.Writable_File_Cap = Rose.Capabilities.Null_Capability then
+      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+
+      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
          Ada.Text_IO.Put (": no file server");
          return False;
       end if;
+
+      declare
+         Writable : Writable_File_Class := Control.Writable;
+      begin
+         File.Open (Writable.Writable_File_Cap);
+      end;
 
       File.Write (Hello);
       if File.Size /= Hello'Length then
@@ -168,6 +182,62 @@ package body Tests.Files is
          end if;
          First.Close;
       end loop;
+
+      --  A version starts as a copy of the file, and changes it only when
+      --  it is committed. A file has one version at a time, and the caps
+      --  of a committed version stop working (#141).
+
+      declare
+         Version : Writable_File_Class := Control.New_Version;
+      begin
+         if Version.Size /= File.Size then
+            Ada.Text_IO.Put (": a version is not a copy of its file");
+            return False;
+         end if;
+
+         Version.Write (Hello);
+         if File.Size /= Hello'Length
+           or else Version.Size /= 2 * Hello'Length
+         then
+            Ada.Text_IO.Put (": writing a version changed its file");
+            return False;
+         end if;
+
+         declare
+            Again : Writable_File_Class := Control.New_Version;
+         begin
+            if Again.Writable_File_Cap /= Rose.Capabilities.Null_Capability
+            then
+               Ada.Text_IO.Put (": a file has two versions");
+               return False;
+            end if;
+         end;
+
+         Control.Commit_Version;
+         if File.Size /= 2 * Hello'Length then
+            Ada.Text_IO.Put (": a committed version is not the file");
+            return False;
+         end if;
+
+         Version.Write (Hello);
+         if File.Size /= 2 * Hello'Length then
+            Ada.Text_IO.Put (": a committed version can still be written");
+            return False;
+         end if;
+      end;
+
+      --  Discarding a version leaves the file as it was.
+
+      declare
+         Version : Writable_File_Class := Control.New_Version;
+      begin
+         Version.Truncate (0);
+         Control.Discard_Version;
+         if File.Size /= 2 * Hello'Length then
+            Ada.Text_IO.Put (": a discarded version changed its file");
+            return False;
+         end if;
+      end;
 
       return True;
    end File_Test;

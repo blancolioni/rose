@@ -27,4 +27,12 @@ is
    --  Remove the directory Name, and end its process. It fails if Name is
    --  not a directory, or if the directory has entries.
 
+   function New_File_Version
+     (Name : String) return interface File_Version;
+   --  A version of the file Name, which starts as a copy of it, or as an
+   --  empty file if there is no entry Name (#141). Nothing changes in
+   --  the directory until the version is committed. It fails if Name is
+   --  a directory, or is empty or too long, or if the file already has
+   --  a version.
+
 end Writable_Directory;

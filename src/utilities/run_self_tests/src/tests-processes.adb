@@ -4,6 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
+with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
@@ -35,11 +36,18 @@ package body Tests.Processes is
         Tests.Registry.Launcher ("file");
       First    : Rose.Interfaces.Process.Process_Object'Class :=
         Launcher.Launch (No_Caps, No_Words);
+      Control  : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File     : Files.Writable_File_Client;
    begin
       Ada.Text_IO.Put ("End process test");
 
-      File.Open (First.Published_Interface);
+      Control.Open (First.Published_Interface);
+      declare
+         Writable : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+           Control.Writable;
+      begin
+         File.Open (Writable.Writable_File_Cap);
+      end;
       File.Write (Hello);
       if File.Size /= Hello'Length then
          return Fail ("the file doesn't work");
@@ -65,9 +73,18 @@ package body Tests.Processes is
       declare
          Second      : Rose.Interfaces.Process.Process_Object'Class :=
            Launcher.Launch (No_Caps, No_Words);
-         Second_File : Files.Writable_File_Client;
+         Second_Control : Rose.Interfaces.File_Control.Client
+           .File_Control_Client;
+         Second_File    : Files.Writable_File_Client;
       begin
-         Second_File.Open (Second.Published_Interface);
+         Second_Control.Open (Second.Published_Interface);
+         declare
+            Writable : Rose.Interfaces.Writable_File
+              .Writable_File_Object'Class :=
+                Second_Control.Writable;
+         begin
+            Second_File.Open (Writable.Writable_File_Cap);
+         end;
 
          begin
             First.Destroy;

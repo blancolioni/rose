@@ -17,6 +17,7 @@ rmdir:
 	    $(INTERFACES)/writable_directory.idl \
 	    $(INTERFACES)/directory.idl \
 	    $(INTERFACES)/writable_file.idl \
+	    $(INTERFACES)/file_version.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/file_reader.idl \
 	    $(INTERFACES)/seekable_file_reader.idl \
