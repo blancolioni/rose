@@ -19,4 +19,12 @@ is
    --  From is not an entry, or if To is already one, or is empty or too
    --  long.
 
+   procedure Delete_File (Name : String);
+   --  Remove the file Name, and end its process. It fails if Name is not
+   --  a file.
+
+   procedure Delete_Directory (Name : String);
+   --  Remove the directory Name, and end its process. It fails if Name is
+   --  not a directory, or if the directory has entries.
+
 end Writable_Directory;
