@@ -10,7 +10,7 @@ To bring a package into the proof, turn `SPARK_Mode` on in it and list its files
 Contracts are proved, not executed.
 The run-time system has no assertions, so the build leaves them off.
 
-`make prove` uses the userland run-time system, so only packages that userland programs use can be proved with it.
+`make prove` uses the userland run-time system.
 Alire installs gnatprove in `~/.alire/bin`, which need not be on the path: `make prove GNATPROVE=~/.alire/bin/gnatprove` finds it.
 It proves at level 1, which `PROVE_LEVEL` changes.
 
@@ -25,3 +25,11 @@ Sending a word or a capability, and sending an object id, require that the invoc
 
 `Rose.Capabilities.Layout`::
 No run-time errors.
+
+`Rose.Kernel.Command_Line`::
+No run-time errors, for any command line from the boot loader: an empty argument, one that ends in `=`, one that starts with it, or one that does not fit.
+The tables of names and values are always within the text that holds them, and `Get_Argument`, `Have_Argument` and `Argument_Count` agree.
+`Integer_Argument` gives 0 for a value that overflows, as it does for one that is not a number.
+The body that prints each argument and passes the adder to `Rose.Multiboot` is not in SPARK, so the contract of `Initialise_Command_Line` is assumed.
+
+The kernel has its own run-time system, but `make prove` uses the userland one for `Rose.Kernel.Command_Line` too, since it uses nothing that they differ in.
