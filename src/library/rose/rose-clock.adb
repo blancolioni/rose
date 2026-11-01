@@ -3,8 +3,6 @@ with Rose.Interfaces.Objects;
 
 package body Rose.Clock is
 
-   use type Rose.Words.Word;
-
    --  The user-mode IDL target's client (#554): a reading that fails
    --  raises Invocation_Error, which is reported as Program_Error.
 
@@ -60,7 +58,7 @@ package body Rose.Clock is
 
    function Realtime_Is_Trusted return Boolean is
    begin
-      return Source.Realtime_Is_Trusted /= 0;
+      return Source.Realtime_Is_Trusted;
    exception
       when Rose.Interfaces.Objects.Invocation_Error =>
          raise Program_Error with "Rose.Clock: the clock can't be reached";
