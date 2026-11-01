@@ -13,10 +13,10 @@ interface Clock is
    --  It doesn't go backwards at a restore, and only Clock_Admin's
    --  Set_Realtime moves it backwards.
 
-   function Realtime_Is_Trusted return Word;
-   --  0 when Realtime is known to be a guess: the RTC's battery bit is
-   --  clear, its fields are out of range, or the clock is held at the
-   --  checkpoint's time after a restore. 1 otherwise, and again after
-   --  Set_Realtime. (A function can't return a Boolean in IDL yet.)
+   function Realtime_Is_Trusted return Boolean;
+   --  False when Realtime is known to be a guess: the RTC's battery bit
+   --  is clear, its fields are out of range, or the clock is held at the
+   --  checkpoint's time after a restore. True otherwise, and again after
+   --  Set_Realtime.
 
 end Clock;

@@ -41,12 +41,12 @@ interface Clock is
 
    function Realtime return Word_64;
 
-   --  0 when Realtime is known to be a guess: the RTC's battery bit is
-   --  clear, its fields are out of range, or the clock is held at the
-   --  checkpoint's time (section 4). 1 otherwise, and again after
-   --  Set_Realtime. (A function can't return a Boolean in IDL yet.)
+   --  False when Realtime is known to be a guess: the RTC's battery bit
+   --  is clear, its fields are out of range, or the clock is held at the
+   --  checkpoint's time (section 4). True otherwise, and again after
+   --  Set_Realtime.
 
-   function Realtime_Is_Trusted return Word;
+   function Realtime_Is_Trusted return Boolean;
 
 end Clock;
 
