@@ -12,10 +12,7 @@ do
 done
 make check-env
 make clean
-make idl
-(cd rts; make)
-(cd src/rts; make)
-make
+make -j"${JOBS:-`nproc`}"
 if [ $book = yes ]; then
     (cd doc/rose-book/; make adoc)
 fi

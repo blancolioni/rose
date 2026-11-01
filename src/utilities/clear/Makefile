@@ -13,4 +13,4 @@ clear:
 	mkdir -p build/generated
 	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
 	    rose-core-clear.idl $(INTERFACES)/rose-core.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

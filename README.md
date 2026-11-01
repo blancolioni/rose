@@ -51,6 +51,11 @@ under QEMU, runs the self tests, and checks the checkpoint log; it needs
 `qemu-system-x86`.  `make hdd` creates a blank hard disk image there too, and
 `make all` builds everything, including the book.
 
+`clean-build.sh` runs `make -j` with a job for each processor (set `JOBS` to
+change that), and so can you.  `make` builds the run-time systems if they are
+missing, but doesn't rebuild them when their sources change: `make rts` does
+that.
+
 ## Status
 
 Rose boots, launches various services, and

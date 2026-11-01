@@ -14,4 +14,4 @@ echo:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-echo.idl $(INTERFACES)/rose-core.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

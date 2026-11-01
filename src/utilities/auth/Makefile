@@ -13,4 +13,4 @@ auth:
 	mkdir -p build/generated
 	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
 	    rose-core-auth.idl $(INTERFACES)/rose-core.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)

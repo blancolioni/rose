@@ -1,4 +1,5 @@
 ROOT=.
+PARALLEL=yes
 include $(ROOT)/mk/common.mk
 
 TARGET=$(ARCH)-unknown-rose
@@ -25,15 +26,22 @@ endif
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-rose: config interfaces $(ROSE) $(BOOT_MODULES) $(DRIVERS) $(UTILITIES) exports stripped bootdisk iso finished
+rose: config interfaces $(ROSE) programs exports stripped bootdisk iso finished
 
-all: idl rts rose hdd doc
+programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
+
+all:
+	$(MAKE) idl
+	$(MAKE) rts
+	$(MAKE) rose
+	$(MAKE) hdd
+	$(MAKE) doc
 
 # None of these targets is a file.  Three of them (rts, interfaces and doc)
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose check-env test rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env test rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso floppy finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -47,9 +55,22 @@ check-env:
 test:
 	sh ./scripts/test-boot
 
+# The run-time systems are built when they are missing, so make works after
+# make clean.  They aren't rebuilt when their sources change: "make rts"
+# does that.
+
+KERNEL_RTS_LIB=$(KERNEL_RTS)/adalib/libgnat.a
+USER_RTS_LIB=$(USER_RTS)/adalib/libgnat.a
+
+$(KERNEL_RTS_LIB):
+	$(MAKE) -C rts
+
+$(USER_RTS_LIB): $(KERNEL_RTS_LIB)
+	$(MAKE) -C src/rts
+
 rts:
-	(cd rts; make)
-	(cd src/rts; make)
+	$(MAKE) -C rts
+	$(MAKE) -C src/rts
 
 interfaces: idl
 
@@ -57,10 +78,10 @@ $(PROJECT):
 	sed s/ARCH/$(ARCH)/g projects/kernel-template.gpr > $(PROJECT)
 
 $(BOOT_MODULES): %:
-	(cd src/servers/$@; make)
+	$(MAKE) -C src/servers/$@
 
 $(DRIVERS): %:
-	(cd src/drivers/$@; make)
+	$(MAKE) -C src/drivers/$@
 	cp src/drivers/$@/$@.driver images/iso/rose/install/drivers/$@.caps
 
 # The installed copy is stripped, so that every program fits in exec's
@@ -68,7 +89,7 @@ $(DRIVERS): %:
 
 $(UTILITIES): %:
 	mkdir -p images/iso/rose/install/bin/
-	(cd src/utilities/$@; make)
+	$(MAKE) -C src/utilities/$@
 	strip -o images/iso/rose/install/bin/$@ src/utilities/$@/build/bin/$@-driver
 	cp src/utilities/$@/$@.caps images/iso/rose/install/bin/$@.caps
 
@@ -109,11 +130,24 @@ finished:
 	@echo Build finished at `date`
 
 doc:
-	(cd doc; make)
+	$(MAKE) -C doc
 
 $(ROSE): $(RELOC)
 
 $(RELOC): kernel boot
+
+# What has to come before what, for make -j.  The servers link the kernel's
+# util.o, which boot builds from the kernel's objects.  Everything that is
+# built from IDL needs the generated interfaces.
+
+$(BOOT_MODULES): config interfaces $(KERNEL_RTS_LIB) $(ROSE)
+$(DRIVERS) $(UTILITIES): config interfaces $(USER_RTS_LIB)
+kernel: config interfaces
+boot: kernel
+exports stripped: programs
+bootdisk: stripped
+iso: bootdisk
+finished: iso exports
 
 # The generated interface packages that the kernel uses, for their
 # endpoint ids. Only these are linked into the kernel's sources.
@@ -128,10 +162,10 @@ kernel:
 	gnatmake -Pprojects/kernel_$(ARCH)
 
 boot:
-	(cd src/asm/$(ARCH); make)
+	$(MAKE) -C src/asm/$(ARCH)
 
 idl:
-	(cd src/library/kernelapi/generated; make)
+	$(MAKE) -C src/library/kernelapi/generated
 
 config:
 	mkdir -p $(BUILDDIR)
@@ -141,10 +175,10 @@ config:
 
 
 clean:
-	(cd src/library/kernelapi/generated; make clean)
-	(cd rts; make clean)
-	(cd src/rts; make clean)
-	(cd doc; make clean)
+	$(MAKE) -C src/library/kernelapi/generated clean
+	$(MAKE) -C rts clean
+	$(MAKE) -C src/rts clean
+	$(MAKE) -C doc clean
 	rm -rf build/*
 	rm -rf `find src -name build -print`
 	rm -f `find src -name "*.o" -print`

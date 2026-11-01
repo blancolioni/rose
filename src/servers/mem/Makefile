@@ -48,7 +48,7 @@ all: mm $(RELOC)
 mm:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	gprbuild --RTS=$(KERNEL_RTS)
+	gprbuild --RTS=$(KERNEL_RTS) $(GPRBUILD_CARGS)
 
 $(RELOC): $(OBJECTS)
 	$(GCC) -Wl,-r -nostdlib $(GCC_OPTS) -o $(RELOC) $(OBJECTS) -g

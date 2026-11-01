@@ -13,7 +13,7 @@ rights:
 	mkdir -p build/generated
 	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
 	    rose-core-rights.idl $(INTERFACES)/rose-core.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)
 
 # The policy is plain Ada, so it is tested on the host.
 

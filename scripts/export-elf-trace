@@ -3,12 +3,42 @@
 # directories, to logs/.  The drivers directory also holds the utilities.
 # There are no lists here: a program that is built is dumped, and a file
 # that can't be dumped stops the script.
+#
+# Dumping with the source takes minutes, and the build links and copies the
+# programs again each time, so a program is only dumped if its contents
+# differ from the ones that were dumped last, and the dumps run in parallel,
+# JOBS at a time (a job for each processor, if JOBS isn't set).
+
 set -e
-objdump -d -S -f -h -t build/i686/i686-unknown-rose > ./logs/rose-objdump.txt
-for path in build/i686/modules/* build/i686/drivers/*
+
+if [ "$1" = "--dump" ]; then
+    # --dump PROGRAM NAME: the dumps of PROGRAM, in logs/rose-NAME-*.txt
+    if [ "$3" = kernel ]; then
+        objdump -d -S -f -h -t $2 > ./logs/rose-objdump.txt
+    else
+        objdump -d -S -f -h -t $2 > ./logs/rose-$3-objdump.txt
+        readelf -a $2 > ./logs/rose-$3-elf.txt
+    fi
+    sha1sum < $2 > ./logs/rose-$3.sha1
+    exit 0
+fi
+
+mkdir -p logs
+list=`mktemp`
+trap 'rm -f $list' EXIT
+
+for path in build/i686/i686-unknown-rose build/i686/modules/* \
+            build/i686/drivers/*
 do
     test -f "$path" || { echo "export-elf-trace: no $path" >&2; exit 1; }
-    name=`basename $path`
-    objdump -d -S -f -h -t $path > ./logs/rose-$name-objdump.txt
-    readelf -a $path > ./logs/rose-$name-elf.txt
+    case $path in
+        build/i686/i686-unknown-rose) name=kernel ;;
+        *) name=`basename $path` ;;
+    esac
+    if [ "`cat ./logs/rose-$name.sha1 2> /dev/null`" != "`sha1sum < $path`" ]
+    then
+        echo "$path $name" >> $list
+    fi
 done
+
+xargs -r -P "${JOBS:-`nproc`}" -L 1 sh $0 --dump < $list

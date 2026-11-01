@@ -1,5 +1,7 @@
 all: rose
 
+.NOTPARALLEL:
+
 ARCH=i686
 TARGET=$(ARCH)-unknown-rose
 ROSE=../../../build/$(ARCH)/$(TARGET)

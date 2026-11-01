@@ -41,4 +41,4 @@ login:
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/heap.idl \
 	    $(INTERFACES)/region.idl
-	gprbuild
+	gprbuild $(GPRBUILD_CARGS)
