@@ -4,12 +4,15 @@ with Ada_Text_IO;
 
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Rights.Client;
+with Rose.Interfaces.User.Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Standard_Streams;
 with Rose.Trace;
 with Rose.Words;
 
+with Petal.Privileges;
 with Petal.Session;
 with Petal.Signatures;
 
@@ -36,6 +39,11 @@ package body Petal.Command_Launch is
    Clock_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  The clock's Clock interface, for the Clock_Service role (ADR 0020).
+
+   Rights_Cap : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   --  The rights broker's Rights interface, which grants the authority of
+   --  a categorised role (ADR 0021).
 
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
@@ -68,6 +76,9 @@ package body Petal.Command_Launch is
 
    procedure Error (Message : String);
    --  Report Message on standard error.
+
+   procedure Warn (Message : String);
+   --  Report the warning Message. The command still runs.
 
    function Is_Writable_Directory
      (Item     : Signature;
@@ -109,9 +120,11 @@ package body Petal.Command_Launch is
       Client       : Rose.Interfaces.Launch.Client.Launch_Client;
       Line         : String;
       Words        : Word_Array;
-      Count        : Natural);
+      Count        : Natural;
+      Sudo         : String);
    --  Bind words 2 .. Count of Line to the arguments of Item, launch the
-   --  command through Client, and call it.
+   --  command through Client, and call it. Sudo is the categories that
+   --  the user named with sudo, separated by commas, or "" for no sudo.
 
    function Lower (Text : String) return String;
 
@@ -119,6 +132,14 @@ package body Petal.Command_Launch is
 
    procedure Put_Help (Item : Signature);
    procedure Put_Version (Item : Signature);
+
+   procedure Run_Command
+     (Line  : String;
+      Words : Word_Array;
+      Count : Natural;
+      Sudo  : String);
+   --  Run the command that is word 1 of Line, with the arguments that are
+   --  words 2 .. Count. Sudo is as for Launch.
 
    procedure Split
      (Line  : String;
@@ -144,7 +165,8 @@ package body Petal.Command_Launch is
       Client       : Rose.Interfaces.Launch.Client.Launch_Client;
       Line         : String;
       Words        : Word_Array;
-      Count        : Natural)
+      Count        : Natural;
+      Sudo         : String)
    is
       --  Slices of the command line keep its indices, so a slice of a
       --  word is also a slice of Line.
@@ -155,6 +177,15 @@ package body Petal.Command_Launch is
       Next_Index   : Positive := 2;
       Options_Done : Boolean := False;
       Failed       : Boolean := False;
+
+      Grants       : array (1 .. Max_Role_Caps) of Rose.Words.Word :=
+        (others => 0);
+      Granted_Caps : array (1 .. Max_Role_Caps) of
+        Rose.Capabilities.Capability :=
+        (others => Rose.Capabilities.Null_Capability);
+      Grant_Count  : Natural := 0;
+      --  The grants that the rights broker made for the command's
+      --  categorised roles, and their caps.
 
       function Word_Text (Index : Positive) return String
       is (Line (Words (Index).First .. Words (Index).Last));
@@ -169,6 +200,17 @@ package body Petal.Command_Launch is
 
       procedure Fail (Message : String);
 
+      procedure Release_Grants;
+      --  Tell the broker that the command has finished, so that it revokes
+      --  the grants, and delete petal's copies of their caps.
+
+      procedure Request_Role
+        (Role : Role_Cap_Record;
+         Cap  : out Rose.Capabilities.Capability);
+      --  Ask the rights broker for the authority of the categorised Role,
+      --  with sudo if the user named a category that covers it. Fail if
+      --  the broker refuses.
+
       procedure Set_Value
         (Index     : Positive;
          Text      : String;
@@ -176,6 +218,10 @@ package body Petal.Command_Launch is
          From_Line : Boolean);
       --  Bind Text, which is at Where in the command line or in the
       --  signature's text, to argument Index.
+
+      procedure Warn_Unneeded;
+      --  Warn about each category that sudo named, and the command does
+      --  not need. The command still runs.
 
       ----------
       -- Fail --
@@ -234,6 +280,69 @@ package body Petal.Command_Launch is
          end loop;
          return 0;
       end Next_Positional;
+
+      --------------------
+      -- Release_Grants --
+      --------------------
+
+      procedure Release_Grants is
+         Rights : Rose.Interfaces.Rights.Client.Rights_Client;
+         User   : Rose.Interfaces.User.Client.User_Client;
+         Found  : Boolean;
+      begin
+         if Grant_Count = 0 then
+            return;
+         end if;
+         Petal.Session.Get_User (User, Found);
+         Rose.Interfaces.Rights.Client.Open (Rights, Rights_Cap);
+         for I in 1 .. Grant_Count loop
+            if Found then
+               Rose.Interfaces.Rights.Client.Finish
+                 (Rights, User, Grants (I));
+            end if;
+            Rose.System_Calls.Delete_Cap (Granted_Caps (I));
+         end loop;
+         Grant_Count := 0;
+      end Release_Grants;
+
+      ------------------
+      -- Request_Role --
+      ------------------
+
+      procedure Request_Role
+        (Role : Role_Cap_Record;
+         Cap  : out Rose.Capabilities.Capability)
+      is
+         Category : constant String := Value (Item, Role.Category);
+         Named    : constant Boolean :=
+           Petal.Privileges.Covered (Sudo, Category);
+         Rights   : Rose.Interfaces.Rights.Client.Rights_Client;
+         User     : Rose.Interfaces.User.Client.User_Client;
+         Found    : Boolean;
+         Grant    : Rose.Words.Word;
+      begin
+         Cap := Rose.Capabilities.Null_Capability;
+         Petal.Session.Get_User (User, Found);
+         if Rights_Cap = Rose.Capabilities.Null_Capability or else not Found
+         then
+            Fail ("petal has no rights broker to ask for " & Category);
+            return;
+         end if;
+
+         Rose.Interfaces.Rights.Client.Open (Rights, Rights_Cap);
+         Rose.Interfaces.Rights.Client.Request
+           (Rights, User, Value (Item, Role.Name),
+            (if Named then 1 else 0), Grant, Cap);
+
+         if Cap = Rose.Capabilities.Null_Capability then
+            Fail ((if Named then "not allowed to have " & Category
+                   else "needs elevation (" & Category & ")"));
+         else
+            Grant_Count := Grant_Count + 1;
+            Grants (Grant_Count) := Grant;
+            Granted_Caps (Grant_Count) := Cap;
+         end if;
+      end Request_Role;
 
       ---------------
       -- Set_Value --
@@ -326,6 +435,35 @@ package body Petal.Command_Launch is
                end if;
          end case;
       end Set_Value;
+
+      -------------------
+      -- Warn_Unneeded --
+      -------------------
+
+      procedure Warn_Unneeded is
+         Roles : Role_Cap_Array renames Item.Role_Caps;
+      begin
+         if not (for some Role of Roles (1 .. Item.Role_Cap_Count) =>
+                   Is_Categorised (Role))
+         then
+            Warn (Command_Name & " needs no elevation");
+            return;
+         end if;
+
+         for I in 1 .. Petal.Privileges.Count (Sudo) loop
+            declare
+               Name : constant String := Petal.Privileges.Item (Sudo, I);
+            begin
+               if not (for some Role of Roles (1 .. Item.Role_Cap_Count) =>
+                         Is_Categorised (Role)
+                         and then Petal.Privileges.Covers
+                                    (Name, Value (Item, Role.Category)))
+               then
+                  Warn (Command_Name & " does not need " & Name);
+               end if;
+            end;
+         end loop;
+      end Warn_Unneeded;
 
    begin
       --  A command that is not live is a transaction over its Versioned
@@ -614,6 +752,10 @@ package body Petal.Command_Launch is
          --  The caps of the command's other roles, which petal has
          --  itself (#460).
 
+         if Sudo'Length > 0 then
+            Warn_Unneeded;
+         end if;
+
          for Role of Item.Role_Caps (1 .. Item.Role_Cap_Count) loop
             case Role.Kind is
                when Create_Endpoint_Cap =>
@@ -638,13 +780,18 @@ package body Petal.Command_Launch is
                   end if;
                   Caps (Role.Cap_Index + 1) := Clock_Cap;
                when Other_Role_Cap =>
-                  Fail ("petal cannot supply role "
-                        & Value (Item, Role.Name));
+                  if Is_Categorised (Role) then
+                     Request_Role (Role, Caps (Role.Cap_Index + 1));
+                  else
+                     Fail ("petal cannot supply role "
+                           & Value (Item, Role.Name));
+                  end if;
             end case;
             Cap_Count := Natural'Max (Cap_Count, Role.Cap_Index + 1);
          end loop;
 
          if Failed then
+            Release_Grants;
             return;
          end if;
 
@@ -654,6 +801,7 @@ package body Petal.Command_Launch is
          Rose.Trace.Event ("launched");
          if Endpoint = Rose.Capabilities.Null_Capability then
             Fail ("cannot launch");
+            Release_Grants;
             return;
          end if;
 
@@ -697,6 +845,7 @@ package body Petal.Command_Launch is
            (Params, Rose.System_Calls.Delete_Cap_Capability);
          Rose.System_Calls.Send_Cap (Params, Endpoint);
          Rose.System_Calls.Invoke_Capability (Params);
+         Release_Grants;
       end;
    end Launch;
 
@@ -835,6 +984,47 @@ package body Petal.Command_Launch is
          return;
       end if;
 
+      --  sudo CATEGORIES COMMAND [ARGUMENT]... runs the command with the
+      --  authority of the categories, which are separated by commas
+      --  (ADR 0021, section 2).
+
+      if Lower (Line (Words (1).First .. Words (1).Last)) = "sudo" then
+         if Count < 3
+           or else Line (Words (2).First .. Words (2).Last) = "--help"
+         then
+            Ada_Text_IO.Put_Line
+              ("Usage: sudo CATEGORIES COMMAND [ARGUMENT]...");
+            Ada_Text_IO.Put_Line
+              ("Run COMMAND with the authority of CATEGORIES, which are "
+               & "separated by commas.");
+         else
+            declare
+               Shifted : Word_Array;
+            begin
+               for I in 3 .. Count loop
+                  Shifted (I - 2) := Words (I);
+               end loop;
+               Run_Command
+                 (Line, Shifted, Count - 2,
+                  Line (Words (2).First .. Words (2).Last));
+            end;
+         end if;
+      else
+         Run_Command (Line, Words, Count, "");
+      end if;
+   end Run;
+
+   -----------------
+   -- Run_Command --
+   -----------------
+
+   procedure Run_Command
+     (Line  : String;
+      Words : Word_Array;
+      Count : Natural;
+      Sudo  : String)
+   is
+   begin
       declare
          Name   : constant String :=
            Lower (Line (Words (1).First .. Words (1).Last));
@@ -873,13 +1063,13 @@ package body Petal.Command_Launch is
          then
             Put_Version (Current);
          else
-            Launch (Name, Current, Client, Line, Words, Count);
+            Launch (Name, Current, Client, Line, Words, Count, Sudo);
             Petal.Session.Release_Files;
          end if;
 
          Rose.Interfaces.Launch.Client.Close (Client);
       end;
-   end Run;
+   end Run_Command;
 
    ------------------
    -- Set_Registry --
@@ -888,7 +1078,8 @@ package body Petal.Command_Launch is
    procedure Set_Registry
      (Commands : Rose.Capabilities.Capability;
       Terminal : Rose.Capabilities.Capability;
-      Clock    : Rose.Capabilities.Capability)
+      Clock    : Rose.Capabilities.Capability;
+      Rights   : Rose.Capabilities.Capability)
    is
       Registry : Rose.Interfaces.Commands.Client.Commands_Client;
    begin
@@ -897,6 +1088,7 @@ package body Petal.Command_Launch is
       Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
       Terminal_Cap := Terminal;
       Clock_Cap := Clock;
+      Rights_Cap := Rights;
    end Set_Registry;
 
    -----------
@@ -939,5 +1131,14 @@ package body Petal.Command_Launch is
          end if;
       end loop;
    end Split;
+
+   ----------
+   -- Warn --
+   ----------
+
+   procedure Warn (Message : String) is
+   begin
+      Ada_Text_IO.Put_Line ("petal: warning: " & Message);
+   end Warn;
 
 end Petal.Command_Launch;
