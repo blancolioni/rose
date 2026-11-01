@@ -111,7 +111,7 @@ A nonpersistent segment has no region behind it.
 
 A program is started in one of two ways:
 
-* *`Launch.Launch`* takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention, and returns the new process's `Process`.
+* *`Launch.Launch`* takes a `Capability_Array`, whose meaning the caller and the program agree on by convention, and returns the new process's `Process`.
 * *`Launch.Launch_Command`* starts the program as a command (ADR 0002, see <<launch-sequence>>).
   Its process starts with the receive capability of a command endpoint, and the result is the endpoint capability, which the shell calls once with the command's arguments.
   `Executable.Launch_Command` does the same for `elf`.

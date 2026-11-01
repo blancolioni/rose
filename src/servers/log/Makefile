@@ -3,8 +3,6 @@ include $(ROOT)/mk/common.mk
 
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/log.reloc.o
-ENVIRONMENT_OBJECTS= \
-
 LIBROSE_OBJECTS=
 
 BLOCK_DEVICE_OBJECTS= \
@@ -39,7 +37,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o \
-	$(ENVIRONMENT_OBJECTS) \
 	$(LIBROSE_OBJECTS) \
 	$(BLOCK_DEVICE_OBJECTS) \
 	$(KERNEL_LOG_OBJECTS) \

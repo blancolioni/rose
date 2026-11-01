@@ -48,11 +48,10 @@ package body Rose.Kernel.Init is
                              Processes.Process_Table_Heap_Size;
       --  Boot modules, and the processes they launch before the
       --  memory server adds to the heap, take their pages from here:
-      --  a page directory and page tables, a stack page, an
-      --  environment page, and each writable segment, including its
-      --  .bss.  Boot_Module_Pages sets how many pages they can have
-      --  (boot-module-pages on the command line); loading a boot
-      --  module that needs more is a panic.
+      --  a page directory and page tables, a stack page, and each
+      --  writable segment, including its .bss.  Boot_Module_Pages sets
+      --  how many pages they can have (boot-module-pages on the command
+      --  line); loading a boot module that needs more is a panic.
 
       Heap_Size       : Physical_Bytes;
    begin
