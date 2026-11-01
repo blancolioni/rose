@@ -86,6 +86,17 @@ package body Mem.Processes is
      array (Real_Process_Id) of aliased Memory_Process_Record;
 
    Process_Table : Memory_Process_Table;
+
+   Identifier_Count : constant := 2 ** 16 - 1;
+   --  The identifiers that a process's caps can have: all but 0.
+
+   function Identifier_Of
+     (Oid : Rose.Objects.Object_Id)
+      return Rose.Objects.Capability_Identifier
+   is (Rose.Objects.Capability_Identifier
+         (Rose.Objects."+" (Rose.Objects."mod" (Oid, Identifier_Count), 1)));
+   --  The identifier of the caps for the process with object id Oid. It
+   --  is never 0.
    Next_Pid      : Real_Process_Id := 1;
 
    procedure Report_Segment (Segment : Segment_Record);
@@ -364,6 +375,26 @@ package body Mem.Processes is
    end Fault_Process;
 
    ------------------
+   -- Find_Process --
+   ------------------
+
+   function Find_Process
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Process_Id
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      for Pid in Process_Table'Range loop
+         if Process_Table (Pid).State /= Available
+           and then Identifier_Of (Process_Table (Pid).Oid) = Identifier
+         then
+            return Pid;
+         end if;
+      end loop;
+      return 0;
+   end Find_Process;
+
+   ------------------
    -- Get_Heap_Cap --
    ------------------
 
@@ -383,15 +414,8 @@ package body Mem.Processes is
      (Process : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Object_Id
    is
-      Pid : constant Process_Id := Process_Id (Process);
    begin
-      if Pid not in Real_Process_Id
-        or else Process_Table (Pid).State = Available
-      then
-         return Rose.Objects.Null_Object_Id;
-      else
-         return Process_Table (Pid).Oid;
-      end if;
+      return Process_Object_Id (Find_Process (Process));
    end Get_Object_Id;
 
    ------------------------
@@ -734,10 +758,37 @@ package body Mem.Processes is
           (Create_Cap   => Create_Endpoint_Cap,
            Endpoint_Id  =>
              Rose.Interfaces.Process.Process_Interface,
-           Identifier   => Rose.Objects.Capability_Identifier (Pid));
+           Identifier   => Process_Identifier (Pid));
       Process_Table (Pid).Interface_Cap := Cap;
       return Cap;
    end New_Process;
+
+   ------------------------
+   -- Process_Identifier --
+   ------------------------
+
+   function Process_Identifier
+     (Process : Process_Id)
+      return Rose.Objects.Capability_Identifier
+   is (Identifier_Of (Process_Table (Process).Oid));
+
+   -----------------------
+   -- Process_Object_Id --
+   -----------------------
+
+   function Process_Object_Id
+     (Process : Process_Id)
+      return Rose.Objects.Object_Id
+   is
+   begin
+      if Process not in Real_Process_Id
+        or else Process_Table (Process).State = Available
+      then
+         return Rose.Objects.Null_Object_Id;
+      else
+         return Process_Table (Process).Oid;
+      end if;
+   end Process_Object_Id;
 
    -----------------------------
    -- Published_Interface_Cap --
@@ -805,13 +856,23 @@ package body Mem.Processes is
       declare
          Oid : constant Rose.Objects.Object_Id :=
                  Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client);
+      begin
+         if Find_Process (Identifier_Of (Oid)) /= 0 then
+            Rose.Console_IO.Put_Line ("mem: process identifier in use");
+            Rose.Interfaces.Kernel_Process.Client.Close (Client);
+            return 0;
+         end if;
+      end;
+
+      declare
+         Oid : constant Rose.Objects.Object_Id :=
+                 Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client);
          Heap_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Endpoint
                         (Create_Cap   => Create_Endpoint_Cap,
                          Endpoint_Id  =>
                            Rose.Interfaces.Heap.Heap_Interface,
-                         Identifier   =>
-                           Rose.Objects.Capability_Identifier (Next_Pid));
+                         Identifier   => Identifier_Of (Oid));
       begin
          Process_Table (Next_Pid) :=
            Memory_Process_Record'
@@ -1016,8 +1077,9 @@ package body Mem.Processes is
 
       Rose.Interfaces.Kernel_Process.Client.Open (Client, Process);
 
-      --  The heap and process caps the process holds carry its id, so
-      --  they are made again in the same way as when it was created.
+      --  The heap and process caps the process holds carry its identifier,
+      --  which comes from its object id, so they are made again in the
+      --  same way as when it was created.
 
       Process_Table (Pid) :=
         Memory_Process_Record'
@@ -1030,14 +1092,20 @@ package body Mem.Processes is
              Rose.System_Calls.Server.Create_Endpoint
                (Create_Cap   => Create_Endpoint_Cap,
                 Endpoint_Id  => Rose.Interfaces.Heap.Heap_Interface,
-                Identifier   => Rose.Objects.Capability_Identifier (Pid)),
+                Identifier   =>
+                  Identifier_Of
+                    (Rose.Interfaces.Kernel_Process.Client.Get_Object_Id
+                       (Client))),
            Server        => 0,
            Process       => Client,
            Interface_Cap =>
              Rose.System_Calls.Server.Create_Endpoint
                (Create_Cap   => Create_Endpoint_Cap,
                 Endpoint_Id  => Rose.Interfaces.Process.Process_Interface,
-                Identifier   => Rose.Objects.Capability_Identifier (Pid)),
+                Identifier   =>
+                  Identifier_Of
+                    (Rose.Interfaces.Kernel_Process.Client.Get_Object_Id
+                       (Client))),
            Faults        => <>);
    end Restore_Process;
 

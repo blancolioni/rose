@@ -17,6 +17,27 @@ package Mem.Processes is
    function Get_Object_Id
      (Process : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Object_Id;
+   --  The object id of the process whose caps have the identifier
+   --  Process: the Process interface's Get_Object_Id.
+
+   function Process_Object_Id
+     (Process : Process_Id)
+      return Rose.Objects.Object_Id;
+   --  The object id of the process in slot Process.
+
+   function Find_Process
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Process_Id;
+   --  The process whose caps have Identifier, or 0 if there is none.
+
+   function Process_Identifier
+     (Process : Process_Id)
+      return Rose.Objects.Capability_Identifier;
+   --  The identifier of the caps that mem makes for Process. It comes from
+   --  the process's object id, which is never used again and is the same
+   --  after a restore, and not from its slot, which the next process can
+   --  take. So a cap for an ended process reaches no other process
+   --  (#616).
 
    function Get_Process_Id
      (Process : Rose.Objects.Object_Id)
