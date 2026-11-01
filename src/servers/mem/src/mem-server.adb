@@ -137,9 +137,14 @@ package body Mem.Server is
       use Rose.Interfaces.Segment;
       use type Rose.Words.Word;
 
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
+      if Pid = 0 then
+         return;
+      end if;
+
       Mem.Processes.Add_Nonpersistent_Segment
-        (Process      => Process_Id (Id),
+        (Process      => Pid,
          Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Readable     => (Flags and Segment_Readable) /= 0,
@@ -165,11 +170,15 @@ package body Mem.Server is
       use type Rose.Words.Word;
 
       Client : Region_Client;
+      Pid    : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
+      if Pid = 0 then
+         return;
+      end if;
 
       Open (Client, Region);
       Mem.Processes.Add_Segment
-        (Process       => Process_Id (Id),
+        (Process       => Pid,
          Virtual_Base  => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
          Region        => Client,
@@ -286,10 +295,14 @@ package body Mem.Server is
      (Id : Rose.Objects.Capability_Identifier)
      return Rose.Words.Word
    is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
+      if Pid = 0 then
+         return 0;
+      end if;
+
       return Rose.Words.Word
-        (Mem.Processes.Get_Process_Heap_Bound
-           (Process => Process_Id (Id)));
+        (Mem.Processes.Get_Process_Heap_Bound (Process => Pid));
    end Current_Bound;
 
    -------------
@@ -297,9 +310,12 @@ package body Mem.Server is
    -------------
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier) is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
-      Mem.Page_Table.Delete_All (Process_Id (Id));
-      Mem.Processes.Kill_Process (Process_Id (Id));
+      if Pid /= 0 then
+         Mem.Page_Table.Delete_All (Pid);
+         Mem.Processes.Kill_Process (Pid);
+      end if;
       Remove_Instances (Id);
    end Destroy;
 
@@ -312,9 +328,12 @@ package body Mem.Server is
       Exit_Status : Natural)
    is
       pragma Unreferenced (Exit_Status);
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
-      Mem.Page_Table.Delete_All (Process_Id (Id));
-      Mem.Processes.Kill_Process (Process_Id (Id));
+      if Pid /= 0 then
+         Mem.Page_Table.Delete_All (Pid);
+         Mem.Processes.Kill_Process (Pid);
+      end if;
       Remove_Instances (Id);
    end Exit_Process;
 
@@ -326,8 +345,13 @@ package body Mem.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
-      return Mem.Processes.Get_Heap_Cap (Process_Id (Id));
+      if Pid = 0 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Mem.Processes.Get_Heap_Cap (Pid);
    end Heap_Interface;
 
    -----------------
@@ -567,9 +591,13 @@ package body Mem.Server is
      (Id            : Rose.Objects.Capability_Identifier;
       Interface_Cap : Rose.Capabilities.Capability)
    is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
-      Mem.Processes.Set_Published_Interface_Cap
-        (Process_Id (Id), Interface_Cap);
+      if Pid = 0 then
+         return;
+      end if;
+
+      Mem.Processes.Set_Published_Interface_Cap (Pid, Interface_Cap);
       Rose.Server.Unblock_Endpoint
         (Server, Rose.Interfaces.Process.Published_Interface_Endpoint);
    end Publish_Interface;
@@ -583,16 +611,16 @@ package body Mem.Server is
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
-      use type Rose.Objects.Capability_Identifier;
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
-      if Id = 0 then
+      if Pid = 0 then
          Rose.Console_IO.Put_Line
-           ("mem: bad pid: 0");
+           ("mem: published interface: no such process");
          return 0;
       end if;
 
       return Cap : constant Rose.Capabilities.Capability :=
-        Mem.Processes.Published_Interface_Cap (Process_Id (Id))
+        Mem.Processes.Published_Interface_Cap (Pid)
       do
          if Cap = Rose.Capabilities.Null_Capability then
             Rose.Server.Block_Current_Request (Server);
@@ -688,9 +716,14 @@ package body Mem.Server is
      (Id        : Rose.Objects.Capability_Identifier;
       New_Bound : Rose.Words.Word)
    is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
+      if Pid = 0 then
+         return;
+      end if;
+
       Mem.Processes.Resize_Segment
-        (Process      => Process_Id (Id),
+        (Process      => Pid,
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;

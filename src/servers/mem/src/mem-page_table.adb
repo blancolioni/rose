@@ -1,6 +1,5 @@
 with Rose.Console_IO;
 with Rose.Limits;
-with Rose.Objects;
 with Rose.Trace;
 
 with Mem.Calls;
@@ -298,8 +297,7 @@ package body Mem.Page_Table is
 
       Mem.Calls.Map
         (Process    =>
-           Mem.Processes.Get_Object_Id
-             (Rose.Objects.Capability_Identifier (Page.Process)),
+           Mem.Processes.Process_Object_Id (Page.Process),
          Physical   => Page.Phys,
          Virtual    => Page.Virt,
          Readable   => Page.Readable,
