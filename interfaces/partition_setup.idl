@@ -1,0 +1,17 @@
+interface Partition_Setup is
+
+   --  Telling a partition server which blocks of the device are its own.
+   --  Init launches the server and calls this once, before it gives the
+   --  Block_Device interface to anything. The server refuses every block
+   --  request until then.
+
+   procedure Set_Range
+     (Start      : Word_64;
+      Bound      : Word_64;
+      Block_Size : Word);
+   --  The partition starts at block Start of the device, and its last
+   --  block is Bound (the count is Bound - Start + 1 device blocks, as
+   --  the server has always taken it). Block_Size is the size in bytes
+   --  of the blocks that the server presents, a multiple of the device's.
+
+end Partition_Setup;

@@ -1,0 +1,20 @@
+= Verification
+
+Parts of Rose are written in SPARK, and proved with gnatprove: the proof shows that they raise no run-time errors, and that they keep the promises in their contracts.
+`make prove` runs it, on the project `projects/spark.gpr`.
+
+A package is in SPARK when it has `SPARK_Mode` on, in the package itself.
+There is no configuration pragma, so the rest of Rose is compiled as before.
+To bring a package into the proof, turn `SPARK_Mode` on in it and list its files in `Source_Files` in `projects/spark.gpr`.
+
+Contracts are proved, not executed.
+The run-time system has no assertions, so the build leaves them off.
+
+`make prove` uses the userland run-time system, so only packages that userland programs use can be proved with it.
+Alire installs gnatprove in `~/.alire/bin`, which need not be on the path: `make prove GNATPROVE=~/.alire/bin/gnatprove` finds it.
+It proves at level 1, which `PROVE_LEVEL` changes.
+
+== Proved Packages
+
+None yet.
+Each package is listed here when it is proved, with its level.

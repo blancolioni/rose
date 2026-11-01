@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env test rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env test prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -71,6 +71,15 @@ $(USER_RTS_LIB): $(KERNEL_RTS_LIB)
 rts:
 	$(MAKE) -C rts/kernel
 	$(MAKE) -C rts/user
+
+# Prove the packages that are in SPARK (projects/spark.gpr).  gnatprove comes
+# from Alire, which puts it in ~/.alire/bin, so GNATPROVE can name it.  The
+# level is 1, and the book says which packages are proved at it.
+GNATPROVE ?= gnatprove
+PROVE_LEVEL ?= 1
+
+prove: $(USER_RTS_LIB)
+	ROSE_USER_RTS=$(CURDIR)/$(USER_RTS) $(GNATPROVE) -P projects/spark.gpr --mode=all --level=$(PROVE_LEVEL) -j0
 
 interfaces: idl
 
