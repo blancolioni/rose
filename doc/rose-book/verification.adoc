@@ -16,5 +16,12 @@ It proves at level 1, which `PROVE_LEVEL` changes.
 
 == Proved Packages
 
-None yet.
-Each package is listed here when it is proved, with its level.
+At level 1, with no unproved checks:
+
+`Rose.Invocation`::
+No run-time errors.
+Sending a word or a capability, and sending an object id, require that the invocation has room: its counts of words and capabilities sent are modular, so without the precondition a seventeenth word would overwrite the first.
+`Send_Word` and `Send_Cap` keep what was sent before.
+
+`Rose.Capabilities.Layout`::
+No run-time errors.

@@ -1,4 +1,6 @@
-package body Rose.Capabilities.Layout is
+package body Rose.Capabilities.Layout
+  with SPARK_Mode
+is
 
    -------------------------
    -- Endpoint_Capability --
