@@ -24,14 +24,22 @@ project Spark is
       "../src/library/capabilities",
       "../src/library/kernelapi");
 
-   for Source_Files use ("rose.ads");
+   for Source_Files use
+     ("rose.ads",
+      "rose-invocation.ads",
+      "rose-invocation.adb",
+      "rose-capabilities-layout.ads",
+      "rose-capabilities-layout.adb");
 
    for Object_Dir use "../build/spark";
 
    for Runtime ("ada") use external ("ROSE_USER_RTS", "rts/user/build/i686-rose");
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnat2020", "-gnatVa");
+      --  gnatprove is a 64-bit program, and -m32 gives it the target's
+      --  sizes, such as a 32-bit address.
+      for Default_Switches ("ada") use
+        ("-m32", "-gnat2020", "-gnatVa");
    end Compiler;
 
    package Prove is
