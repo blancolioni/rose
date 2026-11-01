@@ -7,8 +7,10 @@ with Rose.System_Calls;
 
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.File_Version.Client;
 with Rose.Interfaces.File_Reader.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
+with Rose.Interfaces.Writable_File.Client;
 
 with Petal.Read;
 
@@ -46,6 +48,29 @@ package body Petal.Session is
    Found_Count     : Natural := 0;
    --  The caps that Find_File has returned, for Release_Files.
 
+   Max_Versions         : constant := 8;
+   Max_File_Name_Length : constant := 64;
+   --  As many as a directory makes at once, with its longest name.
+
+   type Version_Entry is
+      record
+         Version   : Rose.Interfaces.File_Version.Client.File_Version_Client;
+         File      : Rose.Interfaces.Writable_File.Client
+           .Writable_File_Client;
+         Name      : String (1 .. Max_File_Name_Length);
+         Name_Last : Natural := 0;
+         Pending   : Boolean := False;
+      end record;
+   --  A version that New_Version made, and petal's client of its
+   --  Writable_File, whose interface cap the command is given.
+
+   Versions      : array (1 .. Max_Versions) of Version_Entry;
+   Version_Count : Natural := 0;
+
+   procedure Close_Version (Item : in out Version_Entry);
+   --  Delete petal's caps for the version Item, which has been committed
+   --  or discarded.
+
    -------------------
    -- Add_Directory --
    -------------------
@@ -72,6 +97,51 @@ package body Petal.Session is
       end;
    end Add_Directory;
 
+   -------------------
+   -- Close_Version --
+   -------------------
+
+   procedure Close_Version (Item : in out Version_Entry) is
+   begin
+      Rose.Interfaces.Writable_File.Client.Close (Item.File);
+      Rose.Interfaces.File_Version.Client.Close (Item.Version);
+      Item.Pending := False;
+   end Close_Version;
+
+   ---------------------
+   -- Commit_Versions --
+   ---------------------
+
+   procedure Commit_Versions (Failed : out Natural) is
+   begin
+      Failed := 0;
+      for Index in 1 .. Version_Count loop
+         Rose.Interfaces.File_Version.Client.Commit
+           (Versions (Index).Version);
+         if Rose.Interfaces.File_Version.Client.Has_Error then
+            Failed := Index;
+            return;
+         end if;
+         Close_Version (Versions (Index));
+      end loop;
+      Version_Count := 0;
+   end Commit_Versions;
+
+   ----------------------
+   -- Discard_Versions --
+   ----------------------
+
+   procedure Discard_Versions is
+   begin
+      for Item of Versions (1 .. Version_Count) loop
+         if Item.Pending then
+            Rose.Interfaces.File_Version.Client.Discard (Item.Version);
+            Close_Version (Item);
+         end if;
+      end loop;
+      Version_Count := 0;
+   end Discard_Versions;
+
    --------------------
    -- Find_Directory --
    --------------------
@@ -97,9 +167,10 @@ package body Petal.Session is
    ---------------
 
    procedure Find_File
-     (Name   : String;
-      File   : out Rose.Capabilities.Capability;
-      Result : out File_Lookup)
+     (Name     : String;
+      Writable : Boolean;
+      File     : out Rose.Capabilities.Capability;
+      Result   : out File_Lookup)
    is
       use type Rose.Interfaces.Directory.File_Kind;
       Home      : Writable_Directory_Client;
@@ -131,7 +202,9 @@ package body Petal.Session is
       --  petal does not need.
 
       Rose.System_Calls.Initialize_Send
-        (Params, Get_Get_Ordinary_File_Cap (Home));
+        (Params,
+         (if Writable then Get_Get_Writable_File_Cap (Home)
+          else Get_Get_Ordinary_File_Cap (Home)));
       Rose.System_Calls.Send_Word (Params, Index);
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -193,6 +266,82 @@ package body Petal.Session is
       User := Session_User;
       Found := Have_User;
    end Get_User;
+
+   -----------------
+   -- New_Version --
+   -----------------
+
+   procedure New_Version
+     (Name   : String;
+      File   : out Rose.Capabilities.Capability;
+      Result : out Version_Lookup)
+   is
+      use type Rose.Interfaces.Directory.File_Kind;
+      Home      : Writable_Directory_Client;
+      Have_Home : Boolean;
+      Index     : Natural;
+      Params    : aliased Rose.Invocation.Invocation_Record;
+   begin
+      File := Rose.Capabilities.Null_Capability;
+
+      Find_Directory (Home_Name, Home, Have_Home);
+      if not Have_Home then
+         Result := No_Version_Directory;
+         return;
+      end if;
+
+      Index := Find_Entry (Home, Name);
+      if Index /= 0
+        and then Directory_Entry_Kind (Home, Index)
+          /= Rose.Interfaces.Directory.Ordinary_File
+      then
+         Result := Not_A_Version_File;
+         return;
+      elsif Version_Count = Max_Versions
+        or else Name'Length > Max_File_Name_Length
+      then
+         Result := No_Version;
+         return;
+      end if;
+
+      --  The call is made here, not through New_File_Version, which
+      --  opens a client of the result even when the directory refuses.
+
+      Rose.System_Calls.Initialize_Send
+        (Params, Get_New_File_Version_Cap (Home));
+      Rose.System_Calls.Send_Text (Params, Name);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         Result := No_Version;
+         return;
+      end if;
+
+      Version_Count := Version_Count + 1;
+      declare
+         Item : Version_Entry renames Versions (Version_Count);
+      begin
+         Rose.Interfaces.File_Version.Client.Open
+           (Item.Version, Params.Caps (0));
+         Item.File :=
+           Rose.Interfaces.File_Version.Client.Writable (Item.Version);
+         Item.Name (1 .. Name'Length) := Name;
+         Item.Name_Last := Name'Length;
+         Item.Pending := True;
+
+         --  A version starts as a copy of the file. The command replaces
+         --  the file (ADR 0012, section 4); appending (#338) would keep
+         --  the copy.
+
+         Rose.Interfaces.Writable_File.Client.Truncate (Item.File, 0);
+         File := Rose.Interfaces.Writable_File.Client.Get_Interface_Cap
+           (Item.File);
+      end;
+      Result := Version_Made;
+   end New_Version;
 
    -------------------
    -- Release_Files --
@@ -306,5 +455,14 @@ package body Petal.Session is
          Add_Directory (Home_Name, Home);
       end if;
    end Start;
+
+   ------------------
+   -- Version_Name --
+   ------------------
+
+   function Version_Name (Index : Positive) return String is
+   begin
+      return Versions (Index).Name (1 .. Versions (Index).Name_Last);
+   end Version_Name;
 
 end Petal.Session;
