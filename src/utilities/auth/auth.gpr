@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Auth is
 
    --  The RTS's own interface specs come first, so that the program
@@ -20,7 +22,7 @@ project Auth is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst");
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
    end Compiler;
 
    package Binder is

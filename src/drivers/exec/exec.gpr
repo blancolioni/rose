@@ -1,3 +1,5 @@
+with "../../../projects/checks.gpr";
+
 project Exec is
 
    --  Built with the userland run-time system (#490), which has Rose's
@@ -23,7 +25,7 @@ project Exec is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib");
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
    end Compiler;
 
    package Binder is

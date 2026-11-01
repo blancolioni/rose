@@ -1,0 +1,27 @@
+--  The run-time checks that the userland programs (the drivers and the
+--  utilities) are compiled with.
+--
+--  checked (the default) keeps the checks that Ada has by default, such as
+--  range, index and discriminant checks, and adds overflow checks and
+--  assertions.  Run-time errors then raise exceptions, which the userland
+--  run-time system reports, instead of going on with a wrong value.
+--
+--  unchecked is what the programs were built with until #566: it
+--  suppresses every check, which makes the programs a little smaller (by
+--  1% to 6%) and faster.  Build with ROSE_CHECKS=unchecked to get it, in the
+--  environment of make or gprbuild.
+
+abstract project Checks is
+
+   type Mode_Type is ("checked", "unchecked");
+
+   Mode : Mode_Type := external ("ROSE_CHECKS", "checked");
+
+   Switches := ("-gnata", "-gnato");
+
+   case Mode is
+      when "checked"   => null;
+      when "unchecked" => Switches := Switches & ("-gnatp");
+   end case;
+
+end Checks;

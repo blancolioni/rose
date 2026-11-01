@@ -56,6 +56,10 @@ change that), and so can you.  `make` builds the run-time systems if they are
 missing, but doesn't rebuild them when their sources change: `make rts` does
 that.
 
+The drivers and the utilities are built with run-time checks: range, index and
+overflow checks, and assertions.  `ROSE_CHECKS=unchecked make` builds them
+without any, as they were built before, which makes them 1% to 6% smaller.
+
 ## Status
 
 Rose boots, launches various services, and
