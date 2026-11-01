@@ -1,6 +1,9 @@
 ROOT=../..
 include $(ROOT)/mk/common.mk
 
+# The userland run-time system, USER_RTS in mk/common.mk, for the drivers and the
+# utilities.  The kernel and the servers have the other one, in rts.
+
 OS=rose
 TARGET=$(ARCH)-$(OS)
 BUILD=./build/$(TARGET)
@@ -12,6 +15,8 @@ all: clean config copy support init rts
 
 clean:
 	rm -rf build
+	rm -f start/start.o
+	$(MAKE) -C support clean
 
 config:
 	mkdir -p $(ADAINCLUDE)
