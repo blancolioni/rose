@@ -1,5 +1,3 @@
-with Rose.Console_IO;
-
 package body Rose.Allocators is
 
    function First_Free_Index (Level : Order_Type) return Natural
@@ -46,10 +44,10 @@ package body Rose.Allocators is
    -- Allocate --
    --------------
 
-   function Allocate
+   procedure Allocate
      (Allocator : in out Store;
-      Size      : Positive)
-      return Natural
+      Size      : Positive;
+      Base      : out Natural)
    is
       Order      : Order_Type := Order_Type'Last;
       Alloc_Size : Positive := 1;
@@ -93,6 +91,12 @@ package body Rose.Allocators is
       end Split_At;
 
    begin
+      Base := 0;
+
+      if Size > 2 ** Natural (Order_Type'Last) then
+         return;
+      end if;
+
       while Alloc_Size < Size loop
          Order := Order - 1;
          Alloc_Size := Alloc_Size * 2;
@@ -111,28 +115,20 @@ package body Rose.Allocators is
             end loop;
 
             if not Found then
-               Rose.Console_IO.Put_Line ("store: out of memory");
-               return 0;
+               return;
             end if;
          end;
       end loop;
 
       declare
          Index : constant Natural := Get_Free (Order);
-         Result : constant Natural :=
-                    (if Index = 0 then 0
-                     else (Index - First_Free_Index (Order))
-                     * 2 ** Natural (Order_Type'Last - Order)
-                     + 1);
       begin
          if Index > 0 then
             Allocator.Free (Index) := False;
             Allocator.Count (Order) :=
               Allocator.Count (Order) - 1;
-            return Result;
-         else
-            Rose.Console_IO.Put_Line ("store: expected a free slot");
-            return 0;
+            Base := (Index - First_Free_Index (Order))
+              * 2 ** Natural (Order_Type'Last - Order) + 1;
          end if;
       end;
 
@@ -142,11 +138,11 @@ package body Rose.Allocators is
    -- Allocate_At --
    -----------------
 
-   function Allocate_At
+   procedure Allocate_At
      (Allocator : in out Store;
       Base      : Positive;
-      Size      : Positive)
-      return Boolean
+      Size      : Positive;
+      Success   : out Boolean)
    is
       Order      : Order_Type := Order_Type'Last;
       Alloc_Size : Positive := 1;
@@ -154,13 +150,21 @@ package body Rose.Allocators is
       Level      : Order_Type;
       Block      : Positive;
    begin
+      Success := False;
+
+      if Size > 2 ** Natural (Order_Type'Last) then
+         return;
+      end if;
+
       while Alloc_Size < Size loop
          Order := Order - 1;
          Alloc_Size := Alloc_Size * 2;
       end loop;
 
-      if (Base - 1) mod Alloc_Size /= 0 then
-         return False;
+      if (Base - 1) mod Alloc_Size /= 0
+        or else (Base - 1) / Alloc_Size >= 2 ** Natural (Order)
+      then
+         return;
       end if;
 
       Index := First_Free_Index (Order) + (Base - 1) / Alloc_Size;
@@ -172,7 +176,7 @@ package body Rose.Allocators is
       Block := Index;
       while not Allocator.Free (Block) loop
          if Level = 0 then
-            return False;
+            return;
          end if;
          Level := Level - 1;
          Block := Block / 2;
@@ -192,7 +196,7 @@ package body Rose.Allocators is
 
       Allocator.Free (Index) := False;
       Allocator.Count (Order) := Allocator.Count (Order) - 1;
-      return True;
+      Success := True;
    end Allocate_At;
 
    ----------------

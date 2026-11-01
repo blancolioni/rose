@@ -1019,7 +1019,7 @@ package body Store.Devices is
          return 0;
       end if;
 
-      Block := Space_Allocators.Allocate (Allocator, 1);
+      Space_Allocators.Allocate (Allocator, 1, Block);
 
       if Block = 0 then
          Rose.Console_IO.Put_Line ("store: out of space");
@@ -1530,6 +1530,7 @@ package body Store.Devices is
    is
       Owner       : Natural := 0;
       Entry_Index : Natural;
+      Allocated   : Boolean := False;
    begin
       for Index in 1 .. Region_Count loop
          if Regions (Index).In_Use
@@ -1549,10 +1550,12 @@ package body Store.Devices is
          return;
       end if;
 
-      if Natural (Block) = 0
-        or else not Space_Allocators.Allocate_At
-          (Allocator, Natural (Block), 1)
-      then
+      if Natural (Block) /= 0 then
+         Space_Allocators.Allocate_At
+           (Allocator, Natural (Block), 1, Allocated);
+      end if;
+
+      if not Allocated then
          Rose.Console_IO.Put ("storage: restore: space for page ");
          Rose.Console_IO.Put (Page);
          Rose.Console_IO.Put_Line (" is not free");
