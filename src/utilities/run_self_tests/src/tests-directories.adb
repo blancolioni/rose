@@ -295,14 +295,12 @@ package body Tests.Directories is
    ------------------
 
    function Version_Test return Boolean is
-      No_Words : Storage_Array (1 .. 0);
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("directory");
       Process  : Rose.Interfaces.Process.Process_Object'Class :=
         Launcher.Launch
           ((Tests.Registry.Launcher_Cap ("file"),
-            Tests.Registry.Launcher_Cap ("directory")),
-           No_Words);
+            Tests.Registry.Launcher_Cap ("directory")));
       Top      : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
 

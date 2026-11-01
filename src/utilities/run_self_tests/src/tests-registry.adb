@@ -1,4 +1,3 @@
-with System.Storage_Elements;
 
 with Rose.System_Calls;
 
@@ -38,11 +37,10 @@ package body Tests.Registry is
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
-      No_Words : System.Storage_Elements.Storage_Array (1 .. 0);
-      Program  : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
         Launcher (Name);
-      Process  : Rose.Interfaces.Process.Process_Object'Class :=
-        Program.Launch (Caps, No_Words);
+      Process : Rose.Interfaces.Process.Process_Object'Class :=
+        Program.Launch (Caps);
    begin
       return Process.Published_Interface;
    end Launch;
