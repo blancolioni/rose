@@ -16,11 +16,6 @@ src/tools/idl/src/idl-paths.ads
 rts/gnat-src
 *~
 make.log
-qemu-port-1.txt
-rose-hd0.img
-bochs-port-1.txt
-bochs.log
-rose-hd0.img.lock
 src/tests/*/obj
 /syn/
 /idle/
