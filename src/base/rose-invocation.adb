@@ -1,4 +1,6 @@
-package body Rose.Invocation is
+package body Rose.Invocation
+  with SPARK_Mode
+is
 
    ------------------------
    -- For_Each_Sent_Word --
@@ -26,7 +28,6 @@ package body Rose.Invocation is
       Index  : Parameter_Word_Index)
       return Rose.Objects.Object_Id
    is
-      use type Rose.Objects.Object_Id;
    begin
       return Oid : Rose.Objects.Object_Id :=
         Rose.Objects.Object_Id (Params.Data (Index))

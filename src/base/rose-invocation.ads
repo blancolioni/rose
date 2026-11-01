@@ -4,9 +4,16 @@ with Rose.Capabilities;
 with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
 
-package Rose.Invocation is
+package Rose.Invocation
+  with SPARK_Mode
+is
 
    pragma Preelaborate;
+
+   pragma Assertion_Policy (Pre => Ignore, Post => Ignore);
+   --  The contracts below are proved (make prove), not executed: the
+   --  boot servers are built with assertions on against a run-time system
+   --  that has no System.Assertions to raise Assert_Failure with.
 
    --  Invocation flags:
    --    Error         An error occurred while processing request.
@@ -64,6 +71,9 @@ package Rose.Invocation is
    --  server when the handler of an operation raises an exception
    --  (idle#60).
 
+   use type Rose.Capabilities.Capability;
+   use type Rose.Objects.Object_Id;
+
    Max_Parameter_Words : constant := 16;
    Max_Capabilities    : constant := 16;
 
@@ -120,27 +130,79 @@ package Rose.Invocation is
    Object_Fits_In_Word : constant Boolean :=
                            Rose.Objects.Object_Id'Size <= Word'Size;
 
+   function Sent_Word_Count (Params : Invocation_Record) return Natural
+   is (if Params.Control.Flags (Send_Words)
+       then Natural (Params.Control.Last_Sent_Word) + 1
+       else 0);
+   --  The number of words that have been sent, which is also how many of
+   --  Data are in use: Last_Sent_Word is the index of the last one, and is
+   --  not meaningful until Send_Words is set.
+
+   function Sent_Cap_Count (Params : Invocation_Record) return Natural
+   is (if Params.Control.Flags (Send_Caps)
+       then Natural (Params.Control.Last_Sent_Cap) + 1
+       else 0);
+   --  The same for the capabilities, and Caps.
+
+   function Object_Id_Words return Positive
+   is (if Object_Fits_In_Word then 1 else 2);
+   --  How many words Send_Object_Id sends.
+
+   --  The indices that count the words and capabilities sent are modular,
+   --  so sending one past the end would wrap around and overwrite the
+   --  first, instead of failing.  The preconditions say that there is room.
+
    procedure Send_Object_Id
      (Params : in out Invocation_Record;
-      Oid    : Rose.Objects.Object_Id);
+      Oid    : Rose.Objects.Object_Id)
+   with
+     Pre  => Sent_Word_Count (Params) <= Max_Parameter_Words - Object_Id_Words,
+     Post => Sent_Word_Count (Params) =
+               Sent_Word_Count (Params'Old) + Object_Id_Words
+             and then Params.Control.Flags (Send_Words);
 
    procedure Send_Word
      (Params : in out Invocation_Record;
-      Value  : Rose.Words.Word);
+      Value  : Rose.Words.Word)
+   with
+     Pre  => Sent_Word_Count (Params) < Max_Parameter_Words,
+     Post => Sent_Word_Count (Params) = Sent_Word_Count (Params'Old) + 1
+             and then Params.Data (Params.Control.Last_Sent_Word) = Value
+             and then (for all I in Parameter_Word_Index =>
+                         (if Natural (I) < Sent_Word_Count (Params'Old)
+                          then Params.Data (I) = Params'Old.Data (I)));
 
    procedure Send_Cap
      (Params : in out Invocation_Record;
-      Cap    : Rose.Capabilities.Capability);
+      Cap    : Rose.Capabilities.Capability)
+   with
+     Pre  => Sent_Cap_Count (Params) < Max_Capabilities,
+     Post => Sent_Cap_Count (Params) = Sent_Cap_Count (Params'Old) + 1
+             and then Params.Caps (Params.Control.Last_Sent_Cap) = Cap
+             and then (for all I in Capability_Index =>
+                         (if Natural (I) < Sent_Cap_Count (Params'Old)
+                          then Params.Caps (I) = Params'Old.Caps (I)));
 
    function Get_Object_Id
      (Params : Invocation_Record;
       Index  : Parameter_Word_Index)
-      return Rose.Objects.Object_Id;
+      return Rose.Objects.Object_Id
+   with
+     Pre  => Natural (Index) <= Max_Parameter_Words - Object_Id_Words,
+     Post => Get_Object_Id'Result =
+               Rose.Objects.Object_Id (Params.Data (Index))
+               + (if Object_Fits_In_Word then 0
+                  else Rose.Objects.Object_Id (Params.Data (Index + 1))
+                         * 2 ** 32);
+   --  The id in Data (Index) and, if it takes two words, the next.
 
    procedure Set_Error
      (Params  : in out Invocation_Record;
       Error   : Invocation_Error;
-      X, Y, Z : Rose.Words.Word := 0);
+      X, Y, Z : Rose.Words.Word := 0)
+   with
+     Post => Params.Control.Flags (Rose.Invocation.Error)
+             and then Sent_Word_Count (Params) = 4;
 
    procedure For_Each_Sent_Word
      (Params  : Invocation_Record;

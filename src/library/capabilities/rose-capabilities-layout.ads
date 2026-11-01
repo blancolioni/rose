@@ -1,6 +1,8 @@
 with Rose.Objects;
 
-package Rose.Capabilities.Layout is
+package Rose.Capabilities.Layout
+  with SPARK_Mode
+is
 
    Capability_Header_Bytes : constant := 8;
    Capability_Layout_Bytes : constant := 16;
