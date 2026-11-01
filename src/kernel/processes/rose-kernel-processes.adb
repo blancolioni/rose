@@ -332,7 +332,7 @@ package body Rose.Kernel.Processes is
         Physical_Page_To_Address (Physical_Directory_Page);
 
       Rose.Kernel.Page_Table.Init_User_Page_Directory (Directory_VP);
-      Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
+      Proc.Invocation_Page := Rose.Kernel.Heap.Allocate_Page;
 
       Proc.Page_Ranges (Stack_Range_Index) :=
         (Virtual_Address_To_Page (Process_Stack_Bound - 16#1_0000#),
@@ -352,18 +352,8 @@ package body Rose.Kernel.Processes is
       Map_Page
         (Directory_Page => Directory_VP,
          Virtual_Page   =>
-           Virtual_Address_To_Page (Environment_Base),
-         Physical_Page  => Proc.Env_Page,
-         Readable       => True,
-         Writable       => True,
-         Executable     => False,
-         User           => True);
-
-      Map_Page
-        (Directory_Page => Directory_VP,
-         Virtual_Page   =>
            Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
-         Physical_Page  => Proc.Env_Page,
+         Physical_Page  => Proc.Invocation_Page,
          Readable       => True,
          Writable       => True,
          Executable     => False,
@@ -1410,9 +1400,9 @@ package body Rose.Kernel.Processes is
          end;
       end if;
 
-      if P.Env_Page /= 0 then
+      if P.Invocation_Page /= 0 then
          Rose.Kernel.Heap.Free_Page
-           (Rose.Kernel.Heap.Get_Virtual_Page (P.Env_Page));
+           (Rose.Kernel.Heap.Get_Virtual_Page (P.Invocation_Page));
       end if;
 
       --  The process table starts out zeroed, as the kernel heap gives

@@ -296,28 +296,6 @@ package body Init.Calls is
       Launch_Caps     : Array_Of_Capabilities)
       return Rose.Capabilities.Capability
    is
-      No_Words : Array_Of_Words (1 .. 0);
-   begin
-      return Launch_Boot_Module
-        (Cap, Module_Index, Oid, Priority,
-         Create_Endpoint, Create_Cap_Set, Launch_Caps, No_Words);
-   end Launch_Boot_Module;
-
-   ------------------------
-   -- Launch_Boot_Module --
-   ------------------------
-
-   function Launch_Boot_Module
-     (Cap             : Rose.Capabilities.Capability;
-      Module_Index    : Rose.Words.Word;
-      Oid             : Rose.Objects.Object_Id;
-      Priority        : Rose.Words.Word;
-      Create_Endpoint : Rose.Capabilities.Capability;
-      Create_Cap_Set  : Rose.Capabilities.Capability;
-      Launch_Caps     : Array_Of_Capabilities;
-      Launch_Words    : Array_Of_Words)
-      return Rose.Capabilities.Capability
-   is
       use Rose.Capabilities;
       use Rose.Invocation;
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -335,12 +313,6 @@ package body Init.Calls is
       Params.Data (0) := Module_Index;
       Params.Data (1) := Priority;
       Params.Data (2) := Rose.Words.Word (Oid);
-
-      for W of Launch_Words loop
-         Params.Control.Last_Sent_Word :=
-           Params.Control.Last_Sent_Word + 1;
-         Params.Data (Params.Control.Last_Sent_Word) := W;
-      end loop;
 
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
 

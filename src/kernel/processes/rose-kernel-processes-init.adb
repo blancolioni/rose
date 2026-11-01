@@ -36,8 +36,6 @@ package body Rose.Kernel.Processes.Init is
 
    Enable_Paging : constant Boolean := True;
 
-   Empty_Environment : aliased Rose.Environment_Pages.Environment_Page;
-
    procedure Add_Init_Caps (Pid : Process_Id);
    --  Give init the caps listed in Rose.Init_Capabilities, at the indices
    --  listed there.
@@ -198,8 +196,7 @@ package body Rose.Kernel.Processes.Init is
                  Load_Boot_Module
                    (Priority    => Process_Priority'Last,
                     Module      => Rose.Kernel.Modules.Init_Module,
-                    Oid         => Rose.Objects.Init_Object_Id,
-                    Environment => null);
+                    Oid         => Rose.Objects.Init_Object_Id);
       begin
          pragma Unreferenced (Pid);
       end;
@@ -219,8 +216,7 @@ package body Rose.Kernel.Processes.Init is
    function Load_Boot_Module
      (Priority    : Process_Priority;
       Module      : Rose.Kernel.Modules.Module_Index;
-      Oid         : Rose.Objects.Boot_Process_Object_Id;
-      Environment : access Rose.Environment_Pages.Environment_Page)
+      Oid         : Rose.Objects.Boot_Process_Object_Id)
       return Rose.Kernel.Processes.Process_Id
    is
       use Rose.Invocation;
@@ -467,10 +463,9 @@ package body Rose.Kernel.Processes.Init is
             Rose.Kernel.Panic.Panic ("boot module: not an ELF image");
          end if;
 
-         --  a page directory, a stack page and its page table, an
-         --  environment page and its page table, and a page table for
-         --  the system call page
-         Heap_Pages := (if Environment = null then 5 else 6);
+         --  a page directory, a stack page and its page table, and a
+         --  page table for the system call page
+         Heap_Pages := 4;
          Rose.Formats.ELF.Scan_Program_Headers
            (Image, Count_Program_Header'Access);
 
@@ -535,15 +530,6 @@ package body Rose.Kernel.Processes.Init is
 
          Proc.Stack_Page := Rose.Kernel.Heap.Allocate_Page;
 
-         if Environment = null then
-            Proc.Env_Page :=
-              Rose.Kernel.Heap.Get_Physical_Page
-                (Virtual_Address_To_Page
-                   (To_Virtual_Address (Empty_Environment'Address)));
-         else
-            Proc.Env_Page := Rose.Kernel.Heap.Allocate_Page;
-         end if;
-
          declare
             use Rose.Kernel.Page_Table;
             System_Call_Page : constant Physical_Page_Address :=
@@ -567,41 +553,6 @@ package body Rose.Kernel.Processes.Init is
             Proc.Page_Flags (Stack_Range_Index) :=
               (Valid => True, Readable => True, Writable => True,
                others => False);
-
-            Map_Page
-              (Directory_Page => Directory_VP,
-               Virtual_Page   =>
-                 Virtual_Address_To_Page (Environment_Base),
-               Physical_Page  => Proc.Env_Page,
-               Readable       => True,
-               Writable       => Environment /= null,
-               Executable     => False,
-               User           => True);
-
-            if Environment /= null then
-               Map_Kernel_Page
-                 (Virtual_Page  =>
-                    Rose.Kernel.Heap.Get_Virtual_Page (Proc.Env_Page),
-                  Physical_Page => Proc.Env_Page,
-                  Readable      => True,
-                  Writable      => True,
-                  Executable    => False,
-                  User          => False);
-
-               declare
-                  Kernel_Page_Address : constant Virtual_Address :=
-                                          Virtual_Address
-                                            (Rose.Kernel.Heap.Get_Virtual_Page
-                                               (Proc.Env_Page))
-                                          * 4096;
-                  Kernel_Env_Page   : Rose.Environment_Pages.Environment_Page;
-                  pragma Import (Ada, Kernel_Env_Page);
-                  for Kernel_Env_Page'Address use
-                    System'To_Address (Kernel_Page_Address);
-               begin
-                  Kernel_Env_Page := Environment.all;
-               end;
-            end if;
 
             Launch_Params.Data (6) :=
               Rose.Words.Word (Proc.Page_Ranges (Stack_Range_Index).Base);

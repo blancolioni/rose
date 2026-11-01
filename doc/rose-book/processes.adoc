@@ -125,7 +125,7 @@ Arguments arrive by invocation so that there is one encoding for them, shared wi
 The reply cap gives the shell its completion signal without a separate result cap.
 The cost is one extra round trip for each launch.
 
-_Today_, `Launch.Launch` takes a `Capability_Array` and an `Environment` storage array, whose meaning the caller and the program agree on by convention only.
+_Today_, `Launch.Launch` takes a `Capability_Array`, whose meaning the caller and the program agree on by convention only.
 Petal does not launch external commands yet: its `Execute` prints `launching:` with the command's launch cap and returns.
 
 [#completion]

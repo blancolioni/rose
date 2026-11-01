@@ -190,8 +190,9 @@ package body Directory.Server is
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
-   --  Launch sends its environment through the invoke buffer; without
-   --  one, Send_Storage_Array clears the cap of the invocation.
+   --  Storage arrays, and strings in requests, go through the invoke
+   --  buffer; without one, Send_Storage_Array clears the cap of the
+   --  invocation.
 
    Context          : Rose.Server.Server_Context;
    The_Directory    : aliased Directory_Object;
@@ -279,8 +280,8 @@ package body Directory.Server is
          return Rose.Capabilities.Null_Capability;
       end if;
 
-      --  Name is in the invoke buffer, which Launch overwrites when it
-      --  sends the environment.
+      --  Name is in the invoke buffer, which the invocations below can
+      --  overwrite.
 
       Saved_Name (1 .. Name'Length) := Name;
       Saved_Last := Name'Length;
@@ -758,15 +759,14 @@ package body Directory.Server is
      (Kind : Rose.Interfaces.Directory.File_Kind)
       return Rose.Interfaces.Process.Process_Object'Class
    is
-      No_Environment : System.Storage_Elements.Storage_Array (1 .. 0);
-      No_Caps        : Rose.Capabilities.Capability_Array (1 .. 0);
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
    begin
       if Kind = Rose.Interfaces.Directory.Ordinary_File then
-         return File_Launch.Launch (No_Caps, No_Environment);
+         return File_Launch.Launch (No_Caps);
       else
          --  A subdirectory can create files and directories too.
          return Directory_Launch.Launch
-           ((File_Launch_Cap, Directory_Launch_Cap), No_Environment);
+           ((File_Launch_Cap, Directory_Launch_Cap));
       end if;
    end Launch;
 

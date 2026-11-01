@@ -267,7 +267,6 @@ package body Auth_Server is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
-      No_Environment : Storage_Array (1 .. 0);
    begin
       if Name'Length = 0 or else Name'Length > Max_Name_Length
         or else User_Lists.Has_Element (Find (Name))
@@ -308,8 +307,7 @@ package body Auth_Server is
               (Rose.Interfaces.Launch.Client.Get_Interface_Cap
                  (File_Launch),
                Rose.Interfaces.Launch.Client.Get_Interface_Cap
-                 (Directory_Launch)),
-              No_Environment);
+                 (Directory_Launch)));
          Home := Rose.Interfaces.Process.Client.Published_Interface (Process);
          if Home = Rose.Capabilities.Null_Capability then
             return Rose.Capabilities.Null_Capability;

@@ -56,8 +56,7 @@ package body Rose.Kernel.Page_Table is
                                        / (Entries_Per_Page
                                           * Physical_Page_Bytes);
    --  The kernel's address space starts at Kernel_Virtual_Base.  Every
-   --  entry below it is a process's own, stacks and the environment page
-   --  among them (#314).
+   --  entry below it is a process's own, stacks among them (#314).
 
    subtype Page_Directory_Index is Page_Entry_Index;
 
@@ -255,9 +254,8 @@ package body Rose.Kernel.Page_Table is
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
       --  Init_User_Page_Directory copies the kernel's entries for the top
-      --  quarter of the address space, but a process maps its stack, its
-      --  environment page and its invocation buffers there too, with
-      --  page tables of its own.
+      --  quarter of the address space, but a process maps its stack and its
+      --  invocation buffers there too, with page tables of its own.
 
       for Index in Page_Directory_Index loop
          if Directory (Index).PFA /= 0
