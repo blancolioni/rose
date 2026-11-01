@@ -39,6 +39,30 @@ package body Tests.Directories is
       Held      : Rose.Interfaces.Writable_File.Client
         .Writable_File_Client;
 
+      function Delete_Refused
+        (Name      : String;
+         Directory : Boolean)
+         return Boolean;
+      --  True if Top refuses to delete Name, as a directory if Directory is
+      --  True, and as a file if not.
+
+      function Delete_Refused
+        (Name      : String;
+         Directory : Boolean)
+         return Boolean
+      is
+      begin
+         if Directory then
+            Top.Delete_Directory (Name);
+         else
+            Top.Delete_File (Name);
+         end if;
+         return False;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return True;
+      end Delete_Refused;
+
       function Refused (From, To : String) return Boolean;
       --  True if Top refuses to rename From to To.
 
@@ -181,6 +205,67 @@ package body Tests.Directories is
         or else Top.Find_Entry ("sub") /= 2
       then
          return Fail ("a refused rename changed the entries");
+      end if;
+
+      --  A delete fails, and changes nothing, for a directory as a file,
+      --  a file as a directory, a directory that has entries, and a name
+      --  that is not an entry (#346).
+
+      if not Delete_Refused ("sub", Directory => False)
+        or else not Delete_Refused ("memo", Directory => True)
+        or else not Delete_Refused ("sub", Directory => True)
+        or else not Delete_Refused ("nothere", Directory => False)
+      then
+         return Fail ("a bad delete was not refused");
+      end if;
+
+      if Top.Directory_Entry_Count /= 2 then
+         return Fail ("a refused delete changed the entries");
+      end if;
+
+      --  Deleting a file removes the entry and ends its process, so the
+      --  cap that is held for it fails.
+
+      begin
+         Top.Delete_File ("memo");
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Fail ("cannot delete a file");
+      end;
+
+      if Top.Directory_Entry_Count /= 1
+        or else Top.Find_Entry ("memo") /= 0
+        or else Top.Find_Entry ("sub") /= 1
+      then
+         return Fail ("wrong entries after deleting a file");
+      end if;
+
+      begin
+         Held.Write (Hello);
+         return Fail ("a deleted file can still be written");
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            null;
+      end;
+
+      --  A directory can be deleted once it is empty.
+
+      begin
+         declare
+            Sub : Rose.Interfaces.Writable_Directory
+              .Writable_Directory_Object'Class :=
+                Top.Get_Writable_Directory (Top.Find_Entry ("sub"));
+         begin
+            Sub.Delete_File ("inner");
+         end;
+         Top.Delete_Directory ("sub");
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Fail ("cannot empty and delete a directory");
+      end;
+
+      if Top.Directory_Entry_Count /= 0 then
+         return Fail ("wrong entries after deleting a directory");
       end if;
 
       return True;
