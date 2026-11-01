@@ -6,8 +6,8 @@ Website: [rose-os.org](https://rose-os.org)
 ## Requirements
 
 Rose requires gcc 15 or later, and is known to build on Fedora 43.  The
-run-time system is built from the GNAT sources, which `rts/copy-runtime.sh`
-and `src/rts/create-sources.sh` copy from the installed compiler.
+run-time system is built from the GNAT sources, which `rts/kernel/copy-runtime.sh`
+and `rts/user/create-sources.sh` copy from the installed compiler.
 `make check-env` checks that everything the build needs is installed, and
 `clean-build.sh` runs it first.
 

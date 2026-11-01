@@ -11,7 +11,7 @@ project Cat is
    --  uses them and not the other copies on its path (#538).
 
    for Source_Dirs use
-      ("../../rts/build/interfaces",
+      ("../../../rts/user/build/interfaces",
        "src",
        "build/generated",
        "../../library/rose");
@@ -22,7 +22,7 @@ project Cat is
    package Builder is
       for Global_Configuration_Pragmas use "cat-pragmas.config";
       for Executable ("rose-core-cat_main.adb") use "cat-driver";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../rts/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
    end Builder;
 
    --  -gnatw.X: the generated user-mode packages raise exceptions, which
@@ -38,7 +38,7 @@ project Cat is
    end Binder;
 
    package Linker is
-      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../rts/start/start.o");
+      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../../rts/user/start/start.o");
    end Linker;
 
    package Pretty_Printer is

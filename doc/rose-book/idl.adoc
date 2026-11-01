@@ -342,8 +342,8 @@ The rest of phase 1 is idle#39.
 ==== Which programs use it
 
 The two targets are not mixed in one program.
-The kernel target needs only what the kernel run-time system (`rts`) has, so a program built with that run-time system uses it.
-A program built with the userland run-time system (`src/rts`) can use either:
+The kernel target needs only what the kernel run-time system (`rts/kernel`) has, so a program built with that run-time system uses it.
+A program built with the userland run-time system (`rts/user`) can use either:
 
 * *Kernel run-time system, kernel target:* the boot modules and the pager path (ADR 0008).
 * *Userland run-time system, kernel target:* the installed drivers `exec`, `command`, `keyboard`, `directory` and `file` (#490), petal, the `user` and `auth` servers, and the commands other than `cat` and `echo`.

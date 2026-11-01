@@ -10,11 +10,11 @@ library project rts is
    for Source_Dirs use
      ("src/adainclude",
       "src/arch/" & Arch,
-      "../base",
-      "../library/capabilities",
-      "../library/kernelapi/system-calls",
-      "../library/kernelapi/system-calls-user",
-      "../library/kernelapi/arch/" & Arch,
+      "../../src/base",
+      "../../src/library/capabilities",
+      "../../src/library/kernelapi/system-calls",
+      "../../src/library/kernelapi/system-calls-user",
+      "../../src/library/kernelapi/arch/" & Arch,
       "build/gnat-src",
       "build/interfaces");
    

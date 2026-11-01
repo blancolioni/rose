@@ -2,7 +2,7 @@ ROOT=../..
 include $(ROOT)/mk/common.mk
 
 # The userland run-time system, USER_RTS in mk/common.mk, for the drivers and the
-# utilities.  The kernel and the servers have the other one, in rts.
+# utilities.  The kernel and the servers have the other one, in rts/kernel.
 
 OS=rose
 TARGET=$(ARCH)-$(OS)
