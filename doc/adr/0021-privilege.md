@@ -1,6 +1,6 @@
 # 21. Privilege: role categories, a rights broker, and sudo
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Amended by:** #549, where the grants are proxies and not derived caps, a server of the kernel target can't fail a call by raising, and `*` covers every category (sections 3 and 4); and a change to `sudo`, which now names the categories that it grants, and warns when one isn't needed (sections 2 and 7)
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands and roles), [ADR 0003](0003-directories-files-and-users.md) (users), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes), [ADR 0018](0018-credentials-after-restore.md) (credentials after a restore), [ADR 0020](0020-clock.md) (the clock), #494 (the clock), #455 (auth), #457 (login), #458 (petal), blancolioni/idle#63 (`Boolean` in operations)
