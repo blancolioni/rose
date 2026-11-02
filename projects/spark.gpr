@@ -22,7 +22,8 @@ project Spark is
       "../src/library",
       "../src/library/rose",
       "../src/library/capabilities",
-      "../src/library/kernelapi");
+      "../src/library/kernelapi",
+      "../src/kernel");
 
    for Source_Files use
      ("rose.ads",
@@ -32,7 +33,9 @@ project Spark is
       "rose-capabilities-layout.adb",
       "rose-allocators.ads",
       "rose-allocators.adb",
-      "rose-allocators_proof.ads");
+      "rose-allocators_proof.ads",
+      "rose-kernel-command_line.ads",
+      "rose-kernel-command_line.adb");
 
    for Object_Dir use "../build/spark";
 
@@ -40,9 +43,13 @@ project Spark is
 
    package Compiler is
       --  gnatprove is a 64-bit program, and -m32 gives it the target's
-      --  sizes, such as a 32-bit address.
+      --  sizes, such as a 32-bit address.  src/boot is only for the units
+      --  that the SPARK packages with: a directory that has none of the
+      --  listed files in it is not searched, and listing the specs makes
+      --  gnatprove try to generate code for them.
       for Default_Switches ("ada") use
-        ("-m32", "-gnat2020", "-gnatVa");
+        ("-m32", "-gnat2020", "-gnatVa",
+         "-I" & Project'Project_Dir & "../src/boot");
    end Compiler;
 
    package Prove is
