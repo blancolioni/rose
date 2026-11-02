@@ -4,6 +4,7 @@ with Rose.Checkpoints;
 with Rose.Interfaces.Restorable;
 with Rose.Limits;
 
+with Rose.Kernel.Cap_Tables;
 with Rose.Kernel.Interrupts;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
@@ -104,8 +105,8 @@ package body Rose.Kernel.Processes.Snapshot is
    function Active_Cap_Count (P : Kernel_Process_Entry) return Natural is
       Count : Natural := 0;
    begin
-      for Cap in 1 .. P.Last_Cap loop
-         if P.Is_Active (Cap) then
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
             Count := Count + 1;
          end if;
       end loop;
@@ -121,7 +122,7 @@ package body Rose.Kernel.Processes.Snapshot is
       P   : Kernel_Process_Entry renames Process_Table (Pid);
       Cap : constant Rose.Capabilities.Capability := P.Current_Params.Cap;
    begin
-      if Cap not in 1 .. P.Last_Cap or else not P.Is_Active (Cap) then
+      if not Cap_Tables.Is_Active (P.Caps, Cap) then
          return Null_Process_Id;
       end if;
 
@@ -150,8 +151,8 @@ package body Rose.Kernel.Processes.Snapshot is
       use type Rose.Objects.Object_Id;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      for Cap in 1 .. P.Last_Cap loop
-         if P.Is_Active (Cap) then
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
             declare
                Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
             begin
@@ -178,8 +179,8 @@ package body Rose.Kernel.Processes.Snapshot is
       use type Rose.Objects.Object_Id;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      for Cap in 1 .. P.Last_Cap loop
-         if P.Is_Active (Cap) then
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
             declare
                Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
             begin
@@ -261,7 +262,6 @@ package body Rose.Kernel.Processes.Snapshot is
       Pid            : out Process_Id;
       Success        : out Boolean)
    is
-      use type Rose.Capabilities.Capability;
       Item : Rose.Checkpoints.Process_Record
         with Import, Address => Pages'Address;
    begin
@@ -273,7 +273,7 @@ package body Rose.Kernel.Processes.Snapshot is
         or else Pages'Length
           < Storage_Count (1 + Item.Cap_Page_Count) * Page_Bytes
         or else Item.Cap_Count > Item.Last_Cap
-        or else Item.Last_Cap > Max_Capability_Index
+        or else Item.Last_Cap > Cap_Tables.Max_Capability_Index
         or else Item.State > Process_State'Pos (Process_State'Last)
         or else Item.Priority not in
           Process_Priority'Pos (Process_Priority'First)
@@ -400,7 +400,8 @@ package body Rose.Kernel.Processes.Snapshot is
          --  The caps go back at the indices they had, since the process's
          --  code and data refer to them by index.
 
-         P.Last_Cap := Rose.Capabilities.Capability (Item.Last_Cap);
+         Cap_Tables.Set_Last_Cap
+           (P.Caps, Rose.Capabilities.Capability (Item.Last_Cap));
 
          for I in 1 .. Natural (Item.Cap_Count) loop
             declare
@@ -418,8 +419,8 @@ package body Rose.Kernel.Processes.Snapshot is
                Layout : Rose.Capabilities.Layout.Capability_Layout
                  with Import, Address => Saved.Layout'Address;
             begin
-               if Cap in 1 .. P.Last_Cap then
-                  P.Is_Active (Cap) := True;
+               if Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) then
+                  Cap_Tables.Activate (P.Caps, Cap);
                   Set_Cap (Pid, Cap, Layout);
                end if;
             end;
@@ -771,8 +772,8 @@ package body Rose.Kernel.Processes.Snapshot is
       Page_Index : Storage_Offset := 0;
       Cap_Index  : Natural := 0;
    begin
-      for Cap in 1 .. P.Last_Cap loop
-         if P.Is_Active (Cap) then
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
             if Cap_Index = Rose.Checkpoints.Caps_Per_Page then
                Page_Index := Page_Index + 1;
                Cap_Index := 0;
@@ -836,7 +837,7 @@ package body Rose.Kernel.Processes.Snapshot is
       Item.Default_Cap := Word_32 (P.Default_Cap);
       Item.Receive_Cap := Word_32 (P.Receive_Cap);
       Item.Send_Cap := Word_32 (P.Send_Cap);
-      Item.Last_Cap := Word_32 (P.Last_Cap);
+      Item.Last_Cap := Word_32 (Cap_Tables.Last_Cap (P.Caps));
       Item.Cap_Count := Word_32 (Caps);
       Item.Cap_Page_Count := Word_32 (Cap_Page_Count (Caps));
       Item.Command_Endpoint := Word_32 (P.Command_Endpoint);
