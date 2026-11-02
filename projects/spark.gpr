@@ -23,7 +23,8 @@ project Spark is
       "../src/library/rose",
       "../src/library/capabilities",
       "../src/library/kernelapi",
-      "../src/kernel");
+      "../src/kernel",
+      "../src/servers/elf/src");
 
    for Source_Files use
      ("rose.ads",
@@ -32,7 +33,9 @@ project Spark is
       "rose-capabilities-layout.ads",
       "rose-capabilities-layout.adb",
       "rose-kernel-command_line.ads",
-      "rose-kernel-command_line.adb");
+      "rose-kernel-command_line.adb",
+      "elf-segments.ads",
+      "elf-segments.adb");
 
    for Object_Dir use "../build/spark";
 

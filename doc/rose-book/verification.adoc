@@ -33,3 +33,9 @@ The tables of names and values are always within the text that holds them, and `
 The body that prints each argument and passes the adder to `Rose.Multiboot` is not in SPARK, so the contract of `Initialise_Command_Line` is assumed.
 
 The kernel has its own run-time system, but `make prove` uses the userland one for `Rose.Kernel.Command_Line` too, since it uses nothing that they differ in.
+
+`Elf.Segments`::
+What `elf` trusts of an executable's program headers.
+No run-time errors, for any headers and any size of image, and `Describe` gives the segments to load only if each is inside the image, is not larger in the file than in memory, is not empty, ends below the stack without wrapping around, and does not overlap another.
+`Elf.Format.Valid` also checks the class, data encoding, version and machine now, not only the magic number, and the loader reads no more than 64 program headers (an executable has about seven) and none from outside the image.
+Not covered: the copy of a writable segment, which does not zero the rest of its last page (#265).
