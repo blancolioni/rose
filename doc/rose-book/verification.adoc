@@ -45,3 +45,11 @@ No run-time errors in decoding an item of the launch buffer, for any contents an
 `Rose.Command_Line.Element` is the one conversion from the address of the buffer to an array, and calls it.
 An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
 Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
+
+`Rose.Containers.Queues` and `Rose.Containers.Bounded_Hashed_Maps`::
+No run-time errors, in the instances that isofs uses (`Rose.Containers.Queues_Proof` and `Maps_Proof`).
+Operations that need room or an element say so: `Insert` requires that the queue is not full, `Delete_First` and `First_Key` that it is not empty, and the map's `Key`, `Element`, `Replace_Element` and `Delete` that the cursor is that of an element.
+The lengths are specified: `Insert` adds one, `Delete_First` takes one, `Replace` changes none, and the map's `Insert` adds one exactly when it says that it inserted.
+The map is an object now, a `Map` that each operation takes, and not the state of the package, as the queue is.
+Its searches are bounded by the number of buckets, so that they end even if the map has no empty bucket, which a `Compile_Time_Error` rules out (it holds fewer elements than it has buckets).
+Not yet proved: that a queue is ordered by key, which needs `<` to be transitive, and that a map finds what has been inserted and not deleted, which needs its probe chains to be unbroken.

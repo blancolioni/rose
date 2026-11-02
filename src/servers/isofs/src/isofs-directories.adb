@@ -48,6 +48,7 @@ package body IsoFS.Directories is
         Rose.Words."<",
         Rose.Words."=");
 
+   Sector_Map   : Sector_Cache.Map;
    Sector_Queue : Sector_Cache_Queues.Queue (100);
    Next_Tick    : Word_32 := 0;
 
@@ -946,7 +947,7 @@ package body IsoFS.Directories is
       use Sector_Cache_Queues;
       Key : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Address);
       Position : Sector_Cache.Cursor :=
-                   Sector_Cache.Find (Key);
+                   Sector_Cache.Find (Sector_Map, Key);
       Item     : Cache_Element;
 
    begin
@@ -954,12 +955,13 @@ package body IsoFS.Directories is
       Next_Tick := Next_Tick + 1;
 
       if not Sector_Cache.Has_Element (Position) then
-         if Sector_Cache.Is_Full then
+         if Sector_Cache.Is_Full (Sector_Map) then
             declare
                Oldest : Sector_Cache.Cursor :=
-                          Sector_Cache.Find (First_Element (Sector_Queue));
+                          Sector_Cache.Find
+                            (Sector_Map, First_Element (Sector_Queue));
             begin
-               Sector_Cache.Delete (Oldest);
+               Sector_Cache.Delete (Sector_Map, Oldest);
                Delete_First (Sector_Queue);
             end;
          end if;
@@ -973,17 +975,18 @@ package body IsoFS.Directories is
             Inserted : Boolean;
          begin
             Sector_Cache.Insert
-              (Key       => Key,
+              (Container => Sector_Map,
+               Key       => Key,
                New_Item  => Item,
                Position  => Position,
                Inserted  => Inserted);
          end;
       else
 
-         Item := Sector_Cache.Element (Position);
+         Item := Sector_Cache.Element (Sector_Map, Position);
          Delete (Sector_Queue, Item.Tick);
          Item.Tick := Next_Tick;
-         Sector_Cache.Replace_Element (Position, Item);
+         Sector_Cache.Replace_Element (Sector_Map, Position, Item);
          Sector := Item.Sector;
 
       end if;

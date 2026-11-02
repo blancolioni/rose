@@ -1,8 +1,17 @@
-package body Rose.Containers.Bounded_Hashed_Maps is
+package body Rose.Containers.Bounded_Hashed_Maps
+  with SPARK_Mode
+is
+
+   pragma Assertion_Policy (Ignore);
+   --  The contracts, loop invariants and variants are for the proof, and the
+   --  boot servers' run-time system has no System.Assertions.
 
    function Find_Bucket
-     (Index : Count_Type)
-      return Hash_Type;
+     (Container : Map;
+      Index     : Count_Type)
+      return Hash_Type
+   with Pre  => Index in 1 .. Capacity,
+        Post => Find_Bucket'Result < Modulus;
    --  Return the bucket which refers to Container.Elements (Index)
 
    --------------
@@ -10,30 +19,36 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    --------------
 
    function Contains
-     (Key       : Key_Type)
+     (Container : Map;
+      Key       : Key_Type)
       return Boolean
-   is
-   begin
-      return Has_Element (Find (Key));
-   end Contains;
+   is (Has_Element (Find (Container, Key)));
 
    ------------
    -- Delete --
    ------------
 
    procedure Delete
-     (Position  : in out Cursor)
+     (Container : in out Map;
+      Position  : in out Cursor)
    is
       Index : constant Count_Type := Count_Type (Position);
       Last  : constant Count_Type := Container.Length;
-      Hole  : Hash_Type := Find_Bucket (Index);
+      Hole  : Hash_Type := Find_Bucket (Container, Index);
       N     : Hash_Type := (Hole + 1) mod Modulus;
    begin
 
       --  backward shift: an entry following the hole can fill it
-      --  unless its home bucket lies cyclically in (Hole, N]
+      --  unless its home bucket lies cyclically in (Hole, N].  The
+      --  entries that follow end at an empty bucket, and there is one
+      --  (Capacity is less than Modulus).
 
-      while Container.Buckets (N) /= 0 loop
+      for Step in 1 .. Modulus - 1 loop
+         pragma Loop_Invariant (Hole < Modulus and then N < Modulus);
+         pragma Loop_Invariant (Container.Length = Last);
+
+         exit when Container.Buckets (N) = 0;
+
          declare
             Home : constant Hash_Type :=
                      Hash (Container.Elements (Container.Buckets (N)).Key)
@@ -53,7 +68,7 @@ package body Rose.Containers.Bounded_Hashed_Maps is
       --  move the last element into the freed slot
 
       if Index /= Last then
-         Container.Buckets (Find_Bucket (Last)) := Index;
+         Container.Buckets (Find_Bucket (Container, Last)) := Index;
          Container.Elements (Index) := Container.Elements (Last);
       end if;
 
@@ -65,26 +80,24 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    -- Element --
    -------------
 
-   function Element (Position : Cursor) return Element_Type is
-   begin
-      return Container.Elements (Count_Type (Position)).Element;
-   end Element;
+   function Element
+     (Container : Map;
+      Position  : Cursor)
+      return Element_Type
+   is (Container.Elements (Count_Type (Position)).Element);
 
    -------------
    -- Element --
    -------------
 
    function Element
-     (Key       : Key_Type)
+     (Container : Map;
+      Key       : Key_Type)
       return Element_Type
    is
-      Position : constant Cursor := Find (Key);
+      Position : constant Cursor := Find (Container, Key);
    begin
-      return Result : Element_Type do
-         if Has_Element (Position) then
-            Result := Element (Position);
-         end if;
-      end return;
+      return Container.Elements (Count_Type (Position)).Element;
    end Element;
 
    ----------
@@ -92,17 +105,28 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    ----------
 
    function Find
-     (Key       : Key_Type)
+     (Container : Map;
+      Key       : Key_Type)
       return Cursor
+   with Refined_Post => Find'Result = No_Element
+                        or else Count_Type (Find'Result) in 1 .. Capacity
    is
-      H : Hash_Type := Hash (Key) mod Modulus;
+      Home : constant Hash_Type := Hash (Key) mod Modulus;
+      H    : Hash_Type;
    begin
-      while Container.Buckets (H) /= 0
-        and then Container.Elements (Container.Buckets (H)).Key /= Key
-      loop
-         H := (H + 1) mod Modulus;
+      for Probe in 0 .. Modulus - 1 loop
+         H := (Home + Probe) mod Modulus;
+
+         if Container.Buckets (H) = 0 then
+            return No_Element;
+         end if;
+
+         if Container.Elements (Container.Buckets (H)).Key = Key then
+            return Cursor (Container.Buckets (H));
+         end if;
       end loop;
-      return Cursor (Container.Buckets (H));
+
+      return No_Element;
    end Find;
 
    -----------------
@@ -110,63 +134,67 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    -----------------
 
    function Find_Bucket
-     (Index : Count_Type)
+     (Container : Map;
+      Index     : Count_Type)
       return Hash_Type
    is
-      H : Hash_Type := Hash (Container.Elements (Index).Key) mod Modulus;
+      Home : constant Hash_Type :=
+               Hash (Container.Elements (Index).Key) mod Modulus;
    begin
-      while Container.Buckets (H) /= Index loop
-         H := (H + 1) mod Modulus;
+      for Probe in 0 .. Modulus - 1 loop
+         declare
+            H : constant Hash_Type := (Home + Probe) mod Modulus;
+         begin
+            if Container.Buckets (H) = Index then
+               return H;
+            end if;
+         end;
       end loop;
-      return H;
+
+      return Home;
    end Find_Bucket;
-
-   -----------------
-   -- Has_Element --
-   -----------------
-
-   function Has_Element (Position : Cursor) return Boolean is
-   begin
-      return Position /= 0;
-   end Has_Element;
 
    ------------
    -- Insert --
    ------------
 
    procedure Insert
-     (Key       : Key_Type;
+     (Container : in out Map;
+      Key       : Key_Type;
       New_Item  : Element_Type;
       Position  : out Cursor;
       Inserted  : out Boolean)
    is
-      H : Hash_Type :=
-            Hash (Key) mod Modulus;
+      Found : constant Cursor := Find (Container, Key);
+      Home  : constant Hash_Type := Hash (Key) mod Modulus;
+      H     : Hash_Type;
    begin
-      if Contains (Key) then
-         Inserted := False;
+      Position := Found;
+      Inserted := False;
+
+      if Has_Element (Found) or else Is_Full (Container) then
          return;
       end if;
 
-      if Is_Full then
-         Inserted := False;
-         return;
-      end if;
+      --  The first empty bucket from the home of Key on.
 
-      Container.Length := Container.Length + 1;
-      Container.Elements (Container.Length) :=
-        Element_Record'
-          (Key     => Key,
-           Element => New_Item);
+      for Probe in 0 .. Modulus - 1 loop
+         pragma Loop_Invariant (Container.Length < Capacity);
 
-      Position := Cursor (Container.Length);
+         H := (Home + Probe) mod Modulus;
 
-      while Container.Buckets (H) /= 0 loop
-         H := (H + 1) mod Modulus;
+         if Container.Buckets (H) = 0 then
+            Container.Length := Container.Length + 1;
+            Container.Elements (Container.Length) :=
+              Element_Record'
+                (Key     => Key,
+                 Element => New_Item);
+            Container.Buckets (H) := Container.Length;
+            Position := Cursor (Container.Length);
+            Inserted := True;
+            return;
+         end if;
       end loop;
-
-      Container.Buckets (H) := Container.Length;
-
    end Insert;
 
    ------------
@@ -174,48 +202,33 @@ package body Rose.Containers.Bounded_Hashed_Maps is
    ------------
 
    procedure Insert
-     (Key       : Key_Type;
+     (Container : in out Map;
+      Key       : Key_Type;
       New_Item  : Element_Type)
    is
       Inserted : Boolean;
       Position : Cursor;
    begin
-      Insert (Key, New_Item, Position, Inserted);
+      Insert (Container, Key, New_Item, Position, Inserted);
    end Insert;
-
-   --------------
-   -- Is_Empty --
-   --------------
-
-   function Is_Empty return Boolean is
-   begin
-      return Container.Length = 0;
-   end Is_Empty;
-
-   -------------
-   -- Is_Full --
-   -------------
-
-   function Is_Full return Boolean is
-   begin
-      return Container.Length >= Container.Elements'Length;
-   end Is_Full;
 
    ---------
    -- Key --
    ---------
 
-   function Key (Position : Cursor) return Key_Type is
-   begin
-      return Container.Elements (Count_Type (Position)).Key;
-   end Key;
+   function Key
+     (Container : Map;
+      Position  : Cursor)
+      return Key_Type
+   is (Container.Elements (Count_Type (Position)).Key);
 
    ---------------------
    -- Replace_Element --
    ---------------------
 
    procedure Replace_Element
-     (Position  : Cursor;
+     (Container : in out Map;
+      Position  : Cursor;
       New_Item  : Element_Type)
    is
    begin
