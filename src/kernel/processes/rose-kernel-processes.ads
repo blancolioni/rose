@@ -90,13 +90,6 @@ package Rose.Kernel.Processes is
       Cap    : Rose.Capabilities.Capability;
       Layout : out Rose.Capabilities.Layout.Capability_Layout);
 
-   procedure Update_Cap
-     (Pid    : Process_Id;
-      Cap    : Rose.Capabilities.Capability;
-      Update : not null access
-        procedure
-          (Layout : in out Rose.Capabilities.Layout.Capability_Layout));
-
    function Cap_Type
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)
@@ -621,8 +614,8 @@ private
      (Pid  : Process_Id;
       Page : Rose.Kernel.Cap_Tables.Capability_Page_Index);
    --  Allocate the page of Pid's capabilities, if it has not got it, for
-   --  Set_Cap and Update_Cap, which need one.  Reading a capability, and
-   --  deleting one, do not.
+   --  Set_Cap, Rescind_Cap and Set_Cap_Id, which need one.  Reading a
+   --  capability, and deleting one, do not.
 
    function Cap_Layout
      (Pid : Process_Id;

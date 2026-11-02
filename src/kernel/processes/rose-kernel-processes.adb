@@ -158,8 +158,14 @@ package body Rose.Kernel.Processes is
       To_Cap : constant Rose.Capabilities.Capability :=
                  Create_Cap (To_Process_Id);
    begin
-      Copy_Cap_Layout (From_Process_Id, Cap,
-                       To_Process_Id, To_Cap);
+      --  A capability that From_Process_Id does not hold is not copied.
+      --  It still takes a number in the other table, which holds nothing,
+      --  since those that follow are at numbers that count on it.
+
+      if Has_Cap (From_Process_Id, Cap) then
+         Copy_Cap_Layout (From_Process_Id, Cap,
+                          To_Process_Id, To_Cap);
+      end if;
    end Copy_Cap;
 
    ---------------------
@@ -960,14 +966,11 @@ package body Rose.Kernel.Processes is
         and then To.Endpoints (Endpoint).Endpoint /= 0
       then
          declare
-            use type Rose.Objects.Rescinded_Count;
             Send_Cap : constant Rose.Capabilities.Capability :=
                          To.Endpoints (Endpoint).Send_Cap;
-            Rescinded_Count : constant Rose.Objects.Rescinded_Count :=
-                                Cap_Layout (Destination_Process, Send_Cap)
-                                .Header.Rescinded_Count;
          begin
-            return Source_Cap.Header.Rescinded_Count = Rescinded_Count;
+            return Cap_Tables.Same_Count
+              (Source_Cap, Cap_Layout (Destination_Process, Send_Cap));
          end;
       end if;
       return False;
@@ -1334,24 +1337,12 @@ package body Rose.Kernel.Processes is
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)
    is
-      procedure Update
-        (Layout : in out Rose.Capabilities.Layout.Capability_Layout);
-
-      ------------
-      -- Update --
-      ------------
-
-      procedure Update
-        (Layout : in out Rose.Capabilities.Layout.Capability_Layout)
-      is
-         use type Rose.Objects.Rescinded_Count;
-      begin
-         Layout.Header.Rescinded_Count :=
-           Layout.Header.Rescinded_Count + 1;
-      end Update;
-
    begin
-      Update_Cap (Pid, Cap, Update'Access);
+      if Cap in 1 .. Cap_Tables.Max_Capability_Index then
+         Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      end if;
+
+      Cap_Tables.Rescind (Process_Table (Pid).Caps, Cap);
    end Rescind_Cap;
 
    ------------------
@@ -1428,7 +1419,9 @@ package body Rose.Kernel.Processes is
         and then From_Process_Id /= 1
       then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
-            if Params.Caps (Cap_Index) /= Null_Capability then
+            if Params.Caps (Cap_Index) /= Null_Capability
+              and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+            then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
                   New_Cap  : constant Capability := Create_Cap (To_Process_Id);
@@ -1457,6 +1450,13 @@ package body Rose.Kernel.Processes is
                            Cap_Layout (From_Process_Id, From_Cap));
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
                end;
+            else
+
+               --  Nothing that the sender holds, so nothing arrives, and
+               --  not the number that it named, which is another process's
+               --  capability here.
+
+               To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
       end if;
@@ -1710,7 +1710,9 @@ package body Rose.Kernel.Processes is
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
-            if Params.Caps (Cap_Index) /= Null_Capability then
+            if Params.Caps (Cap_Index) /= Null_Capability
+              and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+            then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
                   New_Cap  : constant Capability := Create_Cap (To_Process_Id);
@@ -1739,6 +1741,13 @@ package body Rose.Kernel.Processes is
                            Cap_Layout (From_Process_Id, From_Cap));
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
                end;
+            else
+
+               --  Nothing that the sender holds, so nothing arrives, and
+               --  not the number that it named, which is another process's
+               --  capability here.
+
+               To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
       end if;
@@ -1887,7 +1896,10 @@ package body Rose.Kernel.Processes is
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
-      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      if Cap in 1 .. Cap_Tables.Max_Capability_Index then
+         Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      end if;
+
       Cap_Tables.Set (Process_Table (Pid).Caps, Cap, Layout);
    end Set_Cap;
 
@@ -1900,22 +1912,12 @@ package body Rose.Kernel.Processes is
       Cap    : Rose.Capabilities.Capability;
       Cap_Id : Rose.Objects.Capability_Identifier)
    is
-      procedure Update
-        (Layout : in out Rose.Capabilities.Layout.Capability_Layout);
-
-      ------------
-      -- Update --
-      ------------
-
-      procedure Update
-        (Layout : in out Rose.Capabilities.Layout.Capability_Layout)
-      is
-      begin
-         Layout.Header.Identifier := Cap_Id;
-      end Update;
-
    begin
-      Update_Cap (Pid, Cap, Update'Access);
+      if Cap in 1 .. Cap_Tables.Max_Capability_Index then
+         Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      end if;
+
+      Cap_Tables.Set_Identifier (Process_Table (Pid).Caps, Cap, Cap_Id);
    end Set_Cap_Id;
 
    --------------------------
@@ -2282,22 +2284,6 @@ package body Rose.Kernel.Processes is
              (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page);
    end Unmap_Page;
-
-   ----------------
-   -- Update_Cap --
-   ----------------
-
-   procedure Update_Cap
-     (Pid    : Process_Id;
-      Cap    : Rose.Capabilities.Capability;
-      Update : not null access
-        procedure
-          (Layout : in out Rose.Capabilities.Layout.Capability_Layout))
-   is
-   begin
-      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
-      Cap_Tables.Update (Process_Table (Pid).Caps, Cap, Update);
-   end Update_Cap;
 
    --------------
    -- Use_Tick --

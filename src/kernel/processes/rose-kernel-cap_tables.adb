@@ -1,16 +1,38 @@
-package body Rose.Kernel.Cap_Tables is
+package body Rose.Kernel.Cap_Tables
+  with SPARK_Mode
+is
 
-   use type System.Address;
-   use type Rose.Capabilities.Capability;
+   pragma Assertion_Policy (Ignore);
+   --  The invariants, assertions and lemmas are for the proof.
 
-   function Has_Slot
-     (Table : Cap_Table;
-      Cap   : Rose.Capabilities.Capability)
-      return Boolean
-   is (Cap in 1 .. Max_Capability_Index - 1
-       and then Has_Page (Table, Page_Index (Cap)));
-   --  There is a place for the layout of Cap, which is when its page has
-   --  been set.  There is none for Max_Capability_Index (see Page_Index).
+   procedure Lemma_Frame
+     (Table  : Cap_Table;
+      Cap    : Rose.Capabilities.Capability;
+      Memory : Rose.Kernel.Cap_Slots.Memory_Image;
+      Layout : Rose.Capabilities.Layout.Capability_Layout)
+   with Ghost,
+        Pre  => Consistent (Table) and then Has_Slot (Table, Cap),
+        Post =>
+          Layout_In
+            (Table, Cap,
+             Rose.Kernel.Cap_Slots.Updated
+               (Memory,
+                Page_Address (Table, Page_Index (Cap)),
+                Slot_Of (Cap),
+                Layout))
+          = Layout
+          and then
+            (for all C in Capability_Number =>
+               (if C /= Cap
+                then Layout_In
+                       (Table, C,
+                        Rose.Kernel.Cap_Slots.Updated
+                          (Memory,
+                           Page_Address (Table, Page_Index (Cap)),
+                           Slot_Of (Cap),
+                           Layout))
+                     = Layout_In (Table, C, Memory)));
+   --  Writing the slot of Cap changes the layout of Cap, and no other.
 
    --------------
    -- Activate --
@@ -21,9 +43,7 @@ package body Rose.Kernel.Cap_Tables is
       Cap   : Rose.Capabilities.Capability)
    is
    begin
-      if Cap in 1 .. Max_Capability_Index then
-         Table.Is_Active (Cap) := True;
-      end if;
+      Table.Is_Active (Cap) := True;
    end Activate;
 
    ------------
@@ -35,14 +55,18 @@ package body Rose.Kernel.Cap_Tables is
       Cap   : out Rose.Capabilities.Capability)
    is
    begin
-      for Number in Rose.Capabilities.Capability range
-        1 .. Max_Capability_Index
-      loop
+      for Number in Capability_Number loop
+         pragma Loop_Invariant (Table = Table'Loop_Entry);
+         pragma Loop_Invariant
+           (for all C in 1 .. Number - 1 => Table.Is_Active (C));
+
          if not Table.Is_Active (Number) then
             Table.Is_Active (Number) := True;
+
             if Number > Table.Last_Cap then
                Table.Last_Cap := Number;
             end if;
+
             Cap := Number;
             return;
          end if;
@@ -60,43 +84,11 @@ package body Rose.Kernel.Cap_Tables is
       Cap   : Rose.Capabilities.Capability)
    is
    begin
-      Set (Table, Cap, (others => <>));
-
-      if Cap in 1 .. Max_Capability_Index then
+      if Is_Active (Table, Cap) then
+         Set (Table, Cap, Rose.Capabilities.Layout.Empty_Capability);
          Table.Is_Active (Cap) := False;
       end if;
    end Delete;
-
-   --------------
-   -- Has_Page --
-   --------------
-
-   function Has_Page
-     (Table : Cap_Table;
-      Page  : Capability_Page_Index)
-      return Boolean
-   is (Table.Cap_Pages (Page) /= System.Null_Address);
-
-   ---------------
-   -- Is_Active --
-   ---------------
-
-   function Is_Active
-     (Table : Cap_Table;
-      Cap   : Rose.Capabilities.Capability)
-      return Boolean
-   is (Cap in 1 .. Max_Capability_Index
-       and then Cap <= Table.Last_Cap
-       and then Table.Is_Active (Cap));
-
-   --------------
-   -- Last_Cap --
-   --------------
-
-   function Last_Cap
-     (Table : Cap_Table)
-      return Rose.Capabilities.Capability
-   is (Table.Last_Cap);
 
    ------------
    -- Layout --
@@ -108,49 +100,160 @@ package body Rose.Kernel.Cap_Tables is
       return Rose.Capabilities.Layout.Capability_Layout
    is
    begin
-      if not Has_Slot (Table, Cap) then
-         return (others => <>);
+      if Has_Slot (Table, Cap) then
+         return Rose.Kernel.Cap_Slots.Read
+           (Page_Address (Table, Page_Index (Cap)), Slot_Of (Cap));
       end if;
 
-      declare
-         Page : Capability_Page
-           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
-      begin
-         return Page (Cap mod Capabilities_Per_Page + 1);
-      end;
+      return Rose.Capabilities.Layout.Empty_Capability;
    end Layout;
 
-   ------------------
-   -- Page_Address --
-   ------------------
+   -----------------------
+   -- Lemma_Count_Wraps --
+   -----------------------
 
-   function Page_Address
+   procedure Lemma_Count_Wraps
+     (Count    : Rose.Objects.Rescinded_Count;
+      Rescinds : Natural)
+   is
+   begin
+      null;
+   end Lemma_Count_Wraps;
+
+   -----------------
+   -- Lemma_Frame --
+   -----------------
+
+   procedure Lemma_Frame
+     (Table  : Cap_Table;
+      Cap    : Rose.Capabilities.Capability;
+      Memory : Rose.Kernel.Cap_Slots.Memory_Image;
+      Layout : Rose.Capabilities.Layout.Capability_Layout)
+   is
+      Page : constant System.Address :=
+               Page_Address (Table, Page_Index (Cap));
+      Slot : constant Rose.Kernel.Cap_Slots.Slot_Index := Slot_Of (Cap);
+   begin
+      Rose.Kernel.Cap_Slots.Lemma_Updated_Slot (Memory, Page, Slot, Layout);
+
+      for C in Capability_Number loop
+         pragma Loop_Invariant
+           (for all D in 1 .. C - 1 =>
+              (if D /= Cap
+               then Layout_In
+                      (Table, D,
+                       Rose.Kernel.Cap_Slots.Updated
+                         (Memory, Page, Slot, Layout))
+                    = Layout_In (Table, D, Memory)));
+
+         if C /= Cap and then Has_Slot (Table, C) then
+
+            --  Another page is another address, and in the same page it is
+            --  another slot.
+
+            pragma Assert
+              (Page_Address (Table, Page_Index (C)) /= Page
+               or else Slot_Of (C) /= Slot);
+
+            Rose.Kernel.Cap_Slots.Lemma_Updated_Other
+              (Memory, Page, Slot, Layout,
+               Page_Address (Table, Page_Index (C)), Slot_Of (C));
+         end if;
+      end loop;
+   end Lemma_Frame;
+
+   -------------------------------
+   -- Lemma_Rescind_Invalidates --
+   -------------------------------
+
+   procedure Lemma_Rescind_Invalidates
+     (Layout : Rose.Capabilities.Layout.Capability_Layout)
+   is
+   begin
+      null;
+   end Lemma_Rescind_Invalidates;
+
+   -------------
+   -- Rescind --
+   -------------
+
+   procedure Rescind
      (Table : Cap_Table;
-      Page  : Capability_Page_Index)
-      return System.Address
-   is (Table.Cap_Pages (Page));
+      Cap   : Rose.Capabilities.Capability)
+   is
+   begin
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
+         declare
+            Page   : constant System.Address :=
+                       Page_Address (Table, Page_Index (Cap));
+            Slot   : constant Rose.Kernel.Cap_Slots.Slot_Index :=
+                       Slot_Of (Cap);
+            Layout : Rose.Capabilities.Layout.Capability_Layout :=
+                       Rose.Kernel.Cap_Slots.Read (Page, Slot);
+            Before : constant Rose.Kernel.Cap_Slots.Memory_Image :=
+                       Rose.Kernel.Cap_Slots.Image
+            with Ghost;
+         begin
+            Layout.Header.Rescinded_Count :=
+              Layout.Header.Rescinded_Count + 1;
+            Rose.Kernel.Cap_Slots.Write (Page, Slot, Layout);
+            Lemma_Frame (Table, Cap, Before, Layout);
+         end;
+      end if;
+   end Rescind;
 
    ---------
    -- Set --
    ---------
 
    procedure Set
-     (Table  : in out Cap_Table;
+     (Table  : Cap_Table;
       Cap    : Rose.Capabilities.Capability;
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
-      if not Has_Slot (Table, Cap) then
-         return;
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
+         declare
+            Before : constant Rose.Kernel.Cap_Slots.Memory_Image :=
+                       Rose.Kernel.Cap_Slots.Image
+            with Ghost;
+         begin
+            Rose.Kernel.Cap_Slots.Write
+              (Page_Address (Table, Page_Index (Cap)), Slot_Of (Cap),
+               Layout);
+            Lemma_Frame (Table, Cap, Before, Layout);
+         end;
       end if;
-
-      declare
-         Page : Capability_Page
-           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
-      begin
-         Page (Cap mod Capabilities_Per_Page + 1) := Layout;
-      end;
    end Set;
+
+   --------------------
+   -- Set_Identifier --
+   --------------------
+
+   procedure Set_Identifier
+     (Table      : Cap_Table;
+      Cap        : Rose.Capabilities.Capability;
+      Identifier : Rose.Objects.Capability_Identifier)
+   is
+   begin
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
+         declare
+            Page   : constant System.Address :=
+                       Page_Address (Table, Page_Index (Cap));
+            Slot   : constant Rose.Kernel.Cap_Slots.Slot_Index :=
+                       Slot_Of (Cap);
+            Layout : Rose.Capabilities.Layout.Capability_Layout :=
+                       Rose.Kernel.Cap_Slots.Read (Page, Slot);
+            Before : constant Rose.Kernel.Cap_Slots.Memory_Image :=
+                       Rose.Kernel.Cap_Slots.Image
+            with Ghost;
+         begin
+            Layout.Header.Identifier := Identifier;
+            Rose.Kernel.Cap_Slots.Write (Page, Slot, Layout);
+            Lemma_Frame (Table, Cap, Before, Layout);
+         end;
+      end if;
+   end Set_Identifier;
 
    ------------------
    -- Set_Last_Cap --
@@ -176,29 +279,5 @@ package body Rose.Kernel.Cap_Tables is
    begin
       Table.Cap_Pages (Page) := Address;
    end Set_Page;
-
-   ------------
-   -- Update --
-   ------------
-
-   procedure Update
-     (Table  : in out Cap_Table;
-      Cap    : Rose.Capabilities.Capability;
-      Update : not null access
-        procedure
-          (Layout : in out Rose.Capabilities.Layout.Capability_Layout))
-   is
-   begin
-      if not Has_Slot (Table, Cap) then
-         return;
-      end if;
-
-      declare
-         Page : Capability_Page
-           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
-      begin
-         Update (Page (Cap mod Capabilities_Per_Page + 1));
-      end;
-   end Update;
 
 end Rose.Kernel.Cap_Tables;
