@@ -86,9 +86,9 @@ The table is extracted, and its semantics proved as they are, before #116. #116 
 
 ## Open questions
 
-- What a slot holds for a derived capability, how many levels of derivation there can be, and whether validity is checked up the chain on every call or cached. These are #116's, and its amendment to ADR 0001 is to be written with this package in view.
+- What a slot holds for a derived capability, how many levels of derivation there can be, and whether validity is checked up the chain on every call or cached: answered in [ADR 0001](0001-capability-revocation.md), in the section on the derivation record (#116). A slot is the layout and a derivation, 24 bytes; there are at most 8 levels; and validity is checked up the chain on every call, with no cache.
 - Whether the functions that take a process id stay for good, or whether the call sites move to the table in the process entry. Moving them is not needed for the proof.
-- Where the table is saved at a checkpoint, once it has derivation records (#117).
+- Where the table is saved at a checkpoint, once it has derivation records: with the records, in a checkpoint of `Kernel_Table_Version` 5 (ADR 0001).
 
 ## Follow-up work
 
