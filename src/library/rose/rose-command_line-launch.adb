@@ -1,4 +1,5 @@
 with Rose.Capabilities.Standard;
+with Rose.Command_Arguments;
 with Rose.Last_Chance;
 with Rose.Standard_Streams;
 with Rose.System_Calls;
@@ -103,6 +104,14 @@ package body Rose.Command_Line.Launch is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       if Reply_Cap = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      if Rose.Command_Arguments.Exit_Status /= 0 then
+         Fail
+           (Call,
+            "exit status"
+            & Integer'Image (Rose.Command_Arguments.Exit_Status));
          return;
       end if;
 
@@ -245,6 +254,21 @@ package body Rose.Command_Line.Launch is
    begin
       Reply (Failed, Message);
    end Report_Failure;
+
+   ----------------------
+   -- Set_Command_Line --
+   ----------------------
+
+   procedure Set_Command_Line
+     (Name      : String;
+      Arguments : String_List := Empty_List)
+   is
+   begin
+      Rose.Command_Arguments.Set_Command_Name (Name);
+      for Index in 1 .. Length (Arguments) loop
+         Rose.Command_Arguments.Add_Argument (Element (Arguments, Index));
+      end loop;
+   end Set_Command_Line;
 
    --------------
    -- Set_Word --

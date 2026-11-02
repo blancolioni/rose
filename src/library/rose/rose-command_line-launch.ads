@@ -89,6 +89,16 @@ package Rose.Command_Line.Launch is
    --  The list of the strings in items First_Item onwards, whose number is
    --  in data word Count_Word.
 
+   procedure Set_Command_Line
+     (Name      : String;
+      Arguments : String_List := Empty_List);
+   --  Make Name and Arguments what Ada.Command_Line reports. The command's
+   --  main calls this before the command, with the full name of the
+   --  command and its String_List argument, if it has one (#498).
+   --  Complete then fails the command, with the message "exit status N",
+   --  if the program has called Ada.Command_Line.Set_Exit_Status with a
+   --  status N that is not zero.
+
    procedure Use_Standard_Input
      (Call      : Launch_Call;
       Cap_Index : Natural);
