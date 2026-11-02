@@ -158,8 +158,14 @@ package body Rose.Kernel.Processes is
       To_Cap : constant Rose.Capabilities.Capability :=
                  Create_Cap (To_Process_Id);
    begin
-      Copy_Cap_Layout (From_Process_Id, Cap,
-                       To_Process_Id, To_Cap);
+      --  A capability that From_Process_Id does not hold is not copied.
+      --  It still takes a number in the other table, which holds nothing,
+      --  since those that follow are at numbers that count on it.
+
+      if Has_Cap (From_Process_Id, Cap) then
+         Copy_Cap_Layout (From_Process_Id, Cap,
+                          To_Process_Id, To_Cap);
+      end if;
    end Copy_Cap;
 
    ---------------------
@@ -1413,7 +1419,9 @@ package body Rose.Kernel.Processes is
         and then From_Process_Id /= 1
       then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
-            if Params.Caps (Cap_Index) /= Null_Capability then
+            if Params.Caps (Cap_Index) /= Null_Capability
+              and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+            then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
                   New_Cap  : constant Capability := Create_Cap (To_Process_Id);
@@ -1442,6 +1450,13 @@ package body Rose.Kernel.Processes is
                            Cap_Layout (From_Process_Id, From_Cap));
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
                end;
+            else
+
+               --  Nothing that the sender holds, so nothing arrives, and
+               --  not the number that it named, which is another process's
+               --  capability here.
+
+               To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
       end if;
@@ -1695,7 +1710,9 @@ package body Rose.Kernel.Processes is
 
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
-            if Params.Caps (Cap_Index) /= Null_Capability then
+            if Params.Caps (Cap_Index) /= Null_Capability
+              and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+            then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
                   New_Cap  : constant Capability := Create_Cap (To_Process_Id);
@@ -1724,6 +1741,13 @@ package body Rose.Kernel.Processes is
                            Cap_Layout (From_Process_Id, From_Cap));
                   To.Current_Params.Caps (Cap_Index) := New_Cap;
                end;
+            else
+
+               --  Nothing that the sender holds, so nothing arrives, and
+               --  not the number that it named, which is another process's
+               --  capability here.
+
+               To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
       end if;

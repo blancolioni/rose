@@ -84,9 +84,8 @@ is
       Cap   : Rose.Capabilities.Capability)
    is
    begin
-      Set (Table, Cap, Rose.Capabilities.Layout.Empty_Capability);
-
-      if Cap in Capability_Number then
+      if Is_Active (Table, Cap) then
+         Set (Table, Cap, Rose.Capabilities.Layout.Empty_Capability);
          Table.Is_Active (Cap) := False;
       end if;
    end Delete;
@@ -183,7 +182,7 @@ is
       Cap   : Rose.Capabilities.Capability)
    is
    begin
-      if Has_Slot (Table, Cap) then
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
          declare
             Page   : constant System.Address :=
                        Page_Address (Table, Page_Index (Cap));
@@ -213,7 +212,7 @@ is
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
-      if Has_Slot (Table, Cap) then
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
          declare
             Before : constant Rose.Kernel.Cap_Slots.Memory_Image :=
                        Rose.Kernel.Cap_Slots.Image
@@ -237,7 +236,7 @@ is
       Identifier : Rose.Objects.Capability_Identifier)
    is
    begin
-      if Has_Slot (Table, Cap) then
+      if Is_Active (Table, Cap) and then Has_Slot (Table, Cap) then
          declare
             Page   : constant System.Address :=
                        Page_Address (Table, Page_Index (Cap));

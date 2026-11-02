@@ -210,9 +210,12 @@ is
       Cap    : Rose.Capabilities.Capability;
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    with Post => Layout_In (Table, Cap, Rose.Kernel.Cap_Slots.Image)
-                         = (if Has_Slot (Table, Cap)
+                         = (if Is_Active (Table, Cap)
+                              and then Has_Slot (Table, Cap)
                             then Layout
-                            else Rose.Capabilities.Layout.Empty_Capability)
+                            else Layout_In
+                                   (Table, Cap,
+                                    Rose.Kernel.Cap_Slots.Image'Old))
                 and then (for all C in Capability_Number =>
                             (if C /= Cap
                              then Layout_In
@@ -220,18 +223,26 @@ is
                                   = Layout_In
                                       (Table, C,
                                        Rose.Kernel.Cap_Slots.Image'Old)));
-   --  Set the layout of Cap.  It does nothing if there is no page for it,
-   --  which the caller has to allocate first.  No other capability changes.
+   --  Set the layout of Cap.  It does nothing if Cap is not in use, so a
+   --  number that is not a capability is never written, or if there is no
+   --  page for it, which the caller has to allocate first.  No other
+   --  capability changes.
 
    procedure Rescind
      (Table : Cap_Table;
       Cap   : Rose.Capabilities.Capability)
-   with Post => (if Has_Slot (Table, Cap)
+   with Post => (if Is_Active (Table, Cap) and then Has_Slot (Table, Cap)
                    then Layout_In (Table, Cap, Rose.Kernel.Cap_Slots.Image)
                         = Rescinded
                             (Layout_In
                                (Table, Cap,
                                 Rose.Kernel.Cap_Slots.Image'Old)))
+                and then (if not Is_Active (Table, Cap)
+                          then Layout_In
+                                 (Table, Cap, Rose.Kernel.Cap_Slots.Image)
+                               = Layout_In
+                                   (Table, Cap,
+                                    Rose.Kernel.Cap_Slots.Image'Old))
                 and then (for all C in Capability_Number =>
                             (if C /= Cap
                              then Layout_In
@@ -241,19 +252,25 @@ is
                                        Rose.Kernel.Cap_Slots.Image'Old)));
    --  Add one to the rescinded count of Cap, which makes every capability
    --  that was checked against it as it was invalid.  It does nothing if
-   --  there is no page for it.
+   --  Cap is not in use, or there is no page for it.
 
    procedure Set_Identifier
      (Table      : Cap_Table;
       Cap        : Rose.Capabilities.Capability;
       Identifier : Rose.Objects.Capability_Identifier)
-   with Post => (if Has_Slot (Table, Cap)
+   with Post => (if Is_Active (Table, Cap) and then Has_Slot (Table, Cap)
                    then Layout_In (Table, Cap, Rose.Kernel.Cap_Slots.Image)
                         = With_Identifier
                             (Layout_In
                                (Table, Cap,
                                 Rose.Kernel.Cap_Slots.Image'Old),
                              Identifier))
+                and then (if not Is_Active (Table, Cap)
+                          then Layout_In
+                                 (Table, Cap, Rose.Kernel.Cap_Slots.Image)
+                               = Layout_In
+                                   (Table, Cap,
+                                    Rose.Kernel.Cap_Slots.Image'Old))
                 and then (for all C in Capability_Number =>
                             (if C /= Cap
                              then Layout_In
@@ -261,8 +278,8 @@ is
                                   = Layout_In
                                       (Table, C,
                                        Rose.Kernel.Cap_Slots.Image'Old)));
-   --  Give Cap another identifier.  It does nothing if there is no page
-   --  for it.
+   --  Give Cap another identifier.  It does nothing if Cap is not in use,
+   --  or there is no page for it.
 
    procedure Create
      (Table : in out Cap_Table;
@@ -291,7 +308,11 @@ is
    with Post => not Is_Active (Table, Cap)
                 and then Last_Cap (Table) = Last_Cap (Table'Old)
                 and then Layout_In (Table, Cap, Rose.Kernel.Cap_Slots.Image)
-                         = Rose.Capabilities.Layout.Empty_Capability
+                         = (if Is_Active (Table'Old, Cap)
+                            then Rose.Capabilities.Layout.Empty_Capability
+                            else Layout_In
+                                   (Table'Old, Cap,
+                                    Cap_Slots.Image'Old))
                 and then (for all C in Capability_Number =>
                             (if C /= Cap
                              then Is_Active (Table, C)
@@ -302,7 +323,8 @@ is
                                            = Layout_In
                                                (Table'Old, C,
                                                 Cap_Slots.Image'Old)));
-   --  Empty the layout of Cap, and take it out of use.
+   --  Empty the layout of Cap, and take it out of use.  It does nothing
+   --  if Cap is not in use.
 
    procedure Set_Last_Cap
      (Table : in out Cap_Table;
