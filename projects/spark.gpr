@@ -35,7 +35,11 @@ project Spark is
       "rose-allocators.adb",
       "rose-allocators_proof.ads",
       "rose-kernel-command_line.ads",
-      "rose-kernel-command_line.adb");
+      "rose-kernel-command_line.adb",
+      "rose-command_line.ads",
+      "rose-command_line.adb",
+      "rose-command_line-items.ads",
+      "rose-command_line-items.adb");
 
    for Object_Dir use "../build/spark";
 
