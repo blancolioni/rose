@@ -45,3 +45,11 @@ No run-time errors in decoding an item of the launch buffer, for any contents an
 `Rose.Command_Line.Element` is the one conversion from the address of the buffer to an array, and calls it.
 An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
 Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
+
+`Rose.Devices.GPT_Format`::
+The format of a GUID partition table, apart from reading and writing it (`Rose.Devices.GPT` does that): the header and the partition entries as records, their layout in bytes, the CRC32, and what makes them valid.
+No run-time errors, for any bytes and any disk.
+The disk must be one that a GPT can be on (`Geometry_Valid`: a block size of 512 to 4096 that divides the pages the entries are read in, and room for the MBR, both headers and both copies of the entries).
+A header is valid (`Header_Valid`) only if its signature, size, address and CRC are right, the entries are the standard size and there are at most 128, the entries are on the disk, and so is the range of blocks that partitions may use.
+`Add` keeps a table valid: every partition is in the usable blocks, is not empty, and overlaps none, which is also what `Rose.Devices.GPT` checks of the entries that it reads, and of those that it is asked to add.
+Not covered: the reading and writing of the blocks, and the table that is kept for each disk, which are in `Rose.Devices.GPT`.

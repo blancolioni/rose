@@ -2,78 +2,35 @@ with System.Machine_Code;
 with System.Storage_Elements;
 
 with Rose.Interfaces.Block_Device.Client.Table;
+with Rose.Devices.GPT_Format;
 with Rose.Devices.Partitions;
 
 with Rose.Console_IO;
 
 package body Rose.Devices.GPT is
 
+   package Format renames Rose.Devices.GPT_Format;
+
    use Rose.Interfaces.Block_Device;
    use System.Storage_Elements;
    use Rose.Words;
 
-   GPT_Magic : constant Word_64 := 16#5452_4150_2049_4645#;
+   --  The format of the table, and what makes it valid, is in
+   --  Rose.Devices.GPT_Format, which is in SPARK.  This package reads and
+   --  writes it, and keeps the table of each disk that has been asked
+   --  about.
 
-   Entry_Size    : constant := 128;
-   Array_Entries : constant := 128;
-   Array_Bytes   : constant := Entry_Size * Array_Entries;
-   --  The standard partition array: 128 entries of 128 bytes, 16 KiB
-
-   Max_Partitions : constant := 16;
-   --  The partitions in use that are kept in memory
-
-   Chunk_Bytes   : constant := 4096;
-   Chunk_Entries : constant := Chunk_Bytes / Entry_Size;
-   --  The entries are read and written a page at a time, which is as
-   --  much as one call carries.
-
-   Name_Length : constant := 36;
-   --  A partition name is 36 UTF-16LE code units.
-
-   type GPT_Header is
-      record
-         Magic                 : Word_64 := GPT_Magic;
-         Revision              : Word_32 := 16#0001_0000#;
-         Header_Size           : Word_32 := 16#0000_005C#;
-         Header_CRC            : Word_32 := 0;
-         Reserved_Zero         : Word_32 := 0;
-         Current_LBA           : Block_Address_Type := 1;
-         Backup_LBA            : Block_Address_Type := 0;
-         First_Usable_LBA      : Block_Address_Type := 0;
-         Last_Usable_LBA       : Block_Address_Type := 0;
-         Disk_GUID_Lo          : Word_64 := 0;
-         Disk_GUID_Hi          : Word_64 := 0;
-         Start_Partition_LBA   : Block_Address_Type := 2;
-         Partition_Entry_Count : Word_32 := Array_Entries;
-         Partition_Entry_Size  : Word_32 := Entry_Size;
-         Partition_Array_CRC   : Word_32 := 0;
-      end record
-   with Size => 92 * 8;
-
-   Header_Bytes : constant := 92;
-
-   type GPT_Partition_Entry is
-      record
-         Partition_Type_Low  : Word_64 := 0;
-         Partition_Type_High : Word_64 := 0;
-         Partition_Id_Low    : Word_64 := 0;
-         Partition_Id_High   : Word_64 := 0;
-         First_LBA           : Block_Address_Type := 0;
-         Last_LBA            : Block_Address_Type := 0;
-         Flags               : Word_64 := 0;
-         Name                : String (1 .. 2 * Name_Length) :=
-                                 (others => Character'Val (0));
-      end record
-     with Size => Entry_Size * 8;
-
-   type GPT_Partition_Entry_Array is
-     array (Word_32 range <>) of GPT_Partition_Entry;
+   Entry_Size    : constant := Format.Entry_Size;
+   Array_Entries : constant := Format.Array_Entries;
+   Max_Partitions : constant := Format.Max_Partitions;
+   Chunk_Bytes   : constant := Format.Chunk_Bytes;
+   Chunk_Entries : constant := Format.Chunk_Entries;
+   Name_Length   : constant := Format.Name_Length;
 
    type GPT_Record is
       record
-         Header      : GPT_Header;
-         Parts       : GPT_Partition_Entry_Array (0 .. Max_Partitions - 1);
-         Count       : Word_32 := 0;
+         Header      : Format.Header;
+         Table       : Format.Partition_Table;
          State       : GPT_State := No_GPT;
          Block_Size  : Block_Size_Type := 512;
          Block_Count : Block_Address_Type := 0;
@@ -87,31 +44,36 @@ package body Rose.Devices.GPT is
 
    Random_State : Word_64 := 0;
 
+   function Geometry_Valid return Boolean
+   is (Format.Geometry_Valid
+         (Natural (GPT_Data.Block_Size), Word_64 (GPT_Data.Block_Count)));
+   --  The disk is one that a GPT can be on.  Until it is, nothing here
+   --  does anything with the disk's blocks.
+
    function Array_Blocks return Block_Address_Type
-   is (Block_Address_Type (Array_Bytes / Natural (GPT_Data.Block_Size)));
+   is (if Geometry_Valid
+       then Block_Address_Type
+              (Format.Array_Blocks (Natural (GPT_Data.Block_Size)))
+       else 0);
    --  The blocks each copy of the partition array takes
 
    function Chunk_Blocks return Natural
-   is (Chunk_Bytes / Natural (GPT_Data.Block_Size));
+   is (if Geometry_Valid
+       then Chunk_Bytes / Natural (GPT_Data.Block_Size)
+       else 0);
 
-   function Entry_At (Index : Word_32) return GPT_Partition_Entry
-   is (if Index < GPT_Data.Count
-       then GPT_Data.Parts (Index)
+   function Entry_At (Index : Natural) return Format.Partition_Entry
+   is (if Index < GPT_Data.Table.Count
+       then GPT_Data.Table.Parts (Index)
        else (others => <>));
    --  Entry Index of the partition array: a partition in use, or an
    --  empty entry.
 
+   function To_Natural (Value : Word_64) return Natural
+   is (Natural (Word_64'Min (Value, Word_64 (Natural'Last))));
+
    procedure Check_Cached
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
-
-   procedure Update_CRC
-     (CRC  : in out Word_32;
-      Data : Storage_Array);
-   --  CRC32, as GPT, zlib and Ethernet use it.  CRC starts as all ones,
-   --  and the result is its complement.
-
-   function Header_CRC (Header : GPT_Header) return Word_32;
-   --  The CRC of the header, with its own CRC field taken as zero.
 
    procedure New_GUID (Low, High : out Word_64);
    --  A random (version 4) GUID.
@@ -126,7 +88,9 @@ package body Rose.Devices.GPT is
       Valid       : out Boolean);
    --  Read the header at Header_LBA and the entries it points to into
    --  GPT_Data.  Valid if the signature, size, address and both CRCs are
-   --  right.
+   --  right, and so is what they say about the disk and the partitions
+   --  (Format.Header_Valid and Format.Add).  The geometry of the disk
+   --  must be valid.
 
    procedure Save_Changes
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
@@ -142,7 +106,7 @@ package body Rose.Devices.GPT is
 
    procedure Write_Header
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
-      Header : GPT_Header);
+      Header : Format.Header);
    --  Write Header to its Current_LBA.
 
    procedure Write_Protective_MBR
@@ -174,36 +138,47 @@ package body Rose.Devices.GPT is
          return;
       end if;
 
-      if GPT_Data.Count = Max_Partitions then
+      if GPT_Data.Table.Count = Max_Partitions then
          Rose.Console_IO.Put_Line ("add_partition: too many partitions");
          return;
       end if;
 
       declare
-         Part : GPT_Partition_Entry renames GPT_Data.Parts (GPT_Data.Count);
+         Item  : Format.Partition_Entry :=
+           (Partition_Type_Low  => Partition_Type_Low,
+            Partition_Type_High => Partition_Type_High,
+            Partition_Id_Low    => 0,
+            Partition_Id_High   => 0,
+            First_LBA           => Word_64 (First_Block),
+            Last_LBA            => Word_64 (Last_Block),
+            Flags               => Partition_Flags,
+            Name                => <>);
+         Added : Boolean;
       begin
-         Part :=
-           GPT_Partition_Entry'
-             (Partition_Type_Low  => Partition_Type_Low,
-              Partition_Type_High => Partition_Type_High,
-              Partition_Id_Low    => 0,
-              Partition_Id_High   => 0,
-              First_LBA           => First_Block,
-              Last_LBA            => Last_Block,
-              Flags               => Partition_Flags,
-              Name                => <>);
-
-         New_GUID (Part.Partition_Id_Low, Part.Partition_Id_High);
+         New_GUID (Item.Partition_Id_Low, Item.Partition_Id_High);
 
          --  Names are UTF-16LE; Rose's are ASCII.
 
          for I in 1 .. Natural'Min (Partition_Name'Length, Name_Length) loop
-            Part.Name (2 * I - 1) :=
+            Item.Name (2 * I - 1) :=
               Partition_Name (Partition_Name'First + I - 1);
          end loop;
+
+         Format.Add
+           (GPT_Data.Table, Item,
+            Format.First_Usable_Block (Natural (GPT_Data.Block_Size)),
+            Format.Last_Usable_Block
+              (Natural (GPT_Data.Block_Size), Word_64 (GPT_Data.Block_Count)),
+            Added);
+
+         if not Added then
+            Rose.Console_IO.Put_Line
+              ("add_partition: the partition is empty, or is not in the "
+               & "blocks that partitions may use, or overlaps another");
+            return;
+         end if;
       end;
 
-      GPT_Data.Count := GPT_Data.Count + 1;
       GPT_Data.Dirty := True;
       Save_Changes (Block_Device);
    end Add_Partition;
@@ -227,6 +202,15 @@ package body Rose.Devices.GPT is
       Client.Get_Parameters
         (Device, GPT_Data.Block_Count, GPT_Data.Block_Size);
 
+      if not Geometry_Valid then
+         Rose.Console_IO.Put_Line
+           ("gpt: this disk's block size or size is not one that a GPT "
+            & "can be on; not using it");
+         GPT_Data.State := Invalid_GPT;
+         Cached_Table.Insert (Device, GPT_Data);
+         return;
+      end if;
+
       Read_Copy (Device, 1, Primary_Magic, Primary_Valid);
 
       if Primary_Valid then
@@ -245,10 +229,10 @@ package body Rose.Devices.GPT is
             Rose.Console_IO.Put_Line
               ("gpt: this disk's GPT fails its checks; not using it");
             GPT_Data.State := Invalid_GPT;
-            GPT_Data.Count := 0;
+            GPT_Data.Table.Count := 0;
          else
             GPT_Data.State := No_GPT;
-            GPT_Data.Count := 0;
+            GPT_Data.Table.Count := 0;
          end if;
       end if;
 
@@ -291,16 +275,29 @@ package body Rose.Devices.GPT is
    begin
       Check_Cached (Block_Device);
 
+      First_Block := 0;
+      Last_Block := 0;
+      Partition_Type_Low := 0;
+      Partition_Type_High := 0;
+      Partition_Flags := 0;
+      Partition_Name := (others => ' ');
+      Partition_Name_Last := 0;
+
+      --  A partition that is not there is empty.
+
+      if Partition_Index > GPT_Data.Table.Count then
+         return;
+      end if;
+
       declare
-         Part : GPT_Partition_Entry renames
-                  GPT_Data.Parts (Word_32 (Partition_Index) - 1);
+         Part : Format.Partition_Entry renames
+                  GPT_Data.Table.Parts (Partition_Index - 1);
       begin
-         First_Block := Part.First_LBA;
-         Last_Block  := Part.Last_LBA;
+         First_Block := Block_Address_Type (Part.First_LBA);
+         Last_Block  := Block_Address_Type (Part.Last_LBA);
          Partition_Type_Low := Part.Partition_Type_Low;
          Partition_Type_High := Part.Partition_Type_High;
          Partition_Flags := Part.Flags;
-         Partition_Name_Last := 0;
          for I in 1 .. Natural'Min (Partition_Name'Length, Name_Length) loop
             exit when Character'Pos (Part.Name (2 * I - 1)) = 0;
             Partition_Name_Last := Partition_Name_Last + 1;
@@ -309,22 +306,6 @@ package body Rose.Devices.GPT is
          end loop;
       end;
    end Get_Partition_Details;
-
-   ----------------
-   -- Header_CRC --
-   ----------------
-
-   function Header_CRC (Header : GPT_Header) return Word_32 is
-      Copy  : GPT_Header := Header;
-      Bytes : Storage_Array (1 .. Header_Bytes);
-      pragma Import (Ada, Bytes);
-      for Bytes'Address use Copy'Address;
-      CRC   : Word_32 := 16#FFFF_FFFF#;
-   begin
-      Copy.Header_CRC := 0;
-      Update_CRC (CRC, Bytes);
-      return not CRC;
-   end Header_CRC;
 
    --------------------
    -- Initialize_GPT --
@@ -335,9 +316,18 @@ package body Rose.Devices.GPT is
    is
    begin
       Check_Cached (Block_Device);
+
+      --  The disk is not one that a GPT can be on, or has a GPT that it
+      --  would destroy.
+
+      if GPT_Data.State = Invalid_GPT then
+         Rose.Console_IO.Put_Line ("initialize_gpt: not using this disk");
+         return;
+      end if;
+
       GPT_Data.Header := (others => <>);
       New_GUID (GPT_Data.Header.Disk_GUID_Lo, GPT_Data.Header.Disk_GUID_Hi);
-      GPT_Data.Count := 0;
+      GPT_Data.Table.Count := 0;
       GPT_Data.State := Valid_GPT;
       GPT_Data.Dirty := True;
       Save_Changes (Block_Device);
@@ -353,7 +343,14 @@ package body Rose.Devices.GPT is
    is
    begin
       Check_Cached (Block_Device);
-      return GPT_Data.Block_Count - 2 - Array_Blocks;
+
+      if not Geometry_Valid then
+         return 0;
+      end if;
+
+      return Block_Address_Type
+        (Format.Last_Usable_Block
+           (Natural (GPT_Data.Block_Size), Word_64 (GPT_Data.Block_Count)));
    end Last_Usable_Block;
 
    --------------
@@ -382,7 +379,7 @@ package body Rose.Devices.GPT is
    is
    begin
       Check_Cached (Block_Device);
-      return Natural (GPT_Data.Count);
+      return GPT_Data.Table.Count;
    end Partition_Count;
 
    -----------------
@@ -421,74 +418,82 @@ package body Rose.Devices.GPT is
       Found_Magic : out Boolean;
       Valid       : out Boolean)
    is
-      Header : GPT_Header renames GPT_Data.Header;
+      Header : Format.Header renames GPT_Data.Header;
    begin
       Valid := False;
-      GPT_Data.Count := 0;
+      GPT_Data.Table.Count := 0;
 
       declare
-         Block  : Storage_Array (1 .. Storage_Count (GPT_Data.Block_Size));
-         Stored : GPT_Header;
-         pragma Import (Ada, Stored);
-         for Stored'Address use Block'Address;
+         Block : Storage_Array (0 .. Storage_Count (GPT_Data.Block_Size) - 1);
       begin
          Client.Read_Blocks (Device, Header_LBA, 1, Block);
-         Header := Stored;
+         Header := Format.Decode_Header (Block);
       end;
 
-      Found_Magic := Header.Magic = GPT_Magic;
+      Found_Magic := Header.Magic = Format.GPT_Magic;
 
-      if not Found_Magic
-        or else Header.Header_Size /= Header_Bytes
-        or else Header.Header_CRC /= Header_CRC (Header)
-        or else Header.Current_LBA /= Header_LBA
-        or else Header.Partition_Entry_Size /= Entry_Size
-        or else Header.Partition_Entry_Count not in 1 .. Array_Entries
+      if not Format.Header_Valid
+               (Header, Word_64 (Header_LBA),
+                Natural (GPT_Data.Block_Size), Word_64 (GPT_Data.Block_Count))
       then
          return;
       end if;
 
       declare
-         Entries : GPT_Partition_Entry_Array (0 .. Chunk_Entries - 1);
-         Chunk   : Storage_Array (1 .. Chunk_Bytes);
-         pragma Import (Ada, Chunk);
-         for Chunk'Address use Entries'Address;
-         CRC     : Word_32 := 16#FFFF_FFFF#;
-         Index   : Word_32 := 0;
-         Start   : Block_Address_Type := Header.Start_Partition_LBA;
+         Entry_Count : constant Natural :=
+                         Natural (Header.Partition_Entry_Count);
+         Chunk       : Storage_Array (0 .. Chunk_Bytes - 1);
+         CRC         : Word_32 := 16#FFFF_FFFF#;
+         Index       : Natural := 0;
+         Start       : Block_Address_Type :=
+                         Block_Address_Type (Header.Start_Partition_LBA);
+         Intact      : Boolean := True;
       begin
-         while Index < Header.Partition_Entry_Count loop
+         while Index < Entry_Count loop
             Client.Read_Blocks (Device, Start, Chunk_Blocks, Chunk);
             Start := Start + Block_Address_Type (Chunk_Blocks);
 
-            for E of Entries loop
-               exit when Index = Header.Partition_Entry_Count;
+            for K in 0 .. Chunk_Entries - 1 loop
+               exit when Index = Entry_Count;
 
                declare
-                  Bytes : Storage_Array (1 .. Entry_Size);
-                  pragma Import (Ada, Bytes);
-                  for Bytes'Address use E'Address;
+                  Offset : constant Storage_Offset :=
+                             Storage_Offset (K) * Entry_Size;
+                  E      : constant Format.Partition_Entry :=
+                             Format.Decode_Entry (Chunk, Offset);
+                  Added  : Boolean;
                begin
-                  Update_CRC (CRC, Bytes);
-               end;
+                  Format.Update_CRC
+                    (CRC, Chunk (Offset .. Offset + Entry_Size - 1));
 
-               if E.Partition_Type_Low /= 0
-                 or else E.Partition_Type_High /= 0
-               then
-                  if GPT_Data.Count < Max_Partitions then
-                     GPT_Data.Parts (GPT_Data.Count) := E;
-                     GPT_Data.Count := GPT_Data.Count + 1;
-                  else
-                     Rose.Console_IO.Put_Line
-                       ("gpt: too many partitions; ignoring the rest");
+                  if E.Partition_Type_Low /= 0
+                    or else E.Partition_Type_High /= 0
+                  then
+                     if GPT_Data.Table.Count < Max_Partitions then
+                        Format.Add
+                          (GPT_Data.Table, E,
+                           Header.First_Usable_LBA, Header.Last_Usable_LBA,
+                           Added);
+
+                        --  A partition that is empty, outside the blocks
+                        --  that partitions may use, or overlapping
+                        --  another, makes the table not valid.
+
+                        if not Added then
+                           Intact := False;
+                        end if;
+                     else
+                        Rose.Console_IO.Put_Line
+                          ("gpt: too many partitions; ignoring the rest");
+                     end if;
                   end if;
-               end if;
 
-               Index := Index + 1;
+                  Index := Index + 1;
+               end;
             end loop;
          end loop;
 
-         Valid := (not CRC) = Header.Partition_Array_CRC;
+         Valid := Intact and then (not CRC) = Header.Partition_Array_CRC;
       end;
    end Read_Copy;
 
@@ -508,18 +513,18 @@ package body Rose.Devices.GPT is
          return;
       end if;
 
-      if GPT_Data.Count = 0 then
+      if GPT_Data.Table.Count = 0 then
          Rose.Console_IO.Put_Line ("No partitions in device");
          return;
       end if;
 
       Rose.Console_IO.Put_Line
         ("# Name            Start        End      Type      Flags");
-      for I in 0 .. GPT_Data.Count - 1 loop
-         Rose.Console_IO.Put (Natural (I));
+      for I in 0 .. GPT_Data.Table.Count - 1 loop
+         Rose.Console_IO.Put (I);
          Rose.Console_IO.Put (" ");
          declare
-            Part : GPT_Partition_Entry renames GPT_Data.Parts (I);
+            Part : Format.Partition_Entry renames GPT_Data.Table.Parts (I);
          begin
             for J in 1 .. 15 loop
                declare
@@ -533,8 +538,8 @@ package body Rose.Devices.GPT is
                end;
             end loop;
 
-            Rose.Console_IO.Put (Natural (Part.First_LBA), 10);
-            Rose.Console_IO.Put (Natural (Part.Last_LBA), 11);
+            Rose.Console_IO.Put (To_Natural (Part.First_LBA), 10);
+            Rose.Console_IO.Put (To_Natural (Part.Last_LBA), 11);
             Rose.Console_IO.Put ("  ");
 
             declare
@@ -596,27 +601,6 @@ package body Rose.Devices.GPT is
       return GPT_Data.State;
    end State;
 
-   ----------------
-   -- Update_CRC --
-   ----------------
-
-   procedure Update_CRC
-     (CRC  : in out Word_32;
-      Data : Storage_Array)
-   is
-   begin
-      for Element of Data loop
-         CRC := CRC xor Word_32 (Element);
-         for Bit in 1 .. 8 loop
-            if CRC mod 2 = 1 then
-               CRC := (CRC / 2) xor 16#EDB8_8320#;
-            else
-               CRC := CRC / 2;
-            end if;
-         end loop;
-      end loop;
-   end Update_CRC;
-
    ---------------
    -- Write_All --
    ---------------
@@ -624,28 +608,26 @@ package body Rose.Devices.GPT is
    procedure Write_All
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
    is
-      Last    : constant Block_Address_Type := GPT_Data.Block_Count - 1;
-      Primary : GPT_Header := GPT_Data.Header;
-      Backup  : GPT_Header;
+      Block_Size : constant Natural := Natural (GPT_Data.Block_Size);
+      Block_Count : constant Word_64 := Word_64 (GPT_Data.Block_Count);
+      Last    : constant Word_64 := Block_Count - 1;
+      Primary : Format.Header := GPT_Data.Header;
+      Backup  : Format.Header;
       CRC     : Word_32 := 16#FFFF_FFFF#;
+      Bytes   : Storage_Array (0 .. Entry_Size - 1) := (others => 0);
    begin
       for I in 0 .. Array_Entries - 1 loop
-         declare
-            E     : constant GPT_Partition_Entry := Entry_At (Word_32 (I));
-            Bytes : Storage_Array (1 .. Entry_Size);
-            pragma Import (Ada, Bytes);
-            for Bytes'Address use E'Address;
-         begin
-            Update_CRC (CRC, Bytes);
-         end;
+         Format.Encode_Entry (Entry_At (I), Bytes, 0);
+         Format.Update_CRC (CRC, Bytes);
       end loop;
 
-      Primary.Magic := GPT_Magic;
+      Primary.Magic := Format.GPT_Magic;
       Primary.Revision := 16#0001_0000#;
-      Primary.Header_Size := Header_Bytes;
+      Primary.Header_Size := Format.Header_Bytes;
       Primary.Reserved_Zero := 0;
-      Primary.First_Usable_LBA := 2 + Array_Blocks;
-      Primary.Last_Usable_LBA := Last - 1 - Array_Blocks;
+      Primary.First_Usable_LBA := Format.First_Usable_Block (Block_Size);
+      Primary.Last_Usable_LBA :=
+        Format.Last_Usable_Block (Block_Size, Block_Count);
       Primary.Partition_Entry_Count := Array_Entries;
       Primary.Partition_Entry_Size := Entry_Size;
       Primary.Partition_Array_CRC := not CRC;
@@ -653,17 +635,17 @@ package body Rose.Devices.GPT is
       Backup := Primary;
       Backup.Current_LBA := Last;
       Backup.Backup_LBA := 1;
-      Backup.Start_Partition_LBA := Last - Array_Blocks;
-      Backup.Header_CRC := Header_CRC (Backup);
+      Backup.Start_Partition_LBA := Last - Word_64 (Array_Blocks);
+      Backup.Header_CRC := Format.Header_CRC (Backup);
 
       Primary.Current_LBA := 1;
       Primary.Backup_LBA := Last;
       Primary.Start_Partition_LBA := 2;
-      Primary.Header_CRC := Header_CRC (Primary);
+      Primary.Header_CRC := Format.Header_CRC (Primary);
 
       Write_Protective_MBR (Device);
-      Write_Entries (Device, Primary.Start_Partition_LBA);
-      Write_Entries (Device, Backup.Start_Partition_LBA);
+      Write_Entries (Device, Block_Address_Type (Primary.Start_Partition_LBA));
+      Write_Entries (Device, Block_Address_Type (Backup.Start_Partition_LBA));
       Write_Header (Device, Backup);
       Write_Header (Device, Primary);
 
@@ -679,16 +661,14 @@ package body Rose.Devices.GPT is
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
       Start  : Block_Address_Type)
    is
-      Entries : GPT_Partition_Entry_Array (0 .. Chunk_Entries - 1);
-      Chunk   : Storage_Array (1 .. Chunk_Bytes);
-      pragma Import (Ada, Chunk);
-      for Chunk'Address use Entries'Address;
+      Chunk   : Storage_Array (0 .. Chunk_Bytes - 1) := (others => 0);
       Address : Block_Address_Type := Start;
    begin
       for First in 0 .. Array_Entries / Chunk_Entries - 1 loop
-         for I in Entries'Range loop
-            Entries (I) :=
-              Entry_At (Word_32 (First * Chunk_Entries) + I);
+         for K in 0 .. Chunk_Entries - 1 loop
+            Format.Encode_Entry
+              (Entry_At (First * Chunk_Entries + K),
+               Chunk, Storage_Offset (K) * Entry_Size);
          end loop;
          Client.Write_Blocks (Device, Address, Chunk_Blocks, Chunk);
          Address := Address + Block_Address_Type (Chunk_Blocks);
@@ -701,16 +681,14 @@ package body Rose.Devices.GPT is
 
    procedure Write_Header
      (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
-      Header : GPT_Header)
+      Header : Format.Header)
    is
-      Block  : Storage_Array (1 .. Storage_Count (GPT_Data.Block_Size)) :=
-                 (others => 0);
-      Stored : GPT_Header;
-      pragma Import (Ada, Stored);
-      for Stored'Address use Block'Address;
+      Block : Storage_Array (0 .. Storage_Count (GPT_Data.Block_Size) - 1) :=
+                (others => 0);
    begin
-      Stored := Header;
-      Client.Write_Blocks (Device, Header.Current_LBA, 1, Block);
+      Format.Encode_Header (Header, Block);
+      Client.Write_Blocks
+        (Device, Block_Address_Type (Header.Current_LBA), 1, Block);
    end Write_Header;
 
    --------------------------
