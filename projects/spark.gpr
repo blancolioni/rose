@@ -29,7 +29,10 @@ project Spark is
       "rose-invocation.ads",
       "rose-invocation.adb",
       "rose-capabilities-layout.ads",
-      "rose-capabilities-layout.adb");
+      "rose-capabilities-layout.adb",
+      "rose-allocators.ads",
+      "rose-allocators.adb",
+      "rose-allocators_proof.ads");
 
    for Object_Dir use "../build/spark";
 
