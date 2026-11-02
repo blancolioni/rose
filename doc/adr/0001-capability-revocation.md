@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-22
-- **Related:** #115 (remove the Create capability), Capabilities project
+- **Related:** #115 (remove the Create capability), Capabilities project, [ADR 0023](0023-kernel-capability-table.md) (the kernel capability table)
+- **Amended by:** #116, which settles the derivation record (in section 1)
 
 ## Context
 
@@ -47,6 +48,38 @@ Revocation has three layers, each used where it fits.
 - **Existing rescind stays.** Rescinding the server's own endpoint cap still revokes every copy, as it does today.
 
 This follows the approach of seL4, which records a derivation tree and revokes the subtree under a cap, and of KeyKOS/EROS, which used kernel version counts and forwarders in a persistent capability system.
+
+#### The derivation record (amendment, #116)
+
+The decision above says what a derived capability does. This says what the kernel keeps to do it, now that the capability table is a package of its own ([ADR 0023](0023-kernel-capability-table.md)) and its slot is private to it.
+
+**What a slot holds.** A capability's layout is 128 bits, and every bit is used: the header is a type, three access flags, a 24-bit rescinded count, a 16-bit endpoint and a 16-bit identifier, and the payload is an object id. So the derivation is not in the layout. A slot of the table is the layout and a *derivation*: a record id, which is 0 for a capability that was not derived, and the count of that record that the capability was made with. The slot is 24 bytes, so a page holds 170, and a table has more pages (25) so that a process still has about 4,000 capabilities. A capability that is sent is its whole slot, copied. Nothing in an invocation changes: it still carries capability numbers.
+
+**The record.** Derivation records are one table for the kernel, of 4,096. A record has its parent (a record id, or 0 for one that was derived from a capability that was not), the count of the parent when it was made, its own count, its depth, and the number of slots and child records that refer to it. The count of a record is never set back: when a record is freed and used again, its count goes on from where it was, so a capability from the record's last use does not match it (until the count has gone all the way round, which is after 2²⁴ rescinds of one record, as for a capability).
+
+**Derive.** A new operation of the meta capability, `Derive_Cap`, takes a capability of the caller and gives the caller a new one: the same layout, and a new record whose parent is the record of the capability that it was made from. It does not give more authority than it takes, and the capabilities that narrow what they give (ports and interrupts now, and memory when it has a derive) make their narrower layout and then take a record in the same way. It fails with `Out_Of_Capabilities` when there is no record or no slot, and with `Invalid_Operation` when the depth would be more than 8.
+
+**Valid.** A call through a capability is valid if:
+
+1. its layout's count is that of the send capability of the endpoint, in the process that serves it: this is the check that is made now, and it is why rescinding the server's own capability revokes every copy, derived or not;
+2. and, if it has a record, the count that it was made with is the count of its record, the record's recorded count of its parent is the count of the parent, and so on up to a record with no parent.
+
+That is at most nine reads, and no allocation. A depth of 8 is what bounds it, so there is no cache of validity: a cache would need what it caches to be revoked, which is the problem.
+
+**Rescind.** Rescinding the server's own capability is what it is now. Rescinding a derived capability adds one to the count of its record, which makes every copy of it invalid, and every capability derived from it (their records record the old count of their parent), and nothing else: not the parent, and not the siblings. The capability that was rescinded stays valid: its slot has the new count, as the server's own does.
+
+**Lifetime.** A record is freed when nothing refers to it. A slot refers to its record, and a record to its parent. A copy of a slot adds one, and so do `Derive_Cap` and a restore; `Delete_Cap`, a single-use capability that is used, and the death of a process, which will walk the capabilities it has, take one away. A record that has none left is freed, and takes one from its parent, which may be freed in turn. A record is not freed when the capability that it was made for is deleted, since the copies of it that were sent are valid, and are what it is for.
+
+**Checkpoints.** A checkpoint writes the records with the capability tables (#117), and a capability that is saved has its record and its count. `Kernel_Table_Version` becomes 5. A restore rebuilds what refers to what from the slots and the records, and does not trust the numbers that were saved: a table in which a capability names a record that is not in use, or a record's depth is not its parent's and one, is not restored.
+
+**What is proved.** The records and the slots' use of them are a SPARK package, as the table is. What it is proved to keep: the depth of a record is its parent's and one, and at most 8, so there are no cycles; a record that is free is not named; the number of references to a record is the number of slots and records that name it; and, of a rescind, that it makes invalid the capabilities of the record and of every record below it, and no other.
+
+**Why not another way.**
+
+- *A larger layout.* It changes every user of the layout (the invocation, the checkpoint, the debugging output) to put eight bytes in a place that only the table reads.
+- *Bits taken from the layout.* Twelve bits would have to come from the count, the endpoint index or the identifier. A count of 16 bits is wrapped after 65,536 rescinds, which a server that revokes a client at a time reaches; the endpoint index and the identifier are 16 bits each, and cutting either puts a limit on every server.
+- *Records for each process.* A grant is derived in one process and used in others, so its record is not any one process's.
+- *Free a record at a checkpoint, by finding which are named.* It is the reference count done once in a while, and a record would stay until the next one.
 
 ### 2. User space: membranes for sandboxing
 
