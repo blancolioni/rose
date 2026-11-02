@@ -170,14 +170,23 @@ package body Rose.Kernel.Capabilities.Processes is
                                   (Pid);
                      Layout : Rose.Capabilities.Layout.Capability_Layout;
                   begin
-                     Rose.Kernel.Processes.Get_Cap
-                       (Current_Pid, Params.Caps (Cap_Index), Layout);
 
-                     Rose.Kernel.Debug.Put_Cap_Layout
-                       ("initial-cap", Params.Caps (Cap_Index), Layout);
+                     --  A capability that the caller does not hold is not
+                     --  copied.  It still takes a number, which holds
+                     --  nothing, since those that follow count on it.
 
-                     Rose.Kernel.Processes.Set_Cap
-                       (Pid, Cap, Layout);
+                     if Rose.Kernel.Processes.Has_Cap
+                       (Current_Pid, Params.Caps (Cap_Index))
+                     then
+                        Rose.Kernel.Processes.Get_Cap
+                          (Current_Pid, Params.Caps (Cap_Index), Layout);
+
+                        Rose.Kernel.Debug.Put_Cap_Layout
+                          ("initial-cap", Params.Caps (Cap_Index), Layout);
+
+                        Rose.Kernel.Processes.Set_Cap
+                          (Pid, Cap, Layout);
+                     end if;
                   end;
                end loop;
             end if;
