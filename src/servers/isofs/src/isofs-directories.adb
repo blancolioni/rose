@@ -12,7 +12,10 @@ package body IsoFS.Directories is
    use Rose.Interfaces.Block_Device;
    use Rose.Words;
 
-   Max_Directories : constant := 100;
+   Max_Directory_Entries : constant := 512;
+   --  Directory records: one for each entry, with "." and "..", of every
+   --  directory that has been read (#651).
+
    Max_Files       : constant := 64;
    Max_Readers     : constant := 20;
 
@@ -133,7 +136,7 @@ package body IsoFS.Directories is
       end record;
 
    type Directory_Caps_Array is
-     array (Directory_Type range 1 .. Max_Directories)
+     array (Directory_Type range 1 .. Max_Directory_Entries)
      of Directory_Caps_Record;
 
    Directory_Caps : Directory_Caps_Array;
@@ -259,6 +262,9 @@ package body IsoFS.Directories is
                return Rose.Capabilities.Capability
       is (New_Cap (Directory, EP));
 
+      Full : Boolean := False;
+      --  Set when an entry has no room in Directory_Caps
+
       procedure Add_Child_Entry
         (Rec  : Directory_Entry;
          Name : String);
@@ -272,21 +278,35 @@ package body IsoFS.Directories is
          Name : String)
       is
          pragma Unreferenced (Name);
-         New_D    : constant Directory_Type :=
-                      Directory_Count + 1;
-         New_Caps : Directory_Caps_Record renames Directory_Caps (New_D);
       begin
-         if Caps.First_Child = No_Directory then
-            Caps.First_Child := New_D;
-         end if;
-         New_Caps.Valid := True;
-         New_Caps.Sector_Address :=
-           Block_Address_Type (Rec.Extent_Location_LSB);
-         New_Caps.Parent := Directory;
 
-         Directory_Count := Directory_Count + 1;
-         Caps.Child_Count := Caps.Child_Count + 1;
-         New_Caps.Parent_Index := Caps.Child_Count;
+         --  Without a record, the entry is left out of Child_Count, so
+         --  the children that have records stay contiguous from
+         --  First_Child.
+
+         if Directory_Count >= Max_Directory_Entries then
+            Full := True;
+            return;
+         end if;
+
+         declare
+            New_D    : constant Directory_Type :=
+                         Directory_Count + 1;
+            New_Caps : Directory_Caps_Record renames
+                         Directory_Caps (New_D);
+         begin
+            if Caps.First_Child = No_Directory then
+               Caps.First_Child := New_D;
+            end if;
+            New_Caps.Valid := True;
+            New_Caps.Sector_Address :=
+              Block_Address_Type (Rec.Extent_Location_LSB);
+            New_Caps.Parent := Directory;
+
+            Directory_Count := Directory_Count + 1;
+            Caps.Child_Count := Caps.Child_Count + 1;
+            New_Caps.Parent_Index := Caps.Child_Count;
+         end;
       end Add_Child_Entry;
 
    begin
@@ -301,6 +321,12 @@ package body IsoFS.Directories is
               New_Cap (Directory_Interface));
 
       Scan_Directory_Entries (Directory, Add_Child_Entry'Access);
+
+      if Full then
+         Rose.Console_IO.Put_Line
+           ("isofs: directory table full; entries of a directory"
+            & " are missing");
+      end if;
 
    end Create_Cap_Record;
 
@@ -651,7 +677,7 @@ package body IsoFS.Directories is
    is
       Directory : constant Directory_Type := Directory_Type (Identifier);
    begin
-      if Directory in 1 .. Max_Directories
+      if Directory in 1 .. Max_Directory_Entries
         and then Directory_Caps (Directory).Valid
       then
          return Directory;
