@@ -1,37 +1,53 @@
-package body Rose.Containers.Queues is
+package body Rose.Containers.Queues
+  with SPARK_Mode
+is
+
+   pragma Assertion_Policy (Ignore);
+   --  The contracts, loop invariants and variants are for the proof, and the
+   --  boot servers' run-time system has no System.Assertions.
 
    procedure Heapify
-     (Container : in out Queue);
+     (Container : in out Queue)
+   with Pre  => Container.Length <= Container.Capacity,
+        Post => Length (Container) = Length (Container)'Old;
 
    procedure Sift_Down
      (Container : in out Queue;
-      Start     : Count_Type);
+      Start     : Count_Type)
+   with Pre  => Container.Length <= Container.Capacity
+                and then Start >= 1
+                and then Start <= Container.Capacity,
+        Post => Length (Container) = Length (Container)'Old;
 
    procedure Sift_Up
      (Container : in out Queue;
       Start     : Count_Type;
-      Node      : Count_Type);
+      Node      : Count_Type)
+   with Pre  => Container.Length <= Container.Capacity
+                and then Start >= 1
+                and then Node <= Container.Length,
+        Post => Length (Container) = Length (Container)'Old;
 
    function Key
      (Container : Queue;
       Index     : Count_Type)
       return Key_Type
-   is (Container.Vector (Index).Key);
+   is (Container.Vector (Index).Key)
+   with Pre => Index in 1 .. Container.Capacity;
 
    procedure Swap_Elements
      (Container        : in out Queue;
-      Index_1, Index_2 : Count_Type);
+      Index_1, Index_2 : Count_Type)
+   with Pre  => Container.Length <= Container.Capacity
+                and then Index_1 in 1 .. Container.Capacity
+                and then Index_2 in 1 .. Container.Capacity,
+        Post => Length (Container) = Length (Container)'Old;
 
    function Left_Child
      (Node : Count_Type)
       return Count_Type
-   is (Node * 2);
-
-   function Right_Child
-     (Node : Count_Type)
-      return Count_Type
-   is (Node * 2 + 1)
-     with Unreferenced;
+   is (Node * 2)
+   with Pre => Node <= Capacity_Type'Last;
 
    function Parent
      (Node : Count_Type)
@@ -89,6 +105,10 @@ package body Rose.Containers.Queues is
       Start : Count_Type := Parent (Container.Length);
    begin
       while Start > 0 loop
+         pragma Loop_Variant (Decreases => Start);
+         pragma Loop_Invariant (Start <= Container.Capacity);
+         pragma Loop_Invariant
+           (Length (Container) = Length (Container)'Loop_Entry);
          Sift_Down (Container, Start);
          Start := Start - 1;
       end loop;
@@ -109,18 +129,6 @@ package body Rose.Containers.Queues is
       Sift_Up (Container, 1, Container.Length);
    end Insert;
 
-   --------------
-   -- Is_Empty --
-   --------------
-
-   function Is_Empty
-     (Container : Queue)
-      return Boolean
-   is
-   begin
-      return Container.Length = 0;
-   end Is_Empty;
-
    -------------
    -- Iterate --
    -------------
@@ -130,6 +138,7 @@ package body Rose.Containers.Queues is
       Process   : not null access
         procedure (Key : Key_Type;
                    Element : Element_Type))
+   with SPARK_Mode => Off
    is
    begin
       for Item of Container.Vector (1 .. Container.Length) loop
@@ -166,10 +175,14 @@ package body Rose.Containers.Queues is
    is
       Root   : Count_Type := Start;
       Child  : Count_Type;
-      Swap : Count_Type;
+      Swap   : Count_Type;
       Last   : constant Count_Type := Container.Length;
    begin
       while Left_Child (Root) <= Last loop
+         pragma Loop_Variant (Increases => Root);
+         pragma Loop_Invariant (Root >= Start and then Root < Last);
+         pragma Loop_Invariant (Last = Container.Length);
+
          Child := Left_Child (Root);
          Swap := Root;
 
@@ -205,6 +218,11 @@ package body Rose.Containers.Queues is
       Child : Count_Type := Node;
    begin
       while Child > Start loop
+         pragma Loop_Variant (Decreases => Child);
+         pragma Loop_Invariant (Child <= Container.Length);
+         pragma Loop_Invariant
+           (Length (Container) = Length (Container)'Loop_Entry);
+
          declare
             P : constant Count_Type := Parent (Child);
          begin
