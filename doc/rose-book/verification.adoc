@@ -26,6 +26,12 @@ Sending a word or a capability, and sending an object id, require that the invoc
 `Rose.Capabilities.Layout`::
 No run-time errors.
 
+`Rose.Allocators`::
+No run-time errors, for any sizes and addresses, in the instances with 4 and 19 bits of capacity (`Rose.Allocators_Proof`; the store uses 19, and gnatprove proves a generic through its instances).
+`Allocate` and `Allocate_At` give a block that is aligned to its size and inside the allocator.
+Not yet proved: that the block was free and no longer is, that live blocks do not overlap, that `Allocate_At` succeeds exactly when `Allocate` could have given that block, and that `Deallocate` frees exactly the block it is given.
+The tree of free blocks used to keep a count for each level, which the proof would have needed an invariant for, and which only saved scans, so it is gone.
+
 `Rose.Kernel.Command_Line`::
 No run-time errors, for any command line from the boot loader: an empty argument, one that ends in `=`, one that starts with it, or one that does not fit.
 The tables of names and values are always within the text that holds them, and `Get_Argument`, `Have_Argument` and `Argument_Count` agree.
@@ -33,6 +39,12 @@ The tables of names and values are always within the text that holds them, and `
 The body that prints each argument and passes the adder to `Rose.Multiboot` is not in SPARK, so the contract of `Initialise_Command_Line` is assumed.
 
 The kernel has its own run-time system, but `make prove` uses the userland one for `Rose.Kernel.Command_Line` too, since it uses nothing that they differ in.
+
+`Rose.Command_Line.Items`::
+No run-time errors in decoding an item of the launch buffer, for any contents and length of buffer: the buffer is from another process.
+`Rose.Command_Line.Element` is the one conversion from the address of the buffer to an array, and calls it.
+An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
+Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
 
 `Elf.Segments`::
 What `elf` trusts of an executable's program headers.
