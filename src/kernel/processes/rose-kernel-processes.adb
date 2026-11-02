@@ -5,6 +5,7 @@ with Rose.Interfaces.Memory;
 with Rose.Interfaces.Restorable;
 
 with Rose.Arch.Interrupts;
+with Rose.Kernel.Cap_Tables;
 with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
@@ -26,7 +27,6 @@ package body Rose.Kernel.Processes is
 
    Log_Shared_Buffers : constant Boolean := False;
    Log_State_Changes  : constant Boolean := False;
-   Log_Cap_Cache      : constant Boolean := False;
 
    Active_Checkpoint : Boolean := False;
 
@@ -123,9 +123,10 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Layout
    is
-      P : Kernel_Process_Entry renames Process_Table (Pid);
+      Layout : Rose.Capabilities.Layout.Capability_Layout;
    begin
-      return P.Cached_Caps (Load_Cap (Pid, Cap)).Layout;
+      Get_Cap (Pid, Cap, Layout);
+      return Layout;
    end Cap_Layout;
 
    --------------
@@ -186,21 +187,17 @@ package body Rose.Kernel.Processes is
      (Pid : Process_Id)
       return Rose.Capabilities.Capability
    is
-      use Rose.Capabilities;
-      P : Kernel_Process_Entry renames Process_Table (Pid);
+      use type Rose.Capabilities.Capability;
+      Cap : Rose.Capabilities.Capability;
    begin
-      for Cap in Capability range 1 .. Max_Capability_Index loop
-         if not P.Is_Active (Cap) then
-            P.Is_Active (Cap) := True;
-            if Cap > P.Last_Cap then
-               P.Last_Cap := Cap;
-            end if;
-            return Cap;
-         end if;
-      end loop;
-      Debug.Put (Pid);
-      Rose.Boot.Console.Put_Line (": out of capabilities");
-      return 0;
+      Cap_Tables.Create (Process_Table (Pid).Caps, Cap);
+
+      if Cap = Rose.Capabilities.Null_Capability then
+         Debug.Put (Pid);
+         Rose.Boot.Console.Put_Line (": out of capabilities");
+      end if;
+
+      return Cap;
    end Create_Cap;
 
    -----------------
@@ -394,8 +391,8 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
    is
    begin
-      Set_Cap (Pid, Cap, (others => <>));
-      Process_Table (Pid).Is_Active (Cap) := False;
+      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      Cap_Tables.Delete (Process_Table (Pid).Caps, Cap);
    end Delete_Cap;
 
    -------------------------
@@ -539,12 +536,9 @@ package body Rose.Kernel.Processes is
       Cap    : Rose.Capabilities.Capability;
       Layout : out Rose.Capabilities.Layout.Capability_Layout)
    is
-      P : Kernel_Process_Entry renames Process_Table (Pid);
-      Index : constant Cached_Capability_Index := Load_Cap (Pid, Cap);
-      Full_Cap : Rose.Capabilities.Layout.Capability_Layout
-      renames P.Cached_Caps (Index).Layout;
    begin
-      Layout := Full_Cap;
+      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      Cap_Tables.Get (Process_Table (Pid).Caps, Cap, Layout);
    end Get_Cap;
 
    ----------------------------
@@ -736,13 +730,10 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Boolean
    is
-      use type Rose.Capabilities.Capability;
       use Rose.Capabilities.Layout;
       Layout : Capability_Layout;
    begin
-      if Cap > Process_Table (Pid).Last_Cap
-        or else not Process_Table (Pid).Is_Active (Cap)
-      then
+      if not Cap_Tables.Is_Active (Process_Table (Pid).Caps, Cap) then
          return False;
       else
          Get_Cap (Pid, Cap, Layout);
@@ -1041,138 +1032,24 @@ package body Rose.Kernel.Processes is
       end loop;
    end Leave_Checkpoint;
 
-   --------------
-   -- Load_Cap --
-   --------------
-
-   function Load_Cap
-     (Pid : Process_Id;
-      Cap : Rose.Capabilities.Capability)
-      return Cached_Capability_Index
-   is
-      use type Rose.Capabilities.Capability;
-      use type Rose.Words.Word_32;
-      P : Kernel_Process_Entry renames Process_Table (Pid);
-      Result : Cached_Capability_Count := 0;
-   begin
-      if P.Is_Cached (Cap) then
-         for I in P.Cached_Caps'Range loop
-            if P.Cached_Caps (I).Cap = Cap then
-               Result := I;
-               exit;
-            end if;
-         end loop;
-      end if;
-
-      if Result = 0 then
-         declare
-            use Rose.Words;
-            Min_Tick : Word_32 := Word_32'Last;
-            Save_Cap : Boolean := True;
-         begin
-            for I in P.Cached_Caps'Range loop
-               declare
-                  Cached : Cached_Capability renames P.Cached_Caps (I);
-               begin
-                  if Cached.Cap = 0 then
-                     Result := I;
-                     Save_Cap := False;
-                     exit;
-                  end if;
-                  if Cached.Tick < Min_Tick then
-                     Min_Tick := Cached.Tick;
-                     Result := I;
-                  end if;
-               end;
-            end loop;
-
-            if Save_Cap then
-               declare
-                  Cache : Cached_Capability renames
-                            P.Cached_Caps (Result);
-                  Page_Index : constant Capability_Page_Index :=
-                                 Get_Cap_Page_Index (Cache.Cap);
-               begin
-                  if Log_Cap_Cache and then P.Flags (Trace) then
-                     Debug.Put (Pid);
-                     Rose.Boot.Console.Put (": dropping cap: ");
-                     Rose.Boot.Console.Put (Natural (Cache.Cap));
-                     Rose.Boot.Console.Put (" age=");
-                     Rose.Boot.Console.Put (Natural (Min_Tick));
-                     Rose.Boot.Console.New_Line;
-                  end if;
-
-                  Load_Cap_Page (Pid, Page_Index);
-
-                  declare
-                     Page : Capability_Page;
-                     pragma Import (Ada, Page);
-                     for Page'Address use P.Cap_Pages (Page_Index);
-                  begin
-                     Page (Cache.Cap mod Capabilities_Per_Page + 1) :=
-                       Cache.Layout;
-                  end;
-               end;
-            end if;
-         end;
-
-         declare
-            Cached : Cached_Capability renames P.Cached_Caps (Result);
-            Page_Index : constant Capability_Page_Index :=
-                           Get_Cap_Page_Index (Cap);
-         begin
-            if Cached.Cap /= 0 then
-               P.Is_Cached (Cached.Cap) := False;
-            end if;
-
-            if Log_Cap_Cache and then P.Flags (Trace) then
-               Debug.Put (Pid);
-               Rose.Boot.Console.Put (": loading cap: ");
-               Rose.Boot.Console.Put (Natural (Cap));
-               Rose.Boot.Console.Put (" age=");
-               Rose.Boot.Console.Put (Natural (P.Next_Cap_Tick) + 1);
-               Rose.Boot.Console.New_Line;
-            end if;
-
-            Load_Cap_Page (Pid, Page_Index);
-            declare
-               Page : Capability_Page;
-               pragma Import (Ada, Page);
-               for Page'Address use P.Cap_Pages (Page_Index);
-            begin
-               P.Cached_Caps (Result) :=
-                 Cached_Capability'
-                   (Cap    => Cap,
-                    Tick   => 0,
-                    Layout => Page (Cap mod Capabilities_Per_Page + 1));
-            end;
-         end;
-      end if;
-
-      P.Is_Cached (Cap) := True;
-      P.Next_Cap_Tick := P.Next_Cap_Tick + 1;
-      P.Cached_Caps (Result).Tick := P.Next_Cap_Tick;
-      return Result;
-   end Load_Cap;
-
    -------------------
    -- Load_Cap_Page --
    -------------------
 
    procedure Load_Cap_Page
      (Pid  : Process_Id;
-      Page : Capability_Page_Index)
+      Page : Cap_Tables.Capability_Page_Index)
    is
-      use System;
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      if P.Cap_Pages (Page) = Null_Address then
+      if not Cap_Tables.Has_Page (P.Caps, Page) then
          declare
             Page_Address : constant Virtual_Page_Address :=
                              Rose.Kernel.Heap.Allocate_Page;
          begin
-            P.Cap_Pages (Page) :=
-              System'To_Address (Virtual_Page_To_Address (Page_Address));
+            Cap_Tables.Set_Page
+              (P.Caps, Page,
+               System'To_Address (Virtual_Page_To_Address (Page_Address)));
          end;
       end if;
    end Load_Cap_Page;
@@ -1382,10 +1259,12 @@ package body Rose.Kernel.Processes is
          end if;
       end loop;
 
-      for Page of P.Cap_Pages loop
-         if Page /= System.Null_Address then
+      for Page in Cap_Tables.Capability_Page_Index loop
+         if Cap_Tables.Has_Page (P.Caps, Page) then
             Rose.Kernel.Heap.Free_Page
-              (Virtual_Address_To_Page (To_Virtual_Address (Page)));
+              (Virtual_Address_To_Page
+                 (To_Virtual_Address
+                    (Cap_Tables.Page_Address (P.Caps, Page))));
          end if;
       end loop;
 
@@ -2011,9 +1890,9 @@ package body Rose.Kernel.Processes is
       Cap    : Rose.Capabilities.Capability;
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
-      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      P.Cached_Caps (Load_Cap (Pid, Cap)).Layout := Layout;
+      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      Cap_Tables.Set (Process_Table (Pid).Caps, Cap, Layout);
    end Set_Cap;
 
    ----------------
@@ -2419,9 +2298,9 @@ package body Rose.Kernel.Processes is
         procedure
           (Layout : in out Rose.Capabilities.Layout.Capability_Layout))
    is
-      P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
-      Update (P.Cached_Caps (Load_Cap (Pid, Cap)).Layout);
+      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
+      Cap_Tables.Update (Process_Table (Pid).Caps, Cap, Update);
    end Update_Cap;
 
    --------------
@@ -2515,8 +2394,8 @@ package body Rose.Kernel.Processes is
       --  A caller waiting for the reply is named by the payload of the
       --  reply cap that the dead process holds for it.
 
-      for Cap in 1 .. P.Last_Cap loop
-         if P.Is_Active (Cap) then
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
             declare
                Layout : constant Rose.Capabilities.Layout.Capability_Layout :=
                  Cap_Layout (Pid, Cap);

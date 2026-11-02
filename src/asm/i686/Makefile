@@ -37,6 +37,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-invocation-trace.o \
 	$(BUILDDIR)/rose-kernel.o \
 	$(BUILDDIR)/rose-kernel-arch.o \
+	$(BUILDDIR)/rose-kernel-cap_tables.o \
 	$(BUILDDIR)/rose-kernel-capabilities.o \
 	$(BUILDDIR)/rose-kernel-capabilities-arch.o \
 	$(BUILDDIR)/rose-kernel-capabilities-boot.o \
