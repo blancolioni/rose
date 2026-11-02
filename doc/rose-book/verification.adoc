@@ -26,6 +26,12 @@ Sending a word or a capability, and sending an object id, require that the invoc
 `Rose.Capabilities.Layout`::
 No run-time errors.
 
+`Rose.Allocators`::
+No run-time errors, for any sizes and addresses, in the instances with 4 and 19 bits of capacity (`Rose.Allocators_Proof`; the store uses 19, and gnatprove proves a generic through its instances).
+`Allocate` and `Allocate_At` give a block that is aligned to its size and inside the allocator.
+Not yet proved: that the block was free and no longer is, that live blocks do not overlap, that `Allocate_At` succeeds exactly when `Allocate` could have given that block, and that `Deallocate` frees exactly the block it is given.
+The tree of free blocks used to keep a count for each level, which the proof would have needed an invariant for, and which only saved scans, so it is gone.
+
 `Rose.Kernel.Command_Line`::
 No run-time errors, for any command line from the boot loader: an empty argument, one that ends in `=`, one that starts with it, or one that does not fit.
 The tables of names and values are always within the text that holds them, and `Get_Argument`, `Have_Argument` and `Argument_Count` agree.
