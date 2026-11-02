@@ -621,7 +621,8 @@ private
      (Pid  : Process_Id;
       Page : Rose.Kernel.Cap_Tables.Capability_Page_Index);
    --  Allocate the page of Pid's capabilities, if it has not got it, for
-   --  the operations of Rose.Kernel.Cap_Tables that need one.
+   --  Set_Cap and Update_Cap, which need one.  Reading a capability, and
+   --  deleting one, do not.
 
    function Cap_Layout
      (Pid : Process_Id;
