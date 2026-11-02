@@ -65,6 +65,46 @@ package body Rose.Boot.Memory is
          Rose.Boot.Console.Put_Line ("Did not get physical memory map");
       end if;
 
+      --  The framebuffer is device memory (#582), outside the RAM that the
+      --  memory map gives us.
+
+      if Rose.Multiboot.Have_Framebuffer then
+         declare
+            use Rose.Addresses;
+            Base    : constant Physical_Address :=
+                        Physical_Address
+                          (Rose.Multiboot.Framebuffer_Address);
+            Size    : constant Physical_Address :=
+                        Physical_Address
+                          (Rose.Multiboot.Framebuffer_Pitch
+                           * Rose.Multiboot.Framebuffer_Height);
+            Success : Boolean;
+         begin
+            Kernel.Physical_Memory.Allocate_Region
+              (Base     => Base,
+               Bound    => Base + Size,
+               Class    => Kernel.Physical_Memory.Device,
+               Usage    => Kernel.Physical_Memory.Device_Pages,
+               Success  => Success);
+
+            if Success then
+               Rose.Boot.Console.Put ("Framebuffer: ");
+               Rose.Boot.Console.Put
+                 (Natural (Rose.Multiboot.Framebuffer_Width));
+               Rose.Boot.Console.Put ("x");
+               Rose.Boot.Console.Put
+                 (Natural (Rose.Multiboot.Framebuffer_Height));
+               Rose.Boot.Console.Put (" at ");
+               Rose.Boot.Console.Put (Rose.Multiboot.Framebuffer_Address);
+               Rose.Boot.Console.New_Line;
+            else
+               Rose.Boot.Console.Put ("Could not allocate framebuffer at ");
+               Rose.Boot.Console.Put (Rose.Multiboot.Framebuffer_Address);
+               Rose.Boot.Console.New_Line;
+            end if;
+         end;
+      end if;
+
    end Configure_Physical_Memory;
 
    ------------------------

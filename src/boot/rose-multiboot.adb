@@ -16,6 +16,23 @@ package body Rose.Multiboot is
 
    function Physical_Memory_High return Word is (Physmem_High);
 
+   --  The framebuffer tag (type 8): the address is a 64-bit word at 8,
+   --  then pitch, width and height, then the depth and the type as
+   --  bytes at 28 and 29.  For an RGB framebuffer, the position and size
+   --  of the red, green and blue fields follow as bytes from 32.
+
+   Framebuffer_Type_RGB : constant := 1;
+
+   FB_Usable                    : Boolean := False;
+   FB_Address, FB_Pitch         : Word_32 := 0;
+   FB_Width, FB_Height          : Word_32 := 0;
+
+   function Have_Framebuffer return Boolean is (FB_Usable);
+   function Framebuffer_Address return Word_32 is (FB_Address);
+   function Framebuffer_Pitch return Word_32 is (FB_Pitch);
+   function Framebuffer_Width return Word_32 is (FB_Width);
+   function Framebuffer_Height return Word_32 is (FB_Height);
+
    type Multiboot_Tag_Type is
      (End_Of_Tags,
       Command_Line,
@@ -52,6 +69,14 @@ package body Rose.Multiboot is
      (From_Tag_Address : Word;
       Offset           : Word)
       return Word_32;
+
+   function Get_Word_8
+     (From_Tag_Address : Word;
+      Offset           : Word)
+      return Word_8;
+
+   procedure Load_Framebuffer
+     (Tag_Address : Word);
 
    procedure Get_String
      (From_Tag_Address : Word;
@@ -109,6 +134,22 @@ package body Rose.Multiboot is
       end loop;
    end Get_String;
 
+   ----------------
+   -- Get_Word_8 --
+   ----------------
+
+   function Get_Word_8
+     (From_Tag_Address : Word;
+      Offset           : Word)
+      return Word_8
+   is
+      Value : Word_8;
+      for Value'Address use System'To_Address (From_Tag_Address + Offset);
+      pragma Import (Ada, Value);
+   begin
+      return Value;
+   end Get_Word_8;
+
    -----------------
    -- Get_Word_32 --
    -----------------
@@ -133,6 +174,36 @@ package body Rose.Multiboot is
 
    function Have_Modules return Boolean
    is (Found (Module));
+
+   ----------------------
+   -- Load_Framebuffer --
+   ----------------------
+
+   procedure Load_Framebuffer
+     (Tag_Address : Word)
+   is
+      Address_Low  : constant Word_32 := Get_Word_32 (Tag_Address, 8);
+      Address_High : constant Word_32 := Get_Word_32 (Tag_Address, 12);
+      Pitch        : constant Word_32 := Get_Word_32 (Tag_Address, 16);
+      Width        : constant Word_32 := Get_Word_32 (Tag_Address, 20);
+      Height       : constant Word_32 := Get_Word_32 (Tag_Address, 24);
+      Depth        : constant Word_8 := Get_Word_8 (Tag_Address, 28);
+      FB_Type      : constant Word_8 := Get_Word_8 (Tag_Address, 29);
+   begin
+      FB_Usable :=
+        FB_Type = Framebuffer_Type_RGB
+        and then Depth = 32
+        and then Address_High = 0
+        and then Word_64 (Address_Low) + Word_64 (Pitch) * Word_64 (Height)
+                   < 2 ** 32;
+
+      if FB_Usable then
+         FB_Address := Address_Low;
+         FB_Pitch := Pitch;
+         FB_Width := Width;
+         FB_Height := Height;
+      end if;
+   end Load_Framebuffer;
 
    ---------------------------
    -- Load_Multiboot_Header --
@@ -168,6 +239,8 @@ package body Rose.Multiboot is
          if Tag = Basic_Memory_Info then
             Physmem_Low := 0;
             Physmem_High := Get_Word_32 (Start, 12);
+         elsif Tag = Frame_Buffer then
+            Load_Framebuffer (Start);
          end if;
       end Process_Record;
 
@@ -231,6 +304,36 @@ package body Rose.Multiboot is
          when Load_Base_Address =>
             Put ("load base address: ");
             Put (Get_Word_32 (Tag_Address, 8));
+            New_Line;
+         when Frame_Buffer =>
+            Put ("framebuffer: address=");
+            Put (Get_Word_32 (Tag_Address, 12));
+            Put (":");
+            Put (Get_Word_32 (Tag_Address, 8));
+            Put (" pitch=");
+            Put (Natural (Get_Word_32 (Tag_Address, 16)));
+            Put (" size=");
+            Put (Natural (Get_Word_32 (Tag_Address, 20)));
+            Put ("x");
+            Put (Natural (Get_Word_32 (Tag_Address, 24)));
+            Put ("x");
+            Put (Natural (Get_Word_8 (Tag_Address, 28)));
+            Put (" type=");
+            Put (Natural (Get_Word_8 (Tag_Address, 29)));
+            if Get_Word_8 (Tag_Address, 29) = Framebuffer_Type_RGB then
+               Put (" red=");
+               Put (Natural (Get_Word_8 (Tag_Address, 32)));
+               Put ("/");
+               Put (Natural (Get_Word_8 (Tag_Address, 33)));
+               Put (" green=");
+               Put (Natural (Get_Word_8 (Tag_Address, 34)));
+               Put ("/");
+               Put (Natural (Get_Word_8 (Tag_Address, 35)));
+               Put (" blue=");
+               Put (Natural (Get_Word_8 (Tag_Address, 36)));
+               Put ("/");
+               Put (Natural (Get_Word_8 (Tag_Address, 37)));
+            end if;
             New_Line;
          when others =>
             Put ("multiboot: tag=");
