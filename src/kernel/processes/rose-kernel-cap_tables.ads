@@ -3,7 +3,6 @@ with System;
 with Rose.Addresses;
 with Rose.Capabilities;
 with Rose.Capabilities.Layout;
-with Rose.Words;
 
 package Rose.Kernel.Cap_Tables is
 
@@ -11,8 +10,7 @@ package Rose.Kernel.Cap_Tables is
    --  number from 1 to Max_Capability_Index, and is active from Create to
    --  Delete.  Its layout is held in a page: the pages of a table are
    --  allocated by whoever has the table, as it needs them, with Set_Page,
-   --  and the operations that read or write a layout need the page that
-   --  it is in.
+   --  and a layout is read and written in its page, with nothing between.
    --
    --  There is no output, and nothing here knows of a process.  Reporting
    --  that a table is full, and allocating a page, are done by
@@ -40,7 +38,9 @@ package Rose.Kernel.Cap_Tables is
      (Cap : Rose.Capabilities.Capability)
       return Capability_Page_Index
    is (Capability_Page_Count (Natural (Cap) / Capabilities_Per_Page) + 1);
-   --  The page that holds the layout of Cap.
+   --  The page that holds the layout of Cap.  That is a page that there is
+   --  only for the numbers below Max_Capability_Index: the page of
+   --  Max_Capability_Index itself would be the one after the last.
 
    type Cap_Table is private;
    --  A table that is all zeros is empty, which is how a process's entry
@@ -74,17 +74,20 @@ package Rose.Kernel.Cap_Tables is
       Page    : Capability_Page_Index;
       Address : System.Address);
 
-   procedure Get
-     (Table  : in out Cap_Table;
-      Cap    : Rose.Capabilities.Capability;
-      Layout : out Rose.Capabilities.Layout.Capability_Layout);
-   --  The layout of Cap, which is the empty layout if it was never set.
-   --  The page that holds it must have been set.
+   function Layout
+     (Table : Cap_Table;
+      Cap   : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Layout.Capability_Layout;
+   --  The layout of Cap, which is the empty layout if it was never set,
+   --  and if there is no page for it, or no number.  It does not need the
+   --  page to have been set.
 
    procedure Set
      (Table  : in out Cap_Table;
       Cap    : Rose.Capabilities.Capability;
       Layout : Rose.Capabilities.Layout.Capability_Layout);
+   --  Set the layout of Cap.  It does nothing if there is no page for it,
+   --  which the caller has to allocate first.
 
    procedure Update
      (Table  : in out Cap_Table;
@@ -92,7 +95,8 @@ package Rose.Kernel.Cap_Tables is
       Update : not null access
         procedure
           (Layout : in out Rose.Capabilities.Layout.Capability_Layout));
-   --  Change the layout of Cap in place.
+   --  Change the layout of Cap in place.  It does nothing if there is no
+   --  page for it.
 
    procedure Create
      (Table : in out Cap_Table;
@@ -103,8 +107,7 @@ package Rose.Kernel.Cap_Tables is
    procedure Delete
      (Table : in out Cap_Table;
       Cap   : Rose.Capabilities.Capability);
-   --  Empty the layout of Cap, and take it out of use.  The page that
-   --  holds it must have been set.
+   --  Empty the layout of Cap, and take it out of use.
 
    procedure Set_Last_Cap
      (Table : in out Cap_Table;
@@ -118,24 +121,6 @@ package Rose.Kernel.Cap_Tables is
 
 private
 
-   Capability_Cache_Size : constant := 16;
-   --  The layouts of the last capabilities that were used are kept in
-   --  the table, so that they need not be found in their pages.
-
-   type Cached_Capability_Count is range 0 .. Capability_Cache_Size;
-   subtype Cached_Capability_Index is Cached_Capability_Count range
-     1 .. Cached_Capability_Count'Last;
-
-   type Cached_Capability is
-      record
-         Cap    : Rose.Capabilities.Capability := 0;
-         Tick   : Rose.Words.Word_32 := 0;
-         Layout : Rose.Capabilities.Layout.Capability_Layout;
-      end record;
-
-   type Capability_Cache_Array is
-     array (Cached_Capability_Index) of Cached_Capability;
-
    type Capability_Page_Array is
      array (Capability_Page_Index) of System.Address;
 
@@ -146,13 +131,10 @@ private
 
    type Cap_Table is
       record
-         Last_Cap      : Rose.Capabilities.Capability := 0;
-         Cached_Caps   : Capability_Cache_Array := (others => <>);
-         Is_Cached     : Cap_Present_Array := (others => False);
-         Is_Active     : Cap_Present_Array := (others => False);
-         Next_Cap_Tick : Rose.Words.Word_32 := 0;
-         Cap_Pages     : Capability_Page_Array :=
-                           (others => System.Null_Address);
+         Last_Cap  : Rose.Capabilities.Capability := 0;
+         Is_Active : Cap_Present_Array := (others => False);
+         Cap_Pages : Capability_Page_Array :=
+                       (others => System.Null_Address);
       end record;
 
 end Rose.Kernel.Cap_Tables;

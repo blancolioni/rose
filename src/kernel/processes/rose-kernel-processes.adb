@@ -123,10 +123,8 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Layout.Capability_Layout
    is
-      Layout : Rose.Capabilities.Layout.Capability_Layout;
    begin
-      Get_Cap (Pid, Cap, Layout);
-      return Layout;
+      return Cap_Tables.Layout (Process_Table (Pid).Caps, Cap);
    end Cap_Layout;
 
    --------------
@@ -391,7 +389,6 @@ package body Rose.Kernel.Processes is
       Cap : Rose.Capabilities.Capability)
    is
    begin
-      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
       Cap_Tables.Delete (Process_Table (Pid).Caps, Cap);
    end Delete_Cap;
 
@@ -537,8 +534,7 @@ package body Rose.Kernel.Processes is
       Layout : out Rose.Capabilities.Layout.Capability_Layout)
    is
    begin
-      Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
-      Cap_Tables.Get (Process_Table (Pid).Caps, Cap, Layout);
+      Layout := Cap_Tables.Layout (Process_Table (Pid).Caps, Cap);
    end Get_Cap;
 
    ----------------------------
