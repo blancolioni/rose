@@ -275,6 +275,28 @@ a-strbou.adb
 a-strunb.ads
 a-strunb.adb
 
+# Case-insensitive Equal and Hash for String, Bounded_String and
+# Unbounded_String (#536), with Ada.Strings.Unbounded.Aux, which the
+# Unbounded pair uses. They fold case as Latin-1, through
+# Ada.Characters.Handling: Rose has no locale support, and the letters of
+# UTF-8 text beyond ASCII are not folded.
+a-stunau.ads
+a-stunau.adb
+a-secain.ads
+a-secain.adb
+a-shcain.ads
+a-shcain.adb
+a-sfecin.ads
+a-sfhcin.ads
+a-sbecin.ads
+a-sbecin.adb
+a-sbhcin.ads
+a-sbhcin.adb
+a-suecin.ads
+a-suecin.adb
+a-suhcin.ads
+a-suhcin.adb
+
 # Ada.Text_IO (#557), with System.File_IO, which it uses. Rose's own
 # Interfaces.C_Streams and System.OS_Lib, in src/adainclude, are what they
 # stand on.
