@@ -1,5 +1,5 @@
 generic
-   Log_2_Capacity : Natural;
+   Log_2_Capacity : Positive;
 package Rose.Allocators is
 
    type Store is limited private;
@@ -14,20 +14,23 @@ package Rose.Allocators is
    --  nothing outside it can be allocated.  The allocator holds
    --  2 ** (Log_2_Capacity - 1) blocks: anything past them is ignored.
 
-   function Allocate
+   procedure Allocate
      (Allocator : in out Store;
-      Size      : Positive)
-      return Natural;
+      Size      : Positive;
+      Base      : out Natural);
+   --  Allocate a block of Size, rounded up to a power of two.  Base is its
+   --  index, or 0 if there is no free block that large, which includes a
+   --  Size larger than the allocator holds.
 
-   function Allocate_At
+   procedure Allocate_At
      (Allocator : in out Store;
       Base      : Positive;
-      Size      : Positive)
-      return Boolean;
+      Size      : Positive;
+      Success   : out Boolean);
    --  Allocate the block that Allocate returned as Base for an allocation
    --  of Size, as when allocations are made again after a restart.
-   --  False if Base is not where such a block starts, or the block is
-   --  not free.
+   --  Success is False if Base is not where such a block starts, or the
+   --  block is not free.
 
    procedure Deallocate
      (Allocator : in out Store;
@@ -38,6 +41,10 @@ package Rose.Allocators is
    --  Allocate rounds it. For any other range, use Add_Range.
 
 private
+
+   pragma Compile_Time_Error
+     (Log_2_Capacity > 30,
+      "the block indices of a larger allocator do not fit in an Integer");
 
    subtype Order_Type is Natural range 0 .. Log_2_Capacity - 1;
    type Free_Block_Array is array (1 .. 2 ** Log_2_Capacity) of Boolean

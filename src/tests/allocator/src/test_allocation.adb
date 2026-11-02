@@ -42,6 +42,12 @@ package body Test_Allocation is
    --  allocated, and Inside is True if every one lies in Base .. Bound - 1
    --  and none overlaps another.
 
+   function Allocate
+     (Allocator : in out Small_Allocators.Store;
+      Size      : Positive)
+      return Natural;
+   --  The block that Small_Allocators.Allocate gives, or 0.
+
    procedure Test_Merge;
    procedure Test_One_MiB_Blocks;
    procedure Test_Past_Capacity;
@@ -49,6 +55,21 @@ package body Test_Allocation is
    procedure Test_Smoke;
    procedure Test_Store_Partition;
    procedure Test_Unaligned_Range;
+
+   --------------
+   -- Allocate --
+   --------------
+
+   function Allocate
+     (Allocator : in out Small_Allocators.Store;
+      Size      : Positive)
+      return Natural
+   is
+      Base : Natural;
+   begin
+      Small_Allocators.Allocate (Allocator, Size, Base);
+      return Base;
+   end Allocate;
 
    -----------
    -- Check --
@@ -83,7 +104,7 @@ package body Test_Allocation is
       loop
          declare
             Index : constant Natural :=
-              Small_Allocators.Allocate (Allocator, Size);
+              Allocate (Allocator, Size);
          begin
             exit when Index = 0;
             Count := Count + 1;
@@ -138,10 +159,10 @@ package body Test_Allocation is
          Small_Allocators.Deallocate (Allocator, I, I + 1);
       end loop;
       Check ("merge: 1024, 512 and 256 again",
-             Small_Allocators.Allocate (Allocator, 1024) /= 0
-             and then Small_Allocators.Allocate (Allocator, 512) /= 0
-             and then Small_Allocators.Allocate (Allocator, 256) /= 0
-             and then Small_Allocators.Allocate (Allocator, 1) = 0);
+             Allocate (Allocator, 1024) /= 0
+             and then Allocate (Allocator, 512) /= 0
+             and then Allocate (Allocator, 256) /= 0
+             and then Allocate (Allocator, 1) = 0);
    end Test_Merge;
 
    -------------------------
@@ -232,7 +253,7 @@ package body Test_Allocation is
             declare
                Size  : constant Positive := Random_Sizes.Random (Sizes);
                Index : constant Natural :=
-                 Small_Allocators.Allocate (Allocator, Size);
+                 Allocate (Allocator, Size);
             begin
                if Index /= 0 then
                   if Index + Rounded (Size) > 1793 then
@@ -283,8 +304,7 @@ package body Test_Allocation is
       Allocators.Deallocate (Store, 1, 2 ** 19);
       for I in Dataset'Range loop
          Dataset (I).Size := 2;
-         Dataset (I).Index :=
-           Allocators.Allocate (Store, Dataset (I).Size);
+         Allocators.Allocate (Store, Dataset (I).Size, Dataset (I).Index);
          if Dataset (I).Index = 0 then
             Rose.Console_IO.Put_Line
               ("test: out of memory after" & I'Image & " allocations");
