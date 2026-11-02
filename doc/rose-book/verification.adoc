@@ -33,3 +33,9 @@ The tables of names and values are always within the text that holds them, and `
 The body that prints each argument and passes the adder to `Rose.Multiboot` is not in SPARK, so the contract of `Initialise_Command_Line` is assumed.
 
 The kernel has its own run-time system, but `make prove` uses the userland one for `Rose.Kernel.Command_Line` too, since it uses nothing that they differ in.
+
+`Rose.Command_Line.Items`::
+No run-time errors in decoding an item of the launch buffer, for any contents and length of buffer: the buffer is from another process.
+`Rose.Command_Line.Element` is the one conversion from the address of the buffer to an array, and calls it.
+An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
+Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
