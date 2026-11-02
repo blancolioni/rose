@@ -2,16 +2,15 @@ package body Rose.Kernel.Cap_Tables is
 
    use type System.Address;
    use type Rose.Capabilities.Capability;
-   use type Rose.Words.Word_32;
 
-   function Load
-     (Table : in out Cap_Table;
+   function Has_Slot
+     (Table : Cap_Table;
       Cap   : Rose.Capabilities.Capability)
-      return Cached_Capability_Index;
-   --  The entry of the cache that holds the layout of Cap, which is put
-   --  there, in the place of the one that was used longest ago, if it is
-   --  not.  The page that holds Cap must have been set, and so must the
-   --  page of the capability that is replaced, which it was.
+      return Boolean
+   is (Cap in 1 .. Max_Capability_Index - 1
+       and then Has_Page (Table, Page_Index (Cap)));
+   --  There is a place for the layout of Cap, which is when its page has
+   --  been set.  There is none for Max_Capability_Index (see Page_Index).
 
    --------------
    -- Activate --
@@ -68,20 +67,6 @@ package body Rose.Kernel.Cap_Tables is
       end if;
    end Delete;
 
-   ---------
-   -- Get --
-   ---------
-
-   procedure Get
-     (Table  : in out Cap_Table;
-      Cap    : Rose.Capabilities.Capability;
-      Layout : out Rose.Capabilities.Layout.Capability_Layout)
-   is
-      Index : constant Cached_Capability_Index := Load (Table, Cap);
-   begin
-      Layout := Table.Cached_Caps (Index).Layout;
-   end Get;
-
    --------------
    -- Has_Page --
    --------------
@@ -113,93 +98,27 @@ package body Rose.Kernel.Cap_Tables is
       return Rose.Capabilities.Capability
    is (Table.Last_Cap);
 
-   ----------
-   -- Load --
-   ----------
+   ------------
+   -- Layout --
+   ------------
 
-   function Load
-     (Table : in out Cap_Table;
+   function Layout
+     (Table : Cap_Table;
       Cap   : Rose.Capabilities.Capability)
-      return Cached_Capability_Index
+      return Rose.Capabilities.Layout.Capability_Layout
    is
-      Result : Cached_Capability_Count := 0;
    begin
-      if Cap in 1 .. Max_Capability_Index and then Table.Is_Cached (Cap) then
-         for I in Table.Cached_Caps'Range loop
-            if Table.Cached_Caps (I).Cap = Cap then
-               Result := I;
-               exit;
-            end if;
-         end loop;
+      if not Has_Slot (Table, Cap) then
+         return (others => <>);
       end if;
 
-      if Result = 0 then
-         declare
-            Min_Tick : Rose.Words.Word_32 := Rose.Words.Word_32'Last;
-            Save_Cap : Boolean := True;
-         begin
-            for I in Table.Cached_Caps'Range loop
-               declare
-                  Cached : Cached_Capability renames Table.Cached_Caps (I);
-               begin
-                  if Cached.Cap = 0 then
-                     Result := I;
-                     Save_Cap := False;
-                     exit;
-                  end if;
-                  if Cached.Tick < Min_Tick then
-                     Min_Tick := Cached.Tick;
-                     Result := I;
-                  end if;
-               end;
-            end loop;
-
-            --  The cache was full, so the layout that is replaced is
-            --  written back to its page.
-
-            if Save_Cap then
-               declare
-                  Cache : Cached_Capability renames
-                            Table.Cached_Caps (Result);
-                  Page  : Capability_Page
-                    with Import,
-                         Address => Table.Cap_Pages (Page_Index (Cache.Cap));
-               begin
-                  Page (Cache.Cap mod Capabilities_Per_Page + 1) :=
-                    Cache.Layout;
-               end;
-            end if;
-         end;
-
-         declare
-            Cached : Cached_Capability renames Table.Cached_Caps (Result);
-         begin
-            if Cached.Cap /= 0 then
-               Table.Is_Cached (Cached.Cap) := False;
-            end if;
-
-            declare
-               Page : Capability_Page
-                 with Import,
-                      Address => Table.Cap_Pages (Page_Index (Cap));
-            begin
-               Table.Cached_Caps (Result) :=
-                 Cached_Capability'
-                   (Cap    => Cap,
-                    Tick   => 0,
-                    Layout => Page (Cap mod Capabilities_Per_Page + 1));
-            end;
-         end;
-      end if;
-
-      if Cap in 1 .. Max_Capability_Index then
-         Table.Is_Cached (Cap) := True;
-      end if;
-
-      Table.Next_Cap_Tick := Table.Next_Cap_Tick + 1;
-      Table.Cached_Caps (Result).Tick := Table.Next_Cap_Tick;
-      return Result;
-   end Load;
+      declare
+         Page : Capability_Page
+           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
+      begin
+         return Page (Cap mod Capabilities_Per_Page + 1);
+      end;
+   end Layout;
 
    ------------------
    -- Page_Address --
@@ -220,9 +139,17 @@ package body Rose.Kernel.Cap_Tables is
       Cap    : Rose.Capabilities.Capability;
       Layout : Rose.Capabilities.Layout.Capability_Layout)
    is
-      Index : constant Cached_Capability_Index := Load (Table, Cap);
    begin
-      Table.Cached_Caps (Index).Layout := Layout;
+      if not Has_Slot (Table, Cap) then
+         return;
+      end if;
+
+      declare
+         Page : Capability_Page
+           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
+      begin
+         Page (Cap mod Capabilities_Per_Page + 1) := Layout;
+      end;
    end Set;
 
    ------------------
@@ -261,9 +188,17 @@ package body Rose.Kernel.Cap_Tables is
         procedure
           (Layout : in out Rose.Capabilities.Layout.Capability_Layout))
    is
-      Index : constant Cached_Capability_Index := Load (Table, Cap);
    begin
-      Update (Table.Cached_Caps (Index).Layout);
+      if not Has_Slot (Table, Cap) then
+         return;
+      end if;
+
+      declare
+         Page : Capability_Page
+           with Import, Address => Table.Cap_Pages (Page_Index (Cap));
+      begin
+         Update (Page (Cap mod Capabilities_Per_Page + 1));
+      end;
    end Update;
 
 end Rose.Kernel.Cap_Tables;
