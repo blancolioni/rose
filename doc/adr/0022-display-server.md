@@ -18,11 +18,20 @@ What Rose does have is the means to build the right thing directly: caps for dev
 
 ## Decision
 
-### 1. One server owns the framebuffer
+### 1. One owner holds the framebuffer
 
-A `display` server is installed like the other drivers, and its `.driver` file asks for the framebuffer's physical range as a `device-page` cap. No other process holds a cap to the framebuffer, so nothing else can draw on the screen.
+A `display` server is installed like the other drivers, and its `.driver` file asks for the framebuffer's physical range as a `device-page` cap. While it runs, no other process holds a cap to the framebuffer, so nothing else can draw on the screen.
 
-The boot code asks GRUB for a 32-bit graphics mode and passes the framebuffer's address, pitch and size on to the driver (#582). If no framebuffer is offered, there is no display server, and `vga-console` runs as it does today.
+The boot code asks GRUB for a 32-bit graphics mode on every boot, and passes the framebuffer's address, pitch and size on to the drivers (#582). Because the boot always gives the same kind of screen, a checkpoint always restores onto one.
+
+**The framebuffer has one owner at a time: the framebuffer console or the display server.** The framebuffer console is the successor to `vga-console`. It draws text on the framebuffer with a bitmap font, and keeps the keyboard, the line discipline and its copy of the screen (ADR 0005). Which owner runs is a setting that init reads, and it is ordinary persistent state, so it survives a checkpoint.
+
+- **Console mode:** the console holds the framebuffer cap and the keyboard, and no display server runs.
+- **Graphical mode:** the display server holds the framebuffer cap and takes the keyboard (section 3). The shell's console is a terminal client on a surface (#586).
+
+The setting can be changed while the system runs. Init stops one owner and starts the other, with no reboot. Console mode is the default until the display server is in everyday use.
+
+**If GRUB offers no framebuffer, Rose boots to the standard console.** `vga-console` runs on the VGA text page as it does today, and there is no display server. A system that had a framebuffer at an earlier boot and has none now is not handled here (see the open questions).
 
 **The server draws on a root surface.** It is written against one surface, which it draws into and takes its input from, and that surface has the same interface as the ones it gives to its clients (section 2). On the hardware, the server makes the root itself, from the framebuffer cap and the keyboard and pointer streams (sections 3 and 4). A display server can also be given a surface from another display server, and then it draws into that, and takes keys and pointer events from the surface's event stream. That is nesting. The nested server has a *virtual* pointer: its position is the one in the pointer events that arrive on the root surface, in that surface's coordinates, so it always sits where the parent's pointer is, relative to the surface. The nested server doesn't draw a cursor, because the parent draws the only one. A cursor-shape request from a nested client is passed up to the parent through the root surface, like any other client's. Nesting gives:
 
@@ -69,6 +78,7 @@ There is no stacking and no overlap to begin with, so the server needs no clippi
 - **Surfaces are ordinary memory,** so the memory server saves them with the client's other pages, and a checkpoint holds every surface as it was.
 - **The framebuffer is a device page.** Its contents are not in a checkpoint, and a checkpoint leaves it writable (ADR 0005, section 4).
 - **The display server is `Restorable`** (ADR 0004). When it is told that it has been restored, it maps the framebuffer again and draws every surface from the saved pixels. The screen is then as it was at the checkpoint.
+- **So is the framebuffer console.** It maps the framebuffer again and redraws from its copy of the screen. The restore works the same way in both modes, and the mode setting is part of what the checkpoint saves.
 - **The surface caps are persistent,** so a client keeps its surface across a restore, with no work of its own.
 
 ### 7. Interfaces
@@ -83,10 +93,12 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 - **Every draw is a copy.** The client draws into its buffer, and the server copies the damaged region. This is slower than drawing straight to the screen, and simple, and a screen of text is cheap.
 - **A client sees only pointer events inside its own surface,** or during its own grab. It can't track the pointer across the screen, which X lets any client do.
 - **The keyboard still works alone.** Every pointer action in the layout has a key chord, so the display is usable with no pointer.
-- **Text mode is kept** as the fallback, and for the boot console and early messages, which run before the display server does.
+- **The console moves to the framebuffer** when there is one, so text and graphics share a screen and either can be chosen without a reboot. This amends ADR 0005, which has the console on the VGA text page.
+- **VGA text mode is kept** for systems that get no framebuffer from GRUB, and for the earliest boot messages, which run before either owner does.
 
 ## Alternatives considered
 
+- **Choose text or graphics at boot,** with a GRUB entry for each. GRUB sets the video mode, and Rose can't change it afterwards, so the choice would be fixed for the boot. A checkpoint taken in one mode could then be restored into a boot in the other, with the clients' surfaces left with no display server.
 - **Port X (Xfbdev) or Nano-X.** Both need sockets and `fork`, and X gives every client the screen and the keyboard.
 - **Port Wayland.** It is closer to this design, since clients render into buffers, and it still wants sockets, `mmap` and `dmabuf`.
 - **A Plan 9 style draw device** (`/dev/draw`, with rio on top). Clients send drawing commands, and the server holds the images and does the drawing and the fonts. The structure is close to this one: a server multiplexes the screen, the keyboard and the pointer, and a window sees only what it is given. It differs in where the pixels live. A draw-command server keeps every image in the server, so the checkpoint would have to save them, and it needs masks, compositing and fonts in the server. Pixel buffers in client memory come back with the client at restore, and the client can use any renderer. What this ADR takes from Plan 9 is that a window gets only its own slice of the devices, and that a window system can run inside another one (nesting, section 1). A draw-command layer for remote clients could be added later on top of the shared buffer.
@@ -96,6 +108,8 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 
 ## Open questions
 
+- **A framebuffer that was there and now isn't.** A checkpoint saved with a framebuffer owner running, restored on a boot where GRUB gave no framebuffer. Future work.
+- **How the mode is changed.** For example a command that asks init to swap owners. The interface is not decided here.
 - **The pixel format** if the mode GRUB gives isn't 32-bit. The server could convert, or refuse the mode.
 - **Who starts what runs in a window.** The server creates a window on request, for example from the key chord for a new window, and the request has to name or reach whatever receives the surface and manages it. The server might hold a cap to a launcher for this, or the request might carry one. Which, and where that cap comes from, is not decided here.
 - **The cursor.** A software cursor needs the pixels under it saved and restored, or redrawn with each composed frame. Which is simpler depends on how the server composes.
