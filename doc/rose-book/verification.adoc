@@ -51,3 +51,11 @@ What `elf` trusts of an executable's program headers.
 No run-time errors, for any headers and any size of image, and `Describe` gives the segments to load only if each is inside the image, is not larger in the file than in memory, is not empty, ends below the stack without wrapping around, and does not overlap another.
 `Elf.Format.Valid` also checks the class, data encoding, version and machine now, not only the magic number, and the loader reads no more than 64 program headers (an executable has about seven) and none from outside the image.
 Not covered: the copy of a writable segment, which does not zero the rest of its last page (#265).
+
+`Rose.Devices.GPT_Format`::
+The format of a GUID partition table, apart from reading and writing it (`Rose.Devices.GPT` does that): the header and the partition entries as records, their layout in bytes, the CRC32, and what makes them valid.
+No run-time errors, for any bytes and any disk.
+The disk must be one that a GPT can be on (`Geometry_Valid`: a block size of 512 to 4096 that divides the pages the entries are read in, and room for the MBR, both headers and both copies of the entries).
+A header is valid (`Header_Valid`) only if its signature, size, address and CRC are right, the entries are the standard size and there are at most 128, the entries are on the disk, and so is the range of blocks that partitions may use.
+`Add` keeps a table valid: every partition is in the usable blocks, is not empty, and overlaps none, which is also what `Rose.Devices.GPT` checks of the entries that it reads, and of those that it is asked to add.
+Not covered: the reading and writing of the blocks, and the table that is kept for each disk, which are in `Rose.Devices.GPT`.
