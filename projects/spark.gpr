@@ -24,6 +24,7 @@ project Spark is
       "../src/library/capabilities",
       "../src/library/kernelapi",
       "../src/kernel",
+      "../src/kernel/processes",
       "../src/library/kernelapi/devices",
       "../src/servers/elf/src");
 
@@ -53,7 +54,11 @@ project Spark is
       "elf-segments.adb",
       "rose-devices.ads",
       "rose-devices-gpt_format.ads",
-      "rose-devices-gpt_format.adb");
+      "rose-devices-gpt_format.adb",
+      "rose-kernel-cap_slots.ads",
+      "rose-kernel-cap_slots.adb",
+      "rose-kernel-cap_tables.ads",
+      "rose-kernel-cap_tables.adb");
 
    for Object_Dir use "../build/spark";
 
@@ -67,11 +72,17 @@ project Spark is
       --  gnatprove try to generate code for them.
       for Default_Switches ("ada") use
         ("-m32", "-gnat2020", "-gnatVa",
-         "-I" & Project'Project_Dir & "../src/boot");
+         "-I" & Project'Project_Dir & "../src/boot",
+         "-I" & Project'Project_Dir & "../src/kernel");
    end Compiler;
 
    package Prove is
       for Proof_Dir use "../build/spark/proof";
+
+      --  Level 1 gives each check a second, which a loaded machine does not
+      --  always meet, and some of the proofs of the capability table and the
+      --  ELF segments need several.
+      for Proof_Switches ("Ada") use ("--timeout=10");
    end Prove;
 
 end Spark;

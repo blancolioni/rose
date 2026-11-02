@@ -67,3 +67,13 @@ The disk must be one that a GPT can be on (`Geometry_Valid`: a block size of 512
 A header is valid (`Header_Valid`) only if its signature, size, address and CRC are right, the entries are the standard size and there are at most 128, the entries are on the disk, and so is the range of blocks that partitions may use.
 `Add` keeps a table valid: every partition is in the usable blocks, is not empty, and overlaps none, which is also what `Rose.Devices.GPT` checks of the entries that it reads, and of those that it is asked to add.
 Not covered: the reading and writing of the blocks, and the table that is kept for each disk, which are in `Rose.Devices.GPT`.
+
+`Rose.Kernel.Cap_Tables`::
+The capabilities of one process (ADR 0023).
+No run-time errors, for any capability number, including 0 and one past the table: such a number is no capability, has no layout, and nothing is read or written for it.
+An invariant of the table is proved to hold after every operation: the last number is at most 4095, a capability that is active is at most the last, and no two pages are the same page.
+`Create` gives the lowest number that is free, and changes nothing else.
+`Delete`, `Set`, `Rescind` and `Set_Identifier` change one capability and no other, and `Rescind` adds exactly one to its count.
+A capability that is checked against one that has been rescinded does not match (`Same_Count`), unless the 24-bit count has gone all the way round, which is after a multiple of 2 ** 24 rescinds.
+What is not proved, and is trusted, is `Rose.Kernel.Cap_Slots`, the two procedures that read and write a layout through the address of its page, whose contracts say that a slot reads as what was last written to it and that writing one changes no other.
+Not covered: that the pages are allocated, which `Rose.Kernel.Processes` does, and what its callers pass.
