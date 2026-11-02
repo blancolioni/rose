@@ -659,6 +659,9 @@ package body IsoFS.Directories is
               (Start_Address => Rec.Extent_Location_LSB,
                Length        => Rec.Extent_Size_LSB);
             Result := File_Count;
+         else
+            Rose.Console_IO.Put_Line
+              ("isofs: file table full; cannot open a file");
          end if;
       end Process;
 
@@ -850,6 +853,8 @@ package body IsoFS.Directories is
             return R.Identifier;
          end if;
       end loop;
+      Rose.Console_IO.Put_Line
+        ("isofs: too many open readers; cannot open a reader");
       return No_Reader;
    end Open_Reader;
 
