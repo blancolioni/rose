@@ -1,6 +1,6 @@
 # 20. The clock: monotonic and real time for user mode
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-30
 - **Related:** #494 (this decision), [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking, time after a restore), [ADR 0008](0008-install-boot-and-pager-path.md) (the pager path uses the kernel's tick caps), [ADR 0016](0016-random-numbers.md) (random numbers, which mixes in the clock), #372 (fixed object ids), #497 (`Ada.Calendar`), #363 (tasking, `Ada.Real_Time`), #193 (the tick, and a finer clock), #42 (SPARK)
 

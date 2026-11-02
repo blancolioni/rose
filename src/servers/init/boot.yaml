@@ -56,8 +56,8 @@ modules:
   - log
 
 grub:
-  install: images/iso/boot/grub/grub.cfg
-  disk: images/hd0/grub.cfg
+  install: boot/iso/grub/grub.cfg
+  disk: boot/hd0/grub.cfg
 
 priorities:
   memory: 2
