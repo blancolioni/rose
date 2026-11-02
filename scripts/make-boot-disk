@@ -1,6 +1,6 @@
 #!/bin/sh
 # Build what the installer writes to hd0 so that Rose boots from it
-# (#322), in images/iso/rose/install/boot:
+# (#322), in build/install/boot:
 #
 #   boot.img  GRUB's MBR code, for the first 440 bytes of block 0
 #   core.img  GRUB's core image, for the BIOS boot partition
@@ -16,16 +16,16 @@ set -e
 
 . ./scripts/build-env.sh
 
-OUT=images/iso/rose/install/boot
+OUT=build/install/boot
 TMP=images/tmp
 
 BIOS_BOOT_START=2048
 BIOS_BOOT_BLOCKS=2048
 BOOT_PARTITION_BYTES=$((16 * 1024 * 1024))
 
-# The boot disk's boot modules: the ones images/hd0/grub.cfg loads, which
+# The boot disk's boot modules: the ones boot/hd0/grub.cfg loads, which
 # come from src/servers/init/boot.yaml (#374).
-MODULES=$(awk '$1 == "module2" && !seen[$3]++ { print $3 }' images/hd0/grub.cfg)
+MODULES=$(awk '$1 == "module2" && !seen[$3]++ { print $3 }' boot/hd0/grub.cfg)
 
 # Write the 64-bit little-endian value $2 at byte offset $3 of file $1.
 put_word_64 () {
@@ -65,7 +65,7 @@ rm -f $OUT/boot.fat
 truncate -s $BOOT_PARTITION_BYTES $OUT/boot.fat
 mformat -i $OUT/boot.fat -v ROSE-BOOT ::
 mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc
-mcopy -i $OUT/boot.fat images/hd0/grub.cfg ::/boot/grub/grub.cfg
+mcopy -i $OUT/boot.fat boot/hd0/grub.cfg ::/boot/grub/grub.cfg
 mcopy -i $OUT/boot.fat $GRUB_DIR/*.mod $GRUB_DIR/*.lst \
     ::/boot/grub/i386-pc/
 mcopy -i $OUT/boot.fat $TMP/kernel ::/boot/kernel

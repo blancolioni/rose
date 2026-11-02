@@ -91,16 +91,16 @@ $(BOOT_MODULES): %:
 
 $(DRIVERS): %:
 	$(MAKE) -C src/drivers/$@
-	cp src/drivers/$@/$@.driver images/iso/rose/install/drivers/$@.caps
+	cp src/drivers/$@/$@.driver build/install/drivers/$@.caps
 
 # The installed copy is stripped, so that every program fits in exec's
 # storage region; the build directory keeps the one with debug info.
 
 $(UTILITIES): %:
-	mkdir -p images/iso/rose/install/bin/
+	mkdir -p build/install/bin/
 	$(MAKE) -C src/utilities/$@
-	strip -o images/iso/rose/install/bin/$@ src/utilities/$@/build/bin/$@-driver
-	cp src/utilities/$@/$@.caps images/iso/rose/install/bin/$@.caps
+	strip -o build/install/bin/$@ src/utilities/$@/build/bin/$@-driver
+	cp src/utilities/$@/$@.caps build/install/bin/$@.caps
 
 exports:
 	sh ./scripts/export-elf-trace
@@ -177,14 +177,13 @@ config:
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(MODULEDIR)
 	mkdir -p $(DRIVERDIR)
-	mkdir -p ./images/iso/rose/install/drivers
+	mkdir -p ./build/install/drivers
 
 
 # What the build makes, and nothing else: the generated interfaces, the run-time
 # systems (which clean themselves), the programs' build directories, the
-# images, and the logs.  What is in git stays, such as logs/rose-log-files.txt
-# and images/iso/boot/grub, and so does a disk image (rose-hd0.img): that is
-# data.
+# images, and the logs.  What is in git stays, such as logs/rose-log-files.txt,
+# and so does a disk image (rose-hd0.img): that is data.
 clean:
 	$(MAKE) -C src/library/kernelapi/generated clean
 	$(MAKE) -C rts/kernel clean
@@ -192,8 +191,7 @@ clean:
 	$(MAKE) -C doc clean
 	rm -rf build/*
 	rm -rf src/servers/*/build src/drivers/*/build src/utilities/*/build
-	rm -rf images/tmp images/drivers images/iso/rose images/rose.iso
-	find images/iso/boot -maxdepth 1 -type f -delete
+	rm -rf images/tmp images/drivers images/rose.iso
 	rm -f logs/rose-objdump.txt logs/rose-*-objdump.txt logs/rose-*-elf.txt logs/rose-*.sha1 logs/rose-iso.log
 	find src rts projects -name "b~*" -delete
 
