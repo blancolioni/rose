@@ -8,6 +8,7 @@ OBJECTS= \
 	$(BUILDDIR)/elf-driver.o \
 	$(BUILDDIR)/elf-format.o \
 	$(BUILDDIR)/elf-loader.o \
+	$(BUILDDIR)/elf-segments.o \
 	$(BUILDDIR)/elf-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
