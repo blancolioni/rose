@@ -1,8 +1,17 @@
+with Ada.Containers;
+with Ada.Containers.Hashed_Maps;
 with Ada.Strings;
 with Ada.Strings.Bounded;
+with Ada.Strings.Bounded.Equal_Case_Insensitive;
+with Ada.Strings.Bounded.Hash_Case_Insensitive;
+with Ada.Strings.Equal_Case_Insensitive;
 with Ada.Strings.Fixed;
+with Ada.Strings.Fixed.Equal_Case_Insensitive;
+with Ada.Strings.Hash_Case_Insensitive;
 with Ada.Strings.Maps;
 with Ada.Strings.Unbounded;
+with Ada.Strings.Unbounded.Equal_Case_Insensitive;
+with Ada.Strings.Unbounded.Hash_Case_Insensitive;
 with Ada.Text_IO;
 
 package body Tests.Strings is
@@ -15,6 +24,7 @@ package body Tests.Strings is
    function Fixed_Ok return Boolean;
    function Bounded_Ok return Boolean;
    function Unbounded_Ok return Boolean;
+   function Case_Insensitive_Ok return Boolean;
 
    ----------------
    -- Bounded_Ok --
@@ -51,6 +61,68 @@ package body Tests.Strings is
         and then To_String (Full) = "0123456789ABCDEF";
    end Bounded_Ok;
 
+   -------------------------
+   -- Case_Insensitive_Ok --
+   -------------------------
+
+   function Case_Insensitive_Ok return Boolean is
+      use type Ada.Containers.Hash_Type;
+
+      function Bounded_Equal is
+        new Ada.Strings.Bounded.Equal_Case_Insensitive (Short_Strings);
+      function Bounded_Hash is
+        new Ada.Strings.Bounded.Hash_Case_Insensitive (Short_Strings);
+
+      package Name_Maps is new Ada.Containers.Hashed_Maps
+        (Key_Type        => Unbounded_String,
+         Element_Type    => Natural,
+         Hash            => Ada.Strings.Unbounded.Hash_Case_Insensitive,
+         Equivalent_Keys => Ada.Strings.Unbounded.Equal_Case_Insensitive);
+
+      Names : Name_Maps.Map;
+      Valid : Boolean;
+   begin
+      Valid := Ada.Strings.Equal_Case_Insensitive ("Hello", "hELLO")
+        and then not Ada.Strings.Equal_Case_Insensitive ("Hello", "Hellp")
+        and then not Ada.Strings.Equal_Case_Insensitive ("Hello", "Hell")
+        and then Ada.Strings.Fixed.Equal_Case_Insensitive ("ABC", "abc")
+        and then Ada.Strings.Hash_Case_Insensitive ("Hello")
+                   = Ada.Strings.Hash_Case_Insensitive ("hELLO")
+        and then Ada.Strings.Hash_Case_Insensitive ("Hello")
+                   /= Ada.Strings.Hash_Case_Insensitive ("World");
+
+      Valid := Valid
+        and then Bounded_Equal
+          (Short_Strings.To_Bounded_String ("Rose"),
+           Short_Strings.To_Bounded_String ("rOSE"))
+        and then not Bounded_Equal
+          (Short_Strings.To_Bounded_String ("Rose"),
+           Short_Strings.To_Bounded_String ("Roses"))
+        and then Bounded_Hash (Short_Strings.To_Bounded_String ("Rose"))
+                   = Bounded_Hash (Short_Strings.To_Bounded_String ("ROSE"));
+
+      Valid := Valid
+        and then Ada.Strings.Unbounded.Equal_Case_Insensitive
+          (To_Unbounded_String ("Rose"), To_Unbounded_String ("rOSE"))
+        and then not Ada.Strings.Unbounded.Equal_Case_Insensitive
+          (To_Unbounded_String ("Rose"), To_Unbounded_String ("Roses"))
+        and then Ada.Strings.Unbounded.Hash_Case_Insensitive
+          (To_Unbounded_String ("Rose"))
+            = Ada.Strings.Unbounded.Hash_Case_Insensitive
+              (To_Unbounded_String ("ROSE"));
+
+      --  Two spellings of one key find the same element.
+
+      Names.Insert (To_Unbounded_String ("Putney"), 1);
+      Names.Insert (To_Unbounded_String ("Rose"), 2);
+      Names.Include (To_Unbounded_String ("PUTNEY"), 3);
+      return Valid
+        and then Natural (Names.Length) = 2
+        and then Names.Element (To_Unbounded_String ("putney")) = 3
+        and then Names.Contains (To_Unbounded_String ("rOSE"))
+        and then not Names.Contains (To_Unbounded_String ("Roses"));
+   end Case_Insensitive_Ok;
+
    --------------
    -- Fixed_Ok --
    --------------
@@ -84,7 +156,8 @@ package body Tests.Strings is
    function String_Test return Boolean is
    begin
       Ada.Text_IO.Put ("String test");
-      return Fixed_Ok and then Bounded_Ok and then Unbounded_Ok;
+      return Fixed_Ok and then Bounded_Ok and then Unbounded_Ok
+        and then Case_Insensitive_Ok;
    end String_Test;
 
    -------------------
