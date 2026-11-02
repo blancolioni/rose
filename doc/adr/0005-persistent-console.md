@@ -4,7 +4,7 @@
 - **Date:** 2026-10-26
 - **Related:** #269 (this decision), [ADR 0004](0004-restore-notification.md) and #268 (restore notification), #102 (restore at boot)
 - **Amended by:** #454, where vga-console is also the terminal: it reads the keyboard and is the line discipline, and `restore` installs the keyboard before it
-- **Amended by:** [ADR 0022](0022-display-server.md), where the console moves to the framebuffer when GRUB offers one: a framebuffer console draws text with a bitmap font, in place of the VGA text page, and holds the framebuffer's `device-page` cap. It keeps the copy of the screen, the keyboard and the line discipline, and is `Restorable` as described here. It shares the framebuffer with the display server, one owner at a time. Where GRUB offers no framebuffer, `vga-console` and the VGA text page are used as described below
+- **Amended by:** [ADR 0022](0022-display-server.md), where the console moves to the screen surface when GRUB offers a framebuffer: it draws text with a bitmap font into a surface that the `screen` driver gives it, in place of the VGA text page, and takes its keys from the surface. It keeps the copy of the screen and the line discipline. The `screen` driver redraws the screen after a restore, so the console doesn't. Where GRUB offers no framebuffer, `vga-console` and the VGA text page are used as described below
 
 ## Context
 
