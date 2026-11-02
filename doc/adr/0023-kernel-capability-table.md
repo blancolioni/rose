@@ -22,7 +22,7 @@ Four things about this make it hard to prove, and hard to be sure of.
 1. The checks are mixed with what is not SPARK: console output (`Create_Cap` reports that it is out of capabilities, and the cache traces itself behind a constant), heap allocation, and access through addresses.
 2. The kernel is built with checks off (`-gnatp`), so a number outside the table is not an exception but a read or write of whatever is next to it. `Has_Cap` guards the upper end of a capability number with `Last_Cap`, but indexes the active set with the number itself, which the invocation path takes from the process that is calling, and which can be 0.
 3. The cache is a second copy of part of the table that has to agree with the pages. Nothing is cached that is not on a page, and a page can be read at once, so it holds the table's state in two places for the sake of a lookup that is not slow.
-4. #116 changes this code: a derived capability needs a record of what it was derived from, and a capability is valid only if its count and its ancestors' counts match. The layout has no room for it: the header and the payload are all in use. Whatever that record is, it will be in the table, so the table's shape should be settled before it.
+4. #116 changes this code: a derived capability needs a record of what it was derived from, and a capability is valid only if its count and its ancestors' counts match. Whether the layout has room for it is #116's to settle (ADR 0001 repacks the header). Whatever that record is, it will be in the table, so the table's shape should be settled before it.
 
 What does not constrain it. A checkpoint does not save the table as it is held. The snapshot writes the capabilities, through `Cap_Layout`, into its own page format, and a restore puts each one back at its index with `Set_Cap`, so the representation can change without the log format changing.
 
@@ -86,7 +86,7 @@ The table is extracted, and its semantics proved as they are, before #116. #116 
 
 ## Open questions
 
-- What a slot holds for a derived capability, how many levels of derivation there can be, and whether validity is checked up the chain on every call or cached: answered in [ADR 0001](0001-capability-revocation.md), in the section on the derivation record (#116). A slot is the layout and a derivation, 24 bytes; there are at most 8 levels; and validity is checked up the chain on every call, with no cache.
+- What a slot holds for a derived capability, how many levels of derivation there can be, and whether validity is checked up the chain on every call or cached: answered in [ADR 0001](0001-capability-revocation.md), in the section on the derivation record (#116). A slot stays the layout, 16 bytes, with a 12-bit record id in it; there are at most 8 levels; and validity is checked up the chain on every call, with no cache.
 - Whether the functions that take a process id stay for good, or whether the call sites move to the table in the process entry. Moving them is not needed for the proof.
 - Where the table is saved at a checkpoint, once it has derivation records: with the records, in a checkpoint of `Kernel_Table_Version` 5 (ADR 0001).
 
