@@ -8,6 +8,7 @@ with Rose.Interfaces.Segment;
 with Rose.Trace;
 
 with Elf.Format;
+with Elf.Segments;
 
 package body Elf.Loader is
 
@@ -41,11 +42,15 @@ package body Elf.Loader is
       Header : out Elf.Format.Elf_Header);
 
    procedure Scan_Program_Headers
-     (Store   : Storage_Client;
-      Region  : Region_Client;
-      Base    : Rose.Objects.Object_Id;
-      Process : Process_Client;
-      Header  : Elf.Format.Elf_Header);
+     (Store      : Storage_Client;
+      Region     : Region_Client;
+      Base       : Rose.Objects.Object_Id;
+      Process    : Process_Client;
+      Header     : Elf.Format.Elf_Header;
+      Image_Size : Rose.Words.Word_64;
+      Success    : out Boolean);
+   --  Add the segments of the image to Process.  The headers are not
+   --  trusted: Success is False if they are not valid (see Elf.Segments).
 
    procedure Process_Program_Header
      (Top_Store    : Storage_Client;
@@ -72,21 +77,47 @@ package body Elf.Loader is
       Start   : out Rose.Words.Word;
       Success : out Boolean)
    is
+      use type Rose.Objects.Object_Id;
+      use type Rose.Words.Word_64;
       Header      : Elf.Format.Elf_Header;
       Base, Bound : Rose.Objects.Object_Id;
+      Image_Size  : Rose.Words.Word_64;
    begin
       Get_Range (Image, Base, Bound);
       Success := True;
+
+      --  The size of the image, with room to spare in a Word_64 for the
+      --  validation of what the headers say.
+
+      Image_Size :=
+        (if Bound > Base
+         then Rose.Words.Word_64'Min (Rose.Words.Word_64 (Bound - Base),
+                                      2 ** 32)
+              * Rose.Limits.Page_Size
+         else 0);
+
+      if Image_Size < Elf.Format.Elf_Header'Size / System.Storage_Unit then
+         Rose.Console_IO.Put_Line ("elf: image is too small");
+         Success := False;
+         return;
+      end if;
+
       Read_Header (Image, Base, Header);
       Rose.Trace.Event ("header read");
-      if not Elf.Format.Valid (Header) then
+      if not Elf.Format.Valid (Header)
+        or else not Elf.Segments.Table_Fits (Header, Image_Size)
+      then
          Rose.Console_IO.Put_Line ("elf: invalid header");
          Success := False;
          return;
       end if;
 
       Start := Header.E_Entry;
-      Scan_Program_Headers (Store, Image, Base, Process, Header);
+      Scan_Program_Headers
+        (Store, Image, Base, Process, Header, Image_Size, Success);
+      if not Success then
+         return;
+      end if;
       Rose.Trace.Event ("segments added");
 
       declare
@@ -299,16 +330,19 @@ package body Elf.Loader is
    --------------------------
 
    procedure Scan_Program_Headers
-     (Store   : Storage_Client;
-      Region  : Region_Client;
-      Base    : Rose.Objects.Object_Id;
-      Process : Process_Client;
-      Header  : Elf.Format.Elf_Header)
+     (Store      : Storage_Client;
+      Region     : Region_Client;
+      Base       : Rose.Objects.Object_Id;
+      Process    : Process_Client;
+      Header     : Elf.Format.Elf_Header;
+      Image_Size : Rose.Words.Word_64;
+      Success    : out Boolean)
    is
       use System.Storage_Elements;
-      use Rose.Words;
-      PH_Count    : constant Natural := Natural (Header.E_Phnum);
-      PHs         : array (1 .. PH_Count) of Elf.Format.Program_Header;
+      PH_Count : constant Natural := Natural (Header.E_Phnum);
+      --  At most Elf.Segments.Max_Program_Headers, by Table_Fits.
+      PHs      : Elf.Segments.Program_Header_Array (1 .. PH_Count);
+      List     : Elf.Segments.Segment_List;
    begin
       Read
         (Region => Region,
@@ -317,20 +351,30 @@ package body Elf.Loader is
          Item   => PHs'Address,
          Size   => PHs'Size / System.Storage_Unit);
 
-      for PH of PHs loop
-         Process_Program_Header
-           (Top_Store    => Store,
-            Image_Region => Region,
-            Process      => Process,
-            Base_Object  => Base,
-            Segment_Type => PH.P_Type,
-            File_Offset  => PH.P_Offset,
-            V_Address    => PH.P_VAddr,
-            File_Size    => PH.P_FileSz,
-            Memory_Size  => PH.P_MemSz,
-            Readable     => (PH.P_Flags and 4) = 4,
-            Writable     => (PH.P_Flags and 2) = 2,
-            Executable   => (PH.P_Flags and 1) = 1);
+      Elf.Segments.Describe (PHs, Image_Size, Stack_Base, List, Success);
+      if not Success then
+         Rose.Console_IO.Put_Line ("elf: invalid program headers");
+         return;
+      end if;
+
+      for I in 1 .. List.Count loop
+         declare
+            Item : Elf.Segments.Segment renames List.Items (I);
+         begin
+            Process_Program_Header
+              (Top_Store    => Store,
+               Image_Region => Region,
+               Process      => Process,
+               Base_Object  => Base,
+               Segment_Type => Elf.Format.PT_LOAD,
+               File_Offset  => Item.File_Offset,
+               V_Address    => Item.Virtual_Address,
+               File_Size    => Item.File_Size,
+               Memory_Size  => Item.Memory_Size,
+               Readable     => Item.Readable,
+               Writable     => Item.Writable,
+               Executable   => Item.Executable);
+         end;
       end loop;
    end Scan_Program_Headers;
 

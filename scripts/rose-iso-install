@@ -1,7 +1,15 @@
 #!/bin/sh
+# Build images/rose.iso in a fresh staging tree, so that nothing left over
+# from an earlier build ends up on it: the ISO source files in boot/iso,
+# the kernel and modules, and what the build installed in build/install.
 . ./scripts/build-env.sh
 rm -f ./images/rose.iso
-cp images/tmp/* ./images/iso/boot
-mkdir -p ./images/iso/rose/install/drivers
-cp images/drivers/* ./images/iso/rose/install/drivers
-"$GRUB_MKRESCUE" -o ./images/rose.iso ./images/iso > ./logs/rose-iso.log 2>&1
+rm -rf ./build/iso
+mkdir -p ./build/iso/boot ./build/iso/rose ./images
+cp -r boot/iso/grub ./build/iso/boot/grub
+cp -r boot/iso/images ./build/iso/images
+cp images/tmp/* ./build/iso/boot
+mkdir -p ./build/install/drivers
+cp images/drivers/* ./build/install/drivers
+cp -r ./build/install ./build/iso/rose/install
+"$GRUB_MKRESCUE" -o ./images/rose.iso ./build/iso > ./logs/rose-iso.log 2>&1

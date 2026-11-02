@@ -46,6 +46,12 @@ No run-time errors in decoding an item of the launch buffer, for any contents an
 An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
 Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
 
+`Elf.Segments`::
+What `elf` trusts of an executable's program headers.
+No run-time errors, for any headers and any size of image, and `Describe` gives the segments to load only if each is inside the image, is not larger in the file than in memory, is not empty, ends below the stack without wrapping around, and does not overlap another.
+`Elf.Format.Valid` also checks the class, data encoding, version and machine now, not only the magic number, and the loader reads no more than 64 program headers (an executable has about seven) and none from outside the image.
+Not covered: the copy of a writable segment, which does not zero the rest of its last page (#265).
+
 `Rose.Devices.GPT_Format`::
 The format of a GUID partition table, apart from reading and writing it (`Rose.Devices.GPT` does that): the header and the partition entries as records, their layout in bytes, the CRC32, and what makes them valid.
 No run-time errors, for any bytes and any disk.

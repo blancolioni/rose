@@ -56,7 +56,19 @@ package Elf.Format is
       end record
      with Size => 16#34# * 8;
 
+   EI_Class   : constant := 4;
+   EI_Data    : constant := 5;
+   EI_Version : constant := 6;
+   --  Positions in E_Ident.
+
+   ELFCLASS32  : constant := 1;
+   ELFDATA2LSB : constant := 1;
+   EV_Current  : constant := 1;
+
    function Valid (Header : Elf_Header) return Boolean;
+   --  The header is that of a 32-bit, little-endian ELF file of the current
+   --  version, for an i386.  Nothing else about it is checked: see
+   --  Elf.Segments for the program headers.
 
    --  Special section offsets
    SHN_Undefined : constant Section_Offset := 0;
@@ -132,7 +144,15 @@ package Elf.Format is
 
 private
 
+   use type System.Storage_Elements.Storage_Element;
+   use type Rose.Words.Word_32;
+
    function Valid (Header : Elf_Header) return Boolean
-   is (Header.E_Ident (0 .. 3) = Magic (0 .. 3));
+   is (Header.E_Ident (0 .. 3) = Magic (0 .. 3)
+       and then Header.E_Ident (EI_Class) = ELFCLASS32
+       and then Header.E_Ident (EI_Data) = ELFDATA2LSB
+       and then Header.E_Ident (EI_Version) = EV_Current
+       and then Header.E_Version = EV_Current
+       and then Header.E_Machine = EM_386);
 
 end Elf.Format;
