@@ -16,7 +16,7 @@ package body Rose.Kernel.Modules.Init is
                        "init-install console mem pci ata store isofs "
                        & "restore-install scan partition elf timer caps "
                        & "checkpoint log";
-   --  The install media's images/iso/boot/grub/grub.cfg
+   --  The install media's boot/iso/grub/grub.cfg
 
    Disk_Modules    : constant String :=
                        "init console mem pci ata store restore "
