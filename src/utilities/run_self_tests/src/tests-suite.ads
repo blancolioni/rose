@@ -9,6 +9,7 @@ with Tests.Finalization;
 with Tests.Heap;
 with Tests.Invalid_Caps;
 with Tests.Memory;
+with Tests.Numerics;
 with Tests.Processes;
 with Tests.Rights;
 with Tests.Secondary_Stack;
@@ -39,9 +40,11 @@ package Tests.Suite is
                    Tests.Directories.Directory_Test'Access,
                    Tests.Directories.Version_Test'Access,
                    Tests.Users.User_Test'Access,
+                   Tests.Numerics.Numerics_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
                    Tests.Ada_Calendar.Ada_Calendar_Test'Access,
+                   Tests.Numerics.Random_Seed_Test'Access,
                    Tests.Rights.Rights_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
