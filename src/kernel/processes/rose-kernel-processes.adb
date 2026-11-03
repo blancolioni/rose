@@ -6,6 +6,7 @@ with Rose.Interfaces.Restorable;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Cap_Tables;
+with Rose.Kernel.Derivations;
 with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
@@ -31,6 +32,25 @@ package body Rose.Kernel.Processes is
    Active_Checkpoint : Boolean := False;
 
    procedure Release_Entry (Pid : Process_Id);
+
+   Derivation_Records : Rose.Kernel.Derivations.Table;
+   --  What the capabilities that were derived name (ADR 0001).  A slot
+   --  that holds a layout with a derivation counts as a reference to its
+   --  record, which Set_Cap, Delete_Cap and Release_Entry keep.
+
+   procedure Add_Reference
+     (Layout : Rose.Capabilities.Layout.Capability_Layout);
+   --  A slot now holds Layout.
+
+   procedure Drop_Reference
+     (Layout : Rose.Capabilities.Layout.Capability_Layout);
+   --  A slot no longer holds Layout.
+
+   function Is_Valid_Derivation
+     (Layout : Rose.Capabilities.Layout.Capability_Layout)
+      return Boolean;
+   --  The record that Layout was derived from, if any, and the records
+   --  above it have not been revoked.
 
    procedure Wake_Waiting_Processes (Pid : Process_Id);
    --  Wake each process that is waiting on Pid, which is being killed,
@@ -90,6 +110,25 @@ package body Rose.Kernel.Processes is
 
    procedure Enable_Write_Pages
      (Process : in out Kernel_Process_Entry);
+
+   -------------------
+   -- Add_Reference --
+   -------------------
+
+   procedure Add_Reference
+     (Layout : Rose.Capabilities.Layout.Capability_Layout)
+   is
+      use Rose.Kernel.Derivations;
+      use type Rose.Objects.Derivation_Id;
+      Id : constant Record_Id := Layout.Header.Derivation;
+   begin
+      if Id /= 0
+        and then Is_Used (Derivation_Records, Id)
+        and then Slots (Derivation_Records, Id) < Max_Slots
+      then
+         Add_Slot (Derivation_Records, Id);
+      end if;
+   end Add_Reference;
 
    ----------------------
    -- Assign_Object_Id --
@@ -394,7 +433,13 @@ package body Rose.Kernel.Processes is
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)
    is
+      Layout : constant Rose.Capabilities.Layout.Capability_Layout :=
+                 Cap_Tables.Layout (Process_Table (Pid).Caps, Cap);
    begin
+      if Cap_Tables.Is_Active (Process_Table (Pid).Caps, Cap) then
+         Drop_Reference (Layout);
+      end if;
+
       Cap_Tables.Delete (Process_Table (Pid).Caps, Cap);
    end Delete_Cap;
 
@@ -415,6 +460,25 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Page_Table.Activate_Page_Directory (Addr);
       Rose.Kernel.Page_Table.Disable_Page_Writes (Addr);
    end Disable_Write_Pages;
+
+   --------------------
+   -- Drop_Reference --
+   --------------------
+
+   procedure Drop_Reference
+     (Layout : Rose.Capabilities.Layout.Capability_Layout)
+   is
+      use Rose.Kernel.Derivations;
+      use type Rose.Objects.Derivation_Id;
+      Id : constant Record_Id := Layout.Header.Derivation;
+   begin
+      if Id /= 0
+        and then Is_Used (Derivation_Records, Id)
+        and then Slots (Derivation_Records, Id) > 0
+      then
+         Remove_Slot (Derivation_Records, Id);
+      end if;
+   end Drop_Reference;
 
    ------------------------
    -- Enable_Write_Pages --
@@ -932,6 +996,23 @@ package body Rose.Kernel.Processes is
    end Is_User_Page;
 
    -----------------------------
+   -- Is_Valid_Derivation --
+   -------------------------
+
+   function Is_Valid_Derivation
+     (Layout : Rose.Capabilities.Layout.Capability_Layout)
+      return Boolean
+   is
+      use Rose.Kernel.Derivations;
+      use type Rose.Objects.Derivation_Id;
+      Id : constant Record_Id := Layout.Header.Derivation;
+   begin
+      return Id = 0
+        or else (Is_Used (Derivation_Records, Id)
+                 and then Is_Valid (Derivation_Records, Id));
+   end Is_Valid_Derivation;
+
+   -----------------------------
    -- Is_Valid_Endpoint_Index --
    -----------------------------
 
@@ -970,7 +1051,8 @@ package body Rose.Kernel.Processes is
                          To.Endpoints (Endpoint).Send_Cap;
          begin
             return Cap_Tables.Same_Count
-              (Source_Cap, Cap_Layout (Destination_Process, Send_Cap));
+              (Source_Cap, Cap_Layout (Destination_Process, Send_Cap))
+              and then Is_Valid_Derivation (Source_Cap);
          end;
       end if;
       return False;
@@ -1255,6 +1337,12 @@ package body Rose.Kernel.Processes is
                   It.Waiting_Next := Me.Waiting_Next;
                end if;
             end;
+         end if;
+      end loop;
+
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
+            Drop_Reference (Cap_Tables.Layout (P.Caps, Cap));
          end if;
       end loop;
 
@@ -1900,7 +1988,19 @@ package body Rose.Kernel.Processes is
          Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
       end if;
 
-      Cap_Tables.Set (Process_Table (Pid).Caps, Cap, Layout);
+      declare
+         Old : constant Rose.Capabilities.Layout.Capability_Layout :=
+                 Cap_Tables.Layout (Process_Table (Pid).Caps, Cap);
+         Held : constant Boolean :=
+                  Cap_Tables.Is_Active (Process_Table (Pid).Caps, Cap);
+      begin
+         Cap_Tables.Set (Process_Table (Pid).Caps, Cap, Layout);
+
+         if Held then
+            Add_Reference (Layout);
+            Drop_Reference (Old);
+         end if;
+      end;
    end Set_Cap;
 
    ----------------

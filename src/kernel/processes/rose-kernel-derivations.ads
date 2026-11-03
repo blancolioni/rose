@@ -234,7 +234,8 @@ private
             + (if Used (T.Records (Record_Id (Upto)))
                   and then T.Records (Record_Id (Upto)).Parent = Id
                then 1 else 0))
-   with Post => Count_Children'Result <= Upto
+   with Ghost,
+        Post => Count_Children'Result <= Upto
                 and then
                   ((Count_Children'Result = 0)
                    = (for all J in 1 .. Upto =>
@@ -256,18 +257,21 @@ private
                        and then Integer (T.Records (Id).Depth)
                                 = Integer
                                     (T.Records
-                                       (T.Records (Id).Parent).Depth) + 1)));
+                                       (T.Records (Id).Parent).Depth) + 1)))
+   with Ghost;
    --  A record that is used is one level below its parent, which is used.
    --  What a record that is free holds does not matter: it is made again by
    --  Derive.
 
    function Counted (T : Table) return Boolean
    is (for all Id in Record_Number =>
-         T.Records (Id).Children = Count_Children (T, Id, Max_Records));
+         T.Records (Id).Children = Count_Children (T, Id, Max_Records))
+   with Ghost;
    --  The children that a record counts are the used records that name it.
 
    function Consistent (T : Table) return Boolean
-   is (Linked (T) and then Counted (T));
+   is (Linked (T) and then Counted (T))
+   with Ghost;
 
    function Is_Used
      (T  : Table;
