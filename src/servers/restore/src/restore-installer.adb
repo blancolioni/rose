@@ -4,11 +4,12 @@ with Rose.Limits;
 with Rose.Words;
 
 with Rose.Console_IO;
-with Rose.Directories;
 
 with Rose.Invocation;
 with Rose.System_Calls;
 
+with Rose.Interfaces.Directory.Client;
+with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Reader.Client.Conversions;
 with Rose.Interfaces.Stream_Reader.Client;
 
@@ -57,11 +58,35 @@ package body Restore.Installer is
    --    (Cap_File_Entry : Rose.Directories.Directory_Entry_Type);
 
    procedure Install_Executable
-     (Root_Path : String;
-      Directory : String;
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Root_Path : String;
+      Category  : String;
       Name      : String;
       Action    : Install_Action;
       Flags     : Install_Flag_Array);
+   --  Install Name from Directory, which is Root_Path/Category. The
+   --  path is only for messages.
+
+   procedure Open_Directory
+     (Parent    : Rose.Interfaces.Directory.Client.Directory_Client;
+      Name      : String;
+      Directory : out Rose.Interfaces.Directory.Client.Directory_Client;
+      Found     : out Boolean);
+   --  Directory is the directory Name in Parent. Found is False if
+   --  Parent has no directory called Name.
+
+   function Find_File
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Name      : String)
+      return Natural;
+   --  The index of the ordinary file Name in Directory, or 0 if there
+   --  is none.
+
+   --  The installer has no cap to delete caps, so every cap it gets
+   --  stays in its cap table, which holds 4,095 (#667). Directory
+   --  clients cost 8 caps each, so it opens /rose/install once, and a
+   --  category's directory only when the category changes, rather than
+   --  looking up each program's path with Rose.Directories.
 
    procedure Append
      (To   : in out String;
@@ -93,6 +118,29 @@ package body Restore.Installer is
          To (Last) := Ch;
       end loop;
    end Append;
+
+   ---------------
+   -- Find_File --
+   ---------------
+
+   function Find_File
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Name      : String)
+      return Natural
+   is
+      use Rose.Interfaces.Directory.Client;
+      use type Rose.Interfaces.Directory.File_Kind;
+      Index : constant Natural := Find_Entry (Directory, Name);
+   begin
+      if Index /= 0
+        and then Directory_Entry_Kind (Directory, Index)
+        = Rose.Interfaces.Directory.Ordinary_File
+      then
+         return Index;
+      else
+         return 0;
+      end if;
+   end Find_File;
 
    ----------------------------
    -- Get_Ancestor_Interface --
@@ -189,10 +237,17 @@ package body Restore.Installer is
    -------------
 
    procedure Install
-     (Source : Step_Iterator)
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator)
    is
-      use type Rose.Directories.File_Kind;
-      Install_Directory : constant String := "/rose/install";
+      use Rose.Interfaces.Directory.Client;
+      Install_Path       : constant String := "/rose/install";
+      Install_Directory  : Directory_Client;
+      Category_Directory : Directory_Client;
+      Category_Name      : String (1 .. 100);
+      Category_Last      : Natural := 0;
+      Have_Category      : Boolean := False;
+      Found              : Boolean;
 
       procedure Process_Executable
         (Name     : String;
@@ -213,9 +268,42 @@ package body Restore.Installer is
          Install_Flags : Install_Flag_Array := Flags;
       begin
          Install_Flags (Is_Driver) := Category = "drivers";
+
+         if not Have_Category
+           or else Category_Name (1 .. Category_Last) /= Category
+         then
+            if Category = "" then
+               Category_Directory := Install_Directory;
+               Have_Category := True;
+            else
+               Open_Directory
+                 (Install_Directory, Category, Category_Directory,
+                  Have_Category);
+            end if;
+
+            if not Have_Category then
+               Rose.Console_IO.Put ("install: cannot find directory ");
+               Rose.Console_IO.Put (Install_Path);
+               Rose.Console_IO.Put ("/");
+               Rose.Console_IO.Put (Category);
+               Rose.Console_IO.New_Line;
+               return;
+            end if;
+
+            --  A name too long to remember is opened every time.
+
+            if Category'Length <= Category_Name'Length then
+               Category_Last := Category'Length;
+               Category_Name (1 .. Category_Last) := Category;
+            else
+               Have_Category := False;
+            end if;
+         end if;
+
          Install_Executable
-           (Root_Path => Install_Directory,
-            Directory => Category,
+           (Directory => Category_Directory,
+            Root_Path => Install_Path,
+            Category  => Category,
             Name      => Name,
             Action    => Action,
             Flags     => Install_Flags);
@@ -223,17 +311,22 @@ package body Restore.Installer is
 
    begin
 
-      if not Rose.Directories.Exists (Install_Directory) then
+      declare
+         Rose_Directory : Directory_Client;
+      begin
+         Open_Directory
+           (Rose.Interfaces.File_System.Client.Root_Directory (File_System),
+            "rose", Rose_Directory, Found);
+         if Found then
+            Open_Directory
+              (Rose_Directory, "install", Install_Directory, Found);
+         end if;
+      end;
+
+      if not Found then
          Rose.Console_IO.Put_Line
            ("install: cannot find directory /rose/install");
          return;
-      end if;
-
-      if Rose.Directories.Kind (Install_Directory)
-        /= Rose.Directories.Directory
-      then
-         Rose.Console_IO.Put_Line
-           ("install: /rose/install is not a directory");
       end if;
 
       --  Process_Executable ("exec", "", Launch);
@@ -264,12 +357,14 @@ package body Restore.Installer is
    ------------------------
 
    procedure Install_Executable
-     (Root_Path : String;
-      Directory : String;
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Root_Path : String;
+      Category  : String;
       Name      : String;
       Action    : Install_Action;
       Flags     : Install_Flag_Array)
    is
+      use Rose.Interfaces.Directory.Client;
       use Rose.Interfaces.File_Reader.Client;
       Caps_Reader    : File_Reader_Client;
       Binary_Reader  : File_Reader_Client;
@@ -280,6 +375,8 @@ package body Restore.Installer is
       Exec_Path_Last : Natural := 0;
       Cap_Path       : String (1 .. 200);
       Cap_Path_Last  : Natural := 0;
+      Exec_Index     : Natural;
+      Caps_Index     : Natural;
       Flag_Word      : Natural := 0;
       Flag_Bit       : Positive := 1;
    begin
@@ -293,8 +390,8 @@ package body Restore.Installer is
 
       Append (Exec_Path, Exec_Path_Last, Root_Path);
       Append (Exec_Path, Exec_Path_Last, "/");
-      if Directory /= "" then
-         Append (Exec_Path, Exec_Path_Last, Directory);
+      if Category /= "" then
+         Append (Exec_Path, Exec_Path_Last, Category);
          Append (Exec_Path, Exec_Path_Last, "/");
       end if;
       Append (Exec_Path, Exec_Path_Last, Name);
@@ -302,22 +399,33 @@ package body Restore.Installer is
       Cap_Path_Last := Exec_Path_Last;
       Append (Cap_Path, Cap_Path_Last, ".caps");
 
-      if not Rose.Directories.Exists (Exec_Path (1 .. Exec_Path_Last)) then
+      Exec_Index := Find_File (Directory, Name);
+
+      if Exec_Index = 0 then
          Rose.Console_IO.Put ("install: cannot find ");
          Rose.Console_IO.Put (Exec_Path (1 .. Exec_Path_Last));
          Rose.Console_IO.New_Line;
          return;
       end if;
 
-      if not Rose.Directories.Exists (Cap_Path (1 .. Cap_Path_Last)) then
+      Caps_Index :=
+        Find_File
+          (Directory,
+           Cap_Path (Cap_Path_Last - Name'Length - 4 .. Cap_Path_Last));
+
+      if Caps_Index = 0 then
          Rose.Console_IO.Put ("install: cannot find ");
          Rose.Console_IO.Put (Cap_Path (1 .. Cap_Path_Last));
          Rose.Console_IO.New_Line;
          return;
       end if;
 
-      Rose.Directories.Open (Caps_Reader, Cap_Path (1 .. Cap_Path_Last));
-      Rose.Directories.Open (Binary_Reader, Exec_Path (1 .. Exec_Path_Last));
+      Caps_Reader :=
+        Rose.Interfaces.File.Client.Open_Reader
+          (Get_Ordinary_File (Directory, Caps_Index));
+      Binary_Reader :=
+        Rose.Interfaces.File.Client.Open_Reader
+          (Get_Ordinary_File (Directory, Exec_Index));
 
       Rose.Console_IO.Put ("restore: installing: ");
       Rose.Console_IO.Put (Name);
@@ -347,7 +455,7 @@ package body Restore.Installer is
               (Conversions.To_Stream_Reader (Binary_Reader)));
          Rose.System_Calls.Send_Word
            (Params,
-            Natural (Rose.Directories.Size (Exec_Path (1 .. Exec_Path_Last))));
+            Natural (Directory_Entry_Size (Directory, Exec_Index)));
          Rose.System_Calls.Send_Word
            (Params, Rose.Words.Word'(Install_Action'Pos (Action)));
          Rose.System_Calls.Send_Word
@@ -430,6 +538,28 @@ package body Restore.Installer is
       Release (Caps_Reader);
       Release (Binary_Reader);
    end Install_Executable;
+
+   --------------------
+   -- Open_Directory --
+   --------------------
+
+   procedure Open_Directory
+     (Parent    : Rose.Interfaces.Directory.Client.Directory_Client;
+      Name      : String;
+      Directory : out Rose.Interfaces.Directory.Client.Directory_Client;
+      Found     : out Boolean)
+   is
+      use Rose.Interfaces.Directory.Client;
+      use type Rose.Interfaces.Directory.File_Kind;
+      Index : constant Natural := Find_Entry (Parent, Name);
+   begin
+      Found := Index /= 0
+        and then Directory_Entry_Kind (Parent, Index)
+        = Rose.Interfaces.Directory.Directory;
+      if Found then
+         Directory := Get_Directory (Parent, Index);
+      end if;
+   end Open_Directory;
 
    ----------------
    -- Send_Clock --
