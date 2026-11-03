@@ -239,11 +239,13 @@ package body Mem.Calls is
      (Process    : Rose.Objects.Object_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address)
    is
-      use Rose.Words;
+      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.System_Calls.Client.Send
-        (Cap => Mem.Physical_Map.Region_Unmap_Page_Cap,
-         Data => (Word (Process), Word (Virtual)));
+      Rose.System_Calls.Initialize_Send
+        (Params, Mem.Physical_Map.Region_Unmap_Page_Cap);
+      Rose.System_Calls.Send_Object_Id (Params, Process);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Virtual));
+      Rose.System_Calls.Invoke_Capability (Params);
    end Unmap;
 
 end Mem.Calls;

@@ -9,6 +9,17 @@ package body Tests.Registry is
    Registry : Rose.Interfaces.Commands.Client.Commands_Client;
    Clock_Interface_Cap : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   Bank_Interface_Cap  : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+
+   ----------
+   -- Bank --
+   ----------
+
+   function Bank return Rose.Capabilities.Capability is
+   begin
+      return Bank_Interface_Cap;
+   end Bank;
 
    -----------
    -- Clock --
@@ -70,6 +81,15 @@ package body Tests.Registry is
    begin
       return Program.Launch_Cap;
    end Launcher_Cap;
+
+   --------------
+   -- Set_Bank --
+   --------------
+
+   procedure Set_Bank (Bank : Rose.Capabilities.Capability) is
+   begin
+      Bank_Interface_Cap := Bank;
+   end Set_Bank;
 
    ---------------
    -- Set_Clock --

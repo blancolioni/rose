@@ -6,6 +6,7 @@ with Mem.Calls;
 with Mem.Page_Cache;
 with Mem.Physical_Map;
 with Mem.Processes;
+with Mem.Shared_Pages;
 
 package body Mem.Page_Table is
 
@@ -33,6 +34,11 @@ package body Mem.Page_Table is
    Dirty_Pages     : array (1 .. Rose.Limits.Max_Mapped_Pages) of Cursor;
    Dirty_Page_Last : Natural := 0;
 
+   procedure Drop_Deleted_Dirty_Pages;
+   --  Take pages that have been deleted out of the dirty page list, so
+   --  that the next checkpoint doesn't save them: their slots will be
+   --  used again for other pages.
+
    -----------------------
    -- Clear_Dirty_Pages --
    -----------------------
@@ -41,6 +47,17 @@ package body Mem.Page_Table is
    begin
       Dirty_Page_Last := 0;
    end Clear_Dirty_Pages;
+
+   ------------
+   -- Delete --
+   ------------
+
+   procedure Delete (Position : Cursor) is
+   begin
+      Mapped_Pages (Position).Process := 0;
+      Free_Count := Free_Count + 1;
+      Drop_Deleted_Dirty_Pages;
+   end Delete;
 
    ----------------
    -- Delete_All --
@@ -56,13 +73,24 @@ package body Mem.Page_Table is
          begin
             if Element.Process = Process then
                declare
-                  Cached : Boolean;
+                  Cached, Last, Modified : Boolean;
                begin
                   --  A cached page stays in memory for the next process
-                  --  that maps it, until Reclaim needs it.
-                  Mem.Page_Cache.Release (Element.Phys, Cached);
-                  if not Cached then
-                     Mem.Physical_Map.Deallocate_Page (Element.Phys);
+                  --  that maps it, until Reclaim needs it. A shared page
+                  --  stays while another process maps it. Its process
+                  --  has already written it back if this is the last
+                  --  mapping (Mem.Processes.Release_Shared_Segments).
+
+                  if Mem.Shared_Pages.Is_Shared (Element.Phys) then
+                     Mem.Shared_Pages.Release (Element.Phys, Last, Modified);
+                     if Last then
+                        Mem.Physical_Map.Deallocate_Page (Element.Phys);
+                     end if;
+                  else
+                     Mem.Page_Cache.Release (Element.Phys, Cached);
+                     if not Cached then
+                        Mem.Physical_Map.Deallocate_Page (Element.Phys);
+                     end if;
                   end if;
                end;
                Element.Process := 0;
@@ -71,20 +99,7 @@ package body Mem.Page_Table is
          end;
       end loop;
 
-      --  The process's pages are gone, so the next checkpoint must not
-      --  save them: their slots will be used again for other pages.
-
-      declare
-         Kept : Natural := 0;
-      begin
-         for I in 1 .. Dirty_Page_Last loop
-            if Mapped_Pages (Dirty_Pages (I)).Process /= 0 then
-               Kept := Kept + 1;
-               Dirty_Pages (Kept) := Dirty_Pages (I);
-            end if;
-         end loop;
-         Dirty_Page_Last := Kept;
-      end;
+      Drop_Deleted_Dirty_Pages;
    end Delete_All;
 
    ----------------------
@@ -95,6 +110,22 @@ package body Mem.Page_Table is
    begin
       return Dirty_Page_Last;
    end Dirty_Page_Count;
+
+   ------------------------------
+   -- Drop_Deleted_Dirty_Pages --
+   ------------------------------
+
+   procedure Drop_Deleted_Dirty_Pages is
+      Kept : Natural := 0;
+   begin
+      for I in 1 .. Dirty_Page_Last loop
+         if Mapped_Pages (Dirty_Pages (I)).Process /= 0 then
+            Kept := Kept + 1;
+            Dirty_Pages (Kept) := Dirty_Pages (I);
+         end if;
+      end loop;
+      Dirty_Page_Last := Kept;
+   end Drop_Deleted_Dirty_Pages;
 
    ----------
    -- Find --
@@ -237,6 +268,28 @@ package body Mem.Page_Table is
          Process (Dirty_Pages (I));
       end loop;
    end Iterate_Dirty_Pages;
+
+   ---------------------------
+   -- Iterate_Process_Pages --
+   ---------------------------
+
+   procedure Iterate_Process_Pages
+     (Process : Process_Id;
+      Base    : Rose.Addresses.Virtual_Page_Address;
+      Bound   : Rose.Addresses.Virtual_Page_Address;
+      Action  : not null access procedure (Position : Cursor))
+   is
+      use type Rose.Addresses.Virtual_Page_Address;
+   begin
+      for I in 1 .. Mapped_Page_Last loop
+         if Mapped_Pages (I).Process = Process
+           and then Mapped_Pages (I).Virt >= Base
+           and then Mapped_Pages (I).Virt < Bound
+         then
+            Action (I);
+         end if;
+      end loop;
+   end Iterate_Process_Pages;
 
    ----------------------
    -- Physical_Address --

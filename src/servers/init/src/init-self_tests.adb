@@ -2,7 +2,9 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Storage.Client;
 
 with Init.Calls;
 
@@ -33,6 +35,17 @@ package body Init.Self_Tests is
       Cap        : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
    --  A derived copy of Cap, or the null capability if there is none.
+
+   Test_Page_Limit   : constant := 16;
+   Test_Region_Limit : constant := 4;
+   --  The test bank's limits: the shared segment test reserves one
+   --  region of two pages (ADR 0025).
+
+   function Test_Bank
+     (Storage : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+   --  A new sub-bank of Storage's root bank, or the null cap if Storage
+   --  is null.
 
    function Works
      (Cap : Rose.Capabilities.Capability)
@@ -196,7 +209,8 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
-      Clock           : Rose.Capabilities.Capability)
+      Clock           : Rose.Capabilities.Capability;
+      Storage         : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -225,6 +239,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Clock);
+      Rose.System_Calls.Send_Cap (Params, Test_Bank (Storage));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 
@@ -232,6 +247,28 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Run;
+
+   ---------------
+   -- Test_Bank --
+   ---------------
+
+   function Test_Bank
+     (Storage : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Interfaces.Bank.Client;
+      use Rose.Interfaces.Storage.Client;
+      Store : Storage_Client;
+   begin
+      if Storage = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Open (Store, Storage);
+      return Get_Interface_Cap
+        (Create_Sub_Bank
+           (Get_Root_Bank (Store), Test_Page_Limit, Test_Region_Limit));
+   end Test_Bank;
 
    -----------
    -- Works --

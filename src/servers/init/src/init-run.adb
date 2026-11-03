@@ -7,6 +7,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Exec;
 with Rose.Interfaces.Map;
+with Rose.Interfaces.Process;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -135,15 +136,16 @@ package body Init.Run is
         (Process_Cap : Rose.Capabilities.Capability)
          return Rose.Capabilities.Capability
       is
-         Caps          : Init.Calls.Array_Of_Capabilities (1 .. 7);
+         Caps          : Init.Calls.Array_Of_Capabilities
+           (1 .. Rose.Interfaces.Process.Subprogram_Count);
          Public_Cap    : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := Null_Capability;
       begin
          --  get process interface caps
          Init.Calls.Get_Interface (Process_Cap, Caps);
 
-         --  public interface cap is in Caps (3)
-         Public_Cap := Caps (3);
+         Public_Cap :=
+           Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
 
          if Public_Cap /= Null_Capability then
             for I in 1 .. 4 loop
@@ -580,7 +582,8 @@ package body Init.Run is
          Standard_Output => Console_Stream_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
          Commands        => Commands_Cap,
-         Clock           => Clock_Cap)
+         Clock           => Clock_Cap,
+         Storage         => Storage_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);
