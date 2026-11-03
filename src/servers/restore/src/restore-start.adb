@@ -68,6 +68,7 @@ package body Restore.Start is
       Next (Restore_Interrupt_Cap);
       Next (Store_Restore_Cap);
       Next (Memory_Restore_Cap);
+      Next (Restore_Derivations_Cap);
    end Get_Caps;
 
    ----------

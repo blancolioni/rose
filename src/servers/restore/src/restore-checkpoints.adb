@@ -44,6 +44,11 @@ package body Restore.Checkpoints is
    --  A page to send: sending from the invocation buffer would clear it
    --  first.
 
+   Record_Buffer : Storage_Array
+     (1 .. Rose.Checkpoints.Max_Record_Pages * Page_Size)
+     with Alignment => Page_Size;
+   --  The derivation records, for the kernel.
+
    Max_Process_Pages : constant := 8;
 
    Process_Pages : Storage_Array (1 .. Max_Process_Pages * Page_Size)
@@ -325,6 +330,8 @@ package body Restore.Checkpoints is
       Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array;
       Interrupt_Count : Natural;
       Process_Count   : Natural;
+      Record_Pages    : Natural;
+      Record_Count    : Natural;
       Next_Object_Id  : Rose.Objects.Object_Id;
       Restored_Pages  : Natural := 0;
    begin
@@ -357,6 +364,8 @@ package body Restore.Checkpoints is
       Interrupt_Count := Natural (Kernel_Header.Interrupt_Count);
       Interrupts := Kernel_Header.Interrupts;
       Next_Object_Id := Rose.Objects.Object_Id (Kernel_Header.Next_Object_Id);
+      Record_Pages := Natural (Kernel_Header.Record_Page_Count);
+      Record_Count := Natural (Kernel_Header.Record_Count);
 
       --  The regions first: the memory server's segments use them.
 
@@ -413,11 +422,49 @@ package body Restore.Checkpoints is
          Restore_Table_Page (Store, I, Send_Page);
       end loop;
 
+      --  The derivation records, which the capabilities of the processes
+      --  name, so the kernel has them before it restores a process.
+
+      if Record_Pages > 0 then
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            if Record_Pages > Rose.Checkpoints.Max_Record_Pages then
+               Fail ("too many derivation record pages");
+               return;
+            end if;
+
+            for I in 1 .. Record_Pages loop
+               if not Read (Reader, Checkpoint, 1 + I) then
+                  Fail ("cannot read the derivation records");
+                  return;
+               end if;
+               Record_Buffer
+                 (Storage_Offset (I - 1) * Page_Size + 1
+                  .. Storage_Offset (I) * Page_Size) := Page;
+            end loop;
+
+            Rose.System_Calls.Initialize_Send
+              (Params, Restore_Derivations_Cap);
+            Rose.System_Calls.Send_Word
+              (Params, Rose.Words.Word (Record_Count));
+            Rose.System_Calls.Send_Buffer
+              (Params, Storage_Count (Record_Pages) * Page_Size,
+               Record_Buffer'Address, False);
+            Rose.System_Calls.Invoke_Capability (Params);
+
+            if Params.Control.Flags (Rose.Invocation.Error) then
+               Fail ("the kernel cannot restore the derivation records");
+               return;
+            end if;
+         end;
+      end if;
+
       --  The kernel's processes, which can't run until the memory server
       --  has their pages.
 
       declare
-         Index : Positive := 2;
+         Index : Positive := 2 + Record_Pages;
       begin
          for P in 1 .. Process_Count loop
             if not Read (Reader, Checkpoint, Index) then
