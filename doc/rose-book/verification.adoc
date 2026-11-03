@@ -75,7 +75,17 @@ An invariant of the table is proved to hold after every operation: the last numb
 `Create` gives the lowest number that is free, and changes nothing else.
 `Delete`, `Set`, `Rescind` and `Set_Identifier` change one capability and no other, and `Rescind` adds exactly one to its count.
 They act only on a capability that is in use: a number that is not a capability is never written.
-A capability that is checked against one that has been rescinded does not match (`Same_Count`), unless the 24-bit count has gone all the way round, which is after a multiple of 2 ** 24 rescinds.
+A capability that is checked against one that has been rescinded does not match (`Same_Count`), unless the 20-bit count has gone all the way round, which is after a multiple of 2 ** 20 rescinds.
 What is not proved, and is trusted, is `Rose.Kernel.Cap_Slots`, the two procedures that read and write a layout through the address of its page, whose contracts say that a slot reads as what was last written to it and that writing one changes no other.
 Not covered: that the pages are allocated, which `Rose.Kernel.Processes` does, and what its callers pass.
 The callers that take a capability number from another process do not copy one that the process does not hold (`Send_Cap`, `Send_Reply`, `Copy_Cap`, and the initial capabilities of a new process): the receiver gets the null capability, or a number that holds nothing where those that follow count on it.
+
+`Rose.Kernel.Derivations`::
+The derivation records of the kernel (ADR 0001): what a capability that was derived names, so that it can be revoked on its own.
+No run-time errors, for any record number, including 0, which is no record.
+An invariant of the table is proved to hold after every operation: a record that is used is one level below its parent, which is used, and there are at most 8 levels, so there are no cycles, and the children that a record counts are exactly the used records that name it.
+`Derive` gives the lowest record that is free, one level below its parent, with one slot, and changes no other; it gives 0 only when every record is used.
+`Add_Slot` and `Remove_Slot` change the slots of one record.
+`Remove_Slot` frees a record that has nothing left that names it, which takes a child from its parent and may free that in turn, and it uses no record that was not used.
+`Revoke` revokes one record, and `Is_Valid` (at most 8 reads) says that no record from a capability's own up to the root has been revoked; of a revoke, it is proved that it makes invalid the records below the one revoked, and no other.
+Not covered: that the slots counted are the capabilities that name a record, which is for `Rose.Kernel.Processes` to keep when it uses this.
