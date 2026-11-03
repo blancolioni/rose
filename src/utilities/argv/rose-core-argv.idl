@@ -1,0 +1,16 @@
+command Rose.Core.Argv : Standard_Output
+  with Summary     => "Write the command name and arguments that Ada.Command_Line reports.",
+       Description => """
+          Argv writes the name of the command and each of its arguments, as
+          Ada.Command_Line reports them, one to a line and in brackets, so
+          that an argument with a space in it shows. It then checks them
+          against the argument list that the shell passed, and with a
+          status other than zero it ends by asking for that exit status,
+          which fails the command. It tests Ada.Command_Line (#498).
+          """
+is
+   Status : Natural := 0
+     with Help => "the exit status to ask for";
+   Arguments : String_List
+     with Help => "the words to write";
+end Rose.Core.Argv;
