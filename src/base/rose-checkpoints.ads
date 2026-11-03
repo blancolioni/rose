@@ -21,11 +21,12 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 6;
+   Kernel_Table_Version : constant := 7;
    --  Version 2 added the interrupts, version 3 the next object id,
    --  version 4 each process's FPU and SSE state, version 5 the packing
-   --  of a capability's header, and version 6 the derivation records
-   --  (ADR 0001).
+   --  of a capability's header, version 6 the derivation records
+   --  (ADR 0001), and version 7 a table of 64 endpoints in each
+   --  process.
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -94,7 +95,7 @@ package Rose.Checkpoints is
 
    Max_Saved_Waiting   : constant := 16;
    Max_Saved_Ranges    : constant := 8;
-   Max_Saved_Endpoints : constant := 32;
+   Max_Saved_Endpoints : constant := 64;
    Max_Saved_Shared    : constant := 8;
 
    Saved_Register_Bytes   : constant := 64;
@@ -156,7 +157,7 @@ package Rose.Checkpoints is
      with Pack, Size => Max_Saved_Endpoints * 128;
 
    Process_Record_Bytes : constant :=
-                            1216 + 4 + Saved_FPU_Bytes
+                            1216 + 512 + 4 + Saved_FPU_Bytes
                             + Max_Saved_Shared * 16;
    --  The bytes of a process record page that are in use.
 
