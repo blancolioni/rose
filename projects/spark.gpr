@@ -58,7 +58,9 @@ project Spark is
       "rose-kernel-cap_slots.ads",
       "rose-kernel-cap_slots.adb",
       "rose-kernel-cap_tables.ads",
-      "rose-kernel-cap_tables.adb");
+      "rose-kernel-cap_tables.adb",
+      "rose-kernel-derivations.ads",
+      "rose-kernel-derivations.adb");
 
    for Object_Dir use "../build/spark";
 

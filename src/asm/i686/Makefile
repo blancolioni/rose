@@ -39,6 +39,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-kernel-arch.o \
 	$(BUILDDIR)/rose-kernel-cap_slots.o \
 	$(BUILDDIR)/rose-kernel-cap_tables.o \
+	$(BUILDDIR)/rose-kernel-derivations.o \
 	$(BUILDDIR)/rose-kernel-capabilities.o \
 	$(BUILDDIR)/rose-kernel-capabilities-arch.o \
 	$(BUILDDIR)/rose-kernel-capabilities-boot.o \
