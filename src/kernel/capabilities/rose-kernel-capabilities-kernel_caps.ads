@@ -41,6 +41,17 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  Restart the machine (#413). Only init has this cap: it restarts
    --  after an install, once the first checkpoint is in the log.
 
+   Boot_Tags_Endpoint         : constant Rose.Objects.Endpoint_Index := 16;
+   --  Data word 0 is a multiboot2 tag type, from 1 to 65535.  Reply with
+   --  a cap that reads that tag (Read_Boot_Tag_Endpoint) and no other.
+   --  Only init has this cap (#582).
+
+   Read_Boot_Tag_Endpoint     : constant Rose.Objects.Endpoint_Index := 17;
+   --  The cap's payload is a tag type.  Copy the first tag of that type
+   --  from the boot loader's information, header included, into the sent
+   --  buffer, which has to be writable, as far as it fits.  The reply's
+   --  data word is the tag's whole size, or 0 if there is no such tag.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

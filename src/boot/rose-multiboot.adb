@@ -7,6 +7,8 @@ package body Rose.Multiboot is
 
    pragma Warnings (Off);
 
+   use type System.Storage_Elements.Storage_Offset;
+
    Report_Memory_Map : constant Boolean := True;
    Report_Modules    : constant Boolean := True;
 
@@ -16,22 +18,38 @@ package body Rose.Multiboot is
 
    function Physical_Memory_High return Word is (Physmem_High);
 
-   --  The framebuffer tag (type 8): the address is a 64-bit word at 8,
-   --  then pitch, width and height, then the depth and the type as
-   --  bytes at 28 and 29.  For an RGB framebuffer, the position and size
-   --  of the red, green and blue fields follow as bytes from 32.
+   --  The framebuffer tag (type 8), which is only reported here: the
+   --  address is a 64-bit word at 8, then pitch, width and height, then
+   --  the depth and the type as bytes at 28 and 29.  For an RGB
+   --  framebuffer, the position and size of the red, green and blue
+   --  fields follow as bytes from 32.
 
    Framebuffer_Type_RGB : constant := 1;
 
-   FB_Usable                    : Boolean := False;
-   FB_Address, FB_Pitch         : Word_32 := 0;
-   FB_Width, FB_Height          : Word_32 := 0;
+   --  A copy of the boot information, for Copy_Tag.  The boot loader's
+   --  copy is in memory that the kernel may reuse.  Boot information that
+   --  is larger is cut after the last whole tag that fits.
 
-   function Have_Framebuffer return Boolean is (FB_Usable);
-   function Framebuffer_Address return Word_32 is (FB_Address);
-   function Framebuffer_Pitch return Word_32 is (FB_Pitch);
-   function Framebuffer_Width return Word_32 is (FB_Width);
-   function Framebuffer_Height return Word_32 is (FB_Height);
+   Boot_Info_Bytes : constant := 8192;
+
+   Boot_Info      : System.Storage_Elements.Storage_Array
+                      (0 .. Boot_Info_Bytes - 1) := (others => 0);
+   Boot_Info_Size : Word_32 := 0;
+
+   function Boot_Info_Word
+     (Offset : Word_32)
+      return Word_32
+   is (Word_32 (Boot_Info (System.Storage_Elements.Storage_Offset (Offset)))
+       + Word_32
+           (Boot_Info (System.Storage_Elements.Storage_Offset (Offset + 1)))
+         * 2 ** 8
+       + Word_32
+           (Boot_Info (System.Storage_Elements.Storage_Offset (Offset + 2)))
+         * 2 ** 16
+       + Word_32
+           (Boot_Info (System.Storage_Elements.Storage_Offset (Offset + 3)))
+         * 2 ** 24)
+   with Pre => Offset <= Boot_Info_Bytes - 4;
 
    type Multiboot_Tag_Type is
      (End_Of_Tags,
@@ -75,9 +93,6 @@ package body Rose.Multiboot is
       Offset           : Word)
       return Word_8;
 
-   procedure Load_Framebuffer
-     (Tag_Address : Word);
-
    procedure Get_String
      (From_Tag_Address : Word;
       Offset           : Word;
@@ -104,6 +119,52 @@ package body Rose.Multiboot is
          end loop;
       end if;
    end Check_Magic;
+
+   --------------
+   -- Copy_Tag --
+   --------------
+
+   procedure Copy_Tag
+     (Tag_Type : Word_32;
+      To       : out System.Storage_Elements.Storage_Array;
+      Size     : out Word_32)
+   is
+      use System.Storage_Elements;
+      Offset : Word_32 := 8;
+   begin
+      To := (others => 0);
+      Size := 0;
+
+      while Offset + 8 <= Boot_Info_Size loop
+         declare
+            This_Type : constant Word_32 := Boot_Info_Word (Offset);
+            This_Size : constant Word_32 := Boot_Info_Word (Offset + 4);
+         begin
+            exit when This_Type = 0
+              or else This_Size < 8
+              or else This_Size > Boot_Info_Size - Offset;
+
+            if This_Type = Tag_Type then
+               declare
+                  Count : constant Storage_Count :=
+                            Storage_Count'Min
+                              (To'Length, Storage_Count (This_Size));
+               begin
+                  To (To'First .. To'First + Count - 1) :=
+                    Boot_Info (Storage_Offset (Offset)
+                               .. Storage_Offset (Offset) + Count - 1);
+               end;
+               Size := This_Size;
+               return;
+            end if;
+
+            Offset := Offset + This_Size;
+            if Offset mod 8 /= 0 then
+               Offset := Offset + (8 - Offset mod 8);
+            end if;
+         end;
+      end loop;
+   end Copy_Tag;
 
    ----------------
    -- Get_String --
@@ -175,36 +236,6 @@ package body Rose.Multiboot is
    function Have_Modules return Boolean
    is (Found (Module));
 
-   ----------------------
-   -- Load_Framebuffer --
-   ----------------------
-
-   procedure Load_Framebuffer
-     (Tag_Address : Word)
-   is
-      Address_Low  : constant Word_32 := Get_Word_32 (Tag_Address, 8);
-      Address_High : constant Word_32 := Get_Word_32 (Tag_Address, 12);
-      Pitch        : constant Word_32 := Get_Word_32 (Tag_Address, 16);
-      Width        : constant Word_32 := Get_Word_32 (Tag_Address, 20);
-      Height       : constant Word_32 := Get_Word_32 (Tag_Address, 24);
-      Depth        : constant Word_8 := Get_Word_8 (Tag_Address, 28);
-      FB_Type      : constant Word_8 := Get_Word_8 (Tag_Address, 29);
-   begin
-      FB_Usable :=
-        FB_Type = Framebuffer_Type_RGB
-        and then Depth = 32
-        and then Address_High = 0
-        and then Word_64 (Address_Low) + Word_64 (Pitch) * Word_64 (Height)
-                   < 2 ** 32;
-
-      if FB_Usable then
-         FB_Address := Address_Low;
-         FB_Pitch := Pitch;
-         FB_Width := Width;
-         FB_Height := Height;
-      end if;
-   end Load_Framebuffer;
-
    ---------------------------
    -- Load_Multiboot_Header --
    ---------------------------
@@ -239,8 +270,6 @@ package body Rose.Multiboot is
          if Tag = Basic_Memory_Info then
             Physmem_Low := 0;
             Physmem_High := Get_Word_32 (Start, 12);
-         elsif Tag = Frame_Buffer then
-            Load_Framebuffer (Start);
          end if;
       end Process_Record;
 
@@ -249,6 +278,19 @@ package body Rose.Multiboot is
         ("Announced mbi size: ");
       Rose.Boot.Console.Put (Natural (Size));
       Rose.Boot.Console.New_Line;
+
+      declare
+         use System.Storage_Elements;
+         Copy_Size : constant Word_32 :=
+                       Word_32'Min (Size, Boot_Info_Bytes);
+         Source    : Storage_Array (0 .. Storage_Offset (Copy_Size) - 1);
+         for Source'Address use Local_Address;
+         pragma Import (Ada, Source);
+      begin
+         Boot_Info (Source'Range) := Source;
+         Boot_Info_Size := Copy_Size;
+      end;
+
       Scan_Multiboot_Tags (End_Of_Tags, Process_Record'Access);
    end Load_Multiboot_Header;
 

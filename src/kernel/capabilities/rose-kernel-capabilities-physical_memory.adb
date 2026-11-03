@@ -180,6 +180,69 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                  (Process_Id, Rose.Kernel.Processes.Ready);
             end;
 
+         when Device_Range =>
+            declare
+               use type Rose.Capabilities.Capability;
+               First   : constant Word := Params.Data (0);
+               Count   : constant Word := Params.Data (1);
+               Valid   : Boolean :=
+                           Params.Control.Flags (Send_Words)
+                           and then Params.Control.Last_Sent_Word = 1
+                           and then Count in
+                             1 .. Rose.Kernel.Capabilities.Pages
+                                    .Max_Device_Range_Pages
+                           and then First <= Rose.Limits.Max_Physical_Pages
+                           and then Count - 1
+                             <= Rose.Limits.Max_Physical_Pages - First;
+               New_Cap : Rose.Capabilities.Capability;
+            begin
+               if Valid then
+                  for I in 0 .. Count - 1 loop
+                     if Rose.Kernel.Physical_Memory.Is_RAM
+                       (Rose.Addresses.Physical_Page_Address (First + I))
+                     then
+                        Valid := False;
+                        exit;
+                     end if;
+                  end loop;
+               end if;
+
+               if not Valid then
+                  Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+               else
+                  New_Cap := Rose.Kernel.Processes.Create_Cap (Process_Id);
+                  if New_Cap = Rose.Capabilities.Null_Capability then
+                     Rose.Kernel.Processes.Return_Error
+                       (Params, Out_Of_Capabilities);
+                  else
+                     Rose.Kernel.Processes.Set_Cap
+                       (Pid    => Process_Id,
+                        Cap    => New_Cap,
+                        Layout =>
+                          (Header  =>
+                             (Cap_Type =>
+                                  Rose.Capabilities.Layout.Page_Object_Cap,
+                              Endpoint =>
+                                Rose.Kernel.Capabilities.Pages
+                                  .Map_Device_Range,
+                              others   => <>),
+                           Payload =>
+                             Rose.Kernel.Capabilities.Pages
+                               .Device_Range_Payload
+                                 (Rose.Addresses.Physical_Page_Address
+                                    (First),
+                                  Count)));
+                     Params.Control.Flags :=
+                       (Reply => True, Send_Caps => True, others => False);
+                     Params.Control.Last_Sent_Cap := 0;
+                     Params.Caps (0) := New_Cap;
+                  end if;
+               end if;
+
+               Rose.Kernel.Processes.Set_Current_State
+                 (Process_Id, Rose.Kernel.Processes.Ready);
+            end;
+
          when others =>
             null;
       end case;
