@@ -21,9 +21,10 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 4;
-   --  Version 2 added the interrupts, version 3 the next object id, and
-   --  version 4 each process's FPU and SSE state.
+   Kernel_Table_Version : constant := 5;
+   --  Version 2 added the interrupts, version 3 the next object id,
+   --  version 4 each process's FPU and SSE state, and version 5 the
+   --  packing of a capability's header (ADR 0001).
 
    Max_Saved_Interrupts : constant := 32;
 
