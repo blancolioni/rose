@@ -12,6 +12,9 @@ package Rose.Clock_Source is
    procedure Set (Source : Reader);
    --  Use Source for the readings below.
 
+   function Has_Source return Boolean;
+   --  True if a source has been set, so that Realtime can be called.
+
    function Realtime return Rose.Words.Word_64;
    --  Nanoseconds since 1970-01-01 00:00:00 UTC, from the source. It
    --  raises Program_Error if there is none.

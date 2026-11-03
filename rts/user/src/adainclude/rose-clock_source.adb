@@ -2,6 +2,15 @@ package body Rose.Clock_Source is
 
    The_Source : Reader := null;
 
+   ----------------
+   -- Has_Source --
+   ----------------
+
+   function Has_Source return Boolean is
+   begin
+      return The_Source /= null;
+   end Has_Source;
+
    --------------
    -- Realtime --
    --------------

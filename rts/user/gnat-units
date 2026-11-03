@@ -327,3 +327,55 @@ s-aridou.adb
 s-aridou.ads
 s-valuer.adb
 s-valuer.ads
+
+# Ada.Numerics.Elementary_Functions and the complex types (#496), with the
+# Aux packages that they go through. The Aux packages import the C math
+# functions, which are in support/rose-libm.c; Rose's own
+# Aux_Linker_Options, in src/adainclude, drops GNAT's -lm.
+a-nagefl.ads
+a-nuaufl.ads
+a-nalofl.ads
+a-nallfl.ads
+a-nashfl.ads
+a-ngelfu.ads
+a-ngelfu.adb
+a-nuelfu.ads
+a-nlelfu.ads
+a-nllefu.ads
+a-nselfu.ads
+a-ngcoty.ads
+a-ngcoty.adb
+a-nucoty.ads
+a-nlcoty.ads
+a-nllcty.ads
+a-nscoty.ads
+a-ngcefu.ads
+a-ngcefu.adb
+a-ncelfu.ads
+a-nlcefu.ads
+a-nllcef.ads
+a-nscefu.ads
+
+# Exponentiation of a float by an integer, which the "**" of the
+# elementary functions and of the complex types uses: System.Exponr, for
+# each float type, with System.Double_Real and its default Product body.
+s-exnflt.ads
+s-exnlfl.ads
+s-exnllf.ads
+s-exnllf.adb
+s-exponr.ads
+s-exponr.adb
+s-dourea.ads
+s-dourea.adb
+s-dorepr.adb
+
+# Ada.Numerics.Float_Random and Discrete_Random (#496), with
+# System.Random_Numbers. System.Random_Seed's body is Rose's own, in
+# src/adainclude: it seeds from the clock only when the program has one.
+a-nuflra.ads
+a-nuflra.adb
+a-nudira.ads
+a-nudira.adb
+s-rannum.ads
+s-rannum.adb
+s-ransee.ads
