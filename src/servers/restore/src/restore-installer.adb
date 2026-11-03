@@ -11,6 +11,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Reader.Client.Conversions;
+with Rose.Interfaces.Process;
 with Rose.Interfaces.Stream_Reader.Client;
 
 package body Restore.Installer is
@@ -213,7 +214,8 @@ package body Restore.Installer is
       return Rose.Capabilities.Capability
    is
       use Rose.Capabilities;
-      Caps          : Array_Of_Capabilities (1 .. 7);
+      Caps          : Array_Of_Capabilities
+        (1 .. Rose.Interfaces.Process.Subprogram_Count);
       Public_Cap    : Rose.Capabilities.Capability;
       Interface_Cap : Rose.Capabilities.Capability :=
                         Rose.Capabilities.Null_Capability;
@@ -221,8 +223,8 @@ package body Restore.Installer is
       --  get process interface caps
       Get_Interface (Process_Cap, Caps);
 
-      --  public interface cap is in Caps (3)
-      Public_Cap := Caps (3);
+      Public_Cap :=
+        Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
 
       if Public_Cap /= Null_Capability then
          Get_Interface (Public_Cap, Caps);

@@ -2,7 +2,9 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Storage.Client;
 
 with Init.Calls;
 
@@ -33,6 +35,17 @@ package body Init.Self_Tests is
       Cap        : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
    --  A derived copy of Cap, or the null capability if there is none.
+
+   Test_Page_Limit   : constant := 16;
+   Test_Region_Limit : constant := 4;
+   --  The test bank's limits: the shared segment test reserves one
+   --  region of two pages (ADR 0025).
+
+   function Test_Bank
+     (Storage : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+   --  A new sub-bank of Storage's root bank, or the null cap if Storage
+   --  is null.
 
    function Works
      (Cap : Rose.Capabilities.Capability)
@@ -89,7 +102,8 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability)
       return Boolean
    is
       Passed : Boolean := True;
@@ -149,6 +163,10 @@ package body Init.Self_Tests is
       Sibling : Rose.Capabilities.Capability;
       Chain   : Chain_Array;
       Length  : Natural;
+      Kept    : Rose.Capabilities.Capability;
+      Spare   : Rose.Capabilities.Capability;
+      Below   : Rose.Capabilities.Capability;
+      Held    : Rose.Capabilities.Capability;
    begin
       First   := Derive (Derive_Cap, Find_Cap);
       Child   := Derive (Derive_Cap, First);
@@ -184,6 +202,32 @@ package body Init.Self_Tests is
          Delete_Chain (Chain, Length);
       end loop;
 
+      --  Two are kept, so that the checkpoint has derivation records to
+      --  restore (the boot test looks for them).  A record is the lowest
+      --  that is free, so Below, which is derived from Kept, has a lower
+      --  number than it: a restore has to put Kept back first.  Init is
+      --  not restored, so the caps server holds them, in a cap set, and
+      --  init lets go of its own.
+
+      Spare := Derive (Derive_Cap, Find_Cap);
+      Kept  := Derive (Derive_Cap, Find_Cap);
+      Call_On (Delete_Cap, Spare);
+      Below := Derive (Derive_Cap, Kept);
+
+      Check ("two are derived to be kept",
+             Kept /= Rose.Capabilities.Null_Capability
+             and then Below /= Rose.Capabilities.Null_Capability
+             and then Works (Kept) and then Works (Below));
+
+      Held := Init.Calls.Create_Cap_Set_With
+        (Create_Cap_Set, (Kept, Below));
+
+      Check ("the caps server holds them",
+             Held /= Rose.Capabilities.Null_Capability);
+
+      Call_On (Delete_Cap, Kept);
+      Call_On (Delete_Cap, Below);
+
       return Passed;
    end Derive_Test;
 
@@ -196,7 +240,8 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
-      Clock           : Rose.Capabilities.Capability)
+      Clock           : Rose.Capabilities.Capability;
+      Storage         : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -225,6 +270,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Clock);
+      Rose.System_Calls.Send_Cap (Params, Test_Bank (Storage));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 
@@ -232,6 +278,28 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Run;
+
+   ---------------
+   -- Test_Bank --
+   ---------------
+
+   function Test_Bank
+     (Storage : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Interfaces.Bank.Client;
+      use Rose.Interfaces.Storage.Client;
+      Store : Storage_Client;
+   begin
+      if Storage = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Open (Store, Storage);
+      return Get_Interface_Cap
+        (Create_Sub_Bank
+           (Get_Root_Bank (Store), Test_Page_Limit, Test_Region_Limit));
+   end Test_Bank;
 
    -----------
    -- Works --

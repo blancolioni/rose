@@ -5,6 +5,7 @@ with Rose.Interfaces.Restorable;
 with Rose.Limits;
 
 with Rose.Kernel.Cap_Tables;
+with Rose.Kernel.Derivations;
 with Rose.Kernel.Interrupts;
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Queue;
@@ -15,6 +16,10 @@ package body Rose.Kernel.Processes.Snapshot is
    use Rose.Words;
 
    Page_Bytes : constant := Rose.Limits.Page_Size;
+
+   Records_Held : Boolean := False;
+   --  The derivation records have been restored, and each has a slot that
+   --  Release_Restore_Holds has not dropped.
 
    function Is_Saved (P : Kernel_Process_Entry) return Boolean
    is (P.State /= Available and then P.Flags (Persistent));
@@ -210,6 +215,48 @@ package body Rose.Kernel.Processes.Snapshot is
       return False;
    end Is_Undelivered;
 
+   ---------------------------
+   -- Release_Restore_Holds --
+   ---------------------------
+
+   procedure Release_Restore_Holds is
+      use Rose.Kernel.Derivations;
+      Restored : Natural := 0;
+      Used     : Natural := 0;
+   begin
+      if not Records_Held then
+         return;
+      end if;
+
+      Records_Held := False;
+
+      for Id in 1 .. Max_Records loop
+         if Is_Used (Derivation_Records, Record_Id (Id)) then
+            Restored := Restored + 1;
+         end if;
+      end loop;
+
+      for Id in 1 .. Max_Records loop
+         if Is_Used (Derivation_Records, Record_Id (Id))
+           and then Slots (Derivation_Records, Record_Id (Id)) > 0
+         then
+            Remove_Slot (Derivation_Records, Record_Id (Id));
+         end if;
+      end loop;
+
+      for Id in 1 .. Max_Records loop
+         if Is_Used (Derivation_Records, Record_Id (Id)) then
+            Used := Used + 1;
+         end if;
+      end loop;
+
+      Rose.Boot.Console.Put ("kernel: derivation records restored: ");
+      Rose.Boot.Console.Put (Restored);
+      Rose.Boot.Console.Put ("; named by restored capabilities: ");
+      Rose.Boot.Console.Put (Used);
+      Rose.Boot.Console.New_Line;
+   end Release_Restore_Holds;
+
    ------------------
    -- Restart_Call --
    ------------------
@@ -227,6 +274,92 @@ package body Rose.Kernel.Processes.Snapshot is
       P.Flags (Wait_Reply) := False;
       P.Flags (Interrupt_Resume) := False;
    end Restart_Call;
+
+   -------------------------
+   -- Restore_Derivations --
+   -------------------------
+
+   procedure Restore_Derivations
+     (Pages        : System.Storage_Elements.Storage_Array;
+      Record_Count : Natural;
+      Success      : out Boolean)
+   is
+      use Rose.Kernel.Derivations;
+      Saved : Rose.Checkpoints.Saved_Record_Array (1 .. Record_Count)
+        with Import, Address => Pages'Address;
+
+      function Is_Saved_Record (Id : Natural) return Boolean
+      is (Id in Saved'Range
+          and then (Saved (Id).Flags and Rose.Checkpoints.Record_Used) /= 0);
+
+      function Level (Id : Natural) return Natural;
+      --  How many records there are from Id up to the root, counting both,
+      --  or 0 if Id, or a record above it, is not a saved record, or if
+      --  there are more than Max_Depth, which a cycle would have.
+
+      -----------
+      -- Level --
+      -----------
+
+      function Level (Id : Natural) return Natural is
+         Current : Natural := Id;
+         Steps   : Natural := 0;
+      begin
+         while Current /= 0 loop
+            if not Is_Saved_Record (Current) or else Steps = Max_Depth then
+               return 0;
+            end if;
+
+            Steps := Steps + 1;
+            Current := Natural (Saved (Current).Parent);
+         end loop;
+
+         return Steps;
+      end Level;
+
+   begin
+      Success := False;
+
+      if Record_Count > Max_Records
+        or else Records_Held
+        or else Pages'Length
+          < Storage_Count
+              ((Record_Count + Rose.Checkpoints.Records_Per_Page - 1)
+               / Rose.Checkpoints.Records_Per_Page) * Page_Bytes
+      then
+         return;
+      end if;
+
+      for Id in 1 .. Max_Records loop
+         if Is_Used (Derivation_Records, Record_Id (Id)) then
+            return;
+         end if;
+      end loop;
+
+      for Id in Saved'Range loop
+         if Is_Saved_Record (Id) and then Level (Id) = 0 then
+            return;
+         end if;
+      end loop;
+
+      --  A record goes in after the one that it was derived from.
+
+      for Wanted in 1 .. Max_Depth loop
+         for Id in Saved'Range loop
+            if Is_Saved_Record (Id) and then Level (Id) = Wanted then
+               Restore_Record
+                 (Derivation_Records,
+                  Record_Id (Id),
+                  Record_Id (Saved (Id).Parent),
+                  (Saved (Id).Flags and Rose.Checkpoints.Record_Revoked)
+                  /= 0);
+               Records_Held := True;
+            end if;
+         end loop;
+      end loop;
+
+      Success := True;
+   end Restore_Derivations;
 
    -----------------------
    -- Restore_Interrupt --
@@ -707,6 +840,8 @@ package body Rose.Kernel.Processes.Snapshot is
       Success : out Boolean)
    is
    begin
+      Release_Restore_Holds;
+
       Success := Pid in Process_Table'Range
         and then Process_Table (Pid).State = Starting
         and then Process_Table (Pid).Flags (Persistent);
@@ -926,6 +1061,8 @@ package body Rose.Kernel.Processes.Snapshot is
                         Natural (Storage'Length / Page_Bytes);
       Process_Count : Natural := 0;
       Next_Page     : Natural := 1;
+      Record_Count  : Natural := 0;
+      Record_Pages  : Natural;
 
       function Page_Address (Index : Positive) return System.Address
       is (Storage (Storage'First
@@ -936,7 +1073,21 @@ package body Rose.Kernel.Processes.Snapshot is
 
       Save_Owner_FPU_State;
 
-      Page_Count := 1;
+      --  The records are those up to the last that is used.
+
+      for Id in 1 .. Rose.Kernel.Derivations.Max_Records loop
+         if Rose.Kernel.Derivations.Is_Used
+           (Derivation_Records, Rose.Kernel.Derivations.Record_Id (Id))
+         then
+            Record_Count := Id;
+         end if;
+      end loop;
+
+      Record_Pages :=
+        (Record_Count + Rose.Checkpoints.Records_Per_Page - 1)
+        / Rose.Checkpoints.Records_Per_Page;
+
+      Page_Count := 1 + Record_Pages;
       for P of Process_Table.all loop
          if Is_Saved (P) then
             Process_Count := Process_Count + 1;
@@ -999,12 +1150,38 @@ package body Rose.Kernel.Processes.Snapshot is
          Header.Page_Count := Word_32 (Page_Count);
          Header.Process_Count := Word_32 (Process_Count);
          Header.Next_Object_Id := Word_64 (Next_Object_Id);
+         Header.Record_Page_Count := Word_32 (Record_Pages);
+         Header.Record_Count := Word_32 (Record_Count);
          Rose.Kernel.Interrupts.Iterate_Cap_Handlers (Save_Interrupt'Access);
          if not Success then
             Page_Count := 0;
             return;
          end if;
       end;
+
+      if Record_Count > 0 then
+         declare
+            use Rose.Kernel.Derivations;
+            Saved : Rose.Checkpoints.Saved_Record_Array (1 .. Record_Count)
+              with Import, Address => Page_Address (2);
+         begin
+            for Id in Saved'Range loop
+               if Is_Used (Derivation_Records, Record_Id (Id)) then
+                  Saved (Id) :=
+                    (Parent => Word_16 (Parent (Derivation_Records,
+                                                Record_Id (Id))),
+                     Flags  =>
+                       Word_16 (Rose.Checkpoints.Record_Used)
+                       + (if Is_Revoked (Derivation_Records,
+                                         Record_Id (Id))
+                          then Word_16 (Rose.Checkpoints.Record_Revoked)
+                          else 0));
+               end if;
+            end loop;
+         end;
+      end if;
+
+      Next_Page := 1 + Record_Pages;
 
       for P of Process_Table.all loop
          if Is_Saved (P) then

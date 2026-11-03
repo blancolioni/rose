@@ -232,31 +232,7 @@ is
          then (for all K in Record_Number => Used (T.Records (K))));
 
       if Id /= 0 then
-         declare
-            Old_T : constant Table := T with Ghost;
-            Level : constant Depth_Count := Depth (T, Parent_Id) + 1;
-         begin
-            T.Records (Id) :=
-              (Parent   => Parent_Id,
-               Depth    => Level,
-               Revoked  => False,
-               Slots    => 1,
-               Children => 0);
-
-            if Parent_Id /= 0 then
-               --  What the parent counts, with this record, is at most
-               --  all of them, so there is room for it.
-               Lemma_Count_Update_All (Old_T, T, Id);
-
-               T.Records (Parent_Id).Children :=
-                 T.Records (Parent_Id).Children + 1;
-            end if;
-
-            Lemma_Count_Update_All (Old_T, T, Id);
-
-            pragma Assert (Linked (T));
-            pragma Assert (Counted (T));
-         end;
+         Restore_Record (T, Id, Parent_Id, False);
       end if;
    end Derive;
 
@@ -469,6 +445,41 @@ is
          end;
       end loop;
    end Remove_Slot;
+
+   --------------------
+   -- Restore_Record --
+   --------------------
+
+   procedure Restore_Record
+     (T         : in out Table;
+      Id        : Record_Number;
+      Parent_Id : Record_Id;
+      Revoked   : Boolean)
+   is
+      Old_T : constant Table := T with Ghost;
+      Level : constant Depth_Count := Depth (T, Parent_Id) + 1;
+   begin
+      T.Records (Id) :=
+        (Parent   => Parent_Id,
+         Depth    => Level,
+         Revoked  => Revoked,
+         Slots    => 1,
+         Children => 0);
+
+      if Parent_Id /= 0 then
+         --  What the parent counts, with this record, is at most all of
+         --  them, so there is room for it.
+         Lemma_Count_Update_All (Old_T, T, Id);
+
+         T.Records (Parent_Id).Children :=
+           T.Records (Parent_Id).Children + 1;
+      end if;
+
+      Lemma_Count_Update_All (Old_T, T, Id);
+
+      pragma Assert (Linked (T));
+      pragma Assert (Counted (T));
+   end Restore_Record;
 
    ------------
    -- Revoke --

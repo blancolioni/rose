@@ -140,6 +140,36 @@ is
    --  it, which is the capability that is being derived.  Id is the lowest
    --  record that was free, or 0 if there is none.
 
+   procedure Restore_Record
+     (T         : in out Table;
+      Id        : Record_Number;
+      Parent_Id : Record_Id;
+      Revoked   : Boolean)
+   with Pre  => not Is_Used (T, Id)
+                and then (Parent_Id = 0 or else Is_Used (T, Parent_Id))
+                and then Depth (T, Parent_Id) < Max_Depth,
+        Post => Is_Used (T, Id)
+                and then Parent (T, Id) = Parent_Id
+                and then Depth (T, Id) = Depth (T'Old, Parent_Id) + 1
+                and then Slots (T, Id) = 1
+                and then Is_Revoked (T, Id) = Revoked
+                and then (for all J in Record_Number =>
+                            (if J /= Id
+                             then Is_Used (T, J) = Is_Used (T'Old, J)
+                                  and then Parent (T, J)
+                                           = Parent (T'Old, J)
+                                  and then Depth (T, J)
+                                           = Depth (T'Old, J)
+                                  and then Is_Revoked (T, J)
+                                           = Is_Revoked (T'Old, J)
+                                  and then Slots (T, J)
+                                           = Slots (T'Old, J)));
+   --  Make the record Id, as Derive does, but at a number that is given,
+   --  and revoked if it was: for a restore from a checkpoint, which puts
+   --  the records back at the numbers that capabilities name.  Its one
+   --  slot is a hold for the restore, which the capabilities that name it
+   --  add to as they are restored, and which Remove_Slot then drops.
+
    procedure Add_Slot
      (T  : in out Table;
       Id : Record_Number)

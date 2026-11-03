@@ -21,10 +21,12 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 5;
+   Kernel_Table_Version : constant := 7;
    --  Version 2 added the interrupts, version 3 the next object id,
-   --  version 4 each process's FPU and SSE state, and version 5 the
-   --  packing of a capability's header (ADR 0001).
+   --  version 4 each process's FPU and SSE state, version 5 the packing
+   --  of a capability's header, version 6 the derivation records
+   --  (ADR 0001), and version 7 a table of 64 endpoints in each
+   --  process.
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -40,7 +42,7 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Interrupts) of Saved_Interrupt
      with Pack, Size => Max_Saved_Interrupts * 128;
 
-   Kernel_Header_Bytes : constant := 32 + Max_Saved_Interrupts * 16;
+   Kernel_Header_Bytes : constant := 40 + Max_Saved_Interrupts * 16;
 
    type Kernel_Table_Header is
       record
@@ -54,6 +56,12 @@ package Rose.Checkpoints is
          --  The object id the kernel gives the next process.  A restore
          --  carries on from here, so that no process has the id of one
          --  that a cap in the checkpoint names.
+         Record_Page_Count : Rose.Words.Word_32 := 0;
+         Record_Count      : Rose.Words.Word_32 := 0;
+         --  The pages of derivation records that follow this one, and
+         --  how many records are in them: those numbered 1 to
+         --  Record_Count, as Saved_Record.  There are no pages if no
+         --  record is in use.
          Interrupts      : Saved_Interrupt_Array;
          Reserved        : System.Storage_Elements.Storage_Array
                              (1 .. Rose.Limits.Page_Size
@@ -62,11 +70,32 @@ package Rose.Checkpoints is
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
+   --  A derivation record (ADR 0001).  The counts of the slots and the
+   --  children that name it are not saved: a restore counts them again
+   --  from the capabilities and the records that it restores.
+
+   Record_Used    : constant := 1;
+   Record_Revoked : constant := 2;
+
+   type Saved_Record is
+      record
+         Parent : Rose.Words.Word_16 := 0;
+         Flags  : Rose.Words.Word_16 := 0;
+      end record
+     with Pack, Size => 32;
+
+   type Saved_Record_Array is
+     array (Positive range <>) of Saved_Record
+     with Pack;
+
+   Records_Per_Page : constant := Rose.Limits.Page_Size / 4;
+   Max_Record_Pages : constant := 4;
+
    Process_Record_Magic : constant := 16#5052_4F43_4553_5331#;
 
    Max_Saved_Waiting   : constant := 16;
    Max_Saved_Ranges    : constant := 8;
-   Max_Saved_Endpoints : constant := 32;
+   Max_Saved_Endpoints : constant := 64;
    Max_Saved_Shared    : constant := 8;
 
    Saved_Register_Bytes   : constant := 64;
@@ -128,7 +157,7 @@ package Rose.Checkpoints is
      with Pack, Size => Max_Saved_Endpoints * 128;
 
    Process_Record_Bytes : constant :=
-                            1216 + 4 + Saved_FPU_Bytes
+                            1216 + 512 + 4 + Saved_FPU_Bytes
                             + Max_Saved_Shared * 16;
    --  The bytes of a process record page that are in use.
 
@@ -320,7 +349,8 @@ package Rose.Checkpoints is
 
    Mem_Process_Magic : constant := 16#4D50_524F_4345_5331#;
 
-   Max_Saved_Segments : constant := 8;
+   Max_Saved_Segments : constant := 32;
+   --  A process record holds up to 101 segments in its page (ADR 0025).
 
    --  Segment flags.
    Segment_Readable       : constant := 16#01#;
@@ -329,6 +359,7 @@ package Rose.Checkpoints is
    Segment_Extensible     : constant := 16#08#;
    Segment_Persistent     : constant := 16#10#;
    Segment_Private_Region : constant := 16#20#;
+   Segment_Shared         : constant := 16#40#;
 
    --  Base, Bound and Limit are virtual page addresses.  The segment's
    --  pages come from the region whose pages have object ids from

@@ -18,6 +18,13 @@ package Tests.Registry is
    function Clock return Rose.Capabilities.Capability;
    --  The clock's Clock interface.
 
+   procedure Set_Bank (Bank : Rose.Capabilities.Capability);
+   --  The Bank that Run_Self_Tests is given for its Storage_Service role,
+   --  or the null cap if it has none, as when petal runs it.
+
+   function Bank return Rose.Capabilities.Capability;
+   --  The bank, or the null cap.
+
    function Create_Endpoint return Rose.Capabilities.Capability;
    --  The create endpoint cap that Run_Self_Tests is given for its
    --  Create_Endpoint role.

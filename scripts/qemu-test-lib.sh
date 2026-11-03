@@ -93,7 +93,7 @@ install_rose () {
         exit 1
     fi
     echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
-        | grep -c ': ok') checks ok"
+        | grep -c ': ok') of its checks seen ok"
 }
 
 wait_for_install () {

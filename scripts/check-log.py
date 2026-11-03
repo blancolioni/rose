@@ -54,8 +54,12 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 8
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 5
+KERNEL_TABLE_VERSION = 7
 MAX_SAVED_INTERRUPTS = 32
+RECORDS_PER_PAGE = PAGE_SIZE // 4
+MAX_RECORD_PAGES = 4
+MAX_RECORD_DEPTH = 8
+RECORD_USED = 1
 PROCESS_RECORD_MAGIC = 0x50524F4345535331
 CAPS_PER_PAGE = PAGE_SIZE // 20
 
@@ -126,6 +130,34 @@ def describe_page(page):
     return "an empty page" if not any(page) else "something else"
 
 
+def check_records(log, first, count):
+    """Check the derivation records, in the pages that start at first.
+
+    Returns a description of what is wrong, or None.  A record that is used
+    is one level below its parent, which is used, with at most eight levels,
+    as the kernel checks when it restores them."""
+    records = []
+    for i in range(count):
+        if i % RECORDS_PER_PAGE == 0:
+            page = log.page(first + i // RECORDS_PER_PAGE)
+        parent, flags = struct.unpack_from("<HH", page,
+                                           (i % RECORDS_PER_PAGE) * 4)
+        records.append((parent, flags))
+
+    for number, (parent, flags) in enumerate(records, 1):
+        if not flags & RECORD_USED:
+            continue
+        current, steps = number, 0
+        while current:
+            if current > count or not records[current - 1][1] & RECORD_USED \
+               or steps == MAX_RECORD_DEPTH:
+                return "derivation record %d is not %d levels or fewer " \
+                    "below a root" % (number, MAX_RECORD_DEPTH)
+            steps += 1
+            current = records[current - 1][0]
+    return None
+
+
 def check_kernel_tables(log, first, last, verbose):
     """Check the kernel's tables at the start of an entry whose pages are
     first .. last.
@@ -145,7 +177,23 @@ def check_kernel_tables(log, first, last, verbose):
         return False, ("kernel tables of %d pages run past the entry"
                        % page_count), 0, oids
 
-    location = first + 1
+    # Version 6 has the derivation records after the header page.
+    record_pages = 0
+    record_count = 0
+    if version >= 6:
+        record_pages = u32(page, 32)
+        record_count = u32(page, 36)
+        if record_pages > MAX_RECORD_PAGES \
+           or record_pages != (record_count + RECORDS_PER_PAGE - 1) \
+           // RECORDS_PER_PAGE:
+            return False, ("kernel tables: %d derivation records do not "
+                           "fit %d pages" % (record_count, record_pages)), \
+                0, oids
+        problem = check_records(log, first + 1, record_count)
+        if problem:
+            return False, "kernel tables: " + problem, 0, oids
+
+    location = first + 1 + record_pages
     for i in range(process_count):
         record = log.page(location)
         if location > first + page_count - 1 \
@@ -187,7 +235,7 @@ def check_kernel_tables(log, first, last, verbose):
     interrupts_offset = 24
     if version >= 3:
         next_oid = u64(page, 24)
-        interrupts_offset = 32
+        interrupts_offset = 32 if version < 6 else 40
         if not 0 < next_oid <= 0xFFFF_FFFF \
            or any(oid >= next_oid for oid in oids):
             return False, ("kernel tables: next object id %d is not past "
@@ -202,12 +250,14 @@ def check_kernel_tables(log, first, last, verbose):
         if verbose:
             print("    interrupt %d -> process %d cap %d" % (vector, oid, cap))
 
-    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s"
+    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s%s"
                   % (process_count, "" if process_count == 1 else "es",
                      page_count, interrupt_count,
                      "" if interrupt_count == 1 else "s",
                      "" if next_oid is None
-                     else ", next object id %d" % next_oid)), \
+                     else ", next object id %d" % next_oid,
+                     "" if not record_count
+                     else ", %d derivation records" % record_count)), \
         page_count, oids
 
 

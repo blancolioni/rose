@@ -71,7 +71,7 @@ package Rose.Server is
 
 private
 
-   Max_Handled_Endpoints  : constant := 32;
+   Max_Handled_Endpoints  : constant := 64;
    --  As many as the kernel registers for a process
    --  (Rose.Kernel.Processes.Max_Registered_Endpoints).
    Max_Endpoint_Instances : constant := 1024;

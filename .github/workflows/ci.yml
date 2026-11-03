@@ -44,6 +44,9 @@ jobs:
           unzip -q alr.zip -d "$HOME/alire"
           export PATH="$HOME/alire/bin:$PATH"
           alr settings --global --set toolchain.assistant false
+          # The solver gives up after 5 seconds by default and then builds
+          # without Syn.
+          alr settings --global --set solver.timeout 600
           git clone https://github.com/blancolioni/syn ../syn
           git -C ../syn checkout "$SYN_REF"
           git clone https://github.com/blancolioni/idle ../idle

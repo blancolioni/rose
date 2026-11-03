@@ -241,6 +241,7 @@ stages:
         - restore_interrupt
         - store_restore
         - memory_restore
+        - restore_derivations
         - {cap: install_media_fs, when: install}
         - {cap: log_reset, when: install}
         - {cap: mbr, when: install}

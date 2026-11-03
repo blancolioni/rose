@@ -45,8 +45,37 @@ package body Rose.Kernel.Capabilities.Page_Table is
             end;
 
          when Unmap_Page =>
-            Rose.Boot.Console.Put_Line
-              ("kernel: unmap page not implemented");
+
+            --  Data: the process's object id and the virtual page, which
+            --  the memory server no longer maps (ADR 0025).
+
+            declare
+               use Rose.Invocation;
+               Pid         : constant Rose.Kernel.Processes.Process_Id :=
+                               Rose.Kernel.Processes.To_Process_Id
+                                 (Rose.Invocation.Get_Object_Id
+                                    (Params.all, 0));
+               Page_Index  : constant Parameter_Word_Index :=
+                               (if Object_Fits_In_Word
+                                then 1 else 2);
+            begin
+               if Pid = Rose.Kernel.Processes.Null_Process_Id then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Invalid_Object);
+               else
+                  Rose.Kernel.Processes.Unmap_Page
+                    (Pid          => Pid,
+                     Virtual_Page =>
+                       Rose.Addresses.Virtual_Page_Address
+                         (Params.Data (Page_Index)));
+                  Params.Control :=
+                    (Flags  => (Reply => True, others => False),
+                     others => <>);
+               end if;
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
+            end;
 
          when Set_Page =>
             declare

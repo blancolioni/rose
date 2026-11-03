@@ -475,6 +475,44 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Set_Current_State (Current_Process_Id, Ready);
             end;
 
+         when Restore_Derivations_Endpoint =>
+            declare
+               use Rose.Kernel.Processes;
+               use type Rose.Words.Word_32;
+               Bad : constant Boolean :=
+                       not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+                       or else not Params.Control.Flags
+                                     (Rose.Invocation.Send_Words)
+                       or else Params.Data (0) > 4095;
+            begin
+               if Bad then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+
+               declare
+                  Pages   : System.Storage_Elements.Storage_Array
+                    (1 .. Params.Buffer_Length);
+                  pragma Import (Ada, Pages);
+                  for Pages'Address use Params.Buffer_Address;
+                  Success : Boolean;
+               begin
+                  Rose.Kernel.Processes.Snapshot.Restore_Derivations
+                    (Pages        => Pages,
+                     Record_Count => Natural (Params.Data (0)),
+                     Success      => Success);
+                  if not Success then
+                     Rose.Boot.Console.Put_Line
+                       ("kernel: cannot restore derivation records");
+                     Return_Error (Params, Rose.Invocation.Request_Error);
+                     return;
+                  end if;
+                  Params.Control.Flags :=
+                    (Rose.Invocation.Reply => True, others => False);
+                  Set_Current_State (Current_Process_Id, Ready);
+               end;
+            end;
+
          when Restore_Interrupt_Endpoint =>
             declare
                use Rose.Kernel.Processes;

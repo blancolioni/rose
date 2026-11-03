@@ -5,35 +5,44 @@
 A capability represents permission to perform one or more operations.
 The possession of a capability for an operation _O_ is both necessary and sufficient for performing _O_.
 
-For the process, a capability is a 32-bit word, with no particular structure.
-The kernel uses the process capability to index a private table of capability structures.
-Each structure defines the capability type, and the object to which it applies.
+For the process, a capability is a number, with no particular structure, and 0 is the null capability.
+The kernel uses the number to index a private table of capability structures, which are called _layouts_.
+Each layout defines the capability type, and the object to which it applies.
 
-Capability structures are stored in pages.
-The first 32 capabilities used by a process are stored directly in the kernel process structure; the rest are stored in private pages mapped to the process.
+A process can have up to 4095 capabilities, numbered from 1.
+Layouts are 16 bytes, and are stored in pages of the kernel's heap that the kernel takes as the process needs them: 256 to a page, and at most 16 pages (ADR 0023).
+A new capability has the lowest number that is free, and deleting a capability frees its number.
+
+Capabilities are copied when they are sent, as <<operations>> describes, and the copy is a layout in the receiver's table, with a number of the receiver's own.
+A process cannot make a capability from nothing: it has those that the kernel gave it, those it was sent, and those that the kernel's operations return to it.
 
 == Capability Types
 
-[NOTE]
-====
-This table is out of date.
-The capability types are listed in `Capability_Type`, in `rose-capabilities-layout.ads` (#121).
-====
-
 [#captypes]
 .Capability Types
-[cols="1,3",options="header"]
+[cols="1,4",options="header"]
 |===
 | Type | Description
 | Null | The null capability; produces an error if used
-| Page Object | Controls access to physical memory
-| Schedule |
-| Process |
-| Interface |
-| Endpoint |
-| Set |
-| Kernel |
+| Endpoint | Calls one of the endpoints that a process serves
+| Receive | Receives calls on one of the endpoints that the process serves
+| Reply | Replies to a process that is waiting for a reply, once
+| Copy | Gives a copy of an endpoint capability of a process, found by its endpoint id
+| Process | Controls a process: starts, resumes and kills it, and gives it capabilities
+| Meta | The operations on the caller's own table: creating endpoints, rescinding, deleting and deriving capabilities, and exiting
+| Kernel | The kernel's services to the system's servers, such as checkpoints, creating processes, timers and restoring a checkpoint
+| Boot | Starts a boot module; used only while the system starts
+| Page Object | A page or a range of pages of memory, which can be mapped
+| Page Table | Maps and unmaps pages in a page table
+| Physical Memory | Reserves memory, lists the regions of memory, and gives access to device pages
+| Interrupt | Reserves an interrupt vector for a handler
+| Arch | Operations that are particular to the processor, which on i686 is port IO
+| Other | Reserved: it has no handler
+| Unused | Was the Create capability, which made a capability from any layout, and was removed (#115); it keeps its place so that the types after it keep their values
 |===
+
+The types are listed in `Capability_Type`, in `rose-capabilities-layout.ads`.
+A call through a capability whose type has no handler is reported on the kernel's console.
 
 === Generic Capability Layout
 
@@ -43,45 +52,91 @@ Common fields are as follows.
 
 image::capability.svg[Generic capability layout]
 
-* `Rescinded Count` is the number of times a capability has been rescinded.
-  Any time the capability is invoked, the rescinded counts must match.
-* `Derivation` names the record of what the capability was derived from, or
-  is 0 if it was not derived.
-  A capability is valid only if no record from its own up to the root has
-  been revoked.
-* `S` is set for single-use capabilities.
+* `Type` is the capability type.
+* `S` is set for single-use capabilities, which the kernel deletes when they are invoked.
 * `R` requests read-only access to some resource.
 * `W` requests write access to some resource.
 * `X` requests execution access to some resource.
-* `Type` is the capability type.
+* `Endpoint` is an index into the endpoint table of the process that serves the capability, which is translated by the kernel into an endpoint id (see <<endpoints>>).
 * `Identifier` is provided to the receiving object.
-* `Endpoint` is an index into the receiving objects endpoint list, which is translated by the kernel into an endpoint id.
+* `Rescinded Count` is the number of times a capability has been rescinded.
+  Any time the capability is invoked, the rescinded counts must match.
+* `Derivation` names the record of what the capability was derived from, or is 0 if it was not derived.
+  A capability is valid only if no record from its own up to the root has been revoked (see <<revocation>>).
 * `Payload` is a type-specific payload, often an object id.
 
 === Endpoint Capabilities
 
 An endpoint capability is used to invoke an endpoint on the remote object.
-If the process is currently listening on the capability's endpoint, the receive invocation will return with the corresponding invocation record.
+The `Endpoint` field names which of the server's endpoints the call is for, and the server receives the call, with the `Identifier` of the capability, on the receive capability that listens for that endpoint.
+The payload is the object id of the process that serves it.
+
+Before the kernel delivers a call it checks that the capability is valid, by the rescinded count and the derivation (see <<revocation>>).
+A call through a capability that is not valid fails with `Invalid_Capability`, and the server does not see it.
 
 ==== Endpoint Capability Layout
 
 image::endpoint-cap.svg[Endpoint capability layout]
 
+=== Receive Capabilities
+
+A receive capability is held by the process that serves an endpoint, and receives the calls that are made on it.
+If a call is waiting, the receive returns it; if not, the process blocks until one comes, or, if it does not want to block, the receive fails with `Request_Would_Block`.
+A process that has a receive capability for each of its endpoints can also receive on any of them at once, with the meta capability's `Receive_On_Any_Cap`.
+
+=== Reply Capabilities
+
+When a call asks for one, with the `Create_Reply_Cap` flag, the kernel gives the process that receives it a reply capability, which sends the reply to the caller that is waiting for it.
+It is single-use: invoking it deletes it.
+A reply capability for a caller that is not waiting for a reply, because it was killed or has been replied to, does nothing.
+
+=== Copy Capabilities
+
+A copy capability holds the object id of a process.
+Invoked with a 64-bit endpoint id in the first two words, it replies with a copy of that process's capability for the endpoint, in a new capability of the caller.
+A third word replaces the identifier of the copy.
+It fails with `Invalid_Endpoint` if the process has gone or serves no such endpoint.
+This is how a client that knows only a process and an endpoint id gets a capability to call it.
+
 === Page Object Capabilities
 
-A page object gives access to a shared buffer.
-Three endpoints are implemented: `copy-to-buffer`, `copy-from-buffer`, and `map-device-memory`.
+A page object gives access to a page of memory, or to a range of pages.
+Two endpoints are implemented: `Identity_Map_Page`, which maps the page at its own address, and `Map_Device_Range`, which maps a range of device pages at an address in the device window, if none of them is RAM (#582).
 
 ==== Page Object Capability Layout
 
 image::page-object-cap.svg[Page object capability layout]
 
+=== Page Table Capabilities
+
+A page table capability maps a page into the page table that it names (`Map_Page`), unmaps one (`Unmap_Page`), or sets the flags of one (`Set_Page`).
+
+=== Physical Memory Capabilities
+
+A physical memory capability has one of these endpoints: reserving device memory, getting the number of regions of memory that the boot loader reported, getting one of them, and giving a capability for a device page, or for a range of them.
+Only init has the capabilities for the last two, which give a capability that maps a page or a range at the same address, or in the device window, unless a page is RAM.
+
+=== Interrupt Capabilities
+
+An interrupt capability reserves an interrupt vector for a process to handle.
+Init holds one for the whole range of device vectors, whose `Derive` endpoint replies with a capability for one vector, so that a driver can reserve only its own.
+
 === Process Capabilities
 
 A process capability is used to communicate with a running process.
-Two actions are possible, depending on the value of the `Op` field.
-If Op is zero, the capability returns the process's default interface.
-If Op is one, the capability sends the capabilities in the invocation to the process.
+Its endpoints are:
+
+[cols="1,5",options="header"]
+|===
+| Endpoint | Description
+| Process interface | Replies with the capabilities of the process's `Process` interface, such as getting its name, destroying it, getting its object id and resuming it
+| Resume | Makes the process ready to run
+| Faulted | Marks the process as faulted
+| Kill | Kills the process
+| Start | Starts the process, at the address in the first word of the invocation
+| Initial cap | Sends the capabilities in the invocation to the process, which are copies, and takes numbers in its table
+| Command endpoint | Creates the endpoint of a new process that runs a command (ADR 0002)
+|===
 
 Process capabilities are normally given to the parent process by the kernel when the child is launched.
 The parent can then query the child, or send it capabilities.
@@ -90,6 +145,33 @@ For example, when the Petal shell executes a program, it uses the process capabi
 ==== Process Capability Layout
 
 image::process-cap.svg[Process capability layout]
+
+=== Meta Capabilities
+
+A meta capability works on the capabilities of the process that invokes it.
+Its endpoints are:
+
+[#meta-capability-endpoints]
+.Meta capability endpoints
+[cols="1,1,4",options="header"]
+|===
+| Endpoint | Number | Description
+| Create Endpoint | 1 | Registers an endpoint id, and replies with a receive capability and an endpoint capability for it
+| Get Object Id | 9 | Replies with the object id in the capability
+| Derive Cap | 10 | Replies with a copy of the capability in the invocation, that can be rescinded on its own (see <<operations>>)
+| Receive On Any Cap | 17 | Receives on any of the process's endpoints
+| Enable Kernel Debug | 28 | Turns the kernel's logging of calls on or off
+| Rescind Cap | 29 | Rescinds the capabilities in the invocation
+| Delete Cap | 30 | Deletes the capabilities in the invocation
+| Exit Process | 31 | Ends the process
+|===
+
+A process is given a meta capability for each of the operations that it may use, and they are the system capabilities of the run-time system (see <<idl>>): `Create_Endpoint`, `Delete_Cap` and `Rescind_Cap`.
+
+=== Kernel Capabilities
+
+A kernel capability is a service of the kernel that only the system's servers have, and which of them has which is set when init starts them (see the Boot Sequence chapter).
+The services are enabling paging, starting a checkpoint and an image write, creating a process, adding memory to the kernel's heap, setting a timeout, reading the time, entering and leaving a checkpoint, starting the log, tracing, restoring a process, an interrupt or the derivation records from a checkpoint, resuming a restored process, restarting the machine, and reading a boot loader tag.
 
 === Boot Capabilities
 
@@ -134,6 +216,8 @@ The possible endpoints are as follows.
 | 4 | port in range | Invocation data specifies port offsets, result written to received words
 |===
 
+Init holds a port capability for the whole range of ports, and derives from it a capability for the range that a driver needs, which cannot be widened.
+
 ==== Invocation word format
 
 The sent words layout for the port-out-range endpoint varies depending on the size of the data.
@@ -149,6 +233,105 @@ Extra sent words are ignored.
 In all cases, an offset of 255 indicates that no data should be sent.
 Any offset that is not within the port range is also ignored.
 
+[#endpoints]
+== Endpoints
+
+A server is a process that serves endpoints.
+Three numbers name one, and they are easy to confuse.
+
+* The *endpoint id* is 64 bits, and is derived from the declaration of the subprogram, or of the interface, that the endpoint serves (see <<endpoint-ids>>).
+  It is the same in every process, so a client that knows an interface can name it.
+* The *endpoint index* is the number that the kernel gives an endpoint in the table of the process that serves it, when the process registers its id (the meta capability's `Create Endpoint`).
+  It is what a capability holds, in its `Endpoint` field, which is 8 bits, and the kernel translates it back to the id when it delivers a call, in the `Endpoint Id` field of the invocation.
+* The *identifier* is 16 bits in the capability, and tells the objects that one endpoint serves apart.
+  A file server registers the endpoints of `File` once, and gives a client a capability whose identifier is the file.
+
+A process can register at most 64 endpoints, since its table has 64 entries.
+A generated server registers one endpoint for each subprogram of each interface that it implements, and one for each interface, so the number grows with the interfaces that a process serves: the memory server, with five interfaces, uses about 25 of its 64.
+A process that needs more has to be split.
+
+The process that serves an endpoint also holds a capability for it, which is what the kernel compares a client's capability with when it checks that it is valid.
+
+[#operations]
+== Operations on Capabilities
+
+=== Copying
+
+A capability is copied when it is sent: the receiver gets a layout that is the same, in a new capability of its own.
+The copy is as good as the original, and neither can be changed through the other, except by rescinding (below).
+A process can copy only a capability that it holds, and the kernel gives a number that holds nothing to one that it does not, so that those after it keep their places.
+A capability that is single-use is deleted when it is invoked, and so is a reply capability.
+
+=== Deleting
+
+Deleting a capability (the meta capability's `Delete Cap`) empties its layout and frees its number.
+It does not affect any copy.
+A process that ends has all its capabilities deleted.
+
+=== Rescinding
+
+Rescinding a capability adds one to the rescinded count in its layout.
+A call through a capability is valid only if its count is the same as that of the capability that the serving process holds for the endpoint, so rescinding the server's own capability makes every copy that was made of it invalid, in every process, and the server decides who is given a new one.
+A rescinded capability that was derived (below) works differently, and affects only what was derived from it.
+
+=== Deriving
+
+The meta capability's `Derive Cap` replies with a copy of the capability in the invocation, in a new capability of the caller, with a record of its own that says which it was made from.
+The copy can do whatever the original could, and no more.
+It can be rescinded on its own: only it, its copies and what is derived from it are made invalid, and the capability that it was derived from, and its other copies and derivations, are not.
+A capability can be derived from to a depth of eight.
+It fails with `Invalid_Operation` if the capability is not the caller's, is not valid, or is already eight levels down, and with `Out_Of_Capabilities` if there is no number or no record left.
+
+A server derives a capability for each client, to be able to take it back from one without the others, and a client that passes one on can derive for the process that it passes it to.
+
+Ports and interrupts have a different derivation, which makes a capability for a smaller range of them, from a capability of init's; it does not make a record.
+
+[#revocation]
+== Revocation
+
+Rose takes capabilities back in three ways, each where it fits (ADR 0001).
+
+* *The kernel* takes back a capability that is derived, which is what this section describes.
+* *Membranes*, which are processes that forward the calls that go through them, take back everything that passed through one at once, which is what a command that is run in a sandbox needs.
+  They are not built yet (#118).
+* *The memory server* takes back memory, by unmapping it from the processes that have it mapped, which no capability does.
+  It is not built yet (#120).
+
+=== Derivation records
+
+The kernel has a table of 4,095 _derivation records_, one for each capability that was derived, and for each that is rescinded.
+A record has the record that it was derived from, which is its parent, or none for a capability that was derived from one that was not; its depth, which is one more than its parent's, and at most eight; whether it has been revoked; and how many capabilities and records name it.
+The layout of a capability that was derived holds the number of its record, in `Derivation`, and one that was not holds 0.
+A record is 12 bits in a layout, and nothing else in an invocation changes.
+
+A call is valid if its rescinded count is that of the serving process's capability, which is what makes rescinding the server's own capability revoke every copy, and if its record, and each record above it, has not been revoked.
+That is at most nine reads, and the kernel allocates nothing.
+
+=== Rescinding a derived capability
+
+Rescinding a capability that was derived revokes its record, which makes the capability, every copy of it, and everything derived from it invalid, since each names a record that has a revoked record above it.
+Its parent and its siblings are not affected.
+The capability that was rescinded is given a new record, with the same parent, so it goes on working, and what it was rescinded for is that its copies do not.
+If there is no record to give it, it stays on the one that was revoked, and its holder derives another.
+
+=== How long a record lasts
+
+A record is kept while a capability or another record names it.
+A copy of a capability that names it, and deriving from it, add one; deleting a capability, a single-use capability that is used, and the end of a process that holds one, take one away.
+A record that nothing names is freed, and takes one away from its parent, which may be freed in turn.
+A record that has been revoked stays until the copies of it are deleted.
+So a capability can never name a record that has been freed and used for another, and no number of revocations counts them out.
+
+=== Checkpoints
+
+The checkpoint saves a capability with its layout, so it saves the number of its record, and it saves the records (see the Persistence chapter): for each, its parent and whether it is used and revoked, for the records up to the last that is used.
+It does not save the counts.
+A restore gives the kernel the records first, which checks them, and then restores the processes, whose capabilities are counted as they are written back, and when the first process resumes, the records that no restored capability names are freed.
+
+A table that the kernel does not accept is not restored: a record with a parent that is not used, or more than eight levels, or a cycle.
+
+The kernel's records, and what is proved of them (that their depth is their parent's and one, so there are no cycles; that a record that is free is not named; that the counts are the references; and that rescinding makes invalid the record and what is below it, and nothing else), are described in the Verification chapter.
+
 == Invocation
 
 A capability is invoked by making a system call using an _invocation record_.
@@ -157,43 +340,42 @@ A capability is invoked by making a system call using an _invocation record_.
 
 image::invocation-record.svg[Invocation record]
 
-[WARNING]
-====
-The diagram above is generated from `Rose.Invocation.Invocation_Record` and is current.
-The text and the flags table below describe an older record, with `Use`, `CC` and eight flags, and are out of date (#121).
+The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 
-`Flags` is a packed array indexed by `Invocation_Flag`, so flag _N_ is bit _N_:
-`Writable_Buffer` (0), `Send_Buffer`, `No_Trace`, `Error`, `Send`, `Receive`, `Reply`, `Block`, `Create_Reply_Cap`, `Send_Words`, `Recv_Words`, `Send_Caps` and `Recv_Caps` (12).
-`SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`.
-====
+* `Flags` says what the invocation is, and which of the fields below are in use (see the table).
+* `SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`: the index of the last word or capability that is sent, or that the sender is prepared to receive in the reply.
+  They are meaningful only when the flag for sending or receiving words or capabilities is set.
+  A call has up to 16 words and 16 capabilities.
+* `Capability` is the capability that is being invoked.
+* `Reply Capability` is set by the kernel, when the flag asks for it, and gives the target of an invocation a capability on which to send a reply.
+* `Endpoint Id` is set by the kernel when it delivers a call, to the 64-bit id of the endpoint that the capability names.
+* `Identifier` is the identifier of the capability that was invoked.
+* `Error` is the reason that an invocation failed, if the `Error` flag is set.
+  `Extra Errors` and `Unused` are not used.
+* `Parameter words` and `Capabilities` are the words and capabilities that are sent, and where those that are received are put.
+* `Buffer address` and `Buffer length` are the buffer that is shared with the receiver, if `Send_Buffer` is set.
 
-The `RWC` field is the number of words which the sender is prepared to receive in response to the invocation.
-A reply to this message cannot contain more words than specified here, although it can contain less.
-
-The `SWC` field is the number of sent words.
-
-The `CC` field is the number of sent capabilities.
-
-The `Capability` field contains the capability being invoked.
-The `Reply Capability` field is set by the kernel, and gives the target of an invocation a capability on which to send a reply.
-
-If any capabilities are sent, the `Use` field limits the number of times they can be used.
-An allocation count of zero means there is no limit.
+`Flags` is a packed array indexed by `Invocation_Flag`, so flag _N_ is bit _N_.
 
 [#invocation-flags]
 .Invocation Flags
 [cols="1,2,5",options="header"]
 |===
-| Id | Name | Description
-| W | Write | If the P flag is set, allow the receiver to write to the buffer
-| P | Pages | Send one or more shared buffers
-| E | Error | An error occurred (code is in first data word)
-| S | Send | Unprompted send on a capability
-| R | Receive | Willing to receive messages
-| Y | Reply | This is a reply to an earlier send
-| B | Block | The sender will block until the next message
-| C | Cap Construct | Create a reply cap for the message response
-| SWC | Sent Word Count | SWC contains the number of sent words
-| RWC | Receive Word Count | RWC contains the maximum received words
-| CC | Capability Count | Number of sent capabilities
+| Bit | Name | Description
+| 0 | Writable_Buffer | If `Send_Buffer` is set, allow the receiver to write to the buffer
+| 1 | Send_Buffer | Share a buffer with the receiver
+| 2 | No_Trace | Leave this invocation out of the trace
+| 3 | Error | An error occurred; the code is in `Error`
+| 4 | Send | Unprompted send on a capability
+| 5 | Receive | Willing to receive messages
+| 6 | Reply | This is a reply to an earlier send
+| 7 | Block | The sender will block until the next message
+| 8 | Create_Reply_Cap | Create a reply capability for the message response
+| 9 | Send_Words | `SW` is the index of the last sent word
+| 10 | Recv_Words | `RW` is the index of the last word that the sender will receive
+| 11 | Send_Caps | `SC` is the index of the last sent capability
+| 12 | Recv_Caps | `RC` is the index of the last capability that the sender will receive
 |===
+
+An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability` (the capability is null, has no handler, or is not valid), `Out_Of_Capabilities`, `Out_Of_Endpoints`, `Unknown_Request`, `Request_Error`, `No_Access`, `Request_Would_Block`, `Closed`, `Invalid_Endpoint`, `Invalid_Operation`, `Invalid_Object`, `Operation_Not_Implemented`, `Missing_Data`, `Unknown_Error` and `Undefined_Error`.
+The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, and a generated server reports `Exception_Raised` when the handler of an operation raises an exception.
