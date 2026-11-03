@@ -397,3 +397,74 @@ s-gearop.ads
 s-gearop.adb
 a-cgaaso.ads
 a-cgaaso.adb
+
+# Floating-point Image and Value (#670): System.Img_Flt and Val_Flt for
+# each float type, with System.Image_R and Img_Util, which they share, and
+# the tables of powers of ten. System.Float_Control's body is Rose's own,
+# in src/adainclude: the kernel gives each process a clean FPU.
+s-imgflt.ads
+s-imglfl.ads
+s-imgllf.ads
+s-imager.ads
+s-imager.adb
+s-imguti.ads
+s-imguti.adb
+s-imgllu.ads
+s-imgllu.adb
+s-vs_llu.ads
+s-valflt.ads
+s-vallfl.ads
+s-valllf.ads
+s-valrea.ads
+s-valrea.adb
+s-powflt.ads
+s-powlfl.ads
+s-powllf.ads
+s-flocon.ads
+
+# Ada.Text_IO.Float_IO and Ada.Float_Text_IO, Long_Float_Text_IO and
+# Long_Long_Float_Text_IO (#670), with Ada.Text_IO.Generic_Aux.
+a-tiflio.ads
+a-tiflio.adb
+a-tiflau.ads
+a-tiflau.adb
+a-tigeau.ads
+a-tigeau.adb
+a-flteio.ads
+a-lfteio.ads
+a-llftio.ads
+
+# Fixed-point and decimal Image and Value (#670), for the 32-bit and
+# 64-bit types: System.Img_Fixed_32 and _64, Img_Decimal_32 and _64,
+# Val_Fixed_32, Val_Decimal_32 and _64, with the generic Image_F, Image_D
+# and Value_D, System.Arith_32, the Fore helpers, and System.Exponn for the
+# powers of ten that Value_D takes. Text_IO.Fixed_IO and
+# Decimal_IO are not here: the installed GCC's bodies use the 128-bit
+# units as well, which i686 can't compile.
+s-imfi32.ads
+s-imfi64.ads
+s-imagef.ads
+s-imagef.adb
+s-imde32.ads
+s-imde64.ads
+s-imaged.ads
+s-imaged.adb
+s-vafi32.ads
+s-vade32.ads
+s-vade64.ads
+s-valued.ads
+s-valued.adb
+s-arit32.ads
+s-arit32.adb
+s-fore_f.ads
+s-fore_f.adb
+s-fore_d.ads
+s-fore_d.adb
+s-fode32.ads
+s-fode64.ads
+s-exnint.ads
+s-exnint.adb
+s-exnlli.ads
+s-exnlli.adb
+s-exponn.ads
+s-exponn.adb
