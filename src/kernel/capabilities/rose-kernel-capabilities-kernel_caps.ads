@@ -52,6 +52,12 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  buffer, which has to be writable, as far as it fits.  The reply's
    --  data word is the tag's whole size, or 0 if there is no such tag.
 
+   Restore_Derivations_Endpoint : constant Rose.Objects.Endpoint_Index := 18;
+   --  The sent buffer holds the pages of derivation records that follow
+   --  the kernel's header page, and data word 0 is the number of records
+   --  (ADR 0001).  Only the restore server has this cap, and calls it
+   --  before it restores any process.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

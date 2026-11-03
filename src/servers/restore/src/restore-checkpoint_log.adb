@@ -212,6 +212,21 @@ package body Restore.Checkpoint_Log is
       Process_Count := Natural (Kernel_Header.Process_Count);
       Kernel_Oid_Count := 0;
 
+      --  The processes' records come after the derivation records.
+
+      if Kernel_Header.Record_Page_Count > Rose.Checkpoints.Max_Record_Pages
+        or else Kernel_Header.Record_Page_Count
+          /= (Kernel_Header.Record_Count
+              + Rose.Checkpoints.Records_Per_Page - 1)
+            / Rose.Checkpoints.Records_Per_Page
+      then
+         Report_Bad_Entry (Location, "derivation records do not fit "
+                           & "their pages");
+         return False;
+      end if;
+
+      Index := 2 + Natural (Kernel_Header.Record_Page_Count);
+
       if Kernel_Pages = 0 or else Kernel_Pages > Pages then
          Report_Bad_Entry (Location, "kernel tables run past the entry");
          return False;
