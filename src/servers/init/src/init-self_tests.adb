@@ -89,7 +89,8 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability)
       return Boolean
    is
       Passed : Boolean := True;
@@ -149,6 +150,10 @@ package body Init.Self_Tests is
       Sibling : Rose.Capabilities.Capability;
       Chain   : Chain_Array;
       Length  : Natural;
+      Kept    : Rose.Capabilities.Capability;
+      Spare   : Rose.Capabilities.Capability;
+      Below   : Rose.Capabilities.Capability;
+      Held    : Rose.Capabilities.Capability;
    begin
       First   := Derive (Derive_Cap, Find_Cap);
       Child   := Derive (Derive_Cap, First);
@@ -183,6 +188,32 @@ package body Init.Self_Tests is
                 Length = Max_Depth and then Works (Chain (Max_Depth)));
          Delete_Chain (Chain, Length);
       end loop;
+
+      --  Two are kept, so that the checkpoint has derivation records to
+      --  restore (the boot test looks for them).  A record is the lowest
+      --  that is free, so Below, which is derived from Kept, has a lower
+      --  number than it: a restore has to put Kept back first.  Init is
+      --  not restored, so the caps server holds them, in a cap set, and
+      --  init lets go of its own.
+
+      Spare := Derive (Derive_Cap, Find_Cap);
+      Kept  := Derive (Derive_Cap, Find_Cap);
+      Call_On (Delete_Cap, Spare);
+      Below := Derive (Derive_Cap, Kept);
+
+      Check ("two are derived to be kept",
+             Kept /= Rose.Capabilities.Null_Capability
+             and then Below /= Rose.Capabilities.Null_Capability
+             and then Works (Kept) and then Works (Below));
+
+      Held := Init.Calls.Create_Cap_Set_With
+        (Create_Cap_Set, (Kept, Below));
+
+      Check ("the caps server holds them",
+             Held /= Rose.Capabilities.Null_Capability);
+
+      Call_On (Delete_Cap, Kept);
+      Call_On (Delete_Cap, Below);
 
       return Passed;
    end Derive_Test;

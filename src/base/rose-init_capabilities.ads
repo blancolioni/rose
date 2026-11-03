@@ -63,7 +63,11 @@ package Rose.Init_Capabilities is
    --  rescinded on its own, without rescinding the capability that it was
    --  made from or any other copy of that (ADR 0001, #116).
 
-   Last_Cap               : constant := 27;
+   Restore_Derivations_Cap : constant := 28;
+   --  Sends the derivation records of a checkpoint to the kernel, before
+   --  the restore server restores a process (ADR 0001).
+
+   Last_Cap               : constant := 28;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

@@ -45,6 +45,24 @@ package Rose.Kernel.Processes.Snapshot is
    --  record of it (ADR 0004, section 4).  Every process must have been
    --  restored before any is resumed.
 
+   procedure Restore_Derivations
+     (Pages        : System.Storage_Elements.Storage_Array;
+      Record_Count : Natural;
+      Success      : out Boolean);
+   --  Put the derivation records in Pages back, which are those of
+   --  Rose.Checkpoints.Saved_Record, numbered 1 to Record_Count.  It must
+   --  come before the first Restore_Process, since the capabilities that
+   --  are restored name the records.  Success is False, and nothing is
+   --  restored, if the records are not a consistent table, or there are
+   --  records already.  Each record has a slot of its own until
+   --  Release_Restore_Holds, which counts the capabilities that name it.
+
+   procedure Release_Restore_Holds;
+   --  Every process has been restored, and so every capability that names
+   --  a record has counted it: drop the slot that Restore_Derivations
+   --  gave each record, which frees the records that nothing names.  It
+   --  does nothing if it has done it, or if there was nothing to restore.
+
    procedure Restore_Interrupt
      (Interrupt : Rose.Arch.Interrupts.Interrupt_Vector;
       Object    : Rose.Objects.Object_Id;

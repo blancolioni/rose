@@ -24,6 +24,7 @@ package Restore is
    Restore_Interrupt_Cap : Rose.Capabilities.Capability;
    Store_Restore_Cap     : Rose.Capabilities.Capability;
    Memory_Restore_Cap    : Rose.Capabilities.Capability;
+   Restore_Derivations_Cap : Rose.Capabilities.Capability;
 
    --  Only restore-install has these (Restore.Install_Driver).
    Install_Media_Cap   : Rose.Capabilities.Capability :=

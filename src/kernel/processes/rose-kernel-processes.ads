@@ -5,6 +5,7 @@ with Rose.Words;
 
 private with Rose.Kernel.Arch;
 private with Rose.Kernel.Cap_Tables;
+private with Rose.Kernel.Derivations;
 private with Rose.Kernel.Interrupts;
 private with Rose.Kernel.Limits;
 
@@ -546,6 +547,11 @@ private
      access all Kernel_Process_Table;
 
    Process_Table : Process_Table_Access;
+
+   Derivation_Records : Rose.Kernel.Derivations.Table;
+   --  What the capabilities that were derived name (ADR 0001).  A slot
+   --  that holds a layout with a derivation counts as a reference to its
+   --  record, which Set_Cap, Delete_Cap and Release_Entry keep.
 
    procedure Create_Process_Table_Entry
      (Pid : Rose.Kernel.Processes.Process_Id;
