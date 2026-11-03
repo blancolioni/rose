@@ -59,7 +59,7 @@ end Cap_Set;
 | Interface | Parents | Operations | Implemented by
 | `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault`, `Notify` | The kernel
 | `Process` | `Segment`, `Server`, `Cap` | `Heap_Interface`, `Exit_Process`, `Publish_Interface` | `mem`
-| `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment` |
+| `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint` | `mem`
 | `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
@@ -239,7 +239,7 @@ An entry is named by its location in the log, which never changes; `First_Entry`
 |===
 | Interface | Parents | Operations | Implemented by
 | `Storage_Checkpoint` | | `Checkpoint`, `Restore_Region`, `Find_Region` | `store`
-| `Memory_Restore` | | `Restore_Process`, `Restore_Segment`, `Restore_Zero_Segment`, `Restore_Page` | `mem`
+| `Memory_Restore` | | `Restore_Process`, `Restore_Segment`, `Restore_Zero_Segment`, `Restore_Page`, `Restore_Shared_Page` | `mem`
 | `Restorable` | | `Restored` | `vga-console`
 |===
 

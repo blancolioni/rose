@@ -1,5 +1,14 @@
 interface Region is
 
+   --  A range of store pages. A process maps a region into its address
+   --  space with Segment.Add_Segment. A shared segment (Segment_Shared,
+   --  or Rose.Shared_Regions) maps the region's pages themselves, so
+   --  every process that maps a page shared sees the same memory (ADR
+   --  0025). Get and Put don't see a shared mapping: while a page is
+   --  mapped shared, Get returns what is on the device, which can be
+   --  older, and a Put can be overwritten when the last mapping goes. A
+   --  program that shares a region uses it only through mappings.
+
    procedure Get_Range
      (Base_Page : out Object_Id;
       Bound_Page : out Object_Id);

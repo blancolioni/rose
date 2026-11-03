@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-03
 - **Related:** #593 (this decision), [ADR 0022](0022-display-server.md) (the display server, which needs it), [ADR 0014](0014-banks.md) (banks), #200 (the read-only page cache), #356 (consolidation)
+- **Amended by:** #593's implementation, which needed two small kernel changes (Context), lists the shared pages written back to their regions in each checkpoint (sections 4 and 5), and fails the faulting process when the shared table is full (section 6)
 
 ## Context
 
@@ -19,6 +20,8 @@ The gap is in what the memory server does with a writable segment over a region:
 Writing changed pages back to the region instead would not be consistent. The storage server writes a `Region.Put` straight to its device, outside the checkpoint log. After a restore to an earlier checkpoint, the region would hold pages that are newer than everything else in the system.
 
 Nothing about this needs the kernel. The memory server already maps one physical page into several processes, and handles each process's write fault on it separately.
+
+Amended by #593. Two small kernel changes were needed after all. The kernel's `Unmap_Page`, which nothing had called before `Remove_Segment`, never let the memory server run again. And boot modules take their memory from a reservation in the kernel's heap (`Boot_Module_Pages`), which the memory server's larger tables outgrew.
 
 ## Decision
 
@@ -60,17 +63,19 @@ A checkpoint saves each dirty shared page once, keyed by its store page, not by 
 
 So the truth for a shared page is in the log, as it is for a private page, and the region on its device keeps the contents it had when it was first mapped. Consolidation (#356) has to keep the latest copy of each shared page, as it does for each private page.
 
+Amended by #593. The shared header pages also list the pages that were written back to their regions since the last checkpoint (section 5), as released, with no contents. A restore reads the shared pages of every entry up to the checkpoint, and the last that it reads for a store page wins. If that one is released, the region has the newest contents, and the restore doesn't use an older entry's copy. Without this, a page that was saved, then written again and written back when its last mapping went, would be restored from the log with its older contents. The last header page of the per-process pages has a flag, `Has_Shared_Pages`, when shared header pages follow, so entries without them are read as before. Consolidation has to keep the latest of each store page's saved and released records.
+
 ### 5. Unmapping and releasing
 
 - **`Segment` gets `Remove_Segment (Virtual_Base)`.** It unmaps the segment's pages from that process and drops its count on each shared page. `Unmap` in the library calls it.
 - **A process that ends** drops its counts in the same way.
-- **When the last mapping of a shared page goes,** the memory server writes the page back to its region with `Region.Put` if it is dirty, and then frees it. A later mapping reads it from the region again. This write is outside the checkpoint, like every other `Put`, but nothing maps the page any more, so a restore that brings back a mapping also brings back the page from the log.
+- **When the last mapping of a shared page goes,** the memory server writes the page back to its region with `Region.Put` if it is dirty, and then frees it. A later mapping reads it from the region again. This write is outside the checkpoint, like every other `Put`, but nothing maps the page any more, so a restore that brings back a mapping also brings back the page from the log. (Amended by #593: the next checkpoint lists the page as released, so that a restore after it reads the page from the region, and not from an older entry; see section 4.)
 - **Releasing the region** is the storage server's business. Pages that are already mapped stay mapped until they are unmapped. A fault on a page that isn't in memory gets an error from `Region.Get`, and the memory server faults the process, as it does today for a region that has gone.
 
 ### 6. Limits
 
 - **A process has at most 8 segments** today (`Max_Segments`, `Max_Saved_Segments`). A display client with several windows, and the display server with one mapping per client surface, need more. Both limits go to 32.
-- **The shared table** is sized like the page cache. A mapping that would overflow it fails, and `Add_Segment` reports that.
+- **The shared table** is sized like the page cache. A mapping that would overflow it fails, and `Add_Segment` reports that. (Amended by #593: the memory server is built for the kernel target, whose handlers can't report a failure. The table has 2,048 pages, and a fault that would overflow it fails the process.)
 
 What the segment limit costs, from GNAT's representation of `mem-processes.adb` (`-gnatR2`):
 
@@ -105,7 +110,7 @@ So a segment for each package (ADR 0017) needs two changes beyond a larger limit
 
 ## Consequences
 
-- **No kernel change.** The work is in the memory server, the restore server, the checkpoint format and a small user library.
+- **No kernel change.** The work is in the memory server, the restore server, the checkpoint format and a small user library. (Amended by #593: two small kernel changes; see Context.)
 - **The checkpoint format changes,** with a new header kind and larger process records. Old checkpoints restore, because they have no shared pages and their process records are a prefix of the new ones.
 - **The display server, the `screen` driver and the console on a surface (#583, #582, #653) are unblocked.**
 - **`Region.Get` and `Region.Put` don't see a shared mapping.** While a region is mapped shared, `Get` returns what is on the device, which can be older than the mapping. A program that shares a region should only use it through mappings. The comment on `Region` says so.
