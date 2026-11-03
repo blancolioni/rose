@@ -60,9 +60,9 @@ package body Init.Boot_Steps is
       end if;
 
       if Cap = Null_Capability then
-         if Init.Boot.Console_Interface_Cap /= Null_Capability then
+         if Init.Boot.Console_Stream_Cap /= Null_Capability then
             Init.Calls.Send_String
-              (Init.Boot.Console_Interface_Cap, Fail_Message);
+              (Init.Boot.Console_Stream_Cap, Fail_Message);
          end if;
          Init.Calls.Send (Rose.Init_Capabilities.Exit_Cap);
       end if;
@@ -202,7 +202,7 @@ package body Init.Boot_Steps is
 
    procedure Set_Console is
    begin
-      Init.Calls.Set_Console (Init.Boot.Console_Interface_Cap);
+      Init.Calls.Set_Console (Init.Boot.Console_Stream_Cap);
    end Set_Console;
 
    ----------
