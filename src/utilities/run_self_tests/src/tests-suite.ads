@@ -6,6 +6,7 @@ with Tests.Dispatching;
 with Tests.Exceptions;
 with Tests.Files;
 with Tests.Finalization;
+with Tests.Float_Text;
 with Tests.Heap;
 with Tests.Invalid_Caps;
 with Tests.Memory;
@@ -42,6 +43,7 @@ package Tests.Suite is
                    Tests.Users.User_Test'Access,
                    Tests.Numerics.Numerics_Test'Access,
                    Tests.Numerics.Arrays_Test'Access,
+                   Tests.Float_Text.Float_Text_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
                    Tests.Ada_Calendar.Ada_Calendar_Test'Access,
