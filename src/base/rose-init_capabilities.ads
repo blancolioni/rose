@@ -58,7 +58,12 @@ package Rose.Init_Capabilities is
    --  with a cap that maps the range at an address in the device window
    --  that its holder chooses, if no page in it is RAM (#582).
 
-   Last_Cap               : constant := 26;
+   Derive_Cap             : constant := 27;
+   --  Takes a capability, and replies with a copy of it that can be
+   --  rescinded on its own, without rescinding the capability that it was
+   --  made from or any other copy of that (ADR 0001, #116).
+
+   Last_Cap               : constant := 27;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

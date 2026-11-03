@@ -14,6 +14,179 @@ package body Init.Self_Tests is
    --  The first word of a command's reply when it completes
    --  (Rose.Command_Line.Launch).
 
+   Max_Depth : constant := 8;
+   --  How far down a capability can be derived.
+
+   NL : constant Character := Character'Val (10);
+
+   subtype Chain_Index is Natural range 0 .. Max_Depth + 1;
+   type Chain_Array is
+     array (Chain_Index) of Rose.Capabilities.Capability;
+
+   procedure Call_On
+     (Cap    : Rose.Capabilities.Capability;
+      Target : Rose.Capabilities.Capability);
+   --  Invoke Cap with Target as its one capability, and ignore the reply.
+
+   function Derive
+     (Derive_Cap : Rose.Capabilities.Capability;
+      Cap        : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+   --  A derived copy of Cap, or the null capability if there is none.
+
+   function Works
+     (Cap : Rose.Capabilities.Capability)
+      return Boolean;
+   --  A call through Cap, a copy of the registry's capability, is
+   --  answered.
+
+   -------------
+   -- Call_On --
+   -------------
+
+   procedure Call_On
+     (Cap    : Rose.Capabilities.Capability;
+      Target : Rose.Capabilities.Capability)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Cap);
+      Rose.System_Calls.Send_Cap (Params, Target);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Call_On;
+
+   ------------
+   -- Derive --
+   ------------
+
+   function Derive
+     (Derive_Cap : Rose.Capabilities.Capability;
+      Cap        : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Derive_Cap);
+      Rose.System_Calls.Send_Cap (Params, Cap);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Params.Caps (0);
+   end Derive;
+
+   -----------------
+   -- Derive_Test --
+   -----------------
+
+   function Derive_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Derive_Cap      : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      procedure Derive_Chain (Chain : out Chain_Array; Length : out Natural);
+      --  Derive from Find_Cap, then from that, as far as it goes.
+
+      procedure Delete_Chain (Chain : Chain_Array; Length : Natural);
+      --  Delete what Derive_Chain made.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String
+           (Standard_Output,
+            "derive test: " & Name & (if Ok then ": ok" else ": FAIL")
+            & NL);
+         Passed := Passed and then Ok;
+      end Check;
+
+      ------------------
+      -- Delete_Chain --
+      ------------------
+
+      procedure Delete_Chain (Chain : Chain_Array; Length : Natural) is
+      begin
+         for I in 1 .. Length loop
+            Call_On (Delete_Cap, Chain (I));
+         end loop;
+      end Delete_Chain;
+
+      ------------------
+      -- Derive_Chain --
+      ------------------
+
+      procedure Derive_Chain (Chain : out Chain_Array; Length : out Natural)
+      is
+      begin
+         Chain := (0 => Find_Cap, others => Rose.Capabilities.Null_Capability);
+         Length := 0;
+
+         for I in 1 .. Chain_Index'Last loop
+            Chain (I) := Derive (Derive_Cap, Chain (I - 1));
+            exit when Chain (I) = Rose.Capabilities.Null_Capability;
+            Length := I;
+         end loop;
+      end Derive_Chain;
+
+      First   : Rose.Capabilities.Capability;
+      Child   : Rose.Capabilities.Capability;
+      Sibling : Rose.Capabilities.Capability;
+      Chain   : Chain_Array;
+      Length  : Natural;
+   begin
+      First   := Derive (Derive_Cap, Find_Cap);
+      Child   := Derive (Derive_Cap, First);
+      Sibling := Derive (Derive_Cap, Find_Cap);
+
+      Check ("capabilities are derived",
+             First /= Rose.Capabilities.Null_Capability
+             and then Child /= Rose.Capabilities.Null_Capability
+             and then Sibling /= Rose.Capabilities.Null_Capability);
+      Check ("they work",
+             Works (First) and then Works (Child) and then Works (Sibling));
+
+      Call_On (Rescind_Cap, First);
+
+      Check ("the rescinded capability goes on working", Works (First));
+      Check ("what was derived from it does not", not Works (Child));
+      Check ("its sibling and its parent go on working",
+             Works (Sibling) and then Works (Find_Cap));
+
+      Call_On (Delete_Cap, First);
+      Call_On (Delete_Cap, Child);
+      Call_On (Delete_Cap, Sibling);
+
+      --  The records that those used are free again, so there is room to
+      --  derive to the depth that is allowed, twice, and not further.
+
+      for Round in 1 .. 2 loop
+         Derive_Chain (Chain, Length);
+         Check ("derived to a depth of eight, and no more",
+                Length = Max_Depth);
+         Check ("the deepest one works",
+                Length = Max_Depth and then Works (Chain (Max_Depth)));
+         Delete_Chain (Chain, Length);
+      end loop;
+
+      return Passed;
+   end Derive_Test;
+
    ---------
    -- Run --
    ---------
@@ -59,5 +232,18 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Run;
+
+   -----------
+   -- Works --
+   -----------
+
+   function Works
+     (Cap : Rose.Capabilities.Capability)
+      return Boolean
+   is
+   begin
+      return Init.Calls.Find_In_Map (Cap, "run_self_tests")
+        /= Rose.Capabilities.Null_Capability;
+   end Works;
 
 end Init.Self_Tests;

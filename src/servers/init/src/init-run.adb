@@ -46,6 +46,7 @@ package body Init.Run is
                                Init_Caps.Create_Endpoint_Cap;
       Delete_Cap           : constant Capability := Init_Caps.Delete_Cap;
       Rescind_Cap          : constant Capability := Init_Caps.Rescind_Cap;
+      Derive_Cap           : constant Capability := Init_Caps.Derive_Cap;
       Exit_Cap             : constant Capability := Init_Caps.Exit_Cap;
       Restart_Cap          : constant Capability := Init_Caps.Restart_Cap;
       Trace_Cap            : constant Capability := Init_Caps.Trace_Cap;
@@ -563,6 +564,17 @@ package body Init.Run is
 
       Init.Calls.Send_String
         (Console_Stream_Cap, "running self tests" & NL);
+      if not Init.Self_Tests.Derive_Test
+        (Find_Cap        => Find_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Derive_Cap      => Derive_Cap,
+         Rescind_Cap     => Rescind_Cap,
+         Delete_Cap      => Delete_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: derive test failed" & NL);
+      end if;
+
       if not Init.Self_Tests.Run
         (Find_Cap        => Find_Cap,
          Standard_Output => Console_Stream_Cap,
