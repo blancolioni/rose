@@ -69,8 +69,33 @@ So the truth for a shared page is in the log, as it is for a private page, and t
 
 ### 6. Limits
 
-- **A process has at most 8 segments** today (`Max_Segments`, `Max_Saved_Segments`). A display client with several windows, and the display server with one mapping per client surface, need more. Both limits go to 32. A saved process record still fits in a page.
+- **A process has at most 8 segments** today (`Max_Segments`, `Max_Saved_Segments`). A display client with several windows, and the display server with one mapping per client surface, need more. Both limits go to 32.
 - **The shared table** is sized like the page cache. A mapping that would overflow it fails, and `Add_Segment` reports that.
+
+What the segment limit costs, from GNAT's representation of `mem-processes.adb` (`-gnatR2`):
+
+- **A segment record is 76 bytes**, 32 of them the open `Region` client. The rest of a process record is 100 bytes.
+- **The process table is static,** sized for `Max_Processes` (64), whatever is in use. Today it is 44 KiB, within the memory server's 396 KiB of static data.
+- **A saved process record is one page** while it has at most 101 segments: 32 bytes of header and 40 bytes for each segment.
+- **A fault scans the process's segments that are in use,** not the maximum, so it doesn't get slower as the limit rises.
+
+| Segments | Process record | Table, 64 processes | Added to mem's static data | Saved record |
+|---|---|---|---|---|
+| 8 (today) | 708 B | 44 KiB | — | 1 page |
+| 32 (this ADR) | 2,532 B | 158 KiB | +114 KiB | 1 page |
+| 64 | 4,964 B | 310 KiB | +266 KiB | 1 page |
+| 101 | 7,776 B | 486 KiB | +442 KiB | 1 page, full |
+| 128 | 9,828 B | 614 KiB | +570 KiB | 2 pages |
+| 256 | 19,556 B | 1.19 MiB | +1.15 MiB | 2 pages |
+
+**The memory server's caps limit segments more than the table does.** Each segment over a region keeps its own open `Region` client, which is seven caps in the memory server: the interface cap and the six it fetches. The memory server has one cap table, of at most 4,096 caps (ADR 0023), for every process's segments.
+
+A rough count from the code is about 28 caps per process: three segments over regions, the kernel-process client, and the heap, server and interface caps. That is about 1,800 caps for 64 processes, which leaves room for about 330 more segments over regions in the whole system, whatever `Max_Segments` is. This figure is from reading the code and hasn't been measured.
+
+So a segment for each package (ADR 0017) needs two changes beyond a larger limit:
+
+- **One open client for each region,** shared by the segments over it, with a count. A segment over a region that is already open then costs no caps. Every package in ADR 0017's library region would share one client.
+- **Segment records from a pool,** past about 100 segments, so that the memory they take follows the segments in use rather than 64 times the limit. The saved record would need a second page.
 
 ### 7. Interfaces
 
@@ -96,4 +121,5 @@ So the truth for a shared page is in the log, as it is for a private page, and t
 ## Open questions
 
 - **Copy on fork.** Rose has no fork, so a shared segment is never copied. If one is added, a shared segment stays shared in the child.
+- **Sharing open region clients.** It isn't needed for 32 segments, but it is for ADR 0017's segment per package (section 6). It is follow-up work, in its own issue.
 - **Who is charged for a shared page** in a bank (ADR 0014). The region's bank pays for the region's storage. The memory a shared page takes isn't charged to anyone, as with every page today.
