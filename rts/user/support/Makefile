@@ -7,7 +7,8 @@ BUILD=../build/$(TARGET)
 ADAINCLUDE=$(BUILD)/adainclude
 ADALIB=$(BUILD)/adalib
 OBJ=$(BUILD)/obj
-SOURCES=memchr.c memcmp.c memcpy.c memmove.c memset.c strlen.c rose-time.c rose-unwind.c
+SOURCES=memchr.c memcmp.c memcpy.c memmove.c memset.c strlen.c rose-time.c rose-unwind.c \
+    rose-libm.c
 OBJECTS=$(SOURCES:%.c=%.o) raise-gcc.o $(UNWIND_OBJECTS) $(DIVISION_OBJECTS)
 
 # Exception propagation (#170): GNAT's personality routine, from GCC's
