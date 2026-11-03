@@ -443,6 +443,63 @@ package body Rose.Kernel.Processes is
       Cap_Tables.Delete (Process_Table (Pid).Caps, Cap);
    end Delete_Cap;
 
+   ----------------
+   -- Derive_Cap --
+   ----------------
+
+   procedure Derive_Cap
+     (Pid     : Process_Id;
+      Cap     : Rose.Capabilities.Capability;
+      New_Cap : out Rose.Capabilities.Capability;
+      Error   : out Rose.Invocation.Invocation_Error)
+   is
+      use Rose.Kernel.Derivations;
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Derivation_Id;
+      Layout    : Rose.Capabilities.Layout.Capability_Layout;
+      Source_Id : Record_Id;
+      New_Id    : Record_Id := 0;
+   begin
+      New_Cap := Rose.Capabilities.Null_Capability;
+      Error   := Rose.Invocation.Invalid_Operation;
+
+      if not Has_Cap (Pid, Cap) then
+         return;
+      end if;
+
+      Layout := Cap_Layout (Pid, Cap);
+      Source_Id := Layout.Header.Derivation;
+
+      if not Is_Valid_Derivation (Layout)
+        or else Depth (Derivation_Records, Source_Id) >= Max_Depth
+      then
+         return;
+      end if;
+
+      Error := Rose.Invocation.Out_Of_Capabilities;
+
+      New_Cap := Create_Cap (Pid);
+
+      if New_Cap = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Derive (Derivation_Records, Source_Id, New_Id);
+
+      if New_Id = 0 then
+         Delete_Cap (Pid, New_Cap);
+         New_Cap := Rose.Capabilities.Null_Capability;
+         return;
+      end if;
+
+      --  Derive counted the slot that it made the record for, and Set_Cap
+      --  counts the slot that it writes.
+
+      Layout.Header.Derivation := New_Id;
+      Set_Cap (Pid, New_Cap, Layout);
+      Remove_Slot (Derivation_Records, New_Id);
+   end Derive_Cap;
+
    -------------------------
    -- Disable_Write_Pages --
    -------------------------
@@ -1430,7 +1487,37 @@ package body Rose.Kernel.Processes is
          Load_Cap_Page (Pid, Cap_Tables.Page_Index (Cap));
       end if;
 
-      Cap_Tables.Rescind (Process_Table (Pid).Caps, Cap);
+      declare
+         use Rose.Kernel.Derivations;
+         use type Rose.Objects.Derivation_Id;
+         Layout : Rose.Capabilities.Layout.Capability_Layout :=
+                    Cap_Tables.Layout (Process_Table (Pid).Caps, Cap);
+         Old_Id : constant Record_Id := Layout.Header.Derivation;
+         New_Id : Record_Id := 0;
+      begin
+         if Old_Id = 0
+           or else not Cap_Tables.Is_Active (Process_Table (Pid).Caps, Cap)
+           or else not Is_Used (Derivation_Records, Old_Id)
+         then
+            Cap_Tables.Rescind (Process_Table (Pid).Caps, Cap);
+            return;
+         end if;
+
+         --  A derived capability is revoked by revoking its record, which
+         --  makes it, what was copied from it, and what was derived from
+         --  it invalid.  The capability itself goes on to a record of its
+         --  own, below the same parent, if there is one to give it.
+
+         Derive (Derivation_Records,
+                 Parent (Derivation_Records, Old_Id), New_Id);
+         Revoke (Derivation_Records, Old_Id);
+
+         if New_Id /= 0 then
+            Layout.Header.Derivation := New_Id;
+            Set_Cap (Pid, Cap, Layout);
+            Remove_Slot (Derivation_Records, New_Id);
+         end if;
+      end;
    end Rescind_Cap;
 
    ------------------

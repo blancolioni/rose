@@ -17,4 +17,18 @@ package Init.Self_Tests is
    --  clock's Clock interface. True if the command completed, False if
    --  it could not be run, or failed because a test failed.
 
+   function Derive_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Derive_Cap      : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Derive capabilities from Find_Cap, the registry's, and check what
+   --  rescinding one of them does (ADR 0001, #116): the capability goes on
+   --  working, and so do its parent and its siblings, but what was
+   --  derived from it does not; and that a capability can be derived from
+   --  to a depth of eight, and no more.  It reports each check on
+   --  Standard_Output, and is True if they all passed.
+
 end Init.Self_Tests;

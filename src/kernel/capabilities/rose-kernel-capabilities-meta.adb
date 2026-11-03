@@ -10,6 +10,9 @@ package body Rose.Kernel.Capabilities.Meta is
    procedure Create_Endpoint
      (Params : Rose.Invocation.Invocation_Access);
 
+   procedure Derive_Capability
+     (Params : Rose.Invocation.Invocation_Access);
+
    ---------------------
    -- Create_Endpoint --
    ---------------------
@@ -149,6 +152,47 @@ package body Rose.Kernel.Capabilities.Meta is
 
    end Create_Endpoint;
 
+   -----------------------
+   -- Derive_Capability --
+   -----------------------
+
+   procedure Derive_Capability
+     (Params : Rose.Invocation.Invocation_Access)
+   is
+      use Rose.Capabilities;
+      use Rose.Invocation;
+      Process_Id : constant Rose.Kernel.Processes.Process_Id :=
+                     Rose.Kernel.Processes.Current_Process_Id;
+      New_Cap    : Rose.Capabilities.Capability;
+      Error      : Invocation_Error;
+   begin
+      if not Params.Control.Flags (Send_Caps)
+        or else not Params.Control.Flags (Recv_Caps)
+      then
+         Rose.Kernel.Processes.Return_Error
+           (Params, Rose.Invocation.Invalid_Operation);
+         return;
+      end if;
+
+      Rose.Kernel.Processes.Derive_Cap
+        (Process_Id, Params.Caps (0), New_Cap, Error);
+
+      if New_Cap = Null_Capability then
+         Rose.Kernel.Processes.Return_Error (Params, Error);
+         return;
+      end if;
+
+      Params.Control.Last_Sent_Cap := 0;
+      Params.Caps (0) := New_Cap;
+      Params.Control.Flags :=
+        (Rose.Invocation.Reply     => True,
+         Rose.Invocation.Send_Caps => True,
+         others                    => False);
+
+      Rose.Kernel.Processes.Set_Current_State
+        (Process_Id, Rose.Kernel.Processes.Ready);
+   end Derive_Capability;
+
    ------------
    -- Handle --
    ------------
@@ -163,6 +207,9 @@ package body Rose.Kernel.Capabilities.Meta is
       case Cap.Header.Endpoint is
          when Create_Endpoint_Endpoint =>
             Create_Endpoint (Params);
+
+         when Derive_Cap =>
+            Derive_Capability (Params);
 --           when Create_Page_Object_Cap_Endpoint =>
 --              declare
 --                 use Rose.Capabilities;
