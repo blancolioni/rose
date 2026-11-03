@@ -33,11 +33,6 @@ package body Rose.Kernel.Processes is
 
    procedure Release_Entry (Pid : Process_Id);
 
-   Derivation_Records : Rose.Kernel.Derivations.Table;
-   --  What the capabilities that were derived name (ADR 0001).  A slot
-   --  that holds a layout with a derivation counts as a reference to its
-   --  record, which Set_Cap, Delete_Cap and Release_Entry keep.
-
    procedure Add_Reference
      (Layout : Rose.Capabilities.Layout.Capability_Layout);
    --  A slot now holds Layout.

@@ -571,7 +571,8 @@ package body Init.Run is
          Standard_Output => Console_Stream_Cap,
          Derive_Cap      => Derive_Cap,
          Rescind_Cap     => Rescind_Cap,
-         Delete_Cap      => Delete_Cap)
+         Delete_Cap      => Delete_Cap,
+         Create_Cap_Set  => Cap_Set_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: derive test failed" & NL);

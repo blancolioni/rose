@@ -85,6 +85,7 @@ The derivation records of the kernel (ADR 0001): what a capability that was deri
 No run-time errors, for any record number, including 0, which is no record.
 An invariant of the table is proved to hold after every operation: a record that is used is one level below its parent, which is used, and there are at most 8 levels, so there are no cycles, and the children that a record counts are exactly the used records that name it.
 `Derive` gives the lowest record that is free, one level below its parent, with one slot, and changes no other; it gives 0 only when every record is used.
+`Restore_Record` makes a record at a number that is given, with a parent and whether it is revoked, which is what a restore from a checkpoint does, and `Derive` is the lowest free number and that.
 `Add_Slot` and `Remove_Slot` change the slots of one record.
 `Remove_Slot` frees a record that has nothing left that names it, which takes a child from its parent and may free that in turn, and it uses no record that was not used.
 `Revoke` revokes one record, and `Is_Valid` (at most 8 reads) says that no record from a capability's own up to the root has been revoked; of a revoke, it is proved that it makes invalid the records below the one revoked, and no other.

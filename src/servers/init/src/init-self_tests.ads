@@ -25,13 +25,17 @@ package Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Create_Cap_Set  : Rose.Capabilities.Capability)
       return Boolean;
    --  Derive capabilities from Find_Cap, the registry's, and check what
    --  rescinding one of them does (ADR 0001, #116): the capability goes on
    --  working, and so do its parent and its siblings, but what was
    --  derived from it does not; and that a capability can be derived from
    --  to a depth of eight, and no more.  It reports each check on
-   --  Standard_Output, and is True if they all passed.
+   --  Standard_Output, and is True if they all passed.  It leaves two
+   --  derived capabilities in a cap set, which the caps server holds
+   --  (Create_Cap_Set is its constructor), so that a checkpoint has
+   --  derivation records that a restored process names.
 
 end Init.Self_Tests;

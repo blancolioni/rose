@@ -21,10 +21,11 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 5;
+   Kernel_Table_Version : constant := 6;
    --  Version 2 added the interrupts, version 3 the next object id,
-   --  version 4 each process's FPU and SSE state, and version 5 the
-   --  packing of a capability's header (ADR 0001).
+   --  version 4 each process's FPU and SSE state, version 5 the packing
+   --  of a capability's header, and version 6 the derivation records
+   --  (ADR 0001).
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -40,7 +41,7 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Interrupts) of Saved_Interrupt
      with Pack, Size => Max_Saved_Interrupts * 128;
 
-   Kernel_Header_Bytes : constant := 32 + Max_Saved_Interrupts * 16;
+   Kernel_Header_Bytes : constant := 40 + Max_Saved_Interrupts * 16;
 
    type Kernel_Table_Header is
       record
@@ -54,6 +55,12 @@ package Rose.Checkpoints is
          --  The object id the kernel gives the next process.  A restore
          --  carries on from here, so that no process has the id of one
          --  that a cap in the checkpoint names.
+         Record_Page_Count : Rose.Words.Word_32 := 0;
+         Record_Count      : Rose.Words.Word_32 := 0;
+         --  The pages of derivation records that follow this one, and
+         --  how many records are in them: those numbered 1 to
+         --  Record_Count, as Saved_Record.  There are no pages if no
+         --  record is in use.
          Interrupts      : Saved_Interrupt_Array;
          Reserved        : System.Storage_Elements.Storage_Array
                              (1 .. Rose.Limits.Page_Size
@@ -61,6 +68,27 @@ package Rose.Checkpoints is
                                (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   --  A derivation record (ADR 0001).  The counts of the slots and the
+   --  children that name it are not saved: a restore counts them again
+   --  from the capabilities and the records that it restores.
+
+   Record_Used    : constant := 1;
+   Record_Revoked : constant := 2;
+
+   type Saved_Record is
+      record
+         Parent : Rose.Words.Word_16 := 0;
+         Flags  : Rose.Words.Word_16 := 0;
+      end record
+     with Pack, Size => 32;
+
+   type Saved_Record_Array is
+     array (Positive range <>) of Saved_Record
+     with Pack;
+
+   Records_Per_Page : constant := Rose.Limits.Page_Size / 4;
+   Max_Record_Pages : constant := 4;
 
    Process_Record_Magic : constant := 16#5052_4F43_4553_5331#;
 
