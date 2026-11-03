@@ -80,10 +80,36 @@ install_rose () {
     # It says "install complete" on the screen first, but login can clear
     # the screen before the message is seen, so wait for the kernel's
     # restart in the serial log instead.
-    wait_for_serial "kernel: restarting" 400 \
-        || fail "the install did not finish"
+    wait_for_install 400 || fail "the install did not finish"
     sleep 15
     stop_qemu
+
+    # Init's own tests run during the install, and report on the screen.
+    if grep -q -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt"
+    then
+        grep -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt" \
+            | sort -u
+        echo "FAIL: one of init's tests failed"
+        exit 1
+    fi
+    echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
+        | grep -c ': ok') checks ok"
+}
+
+wait_for_install () {
+    # wait_for_install SECONDS: wait until the install has finished, which
+    # is when the kernel restarts, and keep what init's tests print, which
+    # is gone from the screen by then
+    waited=0
+    : > "$WORK/install-screen.txt"
+    while [ $waited -lt "$1" ]; do
+        screen | grep -e "derive test" >> "$WORK/install-screen.txt"
+        grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
+            && return 0
+        sleep 1
+        waited=$((waited + 1))
+    done
+    return 1
 }
 
 log_in () {

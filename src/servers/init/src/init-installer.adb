@@ -14,10 +14,12 @@ with Init.Grants;
 
 package body Init.Installer is
 
-   Exec_Region_Length : constant := 16 * 2 ** 20;
+   Exec_Region_Length : constant := 64 * 2 ** 20;
    --  The storage for the images of the programs that exec installs.
    --  They came to more than 8 MB, with debugging information, once the
-   --  console became a terminal (#454).
+   --  console became a terminal (#454), and to 15 MB of 16 with 26
+   --  programs (#669).  The store only gives a page space on a device
+   --  when it is written, so a larger region costs only page ids.
 
    Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size)
      with Alignment => 4096;

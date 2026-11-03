@@ -98,6 +98,19 @@ package Rose.Kernel.Processes is
    procedure Rescind_Cap
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability);
+   --  Make every copy of Cap that was not derived from it invalid.  If Cap
+   --  was derived (Derive_Cap), only it and what was derived from it are
+   --  made invalid, and Cap goes on to a new derivation that is valid.
+
+   procedure Derive_Cap
+     (Pid     : Process_Id;
+      Cap     : Rose.Capabilities.Capability;
+      New_Cap : out Rose.Capabilities.Capability;
+      Error   : out Rose.Invocation.Invocation_Error);
+   --  A copy of Cap, in a new capability of Pid, that is rescinded on its
+   --  own.  New_Cap is the null capability, and Error says why, if Cap is
+   --  not a capability of Pid or is not valid, if it is eight levels
+   --  down already, or if there is no capability or record to make.
 
    procedure Delete_Cap
      (Pid : Process_Id;

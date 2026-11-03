@@ -1,4 +1,4 @@
-# 24. Mapping a region shared
+# 25. Mapping a region shared
 
 - **Status:** Proposed
 - **Date:** 2026-11-03
