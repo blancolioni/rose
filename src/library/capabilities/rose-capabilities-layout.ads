@@ -36,9 +36,10 @@ is
          Read_Access      : Boolean                            := False;
          Write_Access     : Boolean                            := False;
          Execution_Access : Boolean                            := False;
-         Rescinded_Count  : Rose.Objects.Rescinded_Count       := 0;
          Endpoint         : Rose.Objects.Endpoint_Index        := 0;
          Identifier       : Rose.Objects.Capability_Identifier := 0;
+         Rescinded_Count  : Rose.Objects.Rescinded_Count       := 0;
+         Derivation       : Rose.Objects.Derivation_Id         := 0;
       end record
      with Pack, Size => 64;
 
