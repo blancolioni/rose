@@ -187,6 +187,25 @@ cosl (long double x)
     }
 }
 
+/* The compiler calls sincos in place of a sin and a cos of the same
+   argument, as Ada.Numerics.Generic_Complex_Types has. */
+
+void
+sincosl (long double x, long double *sine, long double *cosine)
+{
+  int quadrant;
+  long double r = reduce (x, &quadrant);
+  long double s = sin_x87 (r), c = cos_x87 (r);
+
+  switch (quadrant)
+    {
+    case 0: *sine = s; *cosine = c; break;
+    case 1: *sine = c; *cosine = -s; break;
+    case 2: *sine = -s; *cosine = -c; break;
+    default: *sine = -c; *cosine = s; break;
+    }
+}
+
 long double
 tanl (long double x)
 {
@@ -313,6 +332,15 @@ double sinh (double x) { return sinhl (x); }
 double cosh (double x) { return coshl (x); }
 double tanh (double x) { return tanhl (x); }
 
+void
+sincos (double x, double *sine, double *cosine)
+{
+  long double s, c;
+  sincosl (x, &s, &c);
+  *sine = s;
+  *cosine = c;
+}
+
 float sqrtf (float x) { return sqrtl (x); }
 float sinf (float x) { return sinl (x); }
 float cosf (float x) { return cosl (x); }
@@ -326,3 +354,12 @@ float powf (float x, float y) { return powl (x, y); }
 float sinhf (float x) { return sinhl (x); }
 float coshf (float x) { return coshl (x); }
 float tanhf (float x) { return tanhl (x); }
+
+void
+sincosf (float x, float *sine, float *cosine)
+{
+  long double s, c;
+  sincosl (x, &s, &c);
+  *sine = s;
+  *cosine = c;
+}
