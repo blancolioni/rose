@@ -1176,6 +1176,11 @@ package body Store.Devices is
         or else Page < Regions (Region_Index).Base
         or else Page >= Regions (Region_Index).Bound
       then
+         Rose.Console_IO.Put ("store: put: invalid region/page: ");
+         Rose.Console_IO.Put (Region_Index);
+         Rose.Console_IO.Put ("/");
+         Rose.Console_IO.Put (Page);
+         Rose.Console_IO.New_Line;
          return;
       end if;
 

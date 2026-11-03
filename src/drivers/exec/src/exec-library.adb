@@ -1,5 +1,6 @@
 with System.Storage_Elements;
 
+with Rose.Console_IO;
 with Rose.Limits;
 with Rose.System_Calls.Server;
 
@@ -284,6 +285,20 @@ package body Exec.Library is
          loop
             Read (ELF_Image, Buffer, Last);
             exit when Last = 0;
+
+            --  An image that doesn't fit is not installed, rather than
+            --  installed with its last pages missing (#669).
+
+            if Next_Page >= Page_Bound then
+               Rose.Console_IO.Put ("exec: no room for ");
+               Rose.Console_IO.Put (Name);
+               Rose.Console_IO.New_Line;
+               Next_Page := Install.ELF_Base;
+               Install.Installed := False;
+               Installed_Count := Installed_Count - 1;
+               return Rose.Capabilities.Null_Capability;
+            end if;
+
             Buffer (Last + 1 .. Buffer'Last) := (others => 0);
             Put (Region, Next_Page, Buffer);
             Next_Page := Next_Page + 1;

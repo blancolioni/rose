@@ -11,6 +11,7 @@ package Rose.Kernel.Capabilities.Meta is
    Add_Cap_To_Set_Endpoint         : constant Endpoint_Index := 7;
    Remove_Cap_From_Set_Endpoint    : constant Endpoint_Index := 8;
    Get_Object_Id_Endpoint          : constant Endpoint_Index := 9;
+   Derive_Cap                      : constant Endpoint_Index := 10;
    Receive_On_Caps                 : constant Endpoint_Index := 16;
    Receive_On_Any_Cap              : constant Endpoint_Index := 17;
    Enable_Kernel_Debug             : constant Endpoint_Index := 28;
