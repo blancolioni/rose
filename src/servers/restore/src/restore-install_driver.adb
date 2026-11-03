@@ -57,7 +57,8 @@ begin
          Open_Cap_Set (File_System, Install_Media_Cap);
          Rose.Directories.Open_Root_File_System (File_System);
          Restore.Installer.Install
-           (Source => Restore.Installer.Default.Iterate_Steps'Access);
+           (File_System => File_System,
+            Source      => Restore.Installer.Default.Iterate_Steps'Access);
       end;
 
       --  So that the disk boots without the install media.  Only a new
