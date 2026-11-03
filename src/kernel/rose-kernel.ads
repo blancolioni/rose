@@ -12,6 +12,9 @@ package Rose.Kernel is
 
    Process_Stack_Base            : constant := 16#D000_0000#;
    Process_Stack_Bound           : constant := 16#E000_0000#;
+   Device_Window_Base            : constant := 16#E000_0000#;
+   Device_Window_Bound           : constant := 16#EF00_0000#;
+   --  Where a process maps a range of device memory (#582)
    Invocation_Buffer_Range_Base  : constant := 16#EF00_0000#;
    Invocation_Buffer_Range_Bound : constant := 16#F000_0000#;
 

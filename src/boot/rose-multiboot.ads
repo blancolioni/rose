@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Words;                        use Rose.Words;
 
 package Rose.Multiboot is
@@ -13,20 +15,15 @@ package Rose.Multiboot is
    function Physical_Memory_Low return Word_32;
    function Physical_Memory_High return Word_32;
 
-   function Have_Framebuffer return Boolean;
-   --  True if the boot loader gave us a linear framebuffer that we can
-   --  use (#582): 32-bit RGB, ending below 4 GB.  A text mode, which
-   --  GRUB also reports with a framebuffer tag, is not one.
-
-   function Framebuffer_Address return Word_32
-     with Pre => Have_Framebuffer;
-   function Framebuffer_Pitch return Word_32
-     with Pre => Have_Framebuffer;
-   --  Bytes from the start of one row to the start of the next
-   function Framebuffer_Width return Word_32
-     with Pre => Have_Framebuffer;
-   function Framebuffer_Height return Word_32
-     with Pre => Have_Framebuffer;
+   procedure Copy_Tag
+     (Tag_Type : Word_32;
+      To       : out System.Storage_Elements.Storage_Array;
+      Size     : out Word_32);
+   --  Copy the first tag of type Tag_Type from the boot information, as
+   --  many bytes of it as fit in To, header included.  Size is the tag's
+   --  whole size, or 0 if there is no such tag.  The tags are copied at
+   --  boot by Load_Multiboot_Header, so this works for as long as the
+   --  kernel runs.
 
    procedure Scan_Modules
      (Process : not null access
