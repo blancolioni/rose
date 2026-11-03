@@ -246,8 +246,8 @@ Three numbers name one, and they are easy to confuse.
 * The *identifier* is 16 bits in the capability, and tells the objects that one endpoint serves apart.
   A file server registers the endpoints of `File` once, and gives a client a capability whose identifier is the file.
 
-A process can register at most 32 endpoints, since its table has 32 entries.
-A generated server registers one endpoint for each subprogram of each interface that it implements, and one for each interface, so the number grows with the interfaces that a process serves: the memory server, with five interfaces, uses about 25 of its 32.
+A process can register at most 64 endpoints, since its table has 64 entries.
+A generated server registers one endpoint for each subprogram of each interface that it implements, and one for each interface, so the number grows with the interfaces that a process serves: the memory server, with five interfaces, uses about 25 of its 64.
 A process that needs more has to be split.
 
 The process that serves an endpoint also holds a capability for it, which is what the kernel compares a client's capability with when it checks that it is valid.
