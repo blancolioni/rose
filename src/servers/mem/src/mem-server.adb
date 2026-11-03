@@ -29,6 +29,7 @@ with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Processes;
+with Mem.Shared_Pages;
 with Mem.Virtual_Map;
 
 package body Mem.Server is
@@ -114,6 +115,23 @@ package body Mem.Server is
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier);
 
+   procedure Remove_Segment
+     (Id           : Rose.Objects.Capability_Identifier;
+      Virtual_Base : Rose.Words.Word);
+
+   procedure Shared_Page_Fault
+     (Object        : Rose.Objects.Object_Id;
+      Pid           : Process_Id;
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      Store_Page    : Rose.Objects.Object_Id;
+      Readable      : Boolean;
+      Writable      : Boolean;
+      Executable    : Boolean;
+      Start         : Natural);
+   --  A fault on a page of a shared segment that isn't mapped: map the
+   --  physical page that holds Store_Page, reading it from the region if
+   --  no process has it (ADR 0025).
+
    procedure Remove_Instances (Id : Rose.Objects.Capability_Identifier);
    --  Delete the caps that the servers made for process Id, which is
    --  gone, so that its entries in their instance tables are free.
@@ -186,7 +204,8 @@ package body Mem.Server is
          Writable      => (Flags and Segment_Writable) /= 0,
          Executable    => (Flags and Segment_Executable) /= 0,
          Resizable    => (Flags and Segment_Resizable) /= 0,
-         Private_Region => (Flags and Segment_Private) /= 0);
+         Private_Region => (Flags and Segment_Private) /= 0,
+         Shared        => (Flags and Segment_Shared) /= 0);
    end Add_Segment;
 
    ----------------
@@ -256,6 +275,7 @@ package body Mem.Server is
          Destroy => Destroy'Access,
          Add_Segment    => Add_Segment'Access,
          Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
+         Remove_Segment => Remove_Segment'Access,
          Published_Interface => Published_Interface'Access,
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
          Exit_Process   => Exit_Process'Access,
@@ -312,6 +332,7 @@ package body Mem.Server is
       Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
       if Pid /= 0 then
+         Mem.Processes.Release_Shared_Segments (Pid);
          Mem.Page_Table.Delete_All (Pid);
          Mem.Processes.Kill_Process (Pid);
       end if;
@@ -330,6 +351,7 @@ package body Mem.Server is
       Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
       if Pid /= 0 then
+         Mem.Processes.Release_Shared_Segments (Pid);
          Mem.Page_Table.Delete_All (Pid);
          Mem.Processes.Kill_Process (Pid);
       end if;
@@ -394,6 +416,7 @@ package body Mem.Server is
                         Mem.Processes.Get_Process_Id (Object);
       Page_Object : Rose.Objects.Object_Id;
       Start  : constant Natural := Rose.Trace.Ticks;
+      use type Rose.Objects.Object_Id;
       --  When the fault arrived, for timing it (#195).
    begin
 
@@ -433,9 +456,20 @@ package body Mem.Server is
             end if;
       end case;
 
-      if Physical_Page = 0 then
+      if Physical_Page = 0
+        and then Mem.Processes.Shared_Page (Pid, Virtual_Page) /= 0
+      then
+         Shared_Page_Fault
+           (Object       => Object,
+            Pid          => Pid,
+            Virtual_Page => Virtual_Page,
+            Store_Page   => Mem.Processes.Shared_Page (Pid, Virtual_Page),
+            Readable     => Readable,
+            Writable     => Writable,
+            Executable   => Executable,
+            Start        => Start);
+      elsif Physical_Page = 0 then
          declare
-            use type Rose.Objects.Object_Id;
             Shared     : constant Boolean := Persistent and then not Writable;
             --  Pages of read-only segments are cached, and shared by the
             --  processes that map them (#200).
@@ -546,6 +580,7 @@ package body Mem.Server is
                         --  flag should be set (since this is the
                         --  first write)
                         Mem.Page_Table.Set_Writable (Position);
+                        Mem.Shared_Pages.Set_Modified (Physical_Page);
                         Mem.Processes.Resume_Process (Pid);
                         Mem.Processes.Count_Fault
                           (Pid, Mem.Processes.Write_Fault,
@@ -705,6 +740,25 @@ package body Mem.Server is
       Rose.Interfaces.Receiver.Server.Remove_Instance (Id);
    end Remove_Instances;
 
+   --------------------
+   -- Remove_Segment --
+   --------------------
+
+   procedure Remove_Segment
+     (Id           : Rose.Objects.Capability_Identifier;
+      Virtual_Base : Rose.Words.Word)
+   is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
+   begin
+      if Pid = 0 then
+         return;
+      end if;
+
+      Mem.Processes.Remove_Segment
+        (Process      => Pid,
+         Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base));
+   end Remove_Segment;
+
    ----------------------
    -- Request_Heap_Top --
    ----------------------
@@ -724,6 +778,71 @@ package body Mem.Server is
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;
+
+   -----------------------
+   -- Shared_Page_Fault --
+   -----------------------
+
+   procedure Shared_Page_Fault
+     (Object        : Rose.Objects.Object_Id;
+      Pid           : Process_Id;
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      Store_Page    : Rose.Objects.Object_Id;
+      Readable      : Boolean;
+      Writable      : Boolean;
+      Executable    : Boolean;
+      Start         : Natural)
+   is
+      use type Rose.Addresses.Physical_Page_Address;
+      Found     : constant Rose.Addresses.Physical_Page_Address :=
+                    Mem.Shared_Pages.Find (Store_Page);
+      Page      : Rose.Addresses.Physical_Page_Address;
+      Have_Page : Boolean;
+      Added     : Boolean;
+   begin
+      if Found /= 0 then
+         Mem.Shared_Pages.Acquire (Found);
+         Page := Found;
+      else
+         Mem.Physical_Map.Allocate_Page (Page, Have_Page);
+         if not Have_Page then
+            Mem.Virtual_Map.Reclaim (Page, Have_Page);
+         end if;
+
+         if not Have_Page then
+            Mem.Processes.Fault_Process (Pid, "out of memory");
+            return;
+         end if;
+
+         Mem.Shared_Pages.Add (Store_Page, Page, Added);
+         if not Added then
+            Mem.Physical_Map.Deallocate_Page (Page);
+            Mem.Processes.Fault_Process (Pid, "too many shared pages");
+            return;
+         end if;
+
+         Mem.Processes.Initialize_Page
+           (Process       => Pid,
+            Physical_Page => Page,
+            Virtual_Page  => Virtual_Page);
+      end if;
+
+      Mem.Virtual_Map.Map
+        (Process       => Object,
+         Virtual_Page  => Virtual_Page,
+         Physical_Page => Page,
+         Readable      => Readable,
+         Writable      => Writable,
+         Executable    => Executable,
+         Persistent    => True);
+
+      Mem.Processes.Resume_Process (Pid);
+      Mem.Processes.Count_Fault
+        (Pid,
+         (if Found /= 0 then Mem.Processes.Cached_Fault
+          else Mem.Processes.Region_Fault),
+         Rose.Trace.Ticks - Start);
+   end Shared_Page_Fault;
 
    ------------------
    -- Start_Server --

@@ -349,7 +349,8 @@ package Rose.Checkpoints is
 
    Mem_Process_Magic : constant := 16#4D50_524F_4345_5331#;
 
-   Max_Saved_Segments : constant := 8;
+   Max_Saved_Segments : constant := 32;
+   --  A process record holds up to 101 segments in its page (ADR 0025).
 
    --  Segment flags.
    Segment_Readable       : constant := 16#01#;
@@ -358,6 +359,7 @@ package Rose.Checkpoints is
    Segment_Extensible     : constant := 16#08#;
    Segment_Persistent     : constant := 16#10#;
    Segment_Private_Region : constant := 16#20#;
+   Segment_Shared         : constant := 16#40#;
 
    --  Base, Bound and Limit are virtual page addresses.  The segment's
    --  pages come from the region whose pages have object ids from

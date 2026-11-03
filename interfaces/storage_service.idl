@@ -1,0 +1,5 @@
+role Storage_Service : Bank;
+--  A bank to reserve storage from (ADR 0014). Run_Self_Tests has it, for
+--  the test of shared segments (ADR 0025): init gives it a sub-bank of the
+--  root bank. Petal holds no bank yet, so it gives none, and a command
+--  must work without one.

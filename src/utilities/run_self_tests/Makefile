@@ -39,5 +39,6 @@ run_self_tests:
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/cap.idl \
 	    $(INTERFACES)/heap.idl \
-	    $(INTERFACES)/region.idl
+	    $(INTERFACES)/region.idl \
+	    $(INTERFACES)/bank.idl
 	gprbuild $(GPRBUILD_CARGS)
