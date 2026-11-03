@@ -418,7 +418,7 @@ private
    procedure Assign_Object_Id (Pid : Process_Id);
    --  Give the new process in entry Pid the next object id.
 
-   Max_Registered_Endpoints : constant := 32;
+   Max_Registered_Endpoints : constant := 64;
    type Registered_Endpoint_Record is
       record
          Endpoint     : Rose.Objects.Endpoint_Id     := 0;

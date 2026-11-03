@@ -13,7 +13,7 @@ What each process has:
 - A set of active capability numbers, and `Last_Cap`, the highest that has been used. Numbers run from 1 to 4096.
 - Up to 16 pages of 256 capabilities each. A capability is a 16-byte `Capability_Layout`: a 64-bit header (type, access flags, a 24-bit rescinded count, an endpoint index and an identifier) and a 64-bit payload. A page is allocated from the kernel heap when the first capability in it is created, and is read and written through an address.
 - A cache of 16 layouts in front of the pages, with a use count for each. It is written back to its page when it is replaced.
-- A table of the 32 endpoints that it serves, each with its own send capability.
+- A table of the 64 endpoints that it serves, each with its own send capability.
 
 What validity is. A call through an endpoint capability is valid if the capability's rescinded count is the same as that of the send capability of the endpoint it names, in the process that serves it (`Is_Valid_Entry`). Rescinding a capability adds one to its count. The count is 24 bits, so a capability that has been rescinded is valid again after 2²⁴ more rescinds.
 
