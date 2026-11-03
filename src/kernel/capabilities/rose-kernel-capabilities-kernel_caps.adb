@@ -21,6 +21,8 @@ with Rose.Kernel.Processes.Snapshot;
 
 with Rose.Arch.Interrupts;
 
+with Rose.Multiboot;
+
 package body Rose.Kernel.Capabilities.Kernel_Caps is
 
    function Process_Cap
@@ -504,6 +506,79 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
          when Restart_Endpoint =>
             Rose.Boot.Console.Put_Line ("kernel: restarting");
             Rose.Arch.Restart;
+
+         when Boot_Tags_Endpoint =>
+            declare
+               use Rose.Kernel.Processes;
+               use type Rose.Capabilities.Capability;
+               use type Rose.Invocation.Parameter_Word_Index;
+               use type Rose.Words.Word;
+               Tag_Type : constant Rose.Words.Word := Params.Data (0);
+               New_Cap  : Rose.Capabilities.Capability;
+            begin
+               if not Params.Control.Flags (Rose.Invocation.Send_Words)
+                 or else Params.Control.Last_Sent_Word /= 0
+                 or else Tag_Type not in 1 .. 16#FFFF#
+               then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+               else
+                  New_Cap := Create_Cap (Current_Process_Id);
+                  if New_Cap = Rose.Capabilities.Null_Capability then
+                     Return_Error
+                       (Params, Rose.Invocation.Out_Of_Capabilities);
+                  else
+                     Set_Cap
+                       (Pid    => Current_Process_Id,
+                        Cap    => New_Cap,
+                        Layout =>
+                          (Header  =>
+                             (Cap_Type =>
+                                  Rose.Capabilities.Layout.Kernel_Cap,
+                              Endpoint => Read_Boot_Tag_Endpoint,
+                              others   => <>),
+                           Payload => Rose.Objects.Object_Id (Tag_Type)));
+                     Params.Control.Flags :=
+                       (Rose.Invocation.Reply     => True,
+                        Rose.Invocation.Send_Caps => True,
+                        others                    => False);
+                     Params.Control.Last_Sent_Cap := 0;
+                     Params.Caps (0) := New_Cap;
+                  end if;
+               end if;
+               Set_Current_State (Current_Process_Id, Ready);
+            end;
+
+         when Read_Boot_Tag_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else not Params.Control.Flags
+                (Rose.Invocation.Writable_Buffer)
+            then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+            else
+               declare
+                  Storage : System.Storage_Elements.Storage_Array
+                    (1 .. Params.Buffer_Length);
+                  pragma Import (Ada, Storage);
+                  for Storage'Address use Params.Buffer_Address;
+                  Size    : Rose.Words.Word_32;
+               begin
+                  Rose.Multiboot.Copy_Tag
+                    (Tag_Type => Rose.Words.Word_32 (Cap.Payload),
+                     To       => Storage,
+                     Size     => Size);
+                  Params.all :=
+                    (Control =>
+                       (Flags => (Rose.Invocation.Reply => True,
+                                  others                => False),
+                        others => <>),
+                     others  => <>);
+                  Rose.Invocation.Send_Word (Params.all, Size);
+               end;
+            end if;
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
 
          when others =>
             Rose.Kernel.Panic.Panic

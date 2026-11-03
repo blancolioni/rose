@@ -121,7 +121,8 @@ is
           Execution_Access => Layout.Header.Execution_Access,
           Rescinded_Count  => Layout.Header.Rescinded_Count + 1,
           Endpoint         => Layout.Header.Endpoint,
-          Identifier       => Layout.Header.Identifier),
+          Identifier       => Layout.Header.Identifier,
+          Derivation       => Layout.Header.Derivation),
        Payload => Layout.Payload)
    with Ghost;
    --  Layout, with one more rescind.
@@ -138,7 +139,8 @@ is
           Execution_Access => Layout.Header.Execution_Access,
           Rescinded_Count  => Layout.Header.Rescinded_Count,
           Endpoint         => Layout.Header.Endpoint,
-          Identifier       => Identifier),
+          Identifier       => Identifier,
+          Derivation       => Layout.Header.Derivation),
        Payload => Layout.Payload)
    with Ghost;
    --  Layout, with another identifier.
@@ -158,7 +160,7 @@ is
      (Count    : Rose.Objects.Rescinded_Count;
       Rescinds : Natural)
       return Rose.Objects.Rescinded_Count
-   is (Count + Rose.Objects.Rescinded_Count (Rescinds mod 2 ** 24))
+   is (Count + Rose.Objects.Rescinded_Count (Rescinds mod 2 ** 20))
    with Ghost;
    --  The count of a capability that has been rescinded Rescinds times.
 
@@ -173,9 +175,9 @@ is
       Rescinds : Natural)
    with Ghost,
         Post => (Count_After (Count, Rescinds) = Count)
-                = (Rescinds mod 2 ** 24 = 0);
+                = (Rescinds mod 2 ** 20 = 0);
    --  ... unless the count has gone all the way round, which is after a
-   --  multiple of 2 ** 24 rescinds.
+   --  multiple of 2 ** 20 rescinds.
 
    procedure Set_Page
      (Table   : in out Cap_Table;

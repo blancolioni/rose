@@ -13,6 +13,13 @@ package Rose.Kernel.Capabilities.Physical_Memory is
    --  physical page in data word 0 at the same address, unless the page
    --  is RAM.
 
+   Device_Range          : constant Rose.Objects.Endpoint_Index :=
+                             Rose.Init_Capabilities.Device_Range_Endpoint;
+   --  Only init's Device_Ranges_Cap has this endpoint.  Data words 0 and
+   --  1 are the first physical page and the number of pages.  It replies
+   --  with a cap that maps them together in the device window (#582),
+   --  unless a page is RAM.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

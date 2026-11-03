@@ -1,3 +1,5 @@
+with Rose.Interfaces.File_System.Client;
+
 package Restore.Installer is
 
    type Install_Action is (Launch, Save);
@@ -30,6 +32,9 @@ package Restore.Installer is
                              Flags : Install_Flag_Array));
 
    procedure Install
-     (Source : Step_Iterator);
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator);
+   --  Install the programs Source gives from /rose/install in
+   --  File_System.
 
 end Restore.Installer;
