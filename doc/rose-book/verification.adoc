@@ -43,8 +43,8 @@ The kernel has its own run-time system, but `make prove` uses the userland one f
 `Rose.Command_Line.Items`::
 No run-time errors in decoding an item of the launch buffer, for any contents and length of buffer: the buffer is from another process.
 `Rose.Command_Line.Element` is the one conversion from the address of the buffer to an array, and calls it.
-An item whose length is 2 ** 31 or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
-Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2 ** 31 or more.
+An item whose length is 2^31^ or more, which `Element` used to raise a constraint error for, is taken to be empty, as is one that does not fit in the buffer.
+Not covered: `Natural_Argument`, which still raises a constraint error for a word of 2^31^ or more.
 
 `Rose.Containers.Queues` and `Rose.Containers.Bounded_Hashed_Maps`::
 No run-time errors, in the instances that isofs uses (`Rose.Containers.Queues_Proof` and `Maps_Proof`).
@@ -75,7 +75,7 @@ An invariant of the table is proved to hold after every operation: the last numb
 `Create` gives the lowest number that is free, and changes nothing else.
 `Delete`, `Set`, `Rescind` and `Set_Identifier` change one capability and no other, and `Rescind` adds exactly one to its count.
 They act only on a capability that is in use: a number that is not a capability is never written.
-A capability that is checked against one that has been rescinded does not match (`Same_Count`), unless the 20-bit count has gone all the way round, which is after a multiple of 2 ** 20 rescinds.
+A capability that is checked against one that has been rescinded does not match (`Same_Count`), unless the 20-bit count has gone all the way round, which is after a multiple of 2^20^ rescinds.
 What is not proved, and is trusted, is `Rose.Kernel.Cap_Slots`, the two procedures that read and write a layout through the address of its page, whose contracts say that a slot reads as what was last written to it and that writing one changes no other.
 Not covered: that the pages are allocated, which `Rose.Kernel.Processes` does, and what its callers pass.
 The callers that take a capability number from another process do not copy one that the process does not hold (`Send_Cap`, `Send_Reply`, `Copy_Cap`, and the initial capabilities of a new process): the receiver gets the null capability, or a number that holds nothing where those that follow count on it.
