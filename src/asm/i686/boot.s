@@ -26,7 +26,18 @@ multiboot_header:
 	.long GRUB_MULTIBOOT_ARCHITECTURE_I386  # architecture i386 protected mode
 	.long MULTIBOOT_HEADER_LENGTH
 	.long CHECKSUM
-	
+
+	# framebuffer tag (#582): ask for 1024x768x32, optionally.  GRUB's
+	# multiboot2 command sets gfxpayload from this, so a grub.cfg entry
+	# that wants text mode sets gfxpayload=text after that command
+	.short 5                                # type
+	.short 1                                # flags: optional
+	.long 20                                # size
+	.long 1024                              # width
+	.long 768                               # height
+	.long 32                                # depth
+	.long 0                                 # pad to 8 bytes
+
 	# end tag
 	.short 0
 	.short 0
