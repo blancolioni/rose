@@ -45,6 +45,10 @@ image::capability.svg[Generic capability layout]
 
 * `Rescinded Count` is the number of times a capability has been rescinded.
   Any time the capability is invoked, the rescinded counts must match.
+* `Derivation` names the record of what the capability was derived from, or
+  is 0 if it was not derived.
+  A capability is valid only if no record from its own up to the root has
+  been revoked.
 * `S` is set for single-use capabilities.
 * `R` requests read-only access to some resource.
 * `W` requests write access to some resource.
