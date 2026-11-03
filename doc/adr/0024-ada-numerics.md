@@ -38,13 +38,13 @@ These generators give deterministic pseudo-random sequences, from seeds that are
 
 ### 4. The scope
 
-- **In:** `Generic_Elementary_Functions` and its instantiations for `Short_Float`, `Float`, `Long_Float` and `Long_Long_Float`; `Generic_Complex_Types` and `Generic_Complex_Elementary_Functions` and theirs; `Float_Random` and `Discrete_Random`; and `System.Exponr`, for `**` of a float by an integer.
-- **Out:** the real and complex vectors and matrices (#664), and converting a float to and from text (`'Image`, `'Value`, `Float_IO`), which the RTS can't do yet (#670).
+- **In:** `Generic_Elementary_Functions` and its instantiations for `Short_Float`, `Float`, `Long_Float` and `Long_Long_Float`; `Generic_Complex_Types` and `Generic_Complex_Elementary_Functions` and theirs; `Float_Random` and `Discrete_Random`; `System.Exponr`, for `**` of a float by an integer; and, since #664, `Generic_Real_Arrays` and `Generic_Complex_Arrays` and their instantiations, with `System.Generic_Array_Operations`.
+- **Out:** converting a float to and from text (`'Image`, `'Value`, `Float_IO`), which the RTS can't do yet (#670).
 - **Targets:** i686, the only one with a userland. On x86_64, the long double functions could stay as they are, but double would be expected to use SSE, so `rose-libm.c` would become one file per architecture.
 
 ## Consequences
 
 - **`gnat-units` gains 39 files from GCC,** with the Aux packages, `System.Exponr` and `System.Double_Real`, `System.Random_Numbers`, and the spec of `System.Random_Seed`.
 - **`Rose.Clock_Source` has `Has_Source`,** so that the seed can tell whether the clock is open without catching `Program_Error`.
-- **The tests are self tests.** `Numerics_Test` checks the functions against known values for each float type to within 8 model epsilons, the complex `Sqrt` and `Exp`, and that two generators given the same seed agree. It runs before the clock tests, and checks that `Reset` without a clock gives the never-reset sequence. `Random_Seed_Test` runs after them, and checks that `Reset` then uses the clock. The order of the suite matters to both.
+- **The tests are self tests.** `Numerics_Test` checks the functions against known values for each float type to within 8 model epsilons, the complex `Sqrt` and `Exp`, and that two generators given the same seed agree. It runs before the clock tests, and checks that `Reset` without a clock gives the never-reset sequence. `Random_Seed_Test` runs after them, and checks that `Reset` then uses the clock. The order of the suite matters to both. `Arrays_Test` checks a matrix product, `Solve`, `Inverse`, `Determinant` and a symmetric eigensystem, and a complex `Solve` and inner product.
 - **Accuracy is bounded where it was cheap to bound,** not everywhere. Trigonometric arguments beyond 2\*\*30 lose accuracy, and long double `pow` multiplies by `log2 x` directly, so it can lose a few bits for very large results. `Float` and `Long_Float` are unaffected by either.
