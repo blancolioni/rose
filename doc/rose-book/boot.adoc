@@ -46,16 +46,19 @@ The kernel then switches its log output to the serial port and starts the clock.
 * the clock: set-timeout and get-ticks;
 * checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process and restore-interrupt;
 * trace events, and writing the system image;
-* three _root capabilities_, for I/O ports, interrupts and device pages.
+* five _root capabilities_, for I/O ports, interrupts, device pages, device ranges and boot tags.
 
 A root capability makes capabilities for hardware.
-Given a range of ports, an interrupt vector or a physical page, it replies with a capability for just that, with less authority than its own; none of the capabilities it makes can make others.
-The device-page root refuses a page that is RAM.
+Given a range of ports, an interrupt vector, a physical page, a range of physical pages or a multiboot2 tag type, it replies with a capability for just that, with less authority than its own; none of the capabilities it makes can make others.
+The device-page and device-range roots refuse a page that is RAM.
+A device page is mapped at its own address, and a device range at an address its holder chooses in the device window, `E000_0000` to `EF00_0000`.
+A boot tag capability reads that tag from what the boot loader reported, such as the framebuffer's address and geometry.
 
 == `init`
 
 `init` gives each program the hardware it needs from its root capabilities, through `Init.Grants`.
 It records which program each port, interrupt and device page has gone to, and refuses it to any other.
+The framebuffer's pages are recorded as device pages, so a program that has the framebuffer has all of them.
 A boot server is recorded by its object id, and an installed program by a number `init` gives it.
 The boot console's screen and cursor ports are given to nobody, so they are not recorded, because the persistent console takes the screen over from the boot console (see <<handing-over-the-console>>).
 
@@ -151,7 +154,7 @@ Each program on the install media comes with a list of the capabilities it asks 
 `init` grants each request that its policy allows, and leaves out the rest:
 
 * any program may have `create-endpoint`;
-* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages;
+* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `framebuffer` (the boot loader's linear framebuffer, if it gave one), and `boot-tag 8` (the framebuffer's geometry);
 * hardware that another program already has is refused (see <<_init>>).
 
 [#handing-over-the-console]
