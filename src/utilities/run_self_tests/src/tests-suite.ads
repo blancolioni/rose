@@ -14,6 +14,7 @@ with Tests.Processes;
 with Tests.Rights;
 with Tests.Secondary_Stack;
 with Tests.Server;
+with Tests.Shared_Regions;
 with Tests.Shared_Segments;
 with Tests.Signed;
 with Tests.Smoke;
@@ -52,6 +53,7 @@ package Tests.Suite is
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
                    Tests.Memory.Copy_Test'Access,
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
+                   Tests.Shared_Regions.Shared_Regions_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;
