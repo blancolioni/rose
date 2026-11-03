@@ -112,9 +112,32 @@ package Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       Resizable     : Boolean;
-      Private_Region : Boolean := False);
+      Private_Region : Boolean := False;
+      Shared        : Boolean := False);
    --  Private_Region is True if Region belongs to the process, and is to
-   --  be released when the process is gone.
+   --  be released when the process is gone. Shared is True if the segment
+   --  maps the region's pages themselves, shared with every process that
+   --  maps them shared (ADR 0025). A shared segment that overlaps another
+   --  segment of the process is left out.
+
+   procedure Remove_Segment
+     (Process      : Process_Id;
+      Virtual_Base : Rose.Addresses.Virtual_Page_Address);
+   --  Unmap the segment that starts at Virtual_Base, and free its pages.
+   --  The last mapping of a shared page writes it back to its region, if
+   --  it has been changed.
+
+   procedure Release_Shared_Segments (Process : Process_Id);
+   --  Process is gone: drop its mappings of shared pages, and write back
+   --  those that it was the last to map. Its other pages are freed by
+   --  Mem.Page_Table.Delete_All.
+
+   function Shared_Page
+     (Process      : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id;
+   --  The store page that Virtual_Page of Process maps, if it is in a
+   --  shared segment, or zero.
 
    function Region_Page
      (Process      : Process_Id;

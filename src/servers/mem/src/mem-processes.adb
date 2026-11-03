@@ -10,8 +10,10 @@ with Rose.Interfaces.Kernel_Process.Client;
 
 with Mem.Calls;
 
+with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Physical_Map;
+with Mem.Shared_Pages;
 with Mem.Virtual_Map;
 
 package body Mem.Processes is
@@ -20,7 +22,8 @@ package body Mem.Processes is
 
    type Process_State is (Available, Active, Faulted);
 
-   type Segment_Flag is (Read, Write, Execute, Extensible, Persistent);
+   type Segment_Flag is
+     (Read, Write, Execute, Extensible, Persistent, Shared);
 
    type Segment_Flag_Array is array (Segment_Flag) of Boolean;
 
@@ -28,7 +31,8 @@ package body Mem.Processes is
      System.Storage_Elements.Storage_Array (1 .. 4096);
    Long_Buffer : System.Storage_Elements.Storage_Array (1 .. 8192);
 
-   Max_Segments : constant := 8;
+   Max_Segments : constant := Rose.Checkpoints.Max_Saved_Segments;
+   --  32: ADR 0025 has what a larger limit would cost.
    type Segment_Count is range 0 .. Max_Segments;
    subtype Segment_Index is Segment_Count range 1 .. Segment_Count'Last;
 
@@ -98,6 +102,27 @@ package body Mem.Processes is
 
    procedure Report_Segment (Segment : Segment_Record);
 
+   function Overlaps
+     (P     : Memory_Process_Record;
+      Base  : Rose.Addresses.Virtual_Page_Address;
+      Bound : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if any page from Base to Bound - 1 is in a segment of P, or
+   --  in the range a resizable segment of P can grow into.
+
+   procedure Close_Segment (Segment : in out Segment_Record);
+   --  Release the segment's region, if it belongs to the process, and
+   --  close it.
+
+   procedure Unmap_Segment_Pages
+     (Process : Process_Id;
+      Segment : Segment_Record;
+      Unmap   : Boolean);
+   --  Forget the pages of Process in Segment, and free them, writing back
+   --  a shared page that nothing else maps if it has changed. If Unmap is
+   --  True, also remove them from the process's page table, which isn't
+   --  needed when the process is gone.
+
    -------------------------------
    -- Add_Nonpersistent_Segment --
    -------------------------------
@@ -131,7 +156,8 @@ package body Mem.Processes is
             Write      => Writable,
             Execute    => Executable,
             Extensible => Resizable,
-            Persistent => False),
+            Persistent => False,
+            Shared     => False),
          Private_Region => False);
 
    end Add_Nonpersistent_Segment;
@@ -150,7 +176,8 @@ package body Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       Resizable     : Boolean;
-      Private_Region : Boolean := False)
+      Private_Region : Boolean := False;
+      Shared        : Boolean := False)
    is
       use type Rose.Objects.Object_Id;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -158,6 +185,18 @@ package body Mem.Processes is
       Region_Bound : Rose.Objects.Page_Object_Id;
    begin
       if P.Num_Segments = Max_Segments then
+         Rose.Console_IO.Put
+           ("mem: add segment: too many segments, process ");
+         Rose.Console_IO.Put (Natural (Process));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      if Shared and then Overlaps (P, Virtual_Base, Virtual_Bound) then
+         Rose.Console_IO.Put
+           ("mem: add segment: shared segment overlaps another, process ");
+         Rose.Console_IO.Put (Natural (Process));
+         Rose.Console_IO.New_Line;
          return;
       end if;
 
@@ -195,7 +234,8 @@ package body Mem.Processes is
             Write => Writable,
             Execute => Executable,
             Extensible => Resizable,
-            Persistent => True),
+            Persistent => True,
+            Mem.Processes.Shared => Add_Segment.Shared),
          Private_Region => Private_Region);
 
       if Log_Segments then
@@ -253,6 +293,23 @@ package body Mem.Processes is
          end;
       end if;
    end Allocate_Physical_Page;
+
+   -------------------
+   -- Close_Segment --
+   -------------------
+
+   procedure Close_Segment (Segment : in out Segment_Record) is
+      use type Rose.Capabilities.Capability;
+   begin
+      if Segment.Private_Region then
+         Rose.Interfaces.Region.Client.Release (Segment.Region);
+      end if;
+      if Rose.Interfaces.Region.Client.Get_Interface_Cap (Segment.Region)
+        /= 0
+      then
+         Rose.Interfaces.Region.Client.Close (Segment.Region);
+      end if;
+   end Close_Segment;
 
    -----------------
    -- Count_Fault --
@@ -623,7 +680,6 @@ package body Mem.Processes is
          Report ("  invalid ", Invalid_Fault);
       end Report_Faults;
 
-      use type Rose.Capabilities.Capability;
    begin
       if P.State = Available then
          return;
@@ -634,14 +690,7 @@ package body Mem.Processes is
       Close (P.Process);
 
       for Segment of P.Segments (1 .. P.Num_Segments) loop
-         if Segment.Private_Region then
-            Rose.Interfaces.Region.Client.Release (Segment.Region);
-         end if;
-         if Rose.Interfaces.Region.Client.Get_Interface_Cap (Segment.Region)
-           /= 0
-         then
-            Rose.Interfaces.Region.Client.Close (Segment.Region);
-         end if;
+         Close_Segment (Segment);
       end loop;
       P.Num_Segments := 0;
 
@@ -675,6 +724,26 @@ package body Mem.Processes is
       Process_Table (Pid).Interface_Cap := Cap;
       return Cap;
    end New_Process;
+
+   --------------
+   -- Overlaps --
+   --------------
+
+   function Overlaps
+     (P     : Memory_Process_Record;
+      Base  : Rose.Addresses.Virtual_Page_Address;
+      Bound : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      use type Rose.Addresses.Virtual_Page_Address;
+   begin
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Base < Segment.Limit and then Segment.Base < Bound then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Overlaps;
 
    ------------------------
    -- Process_Identifier --
@@ -803,6 +872,49 @@ package body Mem.Processes is
       return Next_Pid;
    end Register_Process;
 
+   -----------------------------
+   -- Release_Shared_Segments --
+   -----------------------------
+
+   procedure Release_Shared_Segments (Process : Process_Id) is
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Segment.Flags (Shared) then
+            Unmap_Segment_Pages (Process, Segment, Unmap => False);
+         end if;
+      end loop;
+   end Release_Shared_Segments;
+
+   --------------------
+   -- Remove_Segment --
+   --------------------
+
+   procedure Remove_Segment
+     (Process      : Process_Id;
+      Virtual_Base : Rose.Addresses.Virtual_Page_Address)
+   is
+      use type Rose.Addresses.Virtual_Page_Address;
+      P     : Memory_Process_Record renames Process_Table (Process);
+      Empty : Segment_Record;
+   begin
+      for I in 1 .. P.Num_Segments loop
+         if P.Segments (I).Base = Virtual_Base then
+            Unmap_Segment_Pages (Process, P.Segments (I), Unmap => True);
+            Close_Segment (P.Segments (I));
+            P.Segments (I .. P.Num_Segments - 1) :=
+              P.Segments (I + 1 .. P.Num_Segments);
+            P.Segments (P.Num_Segments) := Empty;
+            P.Num_Segments := P.Num_Segments - 1;
+            return;
+         end if;
+      end loop;
+
+      Rose.Console_IO.Put ("mem: remove segment: no segment there, process ");
+      Rose.Console_IO.Put (Natural (Process));
+      Rose.Console_IO.New_Line;
+   end Remove_Segment;
+
    --------------------
    -- Report_Segment --
    --------------------
@@ -849,6 +961,7 @@ package body Mem.Processes is
       Put (Execute, 'x');
       Put (Extensible, 's');
       Put (Persistent, 'p');
+      Put (Shared, 'S');
       Rose.Console_IO.New_Line;
    end Report_Segment;
 
@@ -1099,7 +1212,8 @@ package body Mem.Processes is
                  Write      => Has (Rose.Checkpoints.Segment_Writable),
                  Execute    => Has (Rose.Checkpoints.Segment_Executable),
                  Extensible => Has (Rose.Checkpoints.Segment_Extensible),
-                 Persistent => Has (Rose.Checkpoints.Segment_Persistent)),
+                 Persistent => Has (Rose.Checkpoints.Segment_Persistent),
+                 Shared     => Has (Rose.Checkpoints.Segment_Shared)),
               Private_Region =>
                 Has (Rose.Checkpoints.Segment_Private_Region));
       end;
@@ -1158,7 +1272,9 @@ package body Mem.Processes is
               or (if Segment.Flags (Persistent)
                   then Rose.Checkpoints.Segment_Persistent else 0)
               or (if Segment.Private_Region
-                  then Rose.Checkpoints.Segment_Private_Region else 0);
+                  then Rose.Checkpoints.Segment_Private_Region else 0)
+              or (if Segment.Flags (Shared)
+                  then Rose.Checkpoints.Segment_Shared else 0);
          end;
       end loop;
    end Save_Process;
@@ -1175,6 +1291,34 @@ package body Mem.Processes is
       Process_Table (Process).Server := Cap;
    end Set_Published_Interface_Cap;
 
+   -----------------
+   -- Shared_Page --
+   -----------------
+
+   function Shared_Page
+     (Process      : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Objects.Object_Id
+   is
+      use Rose.Addresses;
+      use Rose.Objects;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Virtual_Page >= Segment.Base
+           and then Virtual_Page < Segment.Bound
+         then
+            if Segment.Flags (Shared) and then Segment.Region_Base /= 0 then
+               return Segment.Region_Base
+                 + Object_Id (Virtual_Page - Segment.Base)
+                 + Segment.Region_Offset;
+            end if;
+            return 0;
+         end if;
+      end loop;
+      return 0;
+   end Shared_Page;
+
    ----------------------
    -- Store_Read_Count --
    ----------------------
@@ -1183,5 +1327,91 @@ package body Mem.Processes is
    begin
       return Store_Reads;
    end Store_Read_Count;
+
+   -------------------------
+   -- Unmap_Segment_Pages --
+   -------------------------
+
+   procedure Unmap_Segment_Pages
+     (Process : Process_Id;
+      Segment : Segment_Record;
+      Unmap   : Boolean)
+   is
+      use Rose.Addresses;
+
+      procedure Free (Position : Mem.Page_Table.Cursor);
+
+      procedure Write_Back
+        (Virtual_Page  : Virtual_Page_Address;
+         Physical_Page : Physical_Page_Address);
+      --  Put the contents of Physical_Page, which Virtual_Page of the
+      --  segment maps, into the segment's region.
+
+      ----------
+      -- Free --
+      ----------
+
+      procedure Free (Position : Mem.Page_Table.Cursor) is
+         Virtual  : constant Virtual_Page_Address :=
+                      Mem.Page_Table.Virtual_Address (Position);
+         Physical : constant Physical_Page_Address :=
+                      Mem.Page_Table.Physical_Address (Position);
+         Cached, Last, Modified : Boolean;
+      begin
+         if Unmap then
+            Mem.Calls.Unmap (Process_Object_Id (Process), Virtual);
+         end if;
+         Mem.Page_Table.Delete (Position);
+
+         if Mem.Shared_Pages.Is_Shared (Physical) then
+            Mem.Shared_Pages.Release (Physical, Last, Modified);
+            if Last then
+               if Modified then
+                  Write_Back (Virtual, Physical);
+               end if;
+               Mem.Physical_Map.Deallocate_Page (Physical);
+            end if;
+         else
+            Mem.Page_Cache.Release (Physical, Cached);
+            if not Cached then
+               Mem.Physical_Map.Deallocate_Page (Physical);
+            end if;
+         end if;
+      end Free;
+
+      ----------------
+      -- Write_Back --
+      ----------------
+
+      procedure Write_Back
+        (Virtual_Page  : Virtual_Page_Address;
+         Physical_Page : Physical_Page_Address)
+      is
+         use Rose.Objects;
+         Page : constant Page_Object_Id :=
+                  Segment.Region_Base
+                  + Object_Id (Virtual_Page - Segment.Base)
+                  + Segment.Region_Offset;
+
+         procedure Put (Address : System.Address);
+
+         ---------
+         -- Put --
+         ---------
+
+         procedure Put (Address : System.Address) is
+            Data : Page_Buffer with Import, Address => Address;
+         begin
+            Rose.Interfaces.Region.Client.Put (Segment.Region, Page, Data);
+         end Put;
+
+      begin
+         Mem.Virtual_Map.With_Page (Physical_Page, Put'Access);
+      end Write_Back;
+
+   begin
+      Mem.Page_Table.Iterate_Process_Pages
+        (Process, Segment.Base, Segment.Limit, Free'Access);
+   end Unmap_Segment_Pages;
 
 end Mem.Processes;

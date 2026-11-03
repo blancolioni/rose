@@ -53,6 +53,18 @@ package Mem.Page_Table is
    procedure Delete_All
      (Process : Process_Id);
 
+   procedure Delete (Position : Cursor);
+   --  Forget the page at Position, without freeing its physical page or
+   --  unmapping it. The next checkpoint doesn't save it.
+
+   procedure Iterate_Process_Pages
+     (Process : Process_Id;
+      Base    : Rose.Addresses.Virtual_Page_Address;
+      Bound   : Rose.Addresses.Virtual_Page_Address;
+      Action  : not null access procedure (Position : Cursor));
+   --  Call Action for each page of Process from Base to Bound - 1. Action
+   --  may Delete the page it is given.
+
    function Find
      (Process    : Process_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address)

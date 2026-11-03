@@ -13,6 +13,7 @@ OBJECTS= \
 	$(BUILDDIR)/mem-physical_map.o \
 	$(BUILDDIR)/mem-processes.o \
 	$(BUILDDIR)/mem-server.o \
+	$(BUILDDIR)/mem-shared_pages.o \
 	$(BUILDDIR)/mem-virtual_map.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-addresses.o \
