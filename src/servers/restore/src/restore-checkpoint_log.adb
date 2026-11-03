@@ -17,6 +17,8 @@ package body Restore.Checkpoint_Log is
      with Alignment => Rose.Limits.Page_Size;
    Header : Rose.Checkpoints.Header_Page
      with Import, Address => Page'Address;
+   Shared_Header : Rose.Checkpoints.Shared_Header_Page
+     with Import, Address => Page'Address;
    Kernel_Header : Rose.Checkpoints.Kernel_Table_Header
      with Import, Address => Page'Address;
    Process : Rose.Checkpoints.Process_Record
@@ -120,6 +122,7 @@ package body Restore.Checkpoint_Log is
       Table_Pages  : Natural;
       Header_Pages : Natural := 0;
       Listed       : Natural := 0;
+      Has_Shared   : Boolean := False;
    begin
       if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
         or else not Check_Store_Tables
@@ -161,9 +164,58 @@ package body Restore.Checkpoint_Log is
          Header_Pages := Header_Pages + 1;
          Listed := Listed + Natural (Header.Count);
 
-         exit when (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page)
-           /= 0;
+         if (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page) /= 0 then
+            Has_Shared :=
+              (Header.Flags and Rose.Checkpoints.Has_Shared_Pages) /= 0;
+            exit;
+         end if;
       end loop;
+
+      --  Then the shared header pages, after the pages listed so far
+      --  (ADR 0025).
+
+      if Has_Shared then
+         loop
+            if Table_Pages + Header_Pages + Listed = Pages then
+               Report_Bad_Entry
+                 (Location, "shared header pages run past the entry");
+               return False;
+            end if;
+
+            Read_Page
+              (Reader, Location, Table_Pages + Header_Pages + Listed + 1,
+               Page);
+
+            if Has_Error
+              or else Shared_Header.Magic
+                /= Rose.Checkpoints.Shared_Header_Magic
+              or else Shared_Header.Count
+                > Rose.Checkpoints.Max_Shared_References
+            then
+               Report_Bad_Entry (Location, "expected a shared header page");
+               return False;
+            end if;
+
+            for I in 1 .. Shared_Header.Count loop
+               case Shared_Header.Pages (I).Flags is
+                  when Rose.Checkpoints.Shared_Page_Saved =>
+                     Listed := Listed + 1;
+                  when Rose.Checkpoints.Shared_Page_Released =>
+                     null;
+                  when others =>
+                     Report_Bad_Entry
+                       (Location, "a shared page is neither saved nor "
+                        & "released");
+                     return False;
+               end case;
+            end loop;
+
+            Header_Pages := Header_Pages + 1;
+
+            exit when (Shared_Header.Flags
+                       and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
+         end loop;
+      end if;
 
       if Table_Pages + Header_Pages + Listed /= Pages then
          Report_Bad_Entry (Location, "page count does not match its headers");

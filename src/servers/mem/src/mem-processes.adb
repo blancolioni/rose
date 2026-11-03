@@ -114,6 +114,13 @@ package body Mem.Processes is
    --  Release the segment's region, if it belongs to the process, and
    --  close it.
 
+   procedure New_Restored_Page
+     (Page      : System.Storage_Elements.Storage_Array;
+      Physical  : out Rose.Addresses.Physical_Page_Address;
+      Success   : out Boolean);
+   --  Allocate a physical page and copy Page, saved in a checkpoint, into
+   --  it. Success is False if there is no memory for it.
+
    procedure Unmap_Segment_Pages
      (Process : Process_Id;
       Segment : Segment_Record;
@@ -725,6 +732,42 @@ package body Mem.Processes is
       return Cap;
    end New_Process;
 
+   -----------------------
+   -- New_Restored_Page --
+   -----------------------
+
+   procedure New_Restored_Page
+     (Page      : System.Storage_Elements.Storage_Array;
+      Physical  : out Rose.Addresses.Physical_Page_Address;
+      Success   : out Boolean)
+   is
+      use Rose.Addresses;
+   begin
+      Mem.Physical_Map.Allocate_Page (Physical, Success);
+      if not Success then
+         Mem.Virtual_Map.Reclaim (Physical, Success);
+      end if;
+
+      if not Success then
+         return;
+      end if;
+
+      declare
+         Base : constant System.Address := Long_Buffer'Address;
+         X    : constant Virtual_Address := To_Virtual_Address (Base);
+         Y    : constant Virtual_Address :=
+                  (if X mod 4096 = 0 then X
+                   else X - (X mod 4096) + 4096);
+         Buffer : Page_Buffer;
+         pragma Import (Ada, Buffer);
+         for Buffer'Address use To_System_Address (Y);
+      begin
+         Mem.Calls.Load_Page (Physical, Buffer'Address);
+         Buffer := Page;
+         Mem.Calls.Unload_Page (Physical, Buffer'Address);
+      end;
+   end New_Restored_Page;
+
    --------------
    -- Overlaps --
    --------------
@@ -1010,6 +1053,7 @@ package body Mem.Processes is
    is
       pragma Unreferenced (Id);
       use Rose.Addresses;
+      use type Rose.Objects.Object_Id;
       Pid       : constant Process_Id := Process_Id (Mem_Pid);
       V_Page    : constant Virtual_Page_Address :=
                     Virtual_Page_Address (Virtual_Page);
@@ -1036,35 +1080,24 @@ package body Mem.Processes is
          return;
       end if;
 
+      --  A shared segment's pages are restored by store page
+      --  (Restore_Shared_Page). Checkpoints from before ADR 0025's
+      --  section 4 saved them by process too; those copies are ignored.
+
+      if Shared_Page (Pid, V_Page) /= 0 then
+         return;
+      end if;
+
       if Mem.Page_Table.Has_Element (Mem.Page_Table.Find (Pid, V_Page)) then
          Rose.Console_IO.Put_Line ("mem: restore page: already restored");
          return;
       end if;
 
-      Mem.Physical_Map.Allocate_Page (Phys_Page, Have_Page);
-      if not Have_Page then
-         Mem.Virtual_Map.Reclaim (Phys_Page, Have_Page);
-      end if;
-
+      New_Restored_Page (Page, Phys_Page, Have_Page);
       if not Have_Page then
          Rose.Console_IO.Put_Line ("mem: restore page: out of memory");
          return;
       end if;
-
-      declare
-         Base : constant System.Address := Long_Buffer'Address;
-         X    : constant Virtual_Address := To_Virtual_Address (Base);
-         Y    : constant Virtual_Address :=
-                  (if X mod 4096 = 0 then X
-                   else X - (X mod 4096) + 4096);
-         Buffer : Page_Buffer;
-         pragma Import (Ada, Buffer);
-         for Buffer'Address use To_System_Address (Y);
-      begin
-         Mem.Calls.Load_Page (Phys_Page, Buffer'Address);
-         Buffer := Page;
-         Mem.Calls.Unload_Page (Phys_Page, Buffer'Address);
-      end;
 
       Mem.Virtual_Map.Map
         (Process       => Process_Table (Pid).Oid,
@@ -1167,6 +1200,38 @@ package body Mem.Processes is
          end;
       end if;
    end Restore_Segment;
+
+   -------------------------
+   -- Restore_Shared_Page --
+   -------------------------
+
+   procedure Restore_Shared_Page
+     (Id         : Rose.Objects.Capability_Identifier;
+      Store_Page : Rose.Objects.Object_Id;
+      Page       : System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      Physical : Rose.Addresses.Physical_Page_Address;
+      Success  : Boolean;
+   begin
+      if Page'Length /= 4096 then
+         Rose.Console_IO.Put_Line ("mem: restore shared page: bad request");
+         return;
+      end if;
+
+      New_Restored_Page (Page, Physical, Success);
+      if not Success then
+         Rose.Console_IO.Put_Line ("mem: restore shared page: out of memory");
+         return;
+      end if;
+
+      Mem.Shared_Pages.Restore (Store_Page, Physical, Success);
+      if not Success then
+         Rose.Console_IO.Put_Line
+           ("mem: restore shared page: already restored, or table full");
+         Mem.Physical_Map.Deallocate_Page (Physical);
+      end if;
+   end Restore_Shared_Page;
 
    --------------------------
    -- Restore_Zero_Segment --

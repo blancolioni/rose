@@ -37,4 +37,12 @@ interface Memory_Restore is
    --  Give the process the saved contents of one of its pages.  The page
    --  is dirty, so the next checkpoint saves it again.
 
+   procedure Restore_Shared_Page
+     (Store_Page : Object_Id;
+      Page       : Storage_Array);
+   --  Give the memory server the saved contents of a page of shared
+   --  segments (ADR 0025), before any process maps it.  A fault in a
+   --  shared segment over Store_Page finds it.  It is dirty, so the next
+   --  checkpoint saves it again.
+
 end Memory_Restore;

@@ -408,12 +408,18 @@ package Rose.Checkpoints is
    --  order they are listed. The last header page has
    --  Is_Last_Header_Page set. The memory server writes this, and the
    --  restore server reads it.
+   --
+   --  If the last header page also has Has_Shared_Pages, the pages of
+   --  shared segments come next (ADR 0025): one or more shared header
+   --  pages, the last with Is_Last_Header_Page, then the pages that they
+   --  list as saved, in that order.
 
    Header_Page_Magic : constant := 16#7E6A_F178_79CB_E048#;
 
    type Header_Page_Flags is new Rose.Words.Word_32;
 
    Is_Last_Header_Page : constant Header_Page_Flags := 16#0001#;
+   Has_Shared_Pages    : constant Header_Page_Flags := 16#0002#;
 
    type Page_Reference is
       record
@@ -434,6 +440,40 @@ package Rose.Checkpoints is
          Flags : Header_Page_Flags := 0;
          Count : Rose.Words.Word_32 := 0;
          Pages : Page_Reference_Array;
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   --  A shared header page lists store pages, each saved once however many
+   --  processes map it. A saved page's contents follow the header pages.
+   --  A released page was written back to its region when nothing mapped
+   --  it any more, so the region has its newest contents, and a restore
+   --  doesn't use an older entry's copy of it.
+
+   Shared_Header_Magic : constant := 16#5348_4152_4544_5031#;
+
+   Shared_Page_Saved    : constant := 1;
+   Shared_Page_Released : constant := 2;
+
+   type Shared_Page_Reference is
+      record
+         Page  : Rose.Words.Word_64 := 0;
+         Flags : Rose.Words.Word_32 := 0;
+      end record
+     with Pack, Size => 96;
+
+   Max_Shared_References : constant := (Rose.Limits.Page_Size - 16) / 12;
+
+   type Shared_Reference_Array is
+     array (Rose.Words.Word_32 range 1 .. Max_Shared_References)
+     of Shared_Page_Reference
+     with Pack, Size => Max_Shared_References * 96;
+
+   type Shared_Header_Page is
+      record
+         Magic : Rose.Words.Word_64 := Shared_Header_Magic;
+         Flags : Header_Page_Flags := 0;
+         Count : Rose.Words.Word_32 := 0;
+         Pages : Shared_Reference_Array;
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 

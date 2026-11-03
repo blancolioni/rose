@@ -302,7 +302,8 @@ package body Mem.Server is
          Restore_Process      => Mem.Processes.Restore_Process'Access,
          Restore_Segment      => Mem.Processes.Restore_Segment'Access,
          Restore_Zero_Segment => Mem.Processes.Restore_Zero_Segment'Access,
-         Restore_Page         => Mem.Processes.Restore_Page'Access);
+         Restore_Page         => Mem.Processes.Restore_Page'Access,
+         Restore_Shared_Page  => Mem.Processes.Restore_Shared_Page'Access);
 
    end Create_Server;
 
