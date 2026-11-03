@@ -41,6 +41,7 @@ package Tests.Suite is
                    Tests.Directories.Version_Test'Access,
                    Tests.Users.User_Test'Access,
                    Tests.Numerics.Numerics_Test'Access,
+                   Tests.Numerics.Arrays_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
                    Tests.Ada_Calendar.Ada_Calendar_Test'Access,
