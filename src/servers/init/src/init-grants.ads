@@ -43,4 +43,19 @@ package Init.Grants is
    --  A cap that maps physical page Page at the same address, or the
    --  null cap if another owner has it, or the kernel refuses.
 
+   function Framebuffer
+     (Owner : Owner_Id)
+      return Rose.Capabilities.Capability;
+   --  A cap that maps the boot loader's linear framebuffer at an address
+   --  in the device window, or the null cap if there is no RGB
+   --  framebuffer below 4 GB, another owner has any of its pages, or the
+   --  kernel refuses (#582).
+
+   function Boot_Tag
+     (Tag : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+   --  A cap that reads the boot loader's tag of type Tag, or the null cap
+   --  if the kernel refuses.  Reading a tag conflicts with nothing, so it
+   --  is not recorded.
+
 end Init.Grants;

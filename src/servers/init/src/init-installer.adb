@@ -224,6 +224,12 @@ package body Init.Installer is
                Cap := Init.Grants.Interrupt (Owner, Values (1));
             elsif N = "device-page" and then Count = 1 then
                Cap := Init.Grants.Device_Page (Owner, Values (1));
+            elsif N = "framebuffer" and then Count = 0 then
+               Cap := Init.Grants.Framebuffer (Owner);
+            elsif N = "boot-tag" and then Count = 1
+              and then Values (1) = 8
+            then
+               Cap := Init.Grants.Boot_Tag (Values (1));
             elsif N = "port-out-8" and then Count in 1 .. 2 then
                Cap := Port (Init_Caps.Port_Out_Endpoint,
                             Init_Caps.Port_Out_Range_Endpoint);
