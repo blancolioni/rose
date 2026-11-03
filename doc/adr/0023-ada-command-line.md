@@ -56,4 +56,5 @@ A failure reports the number in the message, and nothing else: the shell doesn't
 
 - **`Ada.Command_Line` is a Rose unit,** `a-comlin`, in the run-time system's own source directory, not one of the GNAT units that are copied from the installed GCC.
 - **The generator changes.** `idle` emits the `Set_Command_Line` call in every command's main, so the expected output of every command in its tests changes. A Rose build needs an `idle` that does.
+- **The test is a command, `argv`.** It prints what `Ada.Command_Line` reports and compares it with the `String_List` it was given; with `--status` it sets the exit status. It is installed on the image, so the install list and the `Makefile` carry it.
 - **A ported program can't see its options.** The shell binds `-x` as a named argument by the signature, so a program that parses its own options gets only the positional words, and the shell may refuse an option that the signature doesn't declare. A command aspect that asks the shell to pass every word through unparsed would fix this, and is not part of this decision.
