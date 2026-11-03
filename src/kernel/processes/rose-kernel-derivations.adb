@@ -57,19 +57,6 @@ is
                   + Integer (Contribution (New_T, K, P, N)),
         Subprogram_Variant => (Decreases => N);
 
-   procedure Lemma_Count_Update
-     (Old_T : Table;
-      New_T : Table;
-      K     : Record_Number;
-      P     : Record_Id;
-      N     : Child_Count)
-   is
-   begin
-      if N > 0 then
-         Lemma_Count_Update (Old_T, New_T, K, P, N - 1);
-      end if;
-   end Lemma_Count_Update;
-
    procedure Lemma_Count_Update_All
      (Old_T : Table;
       New_T : Table;
@@ -81,25 +68,6 @@ is
                    = Integer (Count_Children (Old_T, P, Max_Records))
                      - Integer (Contribution (Old_T, K, P, Max_Records))
                      + Integer (Contribution (New_T, K, P, Max_Records)));
-
-   procedure Lemma_Count_Update_All
-     (Old_T : Table;
-      New_T : Table;
-      K     : Record_Number)
-   is
-   begin
-      for P in Record_Number loop
-         Lemma_Count_Update (Old_T, New_T, K, P, Max_Records);
-
-         pragma Loop_Invariant
-           (for all Q in Record_Number =>
-              (if Q <= P
-               then Integer (Count_Children (New_T, Q, Max_Records))
-                    = Integer (Count_Children (Old_T, Q, Max_Records))
-                      - Integer (Contribution (Old_T, K, Q, Max_Records))
-                      + Integer (Contribution (New_T, K, Q, Max_Records))));
-      end loop;
-   end Lemma_Count_Update_All;
 
    function No_Children
      (T  : Table;
@@ -120,39 +88,12 @@ is
         Post => not (Used (T.Records (J)) and then T.Records (J).Parent = Id),
         Subprogram_Variant => (Decreases => N);
 
-   procedure Lemma_Count_Zero
-     (T  : Table;
-      Id : Record_Id;
-      N  : Child_Count;
-      J  : Record_Number)
-   is
-   begin
-      if Natural (J) < N then
-         Lemma_Count_Zero (T, Id, N - 1, J);
-      end if;
-   end Lemma_Count_Zero;
-
    procedure Lemma_No_Children
      (T  : Table;
       Id : Record_Id)
    with Ghost,
         Pre  => Count_Children (T, Id, Max_Records) = 0,
         Post => No_Children (T, Id);
-
-   procedure Lemma_No_Children
-     (T  : Table;
-      Id : Record_Id)
-   is
-   begin
-      for K in Record_Number loop
-         Lemma_Count_Zero (T, Id, Max_Records, K);
-         pragma Loop_Invariant
-           (for all Q in Record_Number =>
-              (if Q <= K
-               then not (Used (T.Records (Q))
-                         and then T.Records (Q).Parent = Id)));
-      end loop;
-   end Lemma_No_Children;
 
    function Pending_Counted
      (T : Table;
@@ -222,18 +163,6 @@ is
                    and then not Is_Below (Old_T, J, Id)),
         Subprogram_Variant => (Decreases => Depth (Old_T, J));
 
-   procedure Lemma_Revoke_Scope
-     (Old_T : Table;
-      New_T : Table;
-      Id    : Record_Number;
-      J     : Record_Id)
-   is
-   begin
-      if J /= 0 then
-         Lemma_Revoke_Scope (Old_T, New_T, Id, Old_T.Records (J).Parent);
-      end if;
-   end Lemma_Revoke_Scope;
-
    procedure Lemma_Revoke_Scope_All
      (Old_T : Table;
       New_T : Table;
@@ -259,26 +188,6 @@ is
                     then Is_Valid_Chain (New_T, Q)
                          = (Is_Valid_Chain (Old_T, Q)
                             and then not Is_Below (Old_T, Q, Id))));
-
-   procedure Lemma_Revoke_Scope_All
-     (Old_T : Table;
-      New_T : Table;
-      Id    : Record_Number)
-   is
-   begin
-      for J in Record_Number loop
-         if Is_Used (Old_T, J) then
-            Lemma_Revoke_Scope (Old_T, New_T, Id, J);
-         end if;
-
-         pragma Loop_Invariant
-           (for all Q in Record_Number =>
-              (if Q <= J and then Is_Used (Old_T, Q)
-               then Is_Valid_Chain (New_T, Q)
-                    = (Is_Valid_Chain (Old_T, Q)
-                       and then not Is_Below (Old_T, Q, Id))));
-      end loop;
-   end Lemma_Revoke_Scope_All;
 
    --------------
    -- Add_Slot --
@@ -377,6 +286,97 @@ is
 
       return True;
    end Is_Valid;
+
+   procedure Lemma_Count_Update
+     (Old_T : Table;
+      New_T : Table;
+      K     : Record_Number;
+      P     : Record_Id;
+      N     : Child_Count)
+   is
+   begin
+      if N > 0 then
+         Lemma_Count_Update (Old_T, New_T, K, P, N - 1);
+      end if;
+   end Lemma_Count_Update;
+
+   procedure Lemma_Count_Update_All
+     (Old_T : Table;
+      New_T : Table;
+      K     : Record_Number)
+   is
+   begin
+      for P in Record_Number loop
+         Lemma_Count_Update (Old_T, New_T, K, P, Max_Records);
+
+         pragma Loop_Invariant
+           (for all Q in Record_Number =>
+              (if Q <= P
+               then Integer (Count_Children (New_T, Q, Max_Records))
+                    = Integer (Count_Children (Old_T, Q, Max_Records))
+                      - Integer (Contribution (Old_T, K, Q, Max_Records))
+                      + Integer (Contribution (New_T, K, Q, Max_Records))));
+      end loop;
+   end Lemma_Count_Update_All;
+
+   procedure Lemma_Count_Zero
+     (T  : Table;
+      Id : Record_Id;
+      N  : Child_Count;
+      J  : Record_Number)
+   is
+   begin
+      if Natural (J) < N then
+         Lemma_Count_Zero (T, Id, N - 1, J);
+      end if;
+   end Lemma_Count_Zero;
+
+   procedure Lemma_No_Children
+     (T  : Table;
+      Id : Record_Id)
+   is
+   begin
+      for K in Record_Number loop
+         Lemma_Count_Zero (T, Id, Max_Records, K);
+         pragma Loop_Invariant
+           (for all Q in Record_Number =>
+              (if Q <= K
+               then not (Used (T.Records (Q))
+                         and then T.Records (Q).Parent = Id)));
+      end loop;
+   end Lemma_No_Children;
+
+   procedure Lemma_Revoke_Scope
+     (Old_T : Table;
+      New_T : Table;
+      Id    : Record_Number;
+      J     : Record_Id)
+   is
+   begin
+      if J /= 0 then
+         Lemma_Revoke_Scope (Old_T, New_T, Id, Old_T.Records (J).Parent);
+      end if;
+   end Lemma_Revoke_Scope;
+
+   procedure Lemma_Revoke_Scope_All
+     (Old_T : Table;
+      New_T : Table;
+      Id    : Record_Number)
+   is
+   begin
+      for J in Record_Number loop
+         if Is_Used (Old_T, J) then
+            Lemma_Revoke_Scope (Old_T, New_T, Id, J);
+         end if;
+
+         pragma Loop_Invariant
+           (for all Q in Record_Number =>
+              (if Q <= J and then Is_Used (Old_T, Q)
+               then Is_Valid_Chain (New_T, Q)
+                    = (Is_Valid_Chain (Old_T, Q)
+                       and then not Is_Below (Old_T, Q, Id))));
+      end loop;
+   end Lemma_Revoke_Scope_All;
 
    -----------------
    -- Remove_Slot --
