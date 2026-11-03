@@ -48,11 +48,22 @@ package Rose.Init_Capabilities is
    Restart_Cap            : constant := 24;
    --  Restarts the machine (#413).
 
-   Last_Cap               : constant := 24;
+   Boot_Tags_Cap          : constant := 25;
+   --  Data: a multiboot2 tag type.  Replies with a cap that reads the
+   --  first tag of that type from the boot loader's information, into a
+   --  writable buffer, and replies with the tag's size, or 0 (#582).
+
+   Device_Ranges_Cap      : constant := 26;
+   --  Data: the first physical page and the number of pages.  Replies
+   --  with a cap that maps the range at an address in the device window
+   --  that its holder chooses, if no page in it is RAM (#582).
+
+   Last_Cap               : constant := 26;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
    Device_Page_Endpoint      : constant := 4;
+   Device_Range_Endpoint     : constant := 5;
 
    Port_Out_Endpoint       : constant := 1;
    Port_In_Endpoint        : constant := 2;
