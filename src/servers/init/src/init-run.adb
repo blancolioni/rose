@@ -461,8 +461,17 @@ package body Init.Run is
                   --  Launch is the program's Launch interface. Restore
                   --  launches drivers itself, through the interface's
                   --  Launch cap, and saves commands with the interface.
+                  --  It is null if exec could not install the program,
+                  --  and then restore gets an error.
 
-                  if Params.Data (1) = 0 then
+                  if Launch = Null_Capability then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: cannot install " & Name (1 .. Name_Last)
+                        & NL);
+                     Rose.System_Calls.Send_Error
+                       (Reply, Rose.Invocation.Request_Error);
+                  elsif Params.Data (1) = 0 then
                      declare
                         Launch_Caps : Init.Calls.Array_Of_Capabilities
                           (1 .. 3);
