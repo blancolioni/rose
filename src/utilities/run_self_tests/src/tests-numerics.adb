@@ -1,3 +1,4 @@
+with Ada.Numerics.Complex_Arrays;
 with Ada.Numerics.Complex_Elementary_Functions;
 with Ada.Numerics.Complex_Types;
 with Ada.Numerics.Discrete_Random;
@@ -6,6 +7,8 @@ with Ada.Numerics.Float_Random;
 with Ada.Numerics.Generic_Elementary_Functions;
 with Ada.Numerics.Long_Elementary_Functions;
 with Ada.Numerics.Long_Long_Elementary_Functions;
+with Ada.Numerics.Long_Long_Real_Arrays;
+with Ada.Numerics.Long_Real_Arrays;
 with Ada.Text_IO;
 
 package body Tests.Numerics is
@@ -31,6 +34,111 @@ package body Tests.Numerics is
    --  Check that generators given the same seed give the same sequence,
    --  and that Reset with no seed, without a clock, gives the sequence of
    --  a generator that was never reset.
+
+   -----------------
+   -- Arrays_Test --
+   -----------------
+
+   function Arrays_Test return Boolean is
+      use Ada.Numerics.Long_Real_Arrays;
+
+      Tolerance : constant := 1.0E-12;
+
+      function Near (Got, Want : Real_Vector) return Boolean
+      is (abs (Got - Want) <= Tolerance);
+
+      function Near (Got, Want : Real_Matrix) return Boolean
+      is (for all I in Got'Range (1) =>
+            (for all J in Got'Range (2) =>
+               abs (Got (I, J) - Want (I, J)) <= Tolerance));
+      --  Got and Want have the same bounds: every matrix here is a
+      --  Matrix_2, or a result whose bounds come from one. A positional
+      --  aggregate of Real_Matrix itself would start at Integer'First.
+
+      subtype Vector_2 is Real_Vector (1 .. 2);
+      subtype Matrix_2 is Real_Matrix (1 .. 2, 1 .. 2);
+
+      A : constant Matrix_2 := ((2.0, 1.0), (1.0, 3.0));
+      B : constant Matrix_2 := ((1.0, 2.0), (3.0, 4.0));
+      S : constant Matrix_2 := ((2.0, 1.0), (1.0, 2.0));
+
+      Product       : constant Matrix_2 := ((5.0, 8.0), (10.0, 14.0));
+      Solution      : constant Vector_2 := (0.8, 1.4);
+      Inverse_A     : constant Matrix_2 := ((0.6, -0.2), (-0.2, 0.4));
+      Eigenvalues_S : constant Vector_2 := (3.0, 1.0);
+   begin
+      Ada.Text_IO.Put ("Ada.Numerics arrays test");
+      Passed := True;
+
+      if not Near (A * B, Product) then
+         Fail ("matrix product");
+      end if;
+      if not Near (Solve (A, Vector_2'(3.0, 5.0)), Solution) then
+         Fail ("Solve");
+      end if;
+      if not Near (Inverse (A), Inverse_A) then
+         Fail ("Inverse");
+      end if;
+      if abs (Determinant (A) - 5.0) > Tolerance then
+         Fail ("Determinant");
+      end if;
+
+      --  The eigenvalues come in non-increasing order (RM G.3.1), and
+      --  each column of the vectors is the eigenvector of its value.
+
+      if not Near (Eigenvalues (S), Eigenvalues_S) then
+         Fail ("Eigenvalues");
+      end if;
+
+      declare
+         Values  : Vector_2;
+         Vectors : Matrix_2;
+      begin
+         Eigensystem (S, Values, Vectors);
+         if not Near (S * Vectors,
+                      Vectors * Matrix_2'((Values (1), 0.0),
+                                          (0.0, Values (2))))
+         then
+            Fail ("Eigensystem");
+         end if;
+      end;
+
+      declare
+         package Long_Long renames Ada.Numerics.Long_Long_Real_Arrays;
+         M : constant Long_Long.Real_Matrix := ((4.0, 1.0), (2.0, 3.0));
+      begin
+         if abs (Long_Long.Determinant (M) - 10.0)
+           > 8.0 * Long_Long_Float'Model_Epsilon
+         then
+            Fail ("Long_Long_Float Determinant");
+         end if;
+      end;
+
+      declare
+         use Ada.Numerics.Complex_Types;
+         use Ada.Numerics.Complex_Arrays;
+
+         Float_Tolerance : constant := 1.0E-5;
+
+         M : constant Complex_Matrix :=
+               (((0.0, 1.0), (0.0, 0.0)),
+                ((0.0, 0.0), (2.0, 0.0)));
+         Y : constant Complex_Vector := ((1.0, 0.0), (4.0, 0.0));
+         X : constant Complex_Vector := ((0.0, -1.0), (2.0, 0.0));
+         U : constant Complex_Vector := ((1.0, 1.0), (2.0, 0.0));
+         V : constant Complex_Vector := ((1.0, -1.0), (3.0, 0.0));
+         Eight : constant Complex := (8.0, 0.0);
+      begin
+         if abs (Solve (M, Y) - X) > Float_Tolerance then
+            Fail ("complex Solve");
+         end if;
+         if abs (U * V - Eight) > Float_Tolerance then
+            Fail ("complex inner product");
+         end if;
+      end;
+
+      return Passed;
+   end Arrays_Test;
 
    -------------------
    -- Check_Complex --

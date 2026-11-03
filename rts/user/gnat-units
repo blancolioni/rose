@@ -379,3 +379,21 @@ a-nudira.adb
 s-rannum.ads
 s-rannum.adb
 s-ransee.ads
+
+# Ada.Numerics.Generic_Real_Arrays and Generic_Complex_Arrays, and their
+# instantiations (#664), with System.Generic_Array_Operations, and the
+# anonymous array sort that Generic_Real_Arrays uses for Eigenvalues.
+a-ngrear.ads
+a-ngrear.adb
+a-nurear.ads
+a-nlrear.ads
+a-nllrar.ads
+a-ngcoar.ads
+a-ngcoar.adb
+a-nucoar.ads
+a-nlcoar.ads
+a-nllcar.ads
+s-gearop.ads
+s-gearop.adb
+a-cgaaso.ads
+a-cgaaso.adb
