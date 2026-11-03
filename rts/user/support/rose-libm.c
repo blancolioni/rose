@@ -6,13 +6,11 @@
    checks the domain of each function before it calls one, and raises
    Argument_Error itself. */
 
-/* x as n pi/2 + r, for the trigonometric functions, which use fsin, fcos
-   and fptan on r alone. Those instructions reduce a larger argument
-   themselves, but by a pi of 66 bits, which loses most of a double's
-   precision by 10**6. Up to 2**30, this is Cody and Waite's reduction,
+/* x as n pi/2 + r, with r at most pi/4, for the trigonometric functions,
+   which work on r alone. Up to 2**30, this is Cody and Waite's reduction,
    with pi/2 in three parts: the first two have 32 bits, so that their
-   products with n are exact, and the third has the next 64. Beyond that,
-   the argument is reduced by fprem1 and 2 pi, which keeps the result in
+   products with n are exact, and the third has the next 64. A larger
+   argument is first reduced by fprem1 and 2 pi, which keeps the result in
    range but not accurate: by 2**64 the argument has no fractional bits
    left. */
 
@@ -31,34 +29,60 @@ reduce (long double x, int *quadrant)
   if (x - x != 0.0L)
     return x - x;
 
-  if (x <= 0x1p30L && x >= -0x1p30L)
+  if (x > 0x1p30L || x < -0x1p30L)
     {
-      n = x * two_over_pi;
-      __asm__ ("frndint" : "+t" (n));
-      *quadrant = (int) n & 3;
-      return ((x - n * half_pi_1) - n * half_pi_2) - n * half_pi_3;
+      __asm__ ("fldpi; fadd %%st(0), %%st(0)" : "=t" (two_pi));
+      do
+        __asm__ ("fprem1; fnstsw %%ax"
+                 : "+t" (x), "=a" (status) : "u" (two_pi));
+      while (status & 0x0400);
     }
 
-  __asm__ ("fldpi; fadd %%st(0), %%st(0)" : "=t" (two_pi));
-  do
-    __asm__ ("fprem1; fnstsw %%ax"
-             : "+t" (x), "=a" (status) : "u" (two_pi));
-  while (status & 0x0400);
-  return x;
+  n = x * two_over_pi;
+  __asm__ ("frndint" : "+t" (n));
+  *quadrant = (int) n & 3;
+  return ((x - n * half_pi_1) - n * half_pi_2) - n * half_pi_3;
+}
+
+/* sin and cos of r, at most pi/4, from their Taylor series, to the
+   terms in r**21 and r**22: the first term left out is less than 1e-24.
+   These are not fsin and fcos because QEMU emulates those instructions
+   in double precision, which loses a third of a long double's bits. */
+
+static const long double sin_terms[] = {
+  0.0L, -1.0L / 6.0L, 1.0L / 120.0L, -1.0L / 5040.0L, 1.0L / 362880.0L,
+  -1.0L / 39916800.0L, 1.0L / 6227020800.0L, -1.0L / 1307674368000.0L,
+  1.0L / 355687428096000.0L, -1.0L / 121645100408832000.0L,
+  1.0L / 51090942171709440000.0L
+};
+
+static const long double cos_terms[] = {
+  0.0L, -1.0L / 2.0L, 1.0L / 24.0L, -1.0L / 720.0L, 1.0L / 40320.0L,
+  -1.0L / 3628800.0L, 1.0L / 479001600.0L, -1.0L / 87178291200.0L,
+  1.0L / 20922789888000.0L, -1.0L / 6402373705728000.0L,
+  1.0L / 2432902008176640000.0L, -1.0L / 1124000727777607680000.0L
+};
+
+static long double
+sin_reduced (long double r)
+{
+  long double z = r * r, sum = sin_terms[10];
+  int k;
+
+  for (k = 9; k >= 1; k--)
+    sum = sum * z + sin_terms[k];
+  return r + r * z * sum;
 }
 
 static long double
-sin_x87 (long double r)
+cos_reduced (long double r)
 {
-  __asm__ ("fsin" : "+t" (r));
-  return r;
-}
+  long double z = r * r, sum = cos_terms[11];
+  int k;
 
-static long double
-cos_x87 (long double r)
-{
-  __asm__ ("fcos" : "+t" (r));
-  return r;
+  for (k = 10; k >= 1; k--)
+    sum = sum * z + cos_terms[k];
+  return 1.0L + z * sum;
 }
 
 /* 2**t, with fscale for the integer part and f2xm1 for the rest. Clamping
@@ -165,10 +189,10 @@ sinl (long double x)
 
   switch (quadrant)
     {
-    case 0: return sin_x87 (r);
-    case 1: return cos_x87 (r);
-    case 2: return -sin_x87 (r);
-    default: return -cos_x87 (r);
+    case 0: return sin_reduced (r);
+    case 1: return cos_reduced (r);
+    case 2: return -sin_reduced (r);
+    default: return -cos_reduced (r);
     }
 }
 
@@ -180,10 +204,10 @@ cosl (long double x)
 
   switch (quadrant)
     {
-    case 0: return cos_x87 (r);
-    case 1: return -sin_x87 (r);
-    case 2: return -cos_x87 (r);
-    default: return sin_x87 (r);
+    case 0: return cos_reduced (r);
+    case 1: return -sin_reduced (r);
+    case 2: return -cos_reduced (r);
+    default: return sin_reduced (r);
     }
 }
 
@@ -195,7 +219,7 @@ sincosl (long double x, long double *sine, long double *cosine)
 {
   int quadrant;
   long double r = reduce (x, &quadrant);
-  long double s = sin_x87 (r), c = cos_x87 (r);
+  long double s = sin_reduced (r), c = cos_reduced (r);
 
   switch (quadrant)
     {
@@ -212,9 +236,9 @@ tanl (long double x)
   int quadrant;
   long double r = reduce (x, &quadrant);
 
-  /* fptan pushes 1.0 above the result, for compatibility with the 8087. */
-  __asm__ ("fptan; fstp %%st(0)" : "+t" (r));
-  return quadrant & 1 ? -1.0L / r : r;
+  long double s = sin_reduced (r), c = cos_reduced (r);
+
+  return quadrant & 1 ? -c / s : s / c;
 }
 
 long double
