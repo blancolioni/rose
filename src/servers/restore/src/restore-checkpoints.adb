@@ -38,6 +38,8 @@ package body Restore.Checkpoints is
      with Import, Address => Page'Address;
    Header        : Rose.Checkpoints.Header_Page
      with Import, Address => Page'Address;
+   Shared_Header : Rose.Checkpoints.Shared_Header_Page
+     with Import, Address => Page'Address;
 
    Send_Page : Storage_Array (1 .. Page_Size)
      with Alignment => Page_Size;
@@ -110,6 +112,30 @@ package body Restore.Checkpoints is
    Reference_Count : Natural := 0;
    --  The pages listed in the header pages of the entry being read.
 
+   type Shared_Source is
+      record
+         Page     : Rose.Words.Word_64;
+         Location : Rose.Words.Word_64;
+         Index    : Natural;
+      end record;
+   --  The newest saved contents of the shared store page Page are page
+   --  Index of the entry at Location, or, if Index is zero, are in the
+   --  page's region, which the memory server wrote it back to (ADR 0025).
+
+   Shared_Sources      : array (1 .. Max_Sources) of Shared_Source;
+   Shared_Source_Count : Natural := 0;
+
+   type Shared_Reference is
+      record
+         Page  : Rose.Words.Word_64;
+         Saved : Boolean;
+      end record;
+
+   Shared_References      : array (1 .. Max_References) of Shared_Reference;
+   Shared_Reference_Count : Natural := 0;
+   --  The pages listed in the shared header pages of the entry being
+   --  read.
+
    function Read
      (Reader   : Log_Reader_Client;
       Location : Rose.Words.Word_64;
@@ -148,6 +174,7 @@ package body Restore.Checkpoints is
       use type Rose.Checkpoints.Header_Page_Flags;
       Kernel_Pages, Store_Pages, Mem_Pages : Natural;
       Index : Positive;
+      Has_Shared : Boolean := False;
    begin
       Read_Table_Sizes
         (Reader, Location, Kernel_Pages, Store_Pages, Mem_Pages, Success);
@@ -189,8 +216,11 @@ package body Restore.Checkpoints is
                Rose.Words.Word_32 (Header.Pages (I).Page));
          end loop;
          Index := Index + 1;
-         exit when (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page)
-           /= 0;
+         if (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page) /= 0 then
+            Has_Shared :=
+              (Header.Flags and Rose.Checkpoints.Has_Shared_Pages) /= 0;
+            exit;
+         end if;
       end loop;
 
       for I in 1 .. Reference_Count loop
@@ -225,6 +255,65 @@ package body Restore.Checkpoints is
             end if;
          end;
       end loop;
+
+      --  The pages of shared segments, after those pages: their header
+      --  pages, then the pages they list as saved.
+
+      if Has_Shared then
+         Shared_Reference_Count := 0;
+         Index := Index + Reference_Count;
+         loop
+            if not Read (Reader, Location, Index)
+              or else Shared_Header.Magic
+                /= Rose.Checkpoints.Shared_Header_Magic
+            then
+               return;
+            end if;
+            for I in 1 .. Shared_Header.Count loop
+               if Shared_Reference_Count = Max_References then
+                  return;
+               end if;
+               Shared_Reference_Count := Shared_Reference_Count + 1;
+               Shared_References (Shared_Reference_Count) :=
+                 (Shared_Header.Pages (I).Page,
+                  Shared_Header.Pages (I).Flags
+                  = Rose.Checkpoints.Shared_Page_Saved);
+            end loop;
+            Index := Index + 1;
+            exit when (Shared_Header.Flags
+                       and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
+         end loop;
+
+         --  In the order they are listed, so that the last wins.
+
+         for Ref of Shared_References (1 .. Shared_Reference_Count) loop
+            declare
+               Data  : constant Natural := (if Ref.Saved then Index else 0);
+               Found : Boolean := False;
+            begin
+               for Source of Shared_Sources (1 .. Shared_Source_Count) loop
+                  if Source.Page = Ref.Page then
+                     Source.Location := Location;
+                     Source.Index := Data;
+                     Found := True;
+                  end if;
+               end loop;
+
+               if not Found then
+                  if Shared_Source_Count = Max_Sources then
+                     return;
+                  end if;
+                  Shared_Source_Count := Shared_Source_Count + 1;
+                  Shared_Sources (Shared_Source_Count) :=
+                    (Ref.Page, Location, Data);
+               end if;
+
+               if Ref.Saved then
+                  Index := Index + 1;
+               end if;
+            end;
+         end loop;
+      end if;
 
       Success := True;
    end Add_Entry_Pages;
@@ -334,10 +423,12 @@ package body Restore.Checkpoints is
       Record_Count    : Natural;
       Next_Object_Id  : Rose.Objects.Object_Id;
       Restored_Pages  : Natural := 0;
+      Shared_Pages    : Natural := 0;
    begin
       Success := False;
       Restored_Count := 0;
       Source_Count := 0;
+      Shared_Source_Count := 0;
 
       Open (Reader, Reader_Cap);
       Open (Store, Store_Restore_Cap);
@@ -598,6 +689,23 @@ package body Restore.Checkpoints is
          end loop;
       end;
 
+      --  The pages of shared segments, which the processes' faults find
+      --  when they run. A page that was written back to its region is
+      --  read from there again.
+
+      for Source of Shared_Sources (1 .. Shared_Source_Count) loop
+         if Source.Index /= 0 then
+            if not Read (Reader, Source.Location, Source.Index) then
+               Fail ("cannot read a saved shared page");
+               return;
+            end if;
+            Send_Page := Page;
+            Restore_Shared_Page
+              (Mem, Rose.Objects.Object_Id (Source.Page), Send_Page);
+            Shared_Pages := Shared_Pages + 1;
+         end if;
+      end loop;
+
       for Source of Sources (1 .. Source_Count) loop
          declare
             R : constant Natural := Find_Restored (Source.Oid);
@@ -640,6 +748,8 @@ package body Restore.Checkpoints is
       Rose.Console_IO.Put (Restored_Count);
       Rose.Console_IO.Put ("; pages: ");
       Rose.Console_IO.Put (Restored_Pages);
+      Rose.Console_IO.Put ("; shared pages: ");
+      Rose.Console_IO.Put (Shared_Pages);
       Rose.Console_IO.Put ("; interrupts: ");
       Rose.Console_IO.Put (Interrupt_Count);
       Rose.Console_IO.New_Line;

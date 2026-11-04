@@ -224,4 +224,9 @@ package Mem.Processes is
       Virtual_Page : Rose.Words.Word;
       Page         : System.Storage_Elements.Storage_Array);
 
+   procedure Restore_Shared_Page
+     (Id         : Rose.Objects.Capability_Identifier;
+      Store_Page : Rose.Objects.Object_Id;
+      Page       : System.Storage_Elements.Storage_Array);
+
 end Mem.Processes;

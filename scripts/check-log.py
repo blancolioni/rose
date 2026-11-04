@@ -8,7 +8,8 @@ server's region table, then the memory server's tables and pages.
 The check is that each part's header agrees with what follows it, that
 the memory server's processes are the kernel's, that their segments'
 regions are in the region table, and that the memory server's header
-pages and the pages they list account for the rest of the entry.
+pages, its shared header pages (ADR 0025) and the pages they list
+account for the rest of the entry.
 
 After walking the entries it also looks at the location after the last
 one, and reports anything there that looks like an entry header, such
@@ -41,6 +42,11 @@ LOG_MAGIC = 0x8F8FFFE0FA39FDF7
 ENTRY_MAGIC = 0x7E753634A3568547
 CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
+HAS_SHARED_PAGES = 0x0002
+SHARED_HEADER_MAGIC = 0x5348415245445031
+MAX_SHARED_REFERENCES = (PAGE_SIZE - 16) // 12
+SHARED_PAGE_SAVED = 1
+SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
 STORE_TABLE_VERSION = 3
@@ -51,7 +57,7 @@ PAGES_PER_BLOCK = 4
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 1
 MEM_PROCESS_MAGIC = 0x4D50524F43455331
-MAX_SAVED_SEGMENTS = 8
+MAX_SAVED_SEGMENTS = 32
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
 KERNEL_TABLE_VERSION = 7
@@ -377,7 +383,8 @@ def check_mem_tables(log, first, last, regions, verbose):
                          "".join(c if flags & bit else "-" for c, bit in
                                  (("r", 1), ("w", 2), ("x", 4), ("e", 8),
                                   ("p", 16)))
-                         + ("P" if flags & 32 else "-"),
+                         + ("P" if flags & 32 else "-")
+                         + ("S" if flags & 64 else "-"),
                          "%x..%x +%d" % (r_base, r_bound, r_offset)
                          if r_base or r_bound else "none"))
 
@@ -449,17 +456,75 @@ def check_memory(log, first, last, processes, verbose):
                                % (location, reference >> 16,
                                   reference & 0xFFFF))
         if u32(page, 8) & IS_LAST_HEADER_PAGE:
+            has_shared = u32(page, 8) & HAS_SHARED_PAGES
             break
         location += 1
 
-    expected = header_pages + listed
-    actual = last - first + 1
     description = ("memory: %d header page%s, %d data pages"
                    % (header_pages, "" if header_pages == 1 else "s", listed))
+
+    if has_shared:
+        ok, shared, shared_headers, saved = check_shared(
+            log, first + header_pages + listed, last, verbose)
+        if not ok:
+            return False, description + "; " + shared
+        description += "; " + shared
+        header_pages += shared_headers
+        listed += saved
+
+    expected = header_pages + listed
+    actual = last - first + 1
     if expected != actual:
         return False, ("%s: expected %d pages, entry has %d"
                        % (description, expected, actual))
     return True, description
+
+
+def check_shared(log, first, last, verbose):
+    """Check the shared header pages, which start at page first.
+
+    Returns (ok, description, header pages, saved pages)."""
+    header_pages = 0
+    saved = 0
+    released = 0
+    location = first
+    while True:
+        page = log.page(location)
+        if page is None or location > last:
+            return False, ("shared header pages run past the entry at "
+                           "location %d" % location), 0, 0
+        if u64(page, 0) != SHARED_HEADER_MAGIC:
+            return False, ("location %d: expected a shared header page, "
+                           "found %s" % (location, describe_page(page))), \
+                0, 0
+        count = u32(page, 12)
+        if count > MAX_SHARED_REFERENCES:
+            return False, ("location %d: shared header page lists %d pages"
+                           % (location, count)), 0, 0
+        header_pages += 1
+        if verbose:
+            print("    shared header page at %d lists %d pages"
+                  % (location, count))
+        for i in range(count):
+            store_page, flags = struct.unpack_from("<QI", page, 16 + i * 12)
+            if flags == SHARED_PAGE_SAVED:
+                saved += 1
+            elif flags == SHARED_PAGE_RELEASED:
+                released += 1
+            else:
+                return False, ("location %d: shared page %x has flags %d"
+                               % (location, store_page, flags)), 0, 0
+            if verbose:
+                print("      shared page %x %s"
+                      % (store_page, "saved" if flags == SHARED_PAGE_SAVED
+                         else "released"))
+        if u32(page, 8) & IS_LAST_HEADER_PAGE:
+            break
+        location += 1
+
+    return True, ("shared: %d header page%s, %d saved, %d released"
+                  % (header_pages, "" if header_pages == 1 else "s",
+                     saved, released)), header_pages, saved
 
 
 def main():
