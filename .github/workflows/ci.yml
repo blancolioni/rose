@@ -57,6 +57,9 @@ jobs:
       - name: Check the build requirements
         run: make check-env
 
+      - name: Test the drawing library
+        run: make test-drawing
+
       - name: Build
         run: ./clean-build.sh
 
