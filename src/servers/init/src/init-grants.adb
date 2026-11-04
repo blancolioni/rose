@@ -12,6 +12,7 @@ with Init.Calls;
 package body Init.Grants is
 
    use Rose.Words;
+   use type System.Storage_Elements.Storage_Element;
 
    Framebuffer_Tag : constant := 8;
    --  The multiboot2 framebuffer information tag
@@ -43,6 +44,18 @@ package body Init.Grants is
       return Boolean;
    --  Record that Owner has First .. Last of Kind, and return True, unless
    --  another owner has any of them, or there is no room.
+
+   function Read_Framebuffer_Tag return Boolean;
+   --  Read the start of the framebuffer tag into Tag_Buffer, and return
+   --  True if it is an RGB framebuffer below 4 GB.  The tag has the
+   --  address as 64 bits at 8, the pitch at 16, the width at 20, the
+   --  height at 24, the bits per pixel at 28, and the type at 29, which
+   --  is 1 for RGB.
+
+   function Get_Word
+     (Offset : System.Storage_Elements.Storage_Offset)
+      return Word;
+   --  The little-endian word at Offset in Tag_Buffer
 
    ----------
    -- Bank --
@@ -144,53 +157,9 @@ package body Init.Grants is
      (Owner : Owner_Id)
       return Rose.Capabilities.Capability
    is
-      use System.Storage_Elements;
-      use type Rose.Capabilities.Capability;
-
       Page_Bytes : constant := 4096;
-
-      function Get_Word (Offset : Storage_Offset) return Word;
-      --  The little-endian word at Offset in Tag_Buffer
-
-      --------------
-      -- Get_Word --
-      --------------
-
-      function Get_Word (Offset : Storage_Offset) return Word is
-         Result : Word := 0;
-      begin
-         for I in reverse Offset .. Offset + 3 loop
-            Result := Result * 256 + Word (Tag_Buffer (I));
-         end loop;
-         return Result;
-      end Get_Word;
-
-      Reader : constant Rose.Capabilities.Capability :=
-                 Boot_Tag (Framebuffer_Tag);
-      Params : aliased Rose.Invocation.Invocation_Record;
-      Size   : Word := 0;
    begin
-      if Reader = Rose.Capabilities.Null_Capability then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      Rose.System_Calls.Initialize_Send (Params, Reader);
-      Rose.System_Calls.Send_Buffer
-        (Params, Tag_Buffer'Length, Tag_Buffer'Address, Writable => True);
-      Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-      if not Params.Control.Flags (Rose.Invocation.Error)
-        and then Params.Control.Flags (Rose.Invocation.Send_Words)
-      then
-         Size := Params.Data (0);
-      end if;
-      Rose.System_Calls.Delete_Cap (Reader);
-
-      --  The tag: the address as 64 bits at 8, the pitch at 16, the
-      --  height at 24, and the type at 29, which is 1 for RGB.
-
-      if Size < 30 or else Tag_Buffer (29) /= 1 or else Get_Word (12) /= 0
-      then
+      if not Read_Framebuffer_Tag then
          return Rose.Capabilities.Null_Capability;
       end if;
 
@@ -216,6 +185,32 @@ package body Init.Grants is
             (First, Word (Count)));
       end;
    end Framebuffer;
+
+   --------------
+   -- Get_Word --
+   --------------
+
+   function Get_Word
+     (Offset : System.Storage_Elements.Storage_Offset)
+      return Word
+   is
+      use System.Storage_Elements;
+      Result : Word := 0;
+   begin
+      for I in reverse Offset .. Offset + 3 loop
+         Result := Result * 256 + Word (Tag_Buffer (I));
+      end loop;
+      return Result;
+   end Get_Word;
+
+   ---------------------
+   -- Has_Framebuffer --
+   ---------------------
+
+   function Has_Framebuffer return Boolean is
+   begin
+      return Read_Framebuffer_Tag and then Tag_Buffer (28) = 32;
+   end Has_Framebuffer;
 
    ---------------
    -- Interrupt --
@@ -267,5 +262,37 @@ package body Init.Grants is
       return Init.Calls.Call
         (Rose.Init_Capabilities.Ports_Cap, (Endpoint, Size, First, Last));
    end Ports;
+
+   --------------------------
+   -- Read_Framebuffer_Tag --
+   --------------------------
+
+   function Read_Framebuffer_Tag return Boolean is
+      use type Rose.Capabilities.Capability;
+      Reader : constant Rose.Capabilities.Capability :=
+                 Boot_Tag (Framebuffer_Tag);
+      Params : aliased Rose.Invocation.Invocation_Record;
+      Size   : Word := 0;
+   begin
+      if Reader = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Reader);
+      Rose.System_Calls.Send_Buffer
+        (Params, Tag_Buffer'Length, Tag_Buffer'Address, Writable => True);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+      if not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+      then
+         Size := Params.Data (0);
+      end if;
+      Rose.System_Calls.Delete_Cap (Reader);
+
+      return Size >= 30
+        and then Tag_Buffer (29) = 1
+        and then Get_Word (12) = 0;
+   end Read_Framebuffer_Tag;
 
 end Init.Grants;

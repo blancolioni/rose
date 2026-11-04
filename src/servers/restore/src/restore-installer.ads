@@ -11,7 +11,9 @@ package Restore.Installer is
       Requires_Input_Stream,
       Provides_Console,
       Is_Driver,
-      Provides_Clock);
+      Provides_Clock,
+      Requires_Framebuffer,
+      Provides_Screen);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Stream_Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
@@ -21,6 +23,10 @@ package Restore.Installer is
    --  Provides_Clock: the program is the clock (ADR 0020), a Clock_Admin
    --  whose ancestor, Clock, init gets. Is_Driver stays where it is in
    --  the flag word, because init reads that bit.
+   --  Requires_Framebuffer: init installs the program only if the boot
+   --  loader gave a framebuffer, and otherwise replies with no caps; init
+   --  reads this bit too. Provides_Screen: the program is the screen
+   --  driver, whose surface init gets (#582).
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 

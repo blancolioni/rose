@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env test prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env test test-screen prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -54,6 +54,11 @@ check-env:
 # minutes.
 test:
 	sh ./scripts/test-boot
+
+# The same with a framebuffer: the screen driver, its surface, and its
+# redraw after a restore (#582).  It isn't part of "make test", or of CI.
+test-screen:
+	sh ./scripts/test-screen
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"

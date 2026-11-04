@@ -39,6 +39,15 @@ package body Restore.Installer.Default is
       Process ("clock", "drivers", Launch,
                (Provides_Clock => True, others => False));
 
+      --  The screen driver, if the boot loader gave a framebuffer (ADR
+      --  0022, #582). Nothing holds its surface yet but the self tests,
+      --  and the console stays on the VGA text page (#653).
+
+      Process ("screen", "drivers", Launch,
+               (Requires_Framebuffer => True,
+                Provides_Screen      => True,
+                others               => False));
+
       --  Saved, not launched: each file and directory is its own
       --  process, launched when it is created (ADR 0003).
 

@@ -123,6 +123,7 @@ package body Restore.Checkpoint_Log is
       Header_Pages : Natural := 0;
       Listed       : Natural := 0;
       Has_Shared   : Boolean := False;
+      Saved        : Natural := 0;
    begin
       if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
         or else not Check_Store_Tables
@@ -171,8 +172,9 @@ package body Restore.Checkpoint_Log is
          end if;
       end loop;
 
-      --  Then the shared header pages, after the pages listed so far
-      --  (ADR 0025).
+      --  Then the shared header pages, after the pages listed so far, and
+      --  then the pages that they list (ADR 0025). Saved counts what they
+      --  list, which comes after all of them.
 
       if Has_Shared then
          loop
@@ -199,7 +201,7 @@ package body Restore.Checkpoint_Log is
             for I in 1 .. Shared_Header.Count loop
                case Shared_Header.Pages (I).Flags is
                   when Rose.Checkpoints.Shared_Page_Saved =>
-                     Listed := Listed + 1;
+                     Saved := Saved + 1;
                   when Rose.Checkpoints.Shared_Page_Released =>
                      null;
                   when others =>
@@ -215,6 +217,7 @@ package body Restore.Checkpoint_Log is
             exit when (Shared_Header.Flags
                        and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
          end loop;
+         Listed := Listed + Saved;
       end if;
 
       if Table_Pages + Header_Pages + Listed /= Pages then

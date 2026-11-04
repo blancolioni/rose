@@ -8,15 +8,18 @@ package Init.Self_Tests is
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
-      Storage         : Rose.Capabilities.Capability)
+      Storage         : Rose.Capabilities.Capability;
+      Screen          : Rose.Capabilities.Capability)
       return Boolean;
    --  Run the run_self_tests command, found through the command
    --  registry's Find_Cap, and wait for it to finish (#460). It is called
    --  with the caps of its roles (src/utilities/run_self_tests/
    --  rose-core-run_self_tests.idl): Standard_Output, Create_Endpoint,
    --  Commands, the registry's Commands interface, Clock, the clock's
-   --  Clock interface, and a sub-bank of the root bank of Storage, the
-   --  storage server's Storage interface, for its Storage_Service role.
+   --  Clock interface, a sub-bank of the root bank of Storage, the
+   --  storage server's Storage interface, for its Storage_Service role,
+   --  and Screen, the screen driver's surface or the null cap, for its
+   --  Screen_Service role (#582).
    --  True if the command completed, False if it could not be run, or
    --  failed because a test failed.
 

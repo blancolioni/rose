@@ -13,6 +13,7 @@ with Tests.Memory;
 with Tests.Numerics;
 with Tests.Processes;
 with Tests.Rights;
+with Tests.Screen;
 with Tests.Secondary_Stack;
 with Tests.Server;
 with Tests.Shared_Regions;
@@ -56,6 +57,7 @@ package Tests.Suite is
                    Tests.Memory.Copy_Test'Access,
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
                    Tests.Shared_Regions.Shared_Regions_Test'Access,
+                   Tests.Screen.Screen_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

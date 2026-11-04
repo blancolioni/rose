@@ -240,7 +240,8 @@ package body Init.Self_Tests is
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
-      Storage         : Rose.Capabilities.Capability)
+      Storage         : Rose.Capabilities.Capability;
+      Screen          : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -270,6 +271,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Clock);
       Rose.System_Calls.Send_Cap (Params, Test_Bank (Storage));
+      Rose.System_Calls.Send_Cap (Params, Screen);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 

@@ -140,7 +140,7 @@ A new system is installed when the install media boots on a disk with no checkpo
 `restore-install` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
 It then reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 
-* the drivers `exec`, `keyboard`, `vga-console` and `command`, which are launched;
+* the drivers `exec`, `keyboard`, `vga-console`, `command` and `clock`, which are launched, and `screen`, which is launched only if the boot loader gave a framebuffer that it can use: otherwise `init` skips it, and gives `restore-install` no caps for it;
 * the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
 * the commands `echo`, `list`, `cat`, `touch`, `mkdir`, `clear`, `user`, `auth`, `run_self_tests` and `petal`, which are saved in the command registry.
 
