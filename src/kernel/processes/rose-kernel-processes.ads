@@ -243,12 +243,19 @@ package Rose.Kernel.Processes is
    function Has_Pending_Memory_Request
      (Receiver : Process_Id)
       return Boolean;
-   --  True if Receiver is mem, and a page fault or a request for heap
-   --  memory waits for it to receive (#270).
+   --  True if Receiver is mem, and a page fault, a request for heap
+   --  memory or an exit waits for it to receive (#270, #697).
 
    procedure Send_Pending_Memory_Request;
    --  Give mem the request for heap memory if there is one, or else the
-   --  next pending page fault.
+   --  next pending page fault or exit.
+
+   procedure Exit_Process (Pid : Process_Id);
+   --  Pid has called the kernel's exit cap. A process that mem knows is
+   --  ended by mem, through its Process interface's Exit_Process, as a
+   --  program that exits through mem is, so that mem frees its memory
+   --  before it kills the process. The kernel ends any other process
+   --  itself (#697).
 
    function Has_Restore_Notice
      (Process  : Process_Id;
@@ -350,7 +357,6 @@ package Rose.Kernel.Processes is
 
    procedure Set_Process_Handlers
      (On_Launch     : Rose.Capabilities.Capability;
-      On_Kill       : Rose.Capabilities.Capability;
       On_Page_Fault : Rose.Capabilities.Capability);
 
    function Have_Process_Handlers return Boolean;
@@ -398,7 +404,11 @@ private
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
-      Restored_Blocked);
+      Restored_Blocked, Memory_Registered, Exit_Pending);
+   --  Flags are saved in a checkpoint by position, so new ones go last.
+   --  Memory_Registered: mem was told about the process when it was
+   --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,
+   --  and mem is to be told when it next receives (#697).
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -678,7 +688,6 @@ private
 
    Mem_Process        : Rose.Kernel.Processes.Process_Id := 0;
    Mem_Launch_Cap     : Rose.Capabilities.Capability := 0;
-   Mem_Kill_Cap       : Rose.Capabilities.Capability := 0;
    Mem_Page_Fault_Cap : Rose.Capabilities.Capability := 0;
 
 end Rose.Kernel.Processes;

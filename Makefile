@@ -158,7 +158,7 @@ finished: iso exports
 # The generated interface packages that the kernel uses, for their
 # endpoint ids. Only these are linked into the kernel's sources.
 
-KERNEL_INTERFACES=kernel_log memory restorable
+KERNEL_INTERFACES=kernel_log memory process restorable
 
 kernel:
 	mkdir -p build/$(ARCH)/kernel/interfaces

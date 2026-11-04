@@ -633,6 +633,8 @@ package body Rose.Kernel.Processes.Snapshot is
 
          Flags (Checkpoint_Page_Fault) := False;
          Flags (Fault_Pending) := False;
+         Flags (Exit_Pending) := False;
+         Flags (Memory_Registered) := False;
          Flags (Boot_Module) := False;
          Flags (Persistent) := True;
          P.Flags := Flags;

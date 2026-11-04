@@ -629,6 +629,7 @@ package body Rose.Kernel.Processes.Init is
                Sender_Cap      => 0,
                Receiver_Cap    => Mem_Launch_Cap,
                Params          => Launch_Params);
+            Proc.Flags (Memory_Registered) := True;
          end if;
 
          Rose.Kernel.Processes.Queue.Queue_Process (Pid);
