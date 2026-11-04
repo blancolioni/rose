@@ -240,13 +240,28 @@ package Rose.System_Calls is
 
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
+      := Rose.Capabilities.Null_Capability;
+      Create_Signal : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability);
-   --  The process's caps for creating endpoints, and for deleting and
-   --  rescinding caps. Only the caps that are not null are recorded, so
-   --  a process can give them in more than one call. After the first
-   --  call, a local cap that has not been given is null (#399): every
-   --  process that is not started by exec calls this, since it has no
-   --  argument cap set to find them in.
+   --  The process's caps for creating endpoints, for deleting and
+   --  rescinding caps, and for making signal caps. Only the caps that
+   --  are not null are recorded, so a process can give them in more than
+   --  one call. After the first call, a local cap that has not been given
+   --  is null (#399): every process that is not started by exec calls
+   --  this, since it has no argument cap set to find them in. The
+   --  Create_Signal cap is never looked for in an argument cap set.
+
+   function Create_Signal_Capability return Rose.Capabilities.Capability;
+   --  The Create_Signal cap given to Use_Capabilities, or null.
+
+   function Create_Signal_Cap
+     (Bit : Natural)
+      return Rose.Capabilities.Capability;
+   --  A new signal cap for the process's own signal Bit, 8 to 31 (ADR
+   --  0006, #708). Invoking it sets the bit, which the process is told of
+   --  when it next receives (Rose.Server.Set_Signal_Handler), and never
+   --  waits. Null if the process has no Create_Signal cap, or the kernel
+   --  refuses.
 
    procedure Use_Buffer
      (Buffer_Address : System.Address;

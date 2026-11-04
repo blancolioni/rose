@@ -12,6 +12,9 @@ package Rose.Kernel.Capabilities.Processes is
    --  Create the command endpoint of a new process (ADR 0002): the
    --  endpoint id is in data words 0 and 1. The receive cap goes in the
    --  process's next free cap, and the reply is the endpoint cap.
+   Signal_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 10;
+   --  A signal cap (ADR 0006, #708): set the process's signal bit that
+   --  is the cap's identifier. It never waits, and has no reply.
 
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;

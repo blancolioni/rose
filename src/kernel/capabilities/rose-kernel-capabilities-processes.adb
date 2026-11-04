@@ -112,6 +112,18 @@ package body Rose.Kernel.Capabilities.Processes is
                end;
             end;
 
+         when Signal_Process_Endpoint =>
+
+            --  The sender goes on at once, whatever the process is doing
+            --  (ADR 0006).
+
+            Rose.Kernel.Processes.Raise_Signal
+              (Pid, Natural (Cap.Header.Identifier));
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply => True, others => False);
+            Rose.Kernel.Processes.Set_Current_State
+              (Current_Pid, Rose.Kernel.Processes.Ready);
+
          when Resume_Process_Endpoint =>
 
             Params.Control.Flags :=

@@ -152,6 +152,9 @@ package body Petal.Signatures is
                            elsif Key = "cap"
                              and then Name = "Screen_Service"
                            then Screen_Service_Cap
+                           elsif Key = "cap"
+                             and then Name = "Create_Signal"
+                           then Create_Signal_Cap
                            else Other_Role_Cap);
                      end;
                   end;

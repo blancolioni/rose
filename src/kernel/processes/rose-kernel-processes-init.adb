@@ -77,6 +77,8 @@ package body Rose.Kernel.Processes.Init is
              Layout (Physical_Memory_Cap, Memory.Get_Region),
            Init_Caps.Create_Endpoint_Cap    =>
              Layout (Meta_Cap, Meta.Create_Endpoint_Endpoint),
+           Init_Caps.Create_Signal_Cap      =>
+             Layout (Meta_Cap, Meta.Create_Signal_Cap_Endpoint),
            Init_Caps.Rescind_Cap            =>
              Layout (Meta_Cap, Meta.Rescind_Cap),
            Init_Caps.Delete_Cap             =>

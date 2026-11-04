@@ -268,6 +268,33 @@ package Rose.Kernel.Processes is
      (Process : Process_Id);
    --  Send Restorable.Restored to Process.
 
+   --  Signals (ADR 0006, #708). Each process has 32 signal bits. Bits 8
+   --  to 31 are its own, and it gives out caps that set them (signal
+   --  caps). A bit stays set until the process is told, when it next
+   --  receives, on any endpoint or on its Signalled endpoint: one message
+   --  from the kernel, Signalled.Signal, carries every bit that is set,
+   --  and clears them. Bits 0 to 7 are for named signals, which aren't
+   --  implemented yet.
+
+   subtype Own_Signal is Natural range 8 .. 31;
+
+   procedure Raise_Signal
+     (Process : Process_Id;
+      Bit     : Own_Signal);
+   --  Set Bit, and tell Process at once if it is waiting to receive.
+
+   function Has_Pending_Signals
+     (Process  : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean;
+   --  True if Process has signal bits set, has a Signalled endpoint, and
+   --  Endpoint is 0 (any) or that endpoint.
+
+   procedure Send_Signals
+     (Process : Process_Id);
+   --  Send Signalled.Signal to Process, with its signal bits, and clear
+   --  them.
+
    function Next_Blocked_Sender
      (Receiver_Id : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index)
@@ -546,6 +573,8 @@ private
          FPU_Valid         : Boolean := False;
          --  The process's FPU and SSE registers, valid once it has used
          --  them and another process has used them since (#170).
+         Signals           : Rose.Words.Word_32 := 0;
+         --  The signal bits that are set and not yet delivered (#708).
       end record;
 
    type Kernel_Process_Table is

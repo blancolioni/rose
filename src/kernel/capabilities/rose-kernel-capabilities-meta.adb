@@ -2,6 +2,7 @@ with Rose.Boot.Console;
 
 with Rose.Words;
 
+with Rose.Kernel.Capabilities.Processes;
 with Rose.Kernel.Processes;
 with Rose.Kernel.Processes.Debug;
 
@@ -9,6 +10,10 @@ package body Rose.Kernel.Capabilities.Meta is
 
    procedure Create_Endpoint
      (Params : Rose.Invocation.Invocation_Access);
+
+   procedure Create_Signal_Cap
+     (Params : Rose.Invocation.Invocation_Access);
+   --  Make a signal cap for the caller's own bit in data word 0.
 
    procedure Derive_Capability
      (Params : Rose.Invocation.Invocation_Access);
@@ -153,6 +158,57 @@ package body Rose.Kernel.Capabilities.Meta is
    end Create_Endpoint;
 
    -----------------------
+   -- Create_Signal_Cap --
+   -----------------------
+
+   procedure Create_Signal_Cap
+     (Params : Rose.Invocation.Invocation_Access)
+   is
+      use Rose.Capabilities;
+      use Rose.Invocation;
+      Process_Id : constant Rose.Kernel.Processes.Process_Id :=
+                     Rose.Kernel.Processes.Current_Process_Id;
+      Signal_Cap : Rose.Capabilities.Capability;
+   begin
+      if not Params.Control.Flags (Send_Words)
+        or else Params.Data (0)
+          not in Rose.Words.Word (Rose.Kernel.Processes.Own_Signal'First)
+            .. Rose.Words.Word (Rose.Kernel.Processes.Own_Signal'Last)
+      then
+         Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+         return;
+      end if;
+
+      Signal_Cap := Rose.Kernel.Processes.Create_Cap (Process_Id);
+      if Signal_Cap = Null_Capability then
+         Rose.Kernel.Processes.Return_Error (Params, Out_Of_Capabilities);
+         return;
+      end if;
+
+      Rose.Kernel.Processes.Set_Cap
+        (Process_Id, Signal_Cap,
+         Rose.Capabilities.Layout.Capability_Layout'
+           (Header  =>
+              (Cap_Type   => Rose.Capabilities.Layout.Process_Cap,
+               Endpoint   =>
+                 Rose.Kernel.Capabilities.Processes.Signal_Process_Endpoint,
+               Identifier =>
+                 Rose.Objects.Capability_Identifier (Params.Data (0)),
+               others     => <>),
+            Payload => Rose.Kernel.Processes.To_Object_Id (Process_Id)));
+
+      Params.Control.Last_Sent_Cap := 0;
+      Params.Caps (0) := Signal_Cap;
+      Params.Control.Flags :=
+        (Rose.Invocation.Reply     => True,
+         Rose.Invocation.Send_Caps => True,
+         others                    => False);
+
+      Rose.Kernel.Processes.Set_Current_State
+        (Process_Id, Rose.Kernel.Processes.Ready);
+   end Create_Signal_Cap;
+
+   -----------------------
    -- Derive_Capability --
    -----------------------
 
@@ -207,6 +263,9 @@ package body Rose.Kernel.Capabilities.Meta is
       case Cap.Header.Endpoint is
          when Create_Endpoint_Endpoint =>
             Create_Endpoint (Params);
+
+         when Create_Signal_Cap_Endpoint =>
+            Create_Signal_Cap (Params);
 
          when Derive_Cap =>
             Derive_Capability (Params);

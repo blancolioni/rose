@@ -67,7 +67,12 @@ package Rose.Init_Capabilities is
    --  Sends the derivation records of a checkpoint to the kernel, before
    --  the restore server restores a process (ADR 0001).
 
-   Last_Cap               : constant := 28;
+   Create_Signal_Cap      : constant := 29;
+   --  Makes a signal cap for one of the caller's own bits (ADR 0006,
+   --  #708).  Init grants it to any program that asks for
+   --  create-signal, as it grants create-endpoint.
+
+   Last_Cap               : constant := 29;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
