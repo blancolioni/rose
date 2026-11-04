@@ -398,7 +398,7 @@ private
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
-      Restored_Blocked);
+      Restored_Blocked, Checkpoint_Reply_Held);
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 

@@ -1161,6 +1161,14 @@ package body Rose.Kernel.Processes is
                   Write_Attempt     => True,
                   Execution_Attempt => False);
             end if;
+            if P.State = Blocked
+              and then P.Flags (Checkpoint_Reply_Held)
+            then
+               Debug.Put (To_Process_Id (P.Oid));
+               Rose.Boot.Console.Put_Line (": reply after checkpoint");
+               P.Flags (Checkpoint_Reply_Held) := False;
+               P.State := Ready;
+            end if;
          end if;
       end loop;
    end Leave_Checkpoint;
@@ -2168,6 +2176,19 @@ package body Rose.Kernel.Processes is
 
       if Current_Process.State = Killed then
          null;
+      elsif Active_Checkpoint
+        and then Current_Process.Flags (Persistent)
+        and then Current_Process.State = Blocked
+        and then State = Ready
+      then
+
+         --  The reply would be written into the process's invocation
+         --  record, which the checkpoint has already saved as the call,
+         --  so a restore would make the call again from the reply (#543).
+         --  The process stays blocked until Leave_Checkpoint.
+
+         Current_Process.Flags (Invoke_Reply) := True;
+         Current_Process.Flags (Checkpoint_Reply_Held) := True;
       else
          Current_Process.Flags (Invoke_Reply) :=
            Current_Process.State = Blocked and then State = Ready;
