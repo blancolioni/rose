@@ -341,6 +341,7 @@ package body Restore.Checkpoint_Log is
       return Boolean
    is
       Process_Count : Natural;
+      Matched       : Natural := 0;
    begin
       Mem_Pages := 0;
       Mem_Pid_Count := 0;
@@ -374,7 +375,13 @@ package body Restore.Checkpoint_Log is
          return False;
       end if;
 
-      if Process_Count /= Kernel_Oid_Count then
+      --  Mem may have a process that the kernel did not save, because it
+      --  was still being launched or had exited (#543, #703), but every
+      --  process that the kernel saved must be in mem's tables.
+
+      if Process_Count < Kernel_Oid_Count
+        or else Process_Count > Mem_Pids'Length
+      then
          Report_Bad_Entry
            (Location, "memory and kernel tables have different processes");
          return False;
@@ -392,12 +399,14 @@ package body Restore.Checkpoint_Log is
             return False;
          end if;
 
-         if not Is_Kernel_Process (Mem_Process.Oid)
-           or else Is_Mem_Process (Mem_Process.Mem_Pid)
-         then
+         if Is_Mem_Process (Mem_Process.Mem_Pid) then
             Report_Bad_Entry
               (Location, "memory and kernel tables have different processes");
             return False;
+         end if;
+
+         if Is_Kernel_Process (Mem_Process.Oid) then
+            Matched := Matched + 1;
          end if;
 
          for Segment of
@@ -416,6 +425,12 @@ package body Restore.Checkpoint_Log is
          Mem_Pid_Count := Mem_Pid_Count + 1;
          Mem_Pids (Mem_Pid_Count) := Mem_Process.Mem_Pid;
       end loop;
+
+      if Matched /= Kernel_Oid_Count then
+         Report_Bad_Entry
+           (Location, "memory and kernel tables have different processes");
+         return False;
+      end if;
 
       return True;
    end Check_Mem_Tables;
