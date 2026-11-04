@@ -1,6 +1,4 @@
-with VGA_Console.Screen;
-
-package body VGA_Console.Line_Discipline is
+package body Text_Console.Line_Discipline is
 
    use System.Storage_Elements;
 
@@ -78,7 +76,7 @@ package body VGA_Console.Line_Discipline is
    procedure Echo (Text : String) is
    begin
       if Echo_Input then
-         VGA_Console.Screen.Put (Text);
+         Put (Text);
       end if;
    end Echo;
 
@@ -235,4 +233,4 @@ package body VGA_Console.Line_Discipline is
       end if;
    end Take;
 
-end VGA_Console.Line_Discipline;
+end Text_Console.Line_Discipline;
