@@ -17,9 +17,9 @@ interface Surface : Resource is
    function Get_Buffer return interface Region;
    --  The pixels, one 32-bit word each, XRGB (the top byte is unused),
    --  row by row from the top left, with no padding between rows: Width
-   --  by Height words. The client and the server share it, and map it
-   --  with the operation that #593 adds to Region. Ask again after a
-   --  Size event.
+   --  by Height words. The client and the server share it: each maps it
+   --  as a shared segment, with Rose.Shared_Regions.Map (ADR 0025), and
+   --  uses it only through that mapping. Ask again after a Size event.
 
    procedure Damage
      (X      : Word;
