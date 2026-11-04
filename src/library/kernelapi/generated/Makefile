@@ -21,7 +21,8 @@ IDL=cap block_device file_system directory file file_control \
 
 COMMANDS=rose-core standard_input standard_output standard_error standard_io \
     create_endpoint delete_cap rescind_cap find_command console timer_service clock_service \
-    clock_admin_service rights_service rights_admin_service storage_service
+    clock_admin_service rights_service rights_admin_service storage_service \
+    screen_service
 
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)
 COMMAND_SOURCES=$(COMMANDS:%=../../../../interfaces/%.idl)

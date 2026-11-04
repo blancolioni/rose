@@ -233,7 +233,7 @@ The driver for the boot loader's linear framebuffer, which gives out the whole s
 
 Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Stream_Reader` that `Events` returns; and `Restorable`.
 Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB.
-Used by:: Nothing yet. The console will hold the surface (#653), and hand it to the display server (#655).
+Used by:: `init`, which gets the surface from the installer and gives it to `run_self_tests` at install, for its `Screen_Service` role; the screen test draws a pattern on it. The console will hold the surface (#653), and hand it to the display server (#655).
 
 * *It uses only a 32-bit RGB framebuffer below 4 GB.*
   With anything else, or none, its surface is 0 by 0 pixels and has no buffer.
@@ -247,7 +247,9 @@ Used by:: Nothing yet. The console will hold the surface (#653), and hand it to 
   A `Read` of the event stream waits: the keyboard comes to the screen with the console (#653), and the pointer with #588.
   `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
 
-`restore` doesn't install `screen` yet: every boot is in text mode until the console can draw on a surface (#654).
+`restore` installs `screen` after `clock`, only if the boot loader gave a 32-bit RGB framebuffer: `init` skips it otherwise.
+Every boot is in text mode until the console can draw on a surface (#654), except the framebuffer entries at the end of the install media's menu and of the disk's, which `scripts/test-screen` uses.
+In framebuffer mode the console is still on the VGA text page, which isn't on the screen.
 
 === `file`
 

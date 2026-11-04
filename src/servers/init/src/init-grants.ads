@@ -51,6 +51,10 @@ package Init.Grants is
    --  framebuffer below 4 GB, another owner has any of its pages, or the
    --  kernel refuses (#582).
 
+   function Has_Framebuffer return Boolean;
+   --  True if the boot loader gave a 32-bit RGB framebuffer below 4 GB,
+   --  which the screen driver can use (#582).
+
    function Boot_Tag
      (Tag : Rose.Words.Word)
       return Rose.Capabilities.Capability;

@@ -1,0 +1,5 @@
+role Screen_Service : Surface;
+--  The whole screen, as a surface (ADR 0022). Run_Self_Tests has it, for
+--  the test of the screen driver (#582): init gives it the screen's
+--  surface when there is a framebuffer. Petal gives none, and a command
+--  must work without one.

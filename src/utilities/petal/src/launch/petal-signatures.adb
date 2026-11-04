@@ -149,6 +149,9 @@ package body Petal.Signatures is
                            elsif Key = "cap"
                              and then Name = "Storage_Service"
                            then Storage_Service_Cap
+                           elsif Key = "cap"
+                             and then Name = "Screen_Service"
+                           then Screen_Service_Cap
                            else Other_Role_Cap);
                      end;
                   end;
