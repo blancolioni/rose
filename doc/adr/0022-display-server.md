@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-31
-- **Related:** #578 (this decision), project 54 (the implementation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (the persistent console), [ADR 0013](0013-typed-streams.md) (typed streams), [ADR 0014](0014-banks.md) (banks)
+- **Related:** #578 (this decision), project 54 (the implementation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (the persistent console), [ADR 0006](0006-signals.md) (signals), [ADR 0013](0013-typed-streams.md) (typed streams), [ADR 0014](0014-banks.md) (banks)
+- **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2)
 
 ## Context
 
@@ -51,6 +52,12 @@ A client asks the display server for a *surface* and gets a cap to it. A surface
 - **A pixel buffer**, always 32-bit XRGB, in memory that the client and the server both map. The client draws into it with whatever it likes (the drawing library, #579). The `screen` driver converts if the framebuffer's format differs (section 1).
 - **`Damage (X, Y, Width, Height)`**, a call by which the client says that it has changed a region. The server copies that region to the screen. A surface that never calls it is never redrawn after the first time.
 - **An event stream** (ADR 0013), from the server to the client. It carries key events, pointer events (section 4), a change of focus, and a change of size. After a size change the client asks the surface for its buffer again.
+
+Amended by #653. A holder that is itself a server, such as the console, or the display server on its root surface, can't wait in a `Read` of the event stream: it has requests to serve. Nor can the surface call it with each event, since IPC is a rendezvous. The holder would be calling the surface with `Damage` while the surface calls it with a key, and each would wait for the other. So:
+
+- **The holder gives the surface a signal cap** (ADR 0006) with `Surface.Notify`. The surface invokes it whenever an event is queued, which never waits, and the holder is told when it next receives.
+- **Once a surface has a signal cap, a `Read` of its events never waits.** It returns the events that are ready, or nothing. A signal can come after its events were read, with others in an earlier `Read`, so the holder reads after each signal until a `Read` returns nothing.
+- **A holder that isn't a server needn't call `Notify`,** and its `Read` waits for events as before.
 
 A client holds the caps to its own surface, so it can draw only there and can't see another client's pixels. How the buffer is shared depends on banks (ADR 0014). Until they exist, the server creates the buffer with the memory server and gives the client a cap that maps it.
 
