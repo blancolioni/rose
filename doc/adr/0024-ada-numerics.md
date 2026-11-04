@@ -38,8 +38,8 @@ These generators give deterministic pseudo-random sequences, from seeds that are
 
 ### 4. The scope
 
-- **In:** `Generic_Elementary_Functions` and its instantiations for `Short_Float`, `Float`, `Long_Float` and `Long_Long_Float`; `Generic_Complex_Types` and `Generic_Complex_Elementary_Functions` and theirs; `Float_Random` and `Discrete_Random`; `System.Exponr`, for `**` of a float by an integer; and, since #664, `Generic_Real_Arrays` and `Generic_Complex_Arrays` and their instantiations, with `System.Generic_Array_Operations`.
-- **Out:** converting a float to and from text (`'Image`, `'Value`, `Float_IO`), which the RTS can't do yet (#670).
+- **In:** `Generic_Elementary_Functions` and its instantiations for `Short_Float`, `Float`, `Long_Float` and `Long_Long_Float`; `Generic_Complex_Types` and `Generic_Complex_Elementary_Functions` and theirs; `Float_Random` and `Discrete_Random`; `System.Exponr`, for `**` of a float by an integer; and, since #664, `Generic_Real_Arrays` and `Generic_Complex_Arrays` and their instantiations, with `System.Generic_Array_Operations`; and, since #670, `'Image` and `'Value` of the float types, of 32-bit and 64-bit fixed point and of decimal types, and `Text_IO.Float_IO` with `Float_Text_IO` and its long variants. `System.Float_Control`'s body is Rose's own and does nothing, since the kernel starts each process with a clean FPU.
+- **Out:** `Text_IO.Fixed_IO` and `Decimal_IO`, whose bodies in the installed GCC, built for x86_64, also use the 128-bit image and value units, which i686 can't compile. GCC's sources have the bodies without them, if they are wanted.
 - **Targets:** i686, the only one with a userland. On x86_64, the long double functions could stay as they are, but double would be expected to use SSE, so `rose-libm.c` would become one file per architecture.
 
 ## Consequences
