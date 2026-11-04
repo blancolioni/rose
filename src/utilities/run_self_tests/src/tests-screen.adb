@@ -2,10 +2,11 @@ with Ada.Text_IO;
 
 with Interfaces;
 
-with System;
+with System.Storage_Elements;
 
 with Rose.Capabilities;
 with Rose.Shared_Regions;
+with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.Region;
@@ -68,12 +69,33 @@ package body Tests.Screen is
             end if;
          end;
 
-         declare
-            Events : constant Rose.Interfaces.Stream_Reader
-              .Stream_Reader_Object'Class := Surface.Events;
-            pragma Unreferenced (Events);
-            --  Not read: there are no events yet, and a Read would wait.
+         --  Once the surface has a signal cap, a Read of its events never
+         --  waits (ADR 0022, as amended by #653). Nothing has typed, so it
+         --  returns nothing. Without the Create_Signal cap, a Read would
+         --  wait, so the events aren't read.
 
+         declare
+            use System.Storage_Elements;
+            Signal : constant Rose.Capabilities.Capability :=
+                       Rose.System_Calls.Create_Signal_Cap (11);
+         begin
+            if Signal /= Rose.Capabilities.Null_Capability then
+               Surface.Notify (Signal);
+               declare
+                  Events : Rose.Interfaces.Stream_Reader
+                    .Stream_Reader_Object'Class := Surface.Events;
+                  Buffer : Storage_Array (1 .. 64);
+                  Last   : Storage_Count;
+               begin
+                  Events.Read (Buffer, Last);
+                  if Last >= Buffer'First then
+                     return Fail ("a Read returned events nobody typed");
+                  end if;
+               end;
+            end if;
+         end;
+
+         declare
             Region  : Rose.Interfaces.Region.Region_Object'Class :=
                         Surface.Get_Buffer;
             Address : constant System.Address :=
