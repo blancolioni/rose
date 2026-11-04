@@ -307,14 +307,11 @@ system_call:
 2:
     mov     Process_EAX(%ebp), %eax
     movl %eax, %esi
-    movl $invocation_record, %ebp
+    movl $invocation_record, %edi
     movl $INVOKE_WORDS,%ecx
-1:	movl (%esi), %eax
-    movl %eax, (%ebp)
-    addl $4, %esi
-    addl $4, %ebp
-    loop 1b
-   
+    cld                                        # the caller's direction flag is unknown
+    rep movsl
+
     push    $invocation_record
     call    invoke_capability
     pop     %esi                               # we need to pop our argument, and conveniently it
@@ -345,17 +342,12 @@ continue:
     cmp     $0, %eax                           # are we sending a reply to their invocation?
     jz      no_reply_continue                  # if not, skip invocation record copy
     
-    mov Process_EAX(%ebp), %eax                # process eax had the pointer to user space invocation record
-    mov %eax, %ebp
-    
+    mov Process_EAX(%ebp), %edi                # process eax had the pointer to user space invocation record
+
     movl $INVOKE_WORDS,%ecx
-1:	movl (%esi), %eax
-    movl %eax, (%ebp)
-    addl $4, %esi
-    addl $4, %ebp
-    loop 1b
-    mov     current_process_ptr, %ebp
-    
+    cld                                        # an interrupted process may have set it
+    rep movsl
+
 no_reply_continue:    
     mov     Process_EDI(%ebp), %edi
     mov     Process_ESI(%ebp), %esi
