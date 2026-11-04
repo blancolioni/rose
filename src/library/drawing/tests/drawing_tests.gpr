@@ -1,0 +1,30 @@
+project Drawing_Tests is
+
+   --  The tests of Rose.Drawing and Rose.Drawing.Text, built and run on
+   --  the host with its own GNAT and run-time system (#579, #580):
+   --
+   --     gprbuild -P drawing_tests.gpr && ./build/test_drawing
+   --
+   --  or "make test-drawing" at the top. The library needs only the root
+   --  package Rose.
+
+   for Source_Dirs use (".", "..", "../..");
+   for Source_Files use
+     ("test_drawing.adb",
+      "rose.ads",
+      "rose-drawing.ads",
+      "rose-drawing.adb",
+      "rose-drawing-text.ads",
+      "rose-drawing-text.adb",
+      "rose-drawing-text-font.ads");
+   for Object_Dir use "build";
+   for Exec_Dir use "build";
+   for Main use ("test_drawing.adb");
+
+   package Compiler is
+      for Default_Switches ("ada") use
+        ("-g", "-gnat12", "-gnata", "-gnatwa", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+   end Compiler;
+
+end Drawing_Tests;
