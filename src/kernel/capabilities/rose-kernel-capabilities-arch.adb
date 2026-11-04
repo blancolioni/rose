@@ -294,6 +294,8 @@ package body Rose.Kernel.Capabilities.Arch is
             end if;
 
             Params.Control.Last_Sent_Word := Params.Control.Last_Recv_Word;
+            Params.Control.Flags (Send_Words) :=
+              Params.Control.Flags (Recv_Words);
 
          when Derive_Endpoint =>
             Derive_Port_Cap;
