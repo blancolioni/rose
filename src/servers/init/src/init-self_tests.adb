@@ -2,11 +2,10 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Storage.Client;
 
 with Init.Calls;
+with Init.Grants;
 
 package body Init.Self_Tests is
 
@@ -286,20 +285,7 @@ package body Init.Self_Tests is
    function Test_Bank
      (Storage : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
-   is
-      use Rose.Interfaces.Bank.Client;
-      use Rose.Interfaces.Storage.Client;
-      Store : Storage_Client;
-   begin
-      if Storage = Rose.Capabilities.Null_Capability then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      Open (Store, Storage);
-      return Get_Interface_Cap
-        (Create_Sub_Bank
-           (Get_Root_Bank (Store), Test_Page_Limit, Test_Region_Limit));
-   end Test_Bank;
+   is (Init.Grants.Bank (Storage, Test_Page_Limit, Test_Region_Limit));
 
    -----------
    -- Works --

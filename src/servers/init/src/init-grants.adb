@@ -4,6 +4,9 @@ with Rose.Init_Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
 
+with Rose.Interfaces.Bank.Client;
+with Rose.Interfaces.Storage.Client;
+
 with Init.Calls;
 
 package body Init.Grants is
@@ -40,6 +43,34 @@ package body Init.Grants is
       return Boolean;
    --  Record that Owner has First .. Last of Kind, and return True, unless
    --  another owner has any of them, or there is no room.
+
+   ----------
+   -- Bank --
+   ----------
+
+   function Bank
+     (Storage : Rose.Capabilities.Capability;
+      Pages   : Rose.Words.Word;
+      Regions : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Interfaces.Bank.Client;
+      use Rose.Interfaces.Storage.Client;
+      use type Rose.Capabilities.Capability;
+      Store : Storage_Client;
+   begin
+      if Storage = Rose.Capabilities.Null_Capability
+        or else Pages = 0
+        or else Regions = 0
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Open (Store, Storage);
+      return Get_Interface_Cap
+        (Create_Sub_Bank
+           (Get_Root_Bank (Store), Word_64 (Pages), Regions));
+   end Bank;
 
    --------------
    -- Boot_Tag --

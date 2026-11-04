@@ -154,7 +154,7 @@ Each program on the install media comes with a list of the capabilities it asks 
 `init` grants each request that its policy allows, and leaves out the rest:
 
 * any program may have `create-endpoint`;
-* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `framebuffer` (the boot loader's linear framebuffer, if it gave one), and `boot-tag 8` (the framebuffer's geometry);
+* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `framebuffer` (the boot loader's linear framebuffer, if it gave one), `boot-tag 8` (the framebuffer's geometry), and `bank PAGES REGIONS` (a bank of its own under the root bank, with those limits, which must not be zero; see ADR 0014);
 * hardware that another program already has is refused (see <<_init>>).
 
 [#handing-over-the-console]
