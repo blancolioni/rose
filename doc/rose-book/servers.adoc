@@ -227,6 +227,28 @@ Used by:: `init`, which gets both interfaces from the installer; `login`, `petal
   It is the only way that the real time goes backwards.
   Only `init` and the rights broker hold `Clock_Admin`, and nothing calls `Set_Realtime` yet (#552).
 
+=== `screen`
+
+The driver for the boot loader's linear framebuffer, which gives out the whole screen as one surface (ADR 0022, #582).
+
+Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Stream_Reader` that `Events` returns; and `Restorable`.
+Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB.
+Used by:: Nothing yet. The console will hold the surface (#653), and hand it to the display server (#655).
+
+* *It uses only a 32-bit RGB framebuffer below 4 GB.*
+  With anything else, or none, its surface is 0 by 0 pixels and has no buffer.
+* *The buffer is ordinary memory, shared with the surface's holder.*
+  The driver reserves it from its bank, maps it as a shared segment with `Rose.Shared_Regions`, and gives its `Region` to whoever asks with `Get_Buffer`, who maps it in the same way (ADR 0025).
+  Its pixels are 32-bit XRGB words, row by row, with no padding.
+* *`Damage` copies a rectangle of the buffer to the framebuffer,* cut to the screen, converting each pixel when the framebuffer's colours are not where XRGB has them.
+* *It redraws the screen after a restore.*
+  The buffer comes back with the checkpoint, and the framebuffer's pages don't, so when it is told that it has been restored, it maps the framebuffer again and copies the whole buffer to it.
+* *There are no events yet.*
+  A `Read` of the event stream waits: the keyboard comes to the screen with the console (#653), and the pointer with #588.
+  `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
+
+`restore` doesn't install `screen` yet: every boot is in text mode until the console can draw on a surface (#654).
+
 === `file`
 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.

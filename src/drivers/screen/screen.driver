@@ -1,0 +1,4 @@
+create-endpoint
+framebuffer                 # the boot loader's linear framebuffer
+boot-tag           8        # its geometry and pixel format
+bank               2048 1   # the surface's buffer, up to 8 MB
