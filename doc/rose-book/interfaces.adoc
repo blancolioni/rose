@@ -251,6 +251,7 @@ They are kept out of `Storage` and `Memory`, so that only the checkpoint and res
 
 A process implements `Restorable` to be told that it has been restored.
 The kernel, not another process, sends `Restored`, the first time the process receives after it is resumed (see <<restore-notification>>).
+In the same way, the kernel sends `Signalled.Signal` to a process that has signal bits set, when it next receives; `Rose.Server` implements it for a process that sets signal handlers (see <<signals>>).
 
 == Unused Interfaces
 
