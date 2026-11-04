@@ -32,6 +32,23 @@ package Rose.Server is
      (Context  : in out Server_Context;
       Endpoint : Rose.Objects.Endpoint_Id);
 
+   --  Signals (ADR 0006, #708). A process makes signal caps for its own
+   --  bits with Rose.System_Calls.Create_Signal_Cap, and gives them to
+   --  whoever is to signal it. When it next receives, the kernel sends
+   --  every bit that is set, and Rose.Server calls the handler for each.
+
+   subtype Signal_Bit is Natural range 8 .. 31;
+
+   type Signal_Handler is access procedure;
+
+   procedure Set_Signal_Handler
+     (Context : in out Server_Context;
+      Bit     : Signal_Bit;
+      Handler : Signal_Handler);
+   --  Call Handler when Bit is signalled. The first handler attaches the
+   --  Signalled interface to Context, so a process that sets none sees
+   --  no change. Bits with no handler are ignored.
+
    type Server_Instance is limited private;
 
    function Has_Instance
@@ -121,6 +138,7 @@ private
          Endpoint_Count : Natural := 0;
          Endpoints      : Endpoint_Array;
          Block_Reply    : Boolean := False;
+         Has_Signals    : Boolean := False;
       end record;
 
    type Server_Instance is limited

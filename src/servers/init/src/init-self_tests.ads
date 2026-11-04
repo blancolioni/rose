@@ -9,7 +9,8 @@ package Init.Self_Tests is
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Storage         : Rose.Capabilities.Capability;
-      Screen          : Rose.Capabilities.Capability)
+      Screen          : Rose.Capabilities.Capability;
+      Create_Signal   : Rose.Capabilities.Capability)
       return Boolean;
    --  Run the run_self_tests command, found through the command
    --  registry's Find_Cap, and wait for it to finish (#460). It is called
@@ -18,8 +19,9 @@ package Init.Self_Tests is
    --  Commands, the registry's Commands interface, Clock, the clock's
    --  Clock interface, a sub-bank of the root bank of Storage, the
    --  storage server's Storage interface, for its Storage_Service role,
-   --  and Screen, the screen driver's surface or the null cap, for its
-   --  Screen_Service role (#582).
+   --  Screen, the screen driver's surface or the null cap, for its
+   --  Screen_Service role (#582), and Create_Signal, the kernel cap that
+   --  makes signal caps, for its Create_Signal role (#708).
    --  True if the command completed, False if it could not be run, or
    --  failed because a test failed.
 

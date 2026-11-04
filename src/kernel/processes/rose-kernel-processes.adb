@@ -4,6 +4,7 @@ with Rose.Boot.Console;
 with Rose.Interfaces.Memory;
 with Rose.Interfaces.Process;
 with Rose.Interfaces.Restorable;
+with Rose.Interfaces.Signalled;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Cap_Tables;
@@ -343,6 +344,7 @@ package body Rose.Kernel.Processes is
          FPU_Owner := null;
       end if;
       Proc.FPU_Valid := False;
+      Proc.Signals := 0;
 
       Assign_Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
@@ -914,6 +916,34 @@ package body Rose.Kernel.Processes is
       return False;
    end Has_Pending_Memory_Request;
 
+   -------------------------
+   -- Has_Pending_Signals --
+   -------------------------
+
+   function Has_Pending_Signals
+     (Process  : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean
+   is
+      use type Rose.Objects.Endpoint_Index;
+      use type Rose.Words.Word_32;
+      P : Kernel_Process_Entry renames Process_Table (Process);
+   begin
+      if P.Signals = 0 then
+         return False;
+      end if;
+
+      declare
+         Signal_Endpoint : constant Rose.Objects.Endpoint_Index :=
+                             Find_Endpoint
+                               (Process,
+                                Rose.Interfaces.Signalled.Signal_Endpoint);
+      begin
+         return Signal_Endpoint /= 0
+           and then (Endpoint = 0 or else Endpoint = Signal_Endpoint);
+      end;
+   end Has_Pending_Signals;
+
    ------------------------
    -- Has_Queued_Message --
    ------------------------
@@ -1360,6 +1390,37 @@ package body Rose.Kernel.Processes is
    begin
       return Current_Page_Fault_Count;
    end Page_Fault_Count;
+
+   ------------------
+   -- Raise_Signal --
+   ------------------
+
+   procedure Raise_Signal
+     (Process : Process_Id;
+      Bit     : Own_Signal)
+   is
+      use type Rose.Objects.Endpoint_Index;
+      use type Rose.Words.Word_32;
+      P               : Kernel_Process_Entry renames Process_Table (Process);
+      Signal_Endpoint : constant Rose.Objects.Endpoint_Index :=
+                          Find_Endpoint
+                            (Process,
+                             Rose.Interfaces.Signalled.Signal_Endpoint);
+   begin
+      P.Signals := P.Signals or 2 ** Bit;
+
+      --  A process that is waiting to receive is told now. One that is
+      --  waiting for a reply, or that has a restore notice to come
+      --  first, is told when it next receives.
+
+      if Signal_Endpoint /= 0
+        and then not P.Flags (Wait_Reply)
+        and then not P.Flags (Restore_Notice)
+        and then Is_Blocked_On_Endpoint (Process, Signal_Endpoint)
+      then
+         Send_Signals (Process);
+      end if;
+   end Raise_Signal;
 
    -------------
    -- Receive --
@@ -2023,6 +2084,44 @@ package body Rose.Kernel.Processes is
          Identifier      => 0,
          Params          => Params);
    end Send_Restore_Notice;
+
+   ------------------
+   -- Send_Signals --
+   ------------------
+
+   procedure Send_Signals
+     (Process : Process_Id)
+   is
+      use Rose.Invocation;
+      To     : Kernel_Process_Entry renames Process_Table (Process);
+      Params : Invocation_Record :=
+                 Invocation_Record'
+                   (Control =>
+                      Control_Word'
+                        (Flags  => (Send       => True,
+                                    Send_Words => True,
+                                    others     => False),
+                         others => <>),
+                    others  => <>);
+   begin
+      if To.Flags (Trace) then
+         Debug.Put (Process);
+         Rose.Boot.Console.Put_Line (": sending signals");
+      end if;
+
+      Params.Data (0) := Rose.Words.Word (To.Signals);
+      Params.Control.Last_Sent_Word := 0;
+      To.Signals := 0;
+      Send_To_Endpoint
+        (From_Process_Id => 1,
+         To_Process_Id   => Process,
+         Sender_Cap      => 0,
+         Endpoint        =>
+           Find_Endpoint
+             (Process, Rose.Interfaces.Signalled.Signal_Endpoint),
+         Identifier      => 0,
+         Params          => Params);
+   end Send_Signals;
 
    ----------------------
    -- Send_To_Endpoint --

@@ -816,6 +816,9 @@ package body Petal.Command_Launch is
                      Fail ("petal has no clock to give the command");
                   end if;
                   Caps (Role.Cap_Index + 1) := Clock_Cap;
+               when Create_Signal_Cap =>
+                  Caps (Role.Cap_Index + 1) :=
+                    Rose.System_Calls.Create_Signal_Capability;
                when Storage_Service_Cap | Screen_Service_Cap =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.Capabilities.Null_Capability;

@@ -1,0 +1,12 @@
+interface Signalled is
+
+   --  Sent by the kernel to a process that has signal bits set (ADR
+   --  0006, #708), the next time it receives, after the restore notice
+   --  and before any other message. Bits is every bit that is set, and
+   --  they are cleared. Bits 8 to 31 are the process's own, set through
+   --  the signal caps it gave out. Rose.Server calls the handler that the
+   --  process registered for each bit.
+
+   procedure Signal (Bits : Word_32);
+
+end Signalled;
