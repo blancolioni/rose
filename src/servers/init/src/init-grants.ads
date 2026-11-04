@@ -58,4 +58,14 @@ package Init.Grants is
    --  if the kernel refuses.  Reading a tag conflicts with nothing, so it
    --  is not recorded.
 
+   function Bank
+     (Storage : Rose.Capabilities.Capability;
+      Pages   : Rose.Words.Word;
+      Regions : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+   --  A new sub-bank of Storage's root bank (ADR 0014), limited to Pages
+   --  pages and Regions regions, or the null cap if Storage is null or
+   --  either limit is zero, which would be no limit.  A bank is storage,
+   --  not hardware, so it is not recorded.
+
 end Init.Grants;
