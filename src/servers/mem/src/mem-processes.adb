@@ -88,17 +88,14 @@ package body Mem.Processes is
 
    Process_Table : Memory_Process_Table;
 
-   Identifier_Count : constant := 2 ** 16 - 1;
-   --  The identifiers that a process's caps can have: all but 0.
-
    function Identifier_Of
      (Oid : Rose.Objects.Object_Id)
       return Rose.Objects.Capability_Identifier
-   is (Rose.Objects.Capability_Identifier
-         (Rose.Objects."+" (Rose.Objects."mod" (Oid, Identifier_Count), 1)));
-   --  The identifier of the caps for the process with object id Oid. It
-   --  is never 0.
-   Next_Pid      : Real_Process_Id := 1;
+      renames Rose.Objects.Process_Identifier;
+   --  The identifier of the caps for the process with object id Oid. The
+   --  kernel uses it too, when the process exits (#697).
+
+   Next_Pid     : Real_Process_Id := 1;
 
    procedure Report_Segment (Segment : Segment_Record);
 

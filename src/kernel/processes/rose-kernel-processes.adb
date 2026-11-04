@@ -2,6 +2,7 @@ with System.Storage_Elements;
 
 with Rose.Boot.Console;
 with Rose.Interfaces.Memory;
+with Rose.Interfaces.Process;
 with Rose.Interfaces.Restorable;
 
 with Rose.Arch.Interrupts;
@@ -83,6 +84,10 @@ package body Rose.Kernel.Processes is
 
    procedure Send_Page_Fault (Pid : Process_Id);
    --  Tell mem about the page fault recorded for Pid.
+
+   procedure Send_Exit (Pid : Process_Id);
+   --  Tell mem that Pid has exited, as if Pid had called Exit_Process on
+   --  its Process interface.
 
    Page_Fault_Address : Rose.Words.Word_32;
    pragma Import (C, Page_Fault_Address, "page_fault_address");
@@ -566,6 +571,33 @@ package body Rose.Kernel.Processes is
       end loop;
    end Enter_Checkpoint;
 
+   ------------------
+   -- Exit_Process --
+   ------------------
+
+   procedure Exit_Process (Pid : Process_Id) is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      if not Have_Process_Handlers
+        or else not P.Flags (Memory_Registered)
+      then
+         Kill_Process (Pid);
+         return;
+      end if;
+
+      --  The entry stays until mem kills the process, so it is not used
+      --  again before mem has forgotten it.
+
+      Wake_Waiting_Processes (Pid);
+      Set_Current_State (Pid, Killed);
+
+      if Can_Send_To_Memory then
+         Send_Exit (Pid);
+      else
+         P.Flags (Exit_Pending) := True;
+      end if;
+   end Exit_Process;
+
    -----------------
    -- Expand_Heap --
    -----------------
@@ -875,7 +907,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       for P of Process_Table.all loop
-         if P.Flags (Fault_Pending) then
+         if P.Flags (Fault_Pending) or else P.Flags (Exit_Pending) then
             return True;
          end if;
       end loop;
@@ -1693,6 +1725,34 @@ package body Rose.Kernel.Processes is
 
    end Send_Cap;
 
+   ---------------
+   -- Send_Exit --
+   ---------------
+
+   procedure Send_Exit (Pid : Process_Id) is
+      use Rose.Invocation;
+      Proc   : Kernel_Process_Entry renames Process_Table (Pid);
+      Params : Invocation_Record;
+   begin
+      Proc.Flags (Exit_Pending) := False;
+
+      Params.Control.Flags := (Send => True,
+                               others => False);
+
+      Params.Cap := Mem_Page_Fault_Cap;
+      Params.Endpoint := Rose.Interfaces.Process.Exit_Process_Endpoint;
+      Params.Identifier := Rose.Objects.Process_Identifier (Proc.Oid);
+
+      Send_Word (Params, 0);
+
+      Send_Cap
+        (From_Process_Id => Pid,
+         To_Process_Id   => Mem_Process,
+         Sender_Cap      => 0,
+         Receiver_Cap    => Mem_Page_Fault_Cap,
+         Params          => Params);
+   end Send_Exit;
+
    -----------------------
    -- Send_Heap_Request --
    -----------------------
@@ -1809,6 +1869,10 @@ package body Rose.Kernel.Processes is
          if Process_Table (Pid).Flags (Fault_Pending) then
             Last_Fault_Pid := Pid;
             Send_Page_Fault (Pid);
+            return;
+         elsif Process_Table (Pid).Flags (Exit_Pending) then
+            Last_Fault_Pid := Pid;
+            Send_Exit (Pid);
             return;
          end if;
       end loop;
@@ -2185,13 +2249,11 @@ package body Rose.Kernel.Processes is
 
    procedure Set_Process_Handlers
      (On_Launch     : Rose.Capabilities.Capability;
-      On_Kill       : Rose.Capabilities.Capability;
       On_Page_Fault : Rose.Capabilities.Capability)
    is
    begin
       Mem_Process := Current_Process_Id;
       Mem_Launch_Cap := On_Launch;
-      Mem_Kill_Cap   := On_Kill;
       Mem_Page_Fault_Cap := On_Page_Fault;
       Rose.Kernel.Interrupts.Set_Handler
         (Interrupt => Rose.Arch.Interrupts.Page_Fault,
