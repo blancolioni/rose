@@ -253,6 +253,16 @@ package body Rose.Kernel.Page_Table is
       for Directory'Address use
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
+      --  Leave this directory, so that the next return to user mode
+      --  reloads cr3, even if the page is reused for that process.
+
+      System.Machine_Code.Asm
+        ("mov %0, %%cr3",
+         Inputs   => Rose.Words.Word_32'Asm_Input
+                       ("r", Rose.Words.Word_32 (Kernel_Page_Directory)),
+         Clobber  => "memory",
+         Volatile => True);
+
       --  Init_User_Page_Directory copies the kernel's entries for the top
       --  quarter of the address space, but a process maps its stack and its
       --  invocation buffers there too, with page tables of its own.
