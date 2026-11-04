@@ -312,8 +312,7 @@ package body Rose.Kernel.Capabilities.Meta is
             end;
 
          when Exit_Process =>
-            Rose.Kernel.Processes.Set_Current_State
-              (Process_Id, Rose.Kernel.Processes.Killed);
+            Rose.Kernel.Processes.Exit_Process (Process_Id);
 
          when others =>
             Rose.Kernel.Processes.Return_Error
