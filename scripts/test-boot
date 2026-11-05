@@ -30,6 +30,7 @@ install_rose "$ISO"
 
 echo "Booting from the disk, which restores the install's checkpoint"
 start_qemu
+choose_last_entry
 log_in
 
 # Init's derive test leaves two derived capabilities in a cap set, so the

@@ -66,7 +66,8 @@ truncate -s $BOOT_PARTITION_BYTES $OUT/boot.fat
 mformat -i $OUT/boot.fat -v ROSE-BOOT ::
 mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc \
     ::/boot/grub/fonts ::/boot/grub/images
-mcopy -i $OUT/boot.fat boot/hd0/grub.cfg ::/boot/grub/grub.cfg
+sed "s/@VERSION@/$ROSE_VERSION/g" boot/hd0/grub.cfg > $OUT/grub.cfg
+mcopy -i $OUT/boot.fat $OUT/grub.cfg ::/boot/grub/grub.cfg
 
 # The menu's font and background (boot/hd0/grub.cfg).
 

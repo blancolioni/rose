@@ -252,7 +252,7 @@ Used by:: `surface-console`, which holds the surface and will hand it to the dis
   The pointer comes with #588: `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
 
 `restore` installs `screen` straight after `keyboard`, only if the boot loader gave a 32-bit RGB framebuffer: `init` skips it otherwise.
-Every boot is in text mode until the early messages can go to the serial port (#654), except the framebuffer entries at the end of the install media's menu and of the disk's, which `scripts/test-screen` uses.
+The default entries of the install media's GRUB menu and the disk's keep the framebuffer, and the last entries, "text mode", don't (see <<boot-variants>>).
 
 === `surface-console`
 
