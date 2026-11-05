@@ -5,3 +5,4 @@ IDLE=${IDLE:-idle}
 GRUB_MKRESCUE=${GRUB_MKRESCUE:-grub2-mkrescue}
 GRUB_MKIMAGE=${GRUB_MKIMAGE:-grub2-mkimage}
 GRUB_DIR=${GRUB_DIR:-/usr/lib/grub/i386-pc}
+GRUB_FONT=${GRUB_FONT:-/usr/share/grub/unicode.pf2}

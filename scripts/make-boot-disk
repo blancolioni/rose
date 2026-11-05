@@ -64,8 +64,15 @@ fi
 rm -f $OUT/boot.fat
 truncate -s $BOOT_PARTITION_BYTES $OUT/boot.fat
 mformat -i $OUT/boot.fat -v ROSE-BOOT ::
-mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc
+mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc \
+    ::/boot/grub/fonts ::/boot/grub/images
 mcopy -i $OUT/boot.fat boot/hd0/grub.cfg ::/boot/grub/grub.cfg
+
+# The menu's font and background (boot/hd0/grub.cfg).
+
+mcopy -i $OUT/boot.fat "$GRUB_FONT" ::/boot/grub/fonts/unicode.pf2
+mcopy -i $OUT/boot.fat boot/iso/images/rose-splash.png \
+    ::/boot/grub/images/rose-splash.png
 mcopy -i $OUT/boot.fat $GRUB_DIR/*.mod $GRUB_DIR/*.lst \
     ::/boot/grub/i386-pc/
 mcopy -i $OUT/boot.fat $TMP/kernel ::/boot/kernel

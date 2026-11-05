@@ -37,6 +37,8 @@ need "$GRUB_MKIMAGE" "grub2-tools; or set GRUB_MKIMAGE"
 
 [ -f "$GRUB_DIR/boot.img" ] ||
     problem "no $GRUB_DIR/boot.img (grub2-pc-modules; or set GRUB_DIR)"
+[ -f "$GRUB_FONT" ] ||
+    problem "no $GRUB_FONT (grub2-tools; or set GRUB_FONT)"
 
 if command -v gcc >/dev/null 2>&1; then
     version=`gcc -dumpversion | cut -d. -f1`
