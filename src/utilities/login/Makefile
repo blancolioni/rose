@@ -20,7 +20,7 @@ login:
 	    $(INTERFACES)/named.idl \
 	    $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/stream.idl \
-	    $(INTERFACES)/stream_reader.idl \
+	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/stream_writer.idl \
 	    $(INTERFACES)/timer.idl \
 	    $(INTERFACES)/clock.idl \
@@ -34,8 +34,8 @@ login:
 	    $(INTERFACES)/writable_file.idl \
 	    $(INTERFACES)/file_version.idl \
 	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/file_reader.idl \
-	    $(INTERFACES)/seekable_file_reader.idl \
+	    $(INTERFACES)/releasable_reader.idl \
+	    $(INTERFACES)/seekable_reader.idl \
 	    $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/seekable.idl \
 	    $(INTERFACES)/process.idl \

@@ -30,8 +30,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-process-server.o \
 	$(BUILDDIR)/rose-interfaces-receiver-server.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-reader.o \
+	$(BUILDDIR)/rose-interfaces-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \

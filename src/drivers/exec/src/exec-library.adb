@@ -245,7 +245,7 @@ package body Exec.Library is
    -------------
 
    function Install
-     (ELF_Image : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (ELF_Image : Rose.Interfaces.Reader.Client.Reader_Client;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
@@ -259,7 +259,7 @@ package body Exec.Library is
       Installed_Count := Installed_Count + 1;
 
       declare
-         use Rose.Interfaces.Stream_Reader.Client;
+         use Rose.Interfaces.Reader.Client;
          use Rose.Interfaces.Region.Client;
          use type Rose.Objects.Object_Id;
          Buffer : Page_Buffer;

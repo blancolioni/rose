@@ -128,12 +128,12 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 [cols="2,2,4,2",options="header"]
 |===
 | Interface | Parents | Operations | Implemented by
-| `Stream_Reader` | | `Read` | `isofs`, `store`, `vga-console`
+| `Reader` | | `Read` | `isofs`, `store`, `vga-console`
 | `Stream_Writer` | | `Write` | `console`, `vga-console`
 | `Output_Redirect` | | `Redirect` | `console`
-| `Stream` | `Stream_Reader`, `Stream_Writer` | |
+| `Stream` | `Reader`, `Stream_Writer` | |
 | `Seekable` | | `Seek` |
-| `File` | `Stream_Reader`, `Seekable` | `Size` |
+| `File` | `Reader`, `Seekable` | `Size` |
 | `Writable_File` | `File`, `Stream_Writer` | | `file`
 | `Terminal` | `Stream` | `Get_Size`, `Move_Cursor`, `Clear`, `Clear_To_End_Of_Line`, `Scroll`, `Set_Attributes`, `Read_Key`, `Disable_Line_Editing`, `Enable_Line_Editing`, `Enable_Echo`, `Disable_Echo` | `vga-console`, `surface-console`
 | `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File` | `isofs`
@@ -170,7 +170,7 @@ interface Directory is
    function Get_Ordinary_File (Index : Positive) return interface File;
    function Get_Directory (Index : Positive) return interface Directory;
 
-   function Read_File (Index : Positive) return interface Stream_Reader;
+   function Read_File (Index : Positive) return interface Reader;
 
 end Directory;
 ----

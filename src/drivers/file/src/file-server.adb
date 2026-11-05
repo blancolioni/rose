@@ -7,7 +7,7 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.File_Control.Server;
-with Rose.Interfaces.Seekable_File_Reader.Server;
+with Rose.Interfaces.Seekable_Reader.Server;
 with Rose.Interfaces.Writable_File.Server;
 
 package body File.Server is
@@ -124,7 +124,7 @@ package body File.Server is
    procedure Read
      (Id     : Rose.Objects.Capability_Identifier;
       Buffer : out Storage_Array;
-      Last   : out Storage_Count);
+      Last   : out Storage_Offset);
 
    procedure Release (Id : Rose.Objects.Capability_Identifier);
 
@@ -195,7 +195,7 @@ package body File.Server is
          Write                => Write'Access,
          Truncate             => Truncate'Access,
          Instanced            => True);
-      Rose.Interfaces.Seekable_File_Reader.Server.Attach_Interface
+      Rose.Interfaces.Seekable_Reader.Server.Attach_Interface
         (Server_Context => Context,
          Read           => Read'Access,
          Release        => Release'Access,
@@ -225,7 +225,7 @@ package body File.Server is
 
       for Reader of Readers loop
          if Reader.Identifier /= No_Reader and then Reader.Of_Version then
-            Rose.Interfaces.Seekable_File_Reader.Server.Remove_Instance
+            Rose.Interfaces.Seekable_Reader.Server.Remove_Instance
               (Reader.Identifier);
             Rose.System_Calls.Delete_Cap (Reader.Interface_Cap);
             Reader := (others => <>);
@@ -324,7 +324,7 @@ package body File.Server is
    -- Open_Reader --
    -----------------
 
-   --  A sequential reader is reached through the File_Reader interface
+   --  A sequential reader is reached through the Releasable_Reader interface
    --  of the reader, which has no Seek.
 
    function Open_Reader
@@ -337,7 +337,7 @@ package body File.Server is
       end if;
 
       return Open
-        (Rose.Interfaces.Seekable_File_Reader.File_Reader_Interface,
+        (Rose.Interfaces.Seekable_Reader.Releasable_Reader_Interface,
          Of_Version => Id /= The_File);
    end Open_Reader;
 
@@ -355,7 +355,7 @@ package body File.Server is
       end if;
 
       return Open
-        (Rose.Interfaces.Seekable_File_Reader.Seekable_File_Reader_Interface,
+        (Rose.Interfaces.Seekable_Reader.Seekable_Reader_Interface,
          Of_Version => Id /= The_File);
    end Open_Seekable_Reader;
 
@@ -366,7 +366,7 @@ package body File.Server is
    procedure Read
      (Id     : Rose.Objects.Capability_Identifier;
       Buffer : out Storage_Array;
-      Last   : out Storage_Count)
+      Last   : out Storage_Offset)
    is
       Slot : constant Natural := Find (Id);
    begin

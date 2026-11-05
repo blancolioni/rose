@@ -1,0 +1,7 @@
+--  A reader made for one client, which is the client's to end: Release it
+--  when it is done with (ADR 0010). A file opens one for each client,
+--  with its own position, which starts at the beginning of the file
+--  (ADR 0009).
+
+interface Releasable_Reader : Reader, Resource is
+end Releasable_Reader;

@@ -1,0 +1,10 @@
+--  The right to read a stream. A reader that is made for one client, and
+--  can be released, is a Releasable_Reader.
+
+interface Reader is
+
+   procedure Read
+     (Buffer : out Stream_Element_Array;
+      Last   : out Stream_Element_Offset);
+
+end Reader;

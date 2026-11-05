@@ -3,7 +3,7 @@ with Rose.Shared_Regions;
 with Rose.Words;
 
 with Rose.Interfaces.Region;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Reader.Client;
 with Rose.Interfaces.Surface.Client;
 
 with Text_Console.Cells;
@@ -19,7 +19,7 @@ package body Surface_Console.Screen is
    --  The VGA console's light grey on black, and white for bold.
 
    Surface : Rose.Interfaces.Surface.Client.Surface_Client;
-   Events  : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+   Events  : Rose.Interfaces.Reader.Client.Reader_Client;
    Target  : Bitmap;
    Width   : Word := 0;
    Height  : Word := 0;
@@ -176,11 +176,11 @@ package body Surface_Console.Screen is
       end;
 
       declare
-         Stream : Rose.Interfaces.Stream_Reader.Stream_Reader_Object'Class :=
+         Stream : Rose.Interfaces.Reader.Reader_Object'Class :=
                     Surface.Events;
       begin
-         Rose.Interfaces.Stream_Reader.Client.Open
-           (Events, Stream.Stream_Reader_Cap);
+         Rose.Interfaces.Reader.Client.Open
+           (Events, Stream.Reader_Cap);
       end;
 
       Cells.Set_Size
@@ -219,7 +219,7 @@ package body Surface_Console.Screen is
       Last   : out System.Storage_Elements.Storage_Count)
    is
    begin
-      Rose.Interfaces.Stream_Reader.Client.Read (Events, Buffer, Last);
+      Rose.Interfaces.Reader.Client.Read (Events, Buffer, Last);
    end Read_Events;
 
    ----------

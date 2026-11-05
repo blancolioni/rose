@@ -39,17 +39,17 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-rights_admin.o \
 	$(BUILDDIR)/rose-interfaces-rights_admin-client.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
+	$(BUILDDIR)/rose-interfaces-reader.o \
 	$(BUILDDIR)/rose-interfaces-storage-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-user.o \
 	$(BUILDDIR)/rose-interfaces-user-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
-	$(BUILDDIR)/rose-interfaces-file_reader.o \
-	$(BUILDDIR)/rose-interfaces-file_reader-client.o \
-	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
-	$(BUILDDIR)/rose-interfaces-seekable_file_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
+	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-seekable_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_reader-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-objects.o \
