@@ -5,7 +5,7 @@ with Rose.Limits;
 with Rose.Objects;
 
 with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Reader.Client;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -31,11 +31,11 @@ package body Init.Installer is
       return Rose.Interfaces.Region.Client.Region_Client;
 
    procedure Copy_Stream
-     (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (From : Rose.Interfaces.Reader.Client.Reader_Client;
       To   : Rose.Interfaces.Region.Client.Region_Client);
 
    procedure Grant_Caps
-     (From      : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (From      : Rose.Interfaces.Reader.Client.Reader_Client;
       To        : in out Rose.Invocation.Invocation_Record;
       Is_Driver : Boolean);
    --  From is the program's cap requests: one to a line, each a name and
@@ -75,11 +75,11 @@ package body Init.Installer is
    -----------------
 
    procedure Copy_Stream
-     (From : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (From : Rose.Interfaces.Reader.Client.Reader_Client;
       To   : Rose.Interfaces.Region.Client.Region_Client)
    is
       use System.Storage_Elements;
-      use Rose.Interfaces.Stream_Reader.Client;
+      use Rose.Interfaces.Reader.Client;
       use Rose.Interfaces.Region.Client;
       use type Rose.Objects.Object_Id;
       Last   : Storage_Count;
@@ -105,11 +105,11 @@ package body Init.Installer is
    ----------------
 
    procedure Grant_Caps
-     (From      : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (From      : Rose.Interfaces.Reader.Client.Reader_Client;
       To        : in out Rose.Invocation.Invocation_Record;
       Is_Driver : Boolean)
    is
-      use Rose.Interfaces.Stream_Reader.Client;
+      use Rose.Interfaces.Reader.Client;
       use System.Storage_Elements;
       use type Rose.Capabilities.Capability;
       use type Rose.Words.Word;
@@ -312,13 +312,13 @@ package body Init.Installer is
       return Rose.Capabilities.Capability
    is
       use Rose.Interfaces.Region.Client;
-      use Rose.Interfaces.Stream_Reader.Client;
+      use Rose.Interfaces.Reader.Client;
       Region      : constant Region_Client :=
                       Reserve_Storage
                         (Reserve_Cap,
                          Rose.Words.Word_64 (Binary_Length));
-      Exec_Reader : Stream_Reader_Client;
-      Cap_Reader  : Stream_Reader_Client;
+      Exec_Reader : Reader_Client;
+      Cap_Reader  : Reader_Client;
 
       Params      : aliased Rose.Invocation.Invocation_Record;
       Exec_Region : constant Region_Client :=
@@ -375,13 +375,13 @@ package body Init.Installer is
    is
       --  use Rose.Words;
       use Rose.Interfaces.Region.Client;
-      use Rose.Interfaces.Stream_Reader.Client;
+      use Rose.Interfaces.Reader.Client;
       Region : constant Region_Client :=
                      Reserve_Storage
                        (Reserve_Cap,
                         Rose.Words.Word_64 (Binary_Length));
-      Exec_Reader : Stream_Reader_Client;
-      Cap_Reader  : Stream_Reader_Client;
+      Exec_Reader : Reader_Client;
+      Cap_Reader  : Reader_Client;
 
       Params      : aliased Rose.Invocation.Invocation_Record;
       Exec_Region : constant Region_Client :=
@@ -441,8 +441,8 @@ package body Init.Installer is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Binary_Length);
-      use Rose.Interfaces.Stream_Reader.Client;
-      Client : Stream_Reader_Client;
+      use Rose.Interfaces.Reader.Client;
+      Client : Reader_Client;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Install_Cap);

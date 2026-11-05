@@ -19,9 +19,9 @@ directory:
 	    $(INTERFACES)/file_version.idl \
 	    $(INTERFACES)/file_control.idl \
 	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/file_reader.idl \
-	    $(INTERFACES)/seekable_file_reader.idl \
-	    $(INTERFACES)/stream_reader.idl \
+	    $(INTERFACES)/releasable_reader.idl \
+	    $(INTERFACES)/seekable_reader.idl \
+	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/stream_writer.idl \
 	    $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/seekable.idl \

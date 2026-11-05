@@ -283,7 +283,8 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File : out Rose.Interfaces.File_Reader.Client.File_Reader_Client;
+     (File : out Rose.Interfaces.Releasable_Reader.Client
+        .Releasable_Reader_Client;
       Name : String)
    is
       Item : Directory_Entry_Type;
@@ -297,8 +298,8 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File            : out Rose.Interfaces.File_Reader.Client
-      .File_Reader_Client;
+     (File            : out Rose.Interfaces.Releasable_Reader.Client
+      .Releasable_Reader_Client;
       Directory_Entry : Directory_Entry_Type)
    is
    begin

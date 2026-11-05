@@ -10,9 +10,9 @@ with Rose.System_Calls;
 
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
-with Rose.Interfaces.File_Reader.Client.Conversions;
+with Rose.Interfaces.Releasable_Reader.Client.Conversions;
 with Rose.Interfaces.Process;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Reader.Client;
 
 package body Restore.Installer is
 
@@ -34,7 +34,7 @@ package body Restore.Installer is
    --  The interface cap of an ancestor of the interface of Interface_Cap,
    --  numbered as the generated server numbers them.
 
-   Stream_Reader_Ancestor : constant := 1;
+   Reader_Ancestor : constant := 1;
    Stream_Writer_Ancestor : constant := 2;
    --  The ancestors of Terminal (interfaces/terminal.idl).
 
@@ -373,9 +373,9 @@ package body Restore.Installer is
       Flags     : Install_Flag_Array)
    is
       use Rose.Interfaces.Directory.Client;
-      use Rose.Interfaces.File_Reader.Client;
-      Caps_Reader    : File_Reader_Client;
-      Binary_Reader  : File_Reader_Client;
+      use Rose.Interfaces.Releasable_Reader.Client;
+      Caps_Reader    : Releasable_Reader_Client;
+      Binary_Reader  : Releasable_Reader_Client;
       --  Released once exec has read them, which frees their slots in
       --  isofs (ADR 0009). Restore has no cap to delete caps, so they
       --  are not closed.
@@ -455,12 +455,12 @@ package body Restore.Installer is
          Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Cap
            (Params,
-            Rose.Interfaces.Stream_Reader.Client.Get_Interface_Cap
-              (Conversions.To_Stream_Reader (Caps_Reader)));
+            Rose.Interfaces.Reader.Client.Get_Interface_Cap
+              (Conversions.To_Reader (Caps_Reader)));
          Rose.System_Calls.Send_Cap
            (Params,
-            Rose.Interfaces.Stream_Reader.Client.Get_Interface_Cap
-              (Conversions.To_Stream_Reader (Binary_Reader)));
+            Rose.Interfaces.Reader.Client.Get_Interface_Cap
+              (Conversions.To_Reader (Binary_Reader)));
          Rose.System_Calls.Send_Word
            (Params,
             Natural (Directory_Entry_Size (Directory, Exec_Index)));
@@ -527,7 +527,7 @@ package body Restore.Installer is
 
                            --  The console is a Terminal (#454). Init gets
                            --  its Stream_Writer as the console, its
-                           --  Stream_Reader as standard input, and the
+                           --  Reader as standard input, and the
                            --  Terminal itself.
 
                            Terminal_Cap :=
@@ -539,7 +539,7 @@ package body Restore.Installer is
                            if Flags (Provides_Input_Stream) then
                               Input_Stream_Cap :=
                                 Get_Ancestor_Interface
-                                  (Terminal_Cap, Stream_Reader_Ancestor);
+                                  (Terminal_Cap, Reader_Ancestor);
                            end if;
 
                         elsif Flags (Provides_Input_Stream) then

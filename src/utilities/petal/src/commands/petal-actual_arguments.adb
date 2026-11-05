@@ -119,15 +119,15 @@ package body Petal.Actual_Arguments is
    end To_Boolean;
 
    ----------------------
-   -- To_Stream_Reader --
+   -- To_Reader --
    ----------------------
 
-   function To_Stream_Reader
+   function To_Reader
      (Argument : Actual_Argument) return Rose.Capabilities.Capability
    is
    begin
       return Petal.Values.To_Capability (Argument.Value);
-   end To_Stream_Reader;
+   end To_Reader;
 
    ---------------
    -- To_String --

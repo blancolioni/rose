@@ -20,7 +20,7 @@ package Petal.Actual_Arguments is
      (Argument : Actual_Argument)
       return String;
 
-   function To_Stream_Reader
+   function To_Reader
      (Argument : Actual_Argument)
       return Rose.Capabilities.Capability;
 

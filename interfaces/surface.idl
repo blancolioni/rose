@@ -37,7 +37,7 @@ interface Surface : Resource is
    --  after each signal until a Read returns nothing (ADR 0022, as
    --  amended by #653). A later Notify replaces the signal cap.
 
-   function Events return interface Stream_Reader;
+   function Events return interface Reader;
    --  The surface's input, as a stream of fixed-size events, in the
    --  order they happened. Each event is four words, written as a
    --  stream's bytes in the machine's byte order:

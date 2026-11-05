@@ -15,7 +15,7 @@ screen:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/region.idl $(INTERFACES)/stream_reader.idl \
+	    $(INTERFACES)/region.idl $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/restorable.idl $(INTERFACES)/bank.idl \
 	    $(INTERFACES)/process.idl $(INTERFACES)/heap.idl \
 	    $(INTERFACES)/event_listener.idl $(INTERFACES)/event_source.idl

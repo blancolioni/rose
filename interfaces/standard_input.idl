@@ -1,1 +1,1 @@
-role Standard_Input : Stream_Reader;
+role Standard_Input : Reader;

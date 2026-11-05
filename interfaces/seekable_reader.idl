@@ -1,0 +1,4 @@
+--  A releasable reader that can also seek (ADR 0009).
+
+interface Seekable_Reader : Releasable_Reader, Seekable is
+end Seekable_Reader;
