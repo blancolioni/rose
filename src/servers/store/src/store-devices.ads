@@ -80,7 +80,7 @@ package Store.Devices is
    procedure Read
      (Id      : in Rose.Objects.Capability_Identifier;
       Storage : out System.Storage_Elements.Storage_Array;
-      Last    : out System.Storage_Elements.Storage_Count);
+      Last    : out System.Storage_Elements.Storage_Offset);
 
    procedure Checkpoint
      (Id          : Rose.Objects.Capability_Identifier;

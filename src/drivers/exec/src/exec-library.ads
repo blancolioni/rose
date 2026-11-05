@@ -2,7 +2,7 @@ with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Reader.Client;
 
 package Exec.Library is
 
@@ -10,7 +10,7 @@ package Exec.Library is
      (Client : Rose.Interfaces.Region.Client.Region_Client);
 
    function Install
-     (ELF_Image  : Rose.Interfaces.Stream_Reader.Client.Stream_Reader_Client;
+     (ELF_Image  : Rose.Interfaces.Reader.Client.Reader_Client;
       Name       : String;
       Caps       : Rose.Capabilities.Capability_Array)
      return Rose.Capabilities.Capability;

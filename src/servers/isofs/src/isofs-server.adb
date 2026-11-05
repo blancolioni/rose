@@ -10,8 +10,8 @@ with Rose.Interfaces.Directory.Server;
 with Rose.Interfaces.File;
 with Rose.Interfaces.File.Server;
 with Rose.Interfaces.File_System.Server;
-with Rose.Interfaces.Seekable_File_Reader;
-with Rose.Interfaces.Seekable_File_Reader.Server;
+with Rose.Interfaces.Seekable_Reader;
+with Rose.Interfaces.Seekable_Reader.Server;
 with Rose.System_Calls.Server;
 
 with Rose.Server;
@@ -93,7 +93,7 @@ package body IsoFS.Server is
    procedure Reader_Read
      (Id     : in     Rose.Objects.Capability_Identifier;
       Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count);
+      Last   :    out System.Storage_Elements.Storage_Offset);
 
    procedure Reader_Release (Id : Rose.Objects.Capability_Identifier);
 
@@ -287,7 +287,7 @@ package body IsoFS.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is (Open_Reader_Through
-         (Id, Rose.Interfaces.Seekable_File_Reader.File_Reader_Interface));
+         (Id, Rose.Interfaces.Seekable_Reader.Releasable_Reader_Interface));
 
    -------------------------
    -- Open_Reader_Through --
@@ -321,8 +321,8 @@ package body IsoFS.Server is
       return Rose.Capabilities.Capability
    is (Open_Reader_Through
          (Id,
-          Rose.Interfaces.Seekable_File_Reader
-          .Seekable_File_Reader_Interface));
+          Rose.Interfaces.Seekable_Reader
+          .Seekable_Reader_Interface));
 
    -----------------
    -- Reader_Read --
@@ -331,7 +331,7 @@ package body IsoFS.Server is
    procedure Reader_Read
      (Id     : in     Rose.Objects.Capability_Identifier;
       Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count)
+      Last   :    out System.Storage_Elements.Storage_Offset)
    is
    begin
       IsoFS.Directories.Read (Id, Buffer, Last);
@@ -435,7 +435,7 @@ package body IsoFS.Server is
          Open_Seekable_Reader => Open_Seekable_Reader'Access,
          Instanced            => True);
 
-      Rose.Interfaces.Seekable_File_Reader.Server.Attach_Interface
+      Rose.Interfaces.Seekable_Reader.Server.Attach_Interface
         (Server_Context => Context,
          Read           => Reader_Read'Access,
          Release        => Reader_Release'Access,

@@ -11,7 +11,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Exec.Server;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Stream_Reader.Client;
+with Rose.Interfaces.Reader.Client;
 
 with Exec.Library;
 
@@ -146,8 +146,8 @@ package body Exec.Server is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
-      use Rose.Interfaces.Stream_Reader.Client;
-      Reader : Stream_Reader_Client;
+      use Rose.Interfaces.Reader.Client;
+      Reader : Reader_Client;
    begin
       Open (Reader, ELF_Image);
       return Exec.Library.Install (Reader, Name, Caps);

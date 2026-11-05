@@ -9,7 +9,7 @@ with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Bank.Server;
 with Rose.Interfaces.Region.Server;
 with Rose.Interfaces.Storage_Checkpoint.Server;
-with Rose.Interfaces.Stream_Reader.Server;
+with Rose.Interfaces.Reader.Server;
 
 with Store.Devices;
 
@@ -62,7 +62,7 @@ package body Store.Server is
          Store.Devices.Release'Access,
          Instanced => True);
 
-      Rose.Interfaces.Stream_Reader.Server.Attach_Interface
+      Rose.Interfaces.Reader.Server.Attach_Interface
         (Server_Context => Server_Context,
          Read           => Store.Devices.Read'Access,
          Instanced      => True);

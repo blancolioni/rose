@@ -5,7 +5,7 @@ interface File is
 
    function Size return Storage_Count;
 
-   function Open_Reader return interface File_Reader;
-   function Open_Seekable_Reader return interface Seekable_File_Reader;
+   function Open_Reader return interface Releasable_Reader;
+   function Open_Seekable_Reader return interface Seekable_Reader;
 
 end File;

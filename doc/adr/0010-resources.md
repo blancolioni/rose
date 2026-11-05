@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** [ADR 0001](0001-capability-revocation.md) (capability revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0009](0009-files-open-readers.md) (files open readers), #389 (file readers), #390 (writers), #359 (finalization in the userland run-time system), blancolioni/idle#44 (the user target's servers)
+- **Amended by:** #725, where an interface that differs from another only by inheriting `Resource` is named `Releasable_` and the other one's name: `File_Reader` is renamed `Releasable_Reader` (section 1)
 
 ## Context
 
@@ -38,6 +39,8 @@ interface File_Reader : Stream_Reader, Resource is ...
 - **`Release`** means "I'm done with this object: free what it holds". After it, every cap to the object fails, whoever holds it.
 - **A program can release any `Resource`** without knowing what it is.
 - **An interface without a lifetime doesn't inherit it.** `File`, `Directory` and `Stream_Writer` live as long as their server does, and a client's `Close` only deletes its caps, as now.
+
+Amended by #725. `File_Reader` was `Stream_Reader` and `Resource`, and nothing more, but its name said it was about files. The difference that matters is that it can be released, and `Stream_Reader` can't, on purpose: standard input is shared, and a reader passed as an argument must not be released by the server it is passed to. So an interface that differs from another only by inheriting `Resource` is named `Releasable_` and the other one's name. `Stream_Reader` is now `Reader`, and `File_Reader` is `Releasable_Reader`.
 
 ### 2. What idle generates
 
