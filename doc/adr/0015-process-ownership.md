@@ -1,6 +1,6 @@
 # 15. Process ownership: ending a process ends what it launched
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-29
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 8 and 9), [ADR 0006](0006-signals.md) (signals, section 3), [ADR 0014](0014-banks.md) (banks), #424 (end a child process), #346 (delete files and directories), #142 (background job handles), #320 (reuse process table entries)
 
@@ -84,10 +84,11 @@ Banks and their dependent objects are saved in the store's checkpoint (ADR 0014,
 
 ## Follow-up work
 
-- `Launch` takes a bank. Elf creates the process's bank, reserves from it, and passes it to `Memory.New_Process` (new issue).
-- Mem: register each process with its bank, end a process when the store invokes it, and destroy the process's bank on `Destroy`, `Exit_Process` and kill (new issue).
-- The run-time system gives each process a cap for its own bank (new issue).
-- Init launches servers against the system bank (new issue).
-- #424: rewrite in terms of this ADR. The directory server keeps each entry's `Process` cap, and destroys it on delete (#346).
+- `Launch` takes a bank. Elf creates the process's bank, reserves from it, and passes it to `Memory.New_Process` (#449).
+- Mem: register each process with its bank, end a process when the store invokes it, and destroy the process's bank on `Destroy`, `Exit_Process` and kill (#750).
+- The run-time system gives each process a cap for its own bank (#449).
+- Init launches servers against the system bank (#450).
+- #424 (done): the directory server keeps each entry's `Process` cap, and destroys it on delete (#346).
+- Petal gives the commands it runs a bank (#517). The self tests launch against a sub-bank and destroy it, so that a run leaves nothing behind (#724).
 - #142: background jobs run against petal's bank, and a job that outlives the session runs against a bank outside the session.
 - ADR 0006: note that the kill operation destroys the process's bank.

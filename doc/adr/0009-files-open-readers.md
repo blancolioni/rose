@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-28
 - **Related:** [ADR 0010](0010-resources.md) (resources), #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users)
+- **Amended by:** #725, where `File_Reader` is renamed `Releasable_Reader`, `Seekable_File_Reader` is renamed `Seekable_Reader`, and `Stream_Reader` is renamed `Reader`. Nothing in them is specific to files. The text below keeps the old names
 
 ## Context
 

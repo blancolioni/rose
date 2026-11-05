@@ -17,6 +17,6 @@ keytest:
 	    rose-core-keytest.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/stream.idl \
-	    $(INTERFACES)/stream_reader.idl \
+	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/stream_writer.idl
 	gprbuild $(GPRBUILD_CARGS)

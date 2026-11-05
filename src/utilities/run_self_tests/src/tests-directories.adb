@@ -6,7 +6,7 @@ with Rose.Capabilities;
 
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File;
-with Rose.Interfaces.File_Reader;
+with Rose.Interfaces.Releasable_Reader;
 with Rose.Interfaces.File_Version;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
@@ -128,7 +128,8 @@ package body Tests.Directories is
       declare
          Read_Only : Rose.Interfaces.File.File_Object'Class :=
            Top.Get_Ordinary_File (1);
-         Reader    : Rose.Interfaces.File_Reader.File_Reader_Object'Class :=
+         Reader    : Rose.Interfaces.Releasable_Reader
+           .Releasable_Reader_Object'Class :=
            Read_Only.Open_Reader;
       begin
          Reader.Read (Buffer, Last);
@@ -324,7 +325,8 @@ package body Tests.Directories is
          declare
             File   : Rose.Interfaces.File.File_Object'Class :=
               Top.Get_Ordinary_File (Index);
-            Reader : Rose.Interfaces.File_Reader.File_Reader_Object'Class :=
+            Reader : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class :=
               File.Open_Reader;
             Buffer : Storage_Array (1 .. 16);
             Last   : Storage_Count;

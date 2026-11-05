@@ -7,8 +7,8 @@ with Rose.Words;
 
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Control.Client;
-with Rose.Interfaces.File_Reader.Client;
-with Rose.Interfaces.Seekable_File_Reader.Client;
+with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Seekable_Reader.Client;
 with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Registry;
@@ -18,9 +18,9 @@ package body Tests.Files is
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
 
-   package Readers renames Rose.Interfaces.File_Reader.Client;
+   package Readers renames Rose.Interfaces.Releasable_Reader.Client;
    package Seekable_Readers renames
-     Rose.Interfaces.Seekable_File_Reader.Client;
+     Rose.Interfaces.Seekable_Reader.Client;
 
    Hello : constant Storage_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -49,9 +49,9 @@ package body Tests.Files is
       Control   : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File      : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Read_Only : Rose.Interfaces.File.Client.File_Client;
-      First     : Readers.File_Reader_Client;
-      Second    : Readers.File_Reader_Client;
-      Seekable  : Seekable_Readers.Seekable_File_Reader_Client;
+      First     : Readers.Releasable_Reader_Client;
+      Second    : Readers.Releasable_Reader_Client;
+      Seekable  : Seekable_Readers.Seekable_Reader_Client;
       Buffer    : Storage_Array (1 .. 16);
       Last      : Storage_Count;
    begin
@@ -250,10 +250,11 @@ package body Tests.Files is
      (File : in out Rose.Interfaces.File.File_Object'Class)
       return Rose.Capabilities.Capability
    is
-      Reader : Rose.Interfaces.File_Reader.File_Reader_Object'Class :=
+      Reader : Rose.Interfaces.Releasable_Reader
+        .Releasable_Reader_Object'Class :=
         File.Open_Reader;
    begin
-      return Reader.File_Reader_Cap;
+      return Reader.Releasable_Reader_Cap;
    end Reader_Cap;
 
    -------------------------
@@ -264,11 +265,11 @@ package body Tests.Files is
      (File : in out Rose.Interfaces.File.File_Object'Class)
       return Rose.Capabilities.Capability
    is
-      Reader : Rose.Interfaces.Seekable_File_Reader
-        .Seekable_File_Reader_Object'Class :=
+      Reader : Rose.Interfaces.Seekable_Reader
+        .Seekable_Reader_Object'Class :=
           File.Open_Seekable_Reader;
    begin
-      return Reader.Seekable_File_Reader_Cap;
+      return Reader.Seekable_Reader_Cap;
    end Seekable_Reader_Cap;
 
 end Tests.Files;

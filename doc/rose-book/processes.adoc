@@ -60,7 +60,7 @@ A command that inherits no role gets no capability beyond its arguments.
 [cols="2,2,5",options="header"]
 |===
 | Role | Interface | Gives the command
-| `Standard_Input` | `Stream_Reader` | Standard input
+| `Standard_Input` | `Reader` | Standard input
 | `Standard_Output` | `Stream_Writer` | Standard output
 | `Standard_Error` | `Stream_Writer` | Standard error
 | `Standard_IO` | | All three streams
