@@ -19,6 +19,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-boot-memory.o \
 	$(BUILDDIR)/rose-main.o \
 	$(BUILDDIR)/rose.o \
+	$(BUILDDIR)/rose-build.o \
 	$(BUILDDIR)/rose-version.o \
 	$(BUILDDIR)/rose-arch.o \
 	$(BUILDDIR)/rose-boot.o \

@@ -12,6 +12,7 @@ OBJECTS= \
 	$(BUILDDIR)/console.o \
 	$(BUILDDIR)/console-server.o \
 	$(BUILDDIR)/rose.o \
+	$(BUILDDIR)/rose-build.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-output_redirect.o \

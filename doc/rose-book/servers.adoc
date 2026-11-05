@@ -115,7 +115,7 @@ Launched with:: The console, hd0 and the exit capability.
 Used by:: `init`.
 
 If hd0 has no GPT partition table, `scan` writes one.
-If the table has no partitions, `scan` creates three: two swap partitions, each a quarter of the disk, the first of them active, and a log partition from the rest.
+If the table has no partitions, `scan` creates them: `bios-boot`, `rose-boot`, and `rose-swap` and `rose-log`, which share the rest of the disk (see <<Drive Layout>>).
 
 When `init` has read the table, it releases `Partitions`, and `scan` exits, so that nothing keeps hd0's whole block device after the boot (#463).
 
@@ -143,7 +143,7 @@ Used by:: `restore`, to read the programs it installs.
 === `log`, `checkpoint` and `restore`
 
 These servers save and restore the system's state.
-`log` writes to the log partition, `checkpoint` takes a checkpoint every few seconds, and `restore` either restores from a checkpoint or installs the system on a first boot (see <<Boot Sequence>> and <<Persistence>>).
+`log` writes to the log partition, `checkpoint` takes a checkpoint every 30 seconds, and `restore` either restores from a checkpoint or installs the system on a first boot (see <<Boot Sequence>> and <<Persistence>>).
 Documenting them fully is tracked in #130.
 
 == Drivers
