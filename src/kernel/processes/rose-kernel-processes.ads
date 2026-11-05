@@ -431,7 +431,8 @@ private
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
-      Restored_Blocked, Memory_Registered, Exit_Pending);
+      Restored_Blocked, Memory_Registered, Exit_Pending,
+      Checkpoint_Reply_Held);
    --  Flags are saved in a checkpoint by position, so new ones go last.
    --  Memory_Registered: mem was told about the process when it was
    --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,

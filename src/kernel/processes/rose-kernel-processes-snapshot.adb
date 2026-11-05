@@ -22,7 +22,11 @@ package body Rose.Kernel.Processes.Snapshot is
    --  Release_Restore_Holds has not dropped.
 
    function Is_Saved (P : Kernel_Process_Entry) return Boolean
-   is (P.State /= Available and then P.Flags (Persistent));
+   is (P.State not in Available | Starting | Killed
+       and then P.Flags (Persistent));
+   --  A Starting process is still being built by the server that launches
+   --  it, which is not saved, and has no entry point yet (#543). A Killed
+   --  one is waiting for mem to end it (#703). Neither can be restored.
 
    function Active_Cap_Count (P : Kernel_Process_Entry) return Natural;
 
@@ -633,6 +637,7 @@ package body Rose.Kernel.Processes.Snapshot is
          end loop;
 
          Flags (Checkpoint_Page_Fault) := False;
+         Flags (Checkpoint_Reply_Held) := False;
          Flags (Fault_Pending) := False;
          Flags (Exit_Pending) := False;
          Flags (Memory_Registered) := False;

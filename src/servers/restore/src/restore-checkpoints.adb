@@ -621,52 +621,53 @@ package body Restore.Checkpoints is
          declare
             R : constant Natural := Find_Restored (Mem_Process.Oid);
          begin
-            if R = 0 then
-               Fail ("a memory process has no kernel process");
-               return;
+            --  The kernel does not save a process that is still being
+            --  launched or has exited (#543, #703), but mem may have
+            --  saved it. It is left out here too, and so are its pages.
+
+            if R /= 0 then
+               Restored (R).Mem_Pid := Mem_Process.Mem_Pid;
+               Restore_Process
+                 (Mem, Restored (R).Process, Natural (Mem_Process.Mem_Pid));
+
+               for Segment of
+                 Mem_Process.Segments
+                   (1 .. Natural (Mem_Process.Segment_Count))
+               loop
+                  if Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0
+                  then
+                     declare
+                        Region : constant Rose.Interfaces.Region.Client
+                          .Region_Client :=
+                            Find_Region
+                              (Store,
+                               Rose.Objects.Object_Id (Segment.Region_Base),
+                               Rose.Objects.Object_Id (Segment.Region_Bound));
+                     begin
+                        Restore_Segment
+                          (Item          => Mem,
+                           Mem_Pid       => Natural (Mem_Process.Mem_Pid),
+                           Base          => Segment.Base,
+                           Bound         => Segment.Bound,
+                           Limit         => Segment.Limit,
+                           Flags         => Segment.Flags,
+                           Region        =>
+                             Rose.Interfaces.Region.Client.Get_Interface_Cap
+                               (Region),
+                           Region_Offset =>
+                             Rose.Words.Word (Segment.Region_Offset));
+                     end;
+                  else
+                     Restore_Zero_Segment
+                       (Item    => Mem,
+                        Mem_Pid => Natural (Mem_Process.Mem_Pid),
+                        Base    => Segment.Base,
+                        Bound   => Segment.Bound,
+                        Limit   => Segment.Limit,
+                        Flags   => Segment.Flags);
+                  end if;
+               end loop;
             end if;
-
-            Restored (R).Mem_Pid := Mem_Process.Mem_Pid;
-            Restore_Process
-              (Mem, Restored (R).Process, Natural (Mem_Process.Mem_Pid));
-
-            for Segment of
-              Mem_Process.Segments
-                (1 .. Natural (Mem_Process.Segment_Count))
-            loop
-               if Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0
-               then
-                  declare
-                     Region : constant Rose.Interfaces.Region.Client
-                       .Region_Client :=
-                         Find_Region
-                           (Store,
-                            Rose.Objects.Object_Id (Segment.Region_Base),
-                            Rose.Objects.Object_Id (Segment.Region_Bound));
-                  begin
-                     Restore_Segment
-                       (Item          => Mem,
-                        Mem_Pid       => Natural (Mem_Process.Mem_Pid),
-                        Base          => Segment.Base,
-                        Bound         => Segment.Bound,
-                        Limit         => Segment.Limit,
-                        Flags         => Segment.Flags,
-                        Region        =>
-                          Rose.Interfaces.Region.Client.Get_Interface_Cap
-                            (Region),
-                        Region_Offset =>
-                          Rose.Words.Word (Segment.Region_Offset));
-                  end;
-               else
-                  Restore_Zero_Segment
-                    (Item    => Mem,
-                     Mem_Pid => Natural (Mem_Process.Mem_Pid),
-                     Base    => Segment.Base,
-                     Bound   => Segment.Bound,
-                     Limit   => Segment.Limit,
-                     Flags   => Segment.Flags);
-               end if;
-            end loop;
          end;
       end loop;
 
