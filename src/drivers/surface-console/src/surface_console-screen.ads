@@ -2,6 +2,8 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
+with Text_Console;
+
 package Surface_Console.Screen is
 
    --  The console's cells, drawn with the Spleen font into the surface's
@@ -16,6 +18,12 @@ package Surface_Console.Screen is
 
    procedure Put (Text : String);
    --  Write Text, as Text_Console.Cells.Put does.
+
+   procedure Operate (Operation : Text_Console.Screen_Operation);
+   --  One of Terminal's screen operations (#734).
+
+   function Columns return Positive;
+   function Rows return Positive;
 
    procedure Notify (Signal : Rose.Capabilities.Capability);
    --  Give the surface Signal, to invoke when it has events.

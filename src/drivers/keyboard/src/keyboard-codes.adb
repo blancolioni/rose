@@ -1,50 +1,67 @@
 package body Keyboard.Codes is
 
-   ESC : constant Character := Character'Val (27);
+   use Rose.Keys;
+   use type Rose.Words.Word;
+   use type Rose.Words.Word_8;
 
-   type Key_Modifier is
-     (None, Shift, Control, Alt);
+   --  The layout: what each key gives (#734). A character key has four
+   --  levels, chosen by Shift and AltGr, and a level can be a dead key,
+   --  which gives the accent that the next key is composed with. Only
+   --  the US layout exists, which has no AltGr level and no dead keys.
 
-   type Modified_Key_Value is array (Key_Modifier) of Character;
+   type Level is (Base, Shifted, AltGr, Shifted_AltGr);
 
-   NUL : constant Character := Character'Val (0);
+   type Level_Keys is array (Level) of Key_Code;
+   --  0 for a level that gives nothing.
+
+   type Level_Flags is array (Level) of Boolean;
+
+   type Modifier_Key is (Shift_Key, Control_Key, Alt_Key, AltGr_Key);
+
+   type Key_Kind is (No_Key, Modifier_Kind, Character_Kind, Named_Kind);
 
    type Key_Entry is
       record
-         Modifier   : Key_Modifier := None;
-         Fn_Key     : Natural := 0;
-         Cursor_Key : Character := NUL;
-         Edit_Key   : Natural := 0;
-         Key_Value  : Modified_Key_Value := (others => NUL);
+         Kind      : Key_Kind := No_Key;
+         Held      : Modifier_Key := Shift_Key;
+         Values    : Level_Keys := (others => 0);
+         Dead      : Level_Flags := (others => False);
+         Named_Key : Key_Code := 0;
       end record;
 
-   function Fn (N : Natural) return Key_Entry
-   is ((Fn_Key => N, others => <>));
+   function Modifier (M : Modifier_Key) return Key_Entry
+   is ((Kind => Modifier_Kind, Held => M, others => <>));
 
-   function Cursor (Final : Character) return Key_Entry
-   is ((Cursor_Key => Final, others => <>));
-   --  A key that produces ESC [ Final.
+   function Name (Key : Key_Code) return Key_Entry
+   is ((Kind => Named_Kind, Named_Key => Key, others => <>));
 
-   function Edit (N : Natural) return Key_Entry
-   is ((Edit_Key => N, others => <>));
-   --  A key that produces ESC [ N ~.
-
-   function Modifier (M : Key_Modifier) return Key_Entry
-   is (Modifier => M, others => <>);
+   function Fn (N : Positive) return Key_Entry
+   is (Name (Function_Key (N)));
 
    function Asc
-     (Base, Shifted, Controled, Alted : Character := Character'Val (0))
+     (Base_Value    : Character;
+      Shifted_Value : Character)
       return Key_Entry
-   is (Key_Entry'
-         (Key_Value => (Base, Shifted, Controled, Alted),
-          others    => <>));
+   is ((Kind   => Character_Kind,
+        Values => (Character'Pos (Base_Value),
+                   Character'Pos (Shifted_Value),
+                   0, 0),
+        others => <>));
 
-   Key_Code : constant array (Rose.Words.Word_8) of Key_Entry :=
-     (16#2A# => Modifier (Shift),
-      16#36# => Modifier (Shift),
-      16#1D# => Modifier (Control),
-      16#38# => Modifier (Alt),
-      16#39# => Asc (' ', ' '),
+   function Asc (Value : Character) return Key_Entry
+   is (Asc (Value, Value));
+
+   ESC : constant Character := Character'Val (27);
+   BS  : constant Character := Character'Val (8);
+   HT  : constant Character := Character'Val (9);
+   LF  : constant Character := Character'Val (10);
+
+   Key_Code_Table : constant array (Rose.Words.Word_8) of Key_Entry :=
+     (16#2A# => Modifier (Shift_Key),
+      16#36# => Modifier (Shift_Key),
+      16#1D# => Modifier (Control_Key),
+      16#38# => Modifier (Alt_Key),
+      16#39# => Asc (' '),
       16#3B# => Fn (1),
       16#3C# => Fn (2),
       16#3D# => Fn (3),
@@ -57,7 +74,7 @@ package body Keyboard.Codes is
       16#44# => Fn (10),
       16#57# => Fn (11),
       16#58# => Fn (12),
-      16#01# => Asc (ESC, ESC),
+      16#01# => Asc (ESC),
       16#02# => Asc ('1', '!'),
       16#03# => Asc ('2', '@'),
       16#04# => Asc ('3', '#'),
@@ -70,8 +87,8 @@ package body Keyboard.Codes is
       16#0B# => Asc ('0', ')'),
       16#0C# => Asc ('-', '_'),
       16#0D# => Asc ('=', '+'),
-      16#0E# => Asc (Character'Val (8), Character'Val (8)),
-      16#0F# => Asc (Character'Val (9)),
+      16#0E# => Asc (BS),
+      16#0F# => Asc (HT),
       16#10# => Asc ('q', 'Q'),
       16#11# => Asc ('w', 'W'),
       16#12# => Asc ('e', 'E'),
@@ -84,7 +101,7 @@ package body Keyboard.Codes is
       16#19# => Asc ('p', 'P'),
       16#1A# => Asc ('[', '{'),
       16#1B# => Asc (']', '}'),
-      16#1C# => Asc (Character'Val (10)),
+      16#1C# => Asc (LF),
       16#1E# => Asc ('a', 'A'),
       16#1F# => Asc ('s', 'S'),
       16#20# => Asc ('d', 'D'),
@@ -110,30 +127,70 @@ package body Keyboard.Codes is
       16#35# => Asc ('/', '?'),
       others => <>);
 
-   --  The keys that follow an E0 prefix. Right Control and right Alt are
-   --  modifiers, as the left ones are.
+   --  The keys that follow an E0 prefix. Right Control is Control, and
+   --  right Alt is AltGr.
 
-   Extended_Key_Code : constant array (Rose.Words.Word_8) of Key_Entry :=
-     (16#1D# => Modifier (Control),
-      16#38# => Modifier (Alt),
-      16#1C# => Asc (Character'Val (10)),
-      16#35# => Asc ('/', '/'),
-      16#47# => Cursor ('H'),
-      16#48# => Cursor ('A'),
-      16#49# => Edit (5),
-      16#4B# => Cursor ('D'),
-      16#4D# => Cursor ('C'),
-      16#4F# => Cursor ('F'),
-      16#50# => Cursor ('B'),
-      16#51# => Edit (6),
-      16#52# => Edit (2),
-      16#53# => Edit (3),
-      others => <>);
+   Extended_Key_Code_Table : constant array (Rose.Words.Word_8)
+     of Key_Entry :=
+       (16#1D# => Modifier (Control_Key),
+        16#38# => Modifier (AltGr_Key),
+        16#1C# => Asc (LF),
+        16#35# => Asc ('/'),
+        16#47# => Name (Home),
+        16#48# => Name (Up),
+        16#49# => Name (Page_Up),
+        16#4B# => Name (Left),
+        16#4D# => Name (Right),
+        16#4F# => Name (End_Key),
+        16#50# => Name (Down),
+        16#51# => Name (Page_Down),
+        16#52# => Name (Insert),
+        16#53# => Name (Delete),
+        others => <>);
 
-   Current_Mod : array (Key_Modifier) of Boolean := (others => False);
+   --  The characters that a dead key's accent composes with a letter:
+   --  the capital letter and its accented form in Latin-1. The small
+   --  letters are 32 above them.
 
-   Extended    : Boolean := False;
+   type Composition is
+      record
+         Accent, Letter, Composed : Key_Code;
+      end record;
+
+   Grave      : constant Key_Code := 16#60#;
+   Acute      : constant Key_Code := 16#B4#;
+   Circumflex : constant Key_Code := 16#5E#;
+   Tilde      : constant Key_Code := 16#7E#;
+   Diaeresis  : constant Key_Code := 16#A8#;
+   Cedilla    : constant Key_Code := 16#B8#;
+
+   function L (Letter : Character) return Key_Code
+   is (Character'Pos (Letter));
+
+   Compositions : constant array (Positive range <>) of Composition :=
+     ((Grave, L ('A'), 16#C0#), (Grave, L ('E'), 16#C8#),
+      (Grave, L ('I'), 16#CC#), (Grave, L ('O'), 16#D2#),
+      (Grave, L ('U'), 16#D9#),
+      (Acute, L ('A'), 16#C1#), (Acute, L ('E'), 16#C9#),
+      (Acute, L ('I'), 16#CD#), (Acute, L ('O'), 16#D3#),
+      (Acute, L ('U'), 16#DA#), (Acute, L ('Y'), 16#DD#),
+      (Circumflex, L ('A'), 16#C2#), (Circumflex, L ('E'), 16#CA#),
+      (Circumflex, L ('I'), 16#CE#), (Circumflex, L ('O'), 16#D4#),
+      (Circumflex, L ('U'), 16#DB#),
+      (Tilde, L ('A'), 16#C3#), (Tilde, L ('N'), 16#D1#),
+      (Tilde, L ('O'), 16#D5#),
+      (Diaeresis, L ('A'), 16#C4#), (Diaeresis, L ('E'), 16#CB#),
+      (Diaeresis, L ('I'), 16#CF#), (Diaeresis, L ('O'), 16#D6#),
+      (Diaeresis, L ('U'), 16#DC#),
+      (Cedilla, L ('C'), 16#C7#));
+
+   Held     : array (Modifier_Key) of Boolean := (others => False);
+
+   Extended : Boolean := False;
    --  The last byte was the E0 prefix.
+
+   Pending_Accent : Key_Code := 0;
+   --  The accent of a dead key that was typed, or 0.
 
    ----------------
    -- Handle_Key --
@@ -141,73 +198,74 @@ package body Keyboard.Codes is
 
    procedure Handle_Key
      (Scan_Code : Rose.Words.Word_8;
-      Result    : out System.Storage_Elements.Storage_Array;
-      Last      : out System.Storage_Elements.Storage_Count)
+      Result    : out Key_Press_Array;
+      Last      : out Natural)
    is
-      use type Rose.Words.Word_8;
-      use type System.Storage_Elements.Storage_Offset;
-
       Code    : constant Rose.Words.Word_8 := Scan_Code and 16#7F#;
       Pressed : constant Boolean := Scan_Code < 16#80#;
       Key     : constant Key_Entry :=
                   (if Extended
-                   then Extended_Key_Code (Code)
-                   else Key_Code (Code));
+                   then Extended_Key_Code_Table (Code)
+                   else Key_Code_Table (Code));
 
-      procedure Copy (Sequence : String);
+      Has_AltGr : constant Boolean :=
+                    Key.Values (AltGr) /= 0
+                    or else Key.Values (Shifted_AltGr) /= 0;
+      --  The key has AltGr characters, so AltGr chooses them; otherwise
+      --  it is Alt.
 
-      procedure Escape_Sequence (Sequence : String);
+      function Modifiers return Modifier_Set;
+      --  The modifiers that are held.
 
-      ----------
-      -- Copy --
-      ----------
+      procedure Add (Value : Key_Code);
+      --  Give Value with the modifiers.
 
-      procedure Copy (Sequence : String) is
+      function Compose (Value : Key_Code) return Key_Code;
+      --  Value composed with the pending accent, or 0 if they don't
+      --  compose.
+
+      ---------
+      -- Add --
+      ---------
+
+      procedure Add (Value : Key_Code) is
       begin
-         for Ch of Sequence loop
-            exit when Last >= Result'Last;
+         if Last < Result'Last then
             Last := Last + 1;
-            Result (Last) := Character'Pos (Ch);
-         end loop;
-      end Copy;
-
-      ---------------------
-      -- Escape_Sequence --
-      ---------------------
-
-      procedure Escape_Sequence (Sequence : String) is
-      begin
-         Copy ((ESC, '['));
-         Copy (Sequence);
-         Copy ((1 => '~'));
-      end Escape_Sequence;
-
-      function Key_Value (Modifier : Key_Modifier) return Character;
-      --  The character the key gives with Modifier held, or NUL if it
-      --  gives none.
-
-      ---------------
-      -- Key_Value --
-      ---------------
-
-      function Key_Value (Modifier : Key_Modifier) return Character is
-         Base  : constant Character := Key.Key_Value (None);
-         Value : constant Character := Key.Key_Value (Modifier);
-      begin
-         if Value /= NUL then
-            return Value;
-         elsif Modifier = Shift then
-            return Base;
-         elsif Modifier = Control and then Base in 'a' .. 'z' then
-
-            --  Ctrl with a letter gives the letter's position modulo 32,
-            --  so Ctrl-D is EOT (ADR 0011, section 1).
-
-            return Character'Val (Character'Pos (Base) mod 32);
-         else
-            return NUL;
+            Result (Last) := (Value, Modifiers);
          end if;
-      end Key_Value;
+      end Add;
+
+      -------------
+      -- Compose --
+      -------------
+
+      function Compose (Value : Key_Code) return Key_Code is
+      begin
+         for Item of Compositions loop
+            if Item.Accent = Pending_Accent then
+               if Value = Item.Letter then
+                  return Item.Composed;
+               elsif Value = Item.Letter + 32 then
+                  return Item.Composed + 32;
+               end if;
+            end if;
+         end loop;
+         return 0;
+      end Compose;
+
+      ---------------
+      -- Modifiers --
+      ---------------
+
+      function Modifiers return Modifier_Set is
+      begin
+         return (if Held (Shift_Key) then Shift else 0)
+           + (if Held (Control_Key) then Control else 0)
+           + (if Held (Alt_Key)
+                or else (Held (AltGr_Key) and then not Has_AltGr)
+              then Alt else 0);
+      end Modifiers;
 
    begin
       Last := Result'First - 1;
@@ -219,49 +277,77 @@ package body Keyboard.Codes is
 
       Extended := False;
 
-      if not Pressed then
-         if Key.Modifier /= None then
-            Current_Mod (Key.Modifier) := False;
-         end if;
-      elsif Key.Modifier /= None then
-         Current_Mod (Key.Modifier) := True;
-      elsif Key.Fn_Key /= 0 then
-         declare
-            Modified_Code : constant Natural :=
-                              Key.Fn_Key
-                                + (if Current_Mod (Shift) then 12 else 0)
-                              + (if Current_Mod (Control) then 24 else 0)
-                              + (if Current_Mod (Alt) then 48 else 0);
-            Sequence      : constant String :=
-                              (Character'Val (Modified_Code / 10 + 48),
-                               Character'Val (Modified_Code mod 10 + 48));
-         begin
-            Escape_Sequence (Sequence);
-         end;
-      elsif Key.Cursor_Key /= NUL then
-         Copy ((ESC, '[', Key.Cursor_Key));
-      elsif Key.Edit_Key /= 0 then
-         Escape_Sequence ((1 => Character'Val (Key.Edit_Key + 48)));
-      elsif Key.Key_Value (None) /= NUL then
-         declare
-            Modifier : Key_Modifier := None;
-         begin
-            for Pressed_Mod in reverse Key_Modifier loop
-               if Current_Mod (Pressed_Mod) then
-                  Modifier := Pressed_Mod;
-                  exit;
-               end if;
-            end loop;
-
-            declare
-               Value : constant Character := Key_Value (Modifier);
-            begin
-               if Value /= NUL then
-                  Copy ((1 => Value));
-               end if;
-            end;
-         end;
+      if Key.Kind = Modifier_Kind then
+         Held (Key.Held) := Pressed;
+         return;
+      elsif not Pressed or else Key.Kind = No_Key then
+         return;
       end if;
+
+      if Key.Kind = Named_Kind then
+
+         --  A dead key followed by a named key gives its accent first.
+
+         if Pending_Accent /= 0 then
+            Add (Pending_Accent);
+            Pending_Accent := 0;
+         end if;
+
+         Add (Key.Named_Key);
+         return;
+      end if;
+
+      declare
+         Chosen : constant Level :=
+                    (if Held (AltGr_Key) and then Has_AltGr
+                     then (if Held (Shift_Key)
+                           then Shifted_AltGr else AltGr)
+                     else (if Held (Shift_Key) then Shifted else Base));
+         Value  : Key_Code := Key.Values (Chosen);
+      begin
+         if Value = 0 then
+            return;
+         end if;
+
+         if Key.Dead (Chosen) then
+
+            --  A second dead key gives the first one's accent.
+
+            if Pending_Accent /= 0 then
+               Add (Pending_Accent);
+            end if;
+            Pending_Accent := Value;
+            return;
+         end if;
+
+         --  Control with a letter gives the letter's position modulo 32,
+         --  so Ctrl-D is EOT (ADR 0011, section 1).
+
+         if Held (Control_Key)
+           and then (Value in L ('a') .. L ('z')
+                     or else Value in L ('A') .. L ('Z'))
+         then
+            Value := Value mod 32;
+         end if;
+
+         if Pending_Accent /= 0 then
+            declare
+               Composed : constant Key_Code := Compose (Value);
+            begin
+               if Composed /= 0 then
+                  Add (Composed);
+               elsif Value = L (' ') then
+                  Add (Pending_Accent);
+               else
+                  Add (Pending_Accent);
+                  Add (Value);
+               end if;
+               Pending_Accent := 0;
+            end;
+         else
+            Add (Value);
+         end if;
+      end;
    end Handle_Key;
 
 end Keyboard.Codes;

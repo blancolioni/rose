@@ -1,0 +1,12 @@
+command Rose.Core.Keytest : Console
+  with Summary     => "Draw at the corners of the screen, and move a mark with the arrow keys.",
+       Description => """
+          Keytest turns the console's line editing off, clears the screen,
+          and draws a + in each of its corners and an @ at its centre,
+          whatever the size of the screen. The arrow keys move the @, and
+          the bottom line names the last key that was typed and where the
+          @ is, as in key Left at 39,11. Q ends it. It tests the screen
+          operations and the key input of Terminal (#734).
+          """
+is
+end Rose.Core.Keytest;

@@ -14,7 +14,15 @@ package body VGA_Console.Screen is
    Num_Columns : constant := 80;
 
    Blank       : constant Word_16 := 16#0720#;
-   Colour      : constant Word_16 := 16#0700#;
+
+   function Colour (Attribute : Text_Console.Attributes) return Word_16
+   is (case Attribute.Bold is
+          when False =>
+            (if Attribute.Reverse_Video then 16#7000# else 16#0700#),
+          when True  =>
+            (if Attribute.Reverse_Video then 16#7F00# else 16#0F00#));
+   --  Light grey on black, white for bold, and black on light grey, or
+   --  white on light grey, in reverse video.
 
    type Screen_Array is
      array (0 .. Num_Lines * Num_Columns - 1) of Word_16
@@ -29,7 +37,10 @@ package body VGA_Console.Screen is
 
    --  The cell model's drawing, on rows 1 to 24 of the VGA text page.
 
-   procedure Draw (Column, Row : Natural; Item : Character);
+   procedure Draw
+     (Column, Row : Natural;
+      Item        : Character;
+      Attribute   : Text_Console.Attributes);
    procedure Scroll (Lines : Positive);
    procedure Clear;
    procedure Show_Cursor (Column, Row : Natural);
@@ -59,14 +70,24 @@ package body VGA_Console.Screen is
       Screen_Memory := (others => Blank);
    end Clear;
 
+   -------------
+   -- Columns --
+   -------------
+
+   function Columns return Positive is (Num_Columns);
+
    ----------
    -- Draw --
    ----------
 
-   procedure Draw (Column, Row : Natural; Item : Character) is
+   procedure Draw
+     (Column, Row : Natural;
+      Item        : Character;
+      Attribute   : Text_Console.Attributes)
+   is
    begin
       Screen_Memory (Row * Num_Columns + Column) :=
-        Colour + Character'Pos (Item);
+        Colour (Attribute) + Character'Pos (Item);
    end Draw;
 
    ---------
@@ -79,6 +100,19 @@ package body VGA_Console.Screen is
       Rose.System_Calls.Initialize_Send (Params, Screen_Page_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end Map;
+
+   -------------
+   -- Operate --
+   -------------
+
+   procedure Operate (Operation : Text_Console.Screen_Operation) is
+   begin
+      if not Taken_Over then
+         Take_Over;
+      end if;
+
+      Cells.Operate (Operation);
+   end Operate;
 
    ---------
    -- Put --
@@ -93,6 +127,7 @@ package body VGA_Console.Screen is
       Cells.Put (Text);
    end Put;
 
+
    ------------
    -- Redraw --
    ------------
@@ -102,6 +137,12 @@ package body VGA_Console.Screen is
       Map;
       Cells.Redraw;
    end Redraw;
+
+   ----------
+   -- Rows --
+   ----------
+
+   function Rows return Positive is (Num_Lines);
 
    ------------
    -- Scroll --
