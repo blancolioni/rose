@@ -75,14 +75,15 @@ private
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
    Boot_Module_Pages : Natural :=
-     18 + 40
+     18 + 40 + 4
      + (Rose.Limits.Mapped_Page_Table_Bytes + Rose.Limits.Page_Size - 1)
      / Rose.Limits.Page_Size;
    --  Pages of kernel heap kept for boot modules, which are loaded before
    --  the memory server can add to the heap (#309): 18 for what they
    --  needed before the memory server's page table was sized from
    --  Rose.Limits.Max_Mapped_Pages, 40 for the memory server's tables of
-   --  32 segments a process and of shared pages (ADR 0025), and the pages
-   --  of the page table. Set by boot-module-pages on the command line.
+   --  32 segments a process and of shared pages (ADR 0025), 4 for the
+   --  boot console's copy of its output (#654), and the pages of the page
+   --  table. Set by boot-module-pages on the command line.
 
 end Rose.Kernel;

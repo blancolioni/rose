@@ -7,7 +7,11 @@ with Console.Server;
 procedure Console.Driver is
 begin
 
-   Console.Calls.Invoke_Memory_Cap;
+   if Console.Calls.Has_Framebuffer then
+      Console.IO.Use_Serial_Port;
+   else
+      Console.Calls.Invoke_Memory_Cap;
+   end if;
 
    Console.IO.Clear;
    Console.IO.Put_Line (Rose.Version.Full_Name);
