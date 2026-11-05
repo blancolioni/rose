@@ -31,6 +31,32 @@ start_qemu () {
     sleep 2
 }
 
+monitor () {
+    # monitor COMMAND: send COMMAND to QEMU's monitor
+    python3 - "$MONITOR" "$1" <<'EOF'
+import socket, sys, time
+c = socket.socket(socket.AF_UNIX)
+c.connect(sys.argv[1])
+c.sendall((sys.argv[2] + "\n").encode())
+time.sleep(0.3)
+EOF
+}
+
+choose_last_entry () {
+    # Choose the last entry of the GRUB menu, which is text mode on the
+    # install media and the boot disk: the first is the framebuffer. End
+    # is pressed for twelve seconds, which is long enough for the menu to
+    # appear and stop its countdown, and does nothing more however often
+    # it is pressed.
+    i=0
+    while [ $i -lt 24 ]; do
+        monitor "sendkey end"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    monitor "sendkey ret"
+}
+
 stop_qemu () {
     [ -f "$WORK/pid" ] && kill "$(cat "$WORK/pid")" 2> /dev/null
     rm -f "$WORK/pid"
@@ -75,6 +101,7 @@ install_rose () {
 
     echo "Installing"
     start_qemu -boot d -drive file="$1",if=ide,index=1,media=cdrom
+    choose_last_entry
 
     # When the install is complete, the system restarts from the disk.
     # It says "install complete" on the screen first, but login can clear

@@ -6,12 +6,12 @@
 #
 # ISO is the install image, images/rose.iso by default. The test:
 #
-#   1. installs Rose on a new disk from the install menu's framebuffer
-#      entry, so that the screen driver holds the framebuffer and the
+#   1. installs Rose on a new disk from the install menu's first entry,
+#      which keeps the framebuffer, so that the screen driver holds the framebuffer and the
 #      keyboard, and the console is surface-console on its surface; the
 #      install's self tests, which init runs, have to pass, as the console
 #      shows;
-#   2. boots from the disk's framebuffer entry, which restores the
+#   2. boots from the disk's first entry, which restores the
 #      install's checkpoint, logs in as the first user, and runs
 #      run_self_tests, which has to pass every test: the keys go through
 #      the screen driver and the surface's events to the console, and the
@@ -39,30 +39,6 @@ screen () {
     python3 "$HERE/fb-text.py" "$MONITOR"
 }
 
-monitor () {
-    # monitor COMMAND: send COMMAND to QEMU's monitor
-    python3 - "$MONITOR" "$1" <<'EOF'
-import socket, sys, time
-c = socket.socket(socket.AF_UNIX)
-c.connect(sys.argv[1])
-c.sendall((sys.argv[2] + "\n").encode())
-time.sleep(0.3)
-EOF
-}
-
-choose_last_entry () {
-    # Choose the last entry of the GRUB menu. End is pressed for twelve
-    # seconds, which is long enough for the menu to appear and stop its
-    # countdown, and does nothing more however often it is pressed.
-    i=0
-    while [ $i -lt 24 ]; do
-        monitor "sendkey end"
-        sleep 0.5
-        i=$((i + 1))
-    done
-    monitor "sendkey ret"
-}
-
 passed () {
     # passed LINE: LINE is a self test result with every test passed
     set -- $(echo "$1" \
@@ -75,7 +51,6 @@ qemu-img create -f raw "$DISK" 6G > /dev/null
 
 echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
-choose_last_entry
 
 # The install restarts the machine when it has finished. Until then, read
 # the screen every ten seconds, and keep the self tests' result.
@@ -96,9 +71,8 @@ passed "$result" || fail "not every install self test passed"
 sleep 15
 stop_qemu
 
-echo "Booting from the disk's framebuffer entry, which restores the install"
+echo "Booting from the disk, which restores the install"
 start_qemu
-choose_last_entry
 log_in
 
 echo "Running the self tests"
