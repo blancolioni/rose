@@ -1,6 +1,6 @@
 # 14. Banks: where storage comes from, and how it is reclaimed
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-29
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0010](0010-resources.md) (resources), [ADR 0015](0015-process-ownership.md) (process ownership), #305 (allocate backing blocks on first write), #320 (reuse process table entries), #126 (the book's old Memory chapter)
 
@@ -98,8 +98,8 @@ Banks, their limits and the regions charged to them are saved in the store's che
 
 ## Follow-up work
 
-- Store: a `Bank` interface with `Reserve_Storage`, `Create_Sub_Bank`, limits and `Destroy`, and banks in the checkpoint (new issue).
-- Store: registration of dependent objects, and invoking them when a bank is destroyed (new issue).
-- Elf, the installer and other reservers: reserve from a bank (new issue).
-- Init: a system bank at boot. The user server: a bank for each user and each session (new issue).
+- Store: a `Bank` interface with `Reserve_Storage`, `Create_Sub_Bank`, limits and `Destroy` (#447), and banks in the checkpoint (#518).
+- Store: registration of dependent objects, and invoking them when a bank is destroyed (#448).
+- Elf, the installer and other reservers: reserve from a bank (#449).
+- Init: a system bank at boot. The user server: a bank for each user and each session (#450).
 - ADR 0010: note that a server can charge a client's resource to the client's bank.
