@@ -25,6 +25,11 @@ package Rose.Multiboot is
    --  boot by Load_Multiboot_Header, so this works for as long as the
    --  kernel runs.
 
+   function Has_Graphics_Framebuffer return Boolean;
+   --  True if the boot loader gave a graphics framebuffer (multiboot2 tag
+   --  8 with a type other than 2, EGA text), so that the VGA text page
+   --  isn't on the screen (#654).
+
    procedure Scan_Modules
      (Process : not null access
         procedure (Mod_Start  : Word_32;

@@ -40,6 +40,9 @@ package body Console.Server is
    Has_Target     : Boolean := False;
    Target_Console : Rose.Interfaces.Stream_Writer.Client.Stream_Writer_Client;
 
+   procedure Write_Target (Text : System.Storage_Elements.Storage_Array);
+   --  Write Text to Target_Console
+
    ---------------------------
    -- Create_Console_Server --
    ---------------------------
@@ -77,6 +80,11 @@ package body Console.Server is
       Has_Target := Target /= Rose.Capabilities.Null_Capability;
       if Has_Target then
          Rose.Interfaces.Stream_Writer.Client.Open (Target_Console, Target);
+
+         --  With a framebuffer, nothing written so far was on the screen,
+         --  so it goes to the new console first (#654).
+
+         Console.IO.Replay (Write_Target'Access);
       end if;
       Rose.System_Calls.Initialize_Reply (Parameters, Parameters.Reply_Cap);
    end Handle_Redirect;
@@ -109,5 +117,14 @@ package body Console.Server is
    begin
       Rose.Server.Start_Server (Server_Context);
    end Start_Server;
+
+   ------------------
+   -- Write_Target --
+   ------------------
+
+   procedure Write_Target (Text : System.Storage_Elements.Storage_Array) is
+   begin
+      Rose.Interfaces.Stream_Writer.Client.Write (Target_Console, Text);
+   end Write_Target;
 
 end Console.Server;
