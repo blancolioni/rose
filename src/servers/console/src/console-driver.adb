@@ -1,4 +1,4 @@
-with Rose.Version;
+with Rose.Build;
 
 with Console.Calls;
 with Console.IO;
@@ -14,7 +14,7 @@ begin
    end if;
 
    Console.IO.Clear;
-   Console.IO.Put_Line (Rose.Version.Full_Name);
+   Console.IO.Put_Line (Rose.Build.Full_Name);
    Console.Server.Create_Console_Server;
    Console.Server.Start_Server;
 end Console.Driver;
