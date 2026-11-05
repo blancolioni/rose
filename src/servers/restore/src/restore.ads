@@ -26,6 +26,10 @@ package Restore is
    Memory_Restore_Cap    : Rose.Capabilities.Capability;
    Restore_Derivations_Cap : Rose.Capabilities.Capability;
 
+   Exit_Cap            : Rose.Capabilities.Capability;
+   --  The kernel's exit cap: restore exits when it has finished, so that
+   --  its caps go with it (#451).
+
    --  Only restore-install has these (Restore.Install_Driver).
    Install_Media_Cap   : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;

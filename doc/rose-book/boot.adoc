@@ -22,6 +22,11 @@ The two boots differ in their boot modules and in what they do when there is no 
 | No checkpoint on hd0 | A new system is installed from the install media, and GRUB is written to hd0 (see <<first-boot>>) | `init` says "no system on this disk; boot the install media", and the system stays idle
 |===
 
+Both menus are drawn over the rose splash, and each entry names the version it boots, from `Rose.Version`: "Install Rose 0.2.0 (putney)" on the install media, and "Rose 0.2.0 (putney)" on the boot disk.
+The default entry keeps the framebuffer that GRUB sets up, so the console is on the screen's surface (see <<Servers>>).
+The "trace launches" entry and the last entry, "text mode", keep the VGA text mode, with `gfxpayload=text`: the boot tests choose the last one, since they read the VGA text page, and so can a machine whose framebuffer doesn't work.
+Until the early messages go to the serial port (#654), nothing is seen with a framebuffer until the console starts.
+
 The boot sequence is described in `src/servers/init/boot.yaml` (#374).
 The build turns it into the Ada package `Init.Boot` with `scripts/make-init`, and writes the `module2` lines of both GRUB menus from it.
 The boot description names each boot module, the object id it is launched with, its priority, the capabilities it is given and the endpoints `init` keeps from it.
@@ -100,7 +105,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
 | 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
 | 16 | `log` | The kernel's start-log capability | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, and the exit capability. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
 | 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
@@ -280,5 +285,4 @@ The diagrams leave out:
 * `init` starting each boot module, which it does through the kernel;
 * the commands that `petal` runs, and the processes that `tests` creates.
 
-When it has finished, `restore` waits for a message that never comes, and keeps the capabilities it was given.
-It should exit instead (#451).
+When it has finished, `restore` exits, and the capabilities it was given go with it (#451).

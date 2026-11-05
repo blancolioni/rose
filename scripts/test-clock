@@ -115,6 +115,7 @@ install_rose "$ISO"
 
 echo "Booting from the disk, which restores the install's checkpoint"
 start_qemu
+choose_last_entry
 log_in
 last=0
 check_date 0
@@ -128,6 +129,7 @@ stop_qemu
 echo "Booting from the disk again"
 start_qemu -rtc base="$(date -u -d "@$(($(date -u +%s) + offset))" \
     +%Y-%m-%dT%H:%M:%S)"
+choose_last_entry
 wait_for "petal>" 200 || fail "petal was not restored"
 sleep 45
 check_date "$last"
