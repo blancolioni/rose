@@ -4,29 +4,28 @@
 
 === Invocation Record
 
-The first four words of an invocation are placed in registers.
-The remaining words, if any, are pushed onto the stack.
+A process passes its invocation record to the kernel by address, not in registers.
+`Rose.System_Calls.Enter_Kernel` jumps to the system call page at `FFFF_0000`, with the address of the record on the stack, and the page enters the kernel with `sysenter` (`src/asm/i686/mp.s`).
 
 [#i686-invocation]
-.i686 invocation record
+.i686 registers on a system call
 [cols="1,4",options="header"]
 |===
-| Register | Parameter
-| `eax` | Control word
-| `edx` | Used by _sysenter_ instruction
-| `ebx` | Invoked capability
-| `ecx` | Used by _sysenter_ instruction
-| `esp` |
-| `ebp` |
-| `esi` | First argument
-| `edi` | Second argument
+| Register | Use
+| `eax` | The address of the invocation record, in the caller's memory
+| `ecx` | The caller's stack pointer, for `sysexit`
+| `edx` | The return address in the system call page, for `sysexit`
+| `ebx`, `esi`, `edi`, `ebp` | Saved, and restored when the process resumes
 |===
+
+The kernel copies the whole record, 40 words, from the caller's memory, and handles the call.
+When it resumes the process with a reply, it copies the record back to the same address, past the write protection of a checkpoint, which is why a persistent process waits for its reply until a checkpoint has finished (see <<Persistence>>).
 
 === Page Table
 
 Uses 4K pages.
 Per-process virtual memory is 3G.
-Page object ids are 31 bits long, allowing up to 2^43^ bytes or 8TB of state.
+Page object ids are 64 bits on every architecture: the top byte is `FF`, and the low 56 bits are the page (see <<Persistence>>).
 
 === Persistence
 
