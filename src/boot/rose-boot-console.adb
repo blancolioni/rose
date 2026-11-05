@@ -1,7 +1,8 @@
 with Ada.Unchecked_Conversion;
 
 with Rose.Arch;
-with Rose.Version;
+with Rose.Multiboot;
+with Rose.Build;
 
 with Rose.Devices.Console;              use Rose.Devices.Console;
 with Rose.Kernel.Clock;
@@ -31,6 +32,9 @@ package body Rose.Boot.Console is
    Enabled             : Boolean := True;
    Serial_Port_Enabled : constant Boolean := True;
    Display_Enabled     : Boolean := True;
+   Status_Enabled      : Boolean := True;
+   --  Whether the status line is drawn. With a graphics framebuffer it
+   --  isn't, and nor is anything else on the VGA text page (#654).
 
    Active_Checkpoint   : Boolean := False;
 
@@ -193,10 +197,15 @@ package body Rose.Boot.Console is
 
    procedure Init_Boot_Console is
    begin
+      if Rose.Multiboot.Has_Graphics_Framebuffer then
+         Display_Enabled := False;
+         Status_Enabled := False;
+      end if;
+
       Terminal_Line := 0;
       Terminal_Column := 0;
       Clear;
-      Console.Put_Line (Rose.Version.Full_Name);
+      Console.Put_Line (Rose.Build.Full_Name);
       Status_Chars :=
         "Rose -'-,-{@        "
         & "                    "
@@ -759,10 +768,12 @@ package body Rose.Boot.Console is
                     .. Status_Chars'Last - 1)
         := Time_Image;
 
-      for I in Status_Chars'Range loop
-         Status_Memory (I) :=
-           Status_Colours (I) + Character'Pos (Status_Chars (I));
-      end loop;
+      if Status_Enabled then
+         for I in Status_Chars'Range loop
+            Status_Memory (I) :=
+              Status_Colours (I) + Character'Pos (Status_Chars (I));
+         end loop;
+      end if;
 
    end Status_Line;
 

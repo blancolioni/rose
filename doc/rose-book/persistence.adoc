@@ -1,116 +1,150 @@
 = Persistence
 
-The active state of the system is defined by the page object state, which is overridden by the swap state, which is overridden by the memory state.
+Rose saves the state of the system in a _checkpoint_, every 30 seconds, and brings it back when it boots.
+A checkpoint is an entry in the checkpoint log, on hd0's log partition.
+Between checkpoints, the changes a process makes stay in memory; nothing is written to the disk until the next checkpoint.
+A restart therefore goes back to the last checkpoint, and what was done since is lost.
 
-== Checkpoint Objects
+== What a Checkpoint Saves
 
-A page object is a single page (where the size of the page is architecture-dependent).
-Object identifiers for page objects range from `ff00 0000 0000 0000` to `ffff ffff ffff ffff`.
-A checkpoint state contains all page objects from a particular system state.
+=== Persistent Processes
 
-The swap state is a copy of the page object state, updated by page writes which have occurred since the last checkpoint.
-A process addresses its own memory using normal virtual memory conventions; these hardware pages are mapped by the kernel to page object ids, which can index swap and page object state directly.
+A checkpoint saves the _persistent_ processes: the installed programs, such as `exec`, the console, `login` and `petal`, and the processes they start.
+For each one, it saves the kernel's record of the process, with its capabilities, and the pages of its memory that have changed.
 
-The memory state is a cache of the swap state.
+A persistent process is saved unless the kernel can't restore it:
 
-== Checkpoint Operation
+* one that is still `Starting`, because the server launching it hasn't started it yet, has no entry point, and the launch itself is not saved (#543);
+* one that is `Killed`, because it has exited and is waiting for `mem` to end it (#703).
 
-Persistence is implemented by a regular checkpoint operation.
+The boot modules are not persistent, and start afresh on every boot (see <<Boot Sequence>>).
+Those on the _pager path_, which a page fault, a checkpoint or a restore passes through, are `mem`, `store`, `partition`, `ata`, `log`, `checkpoint` and `restore`.
+They save the state that persistent processes depend on as data, and are given it back at a restore (ADR 0008):
 
-[NOTE]
-====
-This section describes an earlier design, built on swap and change partitions.
-Checkpoints are now written to a log by the log server, and the chapter is to be rewritten around it (#127).
-====
+* the kernel saves its tables: the processes, the interrupts they handle, and the derivation records that their capabilities name (ADR 0001);
+* `store` saves its regions, and where their pages are on the backing store;
+* `mem` saves its record of each persistent process, with its segments.
 
-=== Pages
+Their own memory is never part of a checkpoint.
 
-Memory pages are always allocated read-only.
-The first write to a page (if it is allowed) causes a page fault which switches the page to read/write and marks it as dirty.
-When a dirty page is swapped out or synchronised, it is written to swap and its page object id is recorded in a list.
+=== Page Objects
+
+A page object is a page of storage, named by a 64-bit page object id from `FF00_0000_0000_0000` to `FFFF_FFFF_FFFF_FFFF`.
+The low 56 bits are the page; the top byte marks the id as a page object's.
+
+`store` hands out page objects in _regions_, which are ranges of page object ids.
+A region's ids are new, and are never used again, even after the region is released, so a page object id always means the same page (#305).
+
+A region has no space on a backing store until a page of it is written.
+At the first write to any of a block of 4 pages, `store` gives the block space on a backing store, and records where in its _map_.
+Until then, and for each page of the block that hasn't been written since, the page is _fresh_: it reads as zeroes without a read from the disk (#203).
+
+=== Where Memory Lives
+
+The swap partition is `store`'s backing store.
+It holds only what is written to a region on purpose:
+
+* the images of programs, which the installer, `exec` and `elf` write;
+* the pages of a shared segment, which `mem` writes back to its region when the last process that maps the page unmaps it, if it was changed (ADR 0025).
+
+A process's own memory never goes to swap.
+When `mem` needs memory, it evicts only cached pages of read-only segments that nothing maps, which it can read again from their region, so a persistent process's changed pages stay in memory until a checkpoint writes them to the log.
+
+== Taking a Checkpoint
+
+=== Changed Pages
+
+`mem` maps a page of a writable segment read-only at first.
+The first write to it faults, and `mem` makes the page writable and adds it to its list of dirty pages (`Set_Writable`; see <<Memory>>).
+A checkpoint saves each dirty page, and makes it read-only again (`Set_Read_Only`), so that the next write is seen.
 
 _Device pages_ are an exception.
-A page that the kernel maps straight into a process, such as the VGA text page that `vga-console` writes to, is not managed by the memory server, so it is not part of a checkpoint.
-The kernel marks such a page as a device page, in a spare bit of its page table entry, and leaves it writable while a checkpoint is active, so that a write to the screen during a checkpoint does not fault (ADR 0005).
+A page that the kernel maps straight into a process, such as the VGA text page that `vga-console` writes to, is not managed by `mem`, so it is not part of a checkpoint.
+The kernel marks such a page as a device page, in a spare bit of its page table entry (ADR 0005).
 
-=== Process
+=== The Sequence
 
-When a checkpoint begins, a new, empty, changed page object list is created.
-All memory pages are marked as read-only, and all dirty pages are written to swap (via synchronisation).
-The former changed page object list is scanned, and the changed pages are copied.
-A new checkpoint is created, which references the previous checkpoint, the most recent checkpoint state, and page content copies.
+`checkpoint` takes a checkpoint when its timer fires, every 30 seconds, and when asked through `Checkpointer.Take_Checkpoint`, as `init` does at the end of an install (#413).
+A checkpoint is one entry in the log, which `checkpoint` writes in this order (`checkpoint-server.adb`):
 
-If a page write occurs while the checkpoint process is running, a page fault will result (because all pages are read-only at this point).
-If dirty pages are still being written, the faulting process will be blocked until the changed page object list scan starts.
+. The kernel writes a snapshot of its tables into `checkpoint`'s buffer, enters checkpoint mode, and tells `log` to start an entry.
+  If the tables don't fit, the kernel doesn't enter checkpoint mode, there is no checkpoint this time, and `mem` keeps its dirty pages for the next one.
+. `checkpoint` appends the kernel's tables to the entry.
+. `store` appends its tables.
+. `mem` appends its tables, then header pages that list its dirty pages, then the pages, and then the pages of shared segments.
+. The kernel tells `log` to commit the entry, and leaves checkpoint mode.
 
-=== Merge
+The kernel's tables are a snapshot of the moment the checkpoint started, and the pages must agree with them.
 
-From time to time, the most recent checkpoint is merged into a full page object state, which will be used for subsequent checkpoint operations.
+=== Checkpoint Mode
 
-There exists at least one consistent checkpoint state.
-The last operation of a checkpoint merge writes an identifier which certifies the new checkpoint state.
-When restoring a checkpoint, if this identifier is missing or malformed, the previous checkpoint state is used instead.
+While the kernel is in checkpoint mode, the state of the persistent processes must not change before it is saved:
 
-=== Pseudocode
+* *Writes.*
+  The kernel write-protects every page that `mem` mapped for a persistent process.
+  A write to one faults, and the process waits until the kernel leaves checkpoint mode; the write then reaches `mem` as an ordinary write fault.
+  Other pages stay writable: device pages, so that a write to the screen doesn't fault, and the buffers of calls in progress (#314).
+* *Replies.*
+  A persistent process that would get a reply or a message stays blocked until the kernel leaves checkpoint mode (#714).
+  The kernel copies a reply into the process's invocation record, in its memory, past the read-only pages.
+  Without the wait, the checkpoint would hold the call in the kernel's tables and the reply in the process's memory, and after a restore the call would be made again from the reply.
 
-==== Initialising Checkpoint
+The boot modules go on running, which is what lets `checkpoint`, `mem`, `store`, `log`, `partition` and `ata` write the checkpoint.
 
-----
-checkpoint:
-   lock
-      Checkpoint_State := Write_Dirty_Pages
+== The Checkpoint Log
 
-      for Page of Writable_Page_List loop
-         if Page.Dirty then
-            Page.Write_To_Swap
-         end if
-         Page.Writable := False
-      end loop
-      Writable_Page_List.Clear
-      old_list := current_list
-      current_list := new Changed_Page_Object_List
-      Checkpoint_State := Copy_Changed_Swap
-   end lock
-----
+`log` writes the checkpoint log to the log partition, in 4K pages that it numbers from 0 (`log-server.adb`).
 
-==== Copying Changed Blocks
+* Page 0 is the log's header, with its _generation_.
+* Each entry starts with a header page, followed by its pages.
+  The header has the entry's generation, and the first and last of its pages.
+* An entry is written with `Create`, any number of `Append`, and `Commit`.
+  `Commit` writes the entry's pages before its header, so that a header is only ever found with all its pages.
+* If an entry can't be completed, because the log is full or a write failed, `Commit` leaves it out, and the previous entry is still the last.
+* `Reset` starts a new log by adding one to the generation.
+  An entry counts only if its generation is the log's, so entries written before a reset are never found again.
+  `restore-install` resets the log before it installs a system.
 
-----
-for Page_Id of Changed_Page_Object_List loop
-   Target_Block := Next_Changed_Page_Block
-   Copy_Block (Active_Swap (Page_Id), Target_Block)
-   Append_Checkpoint_Reference (Page_Id, Target_Block)
-end loop
-Commit_Checkpoint (Change_Page_Object_list)
-----
+The last complete entry is the checkpoint that a restore uses.
 
-==== Merging Checkpoint
+=== What an Entry Holds
 
-----
-Copy_Current_Page_Object_State
-for Checkpoint of Incremental_Checkpoint_List
-   for Page_Id of Checkpoint.Page_Id_List
-      Copy_Block (Page_Id.Checkpoint_Block,
-                  New_Page_Object_State.Block (Page_Id))
-   end loop
-end loop
+An entry holds these parts, in order (`Rose.Checkpoints`):
 
-Commit_And_Activate (New_page_Object_State)
-----
+[cols="2,5",options="header"]
+|===
+| Part | Contents
+| Kernel tables | A header page, with the interrupts that persistent processes handle and the next process object id; the pages of derivation records; then, for each persistent process, a record page and the pages of its capabilities.
+A process record holds its object id, state, registers and invocation records, the processes waiting to send to it, its endpoints, and its FPU state.
+| Store tables | A header page; the regions, each with its range of page object ids; then the map, which gives the space on the backing store of each block of 4 pages that has any, and which of its pages are still fresh.
+| Memory tables | A header page, then a record for each persistent process: its object id, `mem`'s own id for it, and its segments, each with its region.
+| Memory header pages | The dirty pages that follow, each named by `mem`'s id for the process and its virtual page.
+| Dirty pages | The pages themselves, in the order the header pages list them.
+| Shared pages | If the last header page says so: header pages that list the pages of shared segments by page object id, each saved once however many processes map it, then the pages (ADR 0025).
+A page that was written back to its region is listed as released, so that a restore uses the region's copy.
+|===
 
 == Restore
 
-At boot, the `restore` server looks for a checkpoint: the last complete entry in the checkpoint log.
-If it finds one, it brings back the persistent processes as they were at that checkpoint, in this order:
+At boot, `restore` looks for a checkpoint: the last complete entry in the checkpoint log.
+If it finds one, it brings back the persistent processes as they were at that checkpoint, in this order (`restore-checkpoints.adb`):
 
-. the storage server's regions, through `Storage_Checkpoint`;
+. the storage server's regions and map, through `Storage_Checkpoint`;
+. the derivation records, which the processes' capabilities name;
 . each process in the kernel, with its capabilities, not yet runnable;
-. each process in the memory server, with its segments, through `Memory_Restore`;
-. the newest saved contents of each page the processes changed, from any log entry up to the checkpoint;
+. each process in the memory server, with its segments, through `Memory_Restore`, leaving out any process that the kernel didn't save;
+. the pages of shared segments;
+. the newest saved contents of each page the processes changed;
 . the interrupts they handle.
+
+For the pages, `restore` reads every entry from the first up to the checkpoint, and keeps the newest copy of each page: a page that was saved in an older entry and not changed since is only there.
+It can keep track of at most 4,096 different pages, and as many shared pages (`Max_Sources`); past that, the restore fails.
+The log is never consolidated yet, so it grows with every checkpoint until it is reset (see <<Future Work>>).
 
 When `init` has started the last boot modules and replied, `restore` resumes the processes (see <<restore-boot>>).
 A restored process continues from where it was.
+
+If there is no checkpoint, or it cannot be restored, the boot disk's `restore` says that there is no system on the disk, and the install media's `restore-install` starts a new log and installs the system.
 
 [#restore-blocked-calls]
 === Blocked Calls
@@ -136,7 +170,6 @@ Each decision is in the kernel log, as `restore: waits for reply from` or `resto
 A queued message that is a call is restored with its process, so that its caller isn't left waiting.
 Anything else that was queued, such as an interrupt, belongs to the boot before the restart, and is dropped.
 
-If there is no checkpoint, or it cannot be restored, `restore` starts a new log and installs the system instead.
 
 [#restore-notification]
 === Telling a Process It Has Been Restored
@@ -167,81 +200,33 @@ end Restorable;
 
 `vga-console` is the first process to use it: when it is told that it has been restored, it maps the VGA page again and redraws the screen as it was at the checkpoint (see <<Servers>>).
 
+
 == Drive Layout
 
-=== Partition Example
+hd0 has a GPT partition table, with a protective MBR, and four partitions, each starting on a 1 MiB boundary (#354).
+`scan` creates them on a blank disk (see <<boot-modules>>).
 
-This is an example of how to partition a 64G disk.
-
-[#disk-layout-64g]
-.Example 64G disk layout
-[cols="2,1,5",options="header"]
+[cols="2,2,5",options="header"]
 |===
-| Partition | Size | Description
-| Boot | 100MB | Grub, kernel image, boot modules
-| Swap | 16G | Active swap partition
-| State | 16G | Last checkpointed state
-| Change | 16G | Changes since last full checkpoint
-| Incremental | 12G | Changes since last incremental checkpoint
+| Partition | Size | Contents
+| `bios-boot` | 1 MiB | GRUB's `core.img`.
+| `rose-boot` | 16 MiB | An EFI System Partition with a FAT file system: GRUB's menu and modules, the kernel, and the boot disk's boot modules.
+| `rose-swap` | Half of the rest | `store`'s backing store, in 4K blocks, which `store` gives to regions as their pages are written.
+| `rose-log` | The rest | The checkpoint log, which `log` writes in 4K pages.
 |===
 
-=== Boot partition
+`restore-install` writes GRUB to block 0 and the two boot partitions, so that the disk boots without the install media (#322; see <<writing-the-boot-loader>>).
+From then on, GRUB boots from `rose-boot`, and the boot disk's `restore` restores the last checkpoint.
+If there is none, it says that there is no system on the disk, and the install media's `restore-install` installs one (see <<boot-variants>>).
 
-This partition contains the boot sector, grub, a kernel image and enough modules to launch a minimal system.
-The `restore` module looks for a checkpoint, and if it finds one, restores from it.
-Otherwise, the boot disk's `restore` stops, and the install media's `restore-install` installs the system (see <<Boot Sequence>>).
+== Future Work
 
-=== Swap and checkpoint state partition
-
-These partitions are formatted identically.
-Each block in the partition corresponds to exactly one page object; in particular, the block number or'd with the page object type specifier.
-
-=== Change Partition
-
-The change partition is divided into a header block, a range of change file blocks, and a range of changed page object blocks.
-
-The change partition is cleared after a checkpoint merge.
-
-==== Header Block
-
-[#change-partition-header]
-.Change Partition Header
-[cols="1,4",options="header"]
-|===
-| Offset | Description
-| `0000` | Magic number
-| `0004` | Reserved
-| `0008` | Checkpoint Identity
-| `0010` | Checkpoint Start Timestamp
-| `0018` | Checkpoint Finish Timestamp
-| `0020` | First checkpoint block
-| `0028` | Checkpoint block count
-| `0030` | Working Checkpoint Identity
-| `0038` | Working Checkpoint Start
-| `0040` | Working checkpoint first block
-| `0048` | Next free checkpoint block
-| `0050` | Next free page block
-|===
-
-==== Checkpoint Block (4K)
-
-[#checkpoint-block-4k]
-.Checkpoint block (4K)
-[cols="1,4",options="header"]
-|===
-| Offset | Description
-| `0000` | Magic number
-| `0004` | Reserved
-| `0008` | Checkpoint Identity
-| `0010` | Next checkpoint block
-| `0018` | Reserved
-| `0020` | Page Object Id 1
-| `0028` | Page Object Block 1
-| `0030` | Page Object Id 2
-| `0038` | Page Object Block 2
-| `....` |
-| `1FE0` | Page Object Id 509
-| `1FE8` | Page Object Block 509
-| `1FF0` | Checkpoint Identity
-| `1FF8` | Magic number
-|===
+* *Consolidation* (#356).
+  Nothing frees the space of old entries, so the log only grows, and a restore reads every entry.
+  Writing, from time to time, one entry with the newest copy of every page would let the older entries go, and the log could wrap around into the space they leave.
+* *Paging out changed memory.*
+  Nothing writes a process's changed page anywhere but the log, so the changed pages of the persistent processes must fit in memory between checkpoints.
+  If they are paged out again, it has to be decided whether swap becomes part of the restored state, or stays a cache that a restore can't trust past the last checkpoint.
+* *Persistent servers* (ADR 0008, proposed).
+  `elf`, `caps`, `pci` and `timer` are still boot modules, so the state that persistent processes keep in them, such as their cap sets and pending timeouts, is lost at a restore.
+  ADR 0008 proposes installing them as persistent processes, and loading only the pager path on a boot from the disk.

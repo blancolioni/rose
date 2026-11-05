@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-31
 - **Related:** #578 (this decision), project 54 (the implementation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (the persistent console), [ADR 0006](0006-signals.md) (signals), [ADR 0013](0013-typed-streams.md) (typed streams), [ADR 0014](0014-banks.md) (banks)
-- **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2)
+- **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2); #654, where the early messages are replayed on the screen when the console starts (section 1)
 
 ## Context
 
@@ -39,6 +39,15 @@ The boot code asks GRUB for a 32-bit graphics mode on every boot, and passes the
 **If GRUB offers no framebuffer, Rose boots to the standard console.** There is no `screen` driver and no display server, and the console runs on the VGA text page, as `vga-console` does today. A system that had a framebuffer at an earlier boot and has none now is not handled here (see the open questions).
 
 **Before the console has the screen,** nothing draws on it. The kernel's status line and the boot console write to the VGA text page, which isn't on the screen when there is a framebuffer. So with a framebuffer the status line goes, and the early messages go to the serial port only (#654).
+
+Amended by #654. The early messages are on the screen too, once the console has it:
+
+- **The kernel** reads the boot loader's framebuffer tag. With a graphics framebuffer it doesn't draw the status line, and writes its messages to the serial port only, as it already does.
+- **The boot console** reads the same tag, through a boot tag cap from init. With a framebuffer, it writes to the serial port instead of the VGA text page, and keeps a copy of the last 16 KB it wrote, which is more than a 128 by 48 screen shows.
+- **When init hands the boot console's output over** to the persistent console (`Output_Redirect`), the boot console first writes its copy there. If the copy overflowed, it starts with a line that says earlier output was dropped.
+- **The screen is blank** only from GRUB until `surface-console` starts, which is one of the first programs installed, after `exec`, `keyboard` and `screen`. `surface-console` starts with a clear screen, and the copy is drawn on it.
+- **Without a framebuffer, nothing changes.** The status line and the boot console stay on the VGA text page, and `vga-console` takes the screen over as it finds it (ADR 0005), so there is no copy.
+- **A restore discards the boot console's output,** as it does in text mode, so nothing is replayed over the restored screen.
 
 **The server draws on a root surface.** It is written against one surface, which it draws into and takes its input from, and that surface has the same interface as the ones it gives to its clients (section 2). On the hardware, the root is the screen surface. A display server can also be given a surface from another display server, and then it draws into that. Either way, it takes keys and pointer events from the root surface's event stream, so it works the same way on the screen and nested. Running on another display server's surface is nesting. The nested server has a *virtual* pointer: its position is the one in the pointer events that arrive on the root surface, in that surface's coordinates, so it always sits where the parent's pointer is, relative to the surface. The nested server doesn't draw a cursor, because the parent draws the only one. A cursor-shape request from a nested client is passed up to the parent through the root surface, like any other client's. Nesting gives:
 
@@ -109,7 +118,7 @@ The interfaces are declared in `interfaces/` (#581): the display server (create 
 - **The keyboard still works alone.** Every pointer action in the layout has a key chord, so the display is usable with no pointer.
 - **The console moves to the screen surface** when there is a framebuffer, so text and graphics share a screen and either can be chosen without a reboot. This amends ADR 0005, which has the console on the VGA text page.
 - **VGA text mode is kept** for systems that get no framebuffer from GRUB.
-- **With a framebuffer, early messages are on the serial port only,** and the kernel's status line is gone.
+- **With a framebuffer, the kernel's status line is gone,** and the early messages are on the serial port until the console starts, which then shows them (#654).
 
 ## Alternatives considered
 

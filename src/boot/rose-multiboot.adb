@@ -227,6 +227,22 @@ package body Rose.Multiboot is
       return Value;
    end Get_Word_32;
 
+   ------------------------------
+   -- Has_Graphics_Framebuffer --
+   ------------------------------
+
+   function Has_Graphics_Framebuffer return Boolean is
+      use type System.Storage_Elements.Storage_Element;
+      Tag  : System.Storage_Elements.Storage_Array (0 .. 31);
+      Size : Word_32;
+   begin
+      --  The type is at byte 29: 0 for indexed colour, 1 for RGB, and 2
+      --  for EGA text.
+
+      Copy_Tag (8, Tag, Size);
+      return Size >= 30 and then Tag (29) /= 2;
+   end Has_Graphics_Framebuffer;
+
    function Have_Physical_Memory_Range return Boolean
    is (Found (Basic_Memory_Info));
 
