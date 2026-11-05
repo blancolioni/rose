@@ -13,9 +13,24 @@ package body Restore.Start is
 
    Next_Cap_Index : Positive := 1;
 
+   procedure Exit_Restore;
+   --  End restore, and with it the caps it was given (#451).
+
    procedure Wait_Forever;
-   --  Wait for a message that never comes, so that restore stays, and
-   --  so do its caps.
+   --  Wait for a message that never comes.  Exit_Restore does this if
+   --  restore has no exit cap.
+
+   ------------------
+   -- Exit_Restore --
+   ------------------
+
+   procedure Exit_Restore is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Exit_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+      Wait_Forever;
+   end Exit_Restore;
 
    ------------
    -- Finish --
@@ -45,7 +60,7 @@ package body Restore.Start is
          Rose.Console_IO.Put_Line ("restore: restored processes are running");
       end if;
 
-      Wait_Forever;
+      Exit_Restore;
    end Finish;
 
    --------------
@@ -69,6 +84,7 @@ package body Restore.Start is
       Next (Store_Restore_Cap);
       Next (Memory_Restore_Cap);
       Next (Restore_Derivations_Cap);
+      Next (Exit_Cap);
    end Get_Caps;
 
    ----------
@@ -93,8 +109,9 @@ package body Restore.Start is
       Rose.Console_IO.Open (Console_Cap);
 
       --  Without a swap and a log partition, as on a disk whose GPT scan
-      --  refused (#405), there is nothing to restore or install to.  Init
-      --  is left waiting, and the system idles with this on the screen.
+      --  refused (#405), there is nothing to restore or install to.
+      --  Restore exits, init is left waiting, and the system idles with
+      --  this on the screen.
 
       if Swap_Cap = Rose.Capabilities.Null_Capability
         or else Log_Cap = Rose.Capabilities.Null_Capability
@@ -102,7 +119,7 @@ package body Restore.Start is
          Rose.Console_IO.Put_Line
            ("restore: hd0 has no swap or log partition; nothing to "
             & "restore or install to");
-         Wait_Forever;
+         Exit_Restore;
       end if;
 
       --  The log server can only read the log once it has its device.
