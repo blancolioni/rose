@@ -105,6 +105,9 @@ package body Rose.Kernel.Init is
       Trace_Launch :=
         Rose.Kernel.Command_Line.Have_Argument ("trace-launch");
 
+      Check_Record_Cache :=
+        Rose.Kernel.Command_Line.Have_Argument ("check-record-cache");
+
       if Rose.Kernel.Command_Line.Have_Argument ("trace-object-id") then
          Trace_Object_Id := Rose.Objects.Object_Id
            (Rose.Kernel.Command_Line.Integer_Argument

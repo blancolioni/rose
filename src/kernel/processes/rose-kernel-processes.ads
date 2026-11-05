@@ -368,6 +368,19 @@ package Rose.Kernel.Processes is
    --  True if Virtual_Page is mapped in Pid, and Pid can reach it from
    --  user mode.
 
+   function Has_Checked_Record
+     (Pid     : Process_Id;
+      Address : Rose.Words.Word_32)
+      return Boolean;
+   --  True if an invocation record at Address passed the check for Pid,
+   --  and no page table has changed since, so that it still would (#717).
+
+   procedure Set_Checked_Record
+     (Pid     : Process_Id;
+      Address : Rose.Words.Word_32);
+   --  Remember that an invocation record at Address has passed the check
+   --  for Pid.
+
    function Mapped_Physical_Page
      (Pid          : Process_Id;
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)

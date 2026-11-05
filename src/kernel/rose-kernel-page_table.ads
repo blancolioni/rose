@@ -1,5 +1,14 @@
 package Rose.Kernel.Page_Table is
 
+   type Change_Count is mod 2 ** 64;
+
+   function Changes return Change_Count;
+   --  How many times a page table has been changed in a way that can take
+   --  a page away from user mode: an entry overwritten or cleared, or a
+   --  page directory set up or freed. Rose.Kernel.Processes relies on it
+   --  to know that a checked invocation record is still mapped (#717), so
+   --  any new code here that clears or replaces entries must count itself.
+
    procedure Init_Page_Table;
    --  Bring the page table to a known state: nothing mapped except
    --  the kernel starting at 16#F000_0000#

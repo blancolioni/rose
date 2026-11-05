@@ -9,6 +9,7 @@ with Rose.Kernel.Processes.Queue;
 with Rose.Kernel.Processes.Debug;
 
 with Rose.Kernel.Debug;
+with Rose.Kernel.Panic;
 
 with Rose.Kernel.Capabilities;
 
@@ -123,9 +124,32 @@ package body Rose.Kernel.Invocation is
       return Rose.Words.Word_32
    is
       use Rose.Addresses;
+      use Rose.Kernel.Processes;
       Record_Bytes : constant Virtual_Address :=
                        Rose.Invocation.Invocation_Record'Size / 8;
       First        : constant Virtual_Address := Virtual_Address (Address);
+      Pid          : constant Process_Id := Current_Process_Id;
+
+      function Is_Mapped return Boolean;
+      --  True if every page of the record is mapped in Pid, and Pid can
+      --  reach it from user mode.
+
+      ---------------
+      -- Is_Mapped --
+      ---------------
+
+      function Is_Mapped return Boolean is
+      begin
+         for Page in Virtual_Address_To_Page (First)
+           .. Virtual_Address_To_Page (First + Record_Bytes - 1)
+         loop
+            if not Is_User_Page (Pid, Page) then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Is_Mapped;
+
    begin
       if First < Virtual_Page_Bytes
         or else First >= Kernel_Virtual_Base - Record_Bytes
@@ -133,16 +157,23 @@ package body Rose.Kernel.Invocation is
          return 0;
       end if;
 
-      for Page in Virtual_Address_To_Page (First)
-        .. Virtual_Address_To_Page (First + Record_Bytes - 1)
-      loop
-         if not Rose.Kernel.Processes.Is_User_Page
-           (Rose.Kernel.Processes.Current_Process_Id, Page)
-         then
-            return 0;
-         end if;
-      end loop;
+      --  A record that passed at this address, with no page table changed
+      --  since, would pass again (#717).
 
+      if Has_Checked_Record (Pid, Address) then
+         if Check_Record_Cache and then not Is_Mapped then
+            Rose.Kernel.Panic.Panic
+              ("checked invocation record is no longer mapped",
+               Rose.Words.Word (Address));
+         end if;
+         return 1;
+      end if;
+
+      if not Is_Mapped then
+         return 0;
+      end if;
+
+      Set_Checked_Record (Pid, Address);
       return 1;
    end Is_Valid_Invocation_Record;
 
