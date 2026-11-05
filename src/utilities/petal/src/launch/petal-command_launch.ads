@@ -29,6 +29,7 @@ package Petal.Command_Launch is
    --  COMMAND with the authority of CATEGORIES, comma-separated: a
    --  category that the command does not need gets a warning, and a
    --  categorised role that none of them covers is refused (ADR 0021,
-   --  section 2).
+   --  section 2). cd and pwd are built in: they change and write petal's
+   --  current directory (#342, #343).
 
 end Petal.Command_Launch;
