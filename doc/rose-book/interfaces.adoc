@@ -202,7 +202,7 @@ end Writable_Directory;
 | Interface | Parents | Operations | Implemented by
 | `Block_Device` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
 | `ATA` | | `Get_Device` | `ata`
-| `Partitions` | | `Partition_Count`, `Get_Partition` | `scan`
+| `Partitions` | `Resource` | `Partition_Count`, `Get_Partition` | `scan`
 | `Interrupt_Handler` | | `Handle_Interrupt` | `keyboard`
 | `Keyboard_Handler` | | `Handle_Key` |
 | `Event_Source` | | `Add_Listener` | `keyboard`

@@ -181,11 +181,17 @@ package body Init.Boot_Steps is
 
    begin
       Client.Open_Cap_Set
-        (Parts, Init.Boot.Partition_Count_Cap, Init.Boot.Get_Partition_Cap);
+        (Parts, Init.Boot.Release_Partitions_Cap,
+         Init.Boot.Partition_Count_Cap, Init.Boot.Get_Partition_Cap);
 
       for I in 1 .. Client.Partition_Count (Parts) loop
          Load_Partition (I);
       end loop;
+
+      --  Nothing reads the table again, so scan exits, and hd0's whole
+      --  block device goes with it (#463).
+
+      Client.Close (Parts);
 
       --  Block 0 isn't a partition, but restore-install writes GRUB's
       --  boot.img to it (#322).
