@@ -33,6 +33,18 @@ package body Rose.Kernel.Processes is
 
    Active_Checkpoint : Boolean := False;
 
+   type Checked_Record is
+      record
+         Address : Rose.Words.Word_32 := 0;
+         Changes : Rose.Kernel.Page_Table.Change_Count := 0;
+         Valid   : Boolean := False;
+      end record;
+
+   Checked_Records : array (Kernel_Process_Table'Range) of Checked_Record;
+   --  For each process, the last invocation record that passed the check,
+   --  and the page table change count then (#717). It is kept out of the
+   --  process table, so that a checkpoint never saves it.
+
    procedure Release_Entry (Pid : Process_Id);
 
    procedure Add_Reference
@@ -892,6 +904,24 @@ package body Rose.Kernel.Processes is
          return Layout.Header.Cap_Type /= Null_Cap;
       end if;
    end Has_Cap;
+
+   ------------------------
+   -- Has_Checked_Record --
+   ------------------------
+
+   function Has_Checked_Record
+     (Pid     : Process_Id;
+      Address : Rose.Words.Word_32)
+      return Boolean
+   is
+      use type Rose.Kernel.Page_Table.Change_Count;
+      use type Rose.Words.Word_32;
+      Checked : Checked_Record renames Checked_Records (Pid);
+   begin
+      return Checked.Valid
+        and then Checked.Address = Address
+        and then Checked.Changes = Rose.Kernel.Page_Table.Changes;
+   end Has_Checked_Record;
 
    --------------------------------
    -- Has_Pending_Memory_Request --
@@ -2272,6 +2302,21 @@ package body Rose.Kernel.Processes is
 
       Cap_Tables.Set_Identifier (Process_Table (Pid).Caps, Cap, Cap_Id);
    end Set_Cap_Id;
+
+   ------------------------
+   -- Set_Checked_Record --
+   ------------------------
+
+   procedure Set_Checked_Record
+     (Pid     : Process_Id;
+      Address : Rose.Words.Word_32)
+   is
+   begin
+      Checked_Records (Pid) :=
+        (Address => Address,
+         Changes => Rose.Kernel.Page_Table.Changes,
+         Valid   => True);
+   end Set_Checked_Record;
 
    --------------------------
    -- Set_Command_Endpoint --

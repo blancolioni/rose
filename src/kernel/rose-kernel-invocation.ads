@@ -17,7 +17,9 @@ package Rose.Kernel.Invocation is
      (Address : Rose.Words.Word_32)
       return Rose.Words.Word_32;
    --  1 if the whole record at Address is in user memory that the
-   --  current process has mapped, 0 if not.
+   --  current process has mapped, 0 if not. The page tables are not read
+   --  again for a record at the same address as the last one that passed,
+   --  if no page table has changed since (#717).
 
    pragma Export
      (C, Is_Valid_Invocation_Record, "is_valid_invocation_record");

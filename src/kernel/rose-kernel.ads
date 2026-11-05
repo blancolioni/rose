@@ -66,6 +66,11 @@ private
    --  Write trace events to the log: those that processes send through
    --  their trace caps, and the kernel's own events for commands
    --  (blancolioni/rose#197). Set by trace-launch on the command line.
+   Check_Record_Cache       : Boolean := False;
+   --  Check an invocation record's pages even when the record passed at
+   --  the same address with no page table changed since, and panic if
+   --  they no longer pass (#717). Set by check-record-cache on the
+   --  command line.
 
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 

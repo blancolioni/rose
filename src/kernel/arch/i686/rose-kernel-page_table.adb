@@ -86,6 +86,11 @@ package body Rose.Kernel.Page_Table is
 
    procedure Init_Page_Entry (P : in out Page_Entry);
 
+   Change_Total : Change_Count := 0;
+
+   procedure Count_Change;
+   --  Count a change for Changes.
+
    function Page_Table_Block_Start (Dir_Offset : Natural)
                                     return Natural
      with Unreferenced;
@@ -155,6 +160,24 @@ package body Rose.Kernel.Page_Table is
 --           Dir_Entry.PFA := Dir_Entry.PFA + 1;
 --        end loop;
 --     end Allocate_Page_Table_Block;
+
+   -------------
+   -- Changes --
+   -------------
+
+   function Changes return Change_Count is
+   begin
+      return Change_Total;
+   end Changes;
+
+   ------------------
+   -- Count_Change --
+   ------------------
+
+   procedure Count_Change is
+   begin
+      Change_Total := Change_Total + 1;
+   end Count_Change;
 
    -------------------------
    -- Disable_Page_Writes --
@@ -253,6 +276,8 @@ package body Rose.Kernel.Page_Table is
       for Directory'Address use
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
+      Count_Change;
+
       --  Leave this directory, so that the next return to user mode
       --  reloads cr3, even if the page is reused for that process.
 
@@ -309,6 +334,7 @@ package body Rose.Kernel.Page_Table is
       for Directory'Address use
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
+      Count_Change;
       Directory := (others => <>);
       --  top 1G always mapped to Kernel space
       Directory (Kernel_Page_Directory_Index) :=
@@ -445,6 +471,8 @@ package body Rose.Kernel.Page_Table is
       Table_Index : constant Page_Entry_Index :=
                       Page_Entry_Index (Virtual_Page mod 1024);
    begin
+      Count_Change;
+
       if Log_Page_Table then
          Rose.Boot.Console.Put ("Map_Page: ");
          Rose.Boot.Console.Put
@@ -706,6 +734,7 @@ package body Rose.Kernel.Page_Table is
       for Table_Page'Address use System'To_Address (Addr);
       pragma Import (Ada, Table_Page);
    begin
+      Count_Change;
       Table_Page (Table_Index) := (others => <>);
       Invalidate_Page (Virtual_Page);
    end Unmap_Page;
