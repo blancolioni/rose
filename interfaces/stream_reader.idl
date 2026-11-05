@@ -1,7 +1,0 @@
-interface Stream_Reader is
-
-   procedure Read 
-     (Buffer : out Storage_Array;
-      Last   : out Storage_Count);
-      
-end Stream_Reader;

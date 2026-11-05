@@ -12,7 +12,7 @@ with Rose.Interfaces.Bank.Server;
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Region;
 with Rose.Interfaces.Region.Server;
-with Rose.Interfaces.Stream_Reader;
+with Rose.Interfaces.Reader;
 
 package body Store.Devices is
 
@@ -1236,7 +1236,7 @@ package body Store.Devices is
    procedure Read
      (Id      : in Rose.Objects.Capability_Identifier;
       Storage : out System.Storage_Elements.Storage_Array;
-      Last    : out System.Storage_Elements.Storage_Count)
+      Last    : out System.Storage_Elements.Storage_Offset)
    is
       use System.Storage_Elements;
       Rec  : Region_Stream_Record renames
@@ -1319,7 +1319,7 @@ package body Store.Devices is
          if Stream_Rec.Cap = 0 then
             Stream_Rec.Cap :=
               Rose.System_Calls.Server.Create_Endpoint
-                (1, Rose.Interfaces.Stream_Reader.Stream_Reader_Interface,
+                (1, Rose.Interfaces.Reader.Reader_Interface,
                  Stream_Id);
          end if;
 

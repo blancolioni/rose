@@ -22,7 +22,7 @@ package body Terminal.Server is
    procedure On_Read
      (Id     : in     Rose.Objects.Capability_Identifier;
       Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count)
+      Last   :    out System.Storage_Elements.Storage_Offset)
      with Unreferenced;
 
    procedure On_Write
@@ -40,7 +40,7 @@ package body Terminal.Server is
    procedure On_Read
      (Id     : in     Rose.Objects.Capability_Identifier;
       Buffer :    out System.Storage_Elements.Storage_Array;
-      Last   :    out System.Storage_Elements.Storage_Count)
+      Last   :    out System.Storage_Elements.Storage_Offset)
    is
       pragma Unreferenced (Id);
    begin

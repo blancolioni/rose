@@ -14,8 +14,8 @@ with Rose.Interfaces.Event_Listener.Server;
 with Rose.Interfaces.Event_Source.Client;
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Restorable.Server;
-with Rose.Interfaces.Stream_Reader.Client;
-with Rose.Interfaces.Stream_Reader.Server;
+with Rose.Interfaces.Reader.Client;
+with Rose.Interfaces.Reader.Server;
 with Rose.Interfaces.Surface.Server;
 
 with Screen.Events;
@@ -54,7 +54,7 @@ package body Screen.Server is
 
    overriding function Events
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Stream_Reader.Stream_Reader_Object'Class;
+      return Rose.Interfaces.Reader.Reader_Object'Class;
 
    overriding procedure Get_Pointer
      (Item    : in out Screen_Surface;
@@ -92,7 +92,7 @@ package body Screen.Server is
    --  with #588.
 
    type Event_Stream is limited new
-     Rose.Interfaces.Stream_Reader.Server.Stream_Reader_Interface
+     Rose.Interfaces.Reader.Server.Reader_Interface
      and Rose.Interfaces.Event_Listener.Server.Event_Listener_Interface
      with null record;
 
@@ -107,9 +107,9 @@ package body Screen.Server is
    overriding procedure Read
      (Item   : in out Event_Stream;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count);
+      Last   : out System.Storage_Elements.Storage_Offset);
 
-   overriding function Stream_Reader_Cap
+   overriding function Reader_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability;
 
@@ -182,7 +182,7 @@ package body Screen.Server is
       use type Rose.Capabilities.Capability;
    begin
       Rose.Server.Unblock_Endpoint
-        (Server_Context, Rose.Interfaces.Stream_Reader.Read_Endpoint);
+        (Server_Context, Rose.Interfaces.Reader.Read_Endpoint);
 
       --  Invoking a signal cap never waits, so this can't deadlock with a
       --  holder that is calling the screen (ADR 0022, as amended).
@@ -203,12 +203,12 @@ package body Screen.Server is
 
    overriding function Events
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Stream_Reader.Stream_Reader_Object'Class
+      return Rose.Interfaces.Reader.Reader_Object'Class
    is
       pragma Unreferenced (Item);
    begin
-      return Rose.Interfaces.Stream_Reader.Client.From_Cap
-        (Rose.Interfaces.Stream_Reader.Server.Cap_Of (The_Events));
+      return Rose.Interfaces.Reader.Client.From_Cap
+        (Rose.Interfaces.Reader.Server.Cap_Of (The_Events));
    end Events;
 
    ----------------
@@ -296,7 +296,7 @@ package body Screen.Server is
    overriding procedure Read
      (Item   : in out Event_Stream;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count)
+      Last   : out System.Storage_Elements.Storage_Offset)
    is
       pragma Unreferenced (Item);
       use type Rose.Capabilities.Capability;
@@ -425,7 +425,7 @@ package body Screen.Server is
         (Server_Context, The_Surface'Access);
       Rose.Interfaces.Restorable.Server.Attach
         (Server_Context, The_Surface'Access);
-      Rose.Interfaces.Stream_Reader.Server.Attach
+      Rose.Interfaces.Reader.Server.Attach
         (Server_Context, The_Events'Access);
       Rose.Interfaces.Event_Listener.Server.Attach
         (Server_Context, The_Events'Access);
@@ -445,13 +445,13 @@ package body Screen.Server is
    end Start_Server;
 
    -----------------------
-   -- Stream_Reader_Cap --
+   -- Reader_Cap --
    -----------------------
 
-   overriding function Stream_Reader_Cap
+   overriding function Reader_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Stream_Reader.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Reader.Server.Cap_Of (Item));
 
    -----------------
    -- Surface_Cap --

@@ -8,7 +8,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Version.Client;
-with Rose.Interfaces.File_Reader.Client;
+with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
 with Rose.Interfaces.Writable_File.Client;
 
@@ -368,7 +368,8 @@ package body Petal.Session is
       Home   : Writable_Directory_Client;
       Found  : Boolean;
       Index  : Natural;
-      Reader : Rose.Interfaces.File_Reader.Client.File_Reader_Client;
+      Reader : Rose.Interfaces.Releasable_Reader.Client
+        .Releasable_Reader_Client;
       Buffer : Storage_Array (1 .. 512);
       Last   : Storage_Count;
       Line   : String (1 .. 2000);
@@ -417,7 +418,7 @@ package body Petal.Session is
       end;
 
       loop
-         Rose.Interfaces.File_Reader.Client.Read (Reader, Buffer, Last);
+         Rose.Interfaces.Releasable_Reader.Client.Read (Reader, Buffer, Last);
          exit when Last < Buffer'First;
 
          for Element of Buffer (Buffer'First .. Last) loop
@@ -438,7 +439,7 @@ package body Petal.Session is
 
       --  Closing the reader releases it.
 
-      Rose.Interfaces.File_Reader.Client.Close (Reader);
+      Rose.Interfaces.Releasable_Reader.Client.Close (Reader);
    end Run_Startup_File;
 
    -----------

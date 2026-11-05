@@ -80,7 +80,7 @@ Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 Manages persistent storage, divided into regions of pages.
 
-Provides:: `Storage`, whose `Reserve_Storage` returns a new region, and whose `Add_Backing_Store` adds a block device; a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Stream_Reader` for reading a region as a stream.
+Provides:: `Storage`, whose `Reserve_Storage` returns a new region, and whose `Add_Backing_Store` adds a block device; a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
 Launched with:: Delete, the console and trace.
 Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
 
@@ -131,7 +131,7 @@ A partition's block size can be a multiple of the device's: the swap partitions 
 
 Reads the ISO 9660 file system on the install media.
 
-Provides:: `File_System`, whose `Root_Directory` returns the root; `Directory` for each directory, for lookup only; and `Stream_Reader` for the contents of a file, returned by `Directory.Read_File`.
+Provides:: `File_System`, whose `Root_Directory` returns the root; `Directory` for each directory, for lookup only; and `Reader` for the contents of a file, returned by `Directory.Read_File`.
 Launched with:: The console and hd1.
 Used by:: `restore`, to read the programs it installs.
 
@@ -159,7 +159,7 @@ The persistent console, and the terminal: it writes text to the screen, reads wh
 It is on the VGA text page, and is installed only when there is no framebuffer: `surface-console` is the console on a framebuffer (#653).
 Its cells and line discipline are shared with `surface-console` (`src/drivers/text-console`).
 
-Provides:: `Terminal`, which is a `Stream_Reader` and a `Stream_Writer` with `Enable_Echo` and `Disable_Echo`; `Event_Listener`, which it registers with the keyboard; and `Restorable`.
+Provides:: `Terminal`, which is a `Reader` and a `Stream_Writer` with `Enable_Echo` and `Disable_Echo`; `Event_Listener`, which it registers with the keyboard; and `Restorable`.
 Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`; and, from `restore`, the keyboard's `Event_Source`.
 Used by:: Everything installed after it, as its standard output, through `exec`; the boot console, which sends its output on to it; and the shell, as its standard input and output, and for commands with the console role.
 
@@ -181,7 +181,7 @@ Used by:: Everything installed after it, as its standard output, through `exec`;
   It buffers up to 4096 bytes, and a `Read` returns only whole lines: a `Read` that comes before a line is complete waits until it is.
 
 `restore` installs `vga-console` straight after `keyboard`.
-It sends `init` the console's `Stream_Writer`, which hands the screen over to it (see <<Boot Sequence>>), its `Stream_Reader`, which `init` gives the shell as standard input, and its `Terminal`, which `init` gives the shell for the console role.
+It sends `init` the console's `Stream_Writer`, which hands the screen over to it (see <<Boot Sequence>>), its `Reader`, which `init` gives the shell as standard input, and its `Terminal`, which `init` gives the shell for the console role.
 
 === `command`
 
@@ -233,7 +233,7 @@ Used by:: `init`, which gets both interfaces from the installer; `login`, `petal
 
 The driver for the boot loader's linear framebuffer, which gives out the whole screen as one surface (ADR 0022, #582).
 
-Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Notify`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Stream_Reader` that `Events` returns, which is also the `Event_Listener` it registers with the keyboard; and `Restorable`.
+Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Notify`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Reader` that `Events` returns, which is also the `Event_Listener` it registers with the keyboard; and `Restorable`.
 Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB; and, from `restore`, the keyboard's `Event_Source`.
 Used by:: `surface-console`, which holds the surface and will hand it to the display server (#655); and `init`, which gets the surface from the installer and gives it to `run_self_tests` at install, for its `Screen_Service` role.
 

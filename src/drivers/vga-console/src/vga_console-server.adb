@@ -29,7 +29,7 @@ package body VGA_Console.Server is
    overriding procedure Read
      (Item   : in out Console;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count);
+      Last   : out System.Storage_Elements.Storage_Offset);
 
    overriding procedure Write
      (Item   : in out Console;
@@ -56,7 +56,7 @@ package body VGA_Console.Server is
      (Item : in out Console)
       return Rose.Capabilities.Capability;
 
-   overriding function Stream_Reader_Cap
+   overriding function Reader_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability;
 
@@ -132,7 +132,7 @@ package body VGA_Console.Server is
    overriding procedure Read
      (Item   : in out Console;
       Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count)
+      Last   : out System.Storage_Elements.Storage_Offset)
    is
       pragma Unreferenced (Item);
    begin
@@ -207,14 +207,14 @@ package body VGA_Console.Server is
          (Item, Rose.Interfaces.Terminal.Stream_Interface));
 
    -----------------------
-   -- Stream_Reader_Cap --
+   -- Reader_Cap --
    -----------------------
 
-   overriding function Stream_Reader_Cap
+   overriding function Reader_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Stream_Reader_Interface));
+         (Item, Rose.Interfaces.Terminal.Reader_Interface));
 
    -----------------------
    -- Stream_Writer_Cap --

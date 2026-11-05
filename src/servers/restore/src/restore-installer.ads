@@ -19,7 +19,7 @@ package Restore.Installer is
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Stream_Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
-   --  its Stream_Reader is standard input.
+   --  its Reader is standard input.
    --  Is_Driver: the program is from the drivers directory, so init may
    --  give it more caps than other programs (#115).  Install sets it.
    --  Provides_Clock: the program is the clock (ADR 0020), a Clock_Admin

@@ -2,7 +2,7 @@ with System.Storage_Elements;
 
 with Ada.Text_IO;
 
-with Rose.Interfaces.File_Reader;
+with Rose.Interfaces.Releasable_Reader;
 
 procedure Rose.Core.Copy
   (Source : in out Rose.Interfaces.File.File_Object'Class;
@@ -11,7 +11,7 @@ is
    use System.Storage_Elements;
    Buffer : Storage_Array (1 .. 4096);
    Last   : Storage_Count;
-   Reader : Rose.Interfaces.File_Reader.File_Reader_Object'Class :=
+   Reader : Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class :=
      Source.Open_Reader;
    --  A reader of its own, from the start of the file (ADR 0009).
 begin

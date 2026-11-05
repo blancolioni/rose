@@ -26,8 +26,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-server.o \
 	$(BUILDDIR)/rose-interfaces-storage_checkpoint.o \
 	$(BUILDDIR)/rose-interfaces-storage_checkpoint-server.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-server.o \
+	$(BUILDDIR)/rose-interfaces-reader.o \
+	$(BUILDDIR)/rose-interfaces-reader-server.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer.o \
 	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
 	$(BUILDDIR)/rose-server.o \

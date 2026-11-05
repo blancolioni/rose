@@ -3,22 +3,22 @@ include $(ROOT)/mk/common.mk
 
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/restore.reloc.o
-STREAM_READER_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-stream_reader.o \
-	$(BUILDDIR)/rose-interfaces-stream_reader-client.o
+READER_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-reader.o \
+	$(BUILDDIR)/rose-interfaces-reader-client.o
 DIRECTORY_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-directory.o \
 	$(BUILDDIR)/rose-interfaces-directory-client.o
 FILE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file.o \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
-	$(BUILDDIR)/rose-interfaces-file_reader.o \
-	$(BUILDDIR)/rose-interfaces-file_reader-client.o \
-	$(BUILDDIR)/rose-interfaces-file_reader-client-conversions.o \
+	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
+	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-releasable_reader-client-conversions.o \
 	$(BUILDDIR)/rose-interfaces-resource.o \
 	$(BUILDDIR)/rose-interfaces-resource-client.o \
-	$(BUILDDIR)/rose-interfaces-seekable_file_reader.o \
-	$(BUILDDIR)/rose-interfaces-seekable_file_reader-client.o
+	$(BUILDDIR)/rose-interfaces-seekable_reader.o \
+	$(BUILDDIR)/rose-interfaces-seekable_reader-client.o
 FILE_SYSTEM_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file_system.o \
 	$(BUILDDIR)/rose-interfaces-file_system-client.o
@@ -58,7 +58,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-words.o \
 	$(LOG_READER_OBJECTS) \
 	$(RESTORE_OBJECTS) \
-	$(STREAM_READER_OBJECTS)
+	$(READER_OBJECTS)
 
 # restore is the boot disk's restore server, which has no installer, and
 # restore-install the install media's (#373).
