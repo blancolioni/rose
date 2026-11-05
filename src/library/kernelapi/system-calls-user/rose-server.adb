@@ -14,6 +14,74 @@ package body Rose.Server is
      (Invocation : in out Rose.Invocation.Invocation_Record);
    --  Call the handler of each bit in Signalled.Signal's first word.
 
+   procedure Add_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Invocation_Handler;
+      Owns     : Owner_Function);
+   --  Register_Handler, with or without Owns.
+
+   type Identifier_Set is
+     array (Rose.Objects.Capability_Identifier) of Boolean
+     with Pack;
+
+   In_Use     : Identifier_Set := (others => False);
+   Last_Given : Rose.Objects.Capability_Identifier := 0;
+   --  The identifiers of the process's objects, which are its own,
+   --  whichever context serves them (idle#84). New_Identifier goes on
+   --  from the last one it gave out, so a freed identifier is the last to
+   --  be given out again.
+
+   -----------------
+   -- Add_Handler --
+   -----------------
+
+   procedure Add_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Invocation_Handler;
+      Owns     : Owner_Function)
+   is
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Endpoint_Id;
+   begin
+      --  Register the endpoint with the kernel now, even for an instanced
+      --  interface whose caps are made later.  The kernel gives each
+      --  endpoint the next free index, so this fixes the indices by the
+      --  order in which the server attaches its interfaces, and not by
+      --  the order its clients first use them.  Caps hold the index, and
+      --  the caps that persistent processes hold are saved in
+      --  checkpoints, so after a restore the server's endpoints have to
+      --  be where they were. An endpoint that another handler has
+      --  registered already has its index.
+
+      if Rose.System_Calls.Create_Endpoint_Capability
+        /= Rose.Capabilities.Null_Capability
+        and then (for all Rec of
+                    Context.Endpoints (1 .. Context.Endpoint_Count) =>
+                      Rec.Endpoint /= Endpoint)
+      then
+         Create_Anonymous_Endpoint (Endpoint);
+      end if;
+
+      --  Checks are suppressed in the servers, so a full table would
+      --  otherwise be written past its end. Servers cannot raise, so the
+      --  endpoint is not handled.
+
+      if Context.Endpoint_Count = Max_Handlers then
+         return;
+      end if;
+
+      Context.Endpoint_Count := Context.Endpoint_Count + 1;
+      Context.Endpoints (Context.Endpoint_Count) :=
+        Endpoint_Record'
+          (Endpoint => Endpoint,
+           Handler  => Handler,
+           Owns     => Owns,
+           Blocked  => False,
+           Params   => <>);
+   end Add_Handler;
+
    ---------------------------
    -- Block_Current_Request --
    ---------------------------
@@ -51,6 +119,17 @@ package body Rose.Server is
         (Rose.System_Calls.Create_Endpoint_Capability,
          Endpoint_Id, Identifier);
    end Create_Endpoint;
+
+   ---------------------
+   -- Free_Identifier --
+   ---------------------
+
+   procedure Free_Identifier
+     (Identifier : Rose.Objects.Capability_Identifier)
+   is
+   begin
+      In_Use (Identifier) := False;
+   end Free_Identifier;
 
    ----------------------
    -- Get_Instance_Cap --
@@ -135,6 +214,25 @@ package body Rose.Server is
       return Ada.Containers.Hash_Type (Identifier);
    end Hash_Identifier;
 
+   --------------------
+   -- New_Identifier --
+   --------------------
+
+   function New_Identifier return Rose.Objects.Capability_Identifier is
+      use type Rose.Objects.Capability_Identifier;
+      Candidate : Rose.Objects.Capability_Identifier := Last_Given;
+   begin
+      for Count in 1 .. Rose.Objects.Capability_Identifier'Modulus loop
+         Candidate := Candidate + 1;
+         if Candidate /= 0 and then not In_Use (Candidate) then
+            In_Use (Candidate) := True;
+            Last_Given := Candidate;
+            return Candidate;
+         end if;
+      end loop;
+      raise Constraint_Error with "Rose.Server: no identifiers left";
+   end New_Identifier;
+
    -----------------------
    -- Publish_Interface --
    -----------------------
@@ -192,6 +290,9 @@ package body Rose.Server is
 
       declare
          Handled : Boolean := False;
+         Matched : Boolean := False;
+         --  A handler has the endpoint, but none of them owns the object:
+         --  the object is gone, as a handler that can't find it says.
       begin
          for I in 1 .. Context.Endpoint_Count loop
             declare
@@ -201,6 +302,13 @@ package body Rose.Server is
                                 Params;
             begin
                if Rec.Endpoint = Params.Endpoint then
+                  Matched := True;
+               end if;
+
+               if Rec.Endpoint = Params.Endpoint
+                 and then (Rec.Owns = null
+                           or else Rec.Owns (Params.Identifier))
+               then
                   if Rec.Handler /= null then
                      Context.Block_Reply := False;
                      Rec.Handler (Params);
@@ -225,7 +333,9 @@ package body Rose.Server is
          else
             Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
             Rose.System_Calls.Send_Error
-              (Params, Rose.Invocation.Invalid_Endpoint);
+              (Params,
+               (if Matched then Rose.Invocation.Invalid_Operation
+                else Rose.Invocation.Invalid_Endpoint));
          end if;
       end;
 
@@ -240,38 +350,22 @@ package body Rose.Server is
       Endpoint : Rose.Objects.Endpoint_Id;
       Handler  : Invocation_Handler)
    is
-      use type Rose.Capabilities.Capability;
    begin
-      --  Register the endpoint with the kernel now, even for an instanced
-      --  interface whose caps are made later.  The kernel gives each
-      --  endpoint the next free index, so this fixes the indices by the
-      --  order in which the server attaches its interfaces, and not by
-      --  the order its clients first use them.  Caps hold the index, and
-      --  the caps that persistent processes hold are saved in
-      --  checkpoints, so after a restore the server's endpoints have to
-      --  be where they were.
+      Add_Handler (Context, Endpoint, Handler, null);
+   end Register_Handler;
 
-      if Rose.System_Calls.Create_Endpoint_Capability
-        /= Rose.Capabilities.Null_Capability
-      then
-         Create_Anonymous_Endpoint (Endpoint);
-      end if;
+   ----------------------
+   -- Register_Handler --
+   ----------------------
 
-      --  Checks are suppressed in the servers, so a full table would
-      --  otherwise be written past its end. Servers cannot raise, so the
-      --  endpoint is not handled.
-
-      if Context.Endpoint_Count = Max_Handled_Endpoints then
-         return;
-      end if;
-
-      Context.Endpoint_Count := Context.Endpoint_Count + 1;
-      Context.Endpoints (Context.Endpoint_Count) :=
-        Endpoint_Record'
-          (Endpoint => Endpoint,
-           Handler  => Handler,
-           Blocked  => False,
-           Params   => <>);
+   procedure Register_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Invocation_Handler;
+      Owns     : Owner_Function)
+   is
+   begin
+      Add_Handler (Context, Endpoint, Handler, Owns);
    end Register_Handler;
 
    ---------------------
@@ -372,9 +466,13 @@ package body Rose.Server is
    is
       use type Rose.Capabilities.Capability;
       Handled : Boolean := False;
+      Matched : Boolean := False;
       Params  : aliased Rose.Invocation.Invocation_Record;
    begin
       Context.Block_Reply := False;
+
+      --  Handlers can share the endpoint (idle#84), so the blocked
+      --  request can be any of theirs.
 
       for I in 1 .. Context.Endpoint_Count loop
          declare
@@ -382,10 +480,10 @@ package body Rose.Server is
             Rec : Endpoint_Record renames Context.Endpoints (I);
          begin
             if Rec.Endpoint = Endpoint then
-               if not Rec.Blocked then
-                  return;
-               end if;
+               Matched := True;
+            end if;
 
+            if Rec.Endpoint = Endpoint and then Rec.Blocked then
                if Rec.Handler /= null then
                   Params := Rec.Params;
                   Rec.Handler (Params);
@@ -406,7 +504,7 @@ package body Rose.Server is
          then
             Rose.System_Calls.Invoke_Capability (Params);
          end if;
-      else
+      elsif not Matched then
          Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
          Rose.System_Calls.Send_Error
            (Params, Rose.Invocation.Invalid_Endpoint);
