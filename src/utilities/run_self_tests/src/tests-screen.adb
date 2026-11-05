@@ -2,15 +2,13 @@ with Ada.Text_IO;
 
 with Interfaces;
 
-with System.Storage_Elements;
+with System;
 
 with Rose.Capabilities;
 with Rose.Shared_Regions;
-with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.Region;
-with Rose.Interfaces.Stream_Reader;
 with Rose.Interfaces.Surface.Client;
 
 with Tests.Registry;
@@ -69,51 +67,16 @@ package body Tests.Screen is
             end if;
          end;
 
-         --  Once the surface has a signal cap, a Read of its events never
-         --  waits (ADR 0022, as amended by #653). Nothing has typed, so it
-         --  returns nothing. Without the Create_Signal cap, a Read would
-         --  wait, so the events aren't read.
-
-         declare
-            use System.Storage_Elements;
-            Signal : constant Rose.Capabilities.Capability :=
-                       Rose.System_Calls.Create_Signal_Cap (11);
-         begin
-            if Signal /= Rose.Capabilities.Null_Capability then
-               Surface.Notify (Signal);
-               declare
-                  Events : Rose.Interfaces.Stream_Reader
-                    .Stream_Reader_Object'Class := Surface.Events;
-                  Buffer : Storage_Array (1 .. 64);
-                  Last   : Storage_Count;
-               begin
-                  Events.Read (Buffer, Last);
-                  if Last >= Buffer'First then
-                     return Fail ("a Read returned events nobody typed");
-                  end if;
-               end;
-            end if;
-         end;
+         --  The console holds the screen (#653), so the test maps the
+         --  buffer, but neither draws on it nor reads the events, which are
+         --  the console's.
 
          declare
             Region  : Rose.Interfaces.Region.Region_Object'Class :=
                         Surface.Get_Buffer;
             Address : constant System.Address :=
                         Rose.Shared_Regions.Map (Region);
-
-            type Pixel_Array is array (Word range <>) of Word_32;
-            Pixels : Pixel_Array (0 .. Width * Height - 1)
-              with Import, Address => Address;
          begin
-            for Row in 0 .. Height - 1 loop
-               for Column in 0 .. Width - 1 loop
-                  Pixels (Row * Width + Column) :=
-                    (Column mod 256) * 2 ** 16
-                    + (Row mod 256) * 2 ** 8 + 16#80#;
-               end loop;
-            end loop;
-
-            Surface.Damage (0, 0, Width, Height);
             Rose.Shared_Regions.Unmap (Address);
          end;
       end;

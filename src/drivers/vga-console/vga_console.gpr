@@ -14,12 +14,17 @@ project vga_console is
       ("../../../rts/user/build/interfaces",
        "src",
        "build/generated",
+       "../text-console",
        "../../library/kernelapi/devices");
    for Source_Files use
       ("vga_console.ads",
        "vga_console-driver.adb",
        "vga_console-line_discipline.ads",
-       "vga_console-line_discipline.adb",
+       "text_console.ads",
+       "text_console-cells.ads",
+       "text_console-cells.adb",
+       "text_console-line_discipline.ads",
+       "text_console-line_discipline.adb",
        "vga_console-screen.ads",
        "vga_console-screen.adb",
        "vga_console-server.ads",

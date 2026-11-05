@@ -13,7 +13,9 @@ package Restore.Installer is
       Is_Driver,
       Provides_Clock,
       Requires_Framebuffer,
-      Provides_Screen);
+      Provides_Screen,
+      Requires_No_Framebuffer,
+      Requires_Screen);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Stream_Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
@@ -26,7 +28,12 @@ package Restore.Installer is
    --  Requires_Framebuffer: init installs the program only if the boot
    --  loader gave a framebuffer, and otherwise replies with no caps; init
    --  reads this bit too. Provides_Screen: the program is the screen
-   --  driver, whose surface init gets (#582).
+   --  driver, whose surface init gets (#582). Requires_No_Framebuffer:
+   --  init installs the program only if there is no framebuffer, as for
+   --  vga-console; init reads this bit too. Requires_Screen: the program
+   --  is given the screen driver's surface after its own caps, as the
+   --  console on the surface is (#653). A program has at most one of
+   --  Requires_Keyboard_Interface and Requires_Screen.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 

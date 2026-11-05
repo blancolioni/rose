@@ -13,7 +13,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=command keyboard exec file directory vga-console clock screen
+DRIVERS=command keyboard exec file directory vga-console clock screen surface-console
 UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests petal argv
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
@@ -55,8 +55,9 @@ check-env:
 test:
 	sh ./scripts/test-boot
 
-# The same with a framebuffer: the screen driver, its surface, and its
-# redraw after a restore (#582).  It isn't part of "make test", or of CI.
+# The same with a framebuffer: the console on the screen's surface, and
+# the screen driver's keys and redraw after a restore (#582, #653).  It
+# isn't part of "make test", or of CI.
 test-screen:
 	sh ./scripts/test-screen
 

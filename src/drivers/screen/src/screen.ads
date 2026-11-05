@@ -14,5 +14,8 @@ package Screen with Pure is
    --  Reads the boot loader's framebuffer tag (multiboot2 tag 8).
    Bank_Cap            : constant Rose.Capabilities.Capability := 5;
    --  The bank that the surface's buffer is reserved from.
+   Keyboard_Cap        : constant Rose.Capabilities.Capability := 6;
+   --  The keyboard's Event_Source, which the installer gives after the
+   --  caps of screen.driver (#653).
 
 end Screen;

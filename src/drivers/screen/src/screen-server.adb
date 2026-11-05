@@ -11,6 +11,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Event_Listener.Server;
+with Rose.Interfaces.Event_Source.Client;
 with Rose.Interfaces.Region.Client;
 with Rose.Interfaces.Restorable.Server;
 with Rose.Interfaces.Stream_Reader.Client;
@@ -86,10 +87,9 @@ package body Screen.Server is
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability;
 
-   --  The surface's events. The stream is also an Event_Listener, which
-   --  queues each key it is given: the keyboard's, once the installer
-   --  gives the screen the keyboard with the console on the surface
-   --  (#653). The pointer comes with #588.
+   --  The surface's events. The stream is also the keyboard's
+   --  Event_Listener, which queues each key (#653). The pointer comes
+   --  with #588.
 
    type Event_Stream is limited new
      Rose.Interfaces.Stream_Reader.Server.Stream_Reader_Interface
@@ -429,6 +429,17 @@ package body Screen.Server is
         (Server_Context, The_Events'Access);
       Rose.Interfaces.Event_Listener.Server.Attach
         (Server_Context, The_Events'Access);
+
+      --  The screen holds the keyboard, and the console on the surface
+      --  takes its keys from the surface's events (ADR 0022, #653).
+
+      declare
+         Keyboard : Rose.Interfaces.Event_Source.Client.Event_Source_Client;
+      begin
+         Rose.Interfaces.Event_Source.Client.Open (Keyboard, Keyboard_Cap);
+         Rose.Interfaces.Event_Source.Client.Add_Listener
+           (Keyboard, The_Events);
+      end;
 
       Rose.Server.Start_Server (Server_Context);
    end Start_Server;

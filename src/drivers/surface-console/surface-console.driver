@@ -1,0 +1,2 @@
+create-endpoint
+create-signal               # for the surface to signal its events (#653)

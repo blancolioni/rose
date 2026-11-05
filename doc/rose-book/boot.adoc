@@ -140,14 +140,14 @@ A new system is installed when the install media boots on a disk with no checkpo
 `restore-install` starts a new checkpoint log, so that the entries of an old system are never mixed with the new one's.
 It then reads the install media through `isofs`, and installs each program on it by sending it to `init`'s install endpoint:
 
-* the drivers `exec`, `keyboard`, `vga-console`, `command` and `clock`, which are launched, and `screen`, which is launched only if the boot loader gave a framebuffer that it can use: otherwise `init` skips it, and gives `restore-install` no caps for it;
+* the drivers `exec`, `keyboard`, the console, `command` and `clock`, which are launched. With a framebuffer that it can use, the console is `surface-console`, after the `screen` driver, which takes the keyboard; without one, it is `vga-console`, and reads the keyboard itself. `init` skips the programs that don't fit, and gives `restore-install` no caps for them;
 * the file and directory servers `file` and `directory`, which are saved, and launched once for each file or directory;
 * the commands `echo`, `list`, `cat`, `touch`, `mkdir`, `clear`, `user`, `auth`, `run_self_tests` and `petal`, which are saved in the command registry.
 
 `init` serves the install endpoint while `restore-install` runs.
 The first program installed is `exec`, which installs every later program.
 The second is `keyboard`, which the console reads.
-The third is `vga-console`, the persistent console and terminal (see <<Servers>>), and the fourth is `command`, the command registry, whose `Find` operation `init` keeps.
+The third is the persistent console and terminal (see <<Servers>>): `vga-console`, or `screen` and then `surface-console` with a framebuffer. Then comes `command`, the command registry, whose `Find` operation `init` keeps.
 Once the console is running, `restore-install` sends `init` its input stream and its `Terminal`.
 
 Each program on the install media comes with a list of the capabilities it asks for, such as `create-endpoint`, `register-interrupt 33` or `port-in-8 96`.

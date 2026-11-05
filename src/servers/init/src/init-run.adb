@@ -29,9 +29,11 @@ package body Init.Run is
    --  drivers directory (Restore.Installer.Is_Driver).
 
    Requires_Framebuffer_Flag : constant := 128;
+   Requires_No_Framebuffer_Flag : constant := 512;
    --  Set for a program that is installed only if the boot loader gave a
    --  framebuffer: the screen driver (Restore.Installer
-   --  .Requires_Framebuffer, #582).
+   --  .Requires_Framebuffer, #582). Requires_No_Framebuffer_Flag is set
+   --  for one that is installed only if there isn't, vga-console (#653).
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array
      (1 .. Rose.Limits.Page_Size)
@@ -443,6 +445,14 @@ package body Init.Run is
 
                --  The screen driver, and there is no framebuffer. It isn't
                --  installed, and restore gets no caps (#582).
+
+               null;
+            elsif (Params.Data (2) / Requires_No_Framebuffer_Flag) mod 2 = 1
+              and then Init.Grants.Has_Framebuffer
+            then
+
+               --  The console on the VGA page, and the console is on the
+               --  screen's surface instead (#653).
 
                null;
             else

@@ -1,23 +1,26 @@
 #!/bin/sh
-# Boot test of the screen driver (#582), under QEMU, with a framebuffer.
+# Boot test of the console on the screen (#582, #653), under QEMU, with a
+# framebuffer.
 #
 #   scripts/test-screen [ISO]
 #
 # ISO is the install image, images/rose.iso by default. The test:
 #
 #   1. installs Rose on a new disk from the install menu's framebuffer
-#      entry, so that init installs the screen driver and gives its
-#      surface to the self tests, whose screen test draws a pattern on it
-#      (Tests.Screen); a screen dump during the install has to show it;
+#      entry, so that the screen driver holds the framebuffer and the
+#      keyboard, and the console is surface-console on its surface; the
+#      install's self tests, which init runs, have to pass, as the console
+#      shows;
 #   2. boots from the disk's framebuffer entry, which restores the
-#      install's checkpoint, and the screen driver redraws the screen from
-#      its buffer: a screen dump has to show the pattern again;
+#      install's checkpoint, logs in as the first user, and runs
+#      run_self_tests, which has to pass every test: the keys go through
+#      the screen driver and the surface's events to the console, and the
+#      text comes back drawn on the surface;
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk.
 #
-# The console stays on the VGA text page, which isn't on the screen in
-# framebuffer mode, so the test can't log in or read what is written.
-# It takes about ten minutes, and needs qemu-system-i386, qemu-img and
+# The screen's text is read from QEMU's screen dumps by fb-text.py. It
+# takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
 # and QEMU's files if anything failed.
 
@@ -29,6 +32,12 @@ command -v qemu-system-i386 > /dev/null || {
     exit 2
 }
 . "$HERE/qemu-test-lib.sh"
+
+screen () {
+    # The text on the framebuffer, in place of the VGA text page that
+    # qemu-test-lib.sh reads.
+    python3 "$HERE/fb-text.py" "$MONITOR"
+}
 
 monitor () {
     # monitor COMMAND: send COMMAND to QEMU's monitor
@@ -54,11 +63,11 @@ choose_last_entry () {
     monitor "sendkey ret"
 }
 
-shows_pattern () {
-    # shows_pattern NAME: dump the screen to NAME.ppm, and check it
-    monitor "screendump $WORK/$1.ppm"
-    sleep 2
-    python3 "$HERE/check-screen.py" "$WORK/$1.ppm"
+passed () {
+    # passed LINE: LINE is a self test result with every test passed
+    set -- $(echo "$1" \
+        | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+    [ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ]
 }
 
 [ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
@@ -68,33 +77,40 @@ echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
 choose_last_entry
 
-# The install restarts the machine when it has finished. Until then, dump
-# the screen every ten seconds, and look for the pattern.
-seen=""
+# The install restarts the machine when it has finished. Until then, read
+# the screen every ten seconds, and keep the self tests' result.
+: > "$WORK/install-results.txt"
 waited=0
 while [ $waited -lt 900 ]; do
     grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null && break
-    if [ -z "$seen" ] && shows_pattern install > "$WORK/install.txt"; then
-        seen=yes
-        cat "$WORK/install.txt"
-    fi
+    screen | grep "Test result:" >> "$WORK/install-results.txt"
     sleep 8
     waited=$((waited + 10))
 done
 grep -q -- "kernel: restarting" "$WORK/serial" \
     || fail "the install did not finish"
-[ -n "$seen" ] || fail "the install never showed the screen test's pattern"
+result=$(sort -u "$WORK/install-results.txt" | tail -1)
+[ -n "$result" ] || fail "the console never showed the install's self tests"
+echo "install: $result"
+passed "$result" || fail "not every install self test passed"
 sleep 15
 stop_qemu
 
 echo "Booting from the disk's framebuffer entry, which restores the install"
 start_qemu
 choose_last_entry
-wait_for_serial "derivation records restored" 200 \
-    || fail "the checkpoint was not restored"
-sleep 30
-shows_pattern restored \
-    || fail "the restored screen driver did not redraw the screen"
+log_in
+
+echo "Running the self tests"
+type_text "clear
+"
+sleep 5
+type_text "run_self_tests
+"
+wait_for "Test result:" 120 || fail "the self tests did not finish"
+result=$(screen | grep "Test result:" | tail -1)
+echo "$result"
+passed "$result" || fail "not every self test passed"
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

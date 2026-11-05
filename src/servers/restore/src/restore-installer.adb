@@ -43,6 +43,8 @@ package body Restore.Installer is
 
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+   Screen_Surface_Cap     : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Terminal_Cap           : Rose.Capabilities.Capability :=
@@ -472,6 +474,8 @@ package body Restore.Installer is
 
          if Flags (Requires_Keyboard_Interface) then
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         elsif Flags (Requires_Screen) then
+            Rose.System_Calls.Send_Cap (Params, Screen_Surface_Cap);
          end if;
 
          Rose.System_Calls.Receive_Caps (Params, 1);
@@ -482,6 +486,10 @@ package body Restore.Installer is
            and then not Params.Control.Flags (Rose.Invocation.Send_Caps)
          then
             Rose.Console_IO.Put_Line ("skipped: no framebuffer");
+         elsif Flags (Requires_No_Framebuffer)
+           and then not Params.Control.Flags (Rose.Invocation.Send_Caps)
+         then
+            Rose.Console_IO.Put_Line ("skipped: framebuffer");
          else
             Rose.Console_IO.Put_Line ("done");
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then
@@ -509,9 +517,10 @@ package body Restore.Installer is
                         end if;
 
                         if Flags (Provides_Screen) then
-                           Send_Screen
-                             (Get_Public_Interface_From_Process
-                                (Reply.Caps (0)));
+                           Screen_Surface_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Reply.Caps (0));
+                           Send_Screen (Screen_Surface_Cap);
                         end if;
 
                         if Flags (Provides_Console) then
