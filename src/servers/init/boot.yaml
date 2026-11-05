@@ -22,8 +22,10 @@
 #                    for none
 #     caps           the caps it is given, in order: a name;
 #                    {cap: name, when: variant}; {ports: [endpoint, size,
-#                    first, last]}; {interrupt: vector}; or {device_page:
-#                    page}.  The last three are granted to the module
+#                    first, last]}; {interrupt: vector}; {device_page:
+#                    page}; or {boot_tag: type}, which reads the boot
+#                    loader's tag of that type.  Ports, interrupts and
+#                    device pages are granted to the module
 #                    (Init.Grants), or to nobody with 'owner: none'.
 #     words          data words for the launch, if any
 #     exports        names for endpoints copied from it: an endpoint, or
@@ -93,6 +95,13 @@ stages:
       caps:
         - {device_page: 0xB8, owner: none}
         - {ports: [out_range, 8, 0x3D4, 0x3D5], owner: none}
+        # With a framebuffer, the VGA text page isn't on the screen, so
+        # the boot console writes to the serial port, COM1, which the
+        # kernel writes to too, and keeps a copy for the persistent
+        # console (#654). The framebuffer tag says which.
+        - {ports: [out, 8, 0x3F8, 0x3F8], owner: none}
+        - {ports: [in, 8, 0x3FD, 0x3FD], owner: none}
+        - {boot_tag: 8}
       exports:
         console_interface: Stream_Writer.Stream_Writer_Interface
         console_stream: Stream_Writer.Write_Endpoint

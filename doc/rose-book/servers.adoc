@@ -18,10 +18,11 @@ Each entry below says what the server provides, what it is launched with, and wh
 
 === `console`
 
-The boot console, which writes text to the screen until the persistent console, `vga-console`, takes over.
+The boot console, which writes text to the screen until the persistent console, `vga-console` or `surface-console`, takes over.
+With a framebuffer, the VGA text page isn't on the screen, so it writes to the serial port instead, and keeps a copy of the last 16 KB for the persistent console (#654).
 
-Provides:: `Stream_Writer`, and `Output_Redirect`, whose `Redirect` sends everything written from then on to another `Stream_Writer`, or discards it if that is null.
-Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`.
+Provides:: `Stream_Writer`, and `Output_Redirect`, whose `Redirect` sends everything written from then on to another `Stream_Writer`, or discards it if that is null; with a framebuffer, it first sends its copy.
+Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`; the serial port's data port `3F8` and line status port `3FD`; and a cap that reads the boot loader's framebuffer tag, type 8.
 Used by:: Every boot server, for its messages, and `init` and the first programs it installs, until the handover.
 
 `console` is a boot module, so it is not persistent.

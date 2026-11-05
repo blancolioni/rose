@@ -25,7 +25,7 @@ The two boots differ in their boot modules and in what they do when there is no 
 Both menus are drawn over the rose splash, and each entry names the version it boots, from `Rose.Version`: "Install Rose 0.2.0 (putney)" on the install media, and "Rose 0.2.0 (putney)" on the boot disk.
 The default entry keeps the framebuffer that GRUB sets up, so the console is on the screen's surface (see <<Servers>>).
 The "trace launches" entry and the last entry, "text mode", keep the VGA text mode, with `gfxpayload=text`: the boot tests choose the last one, since they read the VGA text page, and so can a machine whose framebuffer doesn't work.
-Until the early messages go to the serial port (#654), nothing is seen with a framebuffer until the console starts.
+With a framebuffer, the screen is blank until the console starts, and then it shows the early messages (see <<handing-over-the-console>>).
 
 The boot sequence is described in `src/servers/init/boot.yaml` (#374).
 The build turns it into the Ada package `Init.Boot` with `scripts/make-init`, and writes the `module2` lines of both GRUB menus from it.
@@ -173,6 +173,12 @@ When `restore-install` has launched `vga-console`, it sends `init` the new conso
 . uses the new console itself, as the standard output of everything it installs or launches from then on.
 
 The boot console passes its output on, rather than stopping, because boot modules and `restore-install` still hold caps to it.
+
+With a framebuffer, the VGA text page isn't on the screen, so nothing that was written before the handover has been seen (#654).
+The kernel doesn't draw its status line, and the boot console writes to the serial port instead, and keeps a copy of the last 16 KB.
+When it is told to send its output on, it first sends its copy, so the new console shows the boot from the start.
+If the copy overflowed, it starts with "[earlier boot output dropped]".
+Both learn that there is a framebuffer from the boot loader's framebuffer tag.
 
 [#writing-the-boot-loader]
 === Writing the boot loader
