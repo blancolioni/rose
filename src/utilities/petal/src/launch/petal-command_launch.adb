@@ -5,6 +5,7 @@ with Ada_Text_IO;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Rights.Client;
+with Rose.Interfaces.Terminal.Client;
 with Rose.Interfaces.User.Client;
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -35,6 +36,9 @@ package body Petal.Command_Launch is
    Terminal_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  The console's Terminal, for the Console role (#454).
+
+   Console : Rose.Interfaces.Terminal.Client.Terminal_Client;
+   --  The same Terminal, opened, if there is one.
 
    Clock_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -142,6 +146,10 @@ package body Petal.Command_Launch is
 
    --  Find the registry, and the caps for deleting caps, the first time.
 
+   procedure Reset_Console;
+   --  A command that had the console has ended: turn line editing and
+   --  echo back on, and the attributes off, whatever it left (#734).
+
    procedure Put_Help (Item : Signature);
    procedure Put_Version (Item : Signature);
 
@@ -198,6 +206,9 @@ package body Petal.Command_Launch is
       Grant_Count  : Natural := 0;
       --  The grants that the rights broker made for the command's
       --  categorised roles, and their caps.
+
+      Gave_Console : Boolean := False;
+      --  The command has the Console role.
 
       function Word_Text (Index : Positive) return String
       is (Line (Words (Index).First .. Words (Index).Last));
@@ -811,6 +822,7 @@ package body Petal.Command_Launch is
                      Fail ("petal has no console to give the command");
                   end if;
                   Caps (Role.Cap_Index + 1) := Terminal_Cap;
+                  Gave_Console := True;
                when Clock_Service_Cap =>
                   if Clock_Cap = Rose.Capabilities.Null_Capability then
                      Fail ("petal has no clock to give the command");
@@ -863,6 +875,10 @@ package body Petal.Command_Launch is
          Rose.System_Calls.Receive_Words (Params, 2);
          Rose.System_Calls.Invoke_Capability (Params);
          Rose.Trace.Event ("reply received");
+
+         if Gave_Console then
+            Reset_Console;
+         end if;
 
          if Params.Control.Flags (Rose.Invocation.Error) then
             Fail ("the launch call failed");
@@ -1030,6 +1046,18 @@ package body Petal.Command_Launch is
       end if;
    end Put_Version;
 
+   -------------------
+   -- Reset_Console --
+   -------------------
+
+   procedure Reset_Console is
+   begin
+      Rose.Interfaces.Terminal.Client.Enable_Line_Editing (Console);
+      Rose.Interfaces.Terminal.Client.Enable_Echo (Console);
+      Rose.Interfaces.Terminal.Client.Set_Attributes
+        (Console, Bold => False, Reverse_Video => False);
+   end Reset_Console;
+
    ---------
    -- Run --
    ---------
@@ -1152,6 +1180,9 @@ package body Petal.Command_Launch is
       Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
       Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
       Terminal_Cap := Terminal;
+      if Terminal_Cap /= Rose.Capabilities.Null_Capability then
+         Rose.Interfaces.Terminal.Client.Open (Console, Terminal_Cap);
+      end if;
       Clock_Cap := Clock;
       Rights_Cap := Rights;
    end Set_Registry;

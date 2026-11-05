@@ -10,12 +10,15 @@
 #      which keeps the framebuffer, so that the screen driver holds the framebuffer and the
 #      keyboard, and the console is surface-console on its surface; the
 #      install's self tests, which init runs, have to pass, as the console
-#      shows;
+#      shows; and the console has to show the boot's early messages, which
+#      the boot console wrote to the serial port and replays to it (#654);
 #   2. boots from the disk's first entry, which restores the
 #      install's checkpoint, logs in as the first user, and runs
 #      run_self_tests, which has to pass every test: the keys go through
 #      the screen driver and the surface's events to the console, and the
-#      text comes back drawn on the surface;
+#      text comes back drawn on the surface; then runs keytest, which has
+#      to draw in the corners of the framebuffer's larger screen and move
+#      its mark with the arrow keys (#734);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk.
 #
@@ -53,17 +56,23 @@ echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
 
 # The install restarts the machine when it has finished. Until then, read
-# the screen every ten seconds, and keep the self tests' result.
+# the screen every ten seconds, and keep the self tests' result. Restore
+# installs the keyboard before surface-console, so its line is on the
+# screen only if the boot console replayed it.
 : > "$WORK/install-results.txt"
+early=
 waited=0
 while [ $waited -lt 900 ]; do
     grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null && break
-    screen | grep "Test result:" >> "$WORK/install-results.txt"
+    screen > "$WORK/screen.txt"
+    grep "Test result:" "$WORK/screen.txt" >> "$WORK/install-results.txt"
+    grep -q "installing: keyboard: done" "$WORK/screen.txt" && early=yes
     sleep 8
     waited=$((waited + 10))
 done
 grep -q -- "kernel: restarting" "$WORK/serial" \
     || fail "the install did not finish"
+[ -n "$early" ] || fail "the console never showed the early messages"
 result=$(sort -u "$WORK/install-results.txt" | tail -1)
 [ -n "$result" ] || fail "the console never showed the install's self tests"
 echo "install: $result"
@@ -85,6 +94,9 @@ wait_for "Test result:" 120 || fail "the self tests did not finish"
 result=$(screen | grep "Test result:" | tail -1)
 echo "$result"
 passed "$result" || fail "not every self test passed"
+
+echo "Running keytest on the framebuffer's screen"
+check_keytest
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

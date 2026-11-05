@@ -4,8 +4,9 @@ usage: qemu-screen.py MONITOR_SOCKET
 
 MONITOR_SOCKET is the path of QEMU's monitor, a Unix socket (-monitor
 unix:PATH,server,nowait). The text is what Rose's console has drawn in the
-VGA text page, at physical address B8000, one line to a row, without the
-trailing spaces.
+VGA text page, at physical address B8000, one line to each of its 25
+rows, without the trailing spaces.  A row with nothing on it is an empty
+line, so that a line's position is its row, as in fb-text.py.
 """
 
 import re
@@ -35,15 +36,16 @@ def main():
     connection.settimeout(2)
     command(connection, "")
     reply = command(connection, "xp /2000hx 0xb8000")
+    # Only the lines of the dump hold cells: the monitor's echo of the
+    # command, as it is typed, ends in 0xb800 too.
     cells = [int(cell, 16)
-             for cell in re.findall(r"0x([0-9a-f]{4})\b",
-                                    reply.split("xp", 1)[1])]
+             for line in reply.splitlines()
+             if re.match(r"[0-9a-f]+: ", line)
+             for cell in re.findall(r"0x([0-9a-f]{4})\b", line)]
     text = "".join(chr(cell & 0xFF) if 32 <= (cell & 0xFF) < 127 else " "
                    for cell in cells)
     for start in range(0, 2000, 80):
-        line = text[start:start + 80].rstrip()
-        if line:
-            print(line)
+        print(text[start:start + 80].rstrip())
 
 
 main()

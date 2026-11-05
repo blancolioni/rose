@@ -7,5 +7,7 @@ package Scan is
 
    Console_Cap         : Rose.Capabilities.Capability;
    Block_Device_Cap    : Rose.Capabilities.Capability;
+   Exit_Cap            : Rose.Capabilities.Capability;
+   --  Scan exits when init releases its Partitions (#463).
 
 end Scan;

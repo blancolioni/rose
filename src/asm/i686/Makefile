@@ -23,6 +23,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-boot-sequence.o \
 	$(BUILDDIR)/rose-capabilities-layout.o \
 	$(BUILDDIR)/rose-main.o \
+	$(BUILDDIR)/rose-build.o \
 	$(BUILDDIR)/rose-version.o \
 	$(BUILDDIR)/rose-arch.o \
 	$(BUILDDIR)/rose-arch-gdt.o \

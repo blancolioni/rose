@@ -43,7 +43,9 @@ interface Surface : Resource is
    --  stream's bytes in the machine's byte order:
    --
    --     Kind 1, Key:      Kind, Code, State, 0
-   --        Code and State are those of Keyboard_Handler.Handle_Key.
+   --        Code is the key, a Unicode code point or a named key,
+   --        and State the modifiers that were held, as
+   --        Terminal.Read_Key gives them (Rose.Keys, #734).
    --     Kind 2, Pointer:  Kind, X, Y, Buttons
    --        X and Y are as Get_Pointer gives them: in the surface's
    --        pixels, as Integer_32 words. Buttons is the mask that

@@ -1,3 +1,5 @@
+with Text_Console;
+
 package VGA_Console.Screen is
 
    --  Rows 1 to 24 of the VGA text screen; row 0 is the kernel's status
@@ -10,7 +12,14 @@ package VGA_Console.Screen is
    --  so this is done again after a restore.
 
    procedure Put (Text : String);
-   --  The first Put takes over the screen as the boot console left it.
+   --  The first Put or Operate takes over the screen as the boot console
+   --  left it.
+
+   procedure Operate (Operation : Text_Console.Screen_Operation);
+   --  One of Terminal's screen operations (#734).
+
+   function Columns return Positive;
+   function Rows return Positive;
 
    procedure Redraw;
    --  After a restore: map the VGA text page again, and put back the

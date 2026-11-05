@@ -7,7 +7,8 @@ dump, and reads each cell by matching its pixels with the font's glyphs,
 which it takes from src/library/drawing/rose-drawing-text-font.ads.  A
 pixel is part of a glyph if it isn't the background, black.  A cell that
 matches no glyph exactly is matched without its bottom two rows of pixels,
-where the cursor is drawn, and is "?" if that fails too.
+where the cursor is drawn.  A cell in reverse video (#734) is matched
+with its pixels inverted, and a cell that matches nothing is "?".
 
 Usage: fb-text.py MONITOR
 
@@ -93,7 +94,9 @@ def main():
                         bits |= 0x80 >> x
                 rows.append(bits)
             rows = tuple(rows)
-            line.append(full.get(rows) or partial.get(rows[:14], "?"))
+            inverse = tuple(0xFF ^ bits for bits in rows)
+            line.append(full.get(rows) or partial.get(rows[:14])
+                        or full.get(inverse) or partial.get(inverse[:14], "?"))
         print("".join(line).rstrip())
     return 0
 

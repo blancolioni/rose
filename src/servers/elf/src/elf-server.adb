@@ -319,6 +319,20 @@ package body Elf.Server is
 
       Create_Process
         (Name, Kernel_Process, Start_Cap, Initial_Cap, Endpoint_Cap);
+
+      --  The kernel refuses when its process table is full (#724). The
+      --  launch fails, and nothing else has been opened yet.
+
+      if Kernel_Process = 0 then
+         Rose.Console_IO.Put_Line ("elf: cannot create process " & Name);
+         Rose.Interfaces.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Client.Close (Storage);
+         for Cap of Caps loop
+            Delete_Cap (Cap);
+         end loop;
+         return 0;
+      end if;
+
       Rose.Interfaces.Kernel_Process.Client.Open
         (Kernel_Client, Kernel_Process);
       Rose.Trace.Event ("process created");

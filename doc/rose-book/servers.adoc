@@ -18,10 +18,11 @@ Each entry below says what the server provides, what it is launched with, and wh
 
 === `console`
 
-The boot console, which writes text to the screen until the persistent console, `vga-console`, takes over.
+The boot console, which writes text to the screen until the persistent console, `vga-console` or `surface-console`, takes over.
+With a framebuffer, the VGA text page isn't on the screen, so it writes to the serial port instead, and keeps a copy of the last 16 KB for the persistent console (#654).
 
-Provides:: `Stream_Writer`, and `Output_Redirect`, whose `Redirect` sends everything written from then on to another `Stream_Writer`, or discards it if that is null.
-Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`.
+Provides:: `Stream_Writer`, and `Output_Redirect`, whose `Redirect` sends everything written from then on to another `Stream_Writer`, or discards it if that is null; with a framebuffer, it first sends its copy.
+Launched with:: The text buffer at `B8000`, as a page object, and the cursor ports `3D4` and `3D5`; the serial port's data port `3F8` and line status port `3FD`; and a cap that reads the boot loader's framebuffer tag, type 8.
 Used by:: Every boot server, for its messages, and `init` and the first programs it installs, until the handover.
 
 `console` is a boot module, so it is not persistent.
@@ -109,12 +110,14 @@ To launch a program, `elf`:
 Reads the partition table of the system disk.
 *This is the server that reformats the disk.*
 
-Provides:: `Partitions` (`Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
-Launched with:: The console and hd0.
+Provides:: `Partitions` (`Release`, `Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
+Launched with:: The console, hd0 and the exit capability.
 Used by:: `init`.
 
 If hd0 has no GPT partition table, `scan` writes one.
-If the table has no partitions, `scan` creates three: two swap partitions, each a quarter of the disk, the first of them active, and a log partition from the rest.
+If the table has no partitions, `scan` creates them: `bios-boot`, `rose-boot`, and `rose-swap` and `rose-log`, which share the rest of the disk (see <<Drive Layout>>).
+
+When `init` has read the table, it releases `Partitions`, and `scan` exits, so that nothing keeps hd0's whole block device after the boot (#463).
 
 === `partition`
 
@@ -140,7 +143,7 @@ Used by:: `restore`, to read the programs it installs.
 === `log`, `checkpoint` and `restore`
 
 These servers save and restore the system's state.
-`log` writes to the log partition, `checkpoint` takes a checkpoint every few seconds, and `restore` either restores from a checkpoint or installs the system on a first boot (see <<Boot Sequence>> and <<Persistence>>).
+`log` writes to the log partition, `checkpoint` takes a checkpoint every 30 seconds, and `restore` either restores from a checkpoint or installs the system on a first boot (see <<Boot Sequence>> and <<Persistence>>).
 Documenting them fully is tracked in #130.
 
 == Drivers
@@ -159,7 +162,7 @@ The persistent console, and the terminal: it writes text to the screen, reads wh
 It is on the VGA text page, and is installed only when there is no framebuffer: `surface-console` is the console on a framebuffer (#653).
 Its cells and line discipline are shared with `surface-console` (`src/drivers/text-console`).
 
-Provides:: `Terminal`, which is a `Reader` and a `Stream_Writer` with `Enable_Echo` and `Disable_Echo`; `Event_Listener`, which it registers with the keyboard; and `Restorable`.
+Provides:: `Terminal`, which is a `Reader` and a `Stream_Writer` with the screen's operations, key input, and switches for line editing and echo (#734); `Event_Listener`, which it registers with the keyboard; and `Restorable`.
 Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`; and, from `restore`, the keyboard's `Event_Source`.
 Used by:: Everything installed after it, as its standard output, through `exec`; the boot console, which sends its output on to it; and the shell, as its standard input and output, and for commands with the console role.
 
@@ -172,13 +175,21 @@ Used by:: Everything installed after it, as its standard output, through `exec`;
 * *It redraws the screen after a restore.*
   When it is told that it has been restored (see <<restore-notification>>), it maps the VGA page again, copies its saved screen to rows 1 to 24, and puts the cursor back, so the screen is as it was at the checkpoint.
   Output written after the last checkpoint is lost from the screen, like everything else written since then.
-* *It acts on some control characters and escape sequences in what it writes.*
+* *It acts on some control characters in what it writes.*
   Backspace moves the cursor back, tab moves it to the next multiple of 8, and carriage return to the start of the line.
-  `ESC [ 2 J` clears the screen, and `ESC [ H` moves the cursor to its top left corner.
-  It draws nothing for other control characters and escape sequences.
+  It draws nothing for other control characters, escape among them: it doesn't interpret escape sequences.
+  A character written in the last column leaves the cursor on it, and the next one starts a new line, so the bottom right cell can be written without scrolling the screen.
+* *Its screen is changed by `Terminal`'s operations, not by what is written (#734).*
+  `Get_Size` gives the screen's columns and rows, `Move_Cursor` moves the cursor to any cell, `Clear` blanks the screen and moves the cursor to the top left, `Clear_To_End_Of_Line` and `Scroll` blank cells, and `Set_Attributes` makes what is written from then on bold, reverse video, or both.
+  Each cell keeps its attributes, so a redraw after a restore shows them.
 * *It is the console's line discipline.*
-  It echoes what is typed, unless echo is off, and acts on backspace, Ctrl-U, Ctrl-W, Ctrl-C and Ctrl-D (ADR 0011).
+  With line editing on, which is the default, it echoes what is typed, unless echo is off, and acts on backspace, Ctrl-U, Ctrl-W, Ctrl-C and Ctrl-D (ADR 0011).
   It buffers up to 4096 bytes, and a `Read` returns only whole lines: a `Read` that comes before a line is complete waits until it is.
+  Line editing uses only the keys that are ASCII characters, until the console is a stream of code points (#140).
+* *With line editing off, it gives each key to `Read_Key`.*
+  `Disable_Line_Editing` turns it off: nothing is echoed, `Read_Key` returns the keys as they are typed, with their modifiers, and a `Read` returns the ones that are ASCII characters.
+  `Read_Key` fails while line editing is on.
+  Petal turns line editing and echo back on, and the attributes off, when a command that it gave the console to ends, and `login` does when petal ends.
 
 `restore` installs `vga-console` straight after `keyboard`.
 It sends `init` the console's `Stream_Writer`, which hands the screen over to it (see <<Boot Sequence>>), its `Reader`, which `init` gives the shell as standard input, and its `Terminal`, which `init` gives the shell for the console role.
@@ -199,8 +210,11 @@ Provides:: `Event_Source`, whose `Add_Listener` registers the one listener that 
 Requests:: `create-endpoint`, `register-interrupt 33`, and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
 Used by:: `vga-console`.
 
-`keyboard` only produces characters: Ctrl with a letter gives its control character, and the arrow and editing keys give escape sequences.
-It doesn't echo them; `vga-console` does.
+`keyboard` gives keys, each with the modifiers that were held (`Rose.Keys`, #734).
+A key is the Unicode code point of the character that it types, or a named key above the code points: the arrows, Home, End, Page Up, Page Down, Insert, Delete and F1 to F12.
+Ctrl with a letter gives its control character.
+It maps scan codes through a layout table with an AltGr level and dead keys; only the US layout exists, and choosing another is #743.
+It doesn't echo the keys; the console does.
 
 === `clock`
 

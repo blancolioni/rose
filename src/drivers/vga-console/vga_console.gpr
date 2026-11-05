@@ -15,6 +15,7 @@ project vga_console is
        "src",
        "build/generated",
        "../text-console",
+       "../../library/rose",
        "../../library/kernelapi/devices");
    for Source_Files use
       ("vga_console.ads",
@@ -29,6 +30,7 @@ project vga_console is
        "vga_console-screen.adb",
        "vga_console-server.ads",
        "vga_console-server.adb",
+       "rose-keys.ads",
        "rose-devices.ads",
        "rose-devices-port_io.ads",
        "rose-devices-port_io.adb",

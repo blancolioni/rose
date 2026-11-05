@@ -44,8 +44,17 @@ begin
 
    for Test of Tests.Suite.Test_Suite loop
       declare
-         Success : constant Boolean := Test.all;
+         Success : Boolean;
       begin
+         --  A test that raises fails, and the others still run (#724).
+
+         begin
+            Success := Test.all;
+         exception
+            when others =>
+               Ada.Text_IO.Put (": raised an exception");
+               Success := False;
+         end;
          Tests_Run := Tests_Run + 1;
          if Success then
             Ada.Text_IO.Put_Line ("PASS");

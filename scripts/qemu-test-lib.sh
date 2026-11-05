@@ -150,3 +150,25 @@ log_in () {
 "
     wait_for "petal>" 60 || fail "could not log in"
 }
+
+check_keytest () {
+    # Run keytest at the petal prompt, which turns line editing off and
+    # draws at the corners and the centre of the screen, move its @ with
+    # the arrow keys, and check what it drew (#734). Then quit, and check
+    # that line editing is back on: petal's command line is echoed again.
+    type_text "keytest
+"
+    wait_for "keytest [0-9]" 30 || fail "keytest did not start"
+    for key in up up left; do
+        monitor "sendkey $key"
+    done
+    sleep 3
+    screen > "$WORK/keytest.txt"
+    python3 "$HERE/check-keytest.py" "$WORK/keytest.txt" Left -1 -2 \
+        || fail "keytest did not draw what it should"
+    type_text "q"
+    sleep 3
+    type_text "echo editing
+"
+    wait_for "> echo editing" 20 || fail "line editing is not back on"
+}

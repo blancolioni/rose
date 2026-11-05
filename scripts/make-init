@@ -216,6 +216,9 @@ class Generator:
                 elif "device_page" in item:
                     call = ("Init.Grants.Device_Page",
                             [owner, hex_literal(item["device_page"])])
+                elif "boot_tag" in item:
+                    call = ("Init.Grants.Boot_Tag",
+                            [str(item["boot_tag"])])
                 else:
                     fail("%s: unknown cap %r" % (where, item))
                 grant = "Grant_%d" % (len(grants) + 1)

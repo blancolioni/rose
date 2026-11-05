@@ -14,7 +14,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock screen surface-console
-UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests petal argv
+UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests petal argv keytest
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
 # the GRUB menus' module2 lines come from.
@@ -42,7 +42,7 @@ all:
 # and skips their recipes.
 
 .PHONY: all rose programs check-env test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
-    bootdisk hdd iso finished doc clean publish-iso \
+    bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
 # Check the tools before building anything; clean-build.sh does this first.
@@ -158,9 +158,9 @@ $(RELOC): kernel boot
 # util.o, which boot builds from the kernel's objects.  Everything that is
 # built from IDL needs the generated interfaces.
 
-$(BOOT_MODULES): config interfaces $(KERNEL_RTS_LIB) $(ROSE)
-$(DRIVERS) $(UTILITIES): config interfaces $(USER_RTS_LIB)
-kernel: config interfaces
+$(BOOT_MODULES): config interfaces version $(KERNEL_RTS_LIB) $(ROSE)
+$(DRIVERS) $(UTILITIES): config interfaces version $(USER_RTS_LIB)
+kernel: config interfaces version
 boot: kernel
 exports stripped: programs
 bootdisk: stripped
@@ -191,6 +191,10 @@ config:
 	mkdir -p $(DRIVERDIR)
 	mkdir -p ./build/install/drivers
 
+# Rose.Build, the build id in the boot banners, in build/version.  It runs
+# on every build, and only rewrites the file when the id changes.
+version:
+	sh ./scripts/make-build-id
 
 # What the build makes, and nothing else: the generated interfaces, the run-time
 # systems (which clean themselves), the programs' build directories, the

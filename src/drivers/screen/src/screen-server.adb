@@ -4,6 +4,7 @@ with Interfaces;
 
 with Rose.Capabilities;
 with Rose.Invocation;
+with Rose.Keys;
 with Rose.Server;
 with Rose.Shared_Regions;
 with Rose.System_Calls;
@@ -283,9 +284,13 @@ package body Screen.Server is
    is
       pragma Unreferenced (Item);
    begin
-      --  The keyboard gives characters, with no state yet.
+      --  The keyboard gives a key and its modifiers in one word, which
+      --  are the event's Code and State (surface.idl, #734).
 
-      Screen.Events.Add (Screen.Events.Key_Event, Word_32 (Code));
+      Screen.Events.Add
+        (Screen.Events.Key_Event,
+         Word_32 (Rose.Keys.Key_Of (Code)),
+         Word_32 (Rose.Keys.Modifiers_Of (Code)));
       Event_Queued;
    end On_Event;
 

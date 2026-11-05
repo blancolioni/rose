@@ -14,8 +14,9 @@ package body Surface_Console.Screen is
    use Rose.Words;
 
    Foreground : constant Pixel := RGB (16#AA#, 16#AA#, 16#AA#);
+   Bold_Ink   : constant Pixel := RGB (16#FF#, 16#FF#, 16#FF#);
    Background : constant Pixel := 0;
-   --  The VGA console's light grey on black.
+   --  The VGA console's light grey on black, and white for bold.
 
    Surface : Rose.Interfaces.Surface.Client.Surface_Client;
    Events  : Rose.Interfaces.Reader.Client.Reader_Client;
@@ -40,7 +41,10 @@ package body Surface_Console.Screen is
 
    --  The cell model's drawing.
 
-   procedure Draw (Column, Row : Natural; Item : Character);
+   procedure Draw
+     (Column, Row : Natural;
+      Item        : Character;
+      Attribute   : Text_Console.Attributes);
    procedure Scroll (Lines : Positive);
    procedure Clear;
    procedure Show_Cursor (Column, Row : Natural);
@@ -78,11 +82,24 @@ package body Surface_Console.Screen is
       Last_Damaged := Natural'Max (Last_Damaged, Row);
    end Damaged;
 
+   -------------
+   -- Columns --
+   -------------
+
+   function Columns return Positive is (Cells.Columns);
+
    ----------
    -- Draw --
    ----------
 
-   procedure Draw (Column, Row : Natural; Item : Character) is
+   procedure Draw
+     (Column, Row : Natural;
+      Item        : Character;
+      Attribute   : Text_Console.Attributes)
+   is
+      Ink   : constant Pixel :=
+                (if Attribute.Bold then Bold_Ink else Foreground);
+      Paper : constant Pixel := Background;
    begin
       if Cursor_Shown
         and then Column = Cursor_Column
@@ -91,7 +108,11 @@ package body Surface_Console.Screen is
          Cursor_Shown := False;
       end if;
 
-      Text.Draw_Character (Target, Column, Row, Item, Foreground, Background);
+      if Attribute.Reverse_Video then
+         Text.Draw_Character (Target, Column, Row, Item, Paper, Ink);
+      else
+         Text.Draw_Character (Target, Column, Row, Item, Ink, Paper);
+      end if;
       Damaged (Row);
    end Draw;
 
@@ -171,6 +192,15 @@ package body Surface_Console.Screen is
       Cells.Redraw;
    end Open;
 
+   -------------
+   -- Operate --
+   -------------
+
+   procedure Operate (Operation : Text_Console.Screen_Operation) is
+   begin
+      Cells.Operate (Operation);
+   end Operate;
+
    ---------
    -- Put --
    ---------
@@ -191,6 +221,12 @@ package body Surface_Console.Screen is
    begin
       Rose.Interfaces.Reader.Client.Read (Events, Buffer, Last);
    end Read_Events;
+
+   ----------
+   -- Rows --
+   ----------
+
+   function Rows return Positive is (Cells.Rows);
 
    ------------
    -- Scroll --

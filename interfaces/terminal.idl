@@ -1,12 +1,59 @@
 interface Terminal : Stream is
 
-   --  A console: a stream whose input and output can be controlled.
-   --  The screen is cleared with escape sequences, written like any
-   --  other output: ESC [ 2 J clears it, and ESC [ H moves the cursor
-   --  home (#454).
+   --  A console: a stream of text, a screen of cells that can be drawn at
+   --  any position, and a keyboard (#734). Text is written to the stream,
+   --  and drawn at the cursor; these operations move the cursor and
+   --  change the screen, with nothing in the text to encode or parse.
+   --  Columns and rows are counted from 0, from the top left.
+
+   procedure Get_Size
+     (Columns : out Word;
+      Rows    : out Word);
+   --  The size of the screen in cells.
+
+   procedure Move_Cursor
+     (Column : Word;
+      Row    : Word);
+   --  Move the cursor. A position past an edge of the screen is moved to
+   --  that edge.
+
+   procedure Clear;
+   --  Blank the screen, and move the cursor to the top left.
+
+   procedure Clear_To_End_Of_Line;
+   --  Blank the cells from the cursor to the end of its row. The cursor
+   --  doesn't move.
+
+   procedure Scroll (Lines : Integer_32);
+   --  Move the rows of the screen up by Lines, or down if Lines is
+   --  negative, and blank the rows left behind. The cursor doesn't move.
+
+   procedure Set_Attributes
+     (Bold          : Boolean;
+      Reverse_Video : Boolean);
+   --  How the text written from now on is drawn. Clear, Scroll and
+   --  Clear_To_End_Of_Line blank cells without attributes.
+
+   procedure Read_Key
+     (Key       : out Word;
+      Modifiers : out Word);
+   --  Wait for the next key that is typed, with line editing off. Key is
+   --  a Unicode code point, or a named key from 16#11_0000#, and
+   --  Modifiers is a mask of the Shift, Control and Alt keys that were
+   --  held (Rose.Keys). Fails if line editing is on.
+
+   procedure Disable_Line_Editing;
+   --  Give each key to Read_Key as it is typed, and echo nothing. A Read
+   --  returns the keys that are ASCII characters, as they are typed.
+
+   procedure Enable_Line_Editing;
+   --  Build lines from the keys that are typed, and echo them, and give
+   --  a Read only whole lines. This is the default. Petal turns line
+   --  editing and echo back on, and the attributes off, when a command
+   --  that it gave the console to ends.
 
    procedure Enable_Echo;
-   --  Echo what is typed. This is the default.
+   --  Echo what is typed, with line editing on. This is the default.
 
    procedure Disable_Echo;
    --  Don't echo what is typed, for example while a password is typed.

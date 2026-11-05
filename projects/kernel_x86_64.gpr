@@ -1,6 +1,6 @@
 project Kernel_X86_64 is
 
-   for Source_Dirs use ("../src", "../src/base", "../src/kernel", "../src/devices", "../src/boot", "../src/asm/x86_64", "../src/arch/x86_64", "../src/kernel/processes", "../src/kernel/modules", "../src/kernel/arch/x86_64", "../src/library/capabilities");
+   for Source_Dirs use ("../src", "../src/base", "../src/kernel", "../src/devices", "../src/boot", "../src/asm/x86_64", "../src/arch/x86_64", "../src/kernel/processes", "../src/kernel/modules", "../src/kernel/arch/x86_64", "../src/library/capabilities", "../build/version");
    for Object_Dir use "../build/x86_64/kernel/obj";
 
    package Builder is
