@@ -9,7 +9,8 @@
 #   2. boots from the disk, which restores the checkpoint, checks that the
 #      kernel restored the derivation records that init's test left,
 #      logs in as the first user, and runs run_self_tests, which has to
-#      pass every test;
+#      pass every test, then keytest, which has to draw in the corners of
+#      the 80 by 24 screen and move its mark with the arrow keys (#734);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent.
 #
@@ -59,6 +60,9 @@ set -- $(echo "$result" \
     | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
 [ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
     || fail "not every self test passed"
+
+echo "Running keytest on the 80 by 24 text screen"
+check_keytest
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

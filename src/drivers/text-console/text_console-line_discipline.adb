@@ -1,8 +1,7 @@
 package body Text_Console.Line_Discipline is
 
    use System.Storage_Elements;
-
-   Cooked_Mode  : constant Boolean := True;
+   use type Rose.Keys.Key_Code;
 
    EOT : constant Storage_Element := 4;
    ETX : constant Storage_Element := 3;
@@ -11,8 +10,9 @@ package body Text_Console.Line_Discipline is
    LF  : constant Storage_Element := 10;
    NAK : constant Storage_Element := 21;
    ETB : constant Storage_Element := 23;
-   ESC : constant Storage_Element := 27;
    DEL : constant Storage_Element := 127;
+
+   Line_Editing : Boolean := True;
 
    Input_Buffer : Storage_Array (1 .. 4096);
    Input_Last   : Storage_Count := 0;
@@ -26,16 +26,27 @@ package body Text_Console.Line_Discipline is
 
    Echo_Input   : Boolean := True;
 
-   type Escape_State is (Ground, Escape, Sequence);
+   type Key_Press is
+      record
+         Key       : Rose.Keys.Key_Code := 0;
+         Modifiers : Rose.Keys.Modifier_Set := 0;
+      end record;
 
-   Escape_Input : Escape_State := Ground;
-   --  Where we are in an escape sequence, which cooked mode drops.
+   Max_Keys : constant := 256;
 
-   procedure Append
-     (Element  : Storage_Element;
-      Complete : in out Boolean);
-   --  Add Element to the line being typed, and echo it in cooked mode.
-   --  Complete is set if that completes the line.
+   type Key_Index is mod Max_Keys;
+
+   Keys       : array (Key_Index) of Key_Press;
+   First_Key  : Key_Index := 0;
+   Key_Count  : Natural range 0 .. Max_Keys := 0;
+   --  The keys typed with line editing off that haven't been read, from
+   --  Keys (First_Key). A key that is typed when it is full is dropped.
+
+   function Is_ASCII (Key : Rose.Keys.Key_Code) return Boolean
+   is (Key < 128);
+
+   procedure Append (Element : Storage_Element);
+   --  Add Element to the line being typed, and echo it.
 
    procedure Echo (Text : String);
 
@@ -47,25 +58,16 @@ package body Text_Console.Line_Discipline is
    -- Append --
    ------------
 
-   procedure Append
-     (Element  : Storage_Element;
-      Complete : in out Boolean)
-   is
+   procedure Append (Element : Storage_Element) is
    begin
       if Input_Last < Input_Buffer'Last then
          Input_Last := Input_Last + 1;
          Input_Buffer (Input_Last) := Element;
-         if Cooked_Mode then
-            Echo ((1 => Character'Val (Element)));
-         end if;
+         Echo ((1 => Character'Val (Element)));
       end if;
 
-      if not Cooked_Mode
-        or else Element = LF
-        or else Input_Last = Input_Buffer'Last
-      then
+      if Element = LF or else Input_Last = Input_Buffer'Last then
          Line_Start := Input_Last;
-         Complete := True;
       end if;
    end Append;
 
@@ -80,97 +82,102 @@ package body Text_Console.Line_Discipline is
       end if;
    end Echo;
 
+   -------------
+   -- Editing --
+   -------------
+
+   function Editing return Boolean is (Line_Editing);
+
+   ---------------
+   -- Key_Ready --
+   ---------------
+
+   function Key_Ready return Boolean is
+   begin
+      return not Line_Editing and then Key_Count > 0;
+   end Key_Ready;
+
    ------------
    -- On_Key --
    ------------
 
    procedure On_Key
-     (Code  : Rose.Words.Word;
-      Ready : out Boolean)
+     (Key       : Rose.Keys.Key_Code;
+      Modifiers : Rose.Keys.Modifier_Set)
    is
-      use type Rose.Words.Word;
-      Element : constant Storage_Element :=
-                  Storage_Element (Code mod 2 ** System.Storage_Unit);
    begin
-      Ready := False;
-
-      if not Cooked_Mode then
-         Append (Element, Ready);
+      if not Line_Editing then
+         if Key_Count < Max_Keys then
+            Keys (First_Key + Key_Index (Key_Count)) := (Key, Modifiers);
+            Key_Count := Key_Count + 1;
+         end if;
          return;
       end if;
 
-      case Escape_Input is
-         when Ground =>
-            null;
-         when Escape =>
-            Escape_Input := (if Element = Character'Pos ('[')
-                             then Sequence
-                             else Ground);
-            return;
-         when Sequence =>
+      --  Line editing builds lines from ASCII characters. Named keys,
+      --  other characters, and keys typed with Alt are ignored, until
+      --  the console is a stream of code points (#140).
 
-            --  An escape sequence ends with a byte in 16#40# .. 16#7E#.
+      if not Is_ASCII (Key)
+        or else (Modifiers and Rose.Keys.Alt) /= 0
+      then
+         return;
+      end if;
 
-            if Element in 16#40# .. 16#7E# then
-               Escape_Input := Ground;
-            end if;
-            return;
-      end case;
+      declare
+         Element : constant Storage_Element := Storage_Element (Key);
+      begin
+         case Element is
+            when LF | HT | 32 .. 126 =>
+               Append (Element);
 
-      case Element is
-         when LF | HT | 32 .. 126 =>
-            Append (Element, Ready);
-
-         when BS | DEL =>
-            Rub_Out;
-
-         when NAK =>
-            while Input_Last > Line_Start loop
+            when BS | DEL =>
                Rub_Out;
-            end loop;
 
-         when ETB =>
-            while Input_Last > Line_Start
-              and then Input_Buffer (Input_Last) = Character'Pos (' ')
-            loop
-               Rub_Out;
-            end loop;
-            while Input_Last > Line_Start
-              and then Input_Buffer (Input_Last) /= Character'Pos (' ')
-            loop
-               Rub_Out;
-            end loop;
+            when NAK =>
+               while Input_Last > Line_Start loop
+                  Rub_Out;
+               end loop;
 
-         when ETX =>
+            when ETB =>
+               while Input_Last > Line_Start
+                 and then Input_Buffer (Input_Last) = Character'Pos (' ')
+               loop
+                  Rub_Out;
+               end loop;
+               while Input_Last > Line_Start
+                 and then Input_Buffer (Input_Last) /= Character'Pos (' ')
+               loop
+                  Rub_Out;
+               end loop;
 
-            --  Discard the line. Once ADR 0006 is implemented, this also
-            --  sends Interrupt to the job that is reading.
+            when ETX =>
 
-            Input_Last := Line_Start;
-            Echo ("^C" & Character'Val (10));
+               --  Discard the line. Once ADR 0006 is implemented, this
+               --  also sends Interrupt to the job that is reading.
 
-         when EOT =>
+               Input_Last := Line_Start;
+               Echo ("^C" & Character'Val (10));
 
-            --  End of file (ADR 0011, section 2). A line that is partly
-            --  typed is returned without a line break, and a second
-            --  Ctrl-D then ends the input.
+            when EOT =>
 
-            if Input_Last = Line_Start then
-               End_Of_File := True;
-            end if;
-            Line_Start := Input_Last;
-            Ready := True;
+               --  End of file (ADR 0011, section 2). A line that is
+               --  partly typed is returned without a line break, and a
+               --  second Ctrl-D then ends the input.
 
-         when ESC =>
-            Escape_Input := Escape;
+               if Input_Last = Line_Start then
+                  End_Of_File := True;
+               end if;
+               Line_Start := Input_Last;
 
-         when others =>
+            when others =>
 
-            --  Other control characters, including Ctrl-Z until ADR 0006
-            --  gives it Stop, are ignored.
+               --  Other control characters, including Escape, and Ctrl-Z
+               --  until ADR 0006 gives it Stop, are ignored.
 
-            null;
-      end case;
+               null;
+         end case;
+      end;
    end On_Key;
 
    -----------
@@ -179,7 +186,16 @@ package body Text_Console.Line_Discipline is
 
    function Ready return Boolean is
    begin
-      return Line_Start > 0 or else End_Of_File;
+      if Line_Editing then
+         return Line_Start > 0 or else End_Of_File;
+      else
+         for I in 0 .. Key_Count - 1 loop
+            if Is_ASCII (Keys (First_Key + Key_Index (I)).Key) then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end if;
    end Ready;
 
    -------------
@@ -203,6 +219,20 @@ package body Text_Console.Line_Discipline is
       Echo_Input := Enabled;
    end Set_Echo;
 
+   -----------------
+   -- Set_Editing --
+   -----------------
+
+   procedure Set_Editing (Enabled : Boolean) is
+   begin
+      if Enabled and then not Line_Editing then
+         Key_Count := 0;
+      elsif not Enabled and then Line_Editing then
+         Input_Last := Line_Start;
+      end if;
+      Line_Editing := Enabled;
+   end Set_Editing;
+
    ----------
    -- Take --
    ----------
@@ -212,7 +242,22 @@ package body Text_Console.Line_Discipline is
       Last   : out System.Storage_Elements.Storage_Count)
    is
    begin
-      if Line_Start > 0 then
+      Last := Buffer'First - 1;
+
+      if not Line_Editing then
+         while Key_Count > 0 and then Last < Buffer'Last loop
+            declare
+               Key : constant Rose.Keys.Key_Code := Keys (First_Key).Key;
+            begin
+               First_Key := First_Key + 1;
+               Key_Count := Key_Count - 1;
+               if Is_ASCII (Key) then
+                  Last := Last + 1;
+                  Buffer (Last) := Storage_Element (Key);
+               end if;
+            end;
+         end loop;
+      elsif Line_Start > 0 then
          declare
             Count : constant Storage_Count :=
                       Storage_Count'Min (Buffer'Length, Line_Start);
@@ -229,8 +274,22 @@ package body Text_Console.Line_Discipline is
          --  A Read that returns nothing is the end of the stream.
 
          End_Of_File := False;
-         Last := Buffer'First - 1;
       end if;
    end Take;
+
+   --------------
+   -- Take_Key --
+   --------------
+
+   procedure Take_Key
+     (Key       : out Rose.Keys.Key_Code;
+      Modifiers : out Rose.Keys.Modifier_Set)
+   is
+   begin
+      Key := Keys (First_Key).Key;
+      Modifiers := Keys (First_Key).Modifiers;
+      First_Key := First_Key + 1;
+      Key_Count := Key_Count - 1;
+   end Take_Key;
 
 end Text_Console.Line_Discipline;

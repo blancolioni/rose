@@ -1,6 +1,5 @@
-with System.Storage_Elements;
-
 with Rose.Invocation;
+with Rose.Keys;
 with Rose.System_Calls.Server;
 with Rose.Words;
 
@@ -139,14 +138,13 @@ package body Keyboard.Server is
 
                while Key_Code_Available loop
                   declare
-                     use System.Storage_Elements;
-                     Result : Storage_Array (1 .. 10);
-                     Last   : Storage_Count;
+                     Result : Keyboard.Codes.Key_Press_Array (1 .. 4);
+                     Last   : Natural;
                   begin
 
-                     --  The keyboard only produces characters. The line
-                     --  discipline, in vga-console, echoes them (#397,
-                     --  #454).
+                     --  The keyboard gives keys, each with its modifiers
+                     --  in one word (Rose.Keys.Pack). The console's line
+                     --  discipline echoes them (#397, #454, #734).
 
                      Keyboard.Codes.Handle_Key
                        (Scan_Code => Read_Key_Code,
@@ -160,10 +158,11 @@ package body Keyboard.Server is
                      end if;
 
                      if Have_Listener then
-                        for Code of Result (1 .. Last) loop
+                        for Press of Result (1 .. Last) loop
                            Rose.Interfaces.Event_Listener.Client.On_Event
                              (Item => Listener,
-                              Code => Rose.Words.Word (Code));
+                              Code => Rose.Keys.Pack
+                                (Press.Key, Press.Modifiers));
                         end loop;
                      end if;
 

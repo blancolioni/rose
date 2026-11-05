@@ -23,7 +23,6 @@ package body Login_Loop is
    use type Rose.Capabilities.Capability;
 
    LF  : constant Character := Character'Val (10);
-   ESC : constant Character := Character'Val (27);
 
    Failure_Delay : constant Rose.Words.Word := 3_000;
    --  Milliseconds to wait after a wrong name or password.
@@ -147,7 +146,8 @@ package body Login_Loop is
             --  but not after a failed login, so that the message stays.
 
             if Clear then
-               Put (ESC & "[2J" & ESC & "[H" & Banner & LF);
+               Console.Clear;
+               Put (Banner & LF);
                Clear := False;
             end if;
 
@@ -171,6 +171,14 @@ package body Login_Loop is
                   if User.User_Cap /= Rose.Capabilities.Null_Capability
                   then
                      Run_Petal (User);
+
+                     --  Whatever the session left, the next one starts
+                     --  with line editing and echo on, and plain text
+                     --  (#734).
+
+                     Console.Enable_Line_Editing;
+                     Console.Enable_Echo;
+                     Console.Set_Attributes (False, False);
                      Clear := True;
                   else
                      Wait (Failure_Delay);
@@ -185,6 +193,7 @@ package body Login_Loop is
                --  Login must keep running, or the console has nothing to
                --  read it.
 
+               Console.Enable_Line_Editing;
                Console.Enable_Echo;
                Put (LF & "login: " & Ada.Exceptions.Exception_Message (E)
                     & LF);
