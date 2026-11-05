@@ -138,6 +138,12 @@ package body Tests.Rights is
                            (Tests.Registry.Launcher_Cap ("file"),
                             Tests.Registry.Launcher_Cap ("directory")));
       begin
+         if Alice_Home = Rose.Capabilities.Null_Capability
+           or else Bob_Home = Rose.Capabilities.Null_Capability
+         then
+            return Fail ("no directory server");
+         end if;
+
          Alice.Open (Tests.Users.Create_User ("alice", Alice_Home));
          Bob.Open (Tests.Users.Create_User ("bob", Bob_Home));
       end;

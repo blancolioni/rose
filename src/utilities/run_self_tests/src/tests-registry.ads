@@ -53,6 +53,6 @@ package Tests.Registry is
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
    --  Launch the program Name with Caps, and return the interface that
-   --  it publishes.
+   --  it publishes, or the null cap if the launch failed.
 
 end Tests.Registry;

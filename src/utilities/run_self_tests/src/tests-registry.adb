@@ -54,7 +54,16 @@ package body Tests.Registry is
         Launcher (Name);
       Process : Rose.Interfaces.Process.Process_Object'Class :=
         Program.Launch (Caps);
+      use type Rose.Capabilities.Capability;
    begin
+
+      --  Elf answers a launch that fails with the null cap, for example
+      --  when the kernel's process table is full (#724).
+
+      if Process.Process_Cap = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
       return Process.Published_Interface;
    end Launch;
 
