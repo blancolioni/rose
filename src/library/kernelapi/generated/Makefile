@@ -12,7 +12,7 @@ IDL=cap block_device file_system directory file file_control \
     server \
     timeout timer constructor cap_set terminal event_source event_listener \
     commands map heap receiver named kernel_process kernel_log log_reader \
-    command_endpoint restorable output_redirect auth auth_admin checkpointer \
+    command_endpoint restorable signalled output_redirect auth auth_admin checkpointer \
     clock clock_admin rights rights_admin display surface
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
@@ -21,7 +21,8 @@ IDL=cap block_device file_system directory file file_control \
 
 COMMANDS=rose-core standard_input standard_output standard_error standard_io \
     create_endpoint delete_cap rescind_cap find_command console timer_service clock_service \
-    clock_admin_service rights_service rights_admin_service storage_service
+    clock_admin_service rights_service rights_admin_service storage_service create_signal \
+    screen_service
 
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)
 COMMAND_SOURCES=$(COMMANDS:%=../../../../interfaces/%.idl)

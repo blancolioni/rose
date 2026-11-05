@@ -495,6 +495,7 @@ package body Rose.Kernel.Processes.Snapshot is
 
          P.FPU_Valid := Item.FPU_Valid = 1;
          FPU_Bytes := Item.FPU_State;
+         P.Signals := Item.Signals;
 
          for I in Page_Range_Index loop
             declare
@@ -638,6 +639,8 @@ package body Rose.Kernel.Processes.Snapshot is
          Flags (Checkpoint_Page_Fault) := False;
          Flags (Checkpoint_Reply_Held) := False;
          Flags (Fault_Pending) := False;
+         Flags (Exit_Pending) := False;
+         Flags (Memory_Registered) := False;
          Flags (Boot_Module) := False;
          Flags (Persistent) := True;
          P.Flags := Flags;
@@ -1003,6 +1006,7 @@ package body Rose.Kernel.Processes.Snapshot is
       Item.Queued_Params (1 .. Queued'Length) := Queued;
       Item.FPU_Valid := (if P.FPU_Valid then 1 else 0);
       Item.FPU_State := FPU_Bytes;
+      Item.Signals := P.Signals;
 
       for I in Page_Range_Index loop
          declare

@@ -11,6 +11,8 @@ package body Tests.Registry is
                            Rose.Capabilities.Null_Capability;
    Bank_Interface_Cap  : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   Screen_Surface_Cap  : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
 
    ----------
    -- Bank --
@@ -82,6 +84,15 @@ package body Tests.Registry is
       return Program.Launch_Cap;
    end Launcher_Cap;
 
+   ------------
+   -- Screen --
+   ------------
+
+   function Screen return Rose.Capabilities.Capability is
+   begin
+      return Screen_Surface_Cap;
+   end Screen;
+
    --------------
    -- Set_Bank --
    --------------
@@ -110,5 +121,14 @@ package body Tests.Registry is
    begin
       Registry.Open (Commands.Commands_Cap);
    end Set_Commands;
+
+   ----------------
+   -- Set_Screen --
+   ----------------
+
+   procedure Set_Screen (Screen : Rose.Capabilities.Capability) is
+   begin
+      Screen_Surface_Cap := Screen;
+   end Set_Screen;
 
 end Tests.Registry;

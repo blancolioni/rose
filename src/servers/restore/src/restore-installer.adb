@@ -43,6 +43,8 @@ package body Restore.Installer is
 
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+   Screen_Surface_Cap     : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Terminal_Cap           : Rose.Capabilities.Capability :=
@@ -103,6 +105,10 @@ package body Restore.Installer is
    --  Give init the clock's Clock_Admin interface, and its Clock
    --  ancestor. Nothing is sent if there is no Clock_Admin, because a
    --  message with no caps is the restore server's last.
+
+   procedure Send_Screen (Surface_Cap : Rose.Capabilities.Capability);
+   --  Give init the screen driver's surface (#582). Nothing is sent if
+   --  there is none, as for the clock.
 
    ------------
    -- Append --
@@ -468,12 +474,22 @@ package body Restore.Installer is
 
          if Flags (Requires_Keyboard_Interface) then
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         elsif Flags (Requires_Screen) then
+            Rose.System_Calls.Send_Cap (Params, Screen_Surface_Cap);
          end if;
 
          Rose.System_Calls.Receive_Caps (Params, 1);
          Rose.System_Calls.Invoke_Capability (Params);
          if Params.Control.Flags (Rose.Invocation.Error) then
             Rose.Console_IO.Put_Line ("FAIL");
+         elsif Flags (Requires_Framebuffer)
+           and then not Params.Control.Flags (Rose.Invocation.Send_Caps)
+         then
+            Rose.Console_IO.Put_Line ("skipped: no framebuffer");
+         elsif Flags (Requires_No_Framebuffer)
+           and then not Params.Control.Flags (Rose.Invocation.Send_Caps)
+         then
+            Rose.Console_IO.Put_Line ("skipped: framebuffer");
          else
             Rose.Console_IO.Put_Line ("done");
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then
@@ -498,6 +514,13 @@ package body Restore.Installer is
                            Send_Clock
                              (Get_Public_Interface_From_Process
                                 (Reply.Caps (0)));
+                        end if;
+
+                        if Flags (Provides_Screen) then
+                           Screen_Surface_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Reply.Caps (0));
+                           Send_Screen (Screen_Surface_Cap);
                         end if;
 
                         if Flags (Provides_Console) then
@@ -601,5 +624,25 @@ package body Restore.Installer is
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(98));
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Console;
+
+   -----------------
+   -- Send_Screen --
+   -----------------
+
+   procedure Send_Screen (Surface_Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Surface_Cap = Rose.Capabilities.Null_Capability then
+         Rose.Console_IO.Put_Line ("restore: no screen surface");
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+      Rose.System_Calls.Send_Cap (Params, Surface_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(96));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Send_Screen;
 
 end Restore.Installer;

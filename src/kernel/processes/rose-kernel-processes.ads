@@ -243,12 +243,19 @@ package Rose.Kernel.Processes is
    function Has_Pending_Memory_Request
      (Receiver : Process_Id)
       return Boolean;
-   --  True if Receiver is mem, and a page fault or a request for heap
-   --  memory waits for it to receive (#270).
+   --  True if Receiver is mem, and a page fault, a request for heap
+   --  memory or an exit waits for it to receive (#270, #697).
 
    procedure Send_Pending_Memory_Request;
    --  Give mem the request for heap memory if there is one, or else the
-   --  next pending page fault.
+   --  next pending page fault or exit.
+
+   procedure Exit_Process (Pid : Process_Id);
+   --  Pid has called the kernel's exit cap. A process that mem knows is
+   --  ended by mem, through its Process interface's Exit_Process, as a
+   --  program that exits through mem is, so that mem frees its memory
+   --  before it kills the process. The kernel ends any other process
+   --  itself (#697).
 
    function Has_Restore_Notice
      (Process  : Process_Id;
@@ -260,6 +267,33 @@ package Rose.Kernel.Processes is
    procedure Send_Restore_Notice
      (Process : Process_Id);
    --  Send Restorable.Restored to Process.
+
+   --  Signals (ADR 0006, #708). Each process has 32 signal bits. Bits 8
+   --  to 31 are its own, and it gives out caps that set them (signal
+   --  caps). A bit stays set until the process is told, when it next
+   --  receives, on any endpoint or on its Signalled endpoint: one message
+   --  from the kernel, Signalled.Signal, carries every bit that is set,
+   --  and clears them. Bits 0 to 7 are for named signals, which aren't
+   --  implemented yet.
+
+   subtype Own_Signal is Natural range 8 .. 31;
+
+   procedure Raise_Signal
+     (Process : Process_Id;
+      Bit     : Own_Signal);
+   --  Set Bit, and tell Process at once if it is waiting to receive.
+
+   function Has_Pending_Signals
+     (Process  : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean;
+   --  True if Process has signal bits set, has a Signalled endpoint, and
+   --  Endpoint is 0 (any) or that endpoint.
+
+   procedure Send_Signals
+     (Process : Process_Id);
+   --  Send Signalled.Signal to Process, with its signal bits, and clear
+   --  them.
 
    function Next_Blocked_Sender
      (Receiver_Id : Process_Id;
@@ -350,7 +384,6 @@ package Rose.Kernel.Processes is
 
    procedure Set_Process_Handlers
      (On_Launch     : Rose.Capabilities.Capability;
-      On_Kill       : Rose.Capabilities.Capability;
       On_Page_Fault : Rose.Capabilities.Capability);
 
    function Have_Process_Handlers return Boolean;
@@ -398,7 +431,11 @@ private
      (Receive_Any, Receive_Cap, Invoke_Reply, Wait_Reply,
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
-      Restored_Blocked, Checkpoint_Reply_Held);
+      Restored_Blocked, Checkpoint_Reply_Held, Memory_Registered, Exit_Pending);
+   --  Flags are saved in a checkpoint by position, so new ones go last.
+   --  Memory_Registered: mem was told about the process when it was
+   --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,
+   --  and mem is to be told when it next receives (#697).
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -536,6 +573,8 @@ private
          FPU_Valid         : Boolean := False;
          --  The process's FPU and SSE registers, valid once it has used
          --  them and another process has used them since (#170).
+         Signals           : Rose.Words.Word_32 := 0;
+         --  The signal bits that are set and not yet delivered (#708).
       end record;
 
    type Kernel_Process_Table is
@@ -678,7 +717,6 @@ private
 
    Mem_Process        : Rose.Kernel.Processes.Process_Id := 0;
    Mem_Launch_Cap     : Rose.Capabilities.Capability := 0;
-   Mem_Kill_Cap       : Rose.Capabilities.Capability := 0;
    Mem_Page_Fault_Cap : Rose.Capabilities.Capability := 0;
 
 end Rose.Kernel.Processes;

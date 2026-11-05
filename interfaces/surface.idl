@@ -29,6 +29,14 @@ interface Surface : Resource is
    --  The client has changed this region of the buffer, and the server is
    --  to draw it. A region outside the surface is cut to the surface.
 
+   procedure Notify (Signal : Capability);
+   --  Signal is a signal cap (ADR 0006), which the surface invokes, never
+   --  waiting, whenever it queues an event. From then on, a Read of
+   --  Events never waits: it returns the whole events that are ready, or
+   --  nothing. A holder that is a server, and can't wait in a Read, reads
+   --  after each signal until a Read returns nothing (ADR 0022, as
+   --  amended by #653). A later Notify replaces the signal cap.
+
    function Events return interface Stream_Reader;
    --  The surface's input, as a stream of fixed-size events, in the
    --  order they happened. Each event is four words, written as a
@@ -46,7 +54,7 @@ interface Surface : Resource is
    --     Kind 4, Size:     Kind, Width, Height, 0
    --
    --  A Read returns the whole events that are ready, and waits only if
-   --  there are none. This is a byte stream until typed streams exist
+   --  there are none and Notify hasn't been called. This is a byte stream until typed streams exist
    --  (ADR 0013, #140), when it becomes a stream of an event type with
    --  the same fields.
 

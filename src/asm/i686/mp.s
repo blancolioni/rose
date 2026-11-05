@@ -332,7 +332,11 @@ continue:
 1:  clts
 2:
     mov Process_Directory_Page(%ebp), %eax     # copy scheduled process page directory
-    mov %eax, %cr3                             # to global page directory register
+    mov %cr3, %edx                             # to global page directory register,
+    cmp %eax, %edx                             # unless it is there already
+    je 3f
+    mov %eax, %cr3
+3:
 
     movl    interrupt_resume, %eax             # was this process interrupted?
     cmp     $0, %eax                          

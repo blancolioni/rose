@@ -6,6 +6,8 @@ with Rose.Words;                        use Rose.Words;
 
 with Rose.Devices.Port_IO;
 
+with Text_Console.Cells;
+
 package body VGA_Console.Screen is
 
    Num_Lines   : constant := 24;
@@ -23,43 +25,49 @@ package body VGA_Console.Screen is
    for Screen_Memory'Address use System'To_Address (16#000B_80A0#);
    pragma Volatile (Screen_Memory);
 
-   Saved_Screen  : Screen_Array := (others => Blank);
-   Line, Column  : Natural := 0;
    Taken_Over    : Boolean := False;
 
-   type Escape_State is (Ground, Escape, Sequence);
+   --  The cell model's drawing, on rows 1 to 24 of the VGA text page.
 
-   Escape_Output : Escape_State := Ground;
-   Parameter     : Natural := 0;
-   --  Where we are in an escape sequence that is being written, and its
-   --  parameter so far (#454).
+   procedure Draw (Column, Row : Natural; Item : Character);
+   procedure Scroll (Lines : Positive);
+   procedure Clear;
+   procedure Show_Cursor (Column, Row : Natural);
+   procedure Flush is null;
+   --  The VGA page shows each cell as it is written.
+
+   package Cells is
+     new Text_Console.Cells
+       (Max_Columns => Num_Columns,
+        Max_Rows    => Num_Lines,
+        Draw        => Draw,
+        Scroll      => Scroll,
+        Clear       => Clear,
+        Show_Cursor => Show_Cursor,
+        Flush       => Flush);
 
    procedure Take_Over;
-   procedure New_Line;
-   procedure Scroll;
-   procedure Set_Cursor;
+   --  Take the screen as the boot console left it: its cells, and the
+   --  cursor position from the CRT controller.
 
-   procedure Put_Character (Ch : Character);
-   --  Draw Ch, or act on it if it is a control character.
+   -----------
+   -- Clear --
+   -----------
 
-   procedure End_Sequence (Final : Character);
-   --  Act on the escape sequence ESC [ Parameter Final. ESC [ 2 J clears
-   --  the screen, and ESC [ H moves the cursor home. Others do nothing.
-
-   ------------------
-   -- End_Sequence --
-   ------------------
-
-   procedure End_Sequence (Final : Character) is
+   procedure Clear is
    begin
-      if Final = 'J' and then Parameter = 2 then
-         Saved_Screen := (others => Blank);
-         Screen_Memory := Saved_Screen;
-      elsif Final = 'H' then
-         Line := 0;
-         Column := 0;
-      end if;
-   end End_Sequence;
+      Screen_Memory := (others => Blank);
+   end Clear;
+
+   ----------
+   -- Draw --
+   ----------
+
+   procedure Draw (Column, Row : Natural; Item : Character) is
+   begin
+      Screen_Memory (Row * Num_Columns + Column) :=
+        Colour + Character'Pos (Item);
+   end Draw;
 
    ---------
    -- Map --
@@ -72,17 +80,6 @@ package body VGA_Console.Screen is
       Rose.System_Calls.Invoke_Capability (Params);
    end Map;
 
-   --------------
-   -- New_Line --
-   --------------
-
-   procedure New_Line is
-   begin
-      Line := Line + 1;
-      Column := 0;
-      Scroll;
-   end New_Line;
-
    ---------
    -- Put --
    ---------
@@ -93,78 +90,8 @@ package body VGA_Console.Screen is
          Take_Over;
       end if;
 
-      for Ch of Text loop
-         case Escape_Output is
-            when Ground =>
-               Put_Character (Ch);
-
-            when Escape =>
-               Escape_Output := (if Ch = '[' then Sequence else Ground);
-               Parameter := 0;
-
-            when Sequence =>
-               if Ch in '0' .. '9' then
-                  Parameter :=
-                    Natural'Min (Parameter * 10, 1000)
-                    + Character'Pos (Ch) - 48;
-               elsif Character'Pos (Ch) in 16#40# .. 16#7E# then
-                  End_Sequence (Ch);
-                  Escape_Output := Ground;
-               end if;
-         end case;
-      end loop;
-
-      Set_Cursor;
+      Cells.Put (Text);
    end Put;
-
-   -------------------
-   -- Put_Character --
-   -------------------
-
-   procedure Put_Character (Ch : Character) is
-   begin
-      if Character'Pos (Ch) = 10 then
-         New_Line;
-      elsif Character'Pos (Ch) = 8 then
-
-         --  Backspace moves the cursor back without erasing, and to the
-         --  end of the line above from the start of a line, so that a
-         --  line that wrapped can be erased (#397).
-
-         if Column > 0 then
-            Column := Column - 1;
-         elsif Line > 0 then
-            Line := Line - 1;
-            Column := Num_Columns - 1;
-         end if;
-      elsif Character'Pos (Ch) = 9 then
-         Column := (Column / 8 + 1) * 8;
-         if Column >= Num_Columns then
-            New_Line;
-         end if;
-      elsif Character'Pos (Ch) = 13 then
-         Column := 0;
-      elsif Character'Pos (Ch) = 27 then
-         Escape_Output := Escape;
-      elsif Character'Pos (Ch) < 32 or else Character'Pos (Ch) = 127 then
-
-         --  Other control characters draw nothing.
-
-         null;
-      else
-         declare
-            Offset : constant Natural := Line * Num_Columns + Column;
-            Cell   : constant Word_16 := Colour + Character'Pos (Ch);
-         begin
-            Saved_Screen (Offset) := Cell;
-            Screen_Memory (Offset) := Cell;
-         end;
-         Column := Column + 1;
-         if Column = Num_Columns then
-            New_Line;
-         end if;
-      end if;
-   end Put_Character;
 
    ------------
    -- Redraw --
@@ -173,35 +100,30 @@ package body VGA_Console.Screen is
    procedure Redraw is
    begin
       Map;
-      Screen_Memory := Saved_Screen;
-      Set_Cursor;
+      Cells.Redraw;
    end Redraw;
 
    ------------
    -- Scroll --
    ------------
 
-   procedure Scroll is
+   procedure Scroll (Lines : Positive) is
+      Kept : constant Natural :=
+               (if Lines < Num_Lines then Num_Lines - Lines else 0);
    begin
-      if Line >= Num_Lines then
-         while Line >= Num_Lines loop
-            Saved_Screen (0 .. (Num_Lines - 1) * Num_Columns - 1) :=
-              Saved_Screen (Num_Columns .. Num_Lines * Num_Columns - 1);
-            Saved_Screen ((Num_Lines - 1) * Num_Columns ..
-                            Num_Lines * Num_Columns - 1) :=
-              (others => Blank);
-            Line := Line - 1;
-         end loop;
-         Screen_Memory := Saved_Screen;
-      end if;
+      Screen_Memory (0 .. Kept * Num_Columns - 1) :=
+        Screen_Memory ((Num_Lines - Kept) * Num_Columns
+                       .. Num_Lines * Num_Columns - 1);
+      Screen_Memory (Kept * Num_Columns .. Num_Lines * Num_Columns - 1) :=
+        (others => Blank);
    end Scroll;
 
-   ----------------
-   -- Set_Cursor --
-   ----------------
+   -----------------
+   -- Show_Cursor --
+   -----------------
 
-   procedure Set_Cursor is
-      Position : constant Natural := (Line + 1) * Num_Columns + Column;
+   procedure Show_Cursor (Column, Row : Natural) is
+      Position : constant Natural := (Row + 1) * Num_Columns + Column;
    begin
       --  The cursor position counts the status line.  Index 16#0E# of
       --  the CRT controller is its high byte, and 16#0F# its low byte.
@@ -210,7 +132,7 @@ package body VGA_Console.Screen is
         (Cursor_Out_Cap,
          ((0, 16#0E#), (1, Word_8 (Position / 256)),
           (0, 16#0F#), (1, Word_8 (Position mod 256))));
-   end Set_Cursor;
+   end Show_Cursor;
 
    ---------------
    -- Take_Over --
@@ -219,7 +141,15 @@ package body VGA_Console.Screen is
    procedure Take_Over is
       Position : Natural;
    begin
-      Saved_Screen := Screen_Memory;
+      Cells.Set_Size (Num_Columns, Num_Lines);
+      for Row in 0 .. Num_Lines - 1 loop
+         for Column in 0 .. Num_Columns - 1 loop
+            Cells.Load
+              (Column, Row,
+               Character'Val
+                 (Screen_Memory (Row * Num_Columns + Column) mod 256));
+         end loop;
+      end loop;
 
       Rose.Devices.Port_IO.Port_Out_8 (Cursor_Out_Cap, 0, 16#0E#);
       Position :=
@@ -233,11 +163,10 @@ package body VGA_Console.Screen is
       if Position < Num_Columns
         or else Position >= (Num_Lines + 1) * Num_Columns
       then
-         Line := Num_Lines - 1;
-         Column := 0;
+         Cells.Move_Cursor (0, Num_Lines - 1);
       else
-         Line := Position / Num_Columns - 1;
-         Column := Position mod Num_Columns;
+         Cells.Move_Cursor
+           (Position mod Num_Columns, Position / Num_Columns - 1);
       end if;
 
       Taken_Over := True;

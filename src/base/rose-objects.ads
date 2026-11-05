@@ -55,6 +55,12 @@ package Rose.Objects is
    function Is_Process_Object_Id (Id : Object_Id) return Boolean
    is (Id in Process_Object_Id);
 
+   function Process_Identifier (Oid : Object_Id) return Capability_Identifier
+   is (Capability_Identifier (Oid mod (2 ** 16 - 1) + 1));
+   --  The identifier of the caps that mem makes for the process with
+   --  object id Oid, and of the kernel's message to mem when the process
+   --  exits (#697). It is never 0.
+
    type Rose_Ticks is new Rose.Words.Word_64;
 
    type Allocation_Count is mod 2 ** 4;

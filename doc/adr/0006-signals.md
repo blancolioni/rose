@@ -4,6 +4,7 @@
 - **Date:** 2026-10-26
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0007](0007-networking.md) (networking)
 - **Amended by:** #512, where a call can be made pausable, so that a signal reaches a process blocked in it without cancelling it (section 5)
+- **Implemented in part by:** #708: the signal word (section 1), delivery at the next receive (section 5), and signal caps for a process's own bits (section 6). A signal cap is a process cap on a new signal endpoint, with the bit as its identifier, since every cap type is in use. A process makes them with a new meta cap, which init grants on `create-signal`, and which a command gets through the `Create_Signal` role.
 
 ## Context
 

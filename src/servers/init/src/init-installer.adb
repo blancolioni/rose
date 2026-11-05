@@ -215,6 +215,8 @@ package body Init.Installer is
                null;
             elsif N = "create-endpoint" and then Count = 0 then
                Cap := Init_Caps.Create_Endpoint_Cap;
+            elsif N = "create-signal" and then Count = 0 then
+               Cap := Init_Caps.Create_Signal_Cap;
             elsif not Is_Driver then
                null;
             elsif N = "delete-endpoint" and then Count = 0 then

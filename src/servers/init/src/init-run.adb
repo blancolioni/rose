@@ -15,6 +15,7 @@ with Rose.System_Calls;
 with Init.Boot;
 with Init.Boot_Steps;
 with Init.Calls;
+with Init.Grants;
 with Init.Installer;
 with Init.Self_Tests;
 with Init.Users;
@@ -26,6 +27,13 @@ package body Init.Run is
    Is_Driver_Flag     : constant := 32;
    --  Set in the flags of an install message for a program from the
    --  drivers directory (Restore.Installer.Is_Driver).
+
+   Requires_Framebuffer_Flag : constant := 128;
+   Requires_No_Framebuffer_Flag : constant := 512;
+   --  Set for a program that is installed only if the boot loader gave a
+   --  framebuffer: the screen driver (Restore.Installer
+   --  .Requires_Framebuffer, #582). Requires_No_Framebuffer_Flag is set
+   --  for one that is installed only if there isn't, vga-console (#653).
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array
      (1 .. Rose.Limits.Page_Size)
@@ -89,6 +97,10 @@ package body Init.Run is
                                    Null_Capability;
       --  The clock's Clock_Admin interface, which init gives to the rights
       --  broker and then deletes (ADR 0021).
+      Screen_Cap               : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The screen driver's surface, from the installer, if there is a
+      --  framebuffer (#582).
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -380,6 +392,11 @@ package body Init.Run is
                   Init.Calls.Send_String
                     (Console_Stream_Cap, "received input stream cap" & NL);
                end if;
+            elsif Params.Data (1) = 96 then
+
+               --  The screen driver is running, and cap 0 is its surface.
+
+               Screen_Cap := Params.Caps (0);
             elsif Params.Data (1) = 97 then
 
                --  The clock is running. Its Clock_Admin interface is cap
@@ -422,6 +439,22 @@ package body Init.Run is
                   Send_Console (Console_Redirect_Cap);
                   Send_Console (Set_Output_Cap);
                end;
+            elsif (Params.Data (2) / Requires_Framebuffer_Flag) mod 2 = 1
+              and then not Init.Grants.Has_Framebuffer
+            then
+
+               --  The screen driver, and there is no framebuffer. It isn't
+               --  installed, and restore gets no caps (#582).
+
+               null;
+            elsif (Params.Data (2) / Requires_No_Framebuffer_Flag) mod 2 = 1
+              and then Init.Grants.Has_Framebuffer
+            then
+
+               --  The console on the VGA page, and the console is on the
+               --  screen's surface instead (#653).
+
+               null;
             else
 
                declare
@@ -584,7 +617,9 @@ package body Init.Run is
          Create_Endpoint => Create_Endpoint_Cap,
          Commands        => Commands_Cap,
          Clock           => Clock_Cap,
-         Storage         => Storage_Cap)
+         Storage         => Storage_Cap,
+         Screen          => Screen_Cap,
+         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);

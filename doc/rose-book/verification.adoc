@@ -90,3 +90,19 @@ An invariant of the table is proved to hold after every operation: a record that
 `Remove_Slot` frees a record that has nothing left that names it, which takes a child from its parent and may free that in turn, and it uses no record that was not used.
 `Revoke` revokes one record, and `Is_Valid` (at most 8 reads) says that no record from a capability's own up to the root has been revoked; of a revoke, it is proved that it makes invalid the records below the one revoked, and no other.
 Not covered: that the slots counted are the capabilities that name a record, which is for `Rose.Kernel.Processes` to keep when it uses this.
+
+== Tests
+
+The tests run under QEMU, or on the host:
+
+`make test`::
+Installs Rose on a new disk from the install image, boots the disk, which restores the install's checkpoint, logs in and runs `run_self_tests`, which has to pass every test, and checks the checkpoint log with `scripts/check-log.py` (`scripts/test-boot`).
+It takes about ten minutes, and CI runs it.
+
+`make test-screen`::
+The same with a framebuffer, where the console is `surface-console` on the screen's surface: the install's self tests have to pass, then it logs in and runs `run_self_tests`, typing through the screen driver's events and reading the text off QEMU's screen dumps with `scripts/fb-text.py` (`scripts/test-screen`, #582, #653).
+It isn't run by CI.
+
+`make test-drawing`::
+The tests of the drawing library, `Rose.Drawing` and `Rose.Drawing.Text` (#579, #580), which need nothing from Rose, so they are built with the host's GNAT and run on the host.
+CI runs them.

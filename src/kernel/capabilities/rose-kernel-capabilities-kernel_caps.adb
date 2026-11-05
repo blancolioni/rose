@@ -110,7 +110,6 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
          when Enable_Paging_Endpoint =>
             Rose.Kernel.Processes.Set_Process_Handlers
               (On_Launch     => Params.Caps (0),
-               On_Kill       => Params.Caps (1),
                On_Page_Fault => Params.Caps (2));
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,

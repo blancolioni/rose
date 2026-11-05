@@ -1,8 +1,18 @@
 with Rose.Capabilities.Standard;
 with Rose.Interfaces.Process;
+with Rose.Interfaces.Signalled;
 with Rose.System_Calls.Server;
+with Rose.Words;
 
 package body Rose.Server is
+
+   Signal_Handlers : array (Signal_Bit) of Signal_Handler :=
+                       (others => null);
+   --  A process's signals are its own, whichever context receives them.
+
+   procedure Handle_Signal
+     (Invocation : in out Rose.Invocation.Invocation_Record);
+   --  Call the handler of each bit in Signalled.Signal's first word.
 
    ---------------------------
    -- Block_Current_Request --
@@ -67,6 +77,25 @@ package body Rose.Server is
       end if;
       return Rose.Capabilities.Null_Capability;
    end Get_Instance_Cap;
+
+   -------------------
+   -- Handle_Signal --
+   -------------------
+
+   procedure Handle_Signal
+     (Invocation : in out Rose.Invocation.Invocation_Record)
+   is
+      use type Rose.Words.Word;
+      Bits : constant Rose.Words.Word := Invocation.Data (0);
+   begin
+      for Bit in Signal_Bit loop
+         if (Bits / 2 ** Bit) mod 2 = 1
+           and then Signal_Handlers (Bit) /= null
+         then
+            Signal_Handlers (Bit).all;
+         end if;
+      end loop;
+   end Handle_Signal;
 
    ------------------
    -- Has_Instance --
@@ -300,6 +329,25 @@ package body Rose.Server is
          --  caps of the new object are null. A server cannot do more.
          null;
    end Set_Instance_Cap;
+
+   ------------------------
+   -- Set_Signal_Handler --
+   ------------------------
+
+   procedure Set_Signal_Handler
+     (Context : in out Server_Context;
+      Bit     : Signal_Bit;
+      Handler : Signal_Handler)
+   is
+   begin
+      Signal_Handlers (Bit) := Handler;
+      if not Context.Has_Signals then
+         Register_Handler
+           (Context, Rose.Interfaces.Signalled.Signal_Endpoint,
+            Handle_Signal'Access);
+         Context.Has_Signals := True;
+      end if;
+   end Set_Signal_Handler;
 
    ------------------
    -- Start_Server --

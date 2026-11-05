@@ -136,6 +136,7 @@ Its endpoints are:
 | Start | Starts the process, at the address in the first word of the invocation
 | Initial cap | Sends the capabilities in the invocation to the process, which are copies, and takes numbers in its table
 | Command endpoint | Creates the endpoint of a new process that runs a command (ADR 0002)
+| Signal | Sets the process's signal bit that is the capability's identifier, and never waits: a signal capability (see <<signals>>)
 |===
 
 Process capabilities are normally given to the parent process by the kernel when the child is launched.
@@ -159,6 +160,7 @@ Its endpoints are:
 | Create Endpoint | 1 | Registers an endpoint id, and replies with a receive capability and an endpoint capability for it
 | Get Object Id | 9 | Replies with the object id in the capability
 | Derive Cap | 10 | Replies with a copy of the capability in the invocation, that can be rescinded on its own (see <<operations>>)
+| Create Signal Cap | 11 | Replies with a signal capability for the caller's own signal bit in the first word, 8 to 31 (see <<signals>>)
 | Receive On Any Cap | 17 | Receives on any of the process's endpoints
 | Enable Kernel Debug | 28 | Turns the kernel's logging of calls on or off
 | Rescind Cap | 29 | Rescinds the capabilities in the invocation
@@ -167,6 +169,7 @@ Its endpoints are:
 |===
 
 A process is given a meta capability for each of the operations that it may use, and they are the system capabilities of the run-time system (see <<idl>>): `Create_Endpoint`, `Delete_Cap` and `Rescind_Cap`.
+A program that asks for `create-signal` is given the one that makes signal capabilities, which it gives to `Rose.System_Calls.Use_Capabilities` as `Create_Signal`.
 
 === Kernel Capabilities
 
@@ -253,6 +256,26 @@ A process that needs more has to be split.
 The process that serves an endpoint also holds a capability for it, which is what the kernel compares a client's capability with when it checks that it is valid.
 
 [#operations]
+[#signals]
+== Signals
+
+A call waits until its receiver receives, so a process can't tell another that something happened without waiting for it.
+A signal can (ADR 0006, #708):
+
+* *Each process has 32 signal bits,* saved in checkpoints with the rest of the process.
+  Bits 8 to 31 are its own; bits 0 to 7 are for named signals, which aren't implemented yet.
+* *A signal capability sets one bit of one process.*
+  It is a process capability on the signal endpoint, with the bit as its identifier.
+  Invoking it sets the bit and never waits, whatever the process is doing, and there is no reply.
+  A bit that is set again before the process is told stays set, so a signal says that something happened at least once.
+* *A process makes signal capabilities for its own bits* with the meta capability's Create Signal Cap endpoint, and gives them to whoever is to signal it.
+* *The process is told when it next receives,* on any endpoint or on its `Signalled` endpoint: the kernel sends `Signalled.Signal`, with every bit that is set in its first word, and clears them.
+  It comes after the restore notice and before any other message, and has no reply cap.
+  A process that is already waiting to receive is told at once.
+  One that is waiting for a reply is told when it next receives.
+* *`Rose.Server` calls a handler for each bit*, registered with `Set_Signal_Handler`.
+  The first handler attaches `Signalled` to the server, and a server with none sees no change.
+
 == Operations on Capabilities
 
 === Copying

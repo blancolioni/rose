@@ -21,13 +21,32 @@ package body Restore.Installer.Default is
       Process ("keyboard", "drivers", Launch,
                (Provides_Keyboard_Interface => True, others => False));
 
+      --  With a framebuffer, the screen driver holds it, and the keys go
+      --  to the screen (ADR 0022, #582, #653).
+
+      Process ("screen", "drivers", Launch,
+               (Requires_Framebuffer        => True,
+                Requires_Keyboard_Interface => True,
+                Provides_Screen             => True,
+                others                      => False));
+
       --  The persistent console is the terminal (#454): it draws what it
       --  is written, and its line discipline reads the keyboard. It comes
-      --  straight after the keyboard, so that everything installed after
-      --  it writes to it.
+      --  straight after the keyboard and the screen, so that everything
+      --  installed after it writes to it. With a framebuffer it is on the
+      --  screen's surface, and takes its keys from the surface's events
+      --  (#653); without one, it is on the VGA text page, and reads the
+      --  keyboard itself.
 
+      Process ("surface-console", "drivers", Launch,
+               (Requires_Framebuffer  => True,
+                Requires_Screen       => True,
+                Provides_Console      => True,
+                Provides_Input_Stream => True,
+                others                => False));
       Process ("vga-console", "drivers", Launch,
-               (Requires_Keyboard_Interface => True,
+               (Requires_No_Framebuffer     => True,
+                Requires_Keyboard_Interface => True,
                 Provides_Console            => True,
                 Provides_Input_Stream       => True,
                 others                      => False));

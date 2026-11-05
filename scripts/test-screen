@@ -1,0 +1,126 @@
+#!/bin/sh
+# Boot test of the console on the screen (#582, #653), under QEMU, with a
+# framebuffer.
+#
+#   scripts/test-screen [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test:
+#
+#   1. installs Rose on a new disk from the install menu's framebuffer
+#      entry, so that the screen driver holds the framebuffer and the
+#      keyboard, and the console is surface-console on its surface; the
+#      install's self tests, which init runs, have to pass, as the console
+#      shows;
+#   2. boots from the disk's framebuffer entry, which restores the
+#      install's checkpoint, logs in as the first user, and runs
+#      run_self_tests, which has to pass every test: the keys go through
+#      the screen driver and the surface's events to the console, and the
+#      text comes back drawn on the surface;
+#   3. waits for a checkpoint, stops the machine, and runs check-log.py on
+#      the disk.
+#
+# The screen's text is read from QEMU's screen dumps by fb-text.py. It
+# takes about ten minutes, and needs qemu-system-i386, qemu-img and
+# python3. It exits with 0 if everything passed, and keeps the disk image
+# and QEMU's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+screen () {
+    # The text on the framebuffer, in place of the VGA text page that
+    # qemu-test-lib.sh reads.
+    python3 "$HERE/fb-text.py" "$MONITOR"
+}
+
+monitor () {
+    # monitor COMMAND: send COMMAND to QEMU's monitor
+    python3 - "$MONITOR" "$1" <<'EOF'
+import socket, sys, time
+c = socket.socket(socket.AF_UNIX)
+c.connect(sys.argv[1])
+c.sendall((sys.argv[2] + "\n").encode())
+time.sleep(0.3)
+EOF
+}
+
+choose_last_entry () {
+    # Choose the last entry of the GRUB menu. End is pressed for twelve
+    # seconds, which is long enough for the menu to appear and stop its
+    # countdown, and does nothing more however often it is pressed.
+    i=0
+    while [ $i -lt 24 ]; do
+        monitor "sendkey end"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    monitor "sendkey ret"
+}
+
+passed () {
+    # passed LINE: LINE is a self test result with every test passed
+    set -- $(echo "$1" \
+        | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+    [ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ]
+}
+
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+qemu-img create -f raw "$DISK" 6G > /dev/null
+
+echo "Installing, with a framebuffer"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+choose_last_entry
+
+# The install restarts the machine when it has finished. Until then, read
+# the screen every ten seconds, and keep the self tests' result.
+: > "$WORK/install-results.txt"
+waited=0
+while [ $waited -lt 900 ]; do
+    grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null && break
+    screen | grep "Test result:" >> "$WORK/install-results.txt"
+    sleep 8
+    waited=$((waited + 10))
+done
+grep -q -- "kernel: restarting" "$WORK/serial" \
+    || fail "the install did not finish"
+result=$(sort -u "$WORK/install-results.txt" | tail -1)
+[ -n "$result" ] || fail "the console never showed the install's self tests"
+echo "install: $result"
+passed "$result" || fail "not every install self test passed"
+sleep 15
+stop_qemu
+
+echo "Booting from the disk's framebuffer entry, which restores the install"
+start_qemu
+choose_last_entry
+log_in
+
+echo "Running the self tests"
+type_text "clear
+"
+sleep 5
+type_text "run_self_tests
+"
+wait_for "Test result:" 120 || fail "the self tests did not finish"
+result=$(screen | grep "Test result:" | tail -1)
+echo "$result"
+passed "$result" || fail "not every self test passed"
+
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" || {
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "PASS"

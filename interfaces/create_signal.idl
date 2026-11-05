@@ -1,0 +1,5 @@
+role Create_Signal : Cap;
+--  The kernel cap that makes signal caps for the process's own signal
+--  bits, 8 to 31 (ADR 0006, #708). A command that has it gives it to
+--  Rose.System_Calls.Use_Capabilities. A driver asks for it with
+--  create-signal in its .driver file instead.

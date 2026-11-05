@@ -13,7 +13,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
-DRIVERS=command keyboard exec file directory vga-console clock screen
+DRIVERS=command keyboard exec file directory vga-console clock screen surface-console
 UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests petal argv
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env test prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -54,6 +54,18 @@ check-env:
 # minutes.
 test:
 	sh ./scripts/test-boot
+
+# The same with a framebuffer: the console on the screen's surface, and
+# the screen driver's keys and redraw after a restore (#582, #653).  It
+# isn't part of "make test", or of CI.
+test-screen:
+	sh ./scripts/test-screen
+
+# The tests of the drawing library and its text (#579, #580), built and
+# run on the host, in a few seconds.  CI runs them.
+test-drawing:
+	cd src/library/drawing/tests && gprbuild -q -P drawing_tests.gpr \
+	    && ./build/test_drawing
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"
@@ -158,7 +170,7 @@ finished: iso exports
 # The generated interface packages that the kernel uses, for their
 # endpoint ids. Only these are linked into the kernel's sources.
 
-KERNEL_INTERFACES=kernel_log memory restorable
+KERNEL_INTERFACES=kernel_log memory process restorable signalled
 
 kernel:
 	mkdir -p build/$(ARCH)/kernel/interfaces

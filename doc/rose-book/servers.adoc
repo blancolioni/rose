@@ -156,6 +156,8 @@ Used by:: `init`, which installs every program after `exec` itself, and sets its
 === `vga-console`
 
 The persistent console, and the terminal: it writes text to the screen, reads what is typed on the keyboard, and survives a restore (ADR 0005).
+It is on the VGA text page, and is installed only when there is no framebuffer: `surface-console` is the console on a framebuffer (#653).
+Its cells and line discipline are shared with `surface-console` (`src/drivers/text-console`).
 
 Provides:: `Terminal`, which is a `Stream_Reader` and a `Stream_Writer` with `Enable_Echo` and `Disable_Echo`; `Event_Listener`, which it registers with the keyboard; and `Restorable`.
 Requests:: `create-endpoint`, `device-page 184` (the VGA text page at `B8000`), `port-out-8 980 981` (the CRT controller's index and data ports, `3D4` and `3D5`), and `port-in-8 981`; and, from `restore`, the keyboard's `Event_Source`.
@@ -231,9 +233,9 @@ Used by:: `init`, which gets both interfaces from the installer; `login`, `petal
 
 The driver for the boot loader's linear framebuffer, which gives out the whole screen as one surface (ADR 0022, #582).
 
-Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Stream_Reader` that `Events` returns; and `Restorable`.
-Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB.
-Used by:: Nothing yet. The console will hold the surface (#653), and hand it to the display server (#655).
+Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Notify`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Stream_Reader` that `Events` returns, which is also the `Event_Listener` it registers with the keyboard; and `Restorable`.
+Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB; and, from `restore`, the keyboard's `Event_Source`.
+Used by:: `surface-console`, which holds the surface and will hand it to the display server (#655); and `init`, which gets the surface from the installer and gives it to `run_self_tests` at install, for its `Screen_Service` role.
 
 * *It uses only a 32-bit RGB framebuffer below 4 GB.*
   With anything else, or none, its surface is 0 by 0 pixels and has no buffer.
@@ -243,11 +245,33 @@ Used by:: Nothing yet. The console will hold the surface (#653), and hand it to 
 * *`Damage` copies a rectangle of the buffer to the framebuffer,* cut to the screen, converting each pixel when the framebuffer's colours are not where XRGB has them.
 * *It redraws the screen after a restore.*
   The buffer comes back with the checkpoint, and the framebuffer's pages don't, so when it is told that it has been restored, it maps the framebuffer again and copies the whole buffer to it.
-* *There are no events yet.*
-  A `Read` of the event stream waits: the keyboard comes to the screen with the console (#653), and the pointer with #588.
-  `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
+* *Its events are the keys* (ADR 0022, as amended by #653).
+  It holds the keyboard, queues each key as a key event, of kind 1 with the character, and signals the holder.
+  The holder gives it a signal cap with `Notify`, and from then on a `Read` of the events never waits: it returns the whole events that are ready, or nothing.
+  Without a signal cap, a `Read` waits for an event.
+  The pointer comes with #588: `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
 
-`restore` doesn't install `screen` yet: every boot is in text mode until the console can draw on a surface (#654).
+`restore` installs `screen` straight after `keyboard`, only if the boot loader gave a 32-bit RGB framebuffer: `init` skips it otherwise.
+Every boot is in text mode until the early messages can go to the serial port (#654), except the framebuffer entries at the end of the install media's menu and of the disk's, which `scripts/test-screen` uses.
+
+=== `surface-console`
+
+The persistent console, and the terminal, on the screen's surface (ADR 0005, ADR 0022, #653): `vga-console`'s successor when the boot loader gives a framebuffer.
+
+Provides:: `Terminal`, as `vga-console` does.
+Requests:: `create-endpoint` and `create-signal`; and, from `restore`, the `screen` driver's surface.
+Used by:: Everything installed after it, as its standard output, and the shell, as `vga-console` is.
+
+* *It shares its cells and its line discipline with `vga-console`* (`src/drivers/text-console`).
+  The cells are drawn into the surface's buffer, which it maps shared with `Rose.Shared_Regions`, with the Spleen font of `Rose.Drawing.Text`, light grey on black, with an underline cursor.
+  A 1024 by 768 screen is 128 columns by 48 rows.
+* *Each write reports the rows that it changed* to the surface with `Damage`.
+* *Its keys are the surface's events.*
+  It gives the surface a signal cap for its own signal bit 8 (ADR 0006), and when it is signalled it reads the events until there are none, and gives each key to the line discipline.
+* *It isn't `Restorable`.*
+  Its cells and the surface's buffer come back with the checkpoint, and the `screen` driver redraws the screen.
+
+`restore` installs it straight after `screen`, with the screen's surface, only if there is a framebuffer.
 
 === `file`
 

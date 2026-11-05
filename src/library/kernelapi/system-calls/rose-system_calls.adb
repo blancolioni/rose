@@ -19,6 +19,9 @@ package body Rose.System_Calls is
 
    Get_Environment_Cap       : Rose.Capabilities.Capability := 0;
 
+   Local_Create_Signal : Rose.Capabilities.Capability := 0;
+   --  The Create_Signal cap given to Use_Capabilities (#708).
+
    Caps_Given : Boolean := False;
    --  True once the process has called Use_Capabilities: then it has
    --  given every local cap it has, and does not look in an argument cap
@@ -196,6 +199,44 @@ package body Rose.System_Calls is
          end;
       end if;
    end Copy_Text;
+
+   -----------------------
+   -- Create_Signal_Cap --
+   -----------------------
+
+   function Create_Signal_Cap
+     (Bit : Natural)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Local_Create_Signal = 0 or else Bit not in 8 .. 31 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Initialize_Send (Params, Local_Create_Signal);
+      Send_Word (Params, Rose.Words.Word (Bit));
+      Receive_Caps (Params, 1);
+      Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Params.Caps (0);
+   end Create_Signal_Cap;
+
+   ------------------------------
+   -- Create_Signal_Capability --
+   ------------------------------
+
+   function Create_Signal_Capability return Rose.Capabilities.Capability is
+   begin
+      return Local_Create_Signal;
+   end Create_Signal_Capability;
 
    ----------------
    -- Delete_Cap --
@@ -1047,6 +1088,8 @@ package body Rose.System_Calls is
 
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability
+      := Rose.Capabilities.Null_Capability;
+      Create_Signal : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability)
    is
 
@@ -1070,11 +1113,15 @@ package body Rose.System_Calls is
          end if;
       end Use_Cap;
 
+      use type Rose.Capabilities.Capability;
    begin
       Caps_Given := True;
       Use_Cap (Create_Endpoint, Rose.System_Calls.Create_Endpoint);
       Use_Cap (Delete_Cap, Rose.System_Calls.Delete_Cap);
       Use_Cap (Rescind_Cap, Rose.System_Calls.Rescind_Cap);
+      if Create_Signal /= 0 then
+         Local_Create_Signal := Create_Signal;
+      end if;
    end Use_Capabilities;
 
 end Rose.System_Calls;
