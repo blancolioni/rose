@@ -2,7 +2,7 @@ with Ada.Unchecked_Conversion;
 
 with Rose.Arch;
 with Rose.Multiboot;
-with Rose.Version;
+with Rose.Build;
 
 with Rose.Devices.Console;              use Rose.Devices.Console;
 with Rose.Kernel.Clock;
@@ -205,7 +205,7 @@ package body Rose.Boot.Console is
       Terminal_Line := 0;
       Terminal_Column := 0;
       Clear;
-      Console.Put_Line (Rose.Version.Full_Name);
+      Console.Put_Line (Rose.Build.Full_Name);
       Status_Chars :=
         "Rose -'-,-{@        "
         & "                    "

@@ -2,7 +2,7 @@ with System;
 
 with Rose.Boot.Sequence;
 with Rose.Boot.Console;
-with Rose.Version;
+with Rose.Build;
 
 with Rose.Multiboot;
 
@@ -24,7 +24,7 @@ package body Rose.Main is
 
       Rose.Boot.Console.Clear;
       Rose.Boot.Console.Put (Starting);
-      Rose.Boot.Console.Put_Line (Rose.Version.Full_Name);
+      Rose.Boot.Console.Put_Line (Rose.Build.Full_Name);
 
       Rose.Multiboot.Load_Multiboot_Header;
 

@@ -4,6 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Invocation;
 with Rose.System_Calls.Server;
+with Rose.Build;
 with Rose.Version;
 with Rose.Words;
 
@@ -132,7 +133,8 @@ package body Login_Loop is
    procedure Run is
       Banner   : constant String :=
                    "Rose " & Rose.Version.Version_String
-                   & " (" & Rose.Version.Version_Name & ")";
+                   & " (" & Rose.Version.Version_Name & ")"
+                   & Rose.Build.Build_Suffix;
       Name     : String (1 .. 64);
       Password : String (1 .. 256);
       Name_Last, Password_Last : Natural;
