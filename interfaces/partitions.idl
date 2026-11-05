@@ -1,4 +1,7 @@
-interface Partitions is
+interface Partitions : Resource is
+
+   --  A disk's partition table.  Release says that the table has been
+   --  read, and the server exits (#463).
 
    function Partition_Count return Natural;
    

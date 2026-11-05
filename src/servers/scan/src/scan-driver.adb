@@ -32,6 +32,7 @@ begin
 
    Console_Cap := Get_Cap (1);
    Block_Device_Cap := Get_Cap (2);
+   Exit_Cap := Get_Cap (3);
 
    Rose.Console_IO.Open (Console_Cap);
 
@@ -190,6 +191,9 @@ begin
    begin
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
+         Rose.Interfaces.Partitions.Release_Endpoint);
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
          Rose.Interfaces.Partitions.Partition_Count_Endpoint);
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
@@ -215,6 +219,15 @@ begin
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
+            when Rose.Interfaces.Partitions.Release_Endpoint =>
+
+               --  Init has read the table, and nothing else can reach
+               --  scan, so it replies and exits (#463).
+
+               Rose.System_Calls.Invoke_Capability (Reply);
+               Rose.System_Calls.Initialize_Send (Reply, Exit_Cap);
+               Rose.System_Calls.Invoke_Capability (Reply);
+
             when Rose.Interfaces.Partitions.Partition_Count_Endpoint =>
                Rose.System_Calls.Send_Word
                  (Reply,

@@ -110,12 +110,14 @@ To launch a program, `elf`:
 Reads the partition table of the system disk.
 *This is the server that reformats the disk.*
 
-Provides:: `Partitions` (`Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
-Launched with:: The console and hd0.
+Provides:: `Partitions` (`Release`, `Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
+Launched with:: The console, hd0 and the exit capability.
 Used by:: `init`.
 
 If hd0 has no GPT partition table, `scan` writes one.
 If the table has no partitions, `scan` creates three: two swap partitions, each a quarter of the disk, the first of them active, and a log partition from the rest.
+
+When `init` has read the table, it releases `Partitions`, and `scan` exits, so that nothing keeps hd0's whole block device after the boot (#463).
 
 === `partition`
 
