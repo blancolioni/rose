@@ -17,6 +17,36 @@ package Rose.Server is
       Endpoint : Rose.Objects.Endpoint_Id;
       Handler  : Invocation_Handler);
 
+   type Owner_Function is access
+     function (Identifier : Rose.Objects.Capability_Identifier)
+               return Boolean;
+
+   procedure Register_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Invocation_Handler;
+      Owns     : Owner_Function);
+   --  As Register_Handler, for a handler that serves only the objects
+   --  for which Owns is true (idle#84). Several handlers can share an
+   --  endpoint, as the server packages of two interfaces with a common
+   --  ancestor do: a call goes to the first whose Owns is true for its
+   --  identifier. A handler registered without Owns serves every
+   --  identifier.
+
+   function New_Identifier return Rose.Objects.Capability_Identifier;
+   --  An identifier for a new object, unique in the process among the
+   --  identifiers in use, so that the objects of every server package in
+   --  the process can be told apart (idle#84). It is never 0, the
+   --  identifier of an endpoint that is not instanced. A freed identifier
+   --  is given out again only after every other one has been. Raises
+   --  Constraint_Error if all are in use.
+
+   procedure Free_Identifier
+     (Identifier : Rose.Objects.Capability_Identifier);
+   --  Identifier can be given out again. Call it only once every cap
+   --  with Identifier has been rescinded, so that none can reach the next
+   --  object to have it.
+
    procedure Receive_Message
      (Context : in out Server_Context);
    --  wait for a single message on one of the context endpoints
@@ -95,6 +125,10 @@ private
    --  As many as the kernel registers for a process
    --  (Rose.Kernel.Processes.Max_Registered_Endpoints).
 
+   Max_Handlers : constant := 2 * Max_Handled_Endpoints;
+   --  Handlers that share an endpoint each have a record, so there can be
+   --  more records than endpoints.
+
    --  A userland process has a heap, so the table of an instanced server
    --  has no fixed size: it holds the caps of each object, found by the
    --  object's identifier, and grows with the objects the server serves.
@@ -124,12 +158,13 @@ private
       record
          Endpoint  : Rose.Objects.Endpoint_Id;
          Handler   : Invocation_Handler;
+         Owns      : Owner_Function;
          Blocked   : Boolean;
          Params    : Rose.Invocation.Invocation_Record;
       end record;
 
    type Endpoint_Array is
-     array (1 .. Max_Handled_Endpoints) of Endpoint_Record;
+     array (1 .. Max_Handlers) of Endpoint_Record;
 
    type Server_Context is limited
       record

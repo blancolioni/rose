@@ -401,7 +401,10 @@ The package names other interfaces, and its own client, through `limited with` c
 The generated handlers look the object up and make a dispatching call to its primitive.
 |===
 
-An object's identifier is its position among the objects attached to the interface, so the first is 0.
+An object's identifier comes from `Rose.Server.New_Identifier`, and is unique in the process among the identifiers in use (idle#84).
+The server packages of interfaces with a common ancestor can therefore be attached in one process: each registers its handlers with `Owns`, and `Rose.Server` sends an invocation to the handler whose package has an object with its identifier.
+A resource that is released frees its identifier once its capabilities are rescinded, and `New_Identifier` gives a freed identifier out again only after every other one.
+Identifier 0 names the object in a package's first slot.
 That is the identifier of the capabilities that a kernel-target server creates when it is not instanced, and of the kernel's restore notice, so a server that serves one object behaves exactly as a kernel-target server that is not instanced.
 A server holds up to 16 objects for each interface.
 An invocation whose identifier has no object gets the error `Invalid_Operation`.
