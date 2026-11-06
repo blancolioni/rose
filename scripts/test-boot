@@ -10,7 +10,9 @@
 #      kernel restored the derivation records that init's test left,
 #      logs in as the first user, and runs run_self_tests, which has to
 #      pass every test, then keytest, which has to draw in the corners of
-#      the 80 by 24 screen and move its mark with the arrow keys (#734);
+#      the 80 by 24 screen and move its mark with the arrow keys (#734),
+#      then kilo, which has to make, save and read back a file, and drop
+#      a change that isn't saved (#735);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent.
 #
@@ -63,6 +65,9 @@ set -- $(echo "$result" \
 
 echo "Running keytest on the 80 by 24 text screen"
 check_keytest
+
+echo "Editing a file with kilo"
+check_kilo
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

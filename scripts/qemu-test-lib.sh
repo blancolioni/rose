@@ -172,3 +172,52 @@ check_keytest () {
 "
     wait_for "> echo editing" 20 || fail "line editing is not back on"
 }
+
+check_kilo () {
+    # Edit a new file with kilo (#735): type a line, save it with Ctrl-S,
+    # quit with Ctrl-Q, and check the file with cat. Then add a second
+    # line and save again. Then type at the start of the file and quit
+    # without saving, which takes Ctrl-Q four times, and check that the
+    # change was dropped (ADR 0026).
+    type_text "kilo notes
+"
+    wait_for "HELP: Ctrl-S" 30 || fail "kilo did not start"
+    type_text "hello from kilo"
+    monitor "sendkey ctrl-s"
+    wait_for "16 bytes written" 20 || fail "kilo did not save"
+    monitor "sendkey ctrl-q"
+    sleep 3
+    type_text "cat notes
+"
+    wait_for "^hello from kilo" 20 || fail "cat did not show what kilo saved"
+
+    type_text "kilo notes
+"
+    wait_for "kilo - 1 lines" 30 || fail "kilo did not read the file"
+    monitor "sendkey down"
+    type_text "second line"
+    monitor "sendkey ctrl-s"
+    wait_for "28 bytes written" 20 || fail "kilo did not save a second line"
+    monitor "sendkey ctrl-q"
+    sleep 3
+    type_text "cat notes
+"
+    wait_for "^second line" 20 || fail "cat did not show the second line"
+
+    type_text "kilo notes
+"
+    wait_for "kilo - 2 lines" 30 || fail "kilo did not read both lines"
+    type_text "dropped"
+    wait_for "(modified)" 20 || fail "kilo did not mark the change"
+    for i in 1 2 3 4; do
+        monitor "sendkey ctrl-q"
+        sleep 1
+    done
+    sleep 3
+    type_text "cat notes
+"
+    wait_for "^second line" 20 || fail "cat did not show the file after kilo"
+    screen | grep -q "dropped" && fail "kilo saved a change it should drop"
+    screen | grep -q "^hello from kilo" \
+        || fail "the file lost its first line"
+}

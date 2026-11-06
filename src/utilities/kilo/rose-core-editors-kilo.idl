@@ -1,0 +1,16 @@
+command Rose.Core.Editors.Kilo : Console
+  with Summary     => "Edit a text file.",
+       Description => """
+          Kilo is a full-screen editor for FILE, a file in the current
+          directory, which is made if it doesn't exist. It is ported from
+          kilo, by Salvatore Sanfilippo. Ctrl-S saves the file, which
+          changes it at once (ADR 0026), Ctrl-F finds text, and Ctrl-Q
+          quits. With changes that haven't been saved, Ctrl-Q warns, and
+          quits when it is pressed three more times; the changes are
+          dropped. A file holds at most 64 KiB, and only printable ASCII
+          and Tab can be typed.
+          """
+is
+   File : in Transactional_Writable_File
+     with Help => "the file to edit";
+end Rose.Core.Editors.Kilo;
