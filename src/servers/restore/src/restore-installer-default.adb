@@ -83,6 +83,7 @@ package body Restore.Installer.Default is
       Process ("run_self_tests", "bin", Save, Default_Flags);
       Process ("argv", "bin", Save, Default_Flags);
       Process ("keytest", "bin", Save, Default_Flags);
+      Process ("kilo", "bin", Save, Default_Flags);
       Process ("petal", "bin", Save,
                (Requires_Input_Stream => True,
                 others => False));
