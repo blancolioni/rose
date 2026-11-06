@@ -73,6 +73,17 @@ package body Petal.Command_Launch is
 
    type Bound_Value_Array is array (1 .. Max_Arguments) of Bound_Value;
 
+   type Output_Kind is (Console_Output, Replace_Output, Append_Output);
+
+   type Redirection is
+      record
+         Kind   : Output_Kind := Console_Output;
+         Target : Slice;
+      end record;
+   --  Where a command's standard output goes: to petal's own, or to the
+   --  file whose name is Target in the command line, which "> name"
+   --  replaces and ">> name" adds to (#338).
+
    Metadata : String (1 .. Max_Text);
    Current  : Signature;
    --  The metadata and signature of the command being run. They are too
@@ -149,10 +160,12 @@ package body Petal.Command_Launch is
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
-      Sudo         : String);
+      Sudo         : String;
+      Output       : Redirection);
    --  Bind words 2 .. Count of Line to the arguments of Item, launch the
    --  command through Client, and call it. Sudo is the categories that
    --  the user named with sudo, separated by commas, or "" for no sudo.
+   --  Output is where the command's standard output goes.
 
    function Lower (Text : String) return String;
 
@@ -166,12 +179,14 @@ package body Petal.Command_Launch is
    procedure Put_Version (Item : Signature);
 
    procedure Run_Command
-     (Line  : String;
-      Words : Word_Array;
-      Count : Natural;
-      Sudo  : String);
+     (Line      : String;
+      All_Words : Word_Array;
+      All_Count : Natural;
+      Sudo      : String);
    --  Run the command that is word 1 of Line, with the arguments that are
-   --  words 2 .. Count. Sudo is as for Launch.
+   --  words 2 .. All_Count, less a redirection of its standard output:
+   --  "> name" or ">> name", with or without the space, in words that
+   --  are not quoted (#338). Sudo is as for Launch.
 
    procedure Split
      (Line  : String;
@@ -198,7 +213,8 @@ package body Petal.Command_Launch is
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
-      Sudo         : String)
+      Sudo         : String;
+      Output       : Redirection)
    is
       --  Slices of the command line keep its indices, so a slice of a
       --  word is also a slice of Line.
@@ -221,6 +237,11 @@ package body Petal.Command_Launch is
 
       Gave_Console : Boolean := False;
       --  The command has the Console role.
+
+      Output_Cap   : Rose.Capabilities.Capability :=
+        Rose.Standard_Streams.Standard_Output;
+      --  The command's standard output: petal's own, or the writer on the
+      --  file it is redirected to.
 
       function Word_Text (Index : Positive) return String
       is (Line (Words (Index).First .. Words (Index).Last));
@@ -687,6 +708,39 @@ package body Petal.Command_Launch is
          end;
       end loop;
 
+      --  The redirection is petal's: the command sees only a writer, and
+      --  petal commits the file's version when the command completes
+      --  (ADR 0026; #338). It comes after the arguments, so that a file
+      --  that an argument has a version of is reported.
+
+      if not Failed and then Output.Kind /= Console_Output then
+         if not (for some Stream of Item.Streams (1 .. Item.Stream_Count)
+                   => Stream.Kind = Output_Stream)
+         then
+            Fail ("has no standard output to redirect");
+         else
+            declare
+               use all type Petal.Session.Version_Lookup;
+               Name   : constant String :=
+                 Line (Output.Target.First .. Output.Target.Last);
+               Result : Petal.Session.Version_Lookup;
+            begin
+               Petal.Session.Redirect_Output
+                 (Name, Output.Kind = Append_Output, Output_Cap, Result);
+               case Result is
+                  when Version_Made =>
+                     null;
+                  when Not_A_Version_File =>
+                     Fail ("'" & Name & "' is not a file");
+                  when No_Version =>
+                     Fail ("cannot write '" & Name & "'");
+                  when No_Version_Directory =>
+                     Fail ("no directory to write '" & Name & "' in");
+               end case;
+            end;
+         end if;
+      end if;
+
       if Failed then
          return;
       end if;
@@ -788,7 +842,7 @@ package body Petal.Command_Launch is
             Caps (Stream.Cap_Index + 1) :=
               (case Stream.Kind is
                   when Input_Stream  => Rose.Standard_Streams.Standard_Input,
-                  when Output_Stream => Rose.Standard_Streams.Standard_Output,
+                  when Output_Stream => Output_Cap,
                   when Error_Stream  => Rose.Standard_Streams.Standard_Error);
             Cap_Count := Natural'Max (Cap_Count, Stream.Cap_Index + 1);
          end loop;
@@ -875,6 +929,12 @@ package body Petal.Command_Launch is
          if Gave_Console then
             Reset_Console;
          end if;
+
+         Petal.Session.End_Redirection
+           (Completed =>
+              not Params.Control.Flags (Rose.Invocation.Error)
+              and then not (Params.Control.Flags (Rose.Invocation.Send_Words)
+                            and then Params.Data (0) /= 0));
 
          if Params.Control.Flags (Rose.Invocation.Error) then
             Fail ("the launch call failed");
@@ -1110,11 +1170,18 @@ package body Petal.Command_Launch is
    -----------------
 
    procedure Run_Command
-     (Line  : String;
-      Words : Word_Array;
-      Count : Natural;
-      Sudo  : String)
+     (Line      : String;
+      All_Words : Word_Array;
+      All_Count : Natural;
+      Sudo      : String)
    is
+      Words  : Word_Array;
+      Count  : Natural := 0;
+      Output : Redirection;
+      Valid  : Boolean := True;
+      --  The words of the command and its arguments, and where its
+      --  output goes.
+
       function Word_Text (Index : Positive) return String
       is (Line (Words (Index).First .. Words (Index).Last));
 
@@ -1137,6 +1204,56 @@ package body Petal.Command_Launch is
       end Options_Last;
 
    begin
+      declare
+         Index : Positive := 1;
+      begin
+         while Index <= All_Count loop
+            declare
+               Word   : constant Slice := All_Words (Index);
+               Text   : constant String := Line (Word.First .. Word.Last);
+               Quoted : constant Boolean :=
+                 Word.First > Line'First and then Line (Word.First - 1) = '"';
+               Length : constant Natural :=
+                 (if Quoted or else Text'Length = 0
+                    or else Text (Text'First) /= '>'
+                  then 0
+                  elsif Text'Length > 1 and then Text (Text'First + 1) = '>'
+                  then 2
+                  else 1);
+               --  The length of the operator that Text starts with.
+            begin
+               if Length = 0 then
+                  Count := Count + 1;
+                  Words (Count) := Word;
+               elsif Index = 1 then
+                  Error ("missing command before " & Text);
+                  Valid := False;
+               elsif Output.Kind /= Console_Output then
+                  Error ("standard output is redirected more than once");
+                  Valid := False;
+               else
+                  Output.Kind :=
+                    (if Length = 2 then Append_Output else Replace_Output);
+                  if Text'Length > Length then
+                     Output.Target := (Word.First + Length, Word.Last);
+                  elsif Index < All_Count then
+                     Index := Index + 1;
+                     Output.Target := All_Words (Index);
+                  else
+                     Error ("missing file name after " & Text);
+                     Valid := False;
+                  end if;
+               end if;
+            end;
+            exit when not Valid;
+            Index := Index + 1;
+         end loop;
+      end;
+
+      if not Valid then
+         return;
+      end if;
+
       declare
          Name   : constant String := Lower (Word_Text (1));
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -1174,12 +1291,16 @@ package body Petal.Command_Launch is
          then
             Put_Version (Current);
          else
-            Launch (Name, Current, Client, Line, Words, Count, Sudo);
+            Launch
+              (Name, Current, Client, Line, Words, Count, Sudo, Output);
 
             --  The command commits its versions itself (ADR 0026), so
             --  they are released whether it completed, failed, or wasn't
-            --  run, which drops what it didn't commit.
+            --  run, which drops what it didn't commit. Launch ends a
+            --  redirection when the command ends; if it wasn't run, the
+            --  redirection is ended here, and the file is as it was.
 
+            Petal.Session.End_Redirection (Completed => False);
             Petal.Session.Release_Versions;
             Petal.Session.Release_Files;
          end if;

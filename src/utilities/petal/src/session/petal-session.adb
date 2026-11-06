@@ -8,6 +8,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Releasable_Writer.Client;
 with Rose.Interfaces.Transactional_Writable_File.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
 with Rose.Interfaces.Writable_File.Client;
@@ -62,6 +63,15 @@ package body Petal.Session is
    --  The versions that New_Version made, whose interface caps the
    --  command is given.
 
+   Redirected    : Boolean := False;
+   Output_File   : Version_Clients.Transactional_Writable_File_Client;
+   Output_Writer : Rose.Interfaces.Releasable_Writer.Client
+     .Releasable_Writer_Client;
+   Output_Name   : String (1 .. Max_File_Name_Length);
+   Output_Last   : Natural := 0;
+   --  The version that Redirect_Output made, which petal commits, the
+   --  writer on it that the command is given, and the file's name.
+
    Max_Depth : constant := 16;
 
    type Level_Entry is
@@ -94,6 +104,14 @@ package body Petal.Session is
      (Directory : out Writable_Directory_Client;
       Found     : out Boolean);
    --  The current directory, if there is one.
+
+   procedure Make_Version
+     (Name    : String;
+      Version : out Version_Clients.Transactional_Writable_File_Client;
+      Result  : out Version_Lookup);
+   --  A version of the file called Name in the current directory, which
+   --  is created first if there is no entry Name, for New_Version and
+   --  Redirect_Output. Version is opened only if Result is Version_Made.
 
    -------------------
    -- Add_Directory --
@@ -433,6 +451,34 @@ package body Petal.Session is
       end;
    end Current_Grant;
 
+   ---------------------
+   -- End_Redirection --
+   ---------------------
+
+   procedure End_Redirection (Completed : Boolean) is
+   begin
+      if not Redirected then
+         return;
+      end if;
+
+      --  Closing the writer releases it.
+
+      Rose.Interfaces.Releasable_Writer.Client.Close (Output_Writer);
+
+      if Completed then
+         Version_Clients.Commit (Output_File);
+         if Version_Clients.Has_Error then
+            Ada_Text_IO.Put_Line
+              ("petal: cannot write '"
+               & Output_Name (1 .. Output_Last) & "'");
+         end if;
+      end if;
+
+      Version_Clients.Release (Output_File);
+      Version_Clients.Close (Output_File);
+      Redirected := False;
+   end End_Redirection;
+
    --------------------
    -- Find_Directory --
    --------------------
@@ -558,14 +604,14 @@ package body Petal.Session is
       Found := Have_User;
    end Get_User;
 
-   -----------------
-   -- New_Version --
-   -----------------
+   ------------------
+   -- Make_Version --
+   ------------------
 
-   procedure New_Version
-     (Name   : String;
-      File   : out Rose.Capabilities.Capability;
-      Result : out Version_Lookup)
+   procedure Make_Version
+     (Name    : String;
+      Version : out Version_Clients.Transactional_Writable_File_Client;
+      Result  : out Version_Lookup)
    is
       use type Rose.Interfaces.Directory.File_Kind;
       Directory      : Writable_Directory_Client;
@@ -573,8 +619,6 @@ package body Petal.Session is
       Index          : Natural;
       Params         : aliased Rose.Invocation.Invocation_Record;
    begin
-      File := Rose.Capabilities.Null_Capability;
-
       Current_Directory (Directory, Have_Directory);
       if not Have_Directory then
          Result := No_Version_Directory;
@@ -588,9 +632,6 @@ package body Petal.Session is
       then
          Result := Not_A_Version_File;
          return;
-      elsif Version_Count = Max_Versions then
-         Result := No_Version;
-         return;
       end if;
 
       --  The calls that can fail are made here, not through the clients'
@@ -602,7 +643,6 @@ package body Petal.Session is
          Saved_Name : constant String := Name;
          Target     : Rose.Interfaces.Writable_File.Client
            .Writable_File_Client;
-         Version    : Rose.Capabilities.Capability;
       begin
          Rose.System_Calls.Initialize_Send
            (Params,
@@ -642,20 +682,93 @@ package body Petal.Session is
             return;
          end if;
 
-         Version := Params.Caps (0);
+         Version_Clients.Open (Version, Params.Caps (0));
          Rose.Interfaces.Writable_File.Client.Close (Target);
-
-         --  A version starts as a copy of the file. A command that
-         --  replaces it opens the version with Rewrite, and one that adds
-         --  to it with Append (ADR 0009, section 4).
-
-         Version_Count := Version_Count + 1;
-         Version_Clients.Open (Versions (Version_Count), Version);
-         File := Version_Clients.Get_Interface_Cap
-           (Versions (Version_Count));
       end;
       Result := Version_Made;
+   end Make_Version;
+
+   -----------------
+   -- New_Version --
+   -----------------
+
+   procedure New_Version
+     (Name   : String;
+      File   : out Rose.Capabilities.Capability;
+      Result : out Version_Lookup)
+   is
+   begin
+      File := Rose.Capabilities.Null_Capability;
+
+      if Version_Count = Max_Versions then
+         Result := No_Version;
+         return;
+      end if;
+
+      --  A version starts as a copy of the file. A command that replaces
+      --  it opens the version with Rewrite, and one that adds to it with
+      --  Append (ADR 0009, section 4).
+
+      Make_Version (Name, Versions (Version_Count + 1), Result);
+      if Result = Version_Made then
+         Version_Count := Version_Count + 1;
+         File := Version_Clients.Get_Interface_Cap
+           (Versions (Version_Count));
+      end if;
    end New_Version;
+
+   ---------------------
+   -- Redirect_Output --
+   ---------------------
+
+   procedure Redirect_Output
+     (Name   : String;
+      Append : Boolean;
+      Output : out Rose.Capabilities.Capability;
+      Result : out Version_Lookup)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Output := Rose.Capabilities.Null_Capability;
+
+      if Redirected or else Name'Length > Max_File_Name_Length then
+         Result := No_Version;
+         return;
+      end if;
+
+      Make_Version (Name, Output_File, Result);
+      if Result /= Version_Made then
+         return;
+      end if;
+
+      --  The writer is opened here, not through the client's Rewrite or
+      --  Append, for the reason given in Make_Version.
+
+      Rose.System_Calls.Initialize_Send
+        (Params,
+         (if Append then Version_Clients.Get_Append_Cap (Output_File)
+          else Version_Clients.Get_Rewrite_Cap (Output_File)));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         Version_Clients.Release (Output_File);
+         Version_Clients.Close (Output_File);
+         Result := No_Version;
+         return;
+      end if;
+
+      Rose.Interfaces.Releasable_Writer.Client.Open
+        (Output_Writer, Params.Caps (0));
+      Output_Last := Name'Length;
+      Output_Name (1 .. Output_Last) := Name;
+      Redirected := True;
+      Output :=
+        Rose.Interfaces.Releasable_Writer.Client.Get_Write_Cap
+          (Output_Writer);
+   end Redirect_Output;
 
    -------------------
    -- Release_Files --
