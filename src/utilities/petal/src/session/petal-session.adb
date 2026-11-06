@@ -67,9 +67,42 @@ package body Petal.Session is
    Versions      : array (1 .. Max_Versions) of Version_Entry;
    Version_Count : Natural := 0;
 
+   Max_Depth : constant := 16;
+
+   type Level_Entry is
+      record
+         Name      : String (1 .. Max_File_Name_Length);
+         Name_Last : Natural := 0;
+         Directory : Writable_Directory_Client;
+         Grant     : Rose.Interfaces.Directory.Client.Directory_Client;
+         Has_Grant : Boolean := False;
+      end record;
+   --  A directory on the path of the current directory: its name in the
+   --  directory before it, petal's client of it, and its read-only
+   --  grant, once it has been made.
+
+   type Level_Array is array (1 .. Max_Depth) of Level_Entry;
+
+   Current_Root : Natural := 0;
+   --  The root of the current directory, an index in Directories, or 0
+   --  if there is no current directory.
+
+   Levels : Level_Array;
+   Depth  : Natural := 0;
+   --  The path from the root to the current directory.
+
+   procedure Close_Level (Item : in out Level_Entry);
+   --  Delete petal's caps for the directory Item, which is no longer on
+   --  the path of the current directory.
+
    procedure Close_Version (Item : in out Version_Entry);
    --  Delete petal's caps for the version Item, which has been committed
    --  or discarded.
+
+   procedure Current_Directory
+     (Directory : out Writable_Directory_Client;
+      Found     : out Boolean);
+   --  The current directory, if there is one.
 
    -------------------
    -- Add_Directory --
@@ -96,6 +129,222 @@ package body Petal.Session is
          Item.Directory := Directory;
       end;
    end Add_Directory;
+
+   ----------------------
+   -- Change_Directory --
+   ----------------------
+
+   procedure Change_Directory (Path : String) is
+
+      type Name_Entry is
+         record
+            Name : String (1 .. Max_File_Name_Length);
+            Last : Natural := 0;
+         end record;
+
+      Root         : Natural := Current_Root;
+      Target       : array (1 .. Max_Depth) of Name_Entry;
+      Target_Depth : Natural := 0;
+      --  The path of the new current directory, from Root.
+
+      Opened : Level_Array;
+      --  The directories on that path that are not on the current one.
+
+      Keep  : Natural := 0;
+      First : Positive := Path'First;
+
+      procedure Error (Message : String);
+
+      function Target_Name (Level : Positive) return String
+      is (Target (Level).Name (1 .. Target (Level).Last));
+
+      -----------
+      -- Error --
+      -----------
+
+      procedure Error (Message : String) is
+      begin
+         Ada_Text_IO.Put_Line ("petal: cd: " & Message);
+      end Error;
+
+   begin
+      for Level in 1 .. Depth loop
+         Target (Level) :=
+           (Levels (Level).Name, Levels (Level).Name_Last);
+      end loop;
+      Target_Depth := Depth;
+
+      --  [root] starts from the named directory root.
+
+      if Path'Length > 0 and then Path (Path'First) = '[' then
+         declare
+            Close : Natural := 0;
+         begin
+            for I in Path'Range loop
+               if Path (I) = ']' then
+                  Close := I;
+                  exit;
+               end if;
+            end loop;
+
+            if Close = 0 then
+               Error ("missing ']' in " & Path);
+               return;
+            end if;
+
+            Root := 0;
+            for I in 1 .. Directory_Count loop
+               if Directories (I).Name (1 .. Directories (I).Name_Last)
+                 = Path (Path'First + 1 .. Close - 1)
+               then
+                  Root := I;
+                  exit;
+               end if;
+            end loop;
+
+            if Root = 0 then
+               Error ("no directory named " & Path (Path'First .. Close));
+               return;
+            end if;
+
+            Target_Depth := 0;
+            First := Close + 1;
+         end;
+      end if;
+
+      if Root = 0 then
+         Error ("there is no current directory");
+         return;
+      end if;
+
+      --  The names, separated by "/".
+
+      while First <= Path'Last loop
+         declare
+            Last : Natural := First - 1;
+         begin
+            while Last < Path'Last and then Path (Last + 1) /= '/' loop
+               Last := Last + 1;
+            end loop;
+
+            declare
+               Name : constant String := Path (First .. Last);
+            begin
+               if Name = "" or else Name = "." then
+                  null;
+               elsif Name = ".." then
+                  if Target_Depth = 0 then
+                     Error ("[" & Directories (Root).Name
+                            (1 .. Directories (Root).Name_Last)
+                            & "] has no parent");
+                     return;
+                  end if;
+                  Target_Depth := Target_Depth - 1;
+               elsif Name'Length > Max_File_Name_Length then
+                  Error ("name too long: " & Name);
+                  return;
+               elsif Target_Depth = Max_Depth then
+                  Error (Path & ": too deep");
+                  return;
+               else
+                  Target_Depth := Target_Depth + 1;
+                  Target (Target_Depth).Name (1 .. Name'Length) := Name;
+                  Target (Target_Depth).Last := Name'Length;
+               end if;
+            end;
+
+            First := Last + 2;
+         end;
+      end loop;
+
+      --  The directories that the two paths share stay open.
+
+      if Root = Current_Root then
+         while Keep < Depth and then Keep < Target_Depth
+           and then Levels (Keep + 1).Name (1 .. Levels (Keep + 1).Name_Last)
+                      = Target_Name (Keep + 1)
+         loop
+            Keep := Keep + 1;
+         end loop;
+      end if;
+
+      for Level in Keep + 1 .. Target_Depth loop
+         declare
+            use type Rose.Interfaces.Directory.File_Kind;
+            Name   : constant String := Target_Name (Level);
+            Parent : constant Writable_Directory_Client :=
+              (if Level > Keep + 1 then Opened (Level - 1).Directory
+               elsif Level > 1 then Levels (Level - 1).Directory
+               else Directories (Root).Directory);
+            Index  : constant Natural := Find_Entry (Parent, Name);
+            Params : aliased Rose.Invocation.Invocation_Record;
+            Failed : Boolean := False;
+         begin
+            if Index = 0 then
+               Error ("no directory named '" & Name & "'");
+               Failed := True;
+            elsif Directory_Entry_Kind (Parent, Index)
+              /= Rose.Interfaces.Directory.Directory
+            then
+               Error ("'" & Name & "' is not a directory");
+               Failed := True;
+            else
+
+               --  The call is made here, not through
+               --  Get_Writable_Directory, which opens a client of the
+               --  result even when the directory refuses.
+
+               Rose.System_Calls.Initialize_Send
+                 (Params, Get_Get_Writable_Directory_Cap (Parent));
+               Rose.System_Calls.Send_Word (Params, Index);
+               Rose.System_Calls.Receive_Caps (Params, 1);
+               Rose.System_Calls.Invoke_Capability (Params);
+
+               if Params.Control.Flags (Rose.Invocation.Error)
+                 or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+               then
+                  Error ("cannot open '" & Name & "'");
+                  Failed := True;
+               end if;
+            end if;
+
+            if Failed then
+               for Item of Opened (Keep + 1 .. Level - 1) loop
+                  Close_Level (Item);
+               end loop;
+               return;
+            end if;
+
+            Open (Opened (Level).Directory, Params.Caps (0));
+            Opened (Level).Name := Target (Level).Name;
+            Opened (Level).Name_Last := Target (Level).Last;
+         end;
+      end loop;
+
+      for Item of Levels (Keep + 1 .. Depth) loop
+         Close_Level (Item);
+      end loop;
+
+      Levels (Keep + 1 .. Target_Depth) := Opened (Keep + 1 .. Target_Depth);
+      Depth := Target_Depth;
+      Current_Root := Root;
+   end Change_Directory;
+
+   -----------------
+   -- Close_Level --
+   -----------------
+
+   procedure Close_Level (Item : in out Level_Entry) is
+   begin
+      if Item.Has_Grant then
+         Rose.System_Calls.Delete_Cap
+           (Rose.Interfaces.Directory.Client.Get_Interface_Cap (Item.Grant));
+         Rose.Interfaces.Directory.Client.Close (Item.Grant);
+         Item.Has_Grant := False;
+      end if;
+      Rose.System_Calls.Delete_Cap (Get_Interface_Cap (Item.Directory));
+      Close (Item.Directory);
+   end Close_Level;
 
    -------------------
    -- Close_Version --
@@ -126,6 +375,102 @@ package body Petal.Session is
       end loop;
       Version_Count := 0;
    end Commit_Versions;
+
+   -----------------------
+   -- Current_Directory --
+   -----------------------
+
+   procedure Current_Directory
+     (Directory : out Writable_Directory_Client;
+      Found     : out Boolean)
+   is
+   begin
+      if Depth > 0 then
+         Directory := Levels (Depth).Directory;
+         Found := True;
+      elsif Current_Root > 0 then
+         Directory := Directories (Current_Root).Directory;
+         Found := True;
+      else
+         Found := False;
+      end if;
+   end Current_Directory;
+
+   ----------------------------
+   -- Current_Directory_Name --
+   ----------------------------
+
+   function Current_Directory_Name return String is
+      Result : String (1 .. Max_Name_Length + 2
+                       + Max_Depth * (Max_File_Name_Length + 1));
+      Last   : Natural := 0;
+
+      procedure Add (Text : String);
+
+      ---------
+      -- Add --
+      ---------
+
+      procedure Add (Text : String) is
+      begin
+         Result (Last + 1 .. Last + Text'Length) := Text;
+         Last := Last + Text'Length;
+      end Add;
+
+   begin
+      if Current_Root = 0 then
+         return "";
+      end if;
+
+      Add ("[" & Directories (Current_Root).Name
+           (1 .. Directories (Current_Root).Name_Last) & "]");
+      for Item of Levels (1 .. Depth) loop
+         Add ("/" & Item.Name (1 .. Item.Name_Last));
+      end loop;
+      return Result (1 .. Last);
+   end Current_Directory_Name;
+
+   -------------------
+   -- Current_Grant --
+   -------------------
+
+   procedure Current_Grant
+     (Writable : Boolean;
+      Grant    : out Rose.Capabilities.Capability;
+      Found    : out Boolean)
+   is
+   begin
+      if Depth = 0 then
+         if Current_Root = 0 then
+            Grant := Rose.Capabilities.Null_Capability;
+            Found := False;
+         else
+            Find_Grant
+              (Directories (Current_Root).Name
+                 (1 .. Directories (Current_Root).Name_Last),
+               Writable, Grant, Found);
+         end if;
+         return;
+      end if;
+
+      declare
+         Item : Level_Entry renames Levels (Depth);
+      begin
+         if Writable then
+            Grant := Get_Interface_Cap (Item.Directory);
+         else
+            if not Item.Has_Grant then
+               Item.Grant :=
+                 Rose.Interfaces.Writable_Directory.Client.Conversions
+                   .To_Directory (Item.Directory);
+               Item.Has_Grant := True;
+            end if;
+            Grant :=
+              Rose.Interfaces.Directory.Client.Get_Interface_Cap (Item.Grant);
+         end if;
+         Found := Grant /= Rose.Capabilities.Null_Capability;
+      end;
+   end Current_Grant;
 
    ----------------------
    -- Discard_Versions --
@@ -173,24 +518,24 @@ package body Petal.Session is
       Result   : out File_Lookup)
    is
       use type Rose.Interfaces.Directory.File_Kind;
-      Home      : Writable_Directory_Client;
-      Have_Home : Boolean;
-      Index     : Natural;
-      Params    : aliased Rose.Invocation.Invocation_Record;
+      Directory      : Writable_Directory_Client;
+      Have_Directory : Boolean;
+      Index          : Natural;
+      Params         : aliased Rose.Invocation.Invocation_Record;
    begin
       File := Rose.Capabilities.Null_Capability;
 
-      Find_Directory (Home_Name, Home, Have_Home);
-      if not Have_Home then
+      Current_Directory (Directory, Have_Directory);
+      if not Have_Directory then
          Result := No_Directory;
          return;
       end if;
 
-      Index := Find_Entry (Home, Name);
+      Index := Find_Entry (Directory, Name);
       if Index = 0 then
          Result := No_Such_File;
          return;
-      elsif Directory_Entry_Kind (Home, Index)
+      elsif Directory_Entry_Kind (Directory, Index)
         /= Rose.Interfaces.Directory.Ordinary_File
       then
          Result := Not_A_File;
@@ -203,8 +548,8 @@ package body Petal.Session is
 
       Rose.System_Calls.Initialize_Send
         (Params,
-         (if Writable then Get_Get_Writable_File_Cap (Home)
-          else Get_Get_Ordinary_File_Cap (Home)));
+         (if Writable then Get_Get_Writable_File_Cap (Directory)
+          else Get_Get_Ordinary_File_Cap (Directory)));
       Rose.System_Calls.Send_Word (Params, Index);
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -277,22 +622,22 @@ package body Petal.Session is
       Result : out Version_Lookup)
    is
       use type Rose.Interfaces.Directory.File_Kind;
-      Home      : Writable_Directory_Client;
-      Have_Home : Boolean;
-      Index     : Natural;
-      Params    : aliased Rose.Invocation.Invocation_Record;
+      Directory      : Writable_Directory_Client;
+      Have_Directory : Boolean;
+      Index          : Natural;
+      Params         : aliased Rose.Invocation.Invocation_Record;
    begin
       File := Rose.Capabilities.Null_Capability;
 
-      Find_Directory (Home_Name, Home, Have_Home);
-      if not Have_Home then
+      Current_Directory (Directory, Have_Directory);
+      if not Have_Directory then
          Result := No_Version_Directory;
          return;
       end if;
 
-      Index := Find_Entry (Home, Name);
+      Index := Find_Entry (Directory, Name);
       if Index /= 0
-        and then Directory_Entry_Kind (Home, Index)
+        and then Directory_Entry_Kind (Directory, Index)
           /= Rose.Interfaces.Directory.Ordinary_File
       then
          Result := Not_A_Version_File;
@@ -308,7 +653,7 @@ package body Petal.Session is
       --  opens a client of the result even when the directory refuses.
 
       Rose.System_Calls.Initialize_Send
-        (Params, Get_New_File_Version_Cap (Home));
+        (Params, Get_New_File_Version_Cap (Directory));
       Rose.System_Calls.Send_Text (Params, Name);
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -454,6 +799,7 @@ package body Petal.Session is
       Have_User := True;
       if Get_Interface_Cap (Home) /= Rose.Capabilities.Null_Capability then
          Add_Directory (Home_Name, Home);
+         Current_Root := Directory_Count;
       end if;
    end Start;
 

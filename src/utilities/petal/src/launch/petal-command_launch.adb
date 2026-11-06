@@ -105,8 +105,8 @@ package body Petal.Command_Launch is
                 and then Value (Item, Argument.Interface_Name)
                            = "Directory"));
    --  True if Argument is an in Directory or an in Writable_Directory. It
-   --  names a directory in petal's table, and is bound to home if it is
-   --  not given (ADR 0003, section 6).
+   --  names a directory in petal's table, and is bound to the current
+   --  directory if it is not given (ADR 0003, section 6; #342).
 
    function Is_In_File
      (Item     : Signature;
@@ -675,9 +675,8 @@ package body Petal.Command_Launch is
                declare
                   Found : Boolean;
                begin
-                  Petal.Session.Find_Grant
-                    (Petal.Session.Home_Name,
-                     Is_Writable_Directory (Item, Argument),
+                  Petal.Session.Current_Grant
+                    (Is_Writable_Directory (Item, Argument),
                      Values (Index).Cap, Found);
                   if Found then
                      Values (Index).Is_Set := True;
@@ -1096,6 +1095,30 @@ package body Petal.Command_Launch is
                   Line (Words (2).First .. Words (2).Last));
             end;
          end if;
+
+      --  cd and pwd are built in: the current directory is petal's own
+      --  (#342, #343).
+
+      elsif Lower (Line (Words (1).First .. Words (1).Last)) = "cd" then
+         if Count > 2 then
+            Error ("cd: too many arguments");
+         elsif Count = 2 then
+            Petal.Session.Change_Directory
+              (Line (Words (2).First .. Words (2).Last));
+         else
+            Petal.Session.Change_Directory
+              ("[" & Petal.Session.Home_Name & "]");
+         end if;
+
+      elsif Lower (Line (Words (1).First .. Words (1).Last)) = "pwd" then
+         if Count > 1 then
+            Error ("pwd: too many arguments");
+         elsif Petal.Session.Current_Directory_Name = "" then
+            Error ("pwd: there is no current directory");
+         else
+            Ada_Text_IO.Put_Line (Petal.Session.Current_Directory_Name);
+         end if;
+
       else
          Run_Command (Line, Words, Count, "");
       end if;
