@@ -714,11 +714,10 @@ package body Petal.Session is
             Item.Name_Last := Saved_Name'Length;
             Item.Pending := True;
 
-            --  A version starts as a copy of the file. The command
-            --  replaces the file (ADR 0012, section 4); appending (#338)
-            --  would keep the copy.
+            --  A version starts as a copy of the file. A command that
+            --  replaces it opens the version with Rewrite, and one that
+            --  adds to it with Append (ADR 0009, section 4).
 
-            Rose.Interfaces.Writable_File.Client.Truncate (Item.File, 0);
             File := Rose.Interfaces.Writable_File.Client.Get_Interface_Cap
               (Item.File);
          end;

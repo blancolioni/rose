@@ -7,6 +7,7 @@ with Rose.Interfaces.Auth.Client;
 with Rose.Interfaces.Auth_Admin.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Rights.Client;
+with Rose.Interfaces.Releasable_Writer.Client;
 with Rose.Interfaces.Rights_Admin.Client;
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
@@ -128,11 +129,13 @@ package body Init.Users is
    is
       use Rose.Interfaces.Writable_Directory.Client;
       package Files renames Rose.Interfaces.Writable_File.Client;
+      package Writers renames Rose.Interfaces.Releasable_Writer.Client;
 
       Admin_Client : Rose.Interfaces.Auth_Admin.Client.Auth_Admin_Client;
       User_Client  : Rose.Interfaces.User.Client.User_Client;
       Directory    : Writable_Directory_Client;
       Rc_File      : Files.Writable_File_Client;
+      Rc_Writer    : Writers.Releasable_Writer_Client;
       Rc_Text      : Storage_Array (1 .. Petal_Rc'Length);
    begin
       User := Rose.Capabilities.Null_Capability;
@@ -169,7 +172,10 @@ package body Init.Users is
          Rc_Text (Storage_Offset (I - Petal_Rc'First + 1)) :=
            Character'Pos (Petal_Rc (I));
       end loop;
-      Files.Write (Rc_File, Rc_Text);
+      Rc_Writer := Files.Rewrite (Rc_File);
+      Writers.Write (Rc_Writer, Rc_Text);
+      Writers.Release (Rc_Writer);
+      Writers.Close (Rc_Writer);
 
       User := Rose.Interfaces.User.Client.Get_Interface_Cap (User_Client);
       Home := Get_Interface_Cap (Directory);

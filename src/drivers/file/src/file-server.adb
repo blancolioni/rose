@@ -7,6 +7,9 @@ with Rose.Words;
 with Rose.Interfaces.File_Control.Server;
 with Rose.Interfaces.Releasable_Reader;
 with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Releasable_Writer;
+with Rose.Interfaces.Releasable_Writer.Client;
+with Rose.Interfaces.Releasable_Writer.Server;
 with Rose.Interfaces.Seekable_Reader;
 with Rose.Interfaces.Seekable_Reader.Client;
 with Rose.Interfaces.Seekable_Reader.Server;
@@ -22,6 +25,7 @@ package body File.Server is
    use System.Storage_Elements;
 
    package Reader_Server renames Rose.Interfaces.Seekable_Reader.Server;
+   package Writer_Server renames Rose.Interfaces.Releasable_Writer.Server;
    package File_Server renames Rose.Interfaces.Writable_File.Server;
    package Version_Server renames
      Rose.Interfaces.Transactional_Writable_File.Server;
@@ -31,6 +35,8 @@ package body File.Server is
      Rose.Interfaces.Writable_File.Writable_File_Object'Class;
    subtype Version_Class is
      Versions.Transactional_Writable_File_Object'Class;
+   subtype Writer_Class is
+     Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class;
 
    Max_Size : constant := 2 ** 16;
    --  A file holds at most 64 KiB for now (#215), in a fixed buffer. A
@@ -60,17 +66,20 @@ package body File.Server is
      (Buffer : Buffer_Index)
       return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class;
 
-   procedure Truncate
+   function Open_Writer
      (Buffer : Buffer_Index;
-      Size   : Storage_Count);
-   --  Shorten Buffer to Size, and move a reader past the new end back to
-   --  it, as a seek past the end does (#215).
+      Empty  : Boolean)
+      return Writer_Class;
+   --  A writer of Buffer, which is emptied first if Empty is True, and
+   --  a reader past its new end moves back to it, as a seek past the end
+   --  does (#215).
 
    procedure Write
      (Buffer : Buffer_Index;
       Data   : Storage_Array);
-   --  Until writers are worked out (#390), a write goes at the end. A
-   --  write that would go past Max_Size raises, and writes nothing.
+   --  A write goes at the end, since a writer has no position (ADR 0009,
+   --  section 4). A write that would go past Max_Size raises, and writes
+   --  nothing.
 
    --  The file is an object served through Writable_File.
 
@@ -82,12 +91,6 @@ package body File.Server is
       return Rose.Capabilities.Capability
    is (File_Server.Cap_Of
          (Item, Rose.Interfaces.Writable_File.File_Interface));
-
-   overriding function Writer_Cap
-     (Item : in out File_Object)
-      return Rose.Capabilities.Capability
-   is (File_Server.Cap_Of
-         (Item, Rose.Interfaces.Writable_File.Writer_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out File_Object)
@@ -109,13 +112,15 @@ package body File.Server is
       return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class
    is (Open_Seekable_Reader (File_Buffer));
 
-   overriding procedure Write
-     (Item   : in out File_Object;
-      Buffer : Storage_Array);
+   overriding function Append
+     (Item : in out File_Object)
+      return Writer_Class
+   is (Open_Writer (File_Buffer, Empty => False));
 
-   overriding procedure Truncate
-     (Item : in out File_Object;
-      Size : Storage_Count);
+   overriding function Rewrite
+     (Item : in out File_Object)
+      return Writer_Class
+   is (Open_Writer (File_Buffer, Empty => True));
 
    overriding function New_Version
      (Item : in out File_Object)
@@ -136,11 +141,6 @@ package body File.Server is
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
    is (Version_Server.Cap_Of (Item, Versions.File_Interface));
-
-   overriding function Writer_Cap
-     (Item : in out Version_Object)
-      return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.Writer_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out Version_Object)
@@ -177,13 +177,15 @@ package body File.Server is
       return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class
    is (Open_Seekable_Reader (Version_Buffer));
 
-   overriding procedure Write
-     (Item   : in out Version_Object;
-      Buffer : Storage_Array);
+   overriding function Append
+     (Item : in out Version_Object)
+      return Writer_Class
+   is (Open_Writer (Version_Buffer, Empty => False));
 
-   overriding procedure Truncate
-     (Item : in out Version_Object;
-      Size : Storage_Count);
+   overriding function Rewrite
+     (Item : in out Version_Object)
+      return Writer_Class
+   is (Open_Writer (Version_Buffer, Empty => True));
 
    overriding function New_Version
      (Item : in out Version_Object)
@@ -267,6 +269,52 @@ package body File.Server is
    procedure Check (Item : Reader_Object'Class);
    --  Raise Ended_Version if Item read a version that has been released.
 
+   --  Writers (ADR 0009, section 4). A writer has no position, since it
+   --  writes at the end, so any number can be open at once. A writer is a
+   --  resource, and comes from a pool, as a reader does.
+
+   type Writer_Object;
+
+   type Writer_Access is access Writer_Object;
+
+   type Writer_Object is
+     limited new Writer_Server.Releasable_Writer_Interface with
+      record
+         Open   : Boolean := False;
+         Buffer : Buffer_Index := File_Buffer;
+         --  What the writer writes.
+         Ended  : Boolean := False;
+         --  The writer wrote a version that has been released.
+         Next   : Writer_Access;
+         --  The next writer in the pool.
+      end record;
+
+   overriding function Writer_Cap
+     (Item : in out Writer_Object)
+      return Rose.Capabilities.Capability
+   is (Writer_Server.Cap_Of
+         (Item, Rose.Interfaces.Releasable_Writer.Writer_Interface));
+
+   overriding function Resource_Cap
+     (Item : in out Writer_Object)
+      return Rose.Capabilities.Capability
+   is (Writer_Server.Cap_Of
+         (Item, Rose.Interfaces.Releasable_Writer.Resource_Interface));
+
+   overriding function Releasable_Writer_Cap
+     (Item : in out Writer_Object)
+      return Rose.Capabilities.Capability
+   is (Writer_Server.Cap_Of (Item));
+
+   overriding procedure Write
+     (Item   : in out Writer_Object;
+      Buffer : Storage_Array);
+
+   overriding procedure Release (Item : in out Writer_Object);
+
+   procedure Check (Item : Writer_Object'Class);
+   --  Raise Ended_Version if Item wrote a version that has been released.
+
    Ended_Version : exception;
 
    --  Only the directory holds File_Control, which the process publishes.
@@ -291,12 +339,25 @@ package body File.Server is
    Control     : aliased Control_Object;
    Readers     : Reader_Access;
    --  Every reader that has been opened, open or not.
+   Writers     : Writer_Access;
+   --  Every writer that has been opened, open or not.
 
    -----------
    -- Check --
    -----------
 
    procedure Check (Item : Reader_Object'Class) is
+   begin
+      if Item.Ended then
+         raise Ended_Version;
+      end if;
+   end Check;
+
+   -----------
+   -- Check --
+   -----------
+
+   procedure Check (Item : Writer_Object'Class) is
    begin
       if Item.Ended then
          raise Ended_Version;
@@ -435,6 +496,49 @@ package body File.Server is
         (Reader.Seekable_Reader_Cap);
    end Open_Seekable_Reader;
 
+   -----------------
+   -- Open_Writer --
+   -----------------
+
+   function Open_Writer
+     (Buffer : Buffer_Index;
+      Empty  : Boolean)
+      return Writer_Class
+   is
+      Writer : Writer_Access := Writers;
+   begin
+      if Empty then
+         Lengths (Buffer) := 0;
+         declare
+            Reader : Reader_Access := Readers;
+         begin
+            while Reader /= null loop
+               if Reader.Open and then Reader.Buffer = Buffer then
+                  Reader.Position := 0;
+               end if;
+               Reader := Reader.Next;
+            end loop;
+         end;
+      end if;
+
+      while Writer /= null and then Writer.Open loop
+         Writer := Writer.Next;
+      end loop;
+
+      if Writer = null then
+         Writer := new Writer_Object;
+         Writer.Next := Writers;
+         Writers := Writer;
+      end if;
+
+      Writer.Open := True;
+      Writer.Buffer := Buffer;
+      Writer.Ended := False;
+      Writer_Server.Attach (Context, Writer);
+      return Rose.Interfaces.Releasable_Writer.Client.From_Cap
+        (Writer.Releasable_Writer_Cap);
+   end Open_Writer;
+
    ----------
    -- Read --
    ----------
@@ -472,13 +576,14 @@ package body File.Server is
    -- Release --
    -------------
 
-   --  What wasn't committed is dropped, and the version's readers end
-   --  with it: their caps still reach them until their holders release
-   --  them, but they raise Ended_Version. The generated handler then
-   --  detaches the version.
+   --  What wasn't committed is dropped, and the version's readers and
+   --  writers end with it: their caps still reach them until their
+   --  holders release them, but they raise Ended_Version. The generated
+   --  handler then detaches the version.
 
    overriding procedure Release (Item : in out Version_Object) is
       Reader : Reader_Access := Readers;
+      Writer : Writer_Access := Writers;
    begin
       while Reader /= null loop
          if Reader.Open and then Reader.Buffer = Version_Buffer then
@@ -486,6 +591,23 @@ package body File.Server is
          end if;
          Reader := Reader.Next;
       end loop;
+      while Writer /= null loop
+         if Writer.Open and then Writer.Buffer = Version_Buffer then
+            Writer.Ended := True;
+         end if;
+         Writer := Writer.Next;
+      end loop;
+      Item.Open := False;
+   end Release;
+
+   -------------
+   -- Release --
+   -------------
+
+   --  The generated handler then detaches the writer.
+
+   overriding procedure Release (Item : in out Writer_Object) is
+   begin
       Item.Open := False;
    end Release;
 
@@ -528,56 +650,6 @@ package body File.Server is
    end Start_Server;
 
    --------------
-   -- Truncate --
-   --------------
-
-   procedure Truncate
-     (Buffer : Buffer_Index;
-      Size   : Storage_Count)
-   is
-      Reader : Reader_Access := Readers;
-   begin
-      if Size >= Lengths (Buffer) then
-         return;
-      end if;
-
-      Lengths (Buffer) := Size;
-      while Reader /= null loop
-         if Reader.Open
-           and then Reader.Buffer = Buffer
-           and then Reader.Position > Size
-         then
-            Reader.Position := Size;
-         end if;
-         Reader := Reader.Next;
-      end loop;
-   end Truncate;
-
-   --------------
-   -- Truncate --
-   --------------
-
-   overriding procedure Truncate
-     (Item : in out File_Object;
-      Size : Storage_Count)
-   is
-   begin
-      Truncate (File_Buffer, Size);
-   end Truncate;
-
-   --------------
-   -- Truncate --
-   --------------
-
-   overriding procedure Truncate
-     (Item : in out Version_Object;
-      Size : Storage_Count)
-   is
-   begin
-      Truncate (Version_Buffer, Size);
-   end Truncate;
-
-   --------------
    -- Writable --
    --------------
 
@@ -610,23 +682,12 @@ package body File.Server is
    -----------
 
    overriding procedure Write
-     (Item   : in out File_Object;
+     (Item   : in out Writer_Object;
       Buffer : Storage_Array)
    is
    begin
-      Write (File_Buffer, Buffer);
-   end Write;
-
-   -----------
-   -- Write --
-   -----------
-
-   overriding procedure Write
-     (Item   : in out Version_Object;
-      Buffer : Storage_Array)
-   is
-   begin
-      Write (Version_Buffer, Buffer);
+      Check (Item);
+      Write (Item.Buffer, Buffer);
    end Write;
 
 end File.Server;

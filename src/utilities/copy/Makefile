@@ -19,6 +19,7 @@ copy:
 	    $(INTERFACES)/transactional.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/releasable_reader.idl \
+	    $(INTERFACES)/releasable_writer.idl \
 	    $(INTERFACES)/seekable_reader.idl \
 	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/writer.idl \

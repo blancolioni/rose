@@ -10,6 +10,7 @@ with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
 with Rose.Interfaces.Writable_File.Client;
 
+with Tests.Files;
 with Tests.Registry;
 
 package body Tests.Processes is
@@ -47,7 +48,7 @@ package body Tests.Processes is
       begin
          File.Open (Writable.Writable_File_Cap);
       end;
-      File.Write (Hello);
+      Tests.Files.Append (File, Hello);
       if File.Size /= Hello'Length then
          return Fail ("the file doesn't work");
       end if;
@@ -93,7 +94,7 @@ package body Tests.Processes is
          end;
 
          begin
-            Second_File.Write (Hello);
+            Tests.Files.Append (Second_File, Hello);
             if Second_File.Size /= Hello'Length then
                return Fail ("wrong size in the second file");
             end if;

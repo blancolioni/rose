@@ -83,9 +83,10 @@ package Petal.Session is
    --  ADR 0012, section 3): a version of the file called Name in the
    --  current directory, from the file's own New_Version (ADR 0026). If
    --  there is no entry Name, the file is created first, so a command
-   --  that fails leaves it empty (ADR 0027). The version is emptied, so
-   --  that the command replaces the file. File is the interface cap of
-   --  the version's Writable_File. Result says whether the version was
+   --  that fails leaves it empty (ADR 0027). The version starts as a copy
+   --  of the file, and the command empties it if it replaces the file
+   --  (ADR 0009, section 4). File is the interface cap of the version's
+   --  Writable_File. Result says whether the version was
    --  made: not if Name is not a file, or the directory or the file
    --  refuses, or there is no directory. The version is petal's until
    --  Commit_Versions or Discard_Versions.

@@ -1,7 +1,5 @@
 with Ada.Text_IO;
 
-with System.Storage_Elements;
-
 with Rose.Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -11,6 +9,7 @@ with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Releasable_Writer.Client;
 with Rose.Interfaces.Seekable_Reader.Client;
 with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Writable_File.Client;
@@ -25,6 +24,7 @@ package body Tests.Files is
    package Readers renames Rose.Interfaces.Releasable_Reader.Client;
    package Seekable_Readers renames
      Rose.Interfaces.Seekable_Reader.Client;
+   package Writers renames Rose.Interfaces.Releasable_Writer.Client;
 
    Hello : constant Storage_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -59,6 +59,29 @@ package body Tests.Files is
       return Rose.Capabilities.Capability;
    --  A new seekable reader of File.
 
+   function Writer_Cap
+     (File  : in out Writable_File_Class;
+      Empty : Boolean := False)
+      return Rose.Capabilities.Capability;
+   --  A new writer of File, from Rewrite if Empty is True, and from
+   --  Append if not. The test holds its writers as clients, as it does
+   --  its readers.
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (File : in out Writable_File_Class;
+      Data : Storage_Array)
+   is
+      Writer : Writers.Releasable_Writer_Client;
+   begin
+      Writer.Open (Writer_Cap (File));
+      Writer.Write (Data);
+      Writer.Close;
+   end Append;
+
    ---------------
    -- File_Test --
    ---------------
@@ -92,7 +115,7 @@ package body Tests.Files is
          File.Open (Writable.Writable_File_Cap);
       end;
 
-      File.Write (Hello);
+      Append (File, Hello);
       if File.Size /= Hello'Length then
          Ada.Text_IO.Put (": wrong size after write");
          return False;
@@ -140,26 +163,25 @@ package body Tests.Files is
          return False;
       end if;
 
-      --  Truncating shortens the file, and moves a reader that was past
+      --  Rewriting empties the file, and moves a reader that was past
       --  the new end back to it, so that it reads what is written next
-      --  (#347). A larger size leaves the file as it is.
+      --  (ADR 0009, section 4).
 
       Seekable.Seek (Rose.Words.Word_64'(4));
-      File.Truncate (2);
-      if File.Size /= 2 then
-         Ada.Text_IO.Put (": wrong size after truncate");
-         return False;
-      end if;
+      declare
+         Writer : Writers.Releasable_Writer_Client;
+      begin
+         Writer.Open (Writer_Cap (File, Empty => True));
+         if File.Size /= 0 then
+            Ada.Text_IO.Put (": wrong size after rewrite");
+            return False;
+         end if;
+         Writer.Write (Hello);
+         Writer.Close;
+      end;
 
-      File.Truncate (Hello'Length);
-      if File.Size /= 2 then
-         Ada.Text_IO.Put (": truncate made the file longer");
-         return False;
-      end if;
-
-      File.Write (Hello (3 .. 5));
       Seekable.Read (Buffer, Last);
-      if Last /= 3 or else Buffer (1 .. 3) /= Hello (3 .. 5) then
+      if Last /= Hello'Length or else Buffer (1 .. Last) /= Hello then
          Ada.Text_IO.Put (": a reader past the end did not move back");
          return False;
       end if;
@@ -242,7 +264,7 @@ package body Tests.Files is
             return False;
          end if;
 
-         Version.Write (Hello);
+         Append (Version, Hello);
          if File.Size /= Hello'Length
            or else Version.Size /= 2 * Hello'Length
          then
@@ -264,7 +286,7 @@ package body Tests.Files is
             return False;
          end if;
 
-         Version.Write (Hello);
+         Append (Version, Hello);
          Version.Commit;
          if File.Size /= 3 * Hello'Length
            or else Version.Size /= 3 * Hello'Length
@@ -273,7 +295,7 @@ package body Tests.Files is
             return False;
          end if;
 
-         Version.Truncate (0);
+         Rewrite (Version, Hello);
          Version.Rollback;
          if Version.Size /= 3 * Hello'Length
            or else File.Size /= 3 * Hello'Length
@@ -282,7 +304,7 @@ package body Tests.Files is
             return False;
          end if;
 
-         Version.Truncate (0);
+         Rewrite (Version, Hello);
          Version.Release;
          if File.Size /= 3 * Hello'Length then
             Ada.Text_IO.Put (": a released version changed its file");
@@ -290,7 +312,7 @@ package body Tests.Files is
          end if;
 
          begin
-            Version.Write (Hello);
+            Append (Version, Hello);
             Ada.Text_IO.Put (": a released version can still be written");
             return False;
          exception
@@ -315,16 +337,19 @@ package body Tests.Files is
       --  nothing.
 
       declare
-         Large : constant Storage_Array (1 .. 4096) := (others => 0);
-         Size  : constant Storage_Count := File.Size;
+         Large  : constant Storage_Array (1 .. 4096) := (others => 0);
+         Size   : constant Storage_Count := File.Size;
+         Writer : Writers.Releasable_Writer_Client;
       begin
+         Writer.Open (Writer_Cap (File));
          for I in 1 .. 16 loop
-            File.Write (Large);
+            Writer.Write (Large);
          end loop;
          Ada.Text_IO.Put (": a file grew past its largest size");
          return False;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
+            Writer.Close;
             if File.Size /= Size + 15 * Large'Length then
                Ada.Text_IO.Put (": a refused write changed the file");
                return False;
@@ -369,6 +394,21 @@ package body Tests.Files is
          return True;
    end Refused;
 
+   -------------
+   -- Rewrite --
+   -------------
+
+   procedure Rewrite
+     (File : in out Writable_File_Class;
+      Data : Storage_Array)
+   is
+      Writer : Writers.Releasable_Writer_Client;
+   begin
+      Writer.Open (Writer_Cap (File, Empty => True));
+      Writer.Write (Data);
+      Writer.Close;
+   end Rewrite;
+
    -------------------------
    -- Seekable_Reader_Cap --
    -------------------------
@@ -397,11 +437,13 @@ package body Tests.Files is
       Last    : Storage_Count;
       Total   : Storage_Count := 0;
 
+      Writer  : Writers.Releasable_Writer_Client;
+
       function Write
         (First, Last : Storage_Offset;
          Writable    : Boolean)
          return Boolean;
-      --  Lend Untouched (First .. Last) to the file's Write, as the
+      --  Lend Untouched (First .. Last) to the writer's Write, as the
       --  generated client does not: it copies into its own buffer.
 
       -----------
@@ -415,7 +457,7 @@ package body Tests.Files is
       is
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
-         Rose.System_Calls.Initialize_Send (Params, File.Get_Write_Cap);
+         Rose.System_Calls.Initialize_Send (Params, Writer.Get_Write_Cap);
          Rose.System_Calls.Send_Buffer
            (Params, Last - First + 1, Untouched (First)'Address, Writable);
          Rose.System_Calls.Invoke_Capability (Params);
@@ -441,6 +483,7 @@ package body Tests.Files is
       --  Two pages read-only, and the third writable, which mem maps for
       --  writing.
 
+      Writer.Open (Writer_Cap (File));
       if not Write (1, 2 * Page_Bytes, Writable => False)
         or else not Write (2 * Page_Bytes + 1, 3 * Page_Bytes,
                            Writable => True)
@@ -448,6 +491,7 @@ package body Tests.Files is
          Ada.Text_IO.Put (": the write failed");
          return False;
       end if;
+      Writer.Close;
 
       if File.Size /= Untouched'Length then
          Ada.Text_IO.Put (": wrong size");
@@ -473,5 +517,184 @@ package body Tests.Files is
 
       return True;
    end Untouched_Buffer_Test;
+
+   ----------------
+   -- Writer_Cap --
+   ----------------
+
+   function Writer_Cap
+     (File  : in out Writable_File_Class;
+      Empty : Boolean := False)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if Empty then
+         declare
+            Writer : Rose.Interfaces.Releasable_Writer
+              .Releasable_Writer_Object'Class :=
+                File.Rewrite;
+         begin
+            return Writer.Releasable_Writer_Cap;
+         end;
+      else
+         declare
+            Writer : Rose.Interfaces.Releasable_Writer
+              .Releasable_Writer_Object'Class :=
+                File.Append;
+         begin
+            return Writer.Releasable_Writer_Cap;
+         end;
+      end if;
+   end Writer_Cap;
+
+   -----------------
+   -- Writer_Test --
+   -----------------
+
+   function Writer_Test return Boolean is
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
+      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      First   : Writers.Releasable_Writer_Client;
+      Second  : Writers.Releasable_Writer_Client;
+      Third   : Writers.Releasable_Writer_Client;
+
+      function Holds (Expected : Storage_Array) return Boolean;
+      --  True if File holds Expected, read through a reader of its own.
+
+      function Refused
+        (Writer : in out Writers.Releasable_Writer_Client)
+         return Boolean;
+      --  True if a write through Writer fails.
+
+      -----------
+      -- Holds --
+      -----------
+
+      function Holds (Expected : Storage_Array) return Boolean is
+         Reader : Readers.Releasable_Reader_Client;
+         Buffer : Storage_Array (1 .. 16);
+         Last   : Storage_Count;
+      begin
+         Reader.Open (Reader_Cap (File));
+         Reader.Read (Buffer, Last);
+         Reader.Close;
+         return Buffer (1 .. Last) = Expected;
+      end Holds;
+
+      -------------
+      -- Refused --
+      -------------
+
+      function Refused
+        (Writer : in out Writers.Releasable_Writer_Client)
+         return Boolean
+      is
+      begin
+         Writer.Write (Hello);
+         return False;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return True;
+      end Refused;
+
+   begin
+      Ada.Text_IO.Put ("Writer test");
+
+      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+
+      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (": no file server");
+         return False;
+      end if;
+
+      declare
+         Writable : Writable_File_Class := Control.Writable;
+      begin
+         File.Open (Writable.Writable_File_Cap);
+      end;
+
+      --  Two writers at once: every write goes at the end of the file,
+      --  whichever writer makes it.
+
+      First.Open (Writer_Cap (File));
+      Second.Open (Writer_Cap (File));
+      First.Write (Hello (1 .. 2));
+      Second.Write (Hello (3 .. 4));
+      First.Write (Hello (5 .. 5));
+      if not Holds (Hello) then
+         Ada.Text_IO.Put (": two writers did not write at the end");
+         return False;
+      end if;
+
+      --  A rewrite empties the file under the other writers, which go on
+      --  writing at its new end.
+
+      Third.Open (Writer_Cap (File, Empty => True));
+      if File.Size /= 0 then
+         Ada.Text_IO.Put (": a rewrite did not empty the file");
+         return False;
+      end if;
+
+      Third.Write (Hello (1 .. 2));
+      Second.Write (Hello (3 .. 5));
+      if not Holds (Hello) then
+         Ada.Text_IO.Put (": wrong contents after a rewrite");
+         return False;
+      end if;
+
+      --  A released writer's caps fail, and the other writers still
+      --  write.
+
+      First.Release;
+      if not Refused (First) then
+         Ada.Text_IO.Put (": a released writer can still write");
+         return False;
+      end if;
+
+      Second.Write (Hello);
+      if File.Size /= 2 * Hello'Length then
+         Ada.Text_IO.Put (": releasing a writer stopped another");
+         return False;
+      end if;
+      Second.Close;
+      Third.Close;
+
+      --  A version's writers write the version, and end with it. The
+      --  file keeps what was committed.
+
+      declare
+         Version : Version_Class := File.New_Version;
+      begin
+         Third.Open (Writer_Cap (Version));
+         Third.Write (Hello);
+         Version.Commit;
+         Third.Write (Hello);
+         Version.Release;
+         if not Refused (Third) then
+            Ada.Text_IO.Put (": a version's writer outlived it");
+            return False;
+         end if;
+      end;
+
+      if File.Size /= 3 * Hello'Length then
+         Ada.Text_IO.Put (": wrong size after a version's writes");
+         return False;
+      end if;
+
+      --  A released writer's object goes back to the pool, to be opened
+      --  again.
+
+      for I in 1 .. 20 loop
+         Second.Open (Writer_Cap (File));
+         if Second.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+            Ada.Text_IO.Put (": no writer after releases");
+            return False;
+         end if;
+         Second.Close;
+      end loop;
+
+      return True;
+   end Writer_Test;
 
 end Tests.Files;

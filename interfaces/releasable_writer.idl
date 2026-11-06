@@ -1,0 +1,7 @@
+--  A writer made for one client, which is the client's to end: Release it
+--  when it is done with (ADR 0010). A writable file opens one for each
+--  client. It has no position: every write goes at the end of the file
+--  (ADR 0009, section 4).
+
+interface Releasable_Writer : Writer, Resource is
+end Releasable_Writer;
