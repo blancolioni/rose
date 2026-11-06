@@ -129,6 +129,20 @@ package body Petal.Command_Launch is
    --  True if Argument is an in File, which names a file in the current
    --  directory (#344). It must be given, unless it has a default.
 
+   function Is_Input_Stream
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Argument.Has_Default
+       and then Value (Item, Argument.Default) = "Standard_Input");
+   --  True if Argument is an in Reader whose default is standard input
+   --  (#395; idle#52). It names a file in the current directory, which
+   --  petal opens a reader on, or if it is not given, it is petal's own
+   --  standard input. The command is given the Read cap of either, as it
+   --  is for the Standard_Input role, and can't tell which it has.
+
    function Is_Writable_File
      (Item     : Signature;
       Argument : Argument_Record)
@@ -467,6 +481,23 @@ package body Petal.Command_Launch is
                         Fail ("no directory named '" & Text & "'");
                      end if;
                   end;
+               elsif Is_Input_Stream (Item, Argument) then
+                  declare
+                     use all type Petal.Session.File_Lookup;
+                     Result : Petal.Session.File_Lookup;
+                  begin
+                     Petal.Session.Open_Reader (Text, Value.Cap, Result);
+                     case Result is
+                        when File_Found =>
+                           null;
+                        when No_Such_File =>
+                           Fail ("no file named '" & Text & "'");
+                        when Not_A_File =>
+                           Fail ("'" & Text & "' is not a file");
+                        when No_Directory =>
+                           Fail ("no directory to find '" & Text & "' in");
+                     end case;
+                  end;
                elsif Is_In_File (Item, Argument)
                  or else Is_Writable_File (Item, Argument)
                then
@@ -508,9 +539,9 @@ package body Petal.Command_Launch is
                else
                   Fail ("cannot bind " & Argument_Name (Index)
                         & ": only in Directory, in Writable_Directory, in"
-                        & " File, in Writable_File and in"
-                        & " Transactional_Writable_File arguments are"
-                        & " supported");
+                        & " File, in Writable_File, in"
+                        & " Transactional_Writable_File and in Reader :="
+                        & " Standard_Input arguments are supported");
                end if;
          end case;
       end Set_Value;
@@ -686,6 +717,15 @@ package body Petal.Command_Launch is
               or else Argument.Of_Type = String_List_Type
             then
                null;
+            elsif Is_Input_Stream (Item, Argument) then
+
+               --  Petal's own standard input, which is not released
+               --  (ADR 0011, section 3).
+
+               Values (Index) :=
+                 (Is_Set => True,
+                  Cap    => Rose.Standard_Streams.Standard_Input,
+                  others => <>);
             elsif Argument.Has_Default then
                Set_Value (Index, Value (Item, Argument.Default),
                           Argument.Default, From_Line => False);

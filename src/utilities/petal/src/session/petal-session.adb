@@ -52,6 +52,12 @@ package body Petal.Session is
    Found_Count     : Natural := 0;
    --  The caps that Find_File has returned, for Release_Files.
 
+   Max_Readers  : constant := 4;
+   Readers      : array (1 .. Max_Readers)
+     of Rose.Interfaces.Releasable_Reader.Client.Releasable_Reader_Client;
+   Reader_Count : Natural := 0;
+   --  The readers that Open_Reader has opened, for Release_Files.
+
    Max_Versions         : constant := 8;
    Max_File_Name_Length : constant := 64;
    --  As many versions as a directory makes at once, and its longest
@@ -104,6 +110,14 @@ package body Petal.Session is
      (Directory : out Writable_Directory_Client;
       Found     : out Boolean);
    --  The current directory, if there is one.
+
+   procedure Lookup_File
+     (Name     : String;
+      Writable : Boolean;
+      File     : out Rose.Capabilities.Capability;
+      Result   : out File_Lookup);
+   --  The interface cap of the ordinary file called Name in the current
+   --  directory, as Find_File gives it, which the caller deletes.
 
    procedure Make_Version
      (Name    : String;
@@ -509,54 +523,12 @@ package body Petal.Session is
       File     : out Rose.Capabilities.Capability;
       Result   : out File_Lookup)
    is
-      use type Rose.Interfaces.Directory.File_Kind;
-      Directory      : Writable_Directory_Client;
-      Have_Directory : Boolean;
-      Index          : Natural;
-      Params         : aliased Rose.Invocation.Invocation_Record;
    begin
-      File := Rose.Capabilities.Null_Capability;
-
-      Current_Directory (Directory, Have_Directory);
-      if not Have_Directory then
-         Result := No_Directory;
-         return;
-      end if;
-
-      Index := Find_Entry (Directory, Name);
-      if Index = 0 then
-         Result := No_Such_File;
-         return;
-      elsif Directory_Entry_Kind (Directory, Index)
-        /= Rose.Interfaces.Directory.Ordinary_File
-      then
-         Result := Not_A_File;
-         return;
-      end if;
-
-      --  Only the file's interface cap: Get_Ordinary_File would also open
-      --  a client of it, with a cap for each of its subprograms, which
-      --  petal does not need.
-
-      Rose.System_Calls.Initialize_Send
-        (Params,
-         (if Writable then Get_Get_Writable_File_Cap (Directory)
-          else Get_Get_Ordinary_File_Cap (Directory)));
-      Rose.System_Calls.Send_Word (Params, Index);
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error) then
-         Result := No_Such_File;
-         return;
-      end if;
-
-      File := Params.Caps (0);
-      if Found_Count < Max_Found_Files then
+      Lookup_File (Name, Writable, File, Result);
+      if Result = File_Found and then Found_Count < Max_Found_Files then
          Found_Count := Found_Count + 1;
          Found_Files (Found_Count) := File;
       end if;
-      Result := File_Found;
    end Find_File;
 
    ----------------
@@ -603,6 +575,62 @@ package body Petal.Session is
       User := Session_User;
       Found := Have_User;
    end Get_User;
+
+   -----------------
+   -- Lookup_File --
+   -----------------
+
+   procedure Lookup_File
+     (Name     : String;
+      Writable : Boolean;
+      File     : out Rose.Capabilities.Capability;
+      Result   : out File_Lookup)
+   is
+      use type Rose.Interfaces.Directory.File_Kind;
+      Directory      : Writable_Directory_Client;
+      Have_Directory : Boolean;
+      Index          : Natural;
+      Params         : aliased Rose.Invocation.Invocation_Record;
+   begin
+      File := Rose.Capabilities.Null_Capability;
+
+      Current_Directory (Directory, Have_Directory);
+      if not Have_Directory then
+         Result := No_Directory;
+         return;
+      end if;
+
+      Index := Find_Entry (Directory, Name);
+      if Index = 0 then
+         Result := No_Such_File;
+         return;
+      elsif Directory_Entry_Kind (Directory, Index)
+        /= Rose.Interfaces.Directory.Ordinary_File
+      then
+         Result := Not_A_File;
+         return;
+      end if;
+
+      --  Only the file's interface cap: Get_Ordinary_File would also open
+      --  a client of it, with a cap for each of its subprograms, which
+      --  petal does not need.
+
+      Rose.System_Calls.Initialize_Send
+        (Params,
+         (if Writable then Get_Get_Writable_File_Cap (Directory)
+          else Get_Get_Ordinary_File_Cap (Directory)));
+      Rose.System_Calls.Send_Word (Params, Index);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         Result := No_Such_File;
+         return;
+      end if;
+
+      File := Params.Caps (0);
+      Result := File_Found;
+   end Lookup_File;
 
    ------------------
    -- Make_Version --
@@ -717,6 +745,58 @@ package body Petal.Session is
       end if;
    end New_Version;
 
+   -----------------
+   -- Open_Reader --
+   -----------------
+
+   procedure Open_Reader
+     (Name   : String;
+      Reader : out Rose.Capabilities.Capability;
+      Result : out File_Lookup)
+   is
+      File_Cap : Rose.Capabilities.Capability;
+      File     : Rose.Interfaces.File.Client.File_Client;
+      Params   : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Reader := Rose.Capabilities.Null_Capability;
+
+      if Reader_Count = Max_Readers then
+         Result := No_Such_File;
+         return;
+      end if;
+
+      Lookup_File (Name, False, File_Cap, Result);
+      if Result /= File_Found then
+         return;
+      end if;
+
+      --  The file's Open_Reader is called here, not through the client's
+      --  function, which opens a client of the result even when the call
+      --  fails. Closing the file's client deletes its caps.
+
+      Rose.Interfaces.File.Client.Open (File, File_Cap);
+      Rose.System_Calls.Initialize_Send
+        (Params, Rose.Interfaces.File.Client.Get_Open_Reader_Cap (File));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         Rose.Interfaces.File.Client.Close (File);
+         Result := No_Such_File;
+         return;
+      end if;
+
+      Reader_Count := Reader_Count + 1;
+      Rose.Interfaces.Releasable_Reader.Client.Open
+        (Readers (Reader_Count), Params.Caps (0));
+      Rose.Interfaces.File.Client.Close (File);
+      Reader :=
+        Rose.Interfaces.Releasable_Reader.Client.Get_Read_Cap
+          (Readers (Reader_Count));
+   end Open_Reader;
+
    ---------------------
    -- Redirect_Output --
    ---------------------
@@ -784,6 +864,13 @@ package body Petal.Session is
          Rose.System_Calls.Invoke_Capability (Params);
       end loop;
       Found_Count := 0;
+
+      --  Closing a reader releases it.
+
+      for Reader of Readers (1 .. Reader_Count) loop
+         Rose.Interfaces.Releasable_Reader.Client.Close (Reader);
+      end loop;
+      Reader_Count := 0;
    end Release_Files;
 
    ----------------------
