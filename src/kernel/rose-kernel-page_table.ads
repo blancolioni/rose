@@ -54,6 +54,13 @@ package Rose.Kernel.Page_Table is
    --  True if Virtual_Page is present, and a process can reach it from
    --  user mode.
 
+   function Is_Writable_User_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if Virtual_Page is present, and a process can write it from
+   --  user mode. A checkpoint makes a page read-only until it ends.
+
    function Mapped_Physical_Page
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address)

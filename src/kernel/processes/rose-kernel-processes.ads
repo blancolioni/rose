@@ -368,6 +368,24 @@ package Rose.Kernel.Processes is
    --  True if Virtual_Page is mapped in Pid, and Pid can reach it from
    --  user mode.
 
+   function Is_Writable_User_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if Virtual_Page is mapped in Pid, and Pid can write it from
+   --  user mode.
+
+   procedure Fault_Call
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address;
+      Is_Mapped    : Boolean;
+      Write        : Boolean);
+   --  The call that Pid is making needs Virtual_Page of its buffer, which
+   --  is not mapped, or is mapped read-only and Write is True (#713).
+   --  Give mem the page fault that Pid would have taken if it had used
+   --  the page itself, and make the call again when mem resumes Pid. The
+   --  call has done nothing yet.
+
    function Has_Checked_Record
      (Pid     : Process_Id;
       Address : Rose.Words.Word_32)
@@ -445,11 +463,14 @@ private
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
       Restored_Blocked, Memory_Registered, Exit_Pending,
-      Checkpoint_Reply_Held);
+      Checkpoint_Reply_Held, Call_Restart);
    --  Flags are saved in a checkpoint by position, so new ones go last.
    --  Memory_Registered: mem was told about the process when it was
    --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,
-   --  and mem is to be told when it next receives (#697).
+   --  and mem is to be told when it next receives (#697). Call_Restart:
+   --  the process is interrupted for a page of its call's buffer, and
+   --  makes the call again when it resumes, instead of returning from an
+   --  interrupt (#713).
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
@@ -729,7 +750,11 @@ private
    function Handle_General_Protection_Fault
      return Rose.Kernel.Interrupts.Interrupt_Handler_Status;
 
-   Mem_Process        : Rose.Kernel.Processes.Process_Id := 0;
+   procedure Restart_Call (P : in out Kernel_Process_Entry);
+   --  Set P to make the system call it is in again when it next returns
+   --  to user mode, with no reply.
+
+   Mem_Process       : Rose.Kernel.Processes.Process_Id := 0;
    Mem_Launch_Cap     : Rose.Capabilities.Capability := 0;
    Mem_Page_Fault_Cap : Rose.Capabilities.Capability := 0;
 

@@ -99,6 +99,13 @@ package body Rose.Kernel.Page_Table is
 
    procedure Show_Page_Entry (Page : Page_Entry);
 
+   function User_Page_Entry
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Page_Entry;
+   --  The page table entry of Virtual_Page, or an entry that is not
+   --  present if it has no page table.
+
    procedure Map_Page
      (Directory      : in out Page_Table_Array;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
@@ -370,36 +377,26 @@ package body Rose.Kernel.Page_Table is
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
       return Boolean
    is
-      Directory : Page_Table_Array;
-      pragma Import (Ada, Directory);
-      for Directory'Address use
-        System'To_Address (Virtual_Page_To_Address (Directory_Page));
-
-      Directory_Index : constant Page_Entry_Index :=
-                          Page_Entry_Index (Virtual_Page / 1024);
-      Table_Index     : constant Page_Entry_Index :=
-                          Page_Entry_Index (Virtual_Page mod 1024);
+      Item : constant Page_Entry :=
+               User_Page_Entry (Directory_Page, Virtual_Page);
    begin
-      if not Directory (Directory_Index).Present
-        or else Directory (Directory_Index).PFA = 0
-      then
-         return False;
-      end if;
-
-      declare
-         Phys_Addr   : constant Physical_Address :=
-                         Physical_Address (Directory (Directory_Index).PFA)
-                         * Physical_Page_Bytes;
-         Addr        : constant Virtual_Address :=
-                         Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
-         Table_Page  : Page_Table_Array;
-         for Table_Page'Address use System'To_Address (Addr);
-         pragma Import (Ada, Table_Page);
-         Table_Entry : Page_Entry renames Table_Page (Table_Index);
-      begin
-         return Table_Entry.Present and then Table_Entry.User;
-      end;
+      return Item.Present and then Item.User;
    end Is_User_Page;
+
+   ---------------------------
+   -- Is_Writable_User_Page --
+   ---------------------------
+
+   function Is_Writable_User_Page
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      Item : constant Page_Entry :=
+               User_Page_Entry (Directory_Page, Virtual_Page);
+   begin
+      return Item.Present and then Item.User and then Item.Writable;
+   end Is_Writable_User_Page;
 
    ---------------------------
    -- Kernel_Page_Directory --
@@ -738,5 +735,45 @@ package body Rose.Kernel.Page_Table is
       Table_Page (Table_Index) := (others => <>);
       Invalidate_Page (Virtual_Page);
    end Unmap_Page;
+
+   ---------------------
+   -- User_Page_Entry --
+   ---------------------
+
+   function User_Page_Entry
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Page_Entry
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index     : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page mod 1024);
+   begin
+      if not Directory (Directory_Index).Present
+        or else Directory (Directory_Index).PFA = 0
+      then
+         return (others => <>);
+      end if;
+
+      declare
+         Phys_Addr   : constant Physical_Address :=
+                         Physical_Address (Directory (Directory_Index).PFA)
+                         * Physical_Page_Bytes;
+         Addr        : constant Virtual_Address :=
+                         Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
+         Table_Page  : Page_Table_Array;
+         for Table_Page'Address use System'To_Address (Addr);
+         pragma Import (Ada, Table_Page);
+         Table_Entry : Page_Entry renames Table_Page (Table_Index);
+      begin
+         return Table_Entry;
+      end;
+   end User_Page_Entry;
 
 end Rose.Kernel.Page_Table;

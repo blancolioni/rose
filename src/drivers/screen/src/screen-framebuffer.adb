@@ -137,13 +137,6 @@ package body Screen.Framebuffer is
    begin
       Success := False;
 
-      --  The kernel writes the tag straight into Tag, and can't take a
-      --  page fault there, so Tag's page has to be mapped first: clearing
-      --  it does that. Otherwise the kernel panics when Tag is on a page
-      --  that nothing has touched yet.
-
-      Tag := (others => 0);
-
       Rose.System_Calls.Initialize_Send (Params, Geometry_Cap);
       Rose.System_Calls.Send_Buffer
         (Params, Tag'Length, Tag'Address, Writable => True);

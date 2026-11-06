@@ -90,9 +90,6 @@ package body Rose.Kernel.Processes.Snapshot is
    --  blocked in: Waiting is True if it goes on waiting for the reply,
    --  and False if it makes the call again.
 
-   procedure Restart_Call (P : in out Kernel_Process_Entry);
-   --  Make P's call again when it runs.
-
    function Cap_Page_Count (Cap_Count : Natural) return Natural
    is ((Cap_Count + Rose.Checkpoints.Caps_Per_Page - 1)
        / Rose.Checkpoints.Caps_Per_Page);
@@ -260,24 +257,6 @@ package body Rose.Kernel.Processes.Snapshot is
       Rose.Boot.Console.Put (Used);
       Rose.Boot.Console.New_Line;
    end Release_Restore_Holds;
-
-   ------------------
-   -- Restart_Call --
-   ------------------
-
-   procedure Restart_Call (P : in out Kernel_Process_Entry) is
-   begin
-      --  The system call page pushed three words before entering the
-      --  kernel, and starts at FFFF_0000.
-
-      P.Stack.EIP := 16#FFFF_0000#;
-      P.Stack.ESP := P.Stack.ESP + 12;
-      P.Flags (Receive_Any) := False;
-      P.Flags (Receive_Cap) := False;
-      P.Flags (Invoke_Reply) := False;
-      P.Flags (Wait_Reply) := False;
-      P.Flags (Interrupt_Resume) := False;
-   end Restart_Call;
 
    -------------------------
    -- Restore_Derivations --
@@ -576,7 +555,11 @@ package body Rose.Kernel.Processes.Snapshot is
                Flags (Invoke_Reply) := False;
                Flags (Interrupt_Resume) := False;
             when Interrupted =>
-               Flags (Interrupt_Resume) := True;
+
+               --  A process that was interrupted for a page of its call's
+               --  buffer makes the call again (#713).
+
+               Flags (Interrupt_Resume) := not Flags (Call_Restart);
                Flags (Wait_Reply) := False;
             when Ready | Running =>
                Current := Item.Current_Params (1 .. Current'Length);

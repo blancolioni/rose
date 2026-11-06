@@ -632,6 +632,45 @@ package body Rose.Kernel.Processes is
       end if;
    end Expand_Heap;
 
+   ----------------
+   -- Fault_Call --
+   ----------------
+
+   procedure Fault_Call
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address;
+      Is_Mapped    : Boolean;
+      Write        : Boolean)
+   is
+      use type Rose.Words.Word;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      if Log_Page_Faults and then Trace (Pid) then
+         Debug.Put (Pid);
+         Rose.Boot.Console.Put (": call faults on buffer page ");
+         Rose.Boot.Console.Put (Rose.Words.Word (Virtual_Page) * 4096);
+         Rose.Boot.Console.New_Line;
+      end if;
+
+      --  Interrupted, as for a fault in user mode, so that mem's resume
+      --  and a checkpoint treat it the same way; Call_Restart makes it
+      --  return by making the call again.
+
+      Set_Current_State (Pid, Interrupted);
+      Restart_Call (P);
+      P.Flags (Call_Restart) := True;
+
+      Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
+
+      Handle_Page_Fault
+        (Pid               => Pid,
+         Virtual_Page      => Virtual_Page,
+         Is_Mapped         => Is_Mapped,
+         Read_Attempt      => not Write,
+         Write_Attempt     => Write,
+         Execution_Attempt => False);
+   end Fault_Call;
+
    -------------------
    -- Find_Endpoint --
    -------------------
@@ -1202,6 +1241,23 @@ package body Rose.Kernel.Processes is
       return False;
    end Is_Valid_Entry;
 
+   ---------------------------
+   -- Is_Writable_User_Page --
+   ---------------------------
+
+   function Is_Writable_User_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      return Rose.Kernel.Page_Table.Is_Writable_User_Page
+        (Rose.Kernel.Heap.Get_Virtual_Page
+           (Physical_Address_To_Page (P.Directory_Page)),
+         Virtual_Page);
+   end Is_Writable_User_Page;
+
    ------------------
    -- Kill_Process --
    ------------------
@@ -1645,6 +1701,25 @@ package body Rose.Kernel.Processes is
          end if;
       end;
    end Rescind_Cap;
+
+   ------------------
+   -- Restart_Call --
+   ------------------
+
+   procedure Restart_Call (P : in out Kernel_Process_Entry) is
+      use type Rose.Words.Word_32;
+   begin
+      --  The system call page pushed three words before entering the
+      --  kernel, and starts at FFFF_0000.
+
+      P.Stack.EIP := 16#FFFF_0000#;
+      P.Stack.ESP := P.Stack.ESP + 12;
+      P.Flags (Receive_Any) := False;
+      P.Flags (Receive_Cap) := False;
+      P.Flags (Invoke_Reply) := False;
+      P.Flags (Wait_Reply) := False;
+      P.Flags (Interrupt_Resume) := False;
+   end Restart_Call;
 
    ------------------
    -- Return_Error --
@@ -2401,7 +2476,11 @@ package body Rose.Kernel.Processes is
          Current_Process.Flags (Invoke_Reply) :=
            Current_Process.State = Blocked and then State = Ready;
          Current_Process.Flags (Interrupt_Resume) :=
-           Current_Process.State = Interrupted and then State = Ready;
+           Current_Process.State = Interrupted and then State = Ready
+           and then not Current_Process.Flags (Call_Restart);
+         if State = Ready then
+            Current_Process.Flags (Call_Restart) := False;
+         end if;
 
          Current_Process.State := State;
       end if;

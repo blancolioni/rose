@@ -105,8 +105,8 @@ package body Petal.Command_Launch is
                 and then Value (Item, Argument.Interface_Name)
                            = "Directory"));
    --  True if Argument is an in Directory or an in Writable_Directory. It
-   --  names a directory in petal's table, and is bound to home if it is
-   --  not given (ADR 0003, section 6).
+   --  names a directory in petal's table, and is bound to the current
+   --  directory if it is not given (ADR 0003, section 6; #342).
 
    function Is_In_File
      (Item     : Signature;
@@ -675,9 +675,8 @@ package body Petal.Command_Launch is
                declare
                   Found : Boolean;
                begin
-                  Petal.Session.Find_Grant
-                    (Petal.Session.Home_Name,
-                     Is_Writable_Directory (Item, Argument),
+                  Petal.Session.Current_Grant
+                    (Is_Writable_Directory (Item, Argument),
                      Values (Index).Cap, Found);
                   if Found then
                      Values (Index).Is_Set := True;
@@ -1096,6 +1095,30 @@ package body Petal.Command_Launch is
                   Line (Words (2).First .. Words (2).Last));
             end;
          end if;
+
+      --  cd and pwd are built in: the current directory is petal's own
+      --  (#342, #343).
+
+      elsif Lower (Line (Words (1).First .. Words (1).Last)) = "cd" then
+         if Count > 2 then
+            Error ("cd: too many arguments");
+         elsif Count = 2 then
+            Petal.Session.Change_Directory
+              (Line (Words (2).First .. Words (2).Last));
+         else
+            Petal.Session.Change_Directory
+              ("[" & Petal.Session.Home_Name & "]");
+         end if;
+
+      elsif Lower (Line (Words (1).First .. Words (1).Last)) = "pwd" then
+         if Count > 1 then
+            Error ("pwd: too many arguments");
+         elsif Petal.Session.Current_Directory_Name = "" then
+            Error ("pwd: there is no current directory");
+         else
+            Ada_Text_IO.Put_Line (Petal.Session.Current_Directory_Name);
+         end if;
+
       else
          Run_Command (Line, Words, Count, "");
       end if;
@@ -1111,10 +1134,30 @@ package body Petal.Command_Launch is
       Count : Natural;
       Sudo  : String)
    is
+      function Word_Text (Index : Positive) return String
+      is (Line (Words (Index).First .. Words (Index).Last));
+
+      function Options_Last return Natural;
+      --  The last word that can be an option: the one before "--", which
+      --  ends the options (#379), or the last word if there is none.
+
+      ------------------
+      -- Options_Last --
+      ------------------
+
+      function Options_Last return Natural is
+      begin
+         for I in 2 .. Count loop
+            if Word_Text (I) = "--" then
+               return I - 1;
+            end if;
+         end loop;
+         return Count;
+      end Options_Last;
+
    begin
       declare
-         Name   : constant String :=
-           Lower (Line (Words (1).First .. Words (1).Last));
+         Name   : constant String := Lower (Word_Text (1));
          Params : aliased Rose.Invocation.Invocation_Record;
          Client : Rose.Interfaces.Launch.Client.Launch_Client;
          Last   : Natural;
@@ -1141,12 +1184,12 @@ package body Petal.Command_Launch is
 
          if not Current.Valid then
             Error (Name & ": not a command");
-         elsif (for some I in 2 .. Count =>
-                  Line (Words (I).First .. Words (I).Last) = "--help")
+         elsif (for some I in 2 .. Options_Last =>
+                  Word_Text (I) = "--help")
          then
             Put_Help (Current);
-         elsif (for some I in 2 .. Count =>
-                  Line (Words (I).First .. Words (I).Last) = "--version")
+         elsif (for some I in 2 .. Options_Last =>
+                  Word_Text (I) = "--version")
          then
             Put_Version (Current);
          else

@@ -10,6 +10,10 @@ package Petal.Session is
    --  first entry is the user's home directory, home (ADR 0002,
    --  section 5).
 
+   --  The current directory (#342) is one of the named directories, its
+   --  root, and a path from it. A directory doesn't know its parent, so
+   --  petal keeps the directories on the path. It starts as home.
+
    procedure Start (User : Rose.Interfaces.User.Client.User_Client);
    --  Start the session of User, with User's home directory as home.
    --  Take the user and the home directory from petal's argument cap
@@ -39,10 +43,11 @@ package Petal.Session is
       Writable : Boolean;
       Grant    : out Rose.Capabilities.Capability;
       Found    : out Boolean);
-   --  A grant of the directory called Name. For an in Directory argument
-   --  it is read-only: the interface cap of its Directory interface,
-   --  which has only the lookup operations (ADR 0003, section 1), made
-   --  the first time it is asked for and then kept. If Writable, for an
+   --  A grant of the directory called Name in the table. For an in
+   --  Directory argument it is read-only: the interface cap of its
+   --  Directory interface, which has only the lookup operations (ADR
+   --  0003, section 1), made the first time it is asked for and then
+   --  kept. If Writable, for an
    --  in Writable_Directory argument, it is the cap of petal's own
    --  Writable_Directory interface, so the command's changes take
    --  effect as it makes them (ADR 0012, section 3).
@@ -56,7 +61,7 @@ package Petal.Session is
       Result   : out File_Lookup);
    --  For an in File argument (#344): the interface cap of the read-only
    --  File interface of the ordinary file called Name in the current
-   --  directory, which is home until petal has one (#342). If Writable,
+   --  directory (#342). If Writable,
    --  for an in Writable_File argument of a live command, it is the
    --  file's Writable_File interface, so the command's changes take
    --  effect as it makes them (ADR 0012, section 4). Result says
@@ -100,9 +105,29 @@ package Petal.Session is
    --  when the command they were bound for has failed, and forget them
    --  all.
 
+   procedure Current_Grant
+     (Writable : Boolean;
+      Grant    : out Rose.Capabilities.Capability;
+      Found    : out Boolean);
+   --  A grant of the current directory, as Find_Grant gives, for an in
+   --  Directory argument that is not given. Found is False if there is
+   --  no current directory.
+
+   procedure Change_Directory (Path : String);
+   --  Make Path the current directory: names separated by "/", each a
+   --  subdirectory of the one before, or ".." for the one before that.
+   --  Path starts from the current directory, or from the named
+   --  directory root if it starts with "[root]". If Path is not a
+   --  directory, report it, and leave the current directory as it was.
+
+   function Current_Directory_Name return String;
+   --  The current directory as pwd writes it (#343): the name of its
+   --  root in square brackets, then the path from the root, with "/"
+   --  before each name.
+
    Home_Name : constant String := "home";
-   --  The user's home directory, the first entry in the table. An in
-   --  Directory argument that is not given is bound to it.
+   --  The user's home directory, the first entry in the table, and the
+   --  first current directory.
 
    procedure Get_User
      (User  : out Rose.Interfaces.User.Client.User_Client;

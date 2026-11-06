@@ -17,6 +17,73 @@ with Rose.Invocation.Trace;
 
 package body Rose.Kernel.Invocation is
 
+   function Check_Buffer
+     (Params : Rose.Invocation.Invocation_Record)
+      return Boolean;
+   --  True if the buffer that the current process sends with Params, if
+   --  any, is in user memory that it has mapped, and can write if the
+   --  buffer is writable, so that the kernel can use it (#713). If not,
+   --  the process is faulted for a buffer outside user memory, or mem is
+   --  given the page fault for the first page that is missing, and the
+   --  call is made again when mem resumes the process. Either way, the
+   --  next process is chosen.
+
+   ------------------
+   -- Check_Buffer --
+   ------------------
+
+   function Check_Buffer
+     (Params : Rose.Invocation.Invocation_Record)
+      return Boolean
+   is
+      use Rose.Addresses;
+      use Rose.Kernel.Processes;
+      Pid      : constant Process_Id := Current_Process_Id;
+      First    : constant Virtual_Address :=
+                   To_Virtual_Address (Params.Buffer_Address);
+      Length   : constant Virtual_Address :=
+                   Virtual_Address (Params.Buffer_Length);
+      Writable : constant Boolean :=
+                   Params.Control.Flags (Rose.Invocation.Writable_Buffer);
+   begin
+      if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+        or else Length = 0
+      then
+         return True;
+      end if;
+
+      if First < Virtual_Page_Bytes
+        or else First >= Kernel_Virtual_Base
+        or else Length > Kernel_Virtual_Base - First
+      then
+         Rose.Kernel.Processes.Debug.Put (Pid);
+         Rose.Boot.Console.Put (": invalid buffer at ");
+         Rose.Boot.Console.Put (Rose.Words.Word (First));
+         Rose.Boot.Console.Put (", length ");
+         Rose.Boot.Console.Put (Rose.Words.Word (Length));
+         Rose.Boot.Console.New_Line;
+         Set_Current_State (Pid, Faulted);
+         Rose.Kernel.Processes.Queue.Choose_Process;
+         return False;
+      end if;
+
+      for Page in Virtual_Address_To_Page (First)
+        .. Virtual_Address_To_Page (First + Length - 1)
+      loop
+         if not Is_User_Page (Pid, Page) then
+            Fault_Call (Pid, Page, Is_Mapped => False, Write => Writable);
+            Rose.Kernel.Processes.Queue.Choose_Process;
+            return False;
+         elsif Writable and then not Is_Writable_User_Page (Pid, Page) then
+            Fault_Call (Pid, Page, Is_Mapped => True, Write => True);
+            Rose.Kernel.Processes.Queue.Choose_Process;
+            return False;
+         end if;
+      end loop;
+
+      return True;
+   end Check_Buffer;
+
    -----------------------------
    -- Fault_Invocation_Record --
    -----------------------------
@@ -58,6 +125,13 @@ package body Rose.Kernel.Invocation is
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
    begin
+
+      --  The buffer is checked before anything else, so that a call
+      --  that faults on it has done nothing when it is made again.
+
+      if not Check_Buffer (Params.all) then
+         return;
+      end if;
 
       if Params.Control.Flags (Block)
         or else Params.Control.Flags (Send_Buffer)
