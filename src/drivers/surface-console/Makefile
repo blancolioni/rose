@@ -15,7 +15,7 @@ surface_console:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/reader.idl $(INTERFACES)/stream_writer.idl \
+	    $(INTERFACES)/reader.idl $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/stream.idl $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/region.idl $(INTERFACES)/process.idl \

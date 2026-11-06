@@ -35,8 +35,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-gpt.o \
 	$(BUILDDIR)/rose-devices-gpt_format.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
+	$(BUILDDIR)/rose-interfaces-writer.o \
+	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

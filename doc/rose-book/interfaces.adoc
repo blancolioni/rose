@@ -129,12 +129,12 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 |===
 | Interface | Parents | Operations | Implemented by
 | `Reader` | | `Read` | `isofs`, `store`, `vga-console`
-| `Stream_Writer` | | `Write` | `console`, `vga-console`
+| `Writer` | | `Write` | `console`, `vga-console`
 | `Output_Redirect` | | `Redirect` | `console`
-| `Stream` | `Reader`, `Stream_Writer` | |
+| `Stream` | `Reader`, `Writer` | |
 | `Seekable` | | `Seek` |
 | `File` | `Reader`, `Seekable` | `Size` |
-| `Writable_File` | `File`, `Stream_Writer` | | `file`
+| `Writable_File` | `File`, `Writer` | | `file`
 | `Terminal` | `Stream` | `Get_Size`, `Move_Cursor`, `Clear`, `Clear_To_End_Of_Line`, `Scroll`, `Set_Attributes`, `Read_Key`, `Disable_Line_Editing`, `Enable_Line_Editing`, `Enable_Echo`, `Disable_Echo` | `vga-console`, `surface-console`
 | `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File` | `isofs`
 | `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory` | `directory`
@@ -144,7 +144,7 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 | `Auth_Admin` | | `New_User` | `auth`
 |===
 
-`Output_Redirect.Redirect` sends everything written to a stream from then on to another `Stream_Writer`, or discards it if that is null.
+`Output_Redirect.Redirect` sends everything written to a stream from then on to another `Writer`, or discards it if that is null.
 The boot console implements it, so that its output can be handed over to the persistent console (see <<Boot Sequence>>).
 
 A `User` gives the user's name, through `Named`, and the user's home directory, as a `Writable_Directory` (ADR 0003).

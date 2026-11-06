@@ -1,1 +1,1 @@
-role Standard_Error : Stream_Writer;
+role Standard_Error : Writer;

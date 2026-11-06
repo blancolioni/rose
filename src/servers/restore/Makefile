@@ -48,8 +48,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
+	$(BUILDDIR)/rose-interfaces-writer.o \
+	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

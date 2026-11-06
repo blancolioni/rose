@@ -7,12 +7,12 @@ with Rose.Console_IO;
 
 with Rose.System_Calls.Server;
 
-with Rose.Interfaces.Stream_Writer.Client;
+with Rose.Interfaces.Writer.Client;
 with Rose.Invocation;
 
 package body Terminal.Server is
 
-   Out_Stream : Rose.Interfaces.Stream_Writer.Client.Stream_Writer_Client;
+   Out_Stream : Rose.Interfaces.Writer.Client.Writer_Client;
 
    Write_Cap  : Rose.Capabilities.Capability;
 
@@ -94,13 +94,13 @@ package body Terminal.Server is
         Rose.System_Calls.Server.Create_Receive_Cap
           (Create_Endpoint_Cap);
       Writer_Endpoint : constant Rose.Objects.Endpoint_Id :=
-        Rose.Interfaces.Stream_Writer.Stream_Writer_Interface;
+        Rose.Interfaces.Writer.Writer_Interface;
    begin
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
          Rose.Interfaces.Get_Interface_Endpoint);
 
-      Rose.Interfaces.Stream_Writer.Client.Open
+      Rose.Interfaces.Writer.Client.Open
         (Client        => Out_Stream,
          Interface_Cap => Output_Device_Cap);
 

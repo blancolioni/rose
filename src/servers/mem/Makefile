@@ -32,8 +32,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-reader.o \
 	$(BUILDDIR)/rose-interfaces-reader-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
+	$(BUILDDIR)/rose-interfaces-writer.o \
+	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-trace.o \
