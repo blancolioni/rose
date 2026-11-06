@@ -3,6 +3,8 @@ with Ada.Text_IO;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
+with Rose.Invocation;
+with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.File.Client;
@@ -25,6 +27,13 @@ package body Tests.Files is
    Hello : constant Storage_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
+
+   Page_Bytes : constant := 4096;
+
+   Untouched : Storage_Array (1 .. 3 * Page_Bytes)
+     with Alignment => Page_Bytes;
+   --  Never read or written by the test, so none of its pages is mapped
+   --  until the kernel asks mem for them (#713).
 
    subtype Writable_File_Class is
      Rose.Interfaces.Writable_File.Writable_File_Object'Class;
@@ -271,5 +280,95 @@ package body Tests.Files is
    begin
       return Reader.Seekable_Reader_Cap;
    end Seekable_Reader_Cap;
+
+   ---------------------------
+   -- Untouched_Buffer_Test --
+   ---------------------------
+
+   function Untouched_Buffer_Test return Boolean is
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
+      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      Reader  : Readers.Releasable_Reader_Client;
+      Buffer  : Storage_Array (1 .. 256);
+      Last    : Storage_Count;
+      Total   : Storage_Count := 0;
+
+      function Write
+        (First, Last : Storage_Offset;
+         Writable    : Boolean)
+         return Boolean;
+      --  Lend Untouched (First .. Last) to the file's Write, as the
+      --  generated client does not: it copies into its own buffer.
+
+      -----------
+      -- Write --
+      -----------
+
+      function Write
+        (First, Last : Storage_Offset;
+         Writable    : Boolean)
+         return Boolean
+      is
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, File.Get_Write_Cap);
+         Rose.System_Calls.Send_Buffer
+           (Params, Last - First + 1, Untouched (First)'Address, Writable);
+         Rose.System_Calls.Invoke_Capability (Params);
+         return not Params.Control.Flags (Rose.Invocation.Error);
+      end Write;
+
+   begin
+      Ada.Text_IO.Put ("Untouched buffer test");
+
+      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+
+      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (": no file server");
+         return False;
+      end if;
+
+      declare
+         Writable : Writable_File_Class := Control.Writable;
+      begin
+         File.Open (Writable.Writable_File_Cap);
+      end;
+
+      --  Two pages read-only, and the third writable, which mem maps for
+      --  writing.
+
+      if not Write (1, 2 * Page_Bytes, Writable => False)
+        or else not Write (2 * Page_Bytes + 1, 3 * Page_Bytes,
+                           Writable => True)
+      then
+         Ada.Text_IO.Put (": the write failed");
+         return False;
+      end if;
+
+      if File.Size /= Untouched'Length then
+         Ada.Text_IO.Put (": wrong size");
+         return False;
+      end if;
+
+      Reader.Open (Reader_Cap (File));
+      loop
+         Reader.Read (Buffer, Last);
+         exit when Last = 0;
+         if Buffer (1 .. Last) /= (1 .. Last => 0) then
+            Ada.Text_IO.Put (": the server read something else");
+            return False;
+         end if;
+         Total := Total + Last;
+      end loop;
+      Reader.Close;
+
+      if Total /= Untouched'Length then
+         Ada.Text_IO.Put (": read back the wrong length");
+         return False;
+      end if;
+
+      return True;
+   end Untouched_Buffer_Test;
 
 end Tests.Files;
