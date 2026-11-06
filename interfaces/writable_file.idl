@@ -1,10 +1,16 @@
-interface Writable_File : File, Writer
+--  A file that can be written. It is not a stream: writers are opened
+--  from it, as readers are from a file (ADR 0009, section 4).
+
+interface Writable_File : File
   with Versioned
 is
 
-   procedure Truncate (Size : Storage_Count);
-   --  Shorten the file to Size bytes. A file that is no longer than Size
-   --  is left as it is.
+   function Append return interface Releasable_Writer;
+   --  A writer that adds to the end of the file.
+
+   function Rewrite return interface Releasable_Writer;
+   --  Empty the file, then a writer that adds to its end. A reader past
+   --  the new end moves back to it.
 
    function New_Version return interface Transactional_Writable_File;
    --  A version of the file, which starts as a copy of it (ADR 0026). It

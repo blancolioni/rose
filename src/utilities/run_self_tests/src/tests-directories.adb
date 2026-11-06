@@ -14,6 +14,7 @@ with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
+with Tests.Files;
 with Tests.Registry;
 
 package body Tests.Directories is
@@ -106,7 +107,7 @@ package body Tests.Directories is
          if Notes.Writable_File_Cap = Rose.Capabilities.Null_Capability then
             return Fail ("cannot create a file");
          end if;
-         Notes.Write (Hello);
+         Tests.Files.Append (Notes, Hello);
          Notes_Cap := Notes.Writable_File_Cap;
       end;
 
@@ -192,7 +193,7 @@ package body Tests.Directories is
 
       begin
          Held.Open (Notes_Cap);
-         Held.Write (Hello);
+         Tests.Files.Append (Held, Hello);
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
             return Fail ("cannot write through a held cap");
@@ -251,7 +252,7 @@ package body Tests.Directories is
       end if;
 
       begin
-         Held.Write (Hello);
+         Tests.Files.Append (Held, Hello);
          return Fail ("a deleted file can still be written");
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
@@ -353,13 +354,12 @@ package body Tests.Directories is
       declare
          File : Writable_File_Class := Top.Create_File ("draft");
       begin
-         File.Write (Hello);
+         Tests.Files.Append (File, Hello);
 
          declare
             Version : Version_Class := File.New_Version;
          begin
-            Version.Truncate (0);
-            Version.Write (Hello (3 .. 5));
+            Tests.Files.Rewrite (Version, Hello (3 .. 5));
             if not Holds ("draft", Hello) then
                return Fail ("writing a version changed its file");
             end if;
@@ -369,7 +369,7 @@ package body Tests.Directories is
                return Fail ("wrong contents after committing a version");
             end if;
 
-            Version.Write (Hello);
+            Tests.Files.Append (Version, Hello);
             Version.Release;
          end;
       end;

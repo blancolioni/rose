@@ -3,6 +3,7 @@ with System.Storage_Elements;
 with Ada.Text_IO;
 
 with Rose.Interfaces.Releasable_Reader;
+with Rose.Interfaces.Releasable_Writer;
 
 procedure Rose.Core.Copy
   (Source : in out Rose.Interfaces.File.File_Object'Class;
@@ -14,17 +15,21 @@ is
    Reader : Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class :=
      Source.Open_Reader;
    --  A reader of its own, from the start of the file (ADR 0009).
+   Writer : Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class :=
+     Target.Rewrite;
+   --  The copy replaces the target's contents (ADR 0009, section 4).
 begin
 
-   --  Target is a version that petal emptied, and commits only if the
-   --  copy completes (#141).
+   --  Target is a version, which petal commits only if the copy
+   --  completes (#141).
 
    loop
       Reader.Read (Buffer, Last);
       exit when Last < Buffer'First;
-      Target.Write (Buffer (Buffer'First .. Last));
+      Writer.Write (Buffer (Buffer'First .. Last));
    end loop;
    Reader.Release;
+   Writer.Release;
 
    --  A file drops what is written past its limit (#215), so a copy of
    --  a larger file is short. It fails, and petal discards it.

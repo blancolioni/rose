@@ -134,7 +134,8 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 | `Stream` | `Reader`, `Writer` | |
 | `Seekable` | | `Seek` |
 | `File` | `Reader`, `Seekable` | `Size` |
-| `Writable_File` | `File`, `Writer` | | `file`
+| `Writable_File` | `File` | `Append`, `Rewrite`, `New_Version` | `file`
+| `Releasable_Writer` | `Writer`, `Resource` | | `file`
 | `Terminal` | `Stream` | `Get_Size`, `Move_Cursor`, `Clear`, `Clear_To_End_Of_Line`, `Scroll`, `Set_Attributes`, `Read_Key`, `Disable_Line_Editing`, `Enable_Line_Editing`, `Enable_Echo`, `Disable_Echo` | `vga-console`, `surface-console`
 | `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File` | `isofs`
 | `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory` | `directory`
@@ -150,7 +151,7 @@ The boot console implements it, so that its output can be handed over to the per
 A `User` gives the user's name, through `Named`, and the user's home directory, as a `Writable_Directory` (ADR 0003).
 
 Files and directories come in a read-only and a writable form, so that the type of a capability says what right it grants (ADR 0002).
-A `File` can be read and sought, and a `Writable_File` can also be written; a `Directory` can only be looked up, and a `Writable_Directory` can also create entries and return them in writable form.
+A `File` can be read and sought, and a `Writable_File` can also be written, through writers that it opens (ADR 0009); a `Directory` can only be looked up, and a `Writable_Directory` can also create entries and return them in writable form.
 
 A directory lists its entries by index, and gives a capability for each one:
 

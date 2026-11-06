@@ -4,7 +4,7 @@ include $(ROOT)/mk/common.mk
 IDL=cap block_device file_system directory file file_control \
     transactional transactional_writable_file \
     writable_directory writable_file user \
-    resource releasable_reader seekable_reader \
+    resource releasable_reader releasable_writer seekable_reader \
     reader writer stream seekable storage storage_checkpoint \
     bank state \
     ata partitions partition_setup keyboard_handler interrupt_handler \
