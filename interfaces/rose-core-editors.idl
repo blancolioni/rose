@@ -1,0 +1,6 @@
+--  The editors (#735). The other aspects come from Rose.Core.
+
+package Rose.Core.Editors
+  with Title => "Rose editors"
+is
+end Rose.Core.Editors;
