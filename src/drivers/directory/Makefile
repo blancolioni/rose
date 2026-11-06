@@ -16,7 +16,8 @@ directory:
 	    $(INTERFACES)/writable_directory.idl \
 	    $(INTERFACES)/directory.idl \
 	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/file_version.idl \
+	    $(INTERFACES)/transactional_writable_file.idl \
+	    $(INTERFACES)/transactional.idl \
 	    $(INTERFACES)/file_control.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/releasable_reader.idl \

@@ -1,0 +1,11 @@
+--  A version of a file, which Writable_File.New_Version makes (ADR 0026).
+--  It starts as a copy of the file, and is read and written as the file
+--  is, but the file changes only when the version is committed. Releasing
+--  the version drops what wasn't committed, and the file can then have
+--  another version. A version has no versions of its own: its New_Version
+--  fails.
+
+interface Transactional_Writable_File
+  : Writable_File, Transactional, Resource
+is
+end Transactional_Writable_File;

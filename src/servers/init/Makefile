@@ -25,7 +25,6 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-directory-client.o \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
-	$(BUILDDIR)/rose-interfaces-file_version-client.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
@@ -46,6 +45,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-user-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
+	$(BUILDDIR)/rose-interfaces-transactional_writable_file-client.o \
 	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
 	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-seekable_reader.o \

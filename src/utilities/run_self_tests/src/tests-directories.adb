@@ -7,10 +7,10 @@ with Rose.Capabilities;
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File;
 with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.File_Version;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
+with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
@@ -26,8 +26,9 @@ package body Tests.Directories is
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
-   subtype File_Version_Class is
-     Rose.Interfaces.File_Version.File_Version_Object'Class;
+   subtype Version_Class is
+     Rose.Interfaces.Transactional_Writable_File
+       .Transactional_Writable_File_Object'Class;
    subtype Writable_File_Class is
      Rose.Interfaces.Writable_File.Writable_File_Object'Class;
 
@@ -337,22 +338,6 @@ package body Tests.Directories is
          end;
       end Holds;
 
-      function Version_Refused (Name : String) return Boolean;
-      --  True if Top refuses to make a version of Name.
-
-      function Version_Refused (Name : String) return Boolean is
-      begin
-         declare
-            Version : File_Version_Class := Top.New_File_Version (Name);
-         begin
-            Version.Discard;
-         end;
-         return False;
-      exception
-         when Rose.Interfaces.Objects.Invocation_Error =>
-            return True;
-      end Version_Refused;
-
    begin
       Ada.Text_IO.Put ("Version test");
 
@@ -361,107 +346,44 @@ package body Tests.Directories is
          return Fail ("no directory server");
       end if;
 
-      --  A version of a new name is listed only when it is committed.
+      --  A version comes from the file, not the directory (ADR 0026).
+      --  What its directory's readers see changes only when it is
+      --  committed, and not when it is released without a commit.
 
       declare
-         Version : File_Version_Class := Top.New_File_Version ("draft");
-         File    : Writable_File_Class := Version.Writable;
+         File : Writable_File_Class := Top.Create_File ("draft");
       begin
          File.Write (Hello);
-         if Top.Find_Entry ("draft") /= 0 then
-            return Fail ("a new file is listed before it is committed");
-         end if;
-         Version.Commit;
-      end;
 
-      if not Holds ("draft", Hello) then
-         return Fail ("wrong contents of a committed new file");
-      end if;
-
-      --  Discarding a version of a new name leaves nothing behind.
-
-      declare
-         Version : File_Version_Class := Top.New_File_Version ("scrap");
-         File    : Writable_File_Class := Version.Writable;
-      begin
-         File.Write (Hello);
-         Version.Discard;
-      end;
-
-      if Top.Find_Entry ("scrap") /= 0
-        or else Top.Directory_Entry_Count /= 1
-      then
-         return Fail ("a discarded new file is listed");
-      end if;
-
-      --  A version of a file starts as a copy of it, and the file is
-      --  unchanged until the version is committed. A file has one
-      --  version at a time.
-
-      declare
-         Version : File_Version_Class := Top.New_File_Version ("draft");
-         File    : Writable_File_Class := Version.Writable;
-      begin
-         if File.Size /= Hello'Length then
-            return Fail ("a version is not a copy of its file");
-         end if;
-
-         File.Truncate (0);
-         File.Write (Hello (3 .. 5));
-         if not Holds ("draft", Hello) then
-            return Fail ("writing a version changed its file");
-         end if;
-
-         if not Version_Refused ("draft") then
-            return Fail ("a file has two versions");
-         end if;
-
-         Version.Commit;
-      end;
-
-      if not Holds ("draft", Hello (3 .. 5)) then
-         return Fail ("wrong contents after committing a version");
-      end if;
-
-      --  Discarding a version leaves the file as it was.
-
-      declare
-         Version : File_Version_Class := Top.New_File_Version ("draft");
-         File    : Writable_File_Class := Version.Writable;
-      begin
-         File.Write (Hello);
-         Version.Discard;
-      end;
-
-      if not Holds ("draft", Hello (3 .. 5)) then
-         return Fail ("discarding a version changed its file");
-      end if;
-
-      --  A new name that was taken in the meantime can't be committed,
-      --  and the version can then be discarded.
-
-      declare
-         Version : File_Version_Class := Top.New_File_Version ("late");
-         Taken   : Writable_File_Class := Top.Create_File ("late");
-      begin
-         if Taken.Writable_File_Cap = Rose.Capabilities.Null_Capability then
-            return Fail ("cannot create a file");
-         end if;
-
+         declare
+            Version : Version_Class := File.New_Version;
          begin
+            Version.Truncate (0);
+            Version.Write (Hello (3 .. 5));
+            if not Holds ("draft", Hello) then
+               return Fail ("writing a version changed its file");
+            end if;
+
             Version.Commit;
-            return Fail ("a version was committed over a new entry");
-         exception
-            when Rose.Interfaces.Objects.Invocation_Error =>
-               null;
+            if not Holds ("draft", Hello (3 .. 5)) then
+               return Fail ("wrong contents after committing a version");
+            end if;
+
+            Version.Write (Hello);
+            Version.Release;
          end;
-         Version.Discard;
       end;
 
-      --  A version of a file that was deleted can't be committed.
+      if not Holds ("draft", Hello (3 .. 5)) then
+         return Fail ("releasing a version changed its file");
+      end if;
+
+      --  Deleting a file ends its process, and its version with it.
 
       declare
-         Version : File_Version_Class := Top.New_File_Version ("draft");
+         File    : Writable_File_Class :=
+           Top.Get_Writable_File (Top.Find_Entry ("draft"));
+         Version : Version_Class := File.New_Version;
       begin
          Top.Delete_File ("draft");
          begin
@@ -471,30 +393,10 @@ package body Tests.Directories is
             when Rose.Interfaces.Objects.Invocation_Error =>
                null;
          end;
-         Version.Discard;
       end;
 
-      --  No version is made of a directory, or of an empty name.
+      --  The directory ends with the test.
 
-      declare
-         Sub : Rose.Interfaces.Writable_Directory
-           .Writable_Directory_Object'Class :=
-             Top.Create_Directory ("sub");
-      begin
-         if Sub.Writable_Directory_Cap = Rose.Capabilities.Null_Capability
-         then
-            return Fail ("cannot create a directory");
-         end if;
-      end;
-
-      if not Version_Refused ("sub") or else not Version_Refused ("") then
-         return Fail ("a bad version was not refused");
-      end if;
-
-      --  The directory and its files end with the test.
-
-      Top.Delete_File ("late");
-      Top.Delete_Directory ("sub");
       Process.Destroy;
       return True;
    end Version_Test;

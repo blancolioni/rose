@@ -9,8 +9,10 @@ with Rose.Words;
 
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Control.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Seekable_Reader.Client;
+with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Registry;
@@ -37,6 +39,14 @@ package body Tests.Files is
 
    subtype Writable_File_Class is
      Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+   subtype Version_Class is
+     Rose.Interfaces.Transactional_Writable_File
+       .Transactional_Writable_File_Object'Class;
+
+   function Refused
+     (File : in out Writable_File_Class)
+      return Boolean;
+   --  True if File refuses to make a version.
 
    function Reader_Cap
      (File : in out Rose.Interfaces.File.File_Object'Class)
@@ -171,14 +181,17 @@ package body Tests.Files is
       First.Close;
 
       --  A released reader can't be read, through the caps that are
-      --  still held for it (ADR 0010).
+      --  still held for it (ADR 0010): the read fails.
 
       Second.Release;
-      Second.Read (Buffer, Last);
-      if Last /= 0 then
+      begin
+         Second.Read (Buffer, Last);
          Ada.Text_IO.Put (": a released reader can still be read");
          return False;
-      end if;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            null;
+      end;
 
       --  Released readers give their slots back: there are more readers
       --  here, one at a time, than the file server has slots.
@@ -192,12 +205,37 @@ package body Tests.Files is
          First.Close;
       end loop;
 
-      --  A version starts as a copy of the file, and changes it only when
-      --  it is committed. A file has one version at a time, and the caps
-      --  of a committed version stop working (#141).
+      --  More readers at once than a server held before #754.
 
       declare
-         Version : Writable_File_Class := Control.New_Version;
+         Many : array (1 .. 20) of Readers.Releasable_Reader_Client;
+      begin
+         for Pass in 1 .. 2 loop
+            for Reader of Many loop
+               Reader.Open (Reader_Cap (File));
+            end loop;
+            for Reader of Many loop
+               Reader.Read (Buffer, Last);
+               if Last /= Hello'Length or else Buffer (1 .. Last) /= Hello
+               then
+                  Ada.Text_IO.Put (": wrong contents with many readers");
+                  return False;
+               end if;
+            end loop;
+            for Reader of Many loop
+               Reader.Close;
+            end loop;
+         end loop;
+      end;
+
+      --  A version starts as a copy of the file, and changes it only when
+      --  it is committed, as often as its holder likes. Rollback drops
+      --  what wasn't committed, and so does Release, after which the
+      --  version's caps fail. A file has one version at a time, and a
+      --  version has none (ADR 0026).
+
+      declare
+         Version : Version_Class := File.New_Version;
       begin
          if Version.Size /= File.Size then
             Ada.Text_IO.Put (": a version is not a copy of its file");
@@ -212,40 +250,85 @@ package body Tests.Files is
             return False;
          end if;
 
-         declare
-            Again : Writable_File_Class := Control.New_Version;
-         begin
-            if Again.Writable_File_Cap /= Rose.Capabilities.Null_Capability
-            then
-               Ada.Text_IO.Put (": a file has two versions");
-               return False;
-            end if;
-         end;
+         if not Refused (File) then
+            Ada.Text_IO.Put (": a file has two versions");
+            return False;
+         elsif not Refused (Version) then
+            Ada.Text_IO.Put (": a version has a version");
+            return False;
+         end if;
 
-         Control.Commit_Version;
+         Version.Commit;
          if File.Size /= 2 * Hello'Length then
             Ada.Text_IO.Put (": a committed version is not the file");
             return False;
          end if;
 
          Version.Write (Hello);
-         if File.Size /= 2 * Hello'Length then
-            Ada.Text_IO.Put (": a committed version can still be written");
+         Version.Commit;
+         if File.Size /= 3 * Hello'Length
+           or else Version.Size /= 3 * Hello'Length
+         then
+            Ada.Text_IO.Put (": a second commit is not the file");
             return False;
          end if;
+
+         Version.Truncate (0);
+         Version.Rollback;
+         if Version.Size /= 3 * Hello'Length
+           or else File.Size /= 3 * Hello'Length
+         then
+            Ada.Text_IO.Put (": a rollback is not the file");
+            return False;
+         end if;
+
+         Version.Truncate (0);
+         Version.Release;
+         if File.Size /= 3 * Hello'Length then
+            Ada.Text_IO.Put (": a released version changed its file");
+            return False;
+         end if;
+
+         begin
+            Version.Write (Hello);
+            Ada.Text_IO.Put (": a released version can still be written");
+            return False;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
       end;
 
-      --  Discarding a version leaves the file as it was.
+      --  Once its version is released, the file can have another.
 
       declare
-         Version : Writable_File_Class := Control.New_Version;
+         Version : Version_Class := File.New_Version;
       begin
-         Version.Truncate (0);
-         Control.Discard_Version;
-         if File.Size /= 2 * Hello'Length then
-            Ada.Text_IO.Put (": a discarded version changed its file");
+         if Version.Size /= 3 * Hello'Length then
+            Ada.Text_IO.Put (": a second version is not a copy");
             return False;
          end if;
+         Version.Release;
+      end;
+
+      --  A write past the end of the largest file fails, and writes
+      --  nothing.
+
+      declare
+         Large : constant Storage_Array (1 .. 4096) := (others => 0);
+         Size  : constant Storage_Count := File.Size;
+      begin
+         for I in 1 .. 16 loop
+            File.Write (Large);
+         end loop;
+         Ada.Text_IO.Put (": a file grew past its largest size");
+         return False;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            if File.Size /= Size + 15 * Large'Length then
+               Ada.Text_IO.Put (": a refused write changed the file");
+               return False;
+            end if;
       end;
 
       return True;
@@ -265,6 +348,26 @@ package body Tests.Files is
    begin
       return Reader.Releasable_Reader_Cap;
    end Reader_Cap;
+
+   -------------
+   -- Refused --
+   -------------
+
+   function Refused
+     (File : in out Writable_File_Class)
+      return Boolean
+   is
+   begin
+      declare
+         Version : Version_Class := File.New_Version;
+      begin
+         Version.Release;
+      end;
+      return False;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return True;
+   end Refused;
 
    -------------------------
    -- Seekable_Reader_Cap --
