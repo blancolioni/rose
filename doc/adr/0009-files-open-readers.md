@@ -2,8 +2,10 @@
 
 - **Status:** Proposed
 - **Date:** 2026-10-28
-- **Related:** [ADR 0010](0010-resources.md) (resources), #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users)
-- **Amended by:** #725, where `File_Reader` is renamed `Releasable_Reader`, `Seekable_File_Reader` is renamed `Seekable_Reader`, and `Stream_Reader` is renamed `Reader`. Nothing in them is specific to files. The text below keeps the old names
+- **Related:** [ADR 0010](0010-resources.md) (resources), #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), #726 (`Stream_Writer` renamed `Writer`), #338 (redirection), #735 (an editor)
+- **Amended by:**
+  - #725, where `File_Reader` is renamed `Releasable_Reader`, `Seekable_File_Reader` is renamed `Seekable_Reader`, and `Stream_Reader` is renamed `Reader`. Nothing in them is specific to files. Sections 1 to 3 keep the old names.
+  - #390, which decides how a file is written (section 4). Section 4 uses the new names, and #726's `Writer` for `Stream_Writer`.
 
 ## Context
 
@@ -62,14 +64,38 @@ isofs implements `Get_Ordinary_File`, which returns a null cap today. The `File`
 - **Seeks are capped at the size,** as the file's own seeks are now (#215).
 - **The table persists.** It is in the file process's memory, so a checkpoint saves each reader's position, and a restore brings it back with the caps that reach it.
 
-### 4. Writers are decided separately
+### 4. A writable file opens writers
 
-`Writable_File : File, Stream_Writer` keeps writing through the file itself, at the file's position, for now. How a file should be written is #390. It covers:
+Decided in #390. A writable file is no longer a stream either. Writers are opened from it, as readers are:
 
-- whether writers are opened, like readers;
-- what opening one does to the contents;
-- shell-owned commit (#141);
-- what becomes of `Truncate` (#347).
+```ada
+interface Writable_File : File is
+   function Append return interface Releasable_Writer;
+   --  A writer that adds to the end of the file.
+
+   function Rewrite return interface Releasable_Writer;
+   --  Empty the file, then a writer that adds to its end.
+end Writable_File;
+
+interface Releasable_Writer : Writer, Resource is
+end Releasable_Writer;
+```
+
+- **A writer has no position.** Every `Write` goes at the end of the file, as it already did. `Rewrite` is `Append` after emptying the file. `>` and `>>` (#338), `copy` and the editor (#735) need nothing else.
+- **`Truncate` goes.** `Rewrite` replaces `Truncate (0)`, which is the only length that anything but the tests shortened a file to. This undoes what #347 added.
+- **A writer is a `Resource`** (ADR 0010), although it has no position to keep. Petal can hand a writer to a command, as standard output, and end it when the command ends. `Release` frees it and commits nothing.
+- **Positioned writes,** a `Seekable_Writer`, wait until something needs them.
+
+**More than one writer at once is allowed.** With no position, writers have nothing to fight over. Each `Write` is atomic and goes at the end, as with `O_APPEND`, so two writers interleave whole writes, which is what a log wants. A `Rewrite` empties the file under every other writer, and under its readers; that is the caller's choice.
+
+**What a reader sees** while the file is written:
+
+- **A live `Writable_File`:** the writes as they are made, as section 1 says ("the file as it is"). A reader past the end after a `Rewrite` moves back to the new end, as a seek past the end does (#215).
+- **A version** (ADR 0026): the file's readers see what was last committed. Readers opened from the version see the version.
+
+Isolation comes from versions, not from writers. This also settles shell-owned commit (#141): a version is how a file is replaced, and the command commits it. `copy`, the editor and `>` call `Rewrite` on the version, write, then `Commit`.
+
+**`Size`** is the current length of a live file, and nothing on a live file is uncommitted. A version's `Size` is the version's own. The `Size` of a file that has a version is the committed length.
 
 ## Consequences
 
@@ -82,3 +108,6 @@ isofs implements `Get_Ordinary_File`, which returns a null cap today. The `File`
 
   Every client and server of these interfaces changes with them, and so does idle's snapshot of Rose's interfaces.
 - **`File` can be given to a command without letting it disturb other readers.** Today a command given a read-only `File` can still seek it, and so move the position of everyone else who reads it.
+- **Writers must be released too,** and the file server keeps a table of them, fixed in size like the readers'.
+- **`Writable_File` changes:** it no longer inherits `Stream_Writer`, it loses `Truncate`, and it gains `Append` and `Rewrite`. Its users change with it: petal, `copy`, the tests, and the file server. This comes after #726 renames `Stream_Writer`.
+- **Writes can't be made in the middle of a file** until a `Seekable_Writer` is added. Nothing needs that yet.
