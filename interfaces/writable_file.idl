@@ -6,4 +6,8 @@ is
    --  Shorten the file to Size bytes. A file that is no longer than Size
    --  is left as it is.
 
+   function New_Version return interface Transactional_Writable_File;
+   --  A version of the file, which starts as a copy of it (ADR 0026). It
+   --  fails if the file already has a version, or if this is a version.
+
 end Writable_File;

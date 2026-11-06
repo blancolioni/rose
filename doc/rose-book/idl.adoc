@@ -327,7 +327,7 @@ Each resource is an _instance_ of the interface, and is identified by a `Capabil
 For example, the timer server attaches `Timeout` and `Cap` as instanced interfaces, so each timer it creates has its own `On_Timeout` and `Destroy` capabilities, and `Destroy_Timer (Id)` knows which timer to remove.
 The caps, isofs, mem and store servers use instanced interfaces in the same way.
 
-The instance table holds up to 160 (endpoint, identifier) pairs for each interface (`Rose.Server.Max_Endpoint_Instances`).
+The instance table holds up to 1024 (endpoint, identifier) pairs for each interface (`Rose.Server.Max_Endpoint_Instances`).
 
 The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
 
@@ -403,11 +403,13 @@ The generated handlers look the object up and make a dispatching call to its pri
 
 An object's identifier comes from `Rose.Server.New_Identifier`, and is unique in the process among the identifiers in use (idle#84).
 The server packages of interfaces with a common ancestor can therefore be attached in one process: each registers its handlers with `Owns`, and `Rose.Server` sends an invocation to the handler whose package has an object with its identifier.
-A resource that is released frees its identifier once its capabilities are rescinded, and `New_Identifier` gives a freed identifier out again only after every other one.
+A resource that is released frees its slot and its identifier once its capabilities are rescinded, and `New_Identifier` gives a freed identifier out again only after every other one.
+Rescinding the capabilities of one object doesn't work yet, though (#769): the kernel checks a capability against the latest one made for its endpoint, whichever object that was for.
+Until then, a server that releases objects is given no rescind capability, and a released object's slot and identifier are retired instead, never to be used again, as the file server's readers are.
 Identifier 0 names the object in a package's first slot.
 That is the identifier of the capabilities that a kernel-target server creates when it is not instanced, and of the kernel's restore notice, so a server that serves one object behaves exactly as a kernel-target server that is not instanced.
-A server holds up to 16 objects for each interface.
-An invocation whose identifier has no object gets the error `Invalid_Operation`.
+A server's table of objects grows as objects are attached (idle#83), and a released resource's slot is used again when it can be.
+An invocation whose identifier has no object gets the error `Invalid_Operation`, and so does one through the capabilities of a released object.
 
 Server packages declare only interfaces, so one type can implement several, and one object can serve each of them.
 `X_Interface` adds nothing to `X_Object`, but it extends it, so an object that a program serves is also an `X_Object` within that program, and can be passed wherever an `X_Object'Class` is expected.

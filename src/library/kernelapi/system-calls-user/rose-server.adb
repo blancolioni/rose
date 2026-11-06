@@ -330,12 +330,18 @@ package body Rose.Server is
             then
                Rose.System_Calls.Invoke_Capability (Params);
             end if;
-         else
+         elsif Params.Reply_Cap /= Rose.Capabilities.Null_Capability then
+
+            --  No handler took the request, so the error is the reply:
+            --  Send_Error only sets it, and a caller that gets no reply
+            --  waits for good (#754).
+
             Rose.System_Calls.Initialize_Reply (Params, Params.Reply_Cap);
             Rose.System_Calls.Send_Error
               (Params,
                (if Matched then Rose.Invocation.Invalid_Operation
                 else Rose.Invocation.Invalid_Endpoint));
+            Rose.System_Calls.Invoke_Capability (Params);
          end if;
       end;
 

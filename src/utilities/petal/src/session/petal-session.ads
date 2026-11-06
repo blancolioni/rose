@@ -81,26 +81,29 @@ package Petal.Session is
       Result : out Version_Lookup);
    --  For an in Writable_File argument of a transactional command (#141,
    --  ADR 0012, section 3): a version of the file called Name in the
-   --  current directory, or of a new file if there is no entry Name.
-   --  The version is emptied, so that the command replaces the file.
-   --  File is the interface cap of the version's Writable_File. Result
-   --  says whether the version was made: not if Name is not a file, or
-   --  the directory refuses, or there is no directory. The version is
-   --  petal's until Commit_Versions or Discard_Versions.
+   --  current directory, from the file's own New_Version (ADR 0026). If
+   --  there is no entry Name, the file is created first, so a command
+   --  that fails leaves it empty (ADR 0027). The version is emptied, so
+   --  that the command replaces the file. File is the interface cap of
+   --  the version's Writable_File. Result says whether the version was
+   --  made: not if Name is not a file, or the directory or the file
+   --  refuses, or there is no directory. The version is petal's until
+   --  Commit_Versions or Discard_Versions.
 
    procedure Commit_Versions (Failed : out Natural);
    --  Commit the versions that New_Version has made since the last call,
    --  in the order it made them, once the command they were bound for
-   --  has completed. Failed is 0 if they were all committed. If not,
-   --  version Failed could not be committed, and it and the ones after
-   --  it are still pending, for Discard_Versions.
+   --  has completed, and release them. Failed is 0 if they were all
+   --  committed. If not, version Failed could not be committed, and it
+   --  and the ones after it are still pending, for Discard_Versions.
 
    function Version_Name (Index : Positive) return String;
    --  The name of the file of version Index.
 
    procedure Discard_Versions;
-   --  Discard the versions that are still pending, as when the command
-   --  they were bound for has failed, and forget them all.
+   --  Release the versions that are still pending, which drops them, as
+   --  when the command they were bound for has failed, and forget them
+   --  all.
 
    procedure Current_Grant
      (Writable : Boolean;

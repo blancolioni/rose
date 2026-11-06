@@ -15,6 +15,8 @@ copy:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-copy.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/writable_file.idl \
+	    $(INTERFACES)/transactional_writable_file.idl \
+	    $(INTERFACES)/transactional.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/releasable_reader.idl \
 	    $(INTERFACES)/seekable_reader.idl \

@@ -1,0 +1,15 @@
+--  Something whose changes take effect only when they are committed
+--  (ADR 0026). The command that holds it commits it, as often as it
+--  likes; what isn't committed is dropped when the object is released.
+
+interface Transactional is
+
+   procedure Commit;
+   --  Make the changes since the last commit take effect. The object
+   --  stays open, for more changes. It fails if the changes can't take
+   --  effect, and they are then still pending.
+
+   procedure Rollback;
+   --  Drop the changes since the last commit.
+
+end Transactional;
