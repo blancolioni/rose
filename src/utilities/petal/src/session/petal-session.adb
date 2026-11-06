@@ -8,7 +8,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Transactional_Writable_File.Client.Conversions;
+with Rose.Interfaces.Transactional_Writable_File.Client;
 with Rose.Interfaces.Writable_Directory.Client.Conversions;
 with Rose.Interfaces.Writable_File.Client;
 
@@ -53,22 +53,14 @@ package body Petal.Session is
 
    Max_Versions         : constant := 8;
    Max_File_Name_Length : constant := 64;
-   --  As many as a directory makes at once, with its longest name.
+   --  As many versions as a directory makes at once, and its longest
+   --  name.
 
-   type Version_Entry is
-      record
-         Version   : Version_Clients.Transactional_Writable_File_Client;
-         File      : Rose.Interfaces.Writable_File.Client
-           .Writable_File_Client;
-         Name      : String (1 .. Max_File_Name_Length);
-         Name_Last : Natural := 0;
-         Pending   : Boolean := False;
-      end record;
-   --  A version that New_Version made, and petal's client of its
-   --  Writable_File, whose interface cap the command is given.
-
-   Versions      : array (1 .. Max_Versions) of Version_Entry;
+   Versions      : array (1 .. Max_Versions)
+     of Version_Clients.Transactional_Writable_File_Client;
    Version_Count : Natural := 0;
+   --  The versions that New_Version made, whose interface caps the
+   --  command is given.
 
    Max_Depth : constant := 16;
 
@@ -97,10 +89,6 @@ package body Petal.Session is
    procedure Close_Level (Item : in out Level_Entry);
    --  Delete petal's caps for the directory Item, which is no longer on
    --  the path of the current directory.
-
-   procedure Close_Version (Item : in out Version_Entry);
-   --  Release the version Item, which drops what wasn't committed, and
-   --  delete petal's caps for it.
 
    procedure Current_Directory
      (Directory : out Writable_Directory_Client;
@@ -349,36 +337,6 @@ package body Petal.Session is
       Close (Item.Directory);
    end Close_Level;
 
-   -------------------
-   -- Close_Version --
-   -------------------
-
-   procedure Close_Version (Item : in out Version_Entry) is
-   begin
-      Version_Clients.Release (Item.Version);
-      Rose.Interfaces.Writable_File.Client.Close (Item.File);
-      Version_Clients.Close (Item.Version);
-      Item.Pending := False;
-   end Close_Version;
-
-   ---------------------
-   -- Commit_Versions --
-   ---------------------
-
-   procedure Commit_Versions (Failed : out Natural) is
-   begin
-      Failed := 0;
-      for Index in 1 .. Version_Count loop
-         Version_Clients.Commit (Versions (Index).Version);
-         if Version_Clients.Has_Error then
-            Failed := Index;
-            return;
-         end if;
-         Close_Version (Versions (Index));
-      end loop;
-      Version_Count := 0;
-   end Commit_Versions;
-
    -----------------------
    -- Current_Directory --
    -----------------------
@@ -474,20 +432,6 @@ package body Petal.Session is
          Found := Grant /= Rose.Capabilities.Null_Capability;
       end;
    end Current_Grant;
-
-   ----------------------
-   -- Discard_Versions --
-   ----------------------
-
-   procedure Discard_Versions is
-   begin
-      for Item of Versions (1 .. Version_Count) loop
-         if Item.Pending then
-            Close_Version (Item);
-         end if;
-      end loop;
-      Version_Count := 0;
-   end Discard_Versions;
 
    --------------------
    -- Find_Directory --
@@ -644,9 +588,7 @@ package body Petal.Session is
       then
          Result := Not_A_Version_File;
          return;
-      elsif Version_Count = Max_Versions
-        or else Name'Length > Max_File_Name_Length
-      then
+      elsif Version_Count = Max_Versions then
          Result := No_Version;
          return;
       end if;
@@ -703,24 +645,14 @@ package body Petal.Session is
          Version := Params.Caps (0);
          Rose.Interfaces.Writable_File.Client.Close (Target);
 
+         --  A version starts as a copy of the file. A command that
+         --  replaces it opens the version with Rewrite, and one that adds
+         --  to it with Append (ADR 0009, section 4).
+
          Version_Count := Version_Count + 1;
-         declare
-            Item : Version_Entry renames Versions (Version_Count);
-         begin
-            Version_Clients.Open (Item.Version, Version);
-            Item.File := Version_Clients.Conversions.To_Writable_File
-              (Item.Version);
-            Item.Name (1 .. Saved_Name'Length) := Saved_Name;
-            Item.Name_Last := Saved_Name'Length;
-            Item.Pending := True;
-
-            --  A version starts as a copy of the file. A command that
-            --  replaces it opens the version with Rewrite, and one that
-            --  adds to it with Append (ADR 0009, section 4).
-
-            File := Rose.Interfaces.Writable_File.Client.Get_Interface_Cap
-              (Item.File);
-         end;
+         Version_Clients.Open (Versions (Version_Count), Version);
+         File := Version_Clients.Get_Interface_Cap
+           (Versions (Version_Count));
       end;
       Result := Version_Made;
    end New_Version;
@@ -740,6 +672,22 @@ package body Petal.Session is
       end loop;
       Found_Count := 0;
    end Release_Files;
+
+   ----------------------
+   -- Release_Versions --
+   ----------------------
+
+   --  Releasing a version drops what wasn't committed, and ends the
+   --  readers and writers opened from it.
+
+   procedure Release_Versions is
+   begin
+      for Version of Versions (1 .. Version_Count) loop
+         Version_Clients.Release (Version);
+         Version_Clients.Close (Version);
+      end loop;
+      Version_Count := 0;
+   end Release_Versions;
 
    ----------------------
    -- Run_Startup_File --
@@ -839,14 +787,5 @@ package body Petal.Session is
          Current_Root := Directory_Count;
       end if;
    end Start;
-
-   ------------------
-   -- Version_Name --
-   ------------------
-
-   function Version_Name (Index : Positive) return String is
-   begin
-      return Versions (Index).Name (1 .. Versions (Index).Name_Last);
-   end Version_Name;
 
 end Petal.Session;

@@ -38,9 +38,9 @@ package Petal.Signatures is
          Of_Type         : Argument_Type := String_Type;
          Interface_Name  : Slice;
          Mode            : Argument_Mode := In_Mode;
-         Versioned       : Boolean := False;
-         --  An in interface whose objects the shell can version and
-         --  commit (ADR 0012, section 2).
+         Transactional   : Boolean := False;
+         --  An in interface that is Transactional: the shell gives the
+         --  command a version, which the command commits (ADR 0026).
          Place           : Place_Kind := Word_Place;
          Index           : Natural := 0;
          Count_Word      : Natural := 0;
@@ -109,10 +109,6 @@ package Petal.Signatures is
          Help_Footer    : Slice;
          Summary        : Slice;
          Description    : Slice;
-         Live           : Boolean := False;
-         --  The command changes its Versioned arguments as it runs,
-         --  rather than being a transaction over them (ADR 0012,
-         --  section 3).
          Argument_Count : Natural := 0;
          Arguments      : Argument_Array;
          Stream_Count   : Natural := 0;

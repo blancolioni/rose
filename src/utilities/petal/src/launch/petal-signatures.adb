@@ -83,8 +83,6 @@ package body Petal.Signatures is
                Result.Summary := Field;
             elsif Key = "description" then
                Result.Description := Field;
-            elsif Key = "live" then
-               Result.Live := Item = "true";
             elsif Key = "stream" then
                if Result.Stream_Count < Max_Streams then
                   Result.Stream_Count := Result.Stream_Count + 1;
@@ -205,8 +203,8 @@ package body Petal.Signatures is
                   elsif Key = "mode" then
                      Argument.Mode :=
                        (if Item = "out" then Out_Mode else In_Mode);
-                  elsif Key = "versioned" then
-                     Argument.Versioned := Item = "true";
+                  elsif Key = "transactional" then
+                     Argument.Transactional := Item = "true";
                   elsif Key = "place" then
                      if Starts (Item, "word ") then
                         Argument.Place := Word_Place;
@@ -260,7 +258,6 @@ package body Petal.Signatures is
       Result.Help_Footer := (others => <>);
       Result.Summary := (others => <>);
       Result.Description := (others => <>);
-      Result.Live := False;
       Result.Length := Natural'Min (Text'Length, Max_Text);
       Result.Text (1 .. Result.Length) :=
         Text (Text'First .. Text'First + Result.Length - 1);
