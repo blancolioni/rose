@@ -126,9 +126,21 @@ package body Petal.Command_Launch is
        and then Argument.Mode = In_Mode
        and then Value (Item, Argument.Interface_Name) = "Writable_File");
    --  True if Argument is an in Writable_File, which names a file in the
-   --  current directory (ADR 0012, section 4). A live command gets the
-   --  file itself, which must exist. A transactional command gets a
-   --  version of it, or of a new file if there is none (#141).
+   --  current directory. The command gets the file itself, which must
+   --  exist (ADR 0026).
+
+   function Is_Transactional_File
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Argument.Transactional
+       and then Value (Item, Argument.Interface_Name)
+                  = "Transactional_Writable_File");
+   --  True if Argument is an in Transactional_Writable_File, which names
+   --  a file in the current directory. The command gets a version of it,
+   --  or of a new file if there is none, and commits it (ADR 0026).
 
    procedure Launch
      (Command_Name : String;
@@ -435,7 +447,7 @@ package body Petal.Command_Launch is
                      end if;
                   end;
                elsif Is_In_File (Item, Argument)
-                 or else (Is_Writable_File (Item, Argument) and then Item.Live)
+                 or else Is_Writable_File (Item, Argument)
                then
                   declare
                      use all type Petal.Session.File_Lookup;
@@ -455,7 +467,7 @@ package body Petal.Command_Launch is
                            Fail ("no directory to find '" & Text & "' in");
                      end case;
                   end;
-               elsif Is_Writable_File (Item, Argument) then
+               elsif Is_Transactional_File (Item, Argument) then
                   declare
                      use all type Petal.Session.Version_Lookup;
                      Result : Petal.Session.Version_Lookup;
@@ -475,7 +487,8 @@ package body Petal.Command_Launch is
                else
                   Fail ("cannot bind " & Argument_Name (Index)
                         & ": only in Directory, in Writable_Directory, in"
-                        & " File and in Writable_File arguments are"
+                        & " File, in Writable_File and in"
+                        & " Transactional_Writable_File arguments are"
                         & " supported");
                end if;
          end case;
@@ -511,22 +524,6 @@ package body Petal.Command_Launch is
       end Warn_Unneeded;
 
    begin
-      --  A command that is not live is a transaction over its Versioned
-      --  arguments (ADR 0012, section 3). Petal makes versions of files
-      --  (#141), but not yet of directories (#634). Running such a
-      --  command live instead would change what it was given without
-      --  saying so.
-
-      if not Item.Live
-        and then (for some Index in 1 .. Item.Argument_Count =>
-                    Item.Arguments (Index).Versioned
-                    and then not Is_Writable_File
-                                   (Item, Item.Arguments (Index)))
-      then
-         Fail ("petal cannot run a transactional command that changes a"
-               & " directory yet: it cannot version directories (#634)");
-      end if;
-
       --  Bind the words: options by name, then the positional arguments
       --  in declaration order, with a String_List taking the rest.
 
@@ -899,22 +896,6 @@ package body Petal.Command_Launch is
             end if;
          end if;
 
-         --  The command completed, so the versions it was given are
-         --  committed (ADR 0012, section 3). If it failed, Run_Command
-         --  discards them.
-
-         if not Failed then
-            declare
-               Not_Committed : Natural;
-            begin
-               Petal.Session.Commit_Versions (Not_Committed);
-               if Not_Committed /= 0 then
-                  Fail ("cannot commit '"
-                        & Petal.Session.Version_Name (Not_Committed) & "'");
-               end if;
-            end;
-         end if;
-
          Rose.System_Calls.Initialize_Send
            (Params, Rose.System_Calls.Delete_Cap_Capability);
          Rose.System_Calls.Send_Cap (Params, Endpoint);
@@ -1195,11 +1176,11 @@ package body Petal.Command_Launch is
          else
             Launch (Name, Current, Client, Line, Words, Count, Sudo);
 
-            --  Launch commits the versions of a command that completed.
-            --  Any that are left are discarded: the command failed, or
-            --  wasn't run.
+            --  The command commits its versions itself (ADR 0026), so
+            --  they are released whether it completed, failed, or wasn't
+            --  run, which drops what it didn't commit.
 
-            Petal.Session.Discard_Versions;
+            Petal.Session.Release_Versions;
             Petal.Session.Release_Files;
          end if;
 

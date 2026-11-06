@@ -61,11 +61,10 @@ package Petal.Session is
       Result   : out File_Lookup);
    --  For an in File argument (#344): the interface cap of the read-only
    --  File interface of the ordinary file called Name in the current
-   --  directory (#342). If Writable,
-   --  for an in Writable_File argument of a live command, it is the
-   --  file's Writable_File interface, so the command's changes take
-   --  effect as it makes them (ADR 0012, section 4). Result says
-   --  whether there is such a file. The cap is petal's until
+   --  directory (#342). If Writable, for an in Writable_File argument,
+   --  it is the file's Writable_File interface, so the command's changes
+   --  take effect as it makes them (ADR 0026). Result says whether there
+   --  is such a file. The cap is petal's until
    --  Release_Files deletes it.
 
    procedure Release_Files;
@@ -79,32 +78,21 @@ package Petal.Session is
      (Name   : String;
       File   : out Rose.Capabilities.Capability;
       Result : out Version_Lookup);
-   --  For an in Writable_File argument of a transactional command (#141,
-   --  ADR 0012, section 3): a version of the file called Name in the
-   --  current directory, from the file's own New_Version (ADR 0026). If
-   --  there is no entry Name, the file is created first, so a command
-   --  that fails leaves it empty (ADR 0027). The version starts as a copy
-   --  of the file, and the command empties it if it replaces the file
-   --  (ADR 0009, section 4). File is the interface cap of the version's
-   --  Writable_File. Result says whether the version was
-   --  made: not if Name is not a file, or the directory or the file
-   --  refuses, or there is no directory. The version is petal's until
-   --  Commit_Versions or Discard_Versions.
+   --  For an in Transactional_Writable_File argument (ADR 0026): a
+   --  version of the file called Name in the current directory, from the
+   --  file's own New_Version, which the command commits. If there is no
+   --  entry Name, the file is created first, so a command that fails
+   --  leaves it empty (ADR 0027). The version starts as a copy of the
+   --  file, and the command empties it if it replaces the file (ADR 0009,
+   --  section 4). File is the interface cap of the version. Result says
+   --  whether the version was made: not if Name is not a file, or the
+   --  directory or the file refuses, or there is no directory. The
+   --  version is petal's until Release_Versions.
 
-   procedure Commit_Versions (Failed : out Natural);
-   --  Commit the versions that New_Version has made since the last call,
-   --  in the order it made them, once the command they were bound for
-   --  has completed, and release them. Failed is 0 if they were all
-   --  committed. If not, version Failed could not be committed, and it
-   --  and the ones after it are still pending, for Discard_Versions.
-
-   function Version_Name (Index : Positive) return String;
-   --  The name of the file of version Index.
-
-   procedure Discard_Versions;
-   --  Release the versions that are still pending, which drops them, as
-   --  when the command they were bound for has failed, and forget them
-   --  all.
+   procedure Release_Versions;
+   --  Release the versions that New_Version has made since the last call,
+   --  once the command they were bound for has ended, whether it
+   --  completed or failed. What the command didn't commit is dropped.
 
    procedure Current_Grant
      (Writable : Boolean;
