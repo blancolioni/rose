@@ -1134,10 +1134,30 @@ package body Petal.Command_Launch is
       Count : Natural;
       Sudo  : String)
    is
+      function Word_Text (Index : Positive) return String
+      is (Line (Words (Index).First .. Words (Index).Last));
+
+      function Options_Last return Natural;
+      --  The last word that can be an option: the one before "--", which
+      --  ends the options (#379), or the last word if there is none.
+
+      ------------------
+      -- Options_Last --
+      ------------------
+
+      function Options_Last return Natural is
+      begin
+         for I in 2 .. Count loop
+            if Word_Text (I) = "--" then
+               return I - 1;
+            end if;
+         end loop;
+         return Count;
+      end Options_Last;
+
    begin
       declare
-         Name   : constant String :=
-           Lower (Line (Words (1).First .. Words (1).Last));
+         Name   : constant String := Lower (Word_Text (1));
          Params : aliased Rose.Invocation.Invocation_Record;
          Client : Rose.Interfaces.Launch.Client.Launch_Client;
          Last   : Natural;
@@ -1164,12 +1184,12 @@ package body Petal.Command_Launch is
 
          if not Current.Valid then
             Error (Name & ": not a command");
-         elsif (for some I in 2 .. Count =>
-                  Line (Words (I).First .. Words (I).Last) = "--help")
+         elsif (for some I in 2 .. Options_Last =>
+                  Word_Text (I) = "--help")
          then
             Put_Help (Current);
-         elsif (for some I in 2 .. Count =>
-                  Line (Words (I).First .. Words (I).Last) = "--version")
+         elsif (for some I in 2 .. Options_Last =>
+                  Word_Text (I) = "--version")
          then
             Put_Version (Current);
          else
