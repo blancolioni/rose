@@ -2,7 +2,8 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-05
-- **Related:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes, writable interfaces and transactions, which this amends), [ADR 0027](0027-new-files-in-a-transaction.md) (new files in a transaction), [ADR 0010](0010-resources.md) (resources), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #735 (an editor, ported from kilo), #752 (read-only and writable files), #634 (directory versions)
+- **Related:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes, writable interfaces and transactions, which this amends), [ADR 0027](0027-new-files-in-a-transaction.md) (new files in a transaction), [ADR 0010](0010-resources.md) (resources), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #735 (an editor, ported from kilo), #752 (read-only and writable files), #634 (directory versions), #338 and #340 (redirection)
+- **Amended by:** #338, where petal commits a redirection, which is its own and not the command's (section 3).
 
 ## Context
 
@@ -73,7 +74,8 @@ end Transactional_Writable_File;
 | `in Transactional_Writable_File` | A version of the file. The command commits it. |
 
 - **Petal binds the name first.** For a `Transactional_Writable_File`, petal finds the file named, or creates it with `Create_File` if there is none, and then asks the file for a version. The name is the directory's, and is settled before the command runs.
-- **Petal never commits.** After the command ends, whether it completed or failed, petal releases each version it made for it. That drops what the command didn't commit, and frees the file for another version.
+- **Petal never commits a command's versions.** After the command ends, whether it completed or failed, petal releases each version it made for the command's arguments. That drops what the command didn't commit, and frees the file for another version.
+- **Petal commits a redirection,** because the redirection is petal's (#338, #340). The command sees only a `Writer` as its standard output or standard error, so it has nothing to commit. Petal knows when the output is done: when the command ends, and whether it completed. So petal makes a version of the file, passes the command a writer of the version (`Rewrite` for `>`, `Append` for `>>`; ADR 0009, section 4), commits the version if the command completed, and releases it either way. This is the same rule as for arguments: whoever knows when the changes are done commits them.
 - **Petal doesn't empty a version.** Whether a command replaces a file, appends to it or edits it is the command's to decide.
 - **The `Live` aspect goes.** It chose between the file and a version, and the argument's type now does that. A command that changes a directory as it runs takes a `Writable_Directory`, which is live until directories have versions (#634).
 - **The `Versioned` aspect goes.** It marked the interfaces that petal versions. Petal versions an argument whose type inherits `Transactional`, and idle records that in the command's signature.
