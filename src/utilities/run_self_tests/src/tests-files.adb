@@ -7,6 +7,7 @@ with Rose.Words;
 
 with Rose.Interfaces.File.Client;
 with Rose.Interfaces.File_Control.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Seekable_Reader.Client;
 with Rose.Interfaces.Writable_File.Client;
@@ -162,14 +163,17 @@ package body Tests.Files is
       First.Close;
 
       --  A released reader can't be read, through the caps that are
-      --  still held for it (ADR 0010).
+      --  still held for it (ADR 0010): the read fails.
 
       Second.Release;
-      Second.Read (Buffer, Last);
-      if Last /= 0 then
+      begin
+         Second.Read (Buffer, Last);
          Ada.Text_IO.Put (": a released reader can still be read");
          return False;
-      end if;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            null;
+      end;
 
       --  Released readers give their slots back: there are more readers
       --  here, one at a time, than the file server has slots.
@@ -219,9 +223,16 @@ package body Tests.Files is
             return False;
          end if;
 
-         Version.Write (Hello);
-         if File.Size /= 2 * Hello'Length then
+         begin
+            Version.Write (Hello);
             Ada.Text_IO.Put (": a committed version can still be written");
+            return False;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
+         if File.Size /= 2 * Hello'Length then
+            Ada.Text_IO.Put (": a late write changed the file");
             return False;
          end if;
       end;
