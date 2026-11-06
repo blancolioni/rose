@@ -14,8 +14,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces.o \
 	$(BUILDDIR)/rose-interfaces-cap.o \
 	$(BUILDDIR)/rose-interfaces-cap-client.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer.o \
-	$(BUILDDIR)/rose-interfaces-stream_writer-client.o \
+	$(BUILDDIR)/rose-interfaces-writer.o \
+	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-interfaces-timer.o \
 	$(BUILDDIR)/rose-interfaces-timer-client.o \
 	$(BUILDDIR)/rose-interfaces-checkpointer.o \

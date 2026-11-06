@@ -103,8 +103,8 @@ stages:
         - {ports: [in, 8, 0x3FD, 0x3FD], owner: none}
         - {boot_tag: 8}
       exports:
-        console_interface: Stream_Writer.Stream_Writer_Interface
-        console_stream: Stream_Writer.Write_Endpoint
+        console_interface: Writer.Writer_Interface
+        console_stream: Writer.Write_Endpoint
         console_redirect: Output_Redirect.Redirect_Endpoint
 
     # Where Init.Calls.Send_String reports, as when the installer refuses

@@ -35,7 +35,7 @@ package body Restore.Installer is
    --  numbered as the generated server numbers them.
 
    Reader_Ancestor : constant := 1;
-   Stream_Writer_Ancestor : constant := 2;
+   Writer_Ancestor : constant := 2;
    --  The ancestors of Terminal (interfaces/terminal.idl).
 
    Clock_Ancestor         : constant := 1;
@@ -97,7 +97,7 @@ package body Restore.Installer is
       S    : String);
 
    procedure Send_Console (Console_Cap : Rose.Capabilities.Capability);
-   --  Give init the persistent console's Stream_Writer interface, so
+   --  Give init the persistent console's Writer interface, so
    --  that it replaces the boot console before anything else is
    --  installed.
 
@@ -526,7 +526,7 @@ package body Restore.Installer is
                         if Flags (Provides_Console) then
 
                            --  The console is a Terminal (#454). Init gets
-                           --  its Stream_Writer as the console, its
+                           --  its Writer as the console, its
                            --  Reader as standard input, and the
                            --  Terminal itself.
 
@@ -535,7 +535,7 @@ package body Restore.Installer is
                                (Reply.Caps (0));
                            Send_Console
                              (Get_Ancestor_Interface
-                                (Terminal_Cap, Stream_Writer_Ancestor));
+                                (Terminal_Cap, Writer_Ancestor));
                            if Flags (Provides_Input_Stream) then
                               Input_Stream_Cap :=
                                 Get_Ancestor_Interface

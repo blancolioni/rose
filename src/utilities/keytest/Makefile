@@ -18,5 +18,5 @@ keytest:
 	    $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/stream.idl \
 	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/stream_writer.idl
+	    $(INTERFACES)/writer.idl
 	gprbuild $(GPRBUILD_CARGS)

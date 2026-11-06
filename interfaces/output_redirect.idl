@@ -3,6 +3,6 @@ interface Output_Redirect is
    --  Send everything written from now on to Target instead, or discard
    --  it if Target is null.
 
-   procedure Redirect (Target : interface Stream_Writer);
+   procedure Redirect (Target : interface Writer);
 
 end Output_Redirect;

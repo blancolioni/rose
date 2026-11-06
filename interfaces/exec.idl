@@ -9,6 +9,6 @@ interface Exec : Launch is
    --  The standard output that exec gives the programs it launches, and
    --  uses itself.
 
-   procedure Set_Standard_Output (Output : interface Stream_Writer);
+   procedure Set_Standard_Output (Output : interface Writer);
 
 end Exec;

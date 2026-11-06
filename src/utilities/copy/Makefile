@@ -21,7 +21,7 @@ copy:
 	    $(INTERFACES)/releasable_reader.idl \
 	    $(INTERFACES)/seekable_reader.idl \
 	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/stream_writer.idl \
+	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

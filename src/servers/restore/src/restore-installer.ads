@@ -17,7 +17,7 @@ package Restore.Installer is
       Requires_No_Framebuffer,
       Requires_Screen);
    --  Provides_Console: the program is the persistent console, a
-   --  Terminal, whose Stream_Writer init gives everything installed after
+   --  Terminal, whose Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
    --  its Reader is standard input.
    --  Is_Driver: the program is from the drivers directory, so init may

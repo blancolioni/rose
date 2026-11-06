@@ -90,7 +90,7 @@ package body Surface_Console.Server is
      (Item : in out Console)
       return Rose.Capabilities.Capability;
 
-   overriding function Stream_Writer_Cap
+   overriding function Writer_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability;
 
@@ -375,14 +375,14 @@ package body Surface_Console.Server is
          (Item, Rose.Interfaces.Terminal.Reader_Interface));
 
    -----------------------
-   -- Stream_Writer_Cap --
+   -- Writer_Cap --
    -----------------------
 
-   overriding function Stream_Writer_Cap
+   overriding function Writer_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Stream_Writer_Interface));
+         (Item, Rose.Interfaces.Terminal.Writer_Interface));
 
    ------------------
    -- Terminal_Cap --

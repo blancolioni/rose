@@ -61,8 +61,8 @@ A command that inherits no role gets no capability beyond its arguments.
 |===
 | Role | Interface | Gives the command
 | `Standard_Input` | `Reader` | Standard input
-| `Standard_Output` | `Stream_Writer` | Standard output
-| `Standard_Error` | `Stream_Writer` | Standard error
+| `Standard_Output` | `Writer` | Standard output
+| `Standard_Error` | `Writer` | Standard error
 | `Standard_IO` | | All three streams
 | `Create_Endpoint` | Kernel interface (#162) | Creating further endpoints
 | `Delete_Cap` | Kernel interface (#162) | Deleting caps

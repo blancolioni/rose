@@ -45,7 +45,7 @@ project vga_console is
        "rose-interfaces-restorable-server.adb",
        "rose-interfaces-stream.ads",
        "rose-interfaces-reader.ads",
-       "rose-interfaces-stream_writer.ads",
+       "rose-interfaces-writer.ads",
        "rose-interfaces-terminal.ads",
        "rose-interfaces-terminal-server.ads",
        "rose-interfaces-terminal-server.adb");

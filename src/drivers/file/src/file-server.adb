@@ -83,11 +83,11 @@ package body File.Server is
    is (File_Server.Cap_Of
          (Item, Rose.Interfaces.Writable_File.File_Interface));
 
-   overriding function Stream_Writer_Cap
+   overriding function Writer_Cap
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
    is (File_Server.Cap_Of
-         (Item, Rose.Interfaces.Writable_File.Stream_Writer_Interface));
+         (Item, Rose.Interfaces.Writable_File.Writer_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out File_Object)
@@ -137,10 +137,10 @@ package body File.Server is
       return Rose.Capabilities.Capability
    is (Version_Server.Cap_Of (Item, Versions.File_Interface));
 
-   overriding function Stream_Writer_Cap
+   overriding function Writer_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.Stream_Writer_Interface));
+   is (Version_Server.Cap_Of (Item, Versions.Writer_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out Version_Object)

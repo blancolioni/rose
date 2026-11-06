@@ -8,8 +8,8 @@ with Rose.Server;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Output_Redirect;
-with Rose.Interfaces.Stream_Writer.Client;
-with Rose.Interfaces.Stream_Writer.Server;
+with Rose.Interfaces.Writer.Client;
+with Rose.Interfaces.Writer.Server;
 
 with Console.IO;
 
@@ -38,7 +38,7 @@ package body Console.Server is
 
    Redirected     : Boolean := False;
    Has_Target     : Boolean := False;
-   Target_Console : Rose.Interfaces.Stream_Writer.Client.Stream_Writer_Client;
+   Target_Console : Rose.Interfaces.Writer.Client.Writer_Client;
 
    procedure Write_Target (Text : System.Storage_Elements.Storage_Array);
    --  Write Text to Target_Console
@@ -54,7 +54,7 @@ package body Console.Server is
       Rose.System_Calls.Use_Buffer
         (Console_Buffer'Address, Console_Buffer_Size);
 
-      Rose.Interfaces.Stream_Writer.Server.Create_Server
+      Rose.Interfaces.Writer.Server.Create_Server
         (Server_Context => Server_Context,
          Write          => Handle_Write'Access);
       Rose.Server.Register_Handler
@@ -79,7 +79,7 @@ package body Console.Server is
       Redirected := True;
       Has_Target := Target /= Rose.Capabilities.Null_Capability;
       if Has_Target then
-         Rose.Interfaces.Stream_Writer.Client.Open (Target_Console, Target);
+         Rose.Interfaces.Writer.Client.Open (Target_Console, Target);
 
          --  With a framebuffer, nothing written so far was on the screen,
          --  so it goes to the new console first (#654).
@@ -105,7 +105,7 @@ package body Console.Server is
       if not Redirected then
          Console.IO.Put (S);
       elsif Has_Target then
-         Rose.Interfaces.Stream_Writer.Client.Write (Target_Console, Buffer);
+         Rose.Interfaces.Writer.Client.Write (Target_Console, Buffer);
       end if;
    end Handle_Write;
 
@@ -124,7 +124,7 @@ package body Console.Server is
 
    procedure Write_Target (Text : System.Storage_Elements.Storage_Array) is
    begin
-      Rose.Interfaces.Stream_Writer.Client.Write (Target_Console, Text);
+      Rose.Interfaces.Writer.Client.Write (Target_Console, Text);
    end Write_Target;
 
 end Console.Server;

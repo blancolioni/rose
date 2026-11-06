@@ -105,7 +105,7 @@ end File;
 ----
 
 * An interface inherits every method of every parent, recursively.
-  `File` has `Read` from `Reader`, `Write` from `Stream_Writer` and `Seek` from `Seekable`.
+  `File` has `Read` from `Reader`, `Write` from `Writer` and `Seek` from `Seekable`.
 * Each parent is found by parsing `<parent>.idl`, in the same directory as the first file the compiler was given.
   The rewritten compiler will search a list of directories instead (see <<search-paths>>).
 * An interface may have no declarations of its own, as `File` does.
@@ -439,7 +439,7 @@ For example, `vga-console` serves the console's screen both as a stream to write
 [source,ada]
 ----
 type Console is limited new
-  Rose.Interfaces.Stream_Writer.Server.Stream_Writer_Interface
+  Rose.Interfaces.Writer.Server.Writer_Interface
   and Rose.Interfaces.Restorable.Server.Restorable_Interface
 with record
    ...
@@ -448,14 +448,14 @@ end record;
 overriding procedure Write (Item : in out Console; Buffer : Storage_Array);
 overriding procedure Restored (Item : in out Console);
 
-overriding function Stream_Writer_Cap (Item : in out Console) return Capability
-is (Rose.Interfaces.Stream_Writer.Server.Cap_Of (Item));
+overriding function Writer_Cap (Item : in out Console) return Capability
+is (Rose.Interfaces.Writer.Server.Cap_Of (Item));
 overriding function Restorable_Cap (Item : in out Console) return Capability
 is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
 
 Screen : aliased Console;
 ...
-Rose.Interfaces.Stream_Writer.Server.Publish (Context, Screen'Access);
+Rose.Interfaces.Writer.Server.Publish (Context, Screen'Access);
 Rose.Interfaces.Restorable.Server.Attach (Context, Screen'Access);
 ----
 
@@ -525,7 +525,7 @@ For `Rose.Core.Copy`, the spec is:
 [source,ada]
 ----
 procedure Rose.Core.Copy
-  (Logging : in out Rose.Interfaces.Stream_Writer.Stream_Writer_Object'Class;
+  (Logging : in out Rose.Interfaces.Writer.Writer_Object'Class;
    Source  : in out Rose.Interfaces.File.File_Object'Class;
    Target  : in out Rose.Interfaces.File.File_Object'Class;
    Root    : in out Rose.Interfaces.Directory.Directory_Object'Class;
@@ -833,8 +833,8 @@ A command inherits roles after its name, and receives their members as arguments
 [source,ada]
 ----
 role Standard_Input : Reader;
-role Standard_Output : Stream_Writer;
-role Standard_Error : Stream_Writer;
+role Standard_Output : Writer;
+role Standard_Error : Writer;
 
 role Standard_IO : Standard_Input, Standard_Output, Standard_Error is
 end Standard_IO;

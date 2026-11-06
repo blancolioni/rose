@@ -21,7 +21,7 @@ login:
 	    $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/stream.idl \
 	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/stream_writer.idl \
+	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/timer.idl \
 	    $(INTERFACES)/clock.idl \
 	    $(INTERFACES)/rights.idl \

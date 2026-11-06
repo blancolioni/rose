@@ -1,7 +1,7 @@
 interface Data_Source is
 
    procedure Add_Sink
-     (Sink : interface Stream_Writer);
+     (Sink : interface Writer);
    
    procedure Remove_Sink;
    
