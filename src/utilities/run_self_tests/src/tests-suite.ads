@@ -41,6 +41,7 @@ package Tests.Suite is
                    Tests.Containers.Container_Test'Access,
                    Tests.Finalization.Finalization_Test'Access,
                    Tests.Files.File_Test'Access,
+                   Tests.Files.Untouched_Buffer_Test'Access,
                    Tests.Processes.End_Process_Test'Access,
                    Tests.Directories.Directory_Test'Access,
                    Tests.Directories.Version_Test'Access,

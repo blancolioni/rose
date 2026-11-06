@@ -21,12 +21,6 @@ package body Console.Calls is
       Params : aliased Rose.Invocation.Invocation_Record;
       Size   : Rose.Words.Word := 0;
    begin
-      --  The kernel writes the tag straight into Tag, and can't take a
-      --  page fault there (#713), so Tag's page is mapped first by
-      --  clearing it.
-
-      Tag := (others => 0);
-
       Rose.System_Calls.Initialize_Send (Params, Framebuffer_Tag_Cap);
       Rose.System_Calls.Send_Buffer
         (Params, Tag'Length, Tag'Address, Writable => True);
