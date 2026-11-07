@@ -1,5 +1,6 @@
 with Ada.Text_IO;
 
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
@@ -15,11 +16,12 @@ with Tests.Registry;
 
 package body Tests.Processes is
 
+   use Ada.Streams;
    use System.Storage_Elements;
 
    package Files renames Rose.Interfaces.Writable_File.Client;
 
-   Hello : constant Storage_Array (1 .. 5) :=
+   Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 

@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 package body Text_Console.Line_Discipline is
 
    use System.Storage_Elements;
@@ -238,9 +240,10 @@ package body Text_Console.Line_Discipline is
    ----------
 
    procedure Take
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count)
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
+      use type Ada.Streams.Stream_Element_Offset;
    begin
       Last := Buffer'First - 1;
 
@@ -253,17 +256,21 @@ package body Text_Console.Line_Discipline is
                Key_Count := Key_Count - 1;
                if Is_ASCII (Key) then
                   Last := Last + 1;
-                  Buffer (Last) := Storage_Element (Key);
+                  Buffer (Last) := Ada.Streams.Stream_Element (Key);
                end if;
             end;
          end loop;
       elsif Line_Start > 0 then
          declare
-            Count : constant Storage_Count :=
-                      Storage_Count'Min (Buffer'Length, Line_Start);
+            Count  : constant Storage_Count :=
+                       Storage_Count'Min (Buffer'Length, Line_Start);
+            Target : Storage_Array (1 .. Count)
+              with Import, Address => Buffer'Address;
+            --  The start of Buffer, as the line is kept.
          begin
-            Last := Buffer'First + Count - 1;
-            Buffer (Buffer'First .. Last) := Input_Buffer (1 .. Count);
+            Last :=
+              Buffer'First + Ada.Streams.Stream_Element_Offset (Count) - 1;
+            Target := Input_Buffer (1 .. Count);
             Input_Buffer (1 .. Input_Last - Count) :=
               Input_Buffer (Count + 1 .. Input_Last);
             Input_Last := Input_Last - Count;

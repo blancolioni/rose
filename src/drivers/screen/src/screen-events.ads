@@ -1,4 +1,4 @@
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Rose.Words;
 
@@ -21,8 +21,8 @@ package Screen.Events is
    function Is_Empty return Boolean;
 
    procedure Take
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset);
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset);
    --  Take as many whole events as fit in Buffer, oldest first. Last is
    --  Buffer'First - 1 if none are queued, or Buffer is too small for
    --  one.

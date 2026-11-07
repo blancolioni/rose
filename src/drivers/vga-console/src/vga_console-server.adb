@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Interfaces;
@@ -33,12 +34,12 @@ package body VGA_Console.Server is
 
    overriding procedure Read
      (Item   : in out Console;
-      Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset);
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset);
 
    overriding procedure Write
      (Item   : in out Console;
-      Buffer : System.Storage_Elements.Storage_Array);
+      Buffer : Ada.Streams.Stream_Element_Array);
 
    overriding procedure Get_Size
      (Item    : in out Console;
@@ -242,8 +243,8 @@ package body VGA_Console.Server is
 
    overriding procedure Read
      (Item   : in out Console;
-      Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset)
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
       pragma Unreferenced (Item);
    begin
@@ -432,7 +433,7 @@ package body VGA_Console.Server is
 
    overriding procedure Write
      (Item   : in out Console;
-      Buffer : System.Storage_Elements.Storage_Array)
+      Buffer : Ada.Streams.Stream_Element_Array)
    is
       pragma Unreferenced (Item);
       S : String (1 .. Natural (Buffer'Length));

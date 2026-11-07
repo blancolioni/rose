@@ -1,13 +1,13 @@
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Ada.Text_IO;
 
 procedure Rose.Core.Cat
   (File : in out Rose.Interfaces.Reader.Reader_Object'Class)
 is
-   use System.Storage_Elements;
-   Buffer : Storage_Array (1 .. 4096);
-   Last   : Storage_Count;
+   use Ada.Streams;
+   Buffer : Stream_Element_Array (1 .. 4096);
+   Last   : Stream_Element_Offset;
 begin
    --  File is a reader that petal opened on the named file, or petal's
    --  standard input, which ends at Ctrl-D (ADR 0011). Petal releases a

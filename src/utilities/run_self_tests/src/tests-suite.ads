@@ -43,6 +43,7 @@ package Tests.Suite is
                    Tests.Files.File_Test'Access,
                    Tests.Files.Writer_Test'Access,
                    Tests.Files.Untouched_Buffer_Test'Access,
+                   Tests.Files.Cap_Stream_Test'Access,
                    Tests.Processes.End_Process_Test'Access,
                    Tests.Directories.Directory_Test'Access,
                    Tests.Directories.Version_Test'Access,
