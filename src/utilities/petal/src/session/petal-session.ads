@@ -94,6 +94,26 @@ package Petal.Session is
    --  once the command they were bound for has ended, whether it
    --  completed or failed. What the command didn't commit is dropped.
 
+   procedure Redirect_Output
+     (Name   : String;
+      Append : Boolean;
+      Output : out Rose.Capabilities.Capability;
+      Result : out Version_Lookup);
+   --  For "> Name" and ">> Name" (#338): a version of the file called
+   --  Name in the current directory, made as New_Version makes one, and
+   --  a writer on it: Rewrite, which empties the version, or Append if
+   --  Append (ADR 0009, section 4). Output is the writer's Write cap, for
+   --  the command's standard output. The command doesn't know about the
+   --  file, so the version is petal's to commit (ADR 0026), in
+   --  End_Redirection. Result is as for New_Version.
+
+   procedure End_Redirection (Completed : Boolean);
+   --  The command whose output Redirect_Output redirected has ended:
+   --  release the writer, commit the version if the command Completed,
+   --  and release the version, which drops what wasn't committed. A
+   --  failed command leaves the file as it was. Do nothing if there is no
+   --  redirection.
+
    procedure Current_Grant
      (Writable : Boolean;
       Grant    : out Rose.Capabilities.Capability;
