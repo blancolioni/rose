@@ -67,9 +67,21 @@ package Petal.Session is
    --  is such a file. The cap is petal's until
    --  Release_Files deletes it.
 
+   procedure Open_Reader
+     (Name   : String;
+      Reader : out Rose.Capabilities.Capability;
+      Result : out File_Lookup);
+   --  For an in Reader argument whose default is standard input (#395):
+   --  a reader of its own on the ordinary file called Name in the current
+   --  directory, from the start of the file (ADR 0009). Reader is the
+   --  reader's Read cap, which the command reads as it reads standard
+   --  input. Result is as for Find_File. The reader is petal's until
+   --  Release_Files releases it.
+
    procedure Release_Files;
    --  Delete the caps that Find_File has returned since the last call,
-   --  once the command they were bound for has run.
+   --  and release the readers that Open_Reader has opened, once the
+   --  command they were bound for has run.
 
    type Version_Lookup is
      (Version_Made, Not_A_Version_File, No_Version, No_Version_Directory);

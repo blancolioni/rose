@@ -2,20 +2,19 @@ with System.Storage_Elements;
 
 with Ada.Text_IO;
 
-with Rose.Interfaces.Releasable_Reader;
-
 procedure Rose.Core.Cat
-  (File : in out Rose.Interfaces.File.File_Object'Class)
+  (File : in out Rose.Interfaces.Reader.Reader_Object'Class)
 is
    use System.Storage_Elements;
    Buffer : Storage_Array (1 .. 4096);
    Last   : Storage_Count;
-   Reader : Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class :=
-     File.Open_Reader;
-   --  A reader of its own, from the start of the file (ADR 0009).
 begin
+   --  File is a reader that petal opened on the named file, or petal's
+   --  standard input, which ends at Ctrl-D (ADR 0011). Petal releases a
+   --  reader it opened, so cat only reads (#395).
+
    loop
-      Reader.Read (Buffer, Last);
+      File.Read (Buffer, Last);
       exit when Last < Buffer'First;
 
       declare
@@ -28,5 +27,4 @@ begin
    end loop;
 
    Ada.Text_IO.Flush;
-   Reader.Release;
 end Rose.Core.Cat;
