@@ -1,3 +1,4 @@
+with Ada.Containers.Vectors;
 with Ada.Streams;
 with System.Storage_Elements;
 
@@ -11,7 +12,6 @@ package body Exec.Library is
 
    use System.Storage_Elements;
 
-   Max_Installed_Programs : constant := 100;
    Max_Start_Caps         : constant := 16;
    Max_Name_Length        : constant := 16;
 
@@ -19,7 +19,6 @@ package body Exec.Library is
 
    type Installed_Program_Record is
       record
-         Installed       : Boolean := False;
          Caps            : Rose.Capabilities.Capability_Array
                              (1 .. Max_Start_Caps);
          Name            : Installed_Program_Name;
@@ -31,14 +30,25 @@ package body Exec.Library is
          Metadata_Length : Storage_Count := 0;
       end record;
 
-   subtype Installed_Program_Index is
-     Rose.Objects.Capability_Identifier range 1 .. Max_Installed_Programs;
+   package Program_Vectors is
+     new Ada.Containers.Vectors (Positive, Installed_Program_Record);
 
-   type Installed_Program_Array is
-     array (Installed_Program_Index) of Installed_Program_Record;
+   Installed_Programs : Program_Vectors.Vector;
+   --  The programs, in the order they were installed: program Id is
+   --  element Id. There is no limit on their number (#490), apart from
+   --  the room for their images in the region.
 
-   Installed_Programs : Installed_Program_Array;
-   Installed_Count    : Rose.Objects.Capability_Identifier := 0;
+   function Is_Installed
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is (Id in 1 .. Rose.Objects.Capability_Identifier
+                   (Installed_Programs.Length));
+
+   function Program
+     (Id : Rose.Objects.Capability_Identifier)
+      return Program_Vectors.Reference_Type
+   is (Installed_Programs.Reference (Positive (Id)));
+   --  Program Id, which Is_Installed.
 
    Region         : Rose.Interfaces.Region.Client.Region_Client;
    --  Where the images are kept.
@@ -167,22 +177,21 @@ package body Exec.Library is
    begin
       Last := Result'First - 1;
 
-      if Id not in Installed_Program_Index
-        or else not Installed_Programs (Id).Installed
-        or else Installed_Programs (Id).Metadata_Length = 0
+      if not Is_Installed (Id)
+        or else Program (Id).Metadata_Length = 0
       then
          return;
       end if;
 
       declare
-         Program : Installed_Program_Record renames Installed_Programs (Id);
-         Length  : constant Storage_Count :=
+         Item   : Installed_Program_Record renames Program (Id);
+         Length : constant Storage_Count :=
            Storage_Count'Min
-             (Program.Metadata_Length, Storage_Count (Result'Length));
-         Data    : Storage_Array (1 .. Length);
-         Valid   : Boolean;
+             (Item.Metadata_Length, Storage_Count (Result'Length));
+         Data   : Storage_Array (1 .. Length);
+         Valid  : Boolean;
       begin
-         Read_Image (Program, Program.Metadata_Offset, Data, Valid);
+         Read_Image (Item, Item.Metadata_Offset, Data, Valid);
          if Valid then
             for Byte of Data loop
                Last := Last + 1;
@@ -203,13 +212,11 @@ package body Exec.Library is
    is
    begin
       Last := Name'First - 1;
-      if Id not in Installed_Program_Index
-        or else not Installed_Programs (Id).Installed
-      then
+      if not Is_Installed (Id) then
          return;
       end if;
 
-      for Ch of Installed_Programs (Id).Name loop
+      for Ch of Program (Id).Name loop
          exit when Ch = ' ' or else Last = Name'Last;
          Last := Last + 1;
          Name (Last) := Ch;
@@ -225,18 +232,17 @@ package body Exec.Library is
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
-      Program : Installed_Program_Record renames Installed_Programs (Id);
+      Item : Installed_Program_Record renames Program (Id);
    begin
-      if Program.Image = Rose.Capabilities.Null_Capability then
+      if Item.Image = Rose.Capabilities.Null_Capability then
          declare
             Image : Rose.Interfaces.Region.Region_Object'Class :=
-              Region.Create_Subregion
-                (Program.ELF_Base, Program.ELF_Bound, 5);
+              Region.Create_Subregion (Item.ELF_Base, Item.ELF_Bound, 5);
          begin
-            Program.Image := Image.Region_Cap;
+            Item.Image := Image.Region_Cap;
          end;
       end if;
-      return Program.Image;
+      return Item.Image;
    end Image_Region;
 
    -------------
@@ -249,13 +255,10 @@ package body Exec.Library is
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Objects.Capability_Identifier
    is
-      use type Rose.Objects.Capability_Identifier;
    begin
-      if Installed_Count = Max_Installed_Programs then
-         return 0;
-      end if;
 
-      Installed_Count := Installed_Count + 1;
+      --  The program is added once its image is in the region, so one
+      --  that doesn't fit leaves nothing behind.
 
       declare
          use type Ada.Streams.Stream_Element_Offset;
@@ -265,10 +268,8 @@ package body Exec.Library is
            with Import, Address => Buffer'Address;
          --  Buffer, as the image is read.
          Last    : Ada.Streams.Stream_Element_Offset;
-         Install : Installed_Program_Record renames
-                     Installed_Programs (Installed_Count);
+         Install : Installed_Program_Record;
       begin
-         Install.Installed := True;
          Install.Caps := (others => 0);
          Install.Caps (1 .. Caps'Length) := Caps;
 
@@ -293,8 +294,6 @@ package body Exec.Library is
             if Next_Page >= Page_Bound then
                Exec.Output.Put_Line ("exec: no room for " & Name);
                Next_Page := Install.ELF_Base;
-               Install.Installed := False;
-               Installed_Count := Installed_Count - 1;
                return 0;
             end if;
 
@@ -306,9 +305,11 @@ package body Exec.Library is
          Install.ELF_Bound := Next_Page;
 
          Find_Metadata (Install);
+         Installed_Programs.Append (Install);
       end;
 
-      return Installed_Count;
+      return Rose.Objects.Capability_Identifier
+        (Installed_Programs.Last_Index);
    end Install;
 
    ----------------
@@ -370,10 +371,8 @@ package body Exec.Library is
    is
       use type Rose.Capabilities.Capability;
    begin
-      if Id in Installed_Program_Index
-        and then Installed_Programs (Id).Installed
-      then
-         for Cap of Installed_Programs (Id).Caps loop
+      if Is_Installed (Id) then
+         for Cap of Program (Id).Caps loop
             exit when Cap = 0;
             Rose.Invocation.Send_Cap (Params, Cap);
          end loop;

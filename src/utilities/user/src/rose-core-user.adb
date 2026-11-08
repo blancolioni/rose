@@ -1,3 +1,5 @@
+with Rose.Command_Line;
+
 with User_Server;
 
 procedure Rose.Core.User
@@ -13,7 +15,7 @@ begin
 
    if Name'Length = 0 or else Name'Length > User_Server.Max_Name_Length
    then
-      raise Constraint_Error with "user: bad name";
+      raise Rose.Command_Line.Command_Failed with "bad name";
    end if;
 
    User_Server.Create_Server

@@ -1,7 +1,7 @@
 with Ada.Streams;
 with System.Storage_Elements;
 
-with Ada.Text_IO;
+with Rose.Command_Line;
 
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader;
@@ -36,16 +36,13 @@ begin
          when Rose.Interfaces.Objects.Invocation_Error =>
 
             --  A write past the largest file fails, and writes nothing
-            --  (#754). An unhandled exception fails the launch call (see
-            --  Rose.Command_Line.Launch), before anything is committed.
+            --  (#754). Failing the launch call comes before anything is
+            --  committed (#802).
 
-            Ada.Text_IO.Put_Line
-              (Ada.Text_IO.Standard_Error,
-               "copy: the target cannot hold more than"
-               & Storage_Count'Image (Target.Size) & " of"
-               & Storage_Count'Image (Source.Size) & " bytes");
-            Ada.Text_IO.Flush (Ada.Text_IO.Standard_Error);
-            raise;
+            raise Rose.Command_Line.Command_Failed
+              with "the target cannot hold more than"
+              & Storage_Count'Image (Target.Size) & " of"
+              & Storage_Count'Image (Source.Size) & " bytes";
       end;
    end loop;
    Reader.Release;

@@ -1,4 +1,4 @@
-with Ada.Text_IO;
+with Rose.Command_Line;
 
 with Rose.Clock.Calendar;
 with Rose.Interfaces.Objects;
@@ -14,9 +14,10 @@ is
    Last_Year  : constant := 2099;
    --  What the RTC can hold, which Clock_Admin.Set_Realtime checks too.
 
-   procedure Fail (Reason : String);
-   --  Report that the time cannot be set, and why, on standard error, and
-   --  fail the launch call.
+   procedure Fail (Reason : String)
+     with No_Return;
+   --  Fail the launch call with a message that says that the time cannot be
+   --  set, and why (#802).
 
    function Number
      (First : Positive;
@@ -31,15 +32,8 @@ is
 
    procedure Fail (Reason : String) is
    begin
-      Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Error,
-         "set_date: cannot set the time to '" & Time & "': " & Reason);
-      Ada.Text_IO.Flush (Ada.Text_IO.Standard_Error);
-
-      --  An unhandled exception fails the launch call (see
-      --  Rose.Command_Line.Launch).
-
-      raise Constraint_Error;
+      raise Rose.Command_Line.Command_Failed
+        with "cannot set the time to '" & Time & "': " & Reason;
    end Fail;
 
    ------------

@@ -30,7 +30,8 @@
 ------------------------------------------------------------------------------
 
 --  The Rose version (#170): report an exception that nothing handles
---  through Rose.Last_Chance, and exit with status 1. It is the only
+--  through Rose.Last_Chance, and exit with status 1. Rose.Last_Chance
+--  .Failed is reported as its message alone (#802). It is the only
 --  __gnat_last_chance_handler in the userland RTS: no program built with
 --  it is compiled with No_Exception_Propagation, whose handler took a
 --  file name and line, and once shadowed this one (#490).
@@ -56,7 +57,10 @@ begin
       declare
          Message : constant String := Exception_Message (Except);
       begin
-         if Message = "" then
+         if Exception_Identity (Except) = Rose.Last_Chance.Failed'Identity
+         then
+            Handler (Message);
+         elsif Message = "" then
             Handler ("unhandled exception " & Exception_Name (Except));
          else
             Handler ("unhandled exception " & Exception_Name (Except)
