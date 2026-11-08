@@ -30,8 +30,10 @@
 ------------------------------------------------------------------------------
 
 --  The Rose version (#170): report an exception that nothing handles
---  through Rose.Last_Chance, as Last_Chance_Handler does for a raise in a
---  program compiled with No_Exception_Propagation, and exit with status 1.
+--  through Rose.Last_Chance, and exit with status 1. It is the only
+--  __gnat_last_chance_handler in the userland RTS: no program built with
+--  it is compiled with No_Exception_Propagation, whose handler took a
+--  file name and line, and once shadowed this one (#490).
 
 with System.Standard_Library;
 

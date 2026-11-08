@@ -4,13 +4,39 @@ include $(ROOT)/mk/common.mk
 all: auth
 	cp ./build/bin/auth-driver ../../../build/$(ARCH)/drivers/auth
 
-# The spec of Rose.Core.Auth, its main and its metadata, and the package
-# Rose.Core, are generated from IDL (ADR 0002).
+# The spec of Rose.Core.Auth, its main and its metadata, the package
+# Rose.Core, and Auth with the interfaces it uses, are generated from IDL
+# (ADR 0002) for the user target.
 
 auth:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target kernel -I $(INTERFACES) -o build/generated \
-	    rose-core-auth.idl $(INTERFACES)/rose-core.idl
+	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	    rose-core-auth.idl $(INTERFACES)/rose-core.idl \
+	    $(INTERFACES)/auth.idl \
+	    $(INTERFACES)/auth_admin.idl \
+	    $(INTERFACES)/user.idl \
+	    $(INTERFACES)/named.idl \
+	    $(INTERFACES)/commands.idl \
+	    $(INTERFACES)/launch.idl \
+	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/segment.idl \
+	    $(INTERFACES)/server.idl \
+	    $(INTERFACES)/cap.idl \
+	    $(INTERFACES)/heap.idl \
+	    $(INTERFACES)/region.idl \
+	    $(INTERFACES)/writable_directory.idl \
+	    $(INTERFACES)/directory.idl \
+	    $(INTERFACES)/writable_file.idl \
+	    $(INTERFACES)/transactional_writable_file.idl \
+	    $(INTERFACES)/transactional.idl \
+	    $(INTERFACES)/file.idl \
+	    $(INTERFACES)/releasable_reader.idl \
+	    $(INTERFACES)/releasable_writer.idl \
+	    $(INTERFACES)/seekable_reader.idl \
+	    $(INTERFACES)/reader.idl \
+	    $(INTERFACES)/writer.idl \
+	    $(INTERFACES)/resource.idl \
+	    $(INTERFACES)/seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

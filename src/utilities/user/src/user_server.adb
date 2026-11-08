@@ -1,28 +1,39 @@
-with Rose.Capabilities.Standard;
-with Rose.Objects;
 with Rose.Server;
 
-with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.User.Server;
+with Rose.Interfaces.Writable_Directory.Client;
 
 package body User_Server is
 
+   --  One object serves User, and Named as its ancestor. Its state is the
+   --  package's, so that a checkpoint holds it with the process's memory.
+
+   type User_Object is
+     new Rose.Interfaces.User.Server.User_Interface with null record;
+
+   overriding function User_Cap
+     (Item : in out User_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Named_Cap
+     (Item : in out User_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Name (Item : in out User_Object) return String;
+
+   subtype Writable_Directory_Class is
+     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
+
+   overriding function Home_Directory
+     (Item : in out User_Object)
+      return Writable_Directory_Class;
+
    Context   : Rose.Server.Server_Context;
-   Name      : String (1 .. Max_Name_Length);
+   The_User  : aliased User_Object;
+   User_Name : String (1 .. Max_Name_Length);
    Name_Last : Natural := 0;
    Home_Cap  : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
-   User_Cap  : Rose.Capabilities.Capability :=
-     Rose.Capabilities.Null_Capability;
-
-   function Home_Directory
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Capabilities.Capability;
-
-   procedure Get_Name
-     (Id     : Rose.Objects.Capability_Identifier;
-      Result : out String;
-      Last   : out Natural);
 
    -------------------
    -- Create_Server --
@@ -32,52 +43,24 @@ package body User_Server is
      (User_Name : String;
       Home      : Rose.Capabilities.Capability)
    is
-      Self : Rose.Interfaces.Process.Client.Process_Client;
    begin
       Name_Last := User_Name'Length;
-      Name (1 .. Name_Last) := User_Name;
+      User_Server.User_Name (1 .. Name_Last) := User_Name;
       Home_Cap := Home;
-
-      Rose.Interfaces.User.Server.Publish_Interface
-        (Server_Context => Context,
-         Name           => Get_Name'Access,
-         Home_Directory => Home_Directory'Access);
-
-      --  The generated server keeps the cap it publishes to itself, so
-      --  ask the process for it.
-
-      Rose.Interfaces.Process.Client.Open
-        (Self, Rose.Capabilities.Standard.Process_Interface_Cap);
-      User_Cap := Rose.Interfaces.Process.Client.Published_Interface (Self);
+      Rose.Interfaces.User.Server.Publish (Context, The_User'Access);
    end Create_Server;
-
-   --------------
-   -- Get_Name --
-   --------------
-
-   procedure Get_Name
-     (Id     : Rose.Objects.Capability_Identifier;
-      Result : out String;
-      Last   : out Natural)
-   is
-      pragma Unreferenced (Id);
-      Length : constant Natural := Natural'Min (Name_Last, Result'Length);
-   begin
-      Last := Result'First + Length - 1;
-      Result (Result'First .. Last) := Name (1 .. Length);
-   end Get_Name;
 
    --------------------
    -- Home_Directory --
    --------------------
 
-   function Home_Directory
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Capabilities.Capability
+   overriding function Home_Directory
+     (Item : in out User_Object)
+      return Writable_Directory_Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
-      return Home_Cap;
+      return Rose.Interfaces.Writable_Directory.Client.From_Cap (Home_Cap);
    end Home_Directory;
 
    -------------------
@@ -86,8 +69,28 @@ package body User_Server is
 
    function Interface_Cap return Rose.Capabilities.Capability is
    begin
-      return User_Cap;
+      return Rose.Interfaces.User.Server.Cap_Of (The_User);
    end Interface_Cap;
+
+   ----------
+   -- Name --
+   ----------
+
+   overriding function Name (Item : in out User_Object) return String is
+      pragma Unreferenced (Item);
+   begin
+      return User_Name (1 .. Name_Last);
+   end Name;
+
+   ---------------
+   -- Named_Cap --
+   ---------------
+
+   overriding function Named_Cap
+     (Item : in out User_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.User.Server.Cap_Of
+         (Item, Rose.Interfaces.User.Named_Interface));
 
    ------------------
    -- Start_Server --
@@ -97,5 +100,14 @@ package body User_Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   --------------
+   -- User_Cap --
+   --------------
+
+   overriding function User_Cap
+     (Item : in out User_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.User.Server.Cap_Of (Item));
 
 end User_Server;
