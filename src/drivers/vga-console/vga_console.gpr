@@ -59,12 +59,8 @@ project vga_console is
       for Executable ("vga_console-driver.adb") use "vga-console";
    end Builder;
 
-   --  -gnatw.X: the generated user-mode packages raise exceptions, which
-   --  go to the last-chance handler until the run-time system propagates
-   --  them (#170). GNAT warns about each such raise.
-
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatw.X", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
    end Compiler;
 
    package Binder is

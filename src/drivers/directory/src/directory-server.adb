@@ -1,3 +1,5 @@
+with Ada.Containers.Vectors;
+with Ada.Unchecked_Deallocation;
 with System.Storage_Elements;
 
 with Rose.Server;
@@ -30,13 +32,11 @@ package body Directory.Server is
    subtype Writable_File_Class is
      Rose.Interfaces.Writable_File.Writable_File_Object'Class;
 
-   Max_Entries     : constant := 64;
    Max_Name_Length : constant := 64;
-   --  User-mode malloc can't grow, so the entries are a fixed table.
+   --  The longest name, which petal and the commands share.
 
    type Entry_Record is
       record
-         Used      : Boolean := False;
          Name      : String (1 .. Max_Name_Length);
          Name_Last : Natural := 0;
          Kind      : Rose.Interfaces.Directory.File_Kind;
@@ -144,14 +144,23 @@ package body Directory.Server is
 
    Context          : Rose.Server.Server_Context;
    The_Directory    : aliased Directory_Object;
-   subtype Slot_Index is Positive range 1 .. Max_Entries;
 
-   Entries          : array (Slot_Index) of Entry_Record;
-   Order            : array (Slot_Index) of Slot_Index;
-   Entry_Count      : Natural := 0;
-   --  Entry I, for I up to Entry_Count, is in Entries (Order (I)). An
-   --  entry holds clients, which can't be copied, so deleting an entry
-   --  moves the slot numbers after it down, and not the entries (#346).
+   type Entry_Access is access Entry_Record;
+
+   procedure Free is
+     new Ada.Unchecked_Deallocation (Entry_Record, Entry_Access);
+
+   package Entry_Vectors is
+     new Ada.Containers.Vectors (Positive, Entry_Access);
+
+   Entries : Entry_Vectors.Vector;
+   --  The entries, in the directory's order. An entry holds clients,
+   --  which can't be copied, so each is on the heap, and deleting an
+   --  entry moves the ones after it down without copying them (#346).
+   --  There is no limit on their number (#490).
+
+   function Entry_Count return Natural
+   is (Natural (Entries.Length));
    File_Launch      : Rose.Interfaces.Launch.Client.Launch_Client;
    Directory_Launch : Rose.Interfaces.Launch.Client.Launch_Client;
 
@@ -161,8 +170,8 @@ package body Directory.Server is
       return Rose.Capabilities.Capability;
    --  Launch a file or directory, add it as Name, and return its
    --  writable interface; or return the existing entry Name if it has
-   --  the same kind. Null if Name is another kind, too long, or there
-   --  is no room, or the launch fails.
+   --  the same kind. Null if Name is another kind, or too long, or the
+   --  launch fails.
 
    function Find (Name : String) return Natural;
    --  The index of the entry Name, or 0 if there is none.
@@ -173,13 +182,13 @@ package body Directory.Server is
       Interface_Cap : Rose.Capabilities.Capability;
       Process_Cap   : Rose.Capabilities.Capability);
    --  Add the entry Name for the process Process_Cap, which publishes
-   --  Interface_Cap. There must be room.
+   --  Interface_Cap.
 
    function Is_Kind
      (Index : Positive;
       Kind  : Rose.Interfaces.Directory.File_Kind)
       return Boolean
-   is (Index <= Entry_Count and then Entries (Order (Index)).Kind = Kind);
+   is (Index <= Entry_Count and then Entries (Index).Kind = Kind);
 
    procedure Remove_Entry (Index : Positive);
    --  End the process of entry Index, delete the caps for it, and remove
@@ -208,18 +217,16 @@ package body Directory.Server is
       Saved_Last    : Natural;
    begin
       if Existing > 0 then
-         if Entries (Order (Existing)).Kind /= Kind then
+         if Entries (Existing).Kind /= Kind then
             return Rose.Capabilities.Null_Capability;
          elsif Kind = Rose.Interfaces.Directory.Ordinary_File then
-            return Entries (Order (Existing)).File.Writable_File_Cap;
+            return Entries (Existing).File.Writable_File_Cap;
          else
-            return Entries (Order (Existing)).Child.Writable_Directory_Cap;
+            return Entries (Existing).Child.Writable_Directory_Cap;
          end if;
       end if;
 
-      if Name'Length = 0 or else Name'Length > Max_Name_Length
-        or else Entry_Count = Max_Entries
-      then
+      if Name'Length = 0 or else Name'Length > Max_Name_Length then
          return Rose.Capabilities.Null_Capability;
       end if;
 
@@ -248,7 +255,7 @@ package body Directory.Server is
         (Saved_Name (1 .. Saved_Last), Kind, Interface_Cap, Process_Cap);
 
       declare
-         Added : Entry_Record renames Entries (Order (Entry_Count));
+         Added : Entry_Record renames Entries.Last_Element.all;
       begin
          if Kind = Rose.Interfaces.Directory.Ordinary_File then
             return Added.File.Writable_File_Cap;
@@ -317,11 +324,11 @@ package body Directory.Server is
    begin
       if Index = 0 then
          raise Constraint_Error with "delete: no such entry";
-      elsif Entries (Order (Index)).Kind
+      elsif Entries (Index).Kind
         /= Rose.Interfaces.Directory.Directory
       then
          raise Constraint_Error with "delete: not a directory";
-      elsif Entries (Order (Index)).Child.Directory_Entry_Count > 0 then
+      elsif Entries (Index).Child.Directory_Entry_Count > 0 then
          raise Constraint_Error with "delete: the directory has entries";
       end if;
 
@@ -341,7 +348,7 @@ package body Directory.Server is
    begin
       if Index = 0 then
          raise Constraint_Error with "delete: no such entry";
-      elsif Entries (Order (Index)).Kind
+      elsif Entries (Index).Kind
         /= Rose.Interfaces.Directory.Ordinary_File
       then
          raise Constraint_Error with "delete: not a file";
@@ -387,7 +394,7 @@ package body Directory.Server is
       if Index > Entry_Count then
          return Rose.Interfaces.Directory.Special_File;
       else
-         return Entries (Order (Index)).Kind;
+         return Entries (Index).Kind;
       end if;
    end Directory_Entry_Kind;
 
@@ -406,7 +413,7 @@ package body Directory.Server is
          return "";
       else
          declare
-            Named : Entry_Record renames Entries (Order (Index));
+            Named : Entry_Record renames Entries (Index).all;
          begin
             return Named.Name (1 .. Named.Name_Last);
          end;
@@ -425,7 +432,7 @@ package body Directory.Server is
       pragma Unreferenced (Item);
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
-         return Entries (Order (Index)).File.Size;
+         return Entries (Index).File.Size;
       else
          return 0;
       end if;
@@ -439,7 +446,7 @@ package body Directory.Server is
    begin
       for Index in 1 .. Entry_Count loop
          declare
-            Item : Entry_Record renames Entries (Order (Index));
+            Item : Entry_Record renames Entries (Index).all;
          begin
             if Item.Name (1 .. Item.Name_Last) = Name then
                return Index;
@@ -480,7 +487,7 @@ package body Directory.Server is
       end if;
 
       declare
-         Listed : Entry_Record renames Entries (Order (Index));
+         Listed : Entry_Record renames Entries (Index).all;
       begin
          if Listed.Read_Only = Rose.Capabilities.Null_Capability then
             Listed.Read_Only := Listed.Child.Directory_Cap;
@@ -506,7 +513,7 @@ package body Directory.Server is
       end if;
 
       declare
-         Listed : Entry_Record renames Entries (Order (Index));
+         Listed : Entry_Record renames Entries (Index).all;
       begin
          if Listed.Read_Only = Rose.Capabilities.Null_Capability then
             Listed.Read_Only := Listed.File.File_Cap;
@@ -528,7 +535,7 @@ package body Directory.Server is
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Directory) then
          return Directory_Clients.From_Cap
-           (Entries (Order (Index)).Child.Writable_Directory_Cap);
+           (Entries (Index).Child.Writable_Directory_Cap);
       else
          return Directory_Clients.From_Cap
            (Rose.Capabilities.Null_Capability);
@@ -548,7 +555,7 @@ package body Directory.Server is
    begin
       if Is_Kind (Index, Rose.Interfaces.Directory.Ordinary_File) then
          return File_Clients.From_Cap
-           (Entries (Order (Index)).File.Writable_File_Cap);
+           (Entries (Index).File.Writable_File_Cap);
       else
          return File_Clients.From_Cap (Rose.Capabilities.Null_Capability);
       end if;
@@ -568,21 +575,11 @@ package body Directory.Server is
       Process_Cap   : Rose.Capabilities.Capability)
    is
    begin
-      --  The first free slot: there is one, since Entry_Count is less
-      --  than Max_Entries.
-
-      for Slot in Slot_Index loop
-         if not Entries (Slot).Used then
-            Entry_Count := Entry_Count + 1;
-            Order (Entry_Count) := Slot;
-            exit;
-         end if;
-      end loop;
+      Entries.Append (new Entry_Record);
 
       declare
-         New_Entry : Entry_Record renames Entries (Order (Entry_Count));
+         New_Entry : Entry_Record renames Entries.Last_Element.all;
       begin
-         New_Entry.Used := True;
          New_Entry.Name (1 .. Name'Length) := Name;
          New_Entry.Name_Last := Name'Length;
          New_Entry.Kind := Kind;
@@ -624,7 +621,8 @@ package body Directory.Server is
    ------------------
 
    procedure Remove_Entry (Index : Positive) is
-      Item : Entry_Record renames Entries (Order (Index));
+      Removed : Entry_Access := Entries (Index);
+      Item    : Entry_Record renames Removed.all;
    begin
       Item.Process.Destroy;
 
@@ -638,12 +636,9 @@ package body Directory.Server is
       else
          Item.Child.Close;
       end if;
-      Item.Read_Only := Rose.Capabilities.Null_Capability;
-      Item.Name_Last := 0;
-      Item.Used := False;
 
-      Order (Index .. Entry_Count - 1) := Order (Index + 1 .. Entry_Count);
-      Entry_Count := Entry_Count - 1;
+      Entries.Delete (Index);
+      Free (Removed);
    end Remove_Entry;
 
    ------------
@@ -671,8 +666,8 @@ package body Directory.Server is
          raise Constraint_Error with "rename: the name is in use";
       end if;
 
-      Entries (Order (Index)).Name (1 .. To'Length) := To;
-      Entries (Order (Index)).Name_Last := To'Length;
+      Entries (Index).Name (1 .. To'Length) := To;
+      Entries (Index).Name_Last := To'Length;
    end Rename;
 
    ------------------

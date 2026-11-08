@@ -1,28 +1,18 @@
+with Ada.Containers.Indefinite_Ordered_Maps;
+
 package body Command.Maps is
 
-   Max_Command_Length : constant := 32;
+   --  The registry: each command's name, and the cap of its Launch
+   --  interface (#490). A name is in it at most once: adding a name that
+   --  is already there replaces its cap.
 
-   subtype Command_String is String (1 .. Max_Command_Length);
+   package Command_Maps is
+     new Ada.Containers.Indefinite_Ordered_Maps
+       (Key_Type     => String,
+        Element_Type => Rose.Capabilities.Capability,
+        "="          => Rose.Capabilities."=");
 
-   type Command_Record is
-      record
-         Name_Length : Natural := 0;
-         Name        : Command_String := (others => ' ');
-         Cap         : Rose.Capabilities.Capability :=
-                         Rose.Capabilities.Null_Capability;
-      end record;
-
-   Max_Commands       : constant := 100;
-   type Command_Count is range 0 .. Max_Commands;
-   subtype Command_Index is Command_Count range 1 .. Command_Count'Last;
-
-   Current_Count      : Command_Count := 0;
-   Empty_Slot         : Command_Count := 0;
-   Command_Array      : array (Command_Index) of Command_Record;
-
-   function Match (Index : Command_Index;
-                   Name  : String)
-                   return Boolean;
+   Commands : Command_Maps.Map;
 
    ------------
    -- Delete --
@@ -30,15 +20,7 @@ package body Command.Maps is
 
    procedure Delete (Command : String) is
    begin
-      for I in 1 .. Current_Count loop
-         if Match (I, Command) then
-            Command_Array (I) := (others => <>);
-            if Empty_Slot = 0 or else I < Empty_Slot then
-               Empty_Slot := I;
-            end if;
-            exit;
-         end if;
-      end loop;
+      Commands.Exclude (Command);
    end Delete;
 
    ----------
@@ -46,65 +28,25 @@ package body Command.Maps is
    ----------
 
    function Find (Command : String) return Rose.Capabilities.Capability is
+      Position : constant Command_Maps.Cursor := Commands.Find (Command);
    begin
-      for I in 1 .. Current_Count loop
-         if Match (I, Command) then
-            return Command_Array (I).Cap;
-         end if;
-      end loop;
-      return Rose.Capabilities.Null_Capability;
+      if Command_Maps.Has_Element (Position) then
+         return Command_Maps.Element (Position);
+      else
+         return Rose.Capabilities.Null_Capability;
+      end if;
    end Find;
 
    ------------
    -- Insert --
    ------------
 
-   procedure Insert (Command : String;
-                     Cap     : Rose.Capabilities.Capability)
+   procedure Insert
+     (Command : String;
+      Cap     : Rose.Capabilities.Capability)
    is
-      Rec : Command_Record :=
-              Command_Record'
-                (Name_Length => Command'Length,
-                 Name        => <>,
-                 Cap         => Cap);
    begin
-      Rec.Name (1 .. Rec.Name_Length) := Command;
-      if Empty_Slot > 0 then
-         Command_Array (Empty_Slot) := Rec;
-         Empty_Slot := 0;
-      else
-         Current_Count := Current_Count + 1;
-         Command_Array (Current_Count) := Rec;
-      end if;
+      Commands.Include (Command, Cap);
    end Insert;
-
-   -----------
-   -- Match --
-   -----------
-
-   function Match (Index : Command_Index;
-                   Name  : String)
-                   return Boolean
-   is
-      Rec : Command_Record renames Command_Array (Index);
-   begin
-      if Rec.Name_Length > 0
-        and then Rec.Name_Length = Name'Length
-      then
-         declare
-            Index : Natural := 0;
-         begin
-            for Ch of Name loop
-               Index := Index + 1;
-               if Rec.Name (Index) /= Ch then
-                  return False;
-               end if;
-            end loop;
-         end;
-         return True;
-      end if;
-
-      return False;
-   end Match;
 
 end Command.Maps;
