@@ -26,21 +26,30 @@ package body Surface_Console.Screen is
 
    Max_Rows : constant := 128;
 
-   type Row_Flags is array (0 .. Max_Rows - 1) of Boolean;
+   type Column_Range is
+      record
+         First : Natural := Natural'Last;
+         Last  : Natural := 0;
+      end record;
+   --  The columns of a row that have changed; none if First > Last.
 
-   Damaged_Rows : Row_Flags := (others => False);
-   --  The rows that have changed since the last Flush.  Each row is
-   --  flagged on its own, so that moving the cursor from one row to
-   --  another damages those two rows, and not the rows between them
-   --  (#787).
+   Undamaged : constant Column_Range := (Natural'Last, 0);
+
+   type Row_Changes is array (0 .. Max_Rows - 1) of Column_Range;
+
+   Changed : Row_Changes := (others => Undamaged);
+   --  The cells that have changed since the last Flush, as a range of
+   --  columns in each row.  Moving the cursor from one place to another
+   --  damages the two cells, and not the rows between them or the rest of
+   --  their rows (#787).
 
    Cursor_Shown  : Boolean := False;
    Cursor_Column : Natural := 0;
    Cursor_Row    : Natural := 0;
    --  Where the cursor is drawn, if it is.
 
-   procedure Damaged (Row : Natural);
-   --  Row has changed.
+   procedure Damaged (Column, Row : Natural);
+   --  The cell at Column, Row has changed.
 
    procedure Damaged_All;
    --  Every row has changed.
@@ -84,9 +93,10 @@ package body Surface_Console.Screen is
    -- Damaged --
    -------------
 
-   procedure Damaged (Row : Natural) is
+   procedure Damaged (Column, Row : Natural) is
    begin
-      Damaged_Rows (Row) := True;
+      Changed (Row).First := Natural'Min (Changed (Row).First, Column);
+      Changed (Row).Last := Natural'Max (Changed (Row).Last, Column);
    end Damaged;
 
    -----------------
@@ -95,7 +105,7 @@ package body Surface_Console.Screen is
 
    procedure Damaged_All is
    begin
-      Damaged_Rows (0 .. Cells.Rows - 1) := (others => True);
+      Changed (0 .. Cells.Rows - 1) := (others => (0, Cells.Columns - 1));
    end Damaged_All;
 
    -------------
@@ -129,7 +139,7 @@ package body Surface_Console.Screen is
       else
          Text.Draw_Character (Target, Column, Row, Item, Ink, Paper);
       end if;
-      Damaged (Row);
+      Damaged (Column, Row);
    end Draw;
 
    -----------
@@ -139,22 +149,31 @@ package body Surface_Console.Screen is
    procedure Flush is
       Row : Natural := 0;
    begin
-      --  One Damage for each run of rows that changed.
+      --  One Damage for each run of rows whose changed columns are the
+      --  same, so that a cleared or scrolled screen is one Damage.  A
+      --  range that reaches the last column takes in the pixels past it.
 
       while Row < Cells.Rows loop
-         if Damaged_Rows (Row) then
+         if Changed (Row).First <= Changed (Row).Last then
             declare
-               First : constant Natural := Row;
+               First   : constant Natural := Row;
+               Span    : constant Column_Range := Changed (Row);
+               X       : constant Word :=
+                           Word (Span.First * Text.Cell_Width);
             begin
-               while Row < Cells.Rows and then Damaged_Rows (Row) loop
-                  Damaged_Rows (Row) := False;
+               while Row < Cells.Rows and then Changed (Row) = Span loop
+                  Changed (Row) := Undamaged;
                   Row := Row + 1;
                end loop;
 
                Surface.Damage
-                 (X      => 0,
+                 (X      => X,
                   Y      => Word (First * Text.Cell_Height),
-                  Width  => Width,
+                  Width  =>
+                    (if Span.Last = Cells.Columns - 1
+                     then Width - X
+                     else Word ((Span.Last - Span.First + 1)
+                                * Text.Cell_Width)),
                   Height => Word ((Row - First) * Text.Cell_Height));
             end;
          else
@@ -171,7 +190,7 @@ package body Surface_Console.Screen is
    begin
       if Cursor_Shown then
          Text.Toggle_Cursor (Target, Cursor_Column, Cursor_Row);
-         Damaged (Cursor_Row);
+         Damaged (Cursor_Column, Cursor_Row);
          Cursor_Shown := False;
       end if;
    end Hide_Cursor;
@@ -280,7 +299,7 @@ package body Surface_Console.Screen is
       Cursor_Shown := True;
       Cursor_Column := Column;
       Cursor_Row := Row;
-      Damaged (Row);
+      Damaged (Column, Row);
    end Show_Cursor;
 
 end Surface_Console.Screen;
