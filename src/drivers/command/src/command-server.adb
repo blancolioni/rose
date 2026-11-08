@@ -1,50 +1,73 @@
-with Rose.Objects;
-
+with Rose.Capabilities;
 with Rose.Server;
+
+with Rose.Interfaces.Commands.Client;
+with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Map.Server;
 
 with Command.Maps;
 
 package body Command.Server is
 
-   Context : Rose.Server.Server_Context;
+   --  One object serves Map, and Commands as its ancestor. A cap for
+   --  Commands has only Commands' operations, so it finds commands but
+   --  cannot add or remove them (#460).
 
-   Commands_Cap : Rose.Capabilities.Capability :=
-     Rose.Capabilities.Null_Capability;
-   --  The cap for the registry's Commands interface (#460), made the
-   --  first time it is asked for.
+   type Registry_Object is
+     new Rose.Interfaces.Map.Server.Map_Interface with null record;
 
-   procedure Add_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String;
-      Cap  : Rose.Capabilities.Capability);
-
-   procedure Remove_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String);
-
-   function Find_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
-      Name : String)
-        return Rose.Capabilities.Capability;
-
-   function Get_Commands_Handler
-     (Id : Rose.Objects.Capability_Identifier)
+   overriding function Map_Cap
+     (Item : in out Registry_Object)
       return Rose.Capabilities.Capability;
 
-   -----------------
-   -- Add_Handler --
-   -----------------
+   overriding function Commands_Cap
+     (Item : in out Registry_Object)
+      return Rose.Capabilities.Capability;
 
-   procedure Add_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
+   overriding procedure Add
+     (Item : in out Registry_Object;
       Name : String;
-      Cap  : Rose.Capabilities.Capability)
+      Cap  : in out Rose.Interfaces.Launch.Launch_Object'Class);
+
+   overriding procedure Remove
+     (Item : in out Registry_Object;
+      Name : String);
+
+   overriding function Find
+     (Item : in out Registry_Object;
+      Name : String)
+      return Rose.Interfaces.Launch.Launch_Object'Class;
+
+   overriding function Get_Commands
+     (Item : in out Registry_Object)
+      return Rose.Interfaces.Commands.Commands_Object'Class;
+
+   Context      : Rose.Server.Server_Context;
+   The_Registry : aliased Registry_Object;
+
+   ---------
+   -- Add --
+   ---------
+
+   overriding procedure Add
+     (Item : in out Registry_Object;
+      Name : String;
+      Cap  : in out Rose.Interfaces.Launch.Launch_Object'Class)
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
-      Command.Maps.Insert (Name, Cap);
-   end Add_Handler;
+      Command.Maps.Insert (Name, Cap.Launch_Cap);
+   end Add;
+
+   ------------------
+   -- Commands_Cap --
+   ------------------
+
+   overriding function Commands_Cap
+     (Item : in out Registry_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Map.Server.Cap_Of
+         (Item, Rose.Interfaces.Map.Commands_Interface));
 
    -------------------
    -- Create_Server --
@@ -52,69 +75,59 @@ package body Command.Server is
 
    procedure Create_Server is
    begin
-      Rose.Interfaces.Map.Server.Publish_Interface
-        (Server_Context => Context,
-         Add            => Add_Handler'Access,
-         Remove         => Remove_Handler'Access,
-         Find           => Find_Handler'Access,
-         Get_Commands   => Get_Commands_Handler'Access);
+      Rose.Interfaces.Map.Server.Publish (Context, The_Registry'Access);
    end Create_Server;
 
-   ------------------
-   -- Find_Handler --
-   ------------------
+   ----------
+   -- Find --
+   ----------
 
-   function Find_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
+   --  A name that isn't registered gives a client with the null cap, which
+   --  petal and login check for.
+
+   overriding function Find
+     (Item : in out Registry_Object;
       Name : String)
-      return Rose.Capabilities.Capability
+      return Rose.Interfaces.Launch.Launch_Object'Class
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
-      return Cap : constant Rose.Capabilities.Capability :=
-        Maps.Find (Name);
-      --  do
-      --     Rose.Console_IO.Put ("command: returning cap ");
-      --     Rose.Console_IO.Put (Natural (Cap));
-      --     Rose.Console_IO.New_Line;
-      --  end return;
-   end Find_Handler;
+      return Rose.Interfaces.Launch.Client.From_Cap (Command.Maps.Find (Name));
+   end Find;
 
-   --------------------------
-   -- Get_Commands_Handler --
-   --------------------------
+   ------------------
+   -- Get_Commands --
+   ------------------
 
-   function Get_Commands_Handler
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Capabilities.Capability
+   overriding function Get_Commands
+     (Item : in out Registry_Object)
+      return Rose.Interfaces.Commands.Commands_Object'Class
    is
-      pragma Unreferenced (Id);
-      use type Rose.Capabilities.Capability;
    begin
-      --  The Map server answers the Commands interface endpoint with the
-      --  Find cap alone, so a cap for it finds commands, but cannot add
-      --  or remove them.
+      return Rose.Interfaces.Commands.Client.From_Cap (Item.Commands_Cap);
+   end Get_Commands;
 
-      if Commands_Cap = Rose.Capabilities.Null_Capability then
-         Commands_Cap :=
-           Rose.Server.Create_Endpoint
-             (Rose.Interfaces.Map.Commands_Interface);
-      end if;
-      return Commands_Cap;
-   end Get_Commands_Handler;
+   -------------
+   -- Map_Cap --
+   -------------
 
-   --------------------
-   -- Remove_Handler --
-   --------------------
+   overriding function Map_Cap
+     (Item : in out Registry_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Map.Server.Cap_Of (Item));
 
-   procedure Remove_Handler
-     (Id   : Rose.Objects.Capability_Identifier;
+   ------------
+   -- Remove --
+   ------------
+
+   overriding procedure Remove
+     (Item : in out Registry_Object;
       Name : String)
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
    begin
       Command.Maps.Delete (Name);
-   end Remove_Handler;
+   end Remove;
 
    ------------------
    -- Start_Server --

@@ -1,26 +1,27 @@
 with Rose.Invocation;
 with Rose.Objects;
 
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Reader.Client;
+with Rose.Interfaces.Reader;
 
 package Exec.Library is
 
-   procedure Set_Region
-     (Client : Rose.Interfaces.Region.Client.Region_Client);
+   --  The installed programs, each numbered from 1, in the order they
+   --  were installed. Exec.Server serves a Launch interface for each.
+
+   procedure Set_Region (Region : Rose.Capabilities.Capability);
+   --  Keep the images in Region, the cap of a Region interface.
 
    function Install
-     (ELF_Image  : Rose.Interfaces.Reader.Client.Reader_Client;
+     (ELF_Image  : in out Rose.Interfaces.Reader.Reader_Object'Class;
       Name       : String;
       Caps       : Rose.Capabilities.Capability_Array)
-     return Rose.Capabilities.Capability;
-   --  Install the program in ELF_Image, and return its Launch interface:
-   --  a cap whose identifier is the program's, and which Send_Interface
-   --  answers.
+     return Rose.Objects.Capability_Identifier;
+   --  Install the program in ELF_Image, and return its number, or 0 if
+   --  there is no room for it.
 
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Interfaces.Region.Client.Region_Client;
+      return Rose.Capabilities.Capability;
    --  A region of the pages of program Id's ELF image. It is made the
    --  first time, and kept: the store has room for a limited number of
    --  regions.
@@ -35,13 +36,6 @@ package Exec.Library is
    procedure Send_Install_Caps
      (Id     : Rose.Objects.Capability_Identifier;
       Params : in out Rose.Invocation.Invocation_Record);
-
-   procedure Send_Interface
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record);
-   --  Send the caps of the Launch interface of program Id, in the order of
-   --  their index constants in Rose.Interfaces.Launch. Each has the
-   --  program's identifier.
 
    procedure Get_Metadata
      (Id     : Rose.Objects.Capability_Identifier;

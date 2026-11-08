@@ -1,4 +1,3 @@
-with Rose.Console_IO;
 with Rose.System_Calls;
 with Rose.Trace;
 
@@ -13,7 +12,6 @@ begin
       Rescind_Cap     => Rescind_Endpoint_Cap);
    Rose.Trace.Set_Trace_Cap (Trace_Cap);
 
-   Rose.Console_IO.Open (Console_Cap);
    Exec.Server.Create_Server;
    Exec.Server.Start_Server;
 end Exec.Driver;

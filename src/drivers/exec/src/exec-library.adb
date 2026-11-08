@@ -1,10 +1,11 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
-with Rose.Console_IO;
 with Rose.Limits;
-with Rose.System_Calls.Server;
 
-with Rose.Interfaces.Launch;
+with Rose.Interfaces.Region.Client;
+
+with Exec.Output;
 
 package body Exec.Library is
 
@@ -16,12 +17,6 @@ package body Exec.Library is
 
    subtype Installed_Program_Name is String (1 .. Max_Name_Length);
 
-   subtype Interface_Caps is
-     Rose.Capabilities.Capability_Array
-       (1 .. Rose.Interfaces.Launch.Subprogram_Count);
-   --  The caps of a program's Launch interface: each at its index in
-   --  Rose.Interfaces.Launch, plus one.
-
    type Installed_Program_Record is
       record
          Installed       : Boolean := False;
@@ -30,9 +25,8 @@ package body Exec.Library is
          Name            : Installed_Program_Name;
          ELF_Base        : Rose.Objects.Page_Object_Id;
          ELF_Bound       : Rose.Objects.Page_Object_Id;
-         Launch_Caps     : Interface_Caps := (others => 0);
-         Have_Image      : Boolean := False;
-         Image           : Rose.Interfaces.Region.Client.Region_Client;
+         Image           : Rose.Capabilities.Capability :=
+                             Rose.Capabilities.Null_Capability;
          Metadata_Offset : Storage_Count := 0;
          Metadata_Length : Storage_Count := 0;
       end record;
@@ -47,6 +41,7 @@ package body Exec.Library is
    Installed_Count    : Rose.Objects.Capability_Identifier := 0;
 
    Region         : Rose.Interfaces.Region.Client.Region_Client;
+   --  Where the images are kept.
    Page_Base,
    Page_Bound         : Rose.Objects.Object_Id := 0;
    Next_Page          : Rose.Objects.Object_Id := 0;
@@ -227,15 +222,19 @@ package body Exec.Library is
 
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Interfaces.Region.Client.Region_Client
+      return Rose.Capabilities.Capability
    is
+      use type Rose.Capabilities.Capability;
       Program : Installed_Program_Record renames Installed_Programs (Id);
    begin
-      if not Program.Have_Image then
-         Program.Image :=
-           Rose.Interfaces.Region.Client.Create_Subregion
-             (Region, Program.ELF_Base, Program.ELF_Bound, 5);
-         Program.Have_Image := True;
+      if Program.Image = Rose.Capabilities.Null_Capability then
+         declare
+            Image : Rose.Interfaces.Region.Region_Object'Class :=
+              Region.Create_Subregion
+                (Program.ELF_Base, Program.ELF_Bound, 5);
+         begin
+            Program.Image := Image.Region_Cap;
+         end;
       end if;
       return Program.Image;
    end Image_Region;
@@ -245,10 +244,10 @@ package body Exec.Library is
    -------------
 
    function Install
-     (ELF_Image : Rose.Interfaces.Reader.Client.Reader_Client;
+     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array)
-      return Rose.Capabilities.Capability
+      return Rose.Objects.Capability_Identifier
    is
       use type Rose.Objects.Capability_Identifier;
    begin
@@ -259,11 +258,13 @@ package body Exec.Library is
       Installed_Count := Installed_Count + 1;
 
       declare
-         use Rose.Interfaces.Reader.Client;
-         use Rose.Interfaces.Region.Client;
+         use type Ada.Streams.Stream_Element_Offset;
          use type Rose.Objects.Object_Id;
-         Buffer : Page_Buffer;
-         Last   : Storage_Count;
+         Buffer  : Page_Buffer;
+         Data    : Ada.Streams.Stream_Element_Array (1 .. Buffer'Length)
+           with Import, Address => Buffer'Address;
+         --  Buffer, as the image is read.
+         Last    : Ada.Streams.Stream_Element_Offset;
          Install : Installed_Program_Record renames
                      Installed_Programs (Installed_Count);
       begin
@@ -283,24 +284,23 @@ package body Exec.Library is
          Install.ELF_Base := Next_Page;
 
          loop
-            Read (ELF_Image, Buffer, Last);
-            exit when Last = 0;
+            ELF_Image.Read (Data, Last);
+            exit when Last < Data'First;
 
             --  An image that doesn't fit is not installed, rather than
             --  installed with its last pages missing (#669).
 
             if Next_Page >= Page_Bound then
-               Rose.Console_IO.Put ("exec: no room for ");
-               Rose.Console_IO.Put (Name);
-               Rose.Console_IO.New_Line;
+               Exec.Output.Put_Line ("exec: no room for " & Name);
                Next_Page := Install.ELF_Base;
                Install.Installed := False;
                Installed_Count := Installed_Count - 1;
-               return Rose.Capabilities.Null_Capability;
+               return 0;
             end if;
 
-            Buffer (Last + 1 .. Buffer'Last) := (others => 0);
-            Put (Region, Next_Page, Buffer);
+            Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
+              (others => 0);
+            Region.Put (Next_Page, Buffer);
             Next_Page := Next_Page + 1;
          end loop;
          Install.ELF_Bound := Next_Page;
@@ -308,10 +308,7 @@ package body Exec.Library is
          Find_Metadata (Install);
       end;
 
-      return Rose.System_Calls.Server.Create_Endpoint
-        (Create_Cap  => Create_Endpoint_Cap,
-         Endpoint_Id => Rose.Interfaces.Launch.Launch_Interface,
-         Identifier  => Installed_Count);
+      return Installed_Count;
    end Install;
 
    ----------------
@@ -353,8 +350,7 @@ package body Exec.Library is
                Cached := Next_Entry;
                Next_Entry := (if Next_Entry = Cache'Last then Cache'First
                               else Next_Entry + 1);
-               Rose.Interfaces.Region.Client.Get
-                 (Region, Page, Cache (Cached).Data);
+               Region.Get (Page, Cache (Cached).Data);
                Cache (Cached).Valid := True;
                Cache (Cached).Page := Page;
             end if;
@@ -385,59 +381,13 @@ package body Exec.Library is
    end Send_Install_Caps;
 
    --------------------
-   -- Send_Interface --
-   --------------------
-
-   procedure Send_Interface
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record)
-   is
-      use type Rose.Capabilities.Capability;
-
-      function Create
-        (Endpoint : Rose.Objects.Endpoint_Id)
-         return Rose.Capabilities.Capability
-      is (Rose.System_Calls.Server.Create_Endpoint
-            (Create_Cap  => Create_Endpoint_Cap,
-             Endpoint_Id => Endpoint,
-             Identifier  => Id));
-
-   begin
-      if Id not in Installed_Program_Index
-        or else not Installed_Programs (Id).Installed
-      then
-         return;
-      end if;
-
-      declare
-         Caps : Interface_Caps renames Installed_Programs (Id).Launch_Caps;
-      begin
-         if Caps (Caps'First) = 0 then
-            Caps (Rose.Interfaces.Launch.Launch_Index + 1) :=
-              Create (Rose.Interfaces.Launch.Launch_Endpoint);
-            Caps (Rose.Interfaces.Launch.Launch_Command_Index + 1) :=
-              Create (Rose.Interfaces.Launch.Launch_Command_Endpoint);
-            Caps (Rose.Interfaces.Launch.Metadata_Index + 1) :=
-              Create (Rose.Interfaces.Launch.Metadata_Endpoint);
-         end if;
-
-         for Cap of Caps loop
-            Rose.Invocation.Send_Cap (Params, Cap);
-         end loop;
-      end;
-   end Send_Interface;
-
-   --------------------
    -- Set_Region --
    --------------------
 
-   procedure Set_Region
-     (Client : Rose.Interfaces.Region.Client.Region_Client)
-   is
+   procedure Set_Region (Region : Rose.Capabilities.Capability) is
    begin
-      Region := Client;
-      Rose.Interfaces.Region.Client.Get_Range
-        (Region, Page_Base, Page_Bound);
+      Rose.Interfaces.Region.Client.Open (Exec.Library.Region, Region);
+      Exec.Library.Region.Get_Range (Page_Base, Page_Bound);
       Next_Page := Page_Base;
    end Set_Region;
 
