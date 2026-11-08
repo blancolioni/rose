@@ -1,30 +1,50 @@
-with System.Storage_Elements;
+with Ada.Streams;
+with Ada.Unchecked_Deallocation;
 
 with Ada_Text_IO;
 
-with Rose.Invocation;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Directory.Client;
+with Rose.Interfaces.Directory;
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Releasable_Writer.Client;
 with Rose.Interfaces.Transactional_Writable_File.Client;
-with Rose.Interfaces.Writable_Directory.Client.Conversions;
+with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
 with Petal.Read;
 
 package body Petal.Session is
 
-   use Rose.Interfaces.Writable_Directory.Client;
    use type Rose.Capabilities.Capability;
+   use type Rose.Interfaces.Directory.File_Kind;
 
+   package Directory_Clients renames Rose.Interfaces.Writable_Directory.Client;
+   package File_Clients renames Rose.Interfaces.Writable_File.Client;
+   package Reader_Clients renames Rose.Interfaces.Releasable_Reader.Client;
+   package Writer_Clients renames Rose.Interfaces.Releasable_Writer.Client;
    package Version_Clients renames
      Rose.Interfaces.Transactional_Writable_File.Client;
 
-   --  Petal's argument cap set: the caps it uses here.
+   Invocation_Error : exception
+     renames Rose.Interfaces.Objects.Invocation_Error;
 
+   --  A directory's client is on the heap, because the path of the
+   --  current directory is copied from level to level, and a client is
+   --  limited. Closing it deletes its caps, its Directory cap among them.
+
+   type Directory_Access is access Directory_Clients.Writable_Directory_Client;
+
+   procedure Free is
+     new Ada.Unchecked_Deallocation
+       (Directory_Clients.Writable_Directory_Client, Directory_Access);
+
+   function Open_Directory
+     (Cap : Rose.Capabilities.Capability)
+      return Directory_Access;
+   --  A new client of the Writable_Directory interface Cap.
 
    Startup_File_Name : constant String := ".petalrc";
 
@@ -35,17 +55,14 @@ package body Petal.Session is
       record
          Name      : String (1 .. Max_Name_Length);
          Name_Last : Natural := 0;
-         Directory : Writable_Directory_Client;
-         Grant     : Rose.Capabilities.Capability :=
-           Rose.Capabilities.Null_Capability;
-         --  The read-only grant of Directory, once it has been made.
+         Directory : Directory_Access;
       end record;
 
    Directories     : array (1 .. Max_Directories) of Directory_Entry;
    Directory_Count : Natural := 0;
 
-   Session_User : Rose.Interfaces.User.Client.User_Client;
-   Have_User    : Boolean := False;
+   Session_User : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
 
    Max_Found_Files : constant := 16;
    Found_Files     : Rose.Capabilities.Capability_Array (1 .. Max_Found_Files);
@@ -54,7 +71,7 @@ package body Petal.Session is
 
    Max_Readers  : constant := 4;
    Readers      : array (1 .. Max_Readers)
-     of Rose.Interfaces.Releasable_Reader.Client.Releasable_Reader_Client;
+     of Reader_Clients.Releasable_Reader_Client;
    Reader_Count : Natural := 0;
    --  The readers that Open_Reader has opened, for Release_Files.
 
@@ -71,8 +88,7 @@ package body Petal.Session is
 
    Redirected    : Boolean := False;
    Output_File   : Version_Clients.Transactional_Writable_File_Client;
-   Output_Writer : Rose.Interfaces.Releasable_Writer.Client
-     .Releasable_Writer_Client;
+   Output_Writer : Writer_Clients.Releasable_Writer_Client;
    Output_Name   : String (1 .. Max_File_Name_Length);
    Output_Last   : Natural := 0;
    --  The version that Redirect_Output made, which petal commits, the
@@ -84,13 +100,10 @@ package body Petal.Session is
       record
          Name      : String (1 .. Max_File_Name_Length);
          Name_Last : Natural := 0;
-         Directory : Writable_Directory_Client;
-         Grant     : Rose.Interfaces.Directory.Client.Directory_Client;
-         Has_Grant : Boolean := False;
+         Directory : Directory_Access;
       end record;
    --  A directory on the path of the current directory: its name in the
-   --  directory before it, petal's client of it, and its read-only
-   --  grant, once it has been made.
+   --  directory before it, and petal's client of it.
 
    type Level_Array is array (1 .. Max_Depth) of Level_Entry;
 
@@ -106,10 +119,11 @@ package body Petal.Session is
    --  Delete petal's caps for the directory Item, which is no longer on
    --  the path of the current directory.
 
-   procedure Current_Directory
-     (Directory : out Writable_Directory_Client;
-      Found     : out Boolean);
-   --  The current directory, if there is one.
+   function Current_Directory return Directory_Access;
+   --  The current directory, or null if there is none.
+
+   function Find_Directory (Name : String) return Directory_Access;
+   --  The directory called Name in the table, or null.
 
    procedure Lookup_File
      (Name     : String;
@@ -127,13 +141,18 @@ package body Petal.Session is
    --  is created first if there is no entry Name, for New_Version and
    --  Redirect_Output. Version is opened only if Result is Version_Made.
 
+   procedure Close_Version
+     (Version : in out Version_Clients.Transactional_Writable_File_Client);
+   --  Release Version, which drops what wasn't committed, and delete
+   --  petal's caps for it. A version that is already gone is only closed.
+
    -------------------
    -- Add_Directory --
    -------------------
 
    procedure Add_Directory
      (Name      : String;
-      Directory : Writable_Directory_Client)
+      Directory : Rose.Capabilities.Capability)
    is
    begin
       if Directory_Count = Max_Directories
@@ -149,7 +168,7 @@ package body Petal.Session is
       begin
          Item.Name_Last := Name'Length;
          Item.Name (1 .. Item.Name_Last) := Name;
-         Item.Directory := Directory;
+         Item.Directory := Open_Directory (Directory);
       end;
    end Add_Directory;
 
@@ -293,52 +312,49 @@ package body Petal.Session is
 
       for Level in Keep + 1 .. Target_Depth loop
          declare
-            use type Rose.Interfaces.Directory.File_Kind;
             Name   : constant String := Target_Name (Level);
-            Parent : constant Writable_Directory_Client :=
+            Parent : constant Directory_Access :=
               (if Level > Keep + 1 then Opened (Level - 1).Directory
                elsif Level > 1 then Levels (Level - 1).Directory
                else Directories (Root).Directory);
-            Index  : constant Natural := Find_Entry (Parent, Name);
-            Params : aliased Rose.Invocation.Invocation_Record;
-            Failed : Boolean := False;
+            Index  : Natural := 0;
+            Child  : Rose.Capabilities.Capability :=
+              Rose.Capabilities.Null_Capability;
          begin
-            if Index = 0 then
-               Error ("no directory named '" & Name & "'");
-               Failed := True;
-            elsif Directory_Entry_Kind (Parent, Index)
-              /= Rose.Interfaces.Directory.Directory
-            then
-               Error ("'" & Name & "' is not a directory");
-               Failed := True;
-            else
-
-               --  The call is made here, not through
-               --  Get_Writable_Directory, which opens a client of the
-               --  result even when the directory refuses.
-
-               Rose.System_Calls.Initialize_Send
-                 (Params, Get_Get_Writable_Directory_Cap (Parent));
-               Rose.System_Calls.Send_Word (Params, Index);
-               Rose.System_Calls.Receive_Caps (Params, 1);
-               Rose.System_Calls.Invoke_Capability (Params);
-
-               if Params.Control.Flags (Rose.Invocation.Error)
-                 or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+            begin
+               Index := Parent.Find_Entry (Name);
+               if Index = 0 then
+                  Error ("no directory named '" & Name & "'");
+               elsif Parent.Directory_Entry_Kind (Index)
+                 /= Rose.Interfaces.Directory.Directory
                then
-                  Error ("cannot open '" & Name & "'");
-                  Failed := True;
+                  Error ("'" & Name & "' is not a directory");
+               else
+                  declare
+                     Directory : Rose.Interfaces.Writable_Directory
+                       .Writable_Directory_Object'Class :=
+                         Parent.Get_Writable_Directory (Index);
+                  begin
+                     Child := Directory.Writable_Directory_Cap;
+                  end;
+                  if Child = Rose.Capabilities.Null_Capability then
+                     Error ("cannot open '" & Name & "'");
+                  end if;
                end if;
-            end if;
+            exception
+               when Invocation_Error =>
+                  Error ("cannot open '" & Name & "'");
+                  Child := Rose.Capabilities.Null_Capability;
+            end;
 
-            if Failed then
+            if Child = Rose.Capabilities.Null_Capability then
                for Item of Opened (Keep + 1 .. Level - 1) loop
                   Close_Level (Item);
                end loop;
                return;
             end if;
 
-            Open (Opened (Level).Directory, Params.Caps (0));
+            Opened (Level).Directory := Open_Directory (Child);
             Opened (Level).Name := Target (Level).Name;
             Opened (Level).Name_Last := Target (Level).Last;
          end;
@@ -359,33 +375,40 @@ package body Petal.Session is
 
    procedure Close_Level (Item : in out Level_Entry) is
    begin
-      if Item.Has_Grant then
-         Rose.System_Calls.Delete_Cap
-           (Rose.Interfaces.Directory.Client.Get_Interface_Cap (Item.Grant));
-         Rose.Interfaces.Directory.Client.Close (Item.Grant);
-         Item.Has_Grant := False;
+      if Item.Directory /= null then
+         Directory_Clients.Close (Item.Directory.all);
+         Free (Item.Directory);
       end if;
-      Rose.System_Calls.Delete_Cap (Get_Interface_Cap (Item.Directory));
-      Close (Item.Directory);
    end Close_Level;
+
+   -------------------
+   -- Close_Version --
+   -------------------
+
+   procedure Close_Version
+     (Version : in out Version_Clients.Transactional_Writable_File_Client)
+   is
+   begin
+      --  Closing a version releases it.
+
+      Version_Clients.Close (Version);
+   exception
+      when Invocation_Error =>
+         null;
+   end Close_Version;
 
    -----------------------
    -- Current_Directory --
    -----------------------
 
-   procedure Current_Directory
-     (Directory : out Writable_Directory_Client;
-      Found     : out Boolean)
-   is
+   function Current_Directory return Directory_Access is
    begin
       if Depth > 0 then
-         Directory := Levels (Depth).Directory;
-         Found := True;
+         return Levels (Depth).Directory;
       elsif Current_Root > 0 then
-         Directory := Directories (Current_Root).Directory;
-         Found := True;
+         return Directories (Current_Root).Directory;
       else
-         Found := False;
+         return null;
       end if;
    end Current_Directory;
 
@@ -432,37 +455,24 @@ package body Petal.Session is
       Grant    : out Rose.Capabilities.Capability;
       Found    : out Boolean)
    is
+      Directory : constant Directory_Access := Current_Directory;
    begin
-      if Depth = 0 then
-         if Current_Root = 0 then
-            Grant := Rose.Capabilities.Null_Capability;
-            Found := False;
-         else
-            Find_Grant
-              (Directories (Current_Root).Name
-                 (1 .. Directories (Current_Root).Name_Last),
-               Writable, Grant, Found);
-         end if;
-         return;
-      end if;
+      Grant := Rose.Capabilities.Null_Capability;
 
-      declare
-         Item : Level_Entry renames Levels (Depth);
-      begin
-         if Writable then
-            Grant := Get_Interface_Cap (Item.Directory);
-         else
-            if not Item.Has_Grant then
-               Item.Grant :=
-                 Rose.Interfaces.Writable_Directory.Client.Conversions
-                   .To_Directory (Item.Directory);
-               Item.Has_Grant := True;
-            end if;
-            Grant :=
-              Rose.Interfaces.Directory.Client.Get_Interface_Cap (Item.Grant);
-         end if;
-         Found := Grant /= Rose.Capabilities.Null_Capability;
-      end;
+      --  The read-only grant is the cap of the directory's Directory
+      --  interface, which has only the lookup operations (ADR 0003,
+      --  section 1). The client asks for it the first time, and keeps it.
+
+      if Directory /= null then
+         Grant :=
+           (if Writable then Directory.Writable_Directory_Cap
+            else Directory.Directory_Cap);
+      end if;
+      Found := Grant /= Rose.Capabilities.Null_Capability;
+   exception
+      when Invocation_Error =>
+         Grant := Rose.Capabilities.Null_Capability;
+         Found := False;
    end Current_Grant;
 
    ---------------------
@@ -477,19 +487,25 @@ package body Petal.Session is
 
       --  Closing the writer releases it.
 
-      Rose.Interfaces.Releasable_Writer.Client.Close (Output_Writer);
+      begin
+         Writer_Clients.Close (Output_Writer);
+      exception
+         when Invocation_Error =>
+            null;
+      end;
 
       if Completed then
-         Version_Clients.Commit (Output_File);
-         if Version_Clients.Has_Error then
-            Ada_Text_IO.Put_Line
-              ("petal: cannot write '"
-               & Output_Name (1 .. Output_Last) & "'");
-         end if;
+         begin
+            Output_File.Commit;
+         exception
+            when Invocation_Error =>
+               Ada_Text_IO.Put_Line
+                 ("petal: cannot write '"
+                  & Output_Name (1 .. Output_Last) & "'");
+         end;
       end if;
 
-      Version_Clients.Release (Output_File);
-      Version_Clients.Close (Output_File);
+      Close_Version (Output_File);
       Redirected := False;
    end End_Redirection;
 
@@ -497,20 +513,14 @@ package body Petal.Session is
    -- Find_Directory --
    --------------------
 
-   procedure Find_Directory
-     (Name      : String;
-      Directory : out Writable_Directory_Client;
-      Found     : out Boolean)
-   is
+   function Find_Directory (Name : String) return Directory_Access is
    begin
       for Item of Directories (1 .. Directory_Count) loop
          if Item.Name (1 .. Item.Name_Last) = Name then
-            Directory := Item.Directory;
-            Found := True;
-            return;
+            return Item.Directory;
          end if;
       end loop;
-      Found := False;
+      return null;
    end Find_Directory;
 
    ---------------
@@ -541,40 +551,20 @@ package body Petal.Session is
       Grant    : out Rose.Capabilities.Capability;
       Found    : out Boolean)
    is
+      Directory : constant Directory_Access := Find_Directory (Name);
    begin
-      for Item of Directories (1 .. Directory_Count) loop
-         if Item.Name (1 .. Item.Name_Last) = Name then
-            if Writable then
-               Grant := Get_Interface_Cap (Item.Directory);
-            else
-               if Item.Grant = Rose.Capabilities.Null_Capability then
-                  Item.Grant :=
-                    Rose.Interfaces.Directory.Client.Get_Interface_Cap
-                      (Rose.Interfaces.Writable_Directory.Client.Conversions
-                       .To_Directory (Item.Directory));
-               end if;
-               Grant := Item.Grant;
-            end if;
-            Found := Grant /= Rose.Capabilities.Null_Capability;
-            return;
-         end if;
-      end loop;
       Grant := Rose.Capabilities.Null_Capability;
-      Found := False;
+      if Directory /= null then
+         Grant :=
+           (if Writable then Directory.Writable_Directory_Cap
+            else Directory.Directory_Cap);
+      end if;
+      Found := Grant /= Rose.Capabilities.Null_Capability;
+   exception
+      when Invocation_Error =>
+         Grant := Rose.Capabilities.Null_Capability;
+         Found := False;
    end Find_Grant;
-
-   --------------
-   -- Get_User --
-   --------------
-
-   procedure Get_User
-     (User  : out Rose.Interfaces.User.Client.User_Client;
-      Found : out Boolean)
-   is
-   begin
-      User := Session_User;
-      Found := Have_User;
-   end Get_User;
 
    -----------------
    -- Lookup_File --
@@ -586,50 +576,53 @@ package body Petal.Session is
       File     : out Rose.Capabilities.Capability;
       Result   : out File_Lookup)
    is
-      use type Rose.Interfaces.Directory.File_Kind;
-      Directory      : Writable_Directory_Client;
-      Have_Directory : Boolean;
-      Index          : Natural;
-      Params         : aliased Rose.Invocation.Invocation_Record;
+      Directory : constant Directory_Access := Current_Directory;
+      Index     : Natural;
    begin
       File := Rose.Capabilities.Null_Capability;
 
-      Current_Directory (Directory, Have_Directory);
-      if not Have_Directory then
+      if Directory = null then
          Result := No_Directory;
          return;
       end if;
 
-      Index := Find_Entry (Directory, Name);
+      Index := Directory.Find_Entry (Name);
       if Index = 0 then
          Result := No_Such_File;
          return;
-      elsif Directory_Entry_Kind (Directory, Index)
+      elsif Directory.Directory_Entry_Kind (Index)
         /= Rose.Interfaces.Directory.Ordinary_File
       then
          Result := Not_A_File;
          return;
       end if;
 
-      --  Only the file's interface cap: Get_Ordinary_File would also open
-      --  a client of it, with a cap for each of its subprograms, which
-      --  petal does not need.
+      --  Only the file's interface cap: its client isn't closed, so the
+      --  cap stays, for the command.
 
-      Rose.System_Calls.Initialize_Send
-        (Params,
-         (if Writable then Get_Get_Writable_File_Cap (Directory)
-          else Get_Get_Ordinary_File_Cap (Directory)));
-      Rose.System_Calls.Send_Word (Params, Index);
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error) then
-         Result := No_Such_File;
-         return;
+      if Writable then
+         declare
+            Item : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+              Directory.Get_Writable_File (Index);
+         begin
+            File := Item.Writable_File_Cap;
+         end;
+      else
+         declare
+            Item : Rose.Interfaces.File.File_Object'Class :=
+              Directory.Get_Ordinary_File (Index);
+         begin
+            File := Item.File_Cap;
+         end;
       end if;
 
-      File := Params.Caps (0);
-      Result := File_Found;
+      Result :=
+        (if File = Rose.Capabilities.Null_Capability then No_Such_File
+         else File_Found);
+   exception
+      when Invocation_Error =>
+         File := Rose.Capabilities.Null_Capability;
+         Result := No_Such_File;
    end Lookup_File;
 
    ------------------
@@ -641,79 +634,72 @@ package body Petal.Session is
       Version : out Version_Clients.Transactional_Writable_File_Client;
       Result  : out Version_Lookup)
    is
-      use type Rose.Interfaces.Directory.File_Kind;
-      Directory      : Writable_Directory_Client;
-      Have_Directory : Boolean;
-      Index          : Natural;
-      Params         : aliased Rose.Invocation.Invocation_Record;
+      Directory : constant Directory_Access := Current_Directory;
+      Index     : Natural;
    begin
-      Current_Directory (Directory, Have_Directory);
-      if not Have_Directory then
+      if Directory = null then
          Result := No_Version_Directory;
          return;
       end if;
 
-      Index := Find_Entry (Directory, Name);
+      Index := Directory.Find_Entry (Name);
       if Index /= 0
-        and then Directory_Entry_Kind (Directory, Index)
+        and then Directory.Directory_Entry_Kind (Index)
           /= Rose.Interfaces.Directory.Ordinary_File
       then
          Result := Not_A_Version_File;
          return;
       end if;
 
-      --  The calls that can fail are made here, not through the clients'
-      --  functions, which open a client of the result even when the
-      --  call fails. Name is copied first: Send_Text puts it in the
-      --  invoke buffer, where it may already be.
-
       declare
          Saved_Name : constant String := Name;
-         Target     : Rose.Interfaces.Writable_File.Client
-           .Writable_File_Client;
+         --  Name is copied first: a call puts its text in the invoke
+         --  buffer, where it may already be.
+
+         function Target_File
+           return Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+         --  The file Name, made first if there is no entry Name (ADR 0027).
+
+         -----------------
+         -- Target_File --
+         -----------------
+
+         function Target_File
+           return Rose.Interfaces.Writable_File.Writable_File_Object'Class
+         is
+         begin
+            if Index = 0 then
+               return Directory.Create_File (Saved_Name);
+            else
+               return Directory.Get_Writable_File (Index);
+            end if;
+         end Target_File;
+
+         Target : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+           Target_File;
       begin
-         Rose.System_Calls.Initialize_Send
-           (Params,
-            (if Index = 0 then Get_Create_File_Cap (Directory)
-             else Get_Get_Writable_File_Cap (Directory)));
-         if Index = 0 then
-            Rose.System_Calls.Send_Text (Params, Saved_Name);
-         else
-            Rose.System_Calls.Send_Word (Params, Index);
-         end if;
-         Rose.System_Calls.Receive_Caps (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
-
-         if Params.Control.Flags (Rose.Invocation.Error)
-           or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-         then
+         if Target.Writable_File_Cap = Rose.Capabilities.Null_Capability then
             Result := No_Version;
             return;
          end if;
 
-         --  The file's New_Version (ADR 0026).
+         --  The file's New_Version (ADR 0026). Petal only needs the
+         --  version, so its client of the file is closed.
 
-         Rose.Interfaces.Writable_File.Client.Open
-           (Target, Params.Caps (0));
-         Rose.System_Calls.Initialize_Send
-           (Params,
-            Rose.Interfaces.Writable_File.Client.Get_New_Version_Cap
-              (Target));
-         Rose.System_Calls.Receive_Caps (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
-
-         if Params.Control.Flags (Rose.Invocation.Error)
-           or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-         then
-            Rose.Interfaces.Writable_File.Client.Close (Target);
-            Result := No_Version;
-            return;
-         end if;
-
-         Version_Clients.Open (Version, Params.Caps (0));
-         Rose.Interfaces.Writable_File.Client.Close (Target);
+         declare
+            New_Version : Rose.Interfaces.Transactional_Writable_File
+              .Transactional_Writable_File_Object'Class :=
+                Target.New_Version;
+         begin
+            Version_Clients.Open
+              (Version, New_Version.Transactional_Writable_File_Cap);
+         end;
+         File_Clients.Close (File_Clients.Writable_File_Client (Target));
       end;
       Result := Version_Made;
+   exception
+      when Invocation_Error =>
+         Result := No_Version;
    end Make_Version;
 
    -----------------
@@ -740,10 +726,24 @@ package body Petal.Session is
       Make_Version (Name, Versions (Version_Count + 1), Result);
       if Result = Version_Made then
          Version_Count := Version_Count + 1;
-         File := Version_Clients.Get_Interface_Cap
-           (Versions (Version_Count));
+         File := Versions (Version_Count).Transactional_Writable_File_Cap;
       end if;
    end New_Version;
+
+   --------------------
+   -- Open_Directory --
+   --------------------
+
+   function Open_Directory
+     (Cap : Rose.Capabilities.Capability)
+      return Directory_Access
+   is
+      Result : constant Directory_Access :=
+        new Directory_Clients.Writable_Directory_Client;
+   begin
+      Directory_Clients.Open (Result.all, Cap);
+      return Result;
+   end Open_Directory;
 
    -----------------
    -- Open_Reader --
@@ -755,8 +755,6 @@ package body Petal.Session is
       Result : out File_Lookup)
    is
       File_Cap : Rose.Capabilities.Capability;
-      File     : Rose.Interfaces.File.Client.File_Client;
-      Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       Reader := Rose.Capabilities.Null_Capability;
 
@@ -770,31 +768,30 @@ package body Petal.Session is
          return;
       end if;
 
-      --  The file's Open_Reader is called here, not through the client's
-      --  function, which opens a client of the result even when the call
-      --  fails. Closing the file's client deletes its caps.
+      --  Petal only needs the reader, so its client of the file is
+      --  closed, which deletes its caps.
 
-      Rose.Interfaces.File.Client.Open (File, File_Cap);
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.Interfaces.File.Client.Get_Open_Reader_Cap (File));
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
+      declare
+         File : Rose.Interfaces.File.Client.File_Client;
+      begin
+         Rose.Interfaces.File.Client.Open (File, File_Cap);
+         declare
+            New_Reader : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class := File.Open_Reader;
+         begin
+            Reader_Count := Reader_Count + 1;
+            Reader_Clients.Open
+              (Readers (Reader_Count), New_Reader.Releasable_Reader_Cap);
+         end;
          Rose.Interfaces.File.Client.Close (File);
-         Result := No_Such_File;
-         return;
-      end if;
+      exception
+         when Invocation_Error =>
+            Rose.Interfaces.File.Client.Close (File);
+            Result := No_Such_File;
+            return;
+      end;
 
-      Reader_Count := Reader_Count + 1;
-      Rose.Interfaces.Releasable_Reader.Client.Open
-        (Readers (Reader_Count), Params.Caps (0));
-      Rose.Interfaces.File.Client.Close (File);
-      Reader :=
-        Rose.Interfaces.Releasable_Reader.Client.Get_Read_Cap
-          (Readers (Reader_Count));
+      Reader := Readers (Reader_Count).Get_Read_Cap;
    end Open_Reader;
 
    ---------------------
@@ -807,7 +804,6 @@ package body Petal.Session is
       Output : out Rose.Capabilities.Capability;
       Result : out Version_Lookup)
    is
-      Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Output := Rose.Capabilities.Null_Capability;
 
@@ -821,33 +817,46 @@ package body Petal.Session is
          return;
       end if;
 
-      --  The writer is opened here, not through the client's Rewrite or
-      --  Append, for the reason given in Make_Version.
+      declare
+         function New_Writer
+           return Rose.Interfaces.Releasable_Writer
+             .Releasable_Writer_Object'Class;
+         --  Rewrite, which empties the version, or Append.
 
-      Rose.System_Calls.Initialize_Send
-        (Params,
-         (if Append then Version_Clients.Get_Append_Cap (Output_File)
-          else Version_Clients.Get_Rewrite_Cap (Output_File)));
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
+         ----------------
+         -- New_Writer --
+         ----------------
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         Version_Clients.Release (Output_File);
-         Version_Clients.Close (Output_File);
-         Result := No_Version;
-         return;
-      end if;
+         function New_Writer
+           return Rose.Interfaces.Releasable_Writer
+             .Releasable_Writer_Object'Class
+         is
+         begin
+            if Append then
+               return Output_File.Append;
+            else
+               return Output_File.Rewrite;
+            end if;
+         end New_Writer;
 
-      Rose.Interfaces.Releasable_Writer.Client.Open
-        (Output_Writer, Params.Caps (0));
+      begin
+         declare
+            Writer : Rose.Interfaces.Releasable_Writer
+              .Releasable_Writer_Object'Class := New_Writer;
+         begin
+            Writer_Clients.Open (Output_Writer, Writer.Releasable_Writer_Cap);
+         end;
+      exception
+         when Invocation_Error =>
+            Close_Version (Output_File);
+            Result := No_Version;
+            return;
+      end;
+
       Output_Last := Name'Length;
       Output_Name (1 .. Output_Last) := Name;
       Redirected := True;
-      Output :=
-        Rose.Interfaces.Releasable_Writer.Client.Get_Write_Cap
-          (Output_Writer);
+      Output := Output_Writer.Get_Write_Cap;
    end Redirect_Output;
 
    -------------------
@@ -855,20 +864,21 @@ package body Petal.Session is
    -------------------
 
    procedure Release_Files is
-      Params : aliased Rose.Invocation.Invocation_Record;
    begin
       for Cap of Found_Files (1 .. Found_Count) loop
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
+         Rose.System_Calls.Delete_Cap (Cap);
       end loop;
       Found_Count := 0;
 
       --  Closing a reader releases it.
 
       for Reader of Readers (1 .. Reader_Count) loop
-         Rose.Interfaces.Releasable_Reader.Client.Close (Reader);
+         begin
+            Reader_Clients.Close (Reader);
+         exception
+            when Invocation_Error =>
+               null;
+         end;
       end loop;
       Reader_Count := 0;
    end Release_Files;
@@ -883,8 +893,7 @@ package body Petal.Session is
    procedure Release_Versions is
    begin
       for Version of Versions (1 .. Version_Count) loop
-         Version_Clients.Release (Version);
-         Version_Clients.Close (Version);
+         Close_Version (Version);
       end loop;
       Version_Count := 0;
    end Release_Versions;
@@ -894,14 +903,11 @@ package body Petal.Session is
    ----------------------
 
    procedure Run_Startup_File is
-      use System.Storage_Elements;
-      Home   : Writable_Directory_Client;
-      Found  : Boolean;
+      use Ada.Streams;
+      Home   : constant Directory_Access := Find_Directory (Home_Name);
       Index  : Natural;
-      Reader : Rose.Interfaces.Releasable_Reader.Client
-        .Releasable_Reader_Client;
-      Buffer : Storage_Array (1 .. 512);
-      Last   : Storage_Count;
+      Buffer : Stream_Element_Array (1 .. 512);
+      Last   : Stream_Element_Offset;
       Line   : String (1 .. 2000);
       Length : Natural := 0;
       Long   : Boolean := False;
@@ -927,65 +933,87 @@ package body Petal.Session is
       end End_Line;
 
    begin
-      Find_Directory (Home_Name, Home, Found);
-      if not Found then
+      if Home = null then
          return;
       end if;
 
-      Index := Find_Entry (Home, Startup_File_Name);
+      Index := Home.Find_Entry (Startup_File_Name);
       if Index = 0 then
          return;
       end if;
 
-      --  A reader of its own, from the start of the file (ADR 0009).
+      --  A reader of its own, from the start of the file (ADR 0009). The
+      --  file's client is closed once the reader is open, and closing
+      --  the reader releases it.
 
       declare
-         File : Rose.Interfaces.File.Client.File_Client :=
-           Get_Ordinary_File (Home, Index);
+         File   : Rose.Interfaces.File.File_Object'Class :=
+           Home.Get_Ordinary_File (Index);
+         Reader : Rose.Interfaces.Releasable_Reader
+           .Releasable_Reader_Object'Class := File.Open_Reader;
       begin
-         Reader := Rose.Interfaces.File.Client.Open_Reader (File);
-         Rose.Interfaces.File.Client.Close (File);
-      end;
+         Rose.Interfaces.File.Client.Close
+           (Rose.Interfaces.File.Client.File_Client (File));
 
-      loop
-         Rose.Interfaces.Releasable_Reader.Client.Read (Reader, Buffer, Last);
-         exit when Last < Buffer'First;
+         loop
+            Reader.Read (Buffer, Last);
+            exit when Last < Buffer'First;
 
-         for Element of Buffer (Buffer'First .. Last) loop
-            if Element = 10 then
-               End_Line;
-            elsif Length = Line'Length then
-               Long := True;
-            else
-               Length := Length + 1;
-               Line (Length) := Character'Val (Element);
-            end if;
+            for Element of Buffer (Buffer'First .. Last) loop
+               if Element = 10 then
+                  End_Line;
+               elsif Length = Line'Length then
+                  Long := True;
+               else
+                  Length := Length + 1;
+                  Line (Length) := Character'Val (Element);
+               end if;
+            end loop;
          end loop;
-      end loop;
 
-      --  A last line need not end with a line feed.
+         --  A last line need not end with a line feed.
 
-      End_Line;
+         End_Line;
 
-      --  Closing the reader releases it.
-
-      Rose.Interfaces.Releasable_Reader.Client.Close (Reader);
+         Reader_Clients.Close
+           (Reader_Clients.Releasable_Reader_Client (Reader));
+      end;
+   exception
+      when Invocation_Error =>
+         Ada_Text_IO.Put_Line
+           ("petal: cannot read " & Startup_File_Name);
    end Run_Startup_File;
 
    -----------
    -- Start --
    -----------
 
-   procedure Start (User : Rose.Interfaces.User.Client.User_Client) is
-      Home : constant Writable_Directory_Client :=
-        Rose.Interfaces.User.Client.Home_Directory (User);
+   procedure Start (User : in out Rose.Interfaces.User.User_Object'Class) is
    begin
-      Session_User := User;
-      Have_User := True;
-      if Get_Interface_Cap (Home) /= Rose.Capabilities.Null_Capability then
-         Add_Directory (Home_Name, Home);
-         Current_Root := Directory_Count;
-      end if;
+      Session_User := User.User_Cap;
+
+      declare
+         Home : Rose.Interfaces.Writable_Directory
+           .Writable_Directory_Object'Class := User.Home_Directory;
+      begin
+         if Home.Writable_Directory_Cap /= Rose.Capabilities.Null_Capability
+         then
+            Add_Directory (Home_Name, Home.Writable_Directory_Cap);
+            Current_Root := Directory_Count;
+         end if;
+      end;
+   exception
+      when Invocation_Error =>
+         Ada_Text_IO.Put_Line ("petal: no home directory");
    end Start;
+
+   --------------
+   -- User_Cap --
+   --------------
+
+   function User_Cap return Rose.Capabilities.Capability is
+   begin
+      return Session_User;
+   end User_Cap;
 
 end Petal.Session;

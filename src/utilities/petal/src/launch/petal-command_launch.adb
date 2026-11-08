@@ -4,6 +4,7 @@ with Ada_Text_IO;
 
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Rights.Client;
 with Rose.Interfaces.Terminal.Client;
 with Rose.Interfaces.User.Client;
@@ -24,14 +25,16 @@ package body Petal.Command_Launch is
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word;
 
+   Invocation_Error : exception
+     renames Rose.Interfaces.Objects.Invocation_Error;
+
    Commands_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  The command registry's Commands interface, which petal also gives
    --  to a command that has the Find_Command role.
 
-   Find_Cap : Rose.Capabilities.Capability :=
-     Rose.Capabilities.Null_Capability;
-   --  Its Find.
+   Registry : Rose.Interfaces.Commands.Client.Commands_Client;
+   --  The same Commands interface, opened, to find commands.
 
    Terminal_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -48,6 +51,9 @@ package body Petal.Command_Launch is
      Rose.Capabilities.Null_Capability;
    --  The rights broker's Rights interface, which grants the authority of
    --  a categorised role (ADR 0021).
+
+   Rights : Rose.Interfaces.Rights.Client.Rights_Client;
+   --  The same Rights interface, opened, if there is one.
 
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
@@ -170,7 +176,7 @@ package body Petal.Command_Launch is
    procedure Launch
      (Command_Name : String;
       Item         : Signature;
-      Client       : Rose.Interfaces.Launch.Client.Launch_Client;
+      Client       : in out Rose.Interfaces.Launch.Client.Launch_Client;
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
@@ -223,7 +229,7 @@ package body Petal.Command_Launch is
    procedure Launch
      (Command_Name : String;
       Item         : Signature;
-      Client       : Rose.Interfaces.Launch.Client.Launch_Client;
+      Client       : in out Rose.Interfaces.Launch.Client.Launch_Client;
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
@@ -356,19 +362,23 @@ package body Petal.Command_Launch is
       --------------------
 
       procedure Release_Grants is
-         Rights : Rose.Interfaces.Rights.Client.Rights_Client;
-         User   : Rose.Interfaces.User.Client.User_Client;
-         Found  : Boolean;
+         User : Rose.Interfaces.User.Client.User_Client;
+         --  A client of the session's User cap, which is not closed: the
+         --  cap is the session's.
       begin
          if Grant_Count = 0 then
             return;
          end if;
-         Petal.Session.Get_User (User, Found);
-         Rose.Interfaces.Rights.Client.Open (Rights, Rights_Cap);
+         Rose.Interfaces.User.Client.Open (User, Petal.Session.User_Cap);
          for I in 1 .. Grant_Count loop
-            if Found then
-               Rose.Interfaces.Rights.Client.Finish
-                 (Rights, User, Grants (I));
+            if Petal.Session.User_Cap /= Rose.Capabilities.Null_Capability
+            then
+               begin
+                  Rights.Finish (User, Grants (I));
+               exception
+                  when Invocation_Error =>
+                     null;
+               end;
             end if;
             Rose.System_Calls.Delete_Cap (Granted_Caps (I));
          end loop;
@@ -386,23 +396,27 @@ package body Petal.Command_Launch is
          Category : constant String := Value (Item, Role.Category);
          Named    : constant Boolean :=
            Petal.Privileges.Covered (Sudo, Category);
-         Rights   : Rose.Interfaces.Rights.Client.Rights_Client;
          User     : Rose.Interfaces.User.Client.User_Client;
-         Found    : Boolean;
+         --  A client of the session's User cap, which is not closed.
          Grant    : Rose.Words.Word;
       begin
          Cap := Rose.Capabilities.Null_Capability;
-         Petal.Session.Get_User (User, Found);
-         if Rights_Cap = Rose.Capabilities.Null_Capability or else not Found
+         if Rights_Cap = Rose.Capabilities.Null_Capability
+           or else Petal.Session.User_Cap = Rose.Capabilities.Null_Capability
          then
             Fail ("petal has no rights broker to ask for " & Category);
             return;
          end if;
 
-         Rose.Interfaces.Rights.Client.Open (Rights, Rights_Cap);
-         Rose.Interfaces.Rights.Client.Request
-           (Rights, User, Value (Item, Role.Name),
-            (if Named then 1 else 0), Grant, Cap);
+         Rose.Interfaces.User.Client.Open (User, Petal.Session.User_Cap);
+         begin
+            Rights.Request
+              (User, Value (Item, Role.Name),
+               (if Named then 1 else 0), Grant, Cap);
+         exception
+            when Invocation_Error =>
+               Cap := Rose.Capabilities.Null_Capability;
+         end;
 
          if Cap = Rose.Capabilities.Null_Capability then
             Fail ((if Named then "not allowed to have " & Category
@@ -941,8 +955,12 @@ package body Petal.Command_Launch is
          end if;
 
          Rose.Trace.Event ("arguments bound");
-         Endpoint :=
-           Rose.Interfaces.Launch.Client.Launch_Command (Client, No_Caps);
+         begin
+            Endpoint := Client.Launch_Command (No_Caps);
+         exception
+            when Invocation_Error =>
+               Endpoint := Rose.Capabilities.Null_Capability;
+         end;
          Rose.Trace.Event ("launched");
          if Endpoint = Rose.Capabilities.Null_Capability then
             Fail ("cannot launch");
@@ -1132,10 +1150,12 @@ package body Petal.Command_Launch is
 
    procedure Reset_Console is
    begin
-      Rose.Interfaces.Terminal.Client.Enable_Line_Editing (Console);
-      Rose.Interfaces.Terminal.Client.Enable_Echo (Console);
-      Rose.Interfaces.Terminal.Client.Set_Attributes
-        (Console, Bold => False, Reverse_Video => False);
+      Console.Enable_Line_Editing;
+      Console.Enable_Echo;
+      Console.Set_Attributes (Bold => False, Reverse_Video => False);
+   exception
+      when Invocation_Error =>
+         Error ("cannot reset the console");
    end Reset_Console;
 
    ---------
@@ -1295,28 +1315,55 @@ package body Petal.Command_Launch is
       end if;
 
       declare
-         Name   : constant String := Lower (Word_Text (1));
-         Params : aliased Rose.Invocation.Invocation_Record;
-         Client : Rose.Interfaces.Launch.Client.Launch_Client;
-         Last   : Natural;
+         Name       : constant String := Lower (Word_Text (1));
+         Params     : aliased Rose.Invocation.Invocation_Record;
+         Client     : Rose.Interfaces.Launch.Client.Launch_Client;
+         Launch_Cap : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         Last       : Natural;
       begin
          Rose.Trace.Event ("run " & Name);
-         Rose.System_Calls.Initialize_Send (Params, Find_Cap);
-         Rose.System_Calls.Send_Text (Params, Name);
-         Rose.System_Calls.Receive_Caps (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
+
+         --  The registry answers a name it doesn't have with the null
+         --  cap.
+
+         begin
+            declare
+               Found : Rose.Interfaces.Launch.Launch_Object'Class :=
+                 Registry.Find (Name);
+            begin
+               Launch_Cap := Found.Launch_Cap;
+            end;
+         exception
+            when Invocation_Error =>
+               Launch_Cap := Rose.Capabilities.Null_Capability;
+         end;
          Rose.Trace.Event ("found in registry");
 
-         if Params.Control.Flags (Rose.Invocation.Error)
-           or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-           or else Params.Caps (0) = Rose.Capabilities.Null_Capability
-         then
+         if Launch_Cap = Rose.Capabilities.Null_Capability then
             Error (Name & ": command not found");
             return;
          end if;
 
-         Rose.Interfaces.Launch.Client.Open (Client, Params.Caps (0));
-         Rose.Interfaces.Launch.Client.Metadata (Client, Metadata, Last);
+         Rose.Interfaces.Launch.Client.Open (Client, Launch_Cap);
+
+         --  The metadata is read here, not through the client's Metadata,
+         --  which reads a string into a text of at most Rose.Texts
+         --  .Max_Length characters: metadata can be longer.
+
+         Rose.System_Calls.Initialize_Send (Params, Client.Get_Metadata_Cap);
+         Rose.System_Calls.Receive_Words (Params, 1);
+         Rose.System_Calls.Receive_Buffer (Params);
+         Rose.System_Calls.Invoke_Capability (Params);
+         if Params.Control.Flags (Rose.Invocation.Error) then
+            Last := 0;
+         else
+            Rose.System_Calls.Copy_Text
+              (Params,
+               Natural (Rose.System_Calls.Get_Word_32 (Params, 0)),
+               Metadata,
+               Last);
+         end if;
          Parse (Metadata (1 .. Last), Current);
          Rose.Trace.Event ("metadata read, bytes ", Last);
 
@@ -1346,6 +1393,10 @@ package body Petal.Command_Launch is
          end if;
 
          Rose.Interfaces.Launch.Client.Close (Client);
+      exception
+         when Invocation_Error =>
+            Error (Name & ": the command's launcher failed");
+            Rose.Interfaces.Launch.Client.Close (Client);
       end;
    end Run_Command;
 
@@ -1359,17 +1410,19 @@ package body Petal.Command_Launch is
       Clock    : Rose.Capabilities.Capability;
       Rights   : Rose.Capabilities.Capability)
    is
-      Registry : Rose.Interfaces.Commands.Client.Commands_Client;
    begin
       Commands_Cap := Commands;
       Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
-      Find_Cap := Rose.Interfaces.Commands.Client.Get_Find_Cap (Registry);
       Terminal_Cap := Terminal;
       if Terminal_Cap /= Rose.Capabilities.Null_Capability then
          Rose.Interfaces.Terminal.Client.Open (Console, Terminal_Cap);
       end if;
       Clock_Cap := Clock;
       Rights_Cap := Rights;
+      if Rights_Cap /= Rose.Capabilities.Null_Capability then
+         Rose.Interfaces.Rights.Client.Open
+           (Command_Launch.Rights, Rights_Cap);
+      end if;
    end Set_Registry;
 
    -----------

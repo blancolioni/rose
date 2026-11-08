@@ -14,7 +14,7 @@
 
 # Programs that are still on the kernel target, each with the issue that
 # moves it. Remove a program from here when it moves.
-EXEMPT="petal"  # #793
+EXEMPT=""
 
 status=0
 
