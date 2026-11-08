@@ -251,6 +251,42 @@ package body Rose.Kernel.Processes is
                        Rose.Invocation.Invocation_Record'Size / 8;
       First        : constant Virtual_Address :=
                        Virtual_Address (P.Stack.EAX);
+
+      procedure Hold (Page : Rose.Addresses.Virtual_Page_Address);
+      --  Hold the reply for a write fault on Page.
+
+      ----------
+      -- Hold --
+      ----------
+
+      procedure Hold (Page : Rose.Addresses.Virtual_Page_Address) is
+      begin
+         Writable := False;
+
+         if Log_Page_Faults and then Trace (Pid) then
+            Debug.Put (Pid);
+            Rose.Boot.Console.Put (": reply held for page ");
+            Rose.Boot.Console.Put (Rose.Words.Word (Page) * 4096);
+            Rose.Boot.Console.New_Line;
+         end if;
+
+         --  Reply_Fault first, so that Set_Current_State keeps
+         --  Invoke_Reply.
+
+         P.Flags (Reply_Fault) := True;
+         Set_Current_State (Pid, Interrupted);
+
+         Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
+
+         Handle_Page_Fault
+           (Pid               => Pid,
+            Virtual_Page      => Page,
+            Is_Mapped         => Is_User_Page (Pid, Page),
+            Read_Attempt      => False,
+            Write_Attempt     => True,
+            Execution_Attempt => False);
+      end Hold;
+
    begin
       Writable := True;
 
@@ -258,33 +294,25 @@ package body Rose.Kernel.Processes is
         .. Rose.Addresses.Virtual_Address_To_Page (First + Record_Bytes - 1)
       loop
          if not Is_Writable_User_Page (Pid, Page) then
-            Writable := False;
-
-            if Log_Page_Faults and then Trace (Pid) then
-               Debug.Put (Pid);
-               Rose.Boot.Console.Put (": reply held for record page ");
-               Rose.Boot.Console.Put (Rose.Words.Word (Page) * 4096);
-               Rose.Boot.Console.New_Line;
-            end if;
-
-            --  Reply_Fault first, so that Set_Current_State keeps
-            --  Invoke_Reply.
-
-            P.Flags (Reply_Fault) := True;
-            Set_Current_State (Pid, Interrupted);
-
-            Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
-
-            Handle_Page_Fault
-              (Pid               => Pid,
-               Virtual_Page      => Page,
-               Is_Mapped         => Is_User_Page (Pid, Page),
-               Read_Attempt      => False,
-               Write_Attempt     => True,
-               Execution_Attempt => False);
+            Hold (Page);
             return;
          end if;
       end loop;
+
+      for Index in 0 .. P.Lent_Buffer_Pages - 1 loop
+         declare
+            Page : constant Rose.Addresses.Virtual_Page_Address :=
+                     P.Lent_Buffer_Page
+                       + Rose.Addresses.Virtual_Page_Address (Index);
+         begin
+            if not Is_Writable_User_Page (Pid, Page) then
+               Hold (Page);
+               return;
+            end if;
+         end;
+      end loop;
+
+      P.Lent_Buffer_Pages := 0;
    end Check_Reply_Record;
 
    --------------
@@ -446,6 +474,7 @@ package body Rose.Kernel.Processes is
       end if;
       Proc.FPU_Valid := False;
       Proc.Signals := 0;
+      Proc.Lent_Buffer_Pages := 0;
 
       Assign_Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
@@ -1830,6 +1859,7 @@ package body Rose.Kernel.Processes is
       P.Flags (Invoke_Reply) := False;
       P.Flags (Wait_Reply) := False;
       P.Flags (Interrupt_Resume) := False;
+      P.Lent_Buffer_Pages := 0;
    end Restart_Call;
 
    ------------------
@@ -2024,6 +2054,8 @@ package body Rose.Kernel.Processes is
             Page      : Rose.Addresses.Virtual_Page_Address :=
                           Rose.Addresses.Virtual_Address_To_Page
                             (Virtual);
+            Base      : constant Rose.Addresses.Virtual_Page_Address :=
+                          Page;
             Remaining : Rose.Words.Word :=
                           Rose.Words.Word (Params.Buffer_Length);
             Writable  : constant Boolean :=
@@ -2042,6 +2074,15 @@ package body Rose.Kernel.Processes is
                Remaining := Remaining
                  - Word'Min (Remaining, Virtual_Page_Bytes);
             end loop;
+
+            --  The server writes a writable buffer through its slot, which
+            --  mem doesn't see, so a caller's pages are checked again
+            --  before it is given the reply (#716).
+
+            if Writable and then From.Flags (Wait_Reply) then
+               From.Lent_Buffer_Page := Base;
+               From.Lent_Buffer_Pages := Natural (Page - Base);
+            end if;
 
             --  The buffer is where its first page was mapped, which is
             --  not the first slot if the server holds another buffered
