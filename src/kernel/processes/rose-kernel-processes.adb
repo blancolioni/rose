@@ -198,6 +198,45 @@ package body Rose.Kernel.Processes is
       end if;
    end Cap_Type;
 
+   ------------------------
+   -- Check_Buffer_Pages --
+   ------------------------
+
+   procedure Check_Buffer_Pages
+     (Pid    : Process_Id;
+      Params : Rose.Invocation.Invocation_Record;
+      Mapped : out Boolean)
+   is
+      First    : constant Virtual_Address :=
+                   To_Virtual_Address (Params.Buffer_Address);
+      Length   : constant Virtual_Address :=
+                   Virtual_Address (Params.Buffer_Length);
+      Writable : constant Boolean :=
+                   Params.Control.Flags (Rose.Invocation.Writable_Buffer);
+   begin
+      Mapped := True;
+
+      if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+        or else Length = 0
+      then
+         return;
+      end if;
+
+      for Page in Rose.Addresses.Virtual_Address_To_Page (First)
+        .. Rose.Addresses.Virtual_Address_To_Page (First + Length - 1)
+      loop
+         if not Is_User_Page (Pid, Page) then
+            Fault_Call (Pid, Page, Is_Mapped => False, Write => Writable);
+            Mapped := False;
+            return;
+         elsif Writable and then not Is_Writable_User_Page (Pid, Page) then
+            Fault_Call (Pid, Page, Is_Mapped => True, Write => True);
+            Mapped := False;
+            return;
+         end if;
+      end loop;
+   end Check_Buffer_Pages;
+
    --------------
    -- Copy_Cap --
    --------------
@@ -1448,30 +1487,52 @@ package body Rose.Kernel.Processes is
       return Process_Id
    is
       use type Rose.Objects.Endpoint_Index;
-      It   : Kernel_Process_Access :=
-               Process_Table (Receiver_Id).Waiting_First;
-      Prev : Kernel_Process_Access := null;
    begin
-      if Endpoint /= 0 then
-         while It /= null
-           and then It.Waiting_Endpoint /= Endpoint
-         loop
-            Prev := It;
-            It := It.Waiting_Next;
-         end loop;
-      end if;
+      loop
+         declare
+            It     : Kernel_Process_Access :=
+                       Process_Table (Receiver_Id).Waiting_First;
+            Prev   : Kernel_Process_Access := null;
+            Mapped : Boolean;
+         begin
+            if Endpoint /= 0 then
+               while It /= null
+                 and then It.Waiting_Endpoint /= Endpoint
+               loop
+                  Prev := It;
+                  It := It.Waiting_Next;
+               end loop;
+            end if;
 
-      if It /= null then
-         if Prev = null then
-            Process_Table (Receiver_Id).Waiting_First := It.Waiting_Next;
-         else
-            Prev.Waiting_Next := It.Waiting_Next;
-         end if;
+            if It = null then
+               return Null_Process_Id;
+            end if;
 
-         It.Waiting_Next := null;
-         return It.Pid;
-      end if;
-      return 0;
+            if Prev = null then
+               Process_Table (Receiver_Id).Waiting_First := It.Waiting_Next;
+            else
+               Prev.Waiting_Next := It.Waiting_Next;
+            end if;
+            It.Waiting_Next := null;
+
+            Check_Buffer_Pages (It.Pid, It.Current_Params, Mapped);
+
+            if Mapped then
+               return It.Pid;
+            end if;
+
+            --  The call is made again, so the reply cap that it made
+            --  goes (Rose.Kernel.Capabilities.Endpoint). Only an endpoint
+            --  call waits for a receiver, and endpoint caps are never
+            --  single use, so the call can be made again.
+
+            if It.Current_Params.Control.Flags
+              (Rose.Invocation.Create_Reply_Cap)
+            then
+               Delete_Cap (Receiver_Id, It.Current_Params.Reply_Cap);
+            end if;
+         end;
+      end loop;
    end Next_Blocked_Sender;
 
    ----------------------
@@ -1786,6 +1847,63 @@ package body Rose.Kernel.Processes is
                                     (Rose.Invocation.Send_Buffer);
       --  A process that receives with Send_Buffer set expects a buffer;
       --  one that does not never sees the sender's (#2).
+
+      function Buffer_Is_Mapped return Boolean;
+      --  True if the buffer is in user memory, and each of its pages is a
+      --  user page of the sender, writable if the buffer is.
+      --  Rose.Kernel.Invocation made sure of this when the sender called,
+      --  and Next_Blocked_Sender again if it waited. If it isn't so, the
+      --  frames are not the sender's to share, and the buffer is not sent,
+      --  rather than give the receiver another process's memory or the
+      --  kernel's (#768).
+
+      ----------------------
+      -- Buffer_Is_Mapped --
+      ----------------------
+
+      function Buffer_Is_Mapped return Boolean is
+         use type Rose.Words.Word;
+         First  : constant Virtual_Address :=
+                    To_Virtual_Address (Params.Buffer_Address);
+         Length : constant Virtual_Address :=
+                    Virtual_Address (Params.Buffer_Length);
+         Write  : constant Boolean :=
+                    Params.Control.Flags (Rose.Invocation.Writable_Buffer);
+      begin
+         if Length = 0 then
+            return True;
+         end if;
+
+         if First < Virtual_Page_Bytes
+           or else First >= Kernel_Virtual_Base
+           or else Length > Kernel_Virtual_Base - First
+         then
+            Debug.Put (From_Process_Id);
+            Rose.Boot.Console.Put (": buffer not sent: outside user memory");
+            Rose.Boot.Console.New_Line;
+            return False;
+         end if;
+
+         for Page in Rose.Addresses.Virtual_Address_To_Page (First)
+           .. Rose.Addresses.Virtual_Address_To_Page (First + Length - 1)
+         loop
+            if not Is_User_Page (From_Process_Id, Page)
+              or else (Write
+                       and then not Is_Writable_User_Page
+                         (From_Process_Id, Page))
+            then
+               Debug.Put (From_Process_Id);
+               Rose.Boot.Console.Put (": buffer not sent: page ");
+               Rose.Boot.Console.Put (Rose.Words.Word (Page) * 4096);
+               Rose.Boot.Console.Put
+                 (if Write then " is not writable" else " is not mapped");
+               Rose.Boot.Console.New_Line;
+               return False;
+            end if;
+         end loop;
+
+         return True;
+      end Buffer_Is_Mapped;
    begin
 
       To.Current_Params := Params;
@@ -1838,7 +1956,8 @@ package body Rose.Kernel.Processes is
       end if;
 
       if Params.Control.Flags (Rose.Invocation.Send_Buffer)
-        and then not Receiver_Expects_Buffer
+        and then (not Receiver_Expects_Buffer
+                  or else not Buffer_Is_Mapped)
       then
          To.Current_Params.Control.Flags (Rose.Invocation.Send_Buffer) :=
            False;
