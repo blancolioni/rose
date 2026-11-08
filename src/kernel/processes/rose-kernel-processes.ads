@@ -299,6 +299,14 @@ package Rose.Kernel.Processes is
      (Receiver_Id : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index)
       return Process_Id;
+   --  Take the first process waiting to send to Receiver_Id on Endpoint
+   --  (any, if 0) off its queue. Its buffer was checked when it called,
+   --  but its pages can have changed while it waited: a checkpoint makes
+   --  them read-only, and mem can unmap them. So they are checked again
+   --  with Check_Buffer_Pages, and a sender that fails is skipped: the
+   --  reply cap its call made in Receiver_Id is deleted, and its call is
+   --  made again when mem has mapped the page (#768). Null_Process_Id if
+   --  no sender is waiting.
 
    procedure Unblock_And_Send
      (From_Process_Id : Process_Id;
@@ -386,6 +394,16 @@ package Rose.Kernel.Processes is
    --  the page itself, and make the call again when mem resumes Pid. The
    --  call has done nothing yet.
 
+   procedure Check_Buffer_Pages
+     (Pid    : Process_Id;
+      Params : Rose.Invocation.Invocation_Record;
+      Mapped : out Boolean);
+   --  Mapped is True if Params sends no buffer, or if each page of its
+   --  buffer is a user page of Pid, and writable if the buffer is. If not,
+   --  Fault_Call has been called for the first page that is not. The
+   --  buffer is in user memory: Rose.Kernel.Invocation checked its range
+   --  when Pid called.
+
    function Has_Checked_Record
      (Pid     : Process_Id;
       Address : Rose.Words.Word_32)
@@ -403,6 +421,8 @@ package Rose.Kernel.Processes is
      (Pid          : Process_Id;
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
+   --  The frame that Virtual_Page is mapped to in Pid, or 0 if it is not
+   --  present (#768).
 
    function Directory_Page
      (Pid : Process_Id)

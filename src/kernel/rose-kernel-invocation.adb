@@ -43,8 +43,6 @@ package body Rose.Kernel.Invocation is
                    To_Virtual_Address (Params.Buffer_Address);
       Length   : constant Virtual_Address :=
                    Virtual_Address (Params.Buffer_Length);
-      Writable : constant Boolean :=
-                   Params.Control.Flags (Rose.Invocation.Writable_Buffer);
    begin
       if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
         or else Length = 0
@@ -67,21 +65,15 @@ package body Rose.Kernel.Invocation is
          return False;
       end if;
 
-      for Page in Virtual_Address_To_Page (First)
-        .. Virtual_Address_To_Page (First + Length - 1)
-      loop
-         if not Is_User_Page (Pid, Page) then
-            Fault_Call (Pid, Page, Is_Mapped => False, Write => Writable);
+      declare
+         Mapped : Boolean;
+      begin
+         Check_Buffer_Pages (Pid, Params, Mapped);
+         if not Mapped then
             Rose.Kernel.Processes.Queue.Choose_Process;
-            return False;
-         elsif Writable and then not Is_Writable_User_Page (Pid, Page) then
-            Fault_Call (Pid, Page, Is_Mapped => True, Write => True);
-            Rose.Kernel.Processes.Queue.Choose_Process;
-            return False;
          end if;
-      end loop;
-
-      return True;
+         return Mapped;
+      end;
    end Check_Buffer;
 
    -----------------------------

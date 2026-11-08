@@ -65,6 +65,8 @@ package Rose.Kernel.Page_Table is
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
       Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
       return Rose.Addresses.Physical_Page_Address;
+   --  The frame that Virtual_Page is mapped to, or 0 if it is not present
+   --  (#768).
 
    procedure Map_Kernel_Page
      (Virtual_Page   : Rose.Addresses.Virtual_Page_Address;
