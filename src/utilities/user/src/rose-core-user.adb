@@ -2,8 +2,8 @@ with User_Server;
 
 procedure Rose.Core.User
   (Name : String;
-   Home : Rose.Interfaces.Writable_Directory.Client
-            .Writable_Directory_Client;
+   Home : in out
+     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
    User : out Rose.Capabilities.Capability)
 is
 begin
@@ -13,17 +13,11 @@ begin
 
    if Name'Length = 0 or else Name'Length > User_Server.Max_Name_Length
    then
-      pragma Warnings (Off, "*No_Exception_Propagation*");
-      pragma Warnings (Off, "*Last_Chance_Handler*");
       raise Constraint_Error with "user: bad name";
-      pragma Warnings (On, "*Last_Chance_Handler*");
-      pragma Warnings (On, "*No_Exception_Propagation*");
    end if;
 
    User_Server.Create_Server
      (User_Name => Name,
-      Home      =>
-        Rose.Interfaces.Writable_Directory.Client.Get_Interface_Cap
-          (Home));
+      Home      => Home.Writable_Directory_Cap);
    User := User_Server.Interface_Cap;
 end Rose.Core.User;
