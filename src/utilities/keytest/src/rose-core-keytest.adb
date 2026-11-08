@@ -1,4 +1,4 @@
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Rose.Keys;
 with Rose.Words;
@@ -110,7 +110,7 @@ is
    ---------
 
    procedure Put (Text : String) is
-      Buffer : System.Storage_Elements.Storage_Array (1 .. Text'Length)
+      Buffer : Ada.Streams.Stream_Element_Array (1 .. Text'Length)
         with Import, Address => Text'Address;
    begin
       Console.Write (Buffer);

@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Interfaces;
@@ -35,12 +36,12 @@ package body Surface_Console.Server is
 
    overriding procedure Read
      (Item   : in out Console;
-      Buffer : out Storage_Array;
-      Last   : out Storage_Offset);
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset);
 
    overriding procedure Write
      (Item   : in out Console;
-      Buffer : Storage_Array);
+      Buffer : Ada.Streams.Stream_Element_Array);
 
    overriding procedure Get_Size
      (Item    : in out Console;
@@ -207,17 +208,18 @@ package body Surface_Console.Server is
 
    procedure On_Events is
       use Rose.Words;
-      Buffer : Storage_Array (1 .. 16 * Event_Bytes);
-      Last   : Storage_Count;
+      use Ada.Streams;
+      Buffer : Stream_Element_Array (1 .. 16 * Event_Bytes);
+      Last   : Stream_Element_Offset;
 
-      function Get_Word (Offset : Storage_Offset) return Word;
+      function Get_Word (Offset : Stream_Element_Offset) return Word;
       --  The word at Offset in Buffer, in the machine's byte order
 
       --------------
       -- Get_Word --
       --------------
 
-      function Get_Word (Offset : Storage_Offset) return Word is
+      function Get_Word (Offset : Stream_Element_Offset) return Word is
          Result : Word := 0;
       begin
          for I in reverse Offset .. Offset + 3 loop
@@ -232,7 +234,7 @@ package body Surface_Console.Server is
          exit when Last < Buffer'First;
 
          declare
-            Start : Storage_Offset := Buffer'First;
+            Start : Stream_Element_Offset := Buffer'First;
          begin
             while Start + Event_Bytes - 1 <= Last loop
                if Get_Word (Start) = Key_Event then
@@ -254,8 +256,8 @@ package body Surface_Console.Server is
 
    overriding procedure Read
      (Item   : in out Console;
-      Buffer : out Storage_Array;
-      Last   : out Storage_Offset)
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
       pragma Unreferenced (Item);
    begin
@@ -420,7 +422,7 @@ package body Surface_Console.Server is
 
    overriding procedure Write
      (Item   : in out Console;
-      Buffer : Storage_Array)
+      Buffer : Ada.Streams.Stream_Element_Array)
    is
       pragma Unreferenced (Item);
       S : String (1 .. Natural (Buffer'Length));

@@ -1,4 +1,4 @@
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Rose.Capabilities;
 
@@ -29,8 +29,8 @@ package Surface_Console.Screen is
    --  Give the surface Signal, to invoke when it has events.
 
    procedure Read_Events
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count);
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset);
    --  The events that are ready: once the surface has a signal cap, this
    --  never waits, and returns nothing if there are none.
 

@@ -37,7 +37,7 @@
 --  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 --  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Ada.Containers.Vectors;
 with Ada.Strings.Unbounded;
@@ -427,10 +427,10 @@ is
    --  carriage return before it is dropped, as in kilo.
 
    procedure Open_File is
-      use System.Storage_Elements;
+      use Ada.Streams;
       Reader : Reader_Class := File.Open_Reader;
-      Buffer : Storage_Array (1 .. 4096);
-      Last   : Storage_Offset;
+      Buffer : Stream_Element_Array (1 .. 4096);
+      Last   : Stream_Element_Offset;
       Line   : Unbounded_String;
    begin
       loop
@@ -537,7 +537,7 @@ is
    ---------
 
    procedure Put (Text : String) is
-      Buffer : System.Storage_Elements.Storage_Array (1 .. Text'Length)
+      Buffer : Ada.Streams.Stream_Element_Array (1 .. Text'Length)
         with Import, Address => Text'Address;
    begin
       if Text'Length > 0 then
@@ -686,13 +686,13 @@ is
    --  A write past the largest file fails, and nothing is committed.
 
    procedure Save is
-      use System.Storage_Elements;
+      use Ada.Streams;
       Total : Natural := 0;
    begin
       declare
          Writer : Writer_Class := File.Rewrite;
-         Buffer : Storage_Array (1 .. 4096);
-         Last   : Storage_Offset := 0;
+         Buffer : Stream_Element_Array (1 .. 4096);
+         Last   : Stream_Element_Offset := 0;
       begin
          for Line of Rows loop
             for C of String'(To_String (Line) & ASCII.LF) loop

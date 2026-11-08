@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Interfaces;
@@ -107,8 +108,8 @@ package body Screen.Server is
 
    overriding procedure Read
      (Item   : in out Event_Stream;
-      Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset);
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset);
 
    overriding function Reader_Cap
      (Item : in out Event_Stream)
@@ -300,8 +301,8 @@ package body Screen.Server is
 
    overriding procedure Read
      (Item   : in out Event_Stream;
-      Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset)
+      Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
       pragma Unreferenced (Item);
       use type Rose.Capabilities.Capability;

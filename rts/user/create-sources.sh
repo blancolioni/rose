@@ -19,12 +19,14 @@ DIRS="$DIRS build/gnat-src"
 # The generated interface packages that the RTS uses, from the user target
 # (#538): only their top-level specs, because every unit in the RTS's
 # source directories goes into the library. Process needs the specs of
-# its parents, and of the interfaces that its operations name. Programs
+# its parents, and of the interfaces that its operations name, and
+# Rose.Streams those of Reader and Writer (#727). Programs
 # built with the RTS put build/interfaces first in their source
 # directories, so that they use these specs and not other copies.
 
 IDLE=${IDLE:-idle}
-INTERFACES="process heap cap_set segment server cap region reader signalled"
+INTERFACES="process heap cap_set segment server cap region reader writer
+signalled"
 mkdir -p build/idl build/interfaces
 IDL_FILES=""
 for name in $INTERFACES
