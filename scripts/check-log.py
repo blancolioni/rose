@@ -6,10 +6,16 @@ walks the entries the way the log server's startup scan does.  Each
 entry should be a checkpoint: the kernel's tables, the storage
 server's region table, then the memory server's tables and pages.
 The check is that each part's header agrees with what follows it, that
-the memory server's processes are the kernel's, that their segments'
+the memory server's processes include the kernel's, that their segments'
 regions are in the region table, and that the memory server's header
 pages, its shared header pages (ADR 0025) and the pages they list
 account for the rest of the entry.
+
+The memory server may have saved processes that the kernel did not: the
+kernel leaves out a process that is still starting or has been killed
+(#543, #703), and the memory server doesn't know about those states.
+Restore leaves such a process out, with its pages, so the check allows
+them, and names them in the entry's description (#723).
 
 After walking the entries it also looks at the location after the last
 one, and reports anything there that looks like an entry header, such
@@ -410,11 +416,17 @@ def check_entry(log, first, last, verbose):
         log, first + kernel_pages + store_pages, last, regions, verbose)
     if not ok:
         return False, kernel + "; " + tables
-    if set(processes.values()) != oids:
-        return False, ("%s; %s: the memory server's processes %s are not "
-                       "the kernel's %s"
-                       % (kernel, tables, sorted(processes.values()),
-                          sorted(oids)))
+    missing = oids - set(processes.values())
+    if missing:
+        return False, ("%s; %s: the kernel's processes %s are not in the "
+                       "memory server's %s"
+                       % (kernel, tables, sorted(missing),
+                          sorted(processes.values())))
+    unsaved = sorted(set(processes.values()) - oids)
+    if unsaved:
+        tables += ("; %d process%s not saved by the kernel: %s"
+                   % (len(unsaved), "" if len(unsaved) == 1 else "es",
+                      ", ".join(str(oid) for oid in unsaved)))
     ok, memory = check_memory(log,
                               first + kernel_pages + store_pages
                               + table_pages,

@@ -299,9 +299,9 @@ a-suhcin.adb
 
 # Ada.Text_IO (#557), with System.File_IO, which it uses. Rose's own
 # Interfaces.C_Streams and System.OS_Lib, in src/adainclude, are what they
-# stand on.
+# stand on. The body is Rose's, in src/adainclude: a copy of GNAT's whose
+# Put counts the line marks it writes (#784).
 a-textio.ads
-a-textio.adb
 s-fileio.ads
 s-fileio.adb
 s-ficobl.ads

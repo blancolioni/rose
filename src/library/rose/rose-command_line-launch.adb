@@ -1,3 +1,5 @@
+with Ada.Text_IO;
+
 with Rose.Capabilities.Standard;
 with Rose.Command_Arguments;
 with Rose.Last_Chance;
@@ -33,6 +35,14 @@ package body Rose.Command_Line.Launch is
      (Call  : in out Launch_Call;
       Word  : Positive;
       Value : Rose.Words.Word);
+
+   procedure Finish_Output;
+   --  End the last line of standard output and standard error, if the
+   --  command left one open, and flush them. Ada.Text_IO otherwise ends
+   --  that line when it closes the files at the end of the program, after
+   --  the reply has let the caller go on, so the line terminator would
+   --  come after whatever the caller writes next, such as petal's prompt
+   --  (#784).
 
    procedure Report_Failure (Message : String);
    --  Fail the launch invocation with Message: the handler of unhandled
@@ -107,6 +117,8 @@ package body Rose.Command_Line.Launch is
          return;
       end if;
 
+      Finish_Output;
+
       if Rose.Command_Arguments.Exit_Status /= 0 then
          Fail
            (Call,
@@ -142,8 +154,41 @@ package body Rose.Command_Line.Launch is
    is
       pragma Unreferenced (Call);
    begin
+      Finish_Output;
       Reply (Failed, Message);
    end Fail;
+
+   -------------------
+   -- Finish_Output --
+   -------------------
+
+   procedure Finish_Output is
+
+      procedure Finish (File : Ada.Text_IO.File_Type);
+
+      ------------
+      -- Finish --
+      ------------
+
+      procedure Finish (File : Ada.Text_IO.File_Type) is
+         use type Ada.Text_IO.Positive_Count;
+      begin
+         if Ada.Text_IO.Col (File) /= 1 then
+            Ada.Text_IO.New_Line (File);
+         end if;
+         Ada.Text_IO.Flush (File);
+      exception
+         when others =>
+            --  The command's work is done, and the stream may have gone:
+            --  closing the file at the end of the program would not
+            --  report an error either.
+            null;
+      end Finish;
+
+   begin
+      Finish (Ada.Text_IO.Standard_Output);
+      Finish (Ada.Text_IO.Standard_Error);
+   end Finish_Output;
 
    ----------------------
    -- Natural_Argument --
