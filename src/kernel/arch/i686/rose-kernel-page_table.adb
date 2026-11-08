@@ -549,7 +549,9 @@ package body Rose.Kernel.Page_Table is
                           Page_Entry_Index (Virtual_Page mod 1024);
    begin
 
-      if Directory (Directory_Index).PFA = 0 then
+      if not Directory (Directory_Index).Present
+        or else Directory (Directory_Index).PFA = 0
+      then
          return 0;
       end if;
 
@@ -564,7 +566,7 @@ package body Rose.Kernel.Page_Table is
          pragma Import (Ada, Table_Page);
          Table_Entry : Page_Entry renames Table_Page (Table_Index);
       begin
-         return Table_Entry.PFA;
+         return (if Table_Entry.Present then Table_Entry.PFA else 0);
       end;
    end Mapped_Physical_Page;
 
