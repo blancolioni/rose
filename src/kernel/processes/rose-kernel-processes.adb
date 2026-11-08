@@ -237,6 +237,56 @@ package body Rose.Kernel.Processes is
       end loop;
    end Check_Buffer_Pages;
 
+   ------------------------
+   -- Check_Reply_Record --
+   ------------------------
+
+   procedure Check_Reply_Record
+     (Pid      : Process_Id;
+      Writable : out Boolean)
+   is
+      use type Rose.Words.Word;
+      P            : Kernel_Process_Entry renames Process_Table (Pid);
+      Record_Bytes : constant Virtual_Address :=
+                       Rose.Invocation.Invocation_Record'Size / 8;
+      First        : constant Virtual_Address :=
+                       Virtual_Address (P.Stack.EAX);
+   begin
+      Writable := True;
+
+      for Page in Rose.Addresses.Virtual_Address_To_Page (First)
+        .. Rose.Addresses.Virtual_Address_To_Page (First + Record_Bytes - 1)
+      loop
+         if not Is_Writable_User_Page (Pid, Page) then
+            Writable := False;
+
+            if Log_Page_Faults and then Trace (Pid) then
+               Debug.Put (Pid);
+               Rose.Boot.Console.Put (": reply held for record page ");
+               Rose.Boot.Console.Put (Rose.Words.Word (Page) * 4096);
+               Rose.Boot.Console.New_Line;
+            end if;
+
+            --  Reply_Fault first, so that Set_Current_State keeps
+            --  Invoke_Reply.
+
+            P.Flags (Reply_Fault) := True;
+            Set_Current_State (Pid, Interrupted);
+
+            Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
+
+            Handle_Page_Fault
+              (Pid               => Pid,
+               Virtual_Page      => Page,
+               Is_Mapped         => Is_User_Page (Pid, Page),
+               Read_Attempt      => False,
+               Write_Attempt     => True,
+               Execution_Attempt => False);
+            return;
+         end if;
+      end loop;
+   end Check_Reply_Record;
+
    --------------
    -- Copy_Cap --
    --------------
@@ -2592,13 +2642,19 @@ package body Rose.Kernel.Processes is
          Current_Process.Flags (Invoke_Reply) := True;
          Current_Process.Flags (Checkpoint_Reply_Held) := True;
       else
+         --  A reply held for a page of the invocation record stays
+         --  until the process resumes (#715).
+
          Current_Process.Flags (Invoke_Reply) :=
-           Current_Process.State = Blocked and then State = Ready;
+           (Current_Process.State = Blocked and then State = Ready)
+           or else Current_Process.Flags (Reply_Fault);
          Current_Process.Flags (Interrupt_Resume) :=
            Current_Process.State = Interrupted and then State = Ready
-           and then not Current_Process.Flags (Call_Restart);
+           and then not Current_Process.Flags (Call_Restart)
+           and then not Current_Process.Flags (Reply_Fault);
          if State = Ready then
             Current_Process.Flags (Call_Restart) := False;
+            Current_Process.Flags (Reply_Fault) := False;
          end if;
 
          Current_Process.State := State;

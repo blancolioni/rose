@@ -32,24 +32,41 @@ package body Rose.Kernel.Processes.Queue is
 
       if not Image_Write_Active then
 
-         Next_Process := null;
-         for I in Process_Queue'Range loop
-            if Process_Queue (I).First /= null then
-               declare
-                  It : Kernel_Process_Access := Process_Queue (I).First;
-               begin
-                  while It /= null loop
-                     exit when It.State = Ready;
-                     It := It.Queue_Next;
-                  end loop;
+         --  A process that is given a reply has it copied into its
+         --  invocation record on the way out, so the record is checked
+         --  first. If it fails, the reply is held for mem's page fault,
+         --  the process is no longer ready, and another is chosen (#715).
 
-                  if It /= null then
-                     Next_Process := It;
-                     exit;
-                  end if;
-               end;
-            end if;
-         end loop;
+         Choose : loop
+            Next_Process := null;
+            for I in Process_Queue'Range loop
+               if Process_Queue (I).First /= null then
+                  declare
+                     It : Kernel_Process_Access := Process_Queue (I).First;
+                  begin
+                     while It /= null loop
+                        exit when It.State = Ready;
+                        It := It.Queue_Next;
+                     end loop;
+
+                     if It /= null then
+                        Next_Process := It;
+                        exit;
+                     end if;
+                  end;
+               end if;
+            end loop;
+
+            exit Choose when Next_Process = null
+              or else not Next_Process.Flags (Invoke_Reply);
+
+            declare
+               Writable : Boolean;
+            begin
+               Check_Reply_Record (Next_Process.Pid, Writable);
+               exit Choose when Writable;
+            end;
+         end loop Choose;
 
          Current_Process := Next_Process;
 

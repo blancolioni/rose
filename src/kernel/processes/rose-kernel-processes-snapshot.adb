@@ -557,9 +557,15 @@ package body Rose.Kernel.Processes.Snapshot is
             when Interrupted =>
 
                --  A process that was interrupted for a page of its call's
-               --  buffer makes the call again (#713).
+               --  buffer makes the call again (#713). One that was
+               --  interrupted for a page of its invocation record is given
+               --  the reply it was waiting for (#715).
 
-               Flags (Interrupt_Resume) := not Flags (Call_Restart);
+               if Flags (Reply_Fault) then
+                  Current := Item.Current_Params (1 .. Current'Length);
+               end if;
+               Flags (Interrupt_Resume) :=
+                 not Flags (Call_Restart) and then not Flags (Reply_Fault);
                Flags (Wait_Reply) := False;
             when Ready | Running =>
                Current := Item.Current_Params (1 .. Current'Length);
