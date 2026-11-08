@@ -1,0 +1,44 @@
+#!/bin/sh
+# Check that every program built with the userland run-time system uses
+# the user IDL target (#490): its project doesn't have the kernel target's
+# packages (src/library/kernelapi/generated) in its source directories, and
+# its Makefile doesn't run idle with --target kernel. The two targets'
+# packages have the same unit names, and the kernel target's clients don't
+# fail by raising, so a program that mixes them works by accident, if at
+# all. The kernel target is for the boot servers in src/servers, which are
+# built with the minimal run-time system.
+#
+# Run from the top of the tree, by "make check-targets", which the build
+# runs before the programs. It prints each program that breaks the rule,
+# and exits with 1 if there is one.
+
+# Programs that are still on the kernel target, each with the issue that
+# moves it. Remove a program from here when it moves.
+EXEMPT="petal"  # #793
+
+status=0
+
+for project in src/drivers/*/*.gpr src/utilities/*/*.gpr; do
+    grep -q 'rts/user/' "$project" || continue
+    dir=$(dirname "$project")
+    name=$(basename "$dir")
+    case " $EXEMPT " in
+        *" $name "*) continue ;;
+    esac
+
+    if grep -q 'library/kernelapi/generated"' "$project"; then
+        echo "check-targets: $project: the kernel IDL target's packages" \
+             "are on the path of a program built with the userland" \
+             "run-time system" >&2
+        status=1
+    fi
+
+    if [ -f "$dir/Makefile" ] && grep -q -- '--target kernel' "$dir/Makefile"
+    then
+        echo "check-targets: $dir/Makefile: idle --target kernel for a" \
+             "program built with the userland run-time system" >&2
+        status=1
+    fi
+done
+
+exit $status
