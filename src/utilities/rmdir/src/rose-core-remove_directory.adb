@@ -1,4 +1,4 @@
-with Ada.Text_IO;
+with Rose.Command_Line;
 
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.Objects;
@@ -12,9 +12,10 @@ is
 
    Index : constant Natural := Directory.Find_Entry (Directory_Name);
 
-   procedure Fail (Reason : String);
-   --  Report that the directory cannot be removed, and why, on standard
-   --  error, and fail the launch call.
+   procedure Fail (Reason : String)
+     with No_Return;
+   --  Fail the launch call with a message that says that the directory cannot
+   --  be removed, and why (#802).
 
    ----------
    -- Fail --
@@ -22,15 +23,8 @@ is
 
    procedure Fail (Reason : String) is
    begin
-      Ada.Text_IO.Put_Line
-        (Ada.Text_IO.Standard_Error,
-         "rmdir: cannot remove '" & Directory_Name & "'" & Reason);
-      Ada.Text_IO.Flush (Ada.Text_IO.Standard_Error);
-
-      --  An unhandled exception fails the launch call (see
-      --  Rose.Command_Line.Launch).
-
-      raise Constraint_Error;
+      raise Rose.Command_Line.Command_Failed
+        with "cannot remove '" & Directory_Name & "'" & Reason;
    end Fail;
 
 begin

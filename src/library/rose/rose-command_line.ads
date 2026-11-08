@@ -1,11 +1,23 @@
 private with System.Storage_Elements;
 
+with Rose.Last_Chance;
 with Rose.Texts;
 
 package Rose.Command_Line is
 
    --  Types for the arguments of commands (ADR 0002). The command's main
    --  receives them through Rose.Command_Line.Launch.
+
+   Command_Failed : exception renames Rose.Last_Chance.Failed;
+   --  A command fails its launch call with a message for the user by
+   --  raising Command_Failed with that message, for example
+   --
+   --     raise Command_Failed with "cannot remove 'x': it is a directory";
+   --
+   --  and writes nothing itself. The shell shows the message once, after
+   --  the command's name (#802). Any other exception that the command
+   --  doesn't handle is a bug, and the shell shows its name and where it
+   --  was raised.
 
    type String_List is private;
    --  The value of a String_List argument: the words it takes. A list
