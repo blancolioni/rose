@@ -1,7 +1,7 @@
 package body Screen.Events is
 
    use Rose.Words;
-   use System.Storage_Elements;
+   use Ada.Streams;
 
    Max_Events : constant := 256;
 
@@ -42,8 +42,8 @@ package body Screen.Events is
    ----------
 
    procedure Take
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Offset)
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
       Fits : constant Natural :=
                Natural'Min (Count, Natural (Buffer'Length / Event_Bytes));
@@ -56,7 +56,7 @@ package body Screen.Events is
             for Byte in 0 .. 3 loop
                Last := Last + 1;
                Buffer (Last) :=
-                 Storage_Element (Value / 2 ** (8 * Byte) mod 256);
+                 Stream_Element (Value / 2 ** (8 * Byte) mod 256);
             end loop;
          end loop;
          Head := (Head + 1) mod Max_Events;

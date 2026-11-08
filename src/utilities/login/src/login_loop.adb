@@ -1,6 +1,6 @@
 with Ada.Exceptions;
 
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Rose.Invocation;
 with Rose.System_Calls.Server;
@@ -19,7 +19,7 @@ with Rose.Interfaces.User;
 
 package body Login_Loop is
 
-   use System.Storage_Elements;
+   use Ada.Streams;
    use type Rose.Capabilities.Capability;
 
    LF  : constant Character := Character'Val (10);
@@ -40,8 +40,8 @@ package body Login_Loop is
                             Rose.Capabilities.Null_Capability;
    --  The rights broker's Rights interface, for petal.
 
-   Pending      : Storage_Array (1 .. 4096);
-   Pending_Last : Storage_Count := 0;
+   Pending      : Stream_Element_Array (1 .. 4096);
+   Pending_Last : Stream_Element_Offset := 0;
    --  What the console has given that Get_Line hasn't returned yet.
 
    Timeout_Receive_Cap : Rose.Capabilities.Capability :=
@@ -93,8 +93,8 @@ package body Login_Loop is
          end loop;
 
          declare
-            Buffer : Storage_Array (1 .. Pending'Last - Pending_Last);
-            Count  : Storage_Count;
+            Buffer : Stream_Element_Array (1 .. Pending'Last - Pending_Last);
+            Count  : Stream_Element_Offset;
          begin
             if Buffer'Length = 0 then
                Pending_Last := 0;
@@ -118,7 +118,7 @@ package body Login_Loop is
    ---------
 
    procedure Put (Text : String) is
-      Buffer : Storage_Array (1 .. Text'Length);
+      Buffer : Stream_Element_Array (1 .. Text'Length);
       for Buffer'Address use Text'Address;
       pragma Import (Ada, Buffer);
    begin

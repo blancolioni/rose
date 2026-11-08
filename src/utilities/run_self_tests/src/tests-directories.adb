@@ -1,5 +1,6 @@
 with Ada.Text_IO;
 
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
@@ -19,11 +20,12 @@ with Tests.Registry;
 
 package body Tests.Directories is
 
-   use System.Storage_Elements;
+   use Ada.Streams;
+   use type System.Storage_Elements.Storage_Count;
    use type Rose.Capabilities.Capability;
    use type Rose.Interfaces.Directory.File_Kind;
 
-   Hello : constant Storage_Array (1 .. 5) :=
+   Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
@@ -43,8 +45,8 @@ package body Tests.Directories is
    function Directory_Test return Boolean is
       Top    : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
-      Buffer    : Storage_Array (1 .. 16);
-      Last      : Storage_Count;
+      Buffer    : Stream_Element_Array (1 .. 16);
+      Last      : Stream_Element_Offset;
       Notes_Cap : Rose.Capabilities.Capability;
       Held      : Rose.Interfaces.Writable_File.Client
         .Writable_File_Client;
@@ -309,13 +311,13 @@ package body Tests.Directories is
 
       function Holds
         (Name     : String;
-         Expected : Storage_Array)
+         Expected : Stream_Element_Array)
          return Boolean;
       --  True if Top has a file Name, which holds Expected.
 
       function Holds
         (Name     : String;
-         Expected : Storage_Array)
+         Expected : Stream_Element_Array)
          return Boolean
       is
          Index : constant Natural := Top.Find_Entry (Name);
@@ -330,8 +332,8 @@ package body Tests.Directories is
             Reader : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class :=
               File.Open_Reader;
-            Buffer : Storage_Array (1 .. 16);
-            Last   : Storage_Count;
+            Buffer : Stream_Element_Array (1 .. 16);
+            Last   : Stream_Element_Offset;
          begin
             Reader.Read (Buffer, Last);
             Reader.Release;

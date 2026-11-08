@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
@@ -22,6 +23,7 @@ with Rose.Interfaces.Writable_File.Server;
 
 package body File.Server is
 
+   use Ada.Streams;
    use System.Storage_Elements;
 
    package Reader_Server renames Rose.Interfaces.Seekable_Reader.Server;
@@ -254,8 +256,8 @@ package body File.Server is
 
    overriding procedure Read
      (Item   : in out Reader_Object;
-      Buffer : out Storage_Array;
-      Last   : out Storage_Offset);
+      Buffer : out Stream_Element_Array;
+      Last   : out Stream_Element_Offset);
 
    overriding procedure Release (Item : in out Reader_Object);
 
@@ -308,7 +310,7 @@ package body File.Server is
 
    overriding procedure Write
      (Item   : in out Writer_Object;
-      Buffer : Storage_Array);
+      Buffer : Stream_Element_Array);
 
    overriding procedure Release (Item : in out Writer_Object);
 
@@ -545,19 +547,21 @@ package body File.Server is
 
    overriding procedure Read
      (Item   : in out Reader_Object;
-      Buffer : out Storage_Array;
-      Last   : out Storage_Offset)
+      Buffer : out Stream_Element_Array;
+      Last   : out Stream_Element_Offset)
    is
       Length   : constant Storage_Count := Lengths (Item.Buffer);
       Position : Storage_Count renames Item.Position;
       Count    : constant Storage_Count :=
         (if Position >= Length then 0
          else Storage_Count'Min (Buffer'Length, Length - Position));
+      Target   : Storage_Array (1 .. Count)
+        with Import, Address => Buffer'Address;
+      --  The start of Buffer, as the file's contents are stored.
    begin
       Check (Item);
-      Last := Buffer'First + Count - 1;
-      Buffer (Buffer'First .. Last) :=
-        Contents (Item.Buffer) (Position + 1 .. Position + Count);
+      Last := Buffer'First + Stream_Element_Offset (Count) - 1;
+      Target := Contents (Item.Buffer) (Position + 1 .. Position + Count);
       Position := Position + Count;
    end Read;
 
@@ -683,11 +687,14 @@ package body File.Server is
 
    overriding procedure Write
      (Item   : in out Writer_Object;
-      Buffer : Storage_Array)
+      Buffer : Stream_Element_Array)
    is
+      Data : constant Storage_Array (1 .. Buffer'Length)
+        with Import, Address => Buffer'Address;
+      --  Buffer, as the file's contents are stored.
    begin
       Check (Item);
-      Write (Item.Buffer, Buffer);
+      Write (Item.Buffer, Data);
    end Write;
 
 end File.Server;

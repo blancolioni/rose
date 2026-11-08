@@ -1,4 +1,4 @@
-with System.Storage_Elements;
+with Ada.Streams;
 
 with Rose.Keys;
 
@@ -23,8 +23,8 @@ package Text_Console.Line_Discipline is
    --  that is an ASCII character has been typed.
 
    procedure Take
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count)
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
      with Pre => Ready;
    --  With line editing on, take the whole lines into Buffer, as many as
    --  fit, or an end of file as nothing (Last < Buffer'First). With it

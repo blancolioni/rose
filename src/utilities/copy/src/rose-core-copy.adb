@@ -1,3 +1,4 @@
+with Ada.Streams;
 with System.Storage_Elements;
 
 with Ada.Text_IO;
@@ -12,8 +13,9 @@ procedure Rose.Core.Copy
                      .Transactional_Writable_File_Object'Class)
 is
    use System.Storage_Elements;
-   Buffer : Storage_Array (1 .. 4096);
-   Last   : Storage_Count;
+   use type Ada.Streams.Stream_Element_Offset;
+   Buffer : Ada.Streams.Stream_Element_Array (1 .. 4096);
+   Last   : Ada.Streams.Stream_Element_Offset;
    Reader : Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class :=
      Source.Open_Reader;
    --  A reader of its own, from the start of the file (ADR 0009).

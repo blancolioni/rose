@@ -244,8 +244,8 @@ package body Surface_Console.Screen is
    -----------------
 
    procedure Read_Events
-     (Buffer : out System.Storage_Elements.Storage_Array;
-      Last   : out System.Storage_Elements.Storage_Count)
+     (Buffer : out Ada.Streams.Stream_Element_Array;
+      Last   : out Ada.Streams.Stream_Element_Offset)
    is
    begin
       Rose.Interfaces.Reader.Client.Read (Events, Buffer, Last);

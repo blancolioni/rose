@@ -1,7 +1,11 @@
+with System.Storage_Elements;
+
+with Ada.IO_Exceptions;
 with Ada.Text_IO;
 
 with Rose.Capabilities;
 with Rose.Invocation;
+with Rose.Streams;
 with Rose.System_Calls;
 with Rose.Words;
 
@@ -18,6 +22,7 @@ with Tests.Registry;
 
 package body Tests.Files is
 
+   use Ada.Streams;
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
 
@@ -26,7 +31,7 @@ package body Tests.Files is
      Rose.Interfaces.Seekable_Reader.Client;
    package Writers renames Rose.Interfaces.Releasable_Writer.Client;
 
-   Hello : constant Storage_Array (1 .. 5) :=
+   Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
@@ -73,7 +78,7 @@ package body Tests.Files is
 
    procedure Append
      (File : in out Writable_File_Class;
-      Data : Storage_Array)
+      Data : Stream_Element_Array)
    is
       Writer : Writers.Releasable_Writer_Client;
    begin
@@ -81,6 +86,80 @@ package body Tests.Files is
       Writer.Write (Data);
       Writer.Close;
    end Append;
+
+   ---------------------
+   -- Cap_Stream_Test --
+   ---------------------
+
+   function Cap_Stream_Test return Boolean is
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
+      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      Writer  : aliased Writers.Releasable_Writer_Client;
+      Reader  : aliased Readers.Releasable_Reader_Client;
+      Long    : constant String (1 .. Page_Bytes + 904) := (others => 'x');
+      --  More than one write carries.
+   begin
+      Ada.Text_IO.Put ("Cap stream test");
+
+      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+
+      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (": no file server");
+         return False;
+      end if;
+
+      declare
+         Writable : Writable_File_Class := Control.Writable;
+      begin
+         File.Open (Writable.Writable_File_Cap);
+      end;
+
+      Writer.Open (Writer_Cap (File));
+      declare
+         Output : aliased Rose.Streams.Writer_Stream (Writer'Access);
+      begin
+         Integer'Write (Output'Access, 42);
+         String'Output (Output'Access, Long);
+      end;
+      Writer.Close;
+
+      --  The integer, then the string's bounds and its characters.
+
+      if File.Size /= 3 * Integer'Size / 8 + Long'Length then
+         Ada.Text_IO.Put (": wrong size after writing");
+         return False;
+      end if;
+
+      Reader.Open (Reader_Cap (File));
+      declare
+         Input : aliased Rose.Streams.Reader_Stream (Reader'Access);
+         Value : Integer;
+      begin
+         Integer'Read (Input'Access, Value);
+         if Value /= 42 then
+            Ada.Text_IO.Put (": read the wrong integer");
+            return False;
+         end if;
+
+         if String'Input (Input'Access) /= Long then
+            Ada.Text_IO.Put (": read the wrong string");
+            return False;
+         end if;
+
+         begin
+            Integer'Read (Input'Access, Value);
+            Ada.Text_IO.Put (": read past the end");
+            return False;
+         exception
+            when Ada.IO_Exceptions.End_Error =>
+               null;
+         end;
+      end;
+      Reader.Close;
+
+      return True;
+   end Cap_Stream_Test;
 
    ---------------
    -- File_Test --
@@ -94,8 +173,8 @@ package body Tests.Files is
       First     : Readers.Releasable_Reader_Client;
       Second    : Readers.Releasable_Reader_Client;
       Seekable  : Seekable_Readers.Seekable_Reader_Client;
-      Buffer    : Storage_Array (1 .. 16);
-      Last      : Storage_Count;
+      Buffer    : Stream_Element_Array (1 .. 16);
+      Last      : Stream_Element_Offset;
    begin
       Ada.Text_IO.Put ("File test");
 
@@ -337,7 +416,7 @@ package body Tests.Files is
       --  nothing.
 
       declare
-         Large  : constant Storage_Array (1 .. 4096) := (others => 0);
+         Large  : constant Stream_Element_Array (1 .. 4096) := (others => 0);
          Size   : constant Storage_Count := File.Size;
          Writer : Writers.Releasable_Writer_Client;
       begin
@@ -400,7 +479,7 @@ package body Tests.Files is
 
    procedure Rewrite
      (File : in out Writable_File_Class;
-      Data : Storage_Array)
+      Data : Stream_Element_Array)
    is
       Writer : Writers.Releasable_Writer_Client;
    begin
@@ -433,9 +512,9 @@ package body Tests.Files is
       Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Reader  : Readers.Releasable_Reader_Client;
-      Buffer  : Storage_Array (1 .. 256);
-      Last    : Storage_Count;
-      Total   : Storage_Count := 0;
+      Buffer  : Stream_Element_Array (1 .. 256);
+      Last    : Stream_Element_Offset;
+      Total   : Stream_Element_Offset := 0;
 
       Writer  : Writers.Releasable_Writer_Client;
 
@@ -559,7 +638,7 @@ package body Tests.Files is
       Second  : Writers.Releasable_Writer_Client;
       Third   : Writers.Releasable_Writer_Client;
 
-      function Holds (Expected : Storage_Array) return Boolean;
+      function Holds (Expected : Stream_Element_Array) return Boolean;
       --  True if File holds Expected, read through a reader of its own.
 
       function Refused
@@ -571,10 +650,10 @@ package body Tests.Files is
       -- Holds --
       -----------
 
-      function Holds (Expected : Storage_Array) return Boolean is
+      function Holds (Expected : Stream_Element_Array) return Boolean is
          Reader : Readers.Releasable_Reader_Client;
-         Buffer : Storage_Array (1 .. 16);
-         Last   : Storage_Count;
+         Buffer : Stream_Element_Array (1 .. 16);
+         Last   : Stream_Element_Offset;
       begin
          Reader.Open (Reader_Cap (File));
          Reader.Read (Buffer, Last);
