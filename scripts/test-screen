@@ -56,9 +56,11 @@ echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
 
 # The install restarts the machine when it has finished. Until then, read
-# the screen every ten seconds, and keep the self tests' result. Restore
-# installs the keyboard before surface-console, so its line is on the
-# screen only if the boot console replayed it.
+# the screen every two seconds or so, and keep the self tests' result. The
+# result is on the screen for only a few seconds before the restart, since
+# the console scrolls quickly (#787). Restore installs the keyboard before
+# surface-console, so its line is on the screen only if the boot console
+# replayed it.
 : > "$WORK/install-results.txt"
 early=
 waited=0
@@ -67,8 +69,8 @@ while [ $waited -lt 900 ]; do
     screen > "$WORK/screen.txt"
     grep "Test result:" "$WORK/screen.txt" >> "$WORK/install-results.txt"
     grep -q "installing: keyboard: done" "$WORK/screen.txt" && early=yes
-    sleep 8
-    waited=$((waited + 10))
+    sleep 1
+    waited=$((waited + 2))
 done
 grep -q -- "kernel: restarting" "$WORK/serial" \
     || fail "the install did not finish"

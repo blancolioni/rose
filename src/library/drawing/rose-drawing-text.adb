@@ -1,6 +1,11 @@
+with System.Storage_Elements;
+
 with Rose.Drawing.Text.Font;
 
 package body Rose.Drawing.Text is
+
+   type Cell_Row is array (0 .. Cell_Width - 1) of Pixel;
+   --  The pixels of one row of a cell
 
    --------------------
    -- Draw_Character --
@@ -19,13 +24,42 @@ package body Rose.Drawing.Text is
       Left  : constant Natural := Column * Cell_Width;
       Top   : constant Natural := Row * Cell_Height;
    begin
-      for Y in Glyph'Range loop
-         for X in 0 .. Cell_Width - 1 loop
-            Set (Target, Left + X, Top + Y,
-                 (if (Glyph (Y) and 2 ** (Cell_Width - 1 - X)) /= 0
-                  then Foreground else Background));
+      if Left + Cell_Width <= Target.Width
+        and then Top + Cell_Height <= Target.Height
+      then
+
+         --  The whole cell is in Target, so each of its rows is drawn
+         --  straight from the row's address, without cutting each pixel
+         --  to Target (#787).
+
+         for Y in Glyph'Range loop
+            declare
+               use System.Storage_Elements;
+               Line : Cell_Row
+                 with Import,
+                      Address =>
+                        Target.Pixels
+                        + Storage_Offset
+                            ((Top + Y) * Target.Stride + Left) * 4;
+               Bits : constant Font.Glyph_Row := Glyph (Y);
+            begin
+               for X in Line'Range loop
+                  Line (X) :=
+                    (if (Bits and 2 ** (Cell_Width - 1 - X)) /= 0
+                     then Foreground else Background);
+               end loop;
+            end;
          end loop;
-      end loop;
+
+      else
+         for Y in Glyph'Range loop
+            for X in 0 .. Cell_Width - 1 loop
+               Set (Target, Left + X, Top + Y,
+                    (if (Glyph (Y) and 2 ** (Cell_Width - 1 - X)) /= 0
+                     then Foreground else Background));
+            end loop;
+         end loop;
+      end if;
    end Draw_Character;
 
    ---------------
