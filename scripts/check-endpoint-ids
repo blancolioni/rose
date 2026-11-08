@@ -1,0 +1,46 @@
+#!/bin/sh
+# Check the endpoint ids of every interface against interfaces/endpoint-ids.txt
+# (#736).
+#
+#   scripts/check-endpoint-ids            check, and fail on any difference
+#   scripts/check-endpoint-ids --update   write the file from the interfaces
+#
+# An endpoint id is a hash of the interface's name, or of the operation's
+# name and parameters, unless the IDL pins it. So renaming an interface or
+# an operation, or changing an operation's parameters, changes its id
+# silently, and a checkpoint taken before the change no longer matches the
+# servers that restore it. This lists every interface and operation with
+# its id (idle --list-endpoints), and compares the list with the one in
+# the tree. Updating that file is a deliberate step in a PR, which a
+# reviewer can see.
+#
+# Run from the top of the tree, by "make check-endpoint-ids", which the
+# build runs before the programs.
+
+IDLE=${IDLE:-idle}
+LIST=interfaces/endpoint-ids.txt
+
+current=$(mktemp) || exit 2
+trap 'rm -f "$current"' EXIT
+
+# shellcheck disable=SC2046
+if ! LC_ALL=C $IDLE --list-endpoints -I interfaces \
+       $(LC_ALL=C ls interfaces/*.idl) > "$current"
+then
+    echo "check-endpoint-ids: idle --list-endpoints failed" >&2
+    exit 2
+fi
+
+if [ "$1" = "--update" ]; then
+    cp "$current" "$LIST"
+    echo "check-endpoint-ids: wrote $LIST"
+    exit 0
+fi
+
+if ! diff -u "$LIST" "$current"; then
+    echo "check-endpoint-ids: the endpoint ids differ from $LIST." >&2
+    echo "  A changed id breaks the restore of a checkpoint taken before" >&2
+    echo "  it. If the change is meant, run scripts/check-endpoint-ids" >&2
+    echo "  --update, and say so in the PR." >&2
+    exit 1
+fi

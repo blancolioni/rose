@@ -26,7 +26,7 @@ endif
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-rose: config interfaces $(ROSE) check-targets programs exports stripped bootdisk iso finished
+rose: config interfaces $(ROSE) check-targets check-endpoint-ids programs exports stripped bootdisk iso finished
 
 programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -53,6 +53,12 @@ check-env:
 # user IDL target (#490), before building them.
 check-targets:
 	sh ./scripts/check-targets
+
+# Check that no endpoint id has changed (#736): a changed id breaks the
+# restore of a checkpoint taken before it. scripts/check-endpoint-ids
+# --update writes the list after a deliberate change.
+check-endpoint-ids:
+	sh ./scripts/check-endpoint-ids
 
 # Boot the ISO under QEMU, run the self tests, and check the checkpoint log.
 # This doesn't build anything, so run "make" first.  It takes about ten
