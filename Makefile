@@ -26,7 +26,7 @@ endif
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-rose: config interfaces $(ROSE) programs exports stripped bootdisk iso finished
+rose: config interfaces $(ROSE) check-targets programs exports stripped bootdisk iso finished
 
 programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -41,13 +41,18 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
 # Check the tools before building anything; clean-build.sh does this first.
 check-env:
 	sh ./scripts/check-env
+
+# Check that every program built with the userland run-time system uses the
+# user IDL target (#490), before building them.
+check-targets:
+	sh ./scripts/check-targets
 
 # Boot the ISO under QEMU, run the self tests, and check the checkpoint log.
 # This doesn't build anything, so run "make" first.  It takes about ten
