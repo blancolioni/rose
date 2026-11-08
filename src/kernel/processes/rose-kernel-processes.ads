@@ -405,6 +405,13 @@ package Rose.Kernel.Processes is
    --  reply is held: Pid is interrupted, mem is given the write fault
    --  that Pid would have taken writing the record itself, and the reply
    --  is copied when mem resumes Pid.
+   --
+   --  The pages of a writable buffer that Pid lent with the call are
+   --  checked in the same way. The server wrote them through its shared
+   --  slot, so mem saw no write fault. If a checkpoint has made a page
+   --  clean since Pid called, it is read-only again, and the write fault
+   --  puts it back on mem's dirty list before Pid can see the data
+   --  (#716).
 
    procedure Check_Buffer_Pages
      (Pid    : Process_Id;
@@ -632,6 +639,11 @@ private
          Pending_Fault_Write   : Boolean := False;
          Pending_Fault_Execute : Boolean := False;
          --  A page fault that waits for mem to receive (Fault_Pending).
+         Lent_Buffer_Page  : Rose.Addresses.Virtual_Page_Address := 0;
+         Lent_Buffer_Pages : Natural := 0;
+         --  The writable buffer of the call that the process waits on. The
+         --  server writes it through its shared slot, which mem doesn't
+         --  see, so Check_Reply_Record checks these pages too (#716).
          Shared_Pages      : Shared_Page_Array;
          Saved_Stack_Value : Rose.Words.Word_32;
          Command_Endpoint  : Rose.Objects.Endpoint_Index := 0;
