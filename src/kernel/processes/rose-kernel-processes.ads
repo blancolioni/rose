@@ -394,6 +394,18 @@ package Rose.Kernel.Processes is
    --  the page itself, and make the call again when mem resumes Pid. The
    --  call has done nothing yet.
 
+   procedure Check_Reply_Record
+     (Pid      : Process_Id;
+      Writable : out Boolean);
+   --  Pid is about to be given the reply to its call, which is copied
+   --  into its invocation record. Writable is True if each page of the
+   --  record is a user page that Pid can write. The record was checked
+   --  when Pid called, but mem can have unmapped a page since, and a
+   --  record in a read-only page passes that check (#715). If not, the
+   --  reply is held: Pid is interrupted, mem is given the write fault
+   --  that Pid would have taken writing the record itself, and the reply
+   --  is copied when mem resumes Pid.
+
    procedure Check_Buffer_Pages
      (Pid    : Process_Id;
       Params : Rose.Invocation.Invocation_Record;
@@ -483,14 +495,16 @@ private
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
       Restored_Blocked, Memory_Registered, Exit_Pending,
-      Checkpoint_Reply_Held, Call_Restart);
+      Checkpoint_Reply_Held, Call_Restart, Reply_Fault);
    --  Flags are saved in a checkpoint by position, so new ones go last.
    --  Memory_Registered: mem was told about the process when it was
    --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,
    --  and mem is to be told when it next receives (#697). Call_Restart:
    --  the process is interrupted for a page of its call's buffer, and
    --  makes the call again when it resumes, instead of returning from an
-   --  interrupt (#713).
+   --  interrupt (#713). Reply_Fault: the process is interrupted for a
+   --  page of its invocation record, and is given its reply when it
+   --  resumes (#715).
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 
