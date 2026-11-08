@@ -8,6 +8,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Clock.Client;
 with Rose.Interfaces.Launch;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Rights.Client;
 with Rose.Interfaces.Rights_Admin.Client;
 with Rose.Interfaces.User.Client;
@@ -196,13 +197,17 @@ package body Tests.Rights is
             return Fail ("another user ended the grant");
          end if;
 
-         --  Alice can, and then the grant is dead, and so is any copy.
+         --  Alice can, and then the grant is dead, and so is any copy: its
+         --  calls fail.
 
          Rights.Finish (Alice, Alices_Grant);
-         After := Clock.Monotonic;
-         if After /= 0 then
+         begin
+            After := Clock.Monotonic;
             return Fail ("the grant works after it was finished");
-         end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
       end;
 
       --  The most specific policy wins: Bob may have everything in an

@@ -1,26 +1,22 @@
 with Ada.Text_IO;
 
-with Rose.Capabilities.Standard;
-with Rose.Objects;
 with Rose.Server;
 with Rose.Words;
 
+with Rose.Interfaces.Clock_Admin.Client;
 with Rose.Interfaces.Clock_Admin.Server;
-with Rose.Interfaces.Process.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Restorable.Server;
 with Rose.Interfaces.Rights.Server;
 with Rose.Interfaces.Rights_Admin.Server;
-with Rose.Interfaces.User.Client;
+with Rose.Interfaces.User;
 
 with Rights_Policy;
 
 package body Rights_Server is
 
-   use type Rose.Capabilities.Capability;
-   use type Rose.Objects.Capability_Identifier;
    use type Rose.Words.Word;
 
-   package Clock_Admin_Client renames Rose.Interfaces.Clock_Admin.Client;
    package Clock_Admin_Server renames Rose.Interfaces.Clock_Admin.Server;
 
    --  The roles that the broker holds are the ones that it declares
@@ -35,84 +31,117 @@ package body Rights_Server is
    Clock_Role     : constant String := "Clock_Admin_Service";
    Clock_Category : constant String := "time";
 
-   --  A grant is an instance of a proxy for the role's interface, which
-   --  the broker serves and forwards to the cap that it holds. There is
-   --  no derive operation for an arbitrary cap yet, so the broker revokes
-   --  a grant by refusing its calls. Identifiers are never used again, so
-   --  a copy of a revoked grant stays dead.
+   --  The broker serves Rights, and takes the restore notice, through one
+   --  object, and Rights_Admin through another.
 
-   Max_Grants : constant := 64;
+   type Broker_Object is
+     new Rose.Interfaces.Rights.Server.Rights_Interface
+     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     with null record;
 
-   type Grant_Record is
-      record
-         Live      : Boolean := False;
-         Id        : Rose.Objects.Capability_Identifier := 0;
-         User      : String (1 .. Rights_Policy.Max_User_Length);
-         User_Last : Natural := 0;
-      end record;
+   overriding function Rights_Cap
+     (Item : in out Broker_Object)
+      return Rose.Capabilities.Capability;
 
-   Grants      : array (1 .. Max_Grants) of Grant_Record;
-   Next_Id     : Rose.Objects.Capability_Identifier := 1;
+   overriding function Restorable_Cap
+     (Item : in out Broker_Object)
+      return Rose.Capabilities.Capability;
 
-   Context     : Rose.Server.Server_Context;
-   Real_Clock  : Clock_Admin_Client.Clock_Admin_Client;
-
-   Rights_Interface_Cap : Rose.Capabilities.Capability :=
-                            Rose.Capabilities.Null_Capability;
-   Admin_Interface_Cap  : Rose.Capabilities.Capability :=
-                            Rose.Capabilities.Null_Capability;
-
-   function Allow
-     (Id       : Rose.Objects.Capability_Identifier;
-      User     : String;
-      Category : String;
-      Mode     : Rose.Words.Word)
-      return Rose.Words.Word;
-
-   function Find_Grant
-     (Id : Rose.Objects.Capability_Identifier)
-      return Natural;
-   --  The index in Grants of the live grant Id, or 0.
-
-   function Is_Live (Id : Rose.Objects.Capability_Identifier) return Boolean;
-
-   procedure Finish
-     (Id    : Rose.Objects.Capability_Identifier;
-      User  : Rose.Capabilities.Capability;
-      Grant : Rose.Words.Word);
-
-   procedure Get_User_Name
-     (User : Rose.Capabilities.Capability;
-      Name : out String;
-      Last : out Natural);
-   --  The name of the user that the User cap is, or Last = 0 if it
-   --  isn't a User.
-
-   function Proxy_Monotonic
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Words.Word_64;
-
-   function Proxy_Realtime
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Words.Word_64;
-
-   function Proxy_Realtime_Is_Trusted
-     (Id : Rose.Objects.Capability_Identifier)
-      return Boolean;
-
-   procedure Proxy_Set_Realtime
-     (Id          : Rose.Objects.Capability_Identifier;
-      Nanoseconds : Rose.Words.Word_64);
-
-   procedure Request
-     (Id        : Rose.Objects.Capability_Identifier;
-      User      : Rose.Capabilities.Capability;
+   overriding procedure Request
+     (Item      : in out Broker_Object;
+      User      : in out Rose.Interfaces.User.User_Object'Class;
       Role_Name : String;
       Elevate   : Rose.Words.Word;
       Grant     : out Rose.Words.Word;
       Granted   : out Rose.Capabilities.Capability);
 
-   procedure Restored (Id : Rose.Objects.Capability_Identifier);
+   overriding procedure Finish
+     (Item  : in out Broker_Object;
+      User  : in out Rose.Interfaces.User.User_Object'Class;
+      Grant : Rose.Words.Word);
+
+   overriding procedure Restored (Item : in out Broker_Object);
+
+   type Admin_Object is
+     new Rose.Interfaces.Rights_Admin.Server.Rights_Admin_Interface
+     with null record;
+
+   overriding function Rights_Admin_Cap
+     (Item : in out Admin_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Allow
+     (Item     : in out Admin_Object;
+      User     : String;
+      Category : String;
+      Mode     : Rose.Words.Word)
+      return Rose.Words.Word;
+
+   --  A grant is a proxy for the role's interface, which the broker
+   --  serves and forwards to the cap that it holds. A server can't take
+   --  back the caps of one object yet (#769), so the broker revokes a
+   --  grant by failing its calls. Each grant is a new object, which is
+   --  never attached again, so a copy of a revoked grant stays dead.
+
+   type Grant_Object is
+     new Clock_Admin_Server.Clock_Admin_Interface with
+      record
+         Live      : Boolean := False;
+         Number    : Rose.Words.Word := 0;
+         User      : String (1 .. Rights_Policy.Max_User_Length);
+         User_Last : Natural := 0;
+      end record;
+
+   overriding function Clock_Cap
+     (Item : in out Grant_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Clock_Admin_Cap
+     (Item : in out Grant_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Monotonic
+     (Item : in out Grant_Object)
+      return Rose.Words.Word_64;
+
+   overriding function Realtime
+     (Item : in out Grant_Object)
+      return Rose.Words.Word_64;
+
+   overriding function Realtime_Is_Trusted
+     (Item : in out Grant_Object)
+      return Boolean;
+
+   overriding procedure Set_Realtime
+     (Item        : in out Grant_Object;
+      Nanoseconds : Rose.Words.Word_64);
+
+   procedure Check (Item : Grant_Object'Class);
+   --  Fail the call if Item has been revoked.
+
+   type Grant_Access is access all Grant_Object;
+
+   Max_Grants : constant := 64;
+   --  The most grants that are live at once.
+
+   Grants      : array (1 .. Max_Grants) of Grant_Access;
+   Next_Number : Rose.Words.Word := 1;
+   --  The number of the next grant, which the requester is given, to
+   --  finish it with.
+
+   Context    : Rose.Server.Server_Context;
+   The_Broker : aliased Broker_Object;
+   The_Admin  : aliased Admin_Object;
+   Real_Clock : Rose.Interfaces.Clock_Admin.Client.Clock_Admin_Client;
+
+   function Find_Grant (Number : Rose.Words.Word) return Natural;
+   --  The index in Grants of the live grant Number, or 0.
+
+   procedure Get_User_Name
+     (User : in out Rose.Interfaces.User.User_Object'Class;
+      Name : out String;
+      Last : out Natural);
+   --  The name of User, or Last = 0 if it can't be asked.
 
    procedure Revoke (Index : Positive);
 
@@ -122,21 +151,21 @@ package body Rights_Server is
 
    function Admin_Cap return Rose.Capabilities.Capability is
    begin
-      return Admin_Interface_Cap;
+      return Rose.Interfaces.Rights_Admin.Server.Cap_Of (The_Admin);
    end Admin_Cap;
 
    -----------
    -- Allow --
    -----------
 
-   function Allow
-     (Id       : Rose.Objects.Capability_Identifier;
+   overriding function Allow
+     (Item     : in out Admin_Object;
       User     : String;
       Category : String;
       Mode     : Rose.Words.Word)
       return Rose.Words.Word
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
 
       --  User and Category are the request's buffer, so copy them before
       --  this process makes an invocation of its own, which writing the
@@ -169,58 +198,59 @@ package body Rights_Server is
       return (if Success then 1 else 0);
    end Allow;
 
+   -----------
+   -- Check --
+   -----------
+
+   procedure Check (Item : Grant_Object'Class) is
+   begin
+      if not Item.Live then
+         raise Constraint_Error with "rights: the grant was revoked";
+      end if;
+   end Check;
+
+   ---------------------
+   -- Clock_Admin_Cap --
+   ---------------------
+
+   overriding function Clock_Admin_Cap
+     (Item : in out Grant_Object)
+      return Rose.Capabilities.Capability
+   is (Clock_Admin_Server.Cap_Of (Item));
+
+   ---------------
+   -- Clock_Cap --
+   ---------------
+
+   overriding function Clock_Cap
+     (Item : in out Grant_Object)
+      return Rose.Capabilities.Capability
+   is (Clock_Admin_Server.Cap_Of
+         (Item, Rose.Interfaces.Clock_Admin.Clock_Interface));
+
    -------------------
    -- Create_Server --
    -------------------
 
-   procedure Create_Server
-     (Clock_Admin : Rose.Interfaces.Clock_Admin.Client.Clock_Admin_Client)
-   is
-      Self : Rose.Interfaces.Process.Client.Process_Client;
+   procedure Create_Server (Clock_Admin : Rose.Capabilities.Capability) is
    begin
-      Real_Clock := Clock_Admin;
-
-      Rose.Interfaces.Rights.Server.Publish_Interface
-        (Server_Context => Context,
-         Request        => Request'Access,
-         Finish         => Finish'Access);
-      Rose.Interfaces.Rights_Admin.Server.Attach_Interface
-        (Server_Context => Context,
-         Allow          => Allow'Access);
-      Clock_Admin_Server.Attach_Interface
-        (Server_Context      => Context,
-         Monotonic           => Proxy_Monotonic'Access,
-         Realtime            => Proxy_Realtime'Access,
-         Realtime_Is_Trusted => Proxy_Realtime_Is_Trusted'Access,
-         Set_Realtime        => Proxy_Set_Realtime'Access,
-         Instanced           => True);
-      Rose.Interfaces.Restorable.Server.Attach_Interface
-        (Server_Context => Context,
-         Restored       => Restored'Access);
-
-      --  The generated server keeps the cap that it publishes to itself,
-      --  so ask the process for it, as auth does.
-
-      Rose.Interfaces.Process.Client.Open
-        (Self, Rose.Capabilities.Standard.Process_Interface_Cap);
-      Rights_Interface_Cap :=
-        Rose.Interfaces.Process.Client.Published_Interface (Self);
-      Admin_Interface_Cap :=
-        Rose.Server.Create_Endpoint
-          (Rose.Interfaces.Rights_Admin.Rights_Admin_Interface);
+      Rose.Interfaces.Clock_Admin.Client.Open (Real_Clock, Clock_Admin);
+      Rose.Interfaces.Rights.Server.Publish (Context, The_Broker'Access);
+      Rose.Interfaces.Rights_Admin.Server.Attach (Context, The_Admin'Access);
+      Rose.Interfaces.Restorable.Server.Attach (Context, The_Broker'Access);
    end Create_Server;
 
    ----------------
    -- Find_Grant --
    ----------------
 
-   function Find_Grant
-     (Id : Rose.Objects.Capability_Identifier)
-      return Natural
-   is
+   function Find_Grant (Number : Rose.Words.Word) return Natural is
    begin
       for Index in Grants'Range loop
-         if Grants (Index).Live and then Grants (Index).Id = Id then
+         if Grants (Index) /= null
+           and then Grants (Index).Live
+           and then Grants (Index).Number = Number
+         then
             return Index;
          end if;
       end loop;
@@ -231,16 +261,15 @@ package body Rights_Server is
    -- Finish --
    ------------
 
-   procedure Finish
-     (Id    : Rose.Objects.Capability_Identifier;
-      User  : Rose.Capabilities.Capability;
+   overriding procedure Finish
+     (Item  : in out Broker_Object;
+      User  : in out Rose.Interfaces.User.User_Object'Class;
       Grant : Rose.Words.Word)
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
       Name  : String (1 .. Rights_Policy.Max_User_Length);
       Last  : Natural;
-      Index : constant Natural :=
-                Find_Grant (Rose.Objects.Capability_Identifier (Grant));
+      Index : constant Natural := Find_Grant (Grant);
    begin
       if Index = 0 then
          return;
@@ -263,118 +292,92 @@ package body Rights_Server is
    -------------------
 
    procedure Get_User_Name
-     (User : Rose.Capabilities.Capability;
+     (User : in out Rose.Interfaces.User.User_Object'Class;
       Name : out String;
       Last : out Natural)
    is
-      Client : Rose.Interfaces.User.Client.User_Client;
    begin
       Last := 0;
-      if User = Rose.Capabilities.Null_Capability then
-         return;
-      end if;
+      declare
+         User_Name : constant String := User.Name;
+         Length    : constant Natural :=
+                       Natural'Min (User_Name'Length, Name'Length);
+      begin
+         Name (Name'First .. Name'First + Length - 1) :=
+           User_Name (User_Name'First .. User_Name'First + Length - 1);
+         Last := Name'First + Length - 1;
+      end;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
 
-      Rose.Interfaces.User.Client.Open (Client, User);
-      Rose.Interfaces.User.Client.Name (Client, Name, Last);
-      if Rose.Interfaces.User.Client.Has_Error then
+         --  Not a User: a null cap, or one that fails.
+
          Last := 0;
-      end if;
    end Get_User_Name;
 
-   -------------
-   -- Is_Live --
-   -------------
+   ---------------
+   -- Monotonic --
+   ---------------
 
-   function Is_Live (Id : Rose.Objects.Capability_Identifier) return Boolean
-   is (Find_Grant (Id) /= 0);
-
-   ---------------------
-   -- Proxy_Monotonic --
-   ---------------------
-
-   function Proxy_Monotonic
-     (Id : Rose.Objects.Capability_Identifier)
+   overriding function Monotonic
+     (Item : in out Grant_Object)
       return Rose.Words.Word_64
    is
    begin
+      Check (Item);
+      return Real_Clock.Monotonic;
+   end Monotonic;
 
-      --  A server of the kernel target can't fail a call by raising an
-      --  exception, so a revoked grant answers 0 and does nothing.
+   --------------
+   -- Realtime --
+   --------------
 
-      if Is_Live (Id) then
-         return Clock_Admin_Client.Monotonic (Real_Clock);
-      else
-         return 0;
-      end if;
-   end Proxy_Monotonic;
-
-   --------------------
-   -- Proxy_Realtime --
-   --------------------
-
-   function Proxy_Realtime
-     (Id : Rose.Objects.Capability_Identifier)
+   overriding function Realtime
+     (Item : in out Grant_Object)
       return Rose.Words.Word_64
    is
    begin
-      if Is_Live (Id) then
-         return Clock_Admin_Client.Realtime (Real_Clock);
-      else
-         return 0;
-      end if;
-   end Proxy_Realtime;
+      Check (Item);
+      return Real_Clock.Realtime;
+   end Realtime;
 
-   -------------------------------
-   -- Proxy_Realtime_Is_Trusted --
-   -------------------------------
+   -------------------------
+   -- Realtime_Is_Trusted --
+   -------------------------
 
-   function Proxy_Realtime_Is_Trusted
-     (Id : Rose.Objects.Capability_Identifier)
+   overriding function Realtime_Is_Trusted
+     (Item : in out Grant_Object)
       return Boolean
    is
    begin
-      return Is_Live (Id)
-        and then Clock_Admin_Client.Realtime_Is_Trusted (Real_Clock);
-   end Proxy_Realtime_Is_Trusted;
-
-   ------------------------
-   -- Proxy_Set_Realtime --
-   ------------------------
-
-   procedure Proxy_Set_Realtime
-     (Id          : Rose.Objects.Capability_Identifier;
-      Nanoseconds : Rose.Words.Word_64)
-   is
-   begin
-      if Is_Live (Id) then
-         Clock_Admin_Client.Set_Realtime (Real_Clock, Nanoseconds);
-      end if;
-   end Proxy_Set_Realtime;
+      Check (Item);
+      return Real_Clock.Realtime_Is_Trusted;
+   end Realtime_Is_Trusted;
 
    -------------
    -- Request --
    -------------
 
-   procedure Request
-     (Id        : Rose.Objects.Capability_Identifier;
-      User      : Rose.Capabilities.Capability;
+   overriding procedure Request
+     (Item      : in out Broker_Object;
+      User      : in out Rose.Interfaces.User.User_Object'Class;
       Role_Name : String;
       Elevate   : Rose.Words.Word;
       Grant     : out Rose.Words.Word;
       Granted   : out Rose.Capabilities.Capability)
    is
-      pragma Unreferenced (Id);
+      pragma Unreferenced (Item);
 
       --  Role_Name is the request's buffer, so copy it before this
       --  process makes an invocation of its own.
 
-      Role      : constant String (1 .. Role_Name'Length) := Role_Name;
-      Name      : String (1 .. Rights_Policy.Max_User_Length);
-      Last      : Natural;
-      Asked     : constant Boolean := Elevate /= 0;
-      Known     : constant Boolean := Role = Clock_Role;
-      Allowed   : Boolean := False;
-      Slot      : Natural := 0;
+      Role    : constant String (1 .. Role_Name'Length) := Role_Name;
+      Name    : String (1 .. Rights_Policy.Max_User_Length);
+      Last    : Natural;
+      Asked   : constant Boolean := Elevate /= 0;
+      Known   : constant Boolean := Role = Clock_Role;
+      Allowed : Boolean := False;
+      Slot    : Natural := 0;
 
       procedure Report (Outcome : String);
       --  Write a line for the request on standard output (ADR 0021,
@@ -423,7 +426,7 @@ package body Rights_Server is
       end if;
 
       for Index in Grants'Range loop
-         if not Grants (Index).Live then
+         if Grants (Index) = null or else not Grants (Index).Live then
             Slot := Index;
             exit;
          end if;
@@ -434,34 +437,47 @@ package body Rights_Server is
          return;
       end if;
 
+      --  A new object for every grant: the revoked one in this slot, if
+      --  there was one, stays attached, and keeps failing its calls.
+
       Grants (Slot) :=
-        (Live      => True,
-         Id        => Next_Id,
-         User      => (others => ' '),
-         User_Last => Last);
+        new Grant_Object'
+          (Live      => True,
+           Number    => Next_Number,
+           User      => (others => ' '),
+           User_Last => Last);
       Grants (Slot).User (1 .. Last) := Name (1 .. Last);
-      Grant := Rose.Words.Word (Next_Id);
-      Granted :=
-        Rose.Server.Create_Endpoint
-          (Rose.Interfaces.Clock_Admin.Clock_Admin_Interface, Next_Id);
-      Next_Id := Next_Id + 1;
+      Clock_Admin_Server.Attach (Context, Grants (Slot));
+
+      Grant := Next_Number;
+      Granted := Clock_Admin_Server.Cap_Of (Grants (Slot).all);
+      Next_Number := Next_Number + 1;
 
       Report ("granted");
    end Request;
+
+   --------------------
+   -- Restorable_Cap --
+   --------------------
+
+   overriding function Restorable_Cap
+     (Item : in out Broker_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
    --------------
 
-   procedure Restored (Id : Rose.Objects.Capability_Identifier) is
-      pragma Unreferenced (Id);
+   overriding procedure Restored (Item : in out Broker_Object) is
+      pragma Unreferenced (Item);
    begin
 
       --  Elevation comes from an authentication, and a restore ends
       --  authentication (ADR 0018), so it ends every grant.
 
       for Index in Grants'Range loop
-         if Grants (Index).Live then
+         if Grants (Index) /= null and then Grants (Index).Live then
             Revoke (Index);
          end if;
       end loop;
@@ -474,12 +490,16 @@ package body Rights_Server is
    procedure Revoke (Index : Positive) is
    begin
       Grants (Index).Live := False;
-
-      --  Free the grant's instance caps. The proxy refuses the grant's
-      --  calls whether or not they are still there.
-
-      Clock_Admin_Server.Remove_Instance (Grants (Index).Id);
    end Revoke;
+
+   ----------------------
+   -- Rights_Admin_Cap --
+   ----------------------
+
+   overriding function Rights_Admin_Cap
+     (Item : in out Admin_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Rights_Admin.Server.Cap_Of (Item));
 
    ----------------
    -- Rights_Cap --
@@ -487,8 +507,30 @@ package body Rights_Server is
 
    function Rights_Cap return Rose.Capabilities.Capability is
    begin
-      return Rights_Interface_Cap;
+      return Rose.Interfaces.Rights.Server.Cap_Of (The_Broker);
    end Rights_Cap;
+
+   ----------------
+   -- Rights_Cap --
+   ----------------
+
+   overriding function Rights_Cap
+     (Item : in out Broker_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Rights.Server.Cap_Of (Item));
+
+   ------------------
+   -- Set_Realtime --
+   ------------------
+
+   overriding procedure Set_Realtime
+     (Item        : in out Grant_Object;
+      Nanoseconds : Rose.Words.Word_64)
+   is
+   begin
+      Check (Item);
+      Real_Clock.Set_Realtime (Nanoseconds);
+   end Set_Realtime;
 
    ------------------
    -- Start_Server --
