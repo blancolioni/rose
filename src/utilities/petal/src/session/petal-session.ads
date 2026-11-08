@@ -1,7 +1,6 @@
 with Rose.Capabilities;
 
-with Rose.Interfaces.User.Client;
-with Rose.Interfaces.Writable_Directory.Client;
+with Rose.Interfaces.User;
 
 package Petal.Session is
 
@@ -14,11 +13,9 @@ package Petal.Session is
    --  root, and a path from it. A directory doesn't know its parent, so
    --  petal keeps the directories on the path. It starts as home.
 
-   procedure Start (User : Rose.Interfaces.User.Client.User_Client);
-   --  Start the session of User, with User's home directory as home.
-   --  Take the user and the home directory from petal's argument cap
-   --  set. Either can be missing, as when petal is not started for a
-   --  user.
+   procedure Start (User : in out Rose.Interfaces.User.User_Object'Class);
+   --  Start the session of User, with User's home directory as home. A
+   --  user with no home directory has no current directory.
 
    procedure Run_Startup_File;
    --  Run each line of .petalrc in the home directory as if it had been
@@ -27,16 +24,9 @@ package Petal.Session is
 
    procedure Add_Directory
      (Name      : String;
-      Directory : Rose.Interfaces.Writable_Directory.Client
-                    .Writable_Directory_Client);
-   --  Name Directory in the table, or report that the table is full.
-
-   procedure Find_Directory
-     (Name      : String;
-      Directory : out Rose.Interfaces.Writable_Directory.Client
-                        .Writable_Directory_Client;
-      Found     : out Boolean);
-   --  The directory called Name in the table, if there is one.
+      Directory : Rose.Capabilities.Capability);
+   --  Name Directory, the cap of a Writable_Directory interface, in the
+   --  table, or report that the table is full. The table keeps the cap.
 
    procedure Find_Grant
      (Name     : String;
@@ -150,9 +140,8 @@ package Petal.Session is
    --  The user's home directory, the first entry in the table, and the
    --  first current directory.
 
-   procedure Get_User
-     (User  : out Rose.Interfaces.User.Client.User_Client;
-      Found : out Boolean);
-   --  The user petal was started for, if there is one.
+   function User_Cap return Rose.Capabilities.Capability;
+   --  The User interface cap of the user petal was started for, or null
+   --  if there is none. It is the session's: don't close a client of it.
 
 end Petal.Session;

@@ -6,22 +6,18 @@ with Petal.Session;
 with Petal.Version;
 
 procedure Rose.Core.Petal
-  (Find_Command   : Rose.Interfaces.Commands.Client.Commands_Client;
-   Console        : Rose.Interfaces.Terminal.Client.Terminal_Client;
-   Clock_Service  : Rose.Interfaces.Clock.Client.Clock_Client;
-   Rights_Service : Rose.Interfaces.Rights.Client.Rights_Client;
-   User           : Rose.Interfaces.User.Client.User_Client)
+  (Find_Command   : in out Rose.Interfaces.Commands.Commands_Object'Class;
+   Console        : in out Rose.Interfaces.Terminal.Terminal_Object'Class;
+   Clock_Service  : in out Rose.Interfaces.Clock.Clock_Object'Class;
+   Rights_Service : in out Rose.Interfaces.Rights.Rights_Object'Class;
+   User           : in out Rose.Interfaces.User.User_Object'Class)
 is
 begin
    Standard.Petal.Command_Launch.Set_Registry
-     (Commands =>
-        Rose.Interfaces.Commands.Client.Get_Interface_Cap (Find_Command),
-      Terminal =>
-        Rose.Interfaces.Terminal.Client.Get_Interface_Cap (Console),
-      Clock    =>
-        Rose.Interfaces.Clock.Client.Get_Interface_Cap (Clock_Service),
-      Rights   =>
-        Rose.Interfaces.Rights.Client.Get_Interface_Cap (Rights_Service));
+     (Commands => Find_Command.Commands_Cap,
+      Terminal => Console.Terminal_Cap,
+      Clock    => Clock_Service.Clock_Cap,
+      Rights   => Rights_Service.Rights_Cap);
 
    Ada.Text_IO.Put_Line
      ("Rose petal, version "
