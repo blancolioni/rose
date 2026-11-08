@@ -24,9 +24,15 @@ package body Surface_Console.Screen is
    Width   : Word := 0;
    Height  : Word := 0;
 
-   First_Damaged : Natural := Natural'Last;
-   Last_Damaged  : Natural := 0;
-   --  The rows that have changed since the last Flush.
+   Max_Rows : constant := 128;
+
+   type Row_Flags is array (0 .. Max_Rows - 1) of Boolean;
+
+   Damaged_Rows : Row_Flags := (others => False);
+   --  The rows that have changed since the last Flush.  Each row is
+   --  flagged on its own, so that moving the cursor from one row to
+   --  another damages those two rows, and not the rows between them
+   --  (#787).
 
    Cursor_Shown  : Boolean := False;
    Cursor_Column : Natural := 0;
@@ -35,6 +41,9 @@ package body Surface_Console.Screen is
 
    procedure Damaged (Row : Natural);
    --  Row has changed.
+
+   procedure Damaged_All;
+   --  Every row has changed.
 
    procedure Hide_Cursor;
    --  Take the cursor away, if it is drawn.
@@ -53,7 +62,7 @@ package body Surface_Console.Screen is
    package Cells is
      new Text_Console.Cells
        (Max_Columns => 256,
-        Max_Rows    => 128,
+        Max_Rows    => Max_Rows,
         Draw        => Draw,
         Scroll      => Scroll,
         Clear       => Clear,
@@ -68,8 +77,7 @@ package body Surface_Console.Screen is
    begin
       Fill (Target, (0, 0, Target.Width, Target.Height), Background);
       Cursor_Shown := False;
-      First_Damaged := 0;
-      Last_Damaged := Cells.Rows - 1;
+      Damaged_All;
    end Clear;
 
    -------------
@@ -78,9 +86,17 @@ package body Surface_Console.Screen is
 
    procedure Damaged (Row : Natural) is
    begin
-      First_Damaged := Natural'Min (First_Damaged, Row);
-      Last_Damaged := Natural'Max (Last_Damaged, Row);
+      Damaged_Rows (Row) := True;
    end Damaged;
+
+   -----------------
+   -- Damaged_All --
+   -----------------
+
+   procedure Damaged_All is
+   begin
+      Damaged_Rows (0 .. Cells.Rows - 1) := (others => True);
+   end Damaged_All;
 
    -------------
    -- Columns --
@@ -121,17 +137,30 @@ package body Surface_Console.Screen is
    -----------
 
    procedure Flush is
+      Row : Natural := 0;
    begin
-      if First_Damaged <= Last_Damaged then
-         Surface.Damage
-           (X      => 0,
-            Y      => Word (First_Damaged * Text.Cell_Height),
-            Width  => Width,
-            Height =>
-              Word ((Last_Damaged - First_Damaged + 1) * Text.Cell_Height));
-      end if;
-      First_Damaged := Natural'Last;
-      Last_Damaged := 0;
+      --  One Damage for each run of rows that changed.
+
+      while Row < Cells.Rows loop
+         if Damaged_Rows (Row) then
+            declare
+               First : constant Natural := Row;
+            begin
+               while Row < Cells.Rows and then Damaged_Rows (Row) loop
+                  Damaged_Rows (Row) := False;
+                  Row := Row + 1;
+               end loop;
+
+               Surface.Damage
+                 (X      => 0,
+                  Y      => Word (First * Text.Cell_Height),
+                  Width  => Width,
+                  Height => Word ((Row - First) * Text.Cell_Height));
+            end;
+         else
+            Row := Row + 1;
+         end if;
+      end loop;
    end Flush;
 
    -----------------
@@ -187,7 +216,7 @@ package body Surface_Console.Screen is
         (Columns =>
            Natural'Max (1, Natural'Min (256, Text.Columns (Target))),
          Rows    =>
-           Natural'Max (1, Natural'Min (128, Text.Rows (Target))));
+           Natural'Max (1, Natural'Min (Max_Rows, Text.Rows (Target))));
       Clear;
       Cells.Redraw;
    end Open;
@@ -237,8 +266,7 @@ package body Surface_Console.Screen is
       Hide_Cursor;
       Text.Scroll_Up
         (Target, 0, 0, Cells.Columns, Cells.Rows, Lines, Background);
-      First_Damaged := 0;
-      Last_Damaged := Cells.Rows - 1;
+      Damaged_All;
    end Scroll;
 
    -----------------
