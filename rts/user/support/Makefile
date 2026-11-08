@@ -40,6 +40,14 @@ librose-util: $(OBJECTS)
 %.o: %.c
 	$(GCC) -c $(GCC_OPTS) $(@:%.o=%.c)
 
+# Every array assignment in userland comes through these, so they are
+# optimised (#787). Without -fno-tree-loop-distribute-patterns, GCC can
+# turn their loops into calls to memcpy and memset, which would then call
+# themselves.
+
+memchr.o memcmp.o memcpy.o memmove.o memset.o strlen.o: \
+    GCC_OPTS += -O2 -fno-tree-loop-distribute-patterns
+
 raise-gcc.o: gcc/raise-gcc.c
 	$(GCC) -c $(GCC_OPTS) $(RAISE_OPTS) gcc/raise-gcc.c -o raise-gcc.o
 
