@@ -1,17 +1,17 @@
 with Ada.Text_IO;
 
-with Rose.Capabilities;
 with Rose.Interfaces.Directory;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Objects;
+with Rose.Interfaces.Writable_File;
 
 procedure Rose.Core.Touch
   (Name      : String;
-   Directory : Rose.Interfaces.Writable_Directory.Client
-                 .Writable_Directory_Client)
+   Directory : in out
+     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class)
 is
-   use Rose.Interfaces.Writable_Directory.Client;
-   use type Rose.Capabilities.Capability;
    use type Rose.Interfaces.Directory.File_Kind;
+
+   Index : constant Natural := Directory.Find_Entry (Name);
 
    procedure Fail (Reason : String);
    --  Report that the file cannot be touched, and why, on standard error,
@@ -26,6 +26,7 @@ is
       Ada.Text_IO.Put_Line
         (Ada.Text_IO.Standard_Error,
          "touch: cannot touch '" & Name & "'" & Reason);
+      Ada.Text_IO.Flush (Ada.Text_IO.Standard_Error);
 
       --  An unhandled exception fails the launch call (see
       --  Rose.Command_Line.Launch).
@@ -33,22 +34,28 @@ is
       raise Constraint_Error;
    end Fail;
 
-   Index : constant Natural := Find_Entry (Directory, Name);
-
 begin
 
-   --  Create_File returns the file if Name is already one, but nothing
-   --  if Name is a directory.
+   --  Create_File returns the file if Name is already one, but fails if
+   --  Name is a directory, so that is checked first, for the message.
 
    if Index > 0
-     and then Directory_Entry_Kind (Directory, Index)
+     and then Directory.Directory_Entry_Kind (Index)
                 = Rose.Interfaces.Directory.Directory
    then
       Fail (": it is a directory");
-   elsif Rose.Interfaces.Writable_File.Client.Get_Interface_Cap
-           (Create_File (Directory, Name))
-     = Rose.Capabilities.Null_Capability
-   then
-      Fail ("");
    end if;
+
+   begin
+      declare
+         File : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+           Directory.Create_File (Name);
+         pragma Unreferenced (File);
+      begin
+         null;
+      end;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         Fail ("");
+   end;
 end Rose.Core.Touch;
