@@ -22,12 +22,13 @@ project Exec is
 
    package Builder is
       for Global_Configuration_Pragmas use "exec-pragmas.config";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
       for Executable ("exec-driver.adb") use "exec";
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is

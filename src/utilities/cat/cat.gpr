@@ -22,7 +22,7 @@ project Cat is
    package Builder is
       for Global_Configuration_Pragmas use "cat-pragmas.config";
       for Executable ("rose-core-cat_main.adb") use "cat-driver";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
    end Builder;
 
    --  -gnatw.X: the generated user-mode packages raise exceptions, which
@@ -30,7 +30,8 @@ project Cat is
    --  them (#170). GNAT warns about each such raise.
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatw.X", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatw.X", "-gnatyM79abcefhiklnoprst") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is

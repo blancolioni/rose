@@ -38,7 +38,7 @@ project Clock is
 
    package Builder is
       for Global_Configuration_Pragmas use "pragmas.config";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
       for Executable ("clock-driver.adb") use "clock";
    end Builder;
 
@@ -47,7 +47,8 @@ project Clock is
    --  them (#170). GNAT warns about each such raise.
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatw.X", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatw.X", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is
