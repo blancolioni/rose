@@ -56,7 +56,7 @@ processes:
   # Boot modules, with their fixed object ids
   checkpoint: {at: [250, 550], kind: boot, label: checkpoint, note: "15"}
   elf:        {at: [550, 550], kind: boot, label: elf, note: "12"}
-  caps:       {at: [700, 550], kind: boot, label: caps, note: "14"}
+  bootcaps:   {at: [700, 550], kind: boot, label: bootcaps, note: "14"}
   restore:    {at: [850, 550], kind: boot, label: restore, note: "9"}
   console:    {at: [1000, 550], kind: boot, label: console, note: "3",
                notes: {restore: "3 · output discarded"}}
@@ -88,7 +88,6 @@ calls:
   - {from: petal, to: home, label: cwd}
   - {from: petal, to: command, label: find}
   - {from: petal, to: vga, label: stdin · stdout, via: [[1000, 75]]}
-  - {from: petal, to: caps, label: cap sets}
   - {from: user, to: home, label: home}
   - {from: home, to: file, label: entry}
   - {from: home, to: exec, label: launch}
@@ -127,7 +126,7 @@ calls:
   # servers, waits, and the partition table.  restore sends it the
   # programs to install, and tells it when it has finished.
   - {from: init, to: console, via: [[200, 463], [980, 463]]}
-  - {from: init, to: caps, via: [[200, 463], [650, 463]]}
+  - {from: init, to: bootcaps, via: [[200, 463], [650, 463]]}
   - {from: init, to: timer, via: [[130, 900]]}
   - {from: init, to: scan, via: [[200, 463], [475, 463], [475, 800],
                                  [520, 800]]}
@@ -148,5 +147,4 @@ calls:
   # tests, after an install
   - {from: tests, to: command, when: install}
   - {from: tests, to: exec, when: install}
-  - {from: tests, to: caps, when: install}
   - {from: tests, to: vga, when: install}

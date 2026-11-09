@@ -14,13 +14,13 @@ package body Rose.Kernel.Modules.Init is
 
    Install_Modules : constant String :=
                        "init-install console mem pci ata store isofs "
-                       & "restore-install scan partition elf timer caps "
+                       & "restore-install scan partition elf timer bootcaps "
                        & "checkpoint log";
    --  The install media's boot/iso/grub/grub.cfg
 
    Disk_Modules    : constant String :=
                        "init console mem pci ata store restore "
-                       & "scan partition elf timer caps checkpoint log";
+                       & "scan partition elf timer bootcaps checkpoint log";
    --  The boot disk's grub.cfg (#322)
 
    --  Init launches boot modules by position, so these have to match

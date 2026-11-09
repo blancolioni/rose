@@ -87,13 +87,20 @@ package body ATA.Server is
       Next (Data_0_Cap_Read_16);
       Next (Data_0_Cap_Write_16);
 
-      Next (Command_1_Cap);
-      Next (Control_1_Cap);
-      Next (Data_1_Cap_8);
-      Next (Data_1_Cap_Read_16);
-      Next (Data_1_Cap_Write_16);
+      --  Init gives no ports for channel 1, whose caps stay null, so the
+      --  timer comes next (boot.yaml).
 
       Next (Set_Timeout_Cap);
+
+      --  Nothing reads the cap set again (#826).
+
+      declare
+         Delete_Cap : Rose.Capabilities.Capability;
+      begin
+         Next (Delete_Cap);
+         Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
+         Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+      end;
 
       Device_Cap := Rose.Capabilities.Null_Capability;
 

@@ -1,13 +1,16 @@
+with Rose.Console_IO;
+with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Interfaces.Constructor.Server;
 with Rose.Interfaces.Cap_Set.Server;
 with Rose.Interfaces.Cap.Server;
+with Rose.Interfaces.Resource;
 
 with Rose.Server;
 with Rose.System_Calls.Server;
 
-package body Caps.Server is
+package body Bootcaps.Server is
 
    Max_Cap_Set_Size : constant := 30;
 
@@ -29,6 +32,9 @@ package body Caps.Server is
    Next_Cap_Id : Rose.Objects.Capability_Identifier := 1;
 
    Server      : Rose.Server.Server_Context;
+
+   Released    : Boolean := False;
+   --  True once init has said that boot is done.
 
    function Next_Id return Rose.Objects.Capability_Identifier;
 
@@ -55,6 +61,12 @@ package body Caps.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Object_Id;
 
+   procedure Handle_Release
+     (Parameters : in out Rose.Invocation.Invocation_Record);
+   --  Resource.Release, registered with Rose.Server directly: the
+   --  generated server package's instance table would not fit in the
+   --  kernel heap that boot modules share (#826).
+
    ------------
    -- Append --
    ------------
@@ -71,8 +83,23 @@ package body Caps.Server is
       declare
          Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
       begin
+
+         --  A set that can't take every cap takes none of them, so that
+         --  no module starts with only some of its caps (#826).
+
+         if Caps'Length > Max_Cap_Set_Size - Set.Last then
+            Rose.Console_IO.Put ("bootcaps: cap set ");
+            Rose.Console_IO.Put (Natural (Id));
+            Rose.Console_IO.Put (" is full: ");
+            Rose.Console_IO.Put
+              (Natural (Caps'Length - (Max_Cap_Set_Size - Set.Last)));
+            Rose.Console_IO.Put (" of ");
+            Rose.Console_IO.Put (Natural (Caps'Length));
+            Rose.Console_IO.Put_Line (" caps do not fit; none added");
+            return;
+         end if;
+
          for Cap of Caps loop
-            exit when Set.Last = Max_Cap_Set_Size;
             Set.Last := Set.Last + 1;
             Set.Set (Set.Last) := Cap;
          end loop;
@@ -109,6 +136,10 @@ package body Caps.Server is
             end;
          end if;
       end loop;
+
+      Rose.Console_IO.Put ("bootcaps: no free cap sets: all ");
+      Rose.Console_IO.Put (Natural (Max_Cap_Set_Count));
+      Rose.Console_IO.Put_Line (" are in use");
       return Rose.Capabilities.Null_Capability;
    end Create;
 
@@ -124,6 +155,11 @@ package body Caps.Server is
 
       Rose.Interfaces.Constructor.Server.Create_Server
         (Server, Create'Access);
+
+      Rose.Server.Register_Handler
+        (Server,
+         Rose.Interfaces.Resource.Release_Endpoint,
+         Handle_Release'Access);
 
       Rose.Interfaces.Cap_Set.Server.Attach_Interface
         (Server_Context => Server,
@@ -189,6 +225,22 @@ package body Caps.Server is
       return 0;
    end Get_Cap_Set_Object_Id;
 
+   --------------------
+   -- Handle_Release --
+   --------------------
+
+   procedure Handle_Release
+     (Parameters : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      for Set of Cap_Sets loop
+         Set.Active := False;
+         Set.Last := 0;
+      end loop;
+      Released := True;
+      Rose.System_Calls.Initialize_Reply (Parameters, Parameters.Reply_Cap);
+   end Handle_Release;
+
    ------------
    -- Length --
    ------------
@@ -223,13 +275,28 @@ package body Caps.Server is
       end return;
    end Next_Id;
 
+
    ------------------
    -- Start_Server --
    ------------------
 
    procedure Start_Server is
    begin
-      Rose.Server.Start_Server (Server);
+      while not Released loop
+         Rose.Server.Receive_Message (Server);
+      end loop;
+
+      --  Boot is done, and init has had its reply. Every cap to this
+      --  server fails from now on, whoever holds it.
+
+      Rose.Console_IO.Put_Line ("bootcaps: boot done; exiting");
+
+      declare
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Exit_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end;
    end Start_Server;
 
-end Caps.Server;
+end Bootcaps.Server;

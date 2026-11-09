@@ -205,8 +205,9 @@ package body Init.Self_Tests is
       --  restore (the boot test looks for them).  A record is the lowest
       --  that is free, so Below, which is derived from Kept, has a lower
       --  number than it: a restore has to put Kept back first.  Init is
-      --  not restored, so the caps server holds them, in a cap set, and
-      --  init lets go of its own.
+      --  not restored, so bootcaps holds them, in a cap set, and init
+      --  lets go of its own. Bootcaps ends after boot, and they go with
+      --  it, until the test moves to the userland cap set server (#825).
 
       Spare := Derive (Derive_Cap, Find_Cap);
       Kept  := Derive (Derive_Cap, Find_Cap);
@@ -221,7 +222,7 @@ package body Init.Self_Tests is
       Held := Init.Calls.Create_Cap_Set_With
         (Create_Cap_Set, (Kept, Below));
 
-      Check ("the caps server holds them",
+      Check ("bootcaps holds them",
              Held /= Rose.Capabilities.Null_Capability);
 
       Call_On (Delete_Cap, Kept);

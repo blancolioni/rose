@@ -10,7 +10,12 @@ package Restore.Start is
 
    procedure Get_Caps;
    --  Take the caps that both servers have, in the order init sends
-   --  them, from Console_Cap to Memory_Restore_Cap (Restore).
+   --  them, from Console_Cap to Exit_Cap (Restore), and then the delete
+   --  cap.
+
+   procedure Delete_Cap_Set;
+   --  Delete the cap to the set, once every cap has been taken from it
+   --  (#826).
 
    procedure Prepare (Checkpoint : out Rose.Words.Word_64);
    --  Open the console, give the log server its device, and give the

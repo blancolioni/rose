@@ -28,6 +28,7 @@ begin
    Restore.Start.Next (MBR_Cap);
    Restore.Start.Next (BIOS_Boot_Cap);
    Restore.Start.Next (Boot_Partition_Cap);
+   Restore.Start.Delete_Cap_Set;
 
    Restore.Start.Prepare (Checkpoint);
 

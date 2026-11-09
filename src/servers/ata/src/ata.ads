@@ -16,11 +16,18 @@ package ATA is
    Data_0_Cap_Read_16  : Rose.Capabilities.Capability;
    Data_0_Cap_Write_16 : Rose.Capabilities.Capability;
 
-   Command_1_Cap       : Rose.Capabilities.Capability;
-   Control_1_Cap       : Rose.Capabilities.Capability;
-   Data_1_Cap_8        : Rose.Capabilities.Capability;
-   Data_1_Cap_Read_16  : Rose.Capabilities.Capability;
-   Data_1_Cap_Write_16 : Rose.Capabilities.Capability;
+   --  Init gives no ports for channel 1, which isn't used.
+
+   Command_1_Cap       : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Control_1_Cap       : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Data_1_Cap_8        : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Data_1_Cap_Read_16  : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Data_1_Cap_Write_16 : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
 
    Set_Timeout_Cap     : Rose.Capabilities.Capability;
 

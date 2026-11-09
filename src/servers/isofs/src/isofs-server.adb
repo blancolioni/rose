@@ -407,6 +407,10 @@ package body IsoFS.Server is
 
       Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
 
+      --  Nothing reads the cap set again (#826).
+
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+
       Rose.Console_IO.Open (Console_Cap);
       Rose.Console_IO.Put_Line ("isofs: starting server");
 

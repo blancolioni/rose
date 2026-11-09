@@ -1,4 +1,5 @@
 with Rose.Init_Capabilities;
+with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Devices.Partitions;
@@ -6,6 +7,7 @@ with Rose.Devices.Partitions;
 with Rose.Interfaces.Block_Device;
 with Rose.Interfaces.Partition_Setup.Client;
 with Rose.Interfaces.Partitions.Client;
+with Rose.Interfaces.Resource.Client;
 
 with Init.Boot;
 with Init.Calls;
@@ -70,6 +72,27 @@ package body Init.Boot_Steps is
       return Cap;
    end Copy;
 
+   -----------------------
+   -- End_Boot_Cap_Sets --
+   -----------------------
+
+   procedure End_Boot_Cap_Sets is
+      use type Rose.Capabilities.Capability;
+      Bootcaps : Rose.Interfaces.Resource.Client.Resource_Client;
+   begin
+      if Init.Boot.Bootcaps_Release_Cap /= Rose.Capabilities.Null_Capability
+      then
+         Rose.Interfaces.Resource.Client.Open_Cap_Set
+           (Bootcaps, Init.Boot.Bootcaps_Release_Cap);
+         Rose.Interfaces.Resource.Client.Release (Bootcaps);
+      end if;
+
+      Rose.System_Calls.Delete_Cap (Init.Boot.Bootcaps_Release_Cap);
+      Rose.System_Calls.Delete_Cap (Init.Boot.Cap_Set_Cap);
+      Init.Boot.Bootcaps_Release_Cap := Rose.Capabilities.Null_Capability;
+      Init.Boot.Cap_Set_Cap := Rose.Capabilities.Null_Capability;
+   end End_Boot_Cap_Sets;
+
    -----------------------------
    -- Launch_Partition_Server --
    -----------------------------
@@ -89,7 +112,8 @@ package body Init.Boot_Steps is
                          Rose.Init_Capabilities.Create_Endpoint_Cap,
                          Init.Boot.Cap_Set_Cap,
                          (Init.Boot.Console_Interface_Cap,
-                          Init.Boot.Hd0_Cap));
+                          Init.Boot.Hd0_Cap,
+                          Rose.Init_Capabilities.Delete_Cap));
       Setup       : Rose.Interfaces.Partition_Setup.Client
                       .Partition_Setup_Client;
    begin
