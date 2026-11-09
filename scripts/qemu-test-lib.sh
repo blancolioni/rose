@@ -93,9 +93,36 @@ wait_for_serial () {
     return 1
 }
 
+answered=
+answer_install () {
+    # answer_install SCREEN: answer the install's questions (#456), each
+    # once, when it is on the last line of SCREEN, a file of the screen's
+    # text: the first user's name and password, the password again, and
+    # the enter that reboots the machine.
+    last=$(grep -v '^ *$' "$1" | tail -1)
+    case "$answered:$last" in
+        :*"User name:"*)
+            type_text "$first_user
+"
+            answered=name ;;
+        name:*"Password:"*)
+            type_text "$first_password
+"
+            answered=password ;;
+        password:*"Password again:"*)
+            type_text "$first_password
+"
+            answered=again ;;
+        again:*"Press enter to reboot."*)
+            type_text "
+"
+            answered=reboot ;;
+    esac
+}
+
 install_rose () {
-    # install_rose ISO: install Rose on a new disk, and wait for the
-    # install to finish
+    # install_rose ISO: install Rose on a new disk, answering its questions,
+    # and wait for the install to finish
     [ -f "$1" ] || { echo "no install image: $1"; exit 2; }
     qemu-img create -f raw "$DISK" 6G > /dev/null
 
@@ -129,8 +156,12 @@ wait_for_install () {
     # is gone from the screen by then
     waited=0
     : > "$WORK/install-screen.txt"
+    answered=
     while [ $waited -lt "$1" ]; do
-        screen | grep -e "derive test" >> "$WORK/install-screen.txt"
+        screen > "$WORK/install-now.txt"
+        grep -e "derive test" "$WORK/install-now.txt" \
+            >> "$WORK/install-screen.txt"
+        answer_install "$WORK/install-now.txt"
         grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
             && return 0
         sleep 1

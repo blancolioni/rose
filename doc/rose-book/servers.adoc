@@ -337,7 +337,7 @@ Keeps the users, and a salted hash of each one's password (#455).
 
 Provides:: `Auth`, whose `Login` returns a user's `User` interface for the right password; and `Auth_Admin`, whose `New_User` creates a user, with a home directory, and fails if the name is taken.
 Requests:: `Create_Endpoint` and `Find_Command`, as roles of its command declaration.
-Used by:: `init`, which launches it on a first boot and creates the first user, `fraser`, through `Auth_Admin`.
+Used by:: `init`, which launches it on a first boot and creates the first user, whose name and password the person installing types (#456), through `Auth_Admin`.
 
 * *Passwords are hashed with PBKDF2-HMAC-SHA-256,* from `Rose.Crypto`, with a 16-byte salt from `Rose.Random` and 100,000 iterations: a login takes about a second in QEMU.
   Each user's record keeps its algorithm and iteration count, so that they can change without losing the users.
@@ -351,7 +351,7 @@ The rights broker (ADR 0021, #549): it holds the caps that grant authority, and 
 
 Provides:: `Rights`, whose `Request` asks for the authority of a role and `Finish` ends a grant; and `Rights_Admin`, whose `Allow` sets the policy.
 Requests:: `Create_Endpoint`, `Standard_Output` and the privileged roles that it holds (`Clock_Admin_Service`, so far), as roles of its command declaration.
-Used by:: `init`, which launches it on a first boot, with the clock's `Clock_Admin` interface as the role `Clock_Admin_Service`, and gives the first user, `fraser`, a policy of `elevate` for every category (#550). `petal` will ask it for a command's privileged roles (#551).
+Used by:: `init`, which launches it on a first boot, with the clock's `Clock_Admin` interface as the role `Clock_Admin_Service`, and gives the first user a policy of `elevate` for every category (#550). `petal` will ask it for a command's privileged roles (#551).
 
 * *Init keeps no privileged cap.* It deletes its copies of `Clock_Admin` once the broker has it, and of `Rights_Admin` once the first user's policy is set.
   Before that it checks the policy, through the first user's `User` cap: an ordinary request for the clock's admin role is refused, and one under `sudo` is granted (`rights: policy checked` on the console).

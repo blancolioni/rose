@@ -64,9 +64,11 @@ start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
 : > "$WORK/install-results.txt"
 early=
 waited=0
+answered=
 while [ $waited -lt 900 ]; do
     grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null && break
     screen > "$WORK/screen.txt"
+    answer_install "$WORK/screen.txt"
     grep "Test result:" "$WORK/screen.txt" >> "$WORK/install-results.txt"
     grep -q "installing: keyboard: done" "$WORK/screen.txt" && early=yes
     sleep 1
