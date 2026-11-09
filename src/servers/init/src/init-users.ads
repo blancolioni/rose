@@ -20,6 +20,33 @@ package Init.Users is
    --  Launch auth as a command, and return its Auth and Auth_Admin
    --  interfaces, or null caps if the launch fails.
 
+   Max_Name_Length     : constant := 64;
+   Max_Password_Length : constant := 128;
+
+   procedure Ask_First_User
+     (Console       : Rose.Capabilities.Capability;
+      Output        : Rose.Capabilities.Capability;
+      Name          : out String;
+      Name_Last     : out Natural;
+      Password      : out String;
+      Password_Last : out Natural);
+   --  Name is Max_Name_Length characters, and Password
+   --  Max_Password_Length, both from 1.
+   --
+   --  Ask the person installing for the first user's name and password
+   --  (#456), on Console, the console's Terminal interface, writing the
+   --  questions to Output, its stream. The name is asked for until it is
+   --  from 1 to Max_Name_Length letters, digits, '_', '-' or '.'. The
+   --  password is read with echo off, and then again, until the two are
+   --  the same and not empty.
+
+   procedure Wait_For_Enter
+     (Console : Rose.Capabilities.Capability;
+      Output  : Rose.Capabilities.Capability;
+      Message : String);
+   --  Write Message to Output, and wait for a line from Console, the
+   --  console's Terminal interface.
+
    procedure Create_First_User
      (Name     : String;
       Password : String;
