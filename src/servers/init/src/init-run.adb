@@ -539,6 +539,7 @@ package body Init.Run is
          Init.Calls.Send_String
            (Console_Stream_Cap,
             "init: no system on this disk; boot the install media" & NL);
+         Init.Boot_Steps.End_Boot_Cap_Sets;
          Init.Calls.Send (Exit_Cap);
          return;
       end if;
@@ -549,6 +550,10 @@ package body Init.Run is
       --  running already, as they were at the checkpoint.
 
       if Restored then
+
+         --  The checkpoint server was the last boot module (#826).
+
+         Init.Boot_Steps.End_Boot_Cap_Sets;
 
          Init.Calls.Send_String
            (Console_Stream_Cap,
@@ -762,6 +767,12 @@ package body Init.Run is
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: unable to launch login" & NL);
       end if;
+
+      --  Login is the last launch. The derive test's cap set goes with
+      --  bootcaps, so the first checkpoint has no derivation records for
+      --  it, until the test moves to the userland cap set server (#825).
+
+      Init.Boot_Steps.End_Boot_Cap_Sets;
 
       --  The new system is complete.  Once its first checkpoint is in
       --  the log, restart, so that the machine boots it from hd0 (#413).

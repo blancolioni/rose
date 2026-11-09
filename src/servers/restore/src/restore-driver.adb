@@ -14,6 +14,7 @@ procedure Restore.Driver is
    Restored   : Boolean := False;
 begin
    Restore.Start.Get_Caps;
+   Restore.Start.Delete_Cap_Set;
    Restore.Start.Prepare (Checkpoint);
 
    if Checkpoint /= 0 then

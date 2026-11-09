@@ -461,6 +461,11 @@ package body Log.Server is
       Console_Cap := Get_Cap (1);
       Start_Log_Cap := Get_Cap (2);
 
+      --  Nothing reads the cap set again (#826).
+
+      Rose.System_Calls.Use_Capabilities (Delete_Cap => Get_Cap (3));
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+
       Rose.Console_IO.Open (Console_Cap);
 
       Rose.Console_IO.Put_Line ("log: starting");

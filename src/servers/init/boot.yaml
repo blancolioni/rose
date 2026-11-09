@@ -53,7 +53,7 @@ modules:
   - partition
   - elf
   - timer
-  - caps
+  - bootcaps
   - checkpoint
   - log
 
@@ -111,13 +111,17 @@ stages:
     # a cap request.
     - call: Set_Console
 
-    - launch: caps
+    # The boot modules' cap sets.  Every module launched after it reads
+    # its caps from its set at startup, and then deletes its cap to the
+    # set.  Once boot is done, init releases it, and it exits (#826).
+    - launch: bootcaps
       oid: 14
       priority: device_driver
       cap_set: none
-      caps: [console_interface]
+      caps: [console_interface, exit]
       exports:
         cap_set: Constructor.Create_Endpoint
+        bootcaps_release: Resource.Release_Endpoint
 
     - launch: mem
       oid: 4
@@ -132,7 +136,7 @@ stages:
     - launch: timer
       oid: 13
       priority: device_driver
-      caps: [console_interface, set_timeout, get_ticks_64]
+      caps: [console_interface, set_timeout, get_ticks_64, delete]
       exports:
         timer: Timer.Set_Timer_Endpoint
         timer_interface: Timer.Timer_Interface
@@ -149,6 +153,7 @@ stages:
         - {ports: [out, 32, 0xCF8, 0xCF8]}
         - {ports: [out, 32, 0xCFC, 0xCFC]}
         - {ports: [in, 32, 0xCFC, 0xCFC]}
+        - delete
       exports:
         pci: 450
 
@@ -166,6 +171,7 @@ stages:
         - {ports: [in, 16, 0x1F0, 0x1F7]}
         - {ports: [out, 16, 0x1F0, 0x1F7]}
         - timer
+        - delete
       exports:
         hd0: {endpoint: Get_Interface_Endpoint, identifier: 0}
         # The install media is hd1, which only the install init uses.
@@ -197,7 +203,7 @@ stages:
     - launch: scan
       oid: 10
       priority: file_system
-      caps: [console_interface, hd0, exit]
+      caps: [console_interface, hd0, exit, delete]
       exports:
         release_partitions: Partitions.Release_Endpoint
         partition_count: Partitions.Partition_Count_Endpoint
@@ -225,7 +231,7 @@ stages:
     - launch: log
       oid: 16
       priority: log
-      caps: [console_interface, start_log]
+      caps: [console_interface, start_log, delete]
       exports:
         add_log_device: Kernel_Log.Add_Log_Device_Endpoint
         append_to_log: Kernel_Log.Append_Endpoint
@@ -253,6 +259,7 @@ stages:
         - memory_restore
         - restore_derivations
         - exit
+        - delete
         - {cap: install_media_fs, when: install}
         - {cap: log_reset, when: install}
         - {cap: mbr, when: install}

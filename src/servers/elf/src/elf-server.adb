@@ -157,6 +157,10 @@ package body Elf.Server is
       begin
          Next (Trace_Cap);
          Rose.Trace.Set_Trace_Cap (Trace_Cap);
+
+         --  Nothing reads the cap set again (#826).
+
+         Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
       end;
 
       Rose.Console_IO.Open (Console_Cap);
