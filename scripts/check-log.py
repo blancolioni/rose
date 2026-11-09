@@ -55,8 +55,9 @@ SHARED_PAGE_SAVED = 1
 SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 3
+STORE_TABLE_VERSION = 4
 REGIONS_PER_PAGE = PAGE_SIZE // 32
+BANKS_PER_PAGE = PAGE_SIZE // 24
 MAP_ENTRIES_PER_PAGE = PAGE_SIZE // 16
 PAGES_PER_BLOCK = 4
 
@@ -66,7 +67,7 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 32
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 8
+KERNEL_TABLE_VERSION = 9
 MAX_SAVED_INTERRUPTS = 32
 RECORDS_PER_PAGE = PAGE_SIZE // 4
 MAX_RECORD_PAGES = 4
@@ -262,60 +263,106 @@ def check_kernel_tables(log, first, last, verbose):
         if verbose:
             print("    interrupt %d -> process %d cap %d" % (vector, oid, cap))
 
-    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s%s"
+    # Version 9 has the interfaces of the boot set that wrote it after the
+    # interrupts (#375).
+    interfaces = ""
+    if version >= 9:
+        major, minor, level, digest = struct.unpack_from(
+            "<HHIQ", page, 40 + MAX_SAVED_INTERRUPTS * 16)
+        interfaces = ", interfaces %d.%d level %d" % (major, minor, level)
+
+    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s%s%s"
                   % (process_count, "" if process_count == 1 else "es",
                      page_count, interrupt_count,
                      "" if interrupt_count == 1 else "s",
                      "" if next_oid is None
                      else ", next object id %d" % next_oid,
                      "" if not record_count
-                     else ", %d derivation records" % record_count)), \
+                     else ", %d derivation records" % record_count,
+                     interfaces)), \
         page_count, oids
 
 
 def check_store_tables(log, first, last, verbose):
-    """Check the storage server's region table and map, which start at
-    page first.
+    """Check the storage server's region table, map and banks, which start
+    at page first.
 
     Returns (ok, description, page count, set of (base, bound))."""
     regions = set()
     page = log.page(first)
     if page is None or first > last or u64(page, 0) != STORE_TABLE_MAGIC:
         return False, ("location %d: expected the storage server's tables, "
-                       "found %s" % (first, describe_page(page or b""))),             0, regions
+                       "found %s" % (first, describe_page(page or b""))), \
+            0, regions
     next_page = u64(page, 8)
-    version, page_count, region_count, map_pages, map_entries =         struct.unpack_from("<IIIII", page, 16)
+    version, page_count, region_count, map_pages, map_entries, \
+        bank_count, bank_pages = struct.unpack_from("<IIIIIII", page, 16)
     if version != STORE_TABLE_VERSION:
         return False, "storage tables version %d" % version, 0, regions
     region_pages = (region_count + REGIONS_PER_PAGE - 1) // REGIONS_PER_PAGE
-    if map_pages != (map_entries + MAP_ENTRIES_PER_PAGE - 1)             // MAP_ENTRIES_PER_PAGE             or page_count != 1 + region_pages + map_pages             or first + page_count - 1 > last:
-        return False, ("storage tables: %d pages for %d regions and %d "
-                       "map entries (%d map pages)"
+    if map_pages != (map_entries + MAP_ENTRIES_PER_PAGE - 1) \
+            // MAP_ENTRIES_PER_PAGE \
+            or bank_count == 0 \
+            or bank_pages != (bank_count + BANKS_PER_PAGE - 1) \
+            // BANKS_PER_PAGE \
+            or page_count != 1 + region_pages + map_pages + bank_pages \
+            or first + page_count - 1 > last:
+        return False, ("storage tables: %d pages for %d regions, %d map "
+                       "entries (%d map pages) and %d banks (%d pages)"
                        % (page_count, region_count, map_entries,
-                          map_pages)), 0, regions
+                          map_pages, bank_count, bank_pages)), 0, regions
+
+    # The banks come last (#518).  Each one's parent must be another bank
+    # in the table, and the root bank, 1, has none.
+    banks = {}
+    for i in range(bank_count):
+        record = log.page(first + 1 + region_pages + map_pages
+                          + i // BANKS_PER_PAGE)
+        index, parent, page_limit, region_limit, _ = struct.unpack_from(
+            "<IIQII", record, (i % BANKS_PER_PAGE) * 24)
+        if index == 0 or index in banks:
+            return False, ("storage bank %d of %d: index %d"
+                           % (i + 1, bank_count, index)), 0, regions
+        banks[index] = parent
+        if verbose:
+            print("    bank %3d: parent %d, limits %d pages, %d regions"
+                  % (index, parent, page_limit, region_limit))
+    if banks.get(1, None) != 0:
+        return False, "storage banks: no root bank", 0, regions
+    for index, parent in banks.items():
+        if index != 1 and (parent not in banks or parent == index):
+            return False, ("storage bank %d has parent %d, which is not in "
+                           "the tables" % (index, parent)), 0, regions
 
     indices = set()
     roots = {}
     for i in range(region_count):
         record = log.page(first + 1 + i // REGIONS_PER_PAGE)
-        index, root, base, bound, blocks, _ =             struct.unpack_from("<IIQQII", record,
+        index, root, base, bound, blocks, bank = \
+            struct.unpack_from("<IIQQII", record,
                                (i % REGIONS_PER_PAGE) * 32)
-        if index == 0 or index in indices or bound < base or bound > next_page:
+        if index == 0 or index in indices or bound < base \
+                or bound > next_page:
             return False, ("storage region %d of %d: index %d, pages "
                            "%x..%x, next page %x"
                            % (i + 1, region_count, index, base, bound,
                               next_page)), 0, regions
+        if bank not in banks:
+            return False, ("storage region %d is charged to bank %d, which "
+                           "is not in the tables" % (index, bank)), \
+                0, regions
         indices.add(index)
         roots[index] = root
         regions.add((base, bound))
         if verbose:
-            print("    region %3d: %x..%x, %d blocks%s"
-                  % (index, base, bound, blocks,
+            print("    region %3d: %x..%x, %d blocks, bank %d%s"
+                  % (index, base, bound, blocks, bank,
                      "" if root == index else " subregion of %d" % root))
     for index, root in roots.items():
         if root not in indices:
             return False, ("storage region %d is a subregion of region %d, "
-                           "which is not in the tables" % (index, root)),                 0, regions
+                           "which is not in the tables" % (index, root)), \
+                0, regions
 
     mapped = set()
     for i in range(map_entries):
@@ -323,7 +370,9 @@ def check_store_tables(log, first, last, verbose):
                           + i // MAP_ENTRIES_PER_PAGE)
         page_id, block, fresh = struct.unpack_from(
             "<QII", record, (i % MAP_ENTRIES_PER_PAGE) * 16)
-        if page_id in mapped                 or fresh >= 1 << PAGES_PER_BLOCK                 or not any(base <= page_id < bound
+        if page_id in mapped \
+                or fresh >= 1 << PAGES_PER_BLOCK \
+                or not any(base <= page_id < bound
                            for base, bound in regions):
             return False, ("storage map entry %d of %d: page %x, block %d, "
                            "fresh %x"
@@ -331,9 +380,11 @@ def check_store_tables(log, first, last, verbose):
                               fresh)), 0, regions
         mapped.add(page_id)
 
-    return True, ("storage: %d region%s, %d mapped block%s"
+    return True, ("storage: %d region%s, %d mapped block%s, %d bank%s"
                   % (region_count, "" if region_count == 1 else "s",
-                     map_entries, "" if map_entries == 1 else "s")),         page_count, regions
+                     map_entries, "" if map_entries == 1 else "s",
+                     bank_count, "" if bank_count == 1 else "s")), \
+        page_count, regions
 
 
 def check_mem_tables(log, first, last, regions, verbose):

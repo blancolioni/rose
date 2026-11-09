@@ -1,6 +1,7 @@
 with Rose.Arch.Interrupt_Table;
 with Rose.Boot.Console;
 with Rose.Checkpoints;
+with Rose.Interface_Level;
 with Rose.Interfaces.Restorable;
 with Rose.Limits;
 
@@ -1151,6 +1152,10 @@ package body Rose.Kernel.Processes.Snapshot is
          Header.Next_Object_Id := Word_64 (Next_Object_Id);
          Header.Record_Page_Count := Word_32 (Record_Pages);
          Header.Record_Count := Word_32 (Record_Count);
+         Header.Interface_Major := Rose.Interface_Level.Series_Major;
+         Header.Interface_Minor := Rose.Interface_Level.Series_Minor;
+         Header.Interface_Level := Rose.Interface_Level.Level;
+         Header.Interface_Hash := Rose.Interface_Level.Hash;
          Rose.Kernel.Interrupts.Iterate_Cap_Handlers (Save_Interrupt'Access);
          if not Success then
             Page_Count := 0;

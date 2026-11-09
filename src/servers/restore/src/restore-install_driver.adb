@@ -1,6 +1,8 @@
 --  The install media's restore server.  It restores the last checkpoint,
 --  as the boot disk's does, and if there is none, or it can't be
---  restored, it installs a new system from the install media.
+--  restored, it installs a new system from the install media.  A
+--  checkpoint that this boot set can't read stops it before either
+--  (Restore.Start.Prepare, #375).
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -64,7 +66,7 @@ begin
 
       --  So that the disk boots without the install media.  Only a new
       --  system writes it; updating it on a disk that has a checkpoint
-      --  is #375.
+      --  is #828.
 
       Restore.Boot_Disk.Write_Boot_Loader;
    end if;

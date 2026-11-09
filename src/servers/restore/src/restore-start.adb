@@ -154,6 +154,20 @@ package body Restore.Start is
 
       Checkpoint := Restore.Checkpoint_Log.Find_Checkpoint (Log_Reader_Cap);
 
+      --  A checkpoint that this boot set can't read is neither restored
+      --  nor installed over (#375).  Restore exits before it has changed
+      --  anything, and the system idles with this on the screen.
+
+      if Restore.Checkpoint_Log.Refused then
+         Rose.Console_IO.Put_Line
+           ("restore: this boot set can't read the checkpoint on hd0, so it");
+         Rose.Console_IO.Put_Line
+           ("restore: neither restores it nor installs over it.  Boot the");
+         Rose.Console_IO.Put_Line
+           ("restore: release that wrote it, from hd0 or its install media");
+         Exit_Restore;
+      end if;
+
       --  The storage server needs its backing store either way: a restore
       --  recreates regions on it, and an install reserves them.
 
