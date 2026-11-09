@@ -35,6 +35,25 @@ package Store.Devices is
       return Rose.Capabilities.Capability;
    --  A bank below bank Id, with limits that are zero if it has none.
 
+   function Add_Dependent
+     (Id     : Rose.Objects.Capability_Identifier;
+      Signal : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+   --  Register a dependent object with bank Id (ADR 0014, section 3),
+   --  and return the cap for its Dependent interface: when the bank, or
+   --  a bank above it, is destroyed, raise Signal, and say Destroyed.
+   --  The null cap, and Signal deleted, if bank Id doesn't exist or
+   --  there is no room.
+
+   function Dependent_Destroyed
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  True if the bank of dependent Id has been destroyed.
+
+   procedure Release_Dependent
+     (Id : Rose.Objects.Capability_Identifier);
+   --  End the registration of dependent Id.
+
    procedure Get_Usage
      (Id           : in     Rose.Objects.Capability_Identifier;
       Pages        :    out Rose.Words.Word_64;
@@ -44,8 +63,9 @@ package Store.Devices is
 
    procedure Destroy_Bank
      (Id : Rose.Objects.Capability_Identifier);
-   --  Release every region charged to bank Id or below it, and destroy
-   --  them.  The root bank stays.
+   --  Release every region charged to bank Id or below it, mark their
+   --  dependents destroyed and raise their signals, and destroy the
+   --  banks.  The root bank stays.
 
    procedure Get_Range
      (Id    : Rose.Objects.Capability_Identifier;

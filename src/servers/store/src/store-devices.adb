@@ -9,6 +9,8 @@ with Rose.System_Calls.Server;
 
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Server;
+with Rose.Interfaces.Dependent;
+with Rose.Interfaces.Dependent.Server;
 with Rose.Interfaces.Block_Device.Client;
 with Rose.Interfaces.Region;
 with Rose.Interfaces.Region.Server;
@@ -150,6 +152,33 @@ package body Store.Devices is
      array (1 .. Max_Banks) of Bank_Record;
 
    Banks : Bank_Array;
+
+   Max_Dependents : constant := 256;
+
+   type Dependent_Record is
+      record
+         In_Use     : Boolean := False;
+         Bank       : Natural := 0;
+         Signal     : Rose.Capabilities.Capability := 0;
+         Access_Cap : Rose.Capabilities.Capability := 0;
+         Destroyed  : Boolean := False;
+      end record;
+   --  An object that a server keeps on behalf of Bank's holder (ADR 0014,
+   --  section 3).  Signal is the server's signal cap, which is raised
+   --  when the bank is destroyed, and deleted then.  Destroyed stays set
+   --  until the server releases the record.  Dependents aren't saved in
+   --  a checkpoint: a restored server adds them again.
+
+   type Dependent_Array is
+     array (1 .. Max_Dependents) of Dependent_Record;
+
+   Dependents : Dependent_Array;
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+   --  Delete one of the storage server's own caps, if it isn't null.
+
+   procedure Free_Dependent (Index : Positive);
+   --  Delete dependent Index's caps, and make its record free.
 
    Table_Page   : System.Storage_Elements.Storage_Array
                     (1 .. Rose.Limits.Page_Size)
@@ -386,6 +415,43 @@ package body Store.Devices is
       end;
 
    end Add_Backing_Store;
+
+   -------------------
+   -- Add_Dependent --
+   -------------------
+
+   function Add_Dependent
+     (Id     : Rose.Objects.Capability_Identifier;
+      Signal : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      Bank : constant Natural := Natural (Id);
+   begin
+      if Bank not in Banks'Range or else not Banks (Bank).In_Use then
+         Delete_Cap (Signal);
+         return 0;
+      end if;
+
+      for Index in Dependents'Range loop
+         if not Dependents (Index).In_Use then
+            Dependents (Index) :=
+              (In_Use     => True,
+               Bank       => Bank,
+               Signal     => Signal,
+               Access_Cap =>
+                 Rose.System_Calls.Server.Create_Endpoint
+                   (Create_Endpoint_Cap,
+                    Rose.Interfaces.Dependent.Dependent_Interface,
+                    Rose.Objects.Capability_Identifier (Index)),
+               Destroyed  => False);
+            return Dependents (Index).Access_Cap;
+         end if;
+      end loop;
+
+      Rose.Console_IO.Put_Line ("store: out of dependents");
+      Delete_Cap (Signal);
+      return 0;
+   end Add_Dependent;
 
    ------------
    -- Charge --
@@ -726,6 +792,37 @@ package body Store.Devices is
 
    end Create_Subregion;
 
+   ----------------
+   -- Delete_Cap --
+   ----------------
+
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Cap /= Rose.Capabilities.Null_Capability then
+         Rose.System_Calls.Initialize_Send
+           (Params, Rose.System_Calls.Delete_Cap_Capability);
+         Rose.System_Calls.Send_Cap (Params, Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end if;
+   end Delete_Cap;
+
+   -------------------------
+   -- Dependent_Destroyed --
+   -------------------------
+
+   function Dependent_Destroyed
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      Index : constant Natural := Natural (Id);
+   begin
+      return Index in Dependents'Range
+        and then Dependents (Index).In_Use
+        and then Dependents (Index).Destroyed;
+   end Dependent_Destroyed;
+
    ------------------
    -- Destroy_Bank --
    ------------------
@@ -758,6 +855,33 @@ package body Store.Devices is
          then
             Release (Rose.Objects.Capability_Identifier (Index));
          end if;
+      end loop;
+
+      --  The dependents of the doomed banks are told, by a signal that
+      --  never waits, and can be asked which they are until their
+      --  servers release them.  A signal that fails belongs to a server
+      --  that has ended, and its registration goes with it.
+
+      for Index in Dependents'Range loop
+         declare
+            Item : Dependent_Record renames Dependents (Index);
+         begin
+            if Item.In_Use
+              and then not Item.Destroyed
+              and then Item.Bank in Doomed'Range
+              and then Doomed (Item.Bank)
+            then
+               Item.Destroyed := True;
+               Rose.System_Calls.Initialize_Send (Params, Item.Signal);
+               Rose.System_Calls.Invoke_Capability (Params);
+               if Params.Control.Flags (Rose.Invocation.Error) then
+                  Free_Dependent (Index);
+               else
+                  Delete_Cap (Item.Signal);
+                  Item.Signal := 0;
+               end if;
+            end if;
+         end;
       end loop;
 
       for Index in Doomed'Range loop
@@ -912,6 +1036,20 @@ package body Store.Devices is
       Rose.Console_IO.Put (Bank_Total);
       Rose.Console_IO.New_Line;
    end Finish_Bank_Restore;
+
+   --------------------
+   -- Free_Dependent --
+   --------------------
+
+   procedure Free_Dependent (Index : Positive) is
+      Item : Dependent_Record renames Dependents (Index);
+   begin
+      Delete_Cap (Item.Signal);
+      Delete_Cap (Item.Access_Cap);
+      Rose.Interfaces.Dependent.Server.Remove_Instance
+        (Rose.Objects.Capability_Identifier (Index));
+      Item := (others => <>);
+   end Free_Dependent;
 
    ---------
    -- Get --
@@ -1509,6 +1647,20 @@ package body Store.Devices is
          Region := (others => <>);
       end;
    end Release;
+
+   -----------------------
+   -- Release_Dependent --
+   -----------------------
+
+   procedure Release_Dependent
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      Index : constant Natural := Natural (Id);
+   begin
+      if Index in Dependents'Range and then Dependents (Index).In_Use then
+         Free_Dependent (Index);
+      end if;
+   end Release_Dependent;
 
    ------------------
    -- Remove_Entry --

@@ -7,6 +7,7 @@
 16#0C71_2F14_FC76_5D30#  interface rose.interfaces.bank
 16#FAC1_38A6_BBDA_195B#  rose.interfaces.bank.reserve_storage(in word_64) return interface rose.interfaces.region
 16#6FB1_6F21_0682_F1B5#  rose.interfaces.bank.create_sub_bank(in word_64; in word) return interface rose.interfaces.bank
+16#EFCE_0218_4E9E_EED3#  rose.interfaces.bank.add_dependent(in capability) return interface rose.interfaces.dependent
 16#C5D3_9ADD_B33A_C8A6#  rose.interfaces.bank.get_usage(out word_64; out word; out word_64; out word)
 16#CA78_0884_E555_0CB1#  rose.interfaces.bank.destroy
 16#0BF4_E8D8_2E3F_6917#  interface rose.interfaces.block_device
@@ -37,6 +38,8 @@
 16#77F8_F7CD_04D8_3C52#  interface rose.interfaces.data_source
 16#695A_236E_7886_0DDA#  rose.interfaces.data_source.add_sink(in interface rose.interfaces.writer)
 16#D98E_13F8_1C69_B17C#  rose.interfaces.data_source.remove_sink
+16#A5A9_AA31_133D_61D2#  interface rose.interfaces.dependent
+16#EAF2_6E43_CB9E_7736#  rose.interfaces.dependent.destroyed return boolean
 16#01C5_FBB7_19DE_112A#  interface rose.interfaces.directory
 16#ADDF_FA0F_D647_4D75#  rose.interfaces.directory.directory_entry_count return natural
 16#DB37_1B14_7C74_740F#  rose.interfaces.directory.directory_entry_name(in positive) return string
