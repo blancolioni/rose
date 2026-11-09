@@ -68,7 +68,16 @@ screen () {
 }
 
 type_text () {
-    python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
+    # type_text TEXT: type TEXT, holding each key while a checkpoint runs
+    # (qemu-keys.py, #807)
+    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
+}
+
+press () {
+    # press KEY...: press keys by their QEMU names, such as up or ctrl-s,
+    # holding each while a checkpoint runs
+    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" \
+        --key "$@"
 }
 
 wait_for () {
@@ -99,7 +108,9 @@ answer_install () {
     # once, when it is on the last line of SCREEN, a file of the screen's
     # text: the first user's name and password, the password again, and
     # the enter that reboots the machine.
-    last=$(grep -v '^ *$' "$1" | tail -1)
+    # A line of only "?" is the cursor, which fb-text.py can't read, on
+    # the line after the question.
+    last=$(grep -v -e '^ *$' -e '^ *? *$' "$1" | tail -1)
     case "$answered:$last" in
         :*"User name:"*)
             type_text "$first_user
@@ -191,7 +202,7 @@ check_keytest () {
 "
     wait_for "keytest [0-9]" 30 || fail "keytest did not start"
     for key in up up left; do
-        monitor "sendkey $key"
+        press $key
     done
     sleep 3
     screen > "$WORK/keytest.txt"
@@ -214,9 +225,9 @@ check_kilo () {
 "
     wait_for "HELP: Ctrl-S" 30 || fail "kilo did not start"
     type_text "hello from kilo"
-    monitor "sendkey ctrl-s"
+    press ctrl-s
     wait_for "16 bytes written" 20 || fail "kilo did not save"
-    monitor "sendkey ctrl-q"
+    press ctrl-q
     sleep 3
     type_text "cat notes
 "
@@ -225,11 +236,11 @@ check_kilo () {
     type_text "kilo notes
 "
     wait_for "kilo - 1 lines" 30 || fail "kilo did not read the file"
-    monitor "sendkey down"
+    press down
     type_text "second line"
-    monitor "sendkey ctrl-s"
+    press ctrl-s
     wait_for "28 bytes written" 20 || fail "kilo did not save a second line"
-    monitor "sendkey ctrl-q"
+    press ctrl-q
     sleep 3
     type_text "cat notes
 "
@@ -241,7 +252,7 @@ check_kilo () {
     type_text "dropped"
     wait_for "(modified)" 20 || fail "kilo did not mark the change"
     for i in 1 2 3 4; do
-        monitor "sendkey ctrl-q"
+        press ctrl-q
         sleep 1
     done
     sleep 3
