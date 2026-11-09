@@ -56,6 +56,7 @@ begin
                Success := False;
          end;
          Tests_Run := Tests_Run + 1;
+         Ada.Text_IO.Set_Col (50);
          if Success then
             Ada.Text_IO.Put_Line ("PASS");
             Tests_Passed := Tests_Passed + 1;
