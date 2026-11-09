@@ -22,7 +22,8 @@ package body Store.Devices is
 
    Max_Backing_Stores  : constant := 16;
    Max_Regions         : constant := 256;
-   Max_Banks           : constant := 64;
+   Max_Banks           : constant := 256;
+   --  A bank for each process (ADR 0015, #750), user and session (#450).
    Block_Size_Bits     : constant := 2;
    Store_Size_Bits     : constant := 21;
    Minimum_Block_Pages : constant := 2 ** Block_Size_Bits;
@@ -159,6 +160,8 @@ package body Store.Devices is
      with Import, Address => Table_Page'Address;
    Map_Table    : Rose.Checkpoints.Map_Page
      with Import, Address => Table_Page'Address;
+   Bank_Table   : Rose.Checkpoints.Bank_Page
+     with Import, Address => Table_Page'Address;
    --  The page in which Checkpoint builds the region table.
 
    Restore_Region_Count : Natural := 0;
@@ -166,10 +169,24 @@ package body Store.Devices is
    Restore_First_Map    : Natural := 0;
    Restore_Last_Map     : Natural := 0;
    Restore_Entry_Count  : Natural := 0;
+   Restore_Regions_Left : Natural := 0;
+   Restore_First_Bank   : Natural := 0;
+   Restore_Last_Bank    : Natural := 0;
+   Restore_Banks_Left   : Natural := 0;
    --  While a restore gives the tables back: the regions they hold, the
    --  last table page that holds regions, the table pages that hold the
-   --  map (zero if there are none), and the entries of the map still to
-   --  come.
+   --  map (zero if there are none), the entries of the map still to
+   --  come, the regions whose banks are still to come, the table pages
+   --  that hold the banks, and the banks still to come.
+
+   procedure Restore_Banks (Page : System.Storage_Elements.Storage_Array);
+   --  Recreate the banks in a table page of them, each with the index
+   --  that the caps for it carry.
+
+   procedure Finish_Bank_Restore;
+   --  After the last bank: put a region whose bank wasn't restored, or a
+   --  bank whose parent wasn't, under the root bank, and say so, then
+   --  charge each bank again for its regions and their blocks.
 
    function New_Region return Natural;
    --  The index of a region that is not in use, or zero if there is none.
@@ -402,6 +419,9 @@ package body Store.Devices is
       Slot        : Natural := 0;
       Map_Pages   : Natural;
       Entry_Slot  : Natural := 0;
+      Bank_Count  : Natural := 0;
+      Bank_Pages  : Natural;
+      Bank_Slot   : Natural := 0;
 
       procedure Append;
       --  Append Table_Page to the log, and clear it.
@@ -421,13 +441,22 @@ package body Store.Devices is
       end Append;
 
    begin
+      Create_Root_Bank;
+
       for Region of Regions (1 .. Region_Count) loop
          if Region.In_Use then
             Count := Count + 1;
          end if;
       end loop;
 
+      for Bank of Banks loop
+         if Bank.In_Use then
+            Bank_Count := Bank_Count + 1;
+         end if;
+      end loop;
+
       Map_Pages := (Map_Count + Entries_Per_Page - 1) / Entries_Per_Page;
+      Bank_Pages := (Bank_Count + Banks_Per_Page - 1) / Banks_Per_Page;
 
       Table_Page := (others => 0);
       Table_Header.Magic := Store_Table_Magic;
@@ -436,10 +465,12 @@ package body Store.Devices is
       Table_Header.Page_Count :=
         Rose.Words.Word_32
           (1 + (Count + Regions_Per_Page - 1) / Regions_Per_Page
-           + Map_Pages);
+           + Map_Pages + Bank_Pages);
       Table_Header.Region_Count := Rose.Words.Word_32 (Count);
       Table_Header.Map_Page_Count := Rose.Words.Word_32 (Map_Pages);
       Table_Header.Map_Entry_Count := Rose.Words.Word_32 (Map_Count);
+      Table_Header.Bank_Count := Rose.Words.Word_32 (Bank_Count);
+      Table_Header.Bank_Page_Count := Rose.Words.Word_32 (Bank_Pages);
       Append;
 
       for Index in 1 .. Region_Count loop
@@ -455,7 +486,7 @@ package body Store.Devices is
                     Base   => Rose.Words.Word_64 (Region.Base),
                     Bound  => Rose.Words.Word_64 (Region.Bound),
                     Blocks => Rose.Words.Word_32 (Region.Mapped_Blocks),
-                    Reserved => 0);
+                    Bank   => Rose.Words.Word_32 (Region.Bank));
                if Slot = Regions_Per_Page then
                   Append;
                   Slot := 0;
@@ -486,6 +517,30 @@ package body Store.Devices is
       end loop;
 
       if Entry_Slot > 0 then
+         Append;
+      end if;
+
+      --  Then the banks.
+
+      for Index in Banks'Range loop
+         if Banks (Index).In_Use then
+            Bank_Slot := Bank_Slot + 1;
+            Bank_Table.Banks (Bank_Slot) :=
+              Saved_Bank'
+                (Index        => Rose.Words.Word_32 (Index),
+                 Parent       => Rose.Words.Word_32 (Banks (Index).Parent),
+                 Page_Limit   => Banks (Index).Page_Limit,
+                 Region_Limit =>
+                   Rose.Words.Word_32 (Banks (Index).Region_Limit),
+                 Reserved     => 0);
+            if Bank_Slot = Banks_Per_Page then
+               Append;
+               Bank_Slot := 0;
+            end if;
+         end if;
+      end loop;
+
+      if Bank_Slot > 0 then
          Append;
       end if;
 
@@ -793,6 +848,70 @@ package body Store.Devices is
       Rose.Console_IO.New_Line;
       return Rose.Capabilities.Null_Capability;
    end Find_Region;
+
+   -------------------------
+   -- Finish_Bank_Restore --
+   -------------------------
+
+   procedure Finish_Bank_Restore is
+      Bank_Total : Natural := 0;
+   begin
+      for Index in Banks'Range loop
+         if Banks (Index).In_Use
+           and then Index /= Root_Bank
+           and then (Banks (Index).Parent not in Banks'Range
+                     or else not Banks (Banks (Index).Parent).In_Use
+                     or else Banks (Index).Parent = Index)
+         then
+            Rose.Console_IO.Put ("storage: restore: bank ");
+            Rose.Console_IO.Put (Index);
+            Rose.Console_IO.Put (": its parent ");
+            Rose.Console_IO.Put (Banks (Index).Parent);
+            Rose.Console_IO.Put_Line
+              (" was not restored; it is now under the root bank");
+            Banks (Index).Parent := Root_Bank;
+         end if;
+      end loop;
+
+      for Bank of Banks loop
+         Bank.Pages := 0;
+         Bank.Regions := 0;
+         if Bank.In_Use then
+            Bank_Total := Bank_Total + 1;
+         end if;
+      end loop;
+
+      for Index in 1 .. Region_Count loop
+         declare
+            Region : Region_Record renames Regions (Index);
+         begin
+            if Region.In_Use then
+               if Region.Bank not in Banks'Range
+                 or else not Banks (Region.Bank).In_Use
+               then
+                  Rose.Console_IO.Put ("storage: restore: region ");
+                  Rose.Console_IO.Put (Index);
+                  Rose.Console_IO.Put (": its bank ");
+                  Rose.Console_IO.Put (Region.Bank);
+                  Rose.Console_IO.Put_Line
+                    (" was not restored; it is now charged to the root "
+                     & "bank");
+                  Region.Bank := Root_Bank;
+               end if;
+
+               Charge
+                 (Region.Bank,
+                  Rose.Words.Word_64 (Region.Mapped_Blocks)
+                  * Minimum_Block_Pages,
+                  1);
+            end if;
+         end;
+      end loop;
+
+      Rose.Console_IO.Put ("storage: restore: banks: ");
+      Rose.Console_IO.Put (Bank_Total);
+      Rose.Console_IO.New_Line;
+   end Finish_Bank_Restore;
 
    ---------
    -- Get --
@@ -1525,6 +1644,55 @@ package body Store.Devices is
    end Reserve_Storage;
 
    -------------------
+   -- Restore_Banks --
+   -------------------
+
+   procedure Restore_Banks (Page : System.Storage_Elements.Storage_Array) is
+      use Rose.Checkpoints;
+      Table : Bank_Page
+        with Import, Address => Page'Address;
+      Last  : constant Natural :=
+                Natural'Min (Restore_Banks_Left, Banks_Per_Page);
+   begin
+      for I in 1 .. Last loop
+         declare
+            Saved : Saved_Bank renames Table.Banks (I);
+            Index : constant Natural := Natural (Saved.Index);
+         begin
+            if Index not in Banks'Range
+              or else (Index /= Root_Bank and then Banks (Index).In_Use)
+            then
+               Rose.Console_IO.Put ("storage: restore: bank ");
+               Rose.Console_IO.Put (Index);
+               Rose.Console_IO.Put_Line (" is not free");
+            elsif Index = Root_Bank then
+
+               --  Restore_Region made the root bank already.
+
+               Create_Root_Bank;
+               Banks (Root_Bank).Page_Limit := Saved.Page_Limit;
+               Banks (Root_Bank).Region_Limit :=
+                 Rose.Words.Word (Saved.Region_Limit);
+            else
+               Banks (Index) :=
+                 (In_Use       => True,
+                  Parent       => Natural (Saved.Parent),
+                  Access_Cap   =>
+                    Rose.System_Calls.Server.Create_Endpoint
+                      (Create_Endpoint_Cap,
+                       Rose.Interfaces.Bank.Bank_Interface,
+                       Rose.Objects.Capability_Identifier (Index)),
+                  Page_Limit   => Saved.Page_Limit,
+                  Region_Limit => Rose.Words.Word (Saved.Region_Limit),
+                  others       => <>);
+            end if;
+         end;
+      end loop;
+
+      Restore_Banks_Left := Restore_Banks_Left - Last;
+   end Restore_Banks;
+
+   -------------------
    -- Restore_Entry --
    -------------------
 
@@ -1576,10 +1744,9 @@ package body Store.Devices is
          return;
       end if;
 
-      --  Banks aren't saved yet (ADR 0014), so the blocks are charged to
-      --  the root bank, like the regions.
+      --  Banks are charged for the blocks once they are all restored
+      --  (Finish_Bank_Restore).
 
-      Charge (Root_Bank, Minimum_Block_Pages, 0);
       Regions (Owner).Mapped_Blocks := Regions (Owner).Mapped_Blocks + 1;
    end Restore_Entry;
 
@@ -1623,10 +1790,8 @@ package body Store.Devices is
            Writes         => 0,
            Bank           => Root_Bank);
 
-      --  Banks aren't saved yet (ADR 0014), so every region is charged to
-      --  the root bank.
-
-      Charge (Root_Bank, 0, 1);
+      --  The region's bank comes with the table pages, and the banks are
+      --  charged once they are all restored (Finish_Bank_Restore).
 
       Region_Count := Natural'Max (Region_Count, Index);
    end Restore_Region;
@@ -1660,10 +1825,15 @@ package body Store.Devices is
             Restore_First_Map := 0;
             Restore_Last_Map := 0;
             Restore_Entry_Count := 0;
+            Restore_Regions_Left := 0;
+            Restore_First_Bank := 0;
+            Restore_Last_Bank := 0;
+            Restore_Banks_Left := 0;
 
             if Header.Magic = Store_Table_Magic
               and then Header.Version = Store_Table_Version
               and then Natural (Header.Region_Count) <= Max_Regions
+              and then Natural (Header.Bank_Count) in 1 .. Max_Banks
             then
                Next_Page :=
                  Rose.Objects.Object_Id'Max
@@ -1676,8 +1846,49 @@ package body Store.Devices is
                Restore_Last_Map :=
                  Restore_Last_Region + Natural (Header.Map_Page_Count);
                Restore_Entry_Count := Natural (Header.Map_Entry_Count);
+               Restore_Regions_Left := Restore_Region_Count;
+               Restore_First_Bank := Restore_Last_Map + 1;
+               Restore_Last_Bank :=
+                 Restore_Last_Map + Natural (Header.Bank_Page_Count);
+               Restore_Banks_Left := Natural (Header.Bank_Count);
+            else
+               Rose.Console_IO.Put_Line
+                 ("storage: restore: the table header is not one I read");
             end if;
          end;
+
+      elsif Index in 2 .. Restore_Last_Region then
+
+         --  The regions are recreated already: set each one's bank.
+
+         declare
+            Table : Region_Page
+              with Import, Address => Page'Address;
+            Last  : constant Natural :=
+                      Natural'Min (Restore_Regions_Left, Regions_Per_Page);
+         begin
+            for I in 1 .. Last loop
+               declare
+                  Saved  : Saved_Region renames Table.Regions (I);
+                  Region : constant Natural := Natural (Saved.Index);
+               begin
+                  if Region in 1 .. Region_Count
+                    and then Regions (Region).In_Use
+                  then
+                     Regions (Region).Bank := Natural (Saved.Bank);
+                  end if;
+               end;
+            end loop;
+
+            Restore_Regions_Left := Restore_Regions_Left - Last;
+         end;
+
+      elsif Index in Restore_First_Bank .. Restore_Last_Bank then
+         Restore_Banks (Page);
+
+         if Index = Restore_Last_Bank then
+            Finish_Bank_Restore;
+         end if;
 
       elsif Index in Restore_First_Map .. Restore_Last_Map then
          declare
