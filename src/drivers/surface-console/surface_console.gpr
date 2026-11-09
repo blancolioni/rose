@@ -24,12 +24,13 @@ project Surface_Console is
 
    package Builder is
       for Global_Configuration_Pragmas use "pragmas.config";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
       for Executable ("surface_console-driver.adb") use "surface-console";
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is
