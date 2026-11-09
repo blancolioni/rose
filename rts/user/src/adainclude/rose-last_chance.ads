@@ -7,6 +7,14 @@ package Rose.Last_Chance is
 
    pragma Preelaborate;
 
+   Failed : exception;
+   --  Raised with a message, this fails the program with that message
+   --  alone: the last chance handler gives the Failure handler the
+   --  message, without "unhandled exception" and the exception's name. A
+   --  command raises it, as Rose.Command_Line.Command_Failed, to fail its
+   --  launch call with a message for the user (#802). Any other exception
+   --  is a bug, and is reported with its name.
+
    type Failure_Handler is access procedure (Message : String);
 
    procedure Set_Handler (Handler : Failure_Handler);
