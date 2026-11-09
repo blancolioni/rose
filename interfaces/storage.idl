@@ -1,15 +1,13 @@
 interface Storage is
 
-   function Reserve_Storage
-     (Size   : Word_64)
-     return interface Region;
-   
+   --  Storage is reserved from a bank (ADR 0014, #449): the root bank,
+   --  or a bank below it.
+
    procedure Add_Backing_Store
      (Store  : interface Block_Device);
 
    function Get_Root_Bank
      return interface Bank;
-   --  The bank that every other is a sub-bank of. Reserve_Storage
-   --  reserves from it, until the callers use a bank of their own.
+   --  The bank that every other is a sub-bank of.
      
 end Storage;

@@ -1,4 +1,3 @@
-with Rose.Objects;
 with Rose.Words;
 
 with Rose.Console_IO;
@@ -15,11 +14,6 @@ with Rose.Interfaces.Reader.Server;
 with Store.Devices;
 
 package body Store.Server is
-
-   function Reserve_Storage
-     (Id    : in     Rose.Objects.Capability_Identifier;
-      Size  : in     Rose.Words.Word_64)
-      return Rose.Capabilities.Capability;
 
    -------------------
    -- Create_Server --
@@ -47,7 +41,6 @@ package body Store.Server is
 
       Rose.Interfaces.Storage.Server.Create_Server
         (Server_Context    => Server_Context,
-         Reserve_Storage   => Reserve_Storage'Access,
          Add_Backing_Store => Store.Devices.Add_Backing_Store'Access,
          Get_Root_Bank     => Store.Devices.Get_Root_Bank'Access);
       Rose.Interfaces.Bank.Server.Attach_Interface
@@ -85,20 +78,6 @@ package body Store.Server is
          Restore_Table_Page => Store.Devices.Restore_Table_Page'Access,
          Find_Region        => Store.Devices.Find_Region'Access);
    end Create_Server;
-
-   ---------------------
-   -- Reserve_Storage --
-   ---------------------
-
-   function Reserve_Storage
-     (Id    : in     Rose.Objects.Capability_Identifier;
-      Size  : in     Rose.Words.Word_64)
-      return Rose.Capabilities.Capability
-   is
-      pragma Unreferenced (Id);
-   begin
-      return Store.Devices.Reserve_Storage (Size);
-   end Reserve_Storage;
 
    ------------------
    -- Start_Server --

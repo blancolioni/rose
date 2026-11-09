@@ -371,7 +371,7 @@ package body Exec.Server is
    is
    begin
       Rose.System_Calls.Send_Cap (Params, Exec.Library.Image_Region (Id));
-      Rose.System_Calls.Send_Cap (Params, Storage_Cap);
+      Rose.System_Calls.Send_Cap (Params, Bank_Cap);
    end Send_Image;
 
    -------------------------
