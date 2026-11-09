@@ -273,11 +273,19 @@ package Rose.Checkpoints is
    --  aren't in the map are all fresh.  The storage server reads the map
    --  back itself (Storage_Checkpoint.Restore_Table_Page).
    --
+   --  The banks come last (ADR 0014, #518): Bank_Page_Count pages, which
+   --  hold Bank_Count banks, Banks_Per_Page to a page, each with its
+   --  index, which the caps for it carry as their identifier, its parent
+   --  (zero for the root bank) and its limits.  A region is saved with
+   --  the bank it is charged to.  What a bank has been charged isn't
+   --  saved: the storage server works it out again from the regions and
+   --  the map.
+   --
    --  Version 3 replaced the space of each region and its fresh pages
-   --  with the map.
+   --  with the map, and version 4 added the banks.
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 3;
+   Store_Table_Version : constant := 4;
 
    type Store_Table_Header is
       record
@@ -289,8 +297,10 @@ package Rose.Checkpoints is
          Region_Count     : Rose.Words.Word_32 := 0;
          Map_Page_Count   : Rose.Words.Word_32 := 0;
          Map_Entry_Count  : Rose.Words.Word_32 := 0;
+         Bank_Count       : Rose.Words.Word_32 := 0;
+         Bank_Page_Count  : Rose.Words.Word_32 := 0;
          Reserved         : System.Storage_Elements.Storage_Array
-                              (1 .. Rose.Limits.Page_Size - 36) :=
+                              (1 .. Rose.Limits.Page_Size - 44) :=
                                 (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
@@ -302,7 +312,7 @@ package Rose.Checkpoints is
          Base     : Rose.Words.Word_64 := 0;
          Bound    : Rose.Words.Word_64 := 0;
          Blocks   : Rose.Words.Word_32 := 0;
-         Reserved : Rose.Words.Word_32 := 0;
+         Bank     : Rose.Words.Word_32 := 0;
       end record
      with Pack, Size => 256;
 
@@ -315,6 +325,31 @@ package Rose.Checkpoints is
    type Region_Page is
       record
          Regions : Saved_Region_Array;
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   type Saved_Bank is
+      record
+         Index        : Rose.Words.Word_32 := 0;
+         Parent       : Rose.Words.Word_32 := 0;
+         Page_Limit   : Rose.Words.Word_64 := 0;
+         Region_Limit : Rose.Words.Word_32 := 0;
+         Reserved     : Rose.Words.Word_32 := 0;
+      end record
+     with Pack, Size => 192;
+
+   Banks_Per_Page : constant := Rose.Limits.Page_Size / 24;
+
+   type Saved_Bank_Array is
+     array (1 .. Banks_Per_Page) of Saved_Bank
+     with Pack, Size => Banks_Per_Page * 192;
+
+   type Bank_Page is
+      record
+         Banks    : Saved_Bank_Array;
+         Reserved : System.Storage_Elements.Storage_Array
+                      (1 .. Rose.Limits.Page_Size - Banks_Per_Page * 24) :=
+                        (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 

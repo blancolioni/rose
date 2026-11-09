@@ -116,7 +116,7 @@ An entry holds these parts, in order (`Rose.Checkpoints`):
 | Part | Contents
 | Kernel tables | A header page, with the interrupts that persistent processes handle, the next process object id, and the interfaces of the boot set that wrote it; the pages of derivation records; then, for each persistent process, a record page and the pages of its capabilities.
 A process record holds its object id, state, registers and invocation records, the processes waiting to send to it, its endpoints, and its FPU state.
-| Store tables | A header page; the regions, each with its range of page object ids; then the map, which gives the space on the backing store of each block of 4 pages that has any, and which of its pages are still fresh.
+| Store tables | A header page; the regions, each with its range of page object ids and its bank; then the map, which gives the space on the backing store of each block of 4 pages that has any, and which of its pages are still fresh; then the banks, each with its parent and its limits. What a bank has been charged isn't saved: the storage server works it out again from the regions and the map.
 | Memory tables | A header page, then a record for each persistent process: its object id, `mem`'s own id for it, and its segments, each with its region.
 | Memory header pages | The dirty pages that follow, each named by `mem`'s id for the process and its virtual page.
 | Dirty pages | The pages themselves, in the order the header pages list them.

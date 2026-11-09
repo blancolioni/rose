@@ -481,9 +481,11 @@ package body Restore.Checkpoint_Log is
       Store_Pages : out Natural)
       return Boolean
    is
-      Count     : Natural;
-      Map_Pages : Natural;
-      Entries   : Natural;
+      Count      : Natural;
+      Map_Pages  : Natural;
+      Entries    : Natural;
+      Bank_Pages : Natural;
+      Bank_Count : Natural;
    begin
       Store_Pages := 0;
       Region_Count := 0;
@@ -513,15 +515,21 @@ package body Restore.Checkpoint_Log is
       Count := Natural (Store_Header.Region_Count);
       Map_Pages := Natural (Store_Header.Map_Page_Count);
       Entries := Natural (Store_Header.Map_Entry_Count);
+      Bank_Pages := Natural (Store_Header.Bank_Page_Count);
+      Bank_Count := Natural (Store_Header.Bank_Count);
 
       if Count > Max_Regions
         or else Store_Pages
           /= 1 + (Count + Rose.Checkpoints.Regions_Per_Page - 1)
                / Rose.Checkpoints.Regions_Per_Page
-               + Map_Pages
+               + Map_Pages + Bank_Pages
         or else Map_Pages
           /= (Entries + Rose.Checkpoints.Entries_Per_Page - 1)
              / Rose.Checkpoints.Entries_Per_Page
+        or else Bank_Count = 0
+        or else Bank_Pages
+          /= (Bank_Count + Rose.Checkpoints.Banks_Per_Page - 1)
+             / Rose.Checkpoints.Banks_Per_Page
         or else First + Store_Pages - 1 > Pages
       then
          Report_Bad_Entry (Location, "storage tables page count is wrong");
