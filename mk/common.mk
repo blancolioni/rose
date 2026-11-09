@@ -17,6 +17,22 @@ endif
 ARCH=i686
 GCC=gcc
 
+# How each part of the build is optimised (#789). Each is built with -g
+# as well, so that a fault's address can be traced to its source.
+#
+#   kernel                 -O3   projects/kernel_i686.gpr; its C and
+#                                assembler (src/asm/i686/Makefile), and
+#                                src/library/util.c, which the kernel and
+#                                the servers link, -O3
+#   kernel RTS             -O2   rts/kernel/rts.gpr
+#   servers (boot modules) -O3   each server's project (src/servers/*)
+#   userland RTS, Ada      -O3   rts/user/rts.gpr
+#   userland RTS, C        -O2   rts/user/support/Makefile
+#   userland programs      -O3   projects/checks.gpr, Optimisation_Switches
+#   _start                 -     rts/user/start/start.c is assembler
+#
+# GCC_OPTS below has no -O: the servers only link with it.
+
 # What the servers' C is compiled with, and the library's util.c, which
 # they link.
 GCC_OPTS=-std=gnu99 -ffreestanding -g -finline-limit=3000 -fno-strict-aliasing -Wall -Winline -Wno-format -Wno-char-subscripts -Werror -m32 -nostdinc -nostdlib

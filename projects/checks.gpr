@@ -1,5 +1,7 @@
---  The run-time checks that the userland programs (the drivers and the
---  utilities) are compiled with.
+--  The run-time checks, and the optimisation, that the userland programs
+--  (the drivers and the utilities) are compiled with. Each program's
+--  project adds Switches and Optimisation_Switches to its compiler's
+--  switches, so they are set here, once (#789).
 --
 --  checked (the default) keeps the checks that Ada has by default, such as
 --  range, index and discriminant checks, and adds overflow checks and
@@ -23,5 +25,10 @@ abstract project Checks is
       when "checked"   => null;
       when "unchecked" => Switches := Switches & ("-gnatp");
    end case;
+
+   Optimisation_Switches := ("-O3");
+   --  Every userland program is optimised; it is also built with -g, so
+   --  a fault's address can still be traced to its source (see
+   --  mk/common.mk for the optimisation of the rest of the build).
 
 end Checks;

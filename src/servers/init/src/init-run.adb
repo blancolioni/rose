@@ -115,9 +115,12 @@ package body Init.Run is
                        Rose.Capabilities.Null_Capability;
       --  The command registry's Commands interface (#460).
 
-      First_User     : constant String := "fraser";
-      First_Password : constant String := "rose";
-      --  Until the installer asks for them (#456).
+      First_User     : String (1 .. Init.Users.Max_Name_Length);
+      First_Last     : Natural := 0;
+      First_Password : String (1 .. Init.Users.Max_Password_Length);
+      Password_Last  : Natural := 0;
+      --  The first user's name and password, which the person installing
+      --  types (#456).
       Auth_Cap       : Rose.Capabilities.Capability;
       Auth_Admin_Cap : Rose.Capabilities.Capability;
       User_Cap       : Rose.Capabilities.Capability;
@@ -661,24 +664,38 @@ package body Init.Run is
       Rose.System_Calls.Delete_Cap (Clock_Admin_Cap);
       Clock_Admin_Cap := Null_Capability;
 
-      --  The first user, with a home directory (ADR 0003). Init runs
-      --  only on a fresh boot, so it is created once.
+      --  The first user, with a home directory (ADR 0003), whose name and
+      --  password the person installing types (#456). Init runs only on
+      --  a fresh boot, so it is created once.
+
+      Init.Users.Ask_First_User
+        (Console       => Console_Terminal_Cap,
+         Output        => Console_Stream_Cap,
+         Name          => First_User,
+         Name_Last     => First_Last,
+         Password      => First_Password,
+         Password_Last => Password_Last);
 
       Init.Calls.Send_String
-        (Console_Stream_Cap, "creating user " & First_User & NL);
+        (Console_Stream_Cap,
+         "creating user " & First_User (1 .. First_Last) & NL);
       Init.Users.Create_First_User
-        (Name     => First_User,
-         Password => First_Password,
+        (Name     => First_User (1 .. First_Last),
+         Password => First_Password (1 .. Password_Last),
          Admin    => Auth_Admin_Cap,
          User     => User_Cap,
          Home     => Home_Cap);
       if User_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
            (Console_Stream_Cap,
-            "init: unable to create user " & First_User & NL);
-      elsif Init.Users.Check_Login (Auth_Cap, First_User, First_Password)
+            "init: unable to create user " & First_User (1 .. First_Last)
+            & NL);
+      elsif Init.Users.Check_Login
+          (Auth_Cap, First_User (1 .. First_Last),
+           First_Password (1 .. Password_Last))
         and then not Init.Users.Check_Login
-          (Auth_Cap, First_User, First_Password & "x")
+          (Auth_Cap, First_User (1 .. First_Last),
+           First_Password (1 .. Password_Last) & "x")
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "auth: login checked" & NL);
@@ -695,11 +712,13 @@ package body Init.Run is
 
       if User_Cap /= Null_Capability then
          if not Init.Users.Allow
-           (Rights_Admin_Cap, First_User, "*", Init.Users.Mode_Elevate)
+           (Rights_Admin_Cap, First_User (1 .. First_Last), "*",
+            Init.Users.Mode_Elevate)
          then
             Init.Calls.Send_String
               (Console_Stream_Cap,
-               "init: unable to set the policy of " & First_User & NL);
+               "init: unable to set the policy of "
+               & First_User (1 .. First_Last) & NL);
          elsif Init.Users.Check_Rights
            (Rights_Cap, User_Cap, "Clock_Admin_Service")
          then
@@ -712,6 +731,16 @@ package body Init.Run is
       end if;
       Rose.System_Calls.Delete_Cap (Rights_Admin_Cap);
       Rights_Admin_Cap := Null_Capability;
+
+      --  The person installing has seen the install finish. The restart
+      --  waits for them, and comes before login runs, which would read
+      --  the console too (#456).
+
+      Init.Users.Wait_For_Enter
+        (Console => Console_Terminal_Cap,
+         Output  => Console_Stream_Cap,
+         Message => NL & "The system is installed. Press enter to reboot."
+                    & NL);
 
       --  The console runs login, which asks for a user name and password
       --  and runs petal for the user (#457, #458).

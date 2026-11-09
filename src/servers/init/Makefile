@@ -40,6 +40,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-reader.o \
 	$(BUILDDIR)/rose-interfaces-storage-client.o \
+	$(BUILDDIR)/rose-interfaces-terminal.o \
+	$(BUILDDIR)/rose-interfaces-terminal-client.o \
 	$(BUILDDIR)/rose-interfaces-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-user.o \
 	$(BUILDDIR)/rose-interfaces-user-client.o \

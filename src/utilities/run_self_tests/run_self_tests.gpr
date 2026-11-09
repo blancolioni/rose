@@ -22,11 +22,12 @@ project Run_Self_Tests is
       for Global_Configuration_Pragmas use "run_self_tests-pragmas.config";
       for Executable ("rose-core-run_self_tests_main.adb")
         use "run_self_tests-driver";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is

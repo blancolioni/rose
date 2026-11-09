@@ -1,4 +1,4 @@
-with Ada.Containers.Doubly_Linked_Lists;
+with Ada.Containers.Indefinite_Ordered_Maps;
 
 with System.Storage_Elements;
 
@@ -46,8 +46,11 @@ package body Auth_Server is
          User       : Rose.Capabilities.Capability;
       end record;
 
-   package User_Lists is
-     new Ada.Containers.Doubly_Linked_Lists (User_Record);
+   package User_Maps is
+     new Ada.Containers.Indefinite_Ordered_Maps
+       (Key_Type     => String,
+        Element_Type => User_Record);
+   --  The users, by name (#490).
 
    subtype User_Class is Rose.Interfaces.User.User_Object'Class;
 
@@ -82,7 +85,7 @@ package body Auth_Server is
       Password : String)
       return User_Class;
 
-   Users     : User_Lists.List;
+   Users     : User_Maps.Map;
    Context   : Rose.Server.Server_Context;
    Programs  : Rose.Interfaces.Commands.Client.Commands_Client;
    The_Auth  : aliased Auth_Object;
@@ -91,8 +94,6 @@ package body Auth_Server is
    function No_User return User_Class
    is (Rose.Interfaces.User.Client.From_Cap
          (Rose.Capabilities.Null_Capability));
-
-   function Find (Name : String) return User_Lists.Cursor;
 
    procedure Hash_Password
      (Password   : String;
@@ -154,24 +155,6 @@ package body Auth_Server is
       Rose.Interfaces.Auth.Server.Publish (Context, The_Auth'Access);
       Rose.Interfaces.Auth_Admin.Server.Attach (Context, The_Admin'Access);
    end Create_Server;
-
-   ----------
-   -- Find --
-   ----------
-
-   function Find (Name : String) return User_Lists.Cursor is
-   begin
-      for Position in Users.Iterate loop
-         declare
-            Item : User_Record renames Users (Position);
-         begin
-            if Item.Name (1 .. Item.Name_Last) = Name then
-               return Position;
-            end if;
-         end;
-      end loop;
-      return User_Lists.No_Element;
-   end Find;
 
    -------------------
    -- Hash_Password --
@@ -247,10 +230,10 @@ package body Auth_Server is
       return User_Class
    is
       pragma Unreferenced (Item);
-      Position : constant User_Lists.Cursor := Find (Name);
+      Position : constant User_Maps.Cursor := Users.Find (Name);
       Hash     : Storage_Array (1 .. Hash_Length);
    begin
-      if not User_Lists.Has_Element (Position) then
+      if not User_Maps.Has_Element (Position) then
 
          --  Take as long as for a user who exists, so that the time does
          --  not tell which names do.
@@ -292,7 +275,7 @@ package body Auth_Server is
       User     : Rose.Capabilities.Capability;
    begin
       if Name'Length = 0 or else Name'Length > Max_Name_Length
-        or else User_Lists.Has_Element (Find (Name))
+        or else Users.Contains (Name)
       then
          return No_User;
       end if;
@@ -345,7 +328,7 @@ package body Auth_Server is
       end if;
 
       New_Item.User := User;
-      Users.Append (New_Item);
+      Users.Insert (New_Item.Name (1 .. New_Item.Name_Last), New_Item);
 
       return Rose.Interfaces.User.Client.From_Cap (User);
    end New_User;
