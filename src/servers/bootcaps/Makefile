@@ -2,18 +2,19 @@ ROOT=../../..
 include $(ROOT)/mk/common.mk
 
 BUILDDIR=./build/obj
-RELOC=$(BUILDDIR)/caps.reloc.o
+RELOC=$(BUILDDIR)/bootcaps.reloc.o
 
 OBJECTS= \
-	$(BUILDDIR)/caps.o \
-	$(BUILDDIR)/caps-driver.o \
-	$(BUILDDIR)/caps-server.o \
+	$(BUILDDIR)/bootcaps.o \
+	$(BUILDDIR)/bootcaps-driver.o \
+	$(BUILDDIR)/bootcaps-server.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces-constructor-server.o \
 	$(BUILDDIR)/rose-interfaces-cap-server.o \
 	$(BUILDDIR)/rose-interfaces-cap_set-server.o \
+	$(BUILDDIR)/rose-interfaces-resource.o \
 	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
@@ -23,10 +24,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-objects.o \
 	$(BUILDDIR)/rose-words.o
 
-all: caps $(RELOC)
-	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/caps $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
+all: bootcaps $(RELOC)
+	$(GCC) -Wl,-Tlinker.ld  $(GCC_OPTS) -nostdlib -o ../../../build/$(ARCH)/modules/bootcaps $(OBJECTS) ../../../build/$(ARCH)/kernel/obj/util.o -g
 
-caps:
+bootcaps:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	gprbuild --RTS=$(KERNEL_RTS) $(GPRBUILD_CARGS)

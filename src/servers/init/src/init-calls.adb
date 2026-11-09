@@ -298,7 +298,10 @@ package body Init.Calls is
    is
       use Rose.Capabilities;
       use Rose.Invocation;
-      Params : aliased Rose.Invocation.Invocation_Record;
+      Params   : aliased Rose.Invocation.Invocation_Record;
+      Set_Caps : Array_Of_Capabilities (1 .. 4) := (others => 0);
+      --  Init's caps to the module's set, and to its Append, Get_Cap and
+      --  Length, which it deletes once the module has its copy (#826).
    begin
       Params.Cap := Cap;
       Params.Control.Flags := (Send             => True,
@@ -334,6 +337,7 @@ package body Init.Calls is
             Rose.System_Calls.Invoke_Capability (Cap_Params);
             Append := Cap_Params.Caps (0);
             Get_Cap := Cap_Params.Caps (1);
+            Set_Caps := (Cap_Set, Append, Get_Cap, Cap_Params.Caps (2));
 
             Rose.System_Calls.Initialize_Send (Cap_Params, Append);
 
@@ -357,6 +361,10 @@ package body Init.Calls is
       end if;
 
       Rose.System_Calls.Invoke_Capability (Params);
+
+      for Set_Cap of Set_Caps loop
+         Rose.System_Calls.Delete_Cap (Set_Cap);
+      end loop;
 
       --  The kernel's reply has a copy cap for the new process (#115).
 

@@ -23,6 +23,11 @@ package Init.Boot_Steps is
    procedure Set_Console;
    --  Make the boot console where Init.Calls.Send_String reports.
 
+   procedure End_Boot_Cap_Sets;
+   --  Boot is done: init launches no more boot modules, so release
+   --  bootcaps, which ends, and with it every boot module's cap set
+   --  (#826). Init's own caps to it are deleted.
+
    procedure Load_Partitions;
    --  Launch partition servers for the swap and log partitions that scan
    --  found on hd0.  The install media's init also launches them for the

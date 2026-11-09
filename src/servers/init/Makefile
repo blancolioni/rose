@@ -50,6 +50,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-writable_file-client.o \
 	$(BUILDDIR)/rose-interfaces-transactional_writable_file-client.o \
+	$(BUILDDIR)/rose-interfaces-resource.o \
+	$(BUILDDIR)/rose-interfaces-resource-client.o \
 	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
 	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-releasable_writer.o \

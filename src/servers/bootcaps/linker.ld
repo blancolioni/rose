@@ -1,5 +1,5 @@
 OUTPUT_FORMAT(elf32-i386)
-STARTUP(./build/obj/b__caps-driver.o)
+STARTUP(./build/obj/b__bootcaps-driver.o)
 ENTRY (main)
 
 SECTIONS

@@ -72,8 +72,14 @@ Each boot module is launched with an object id, a priority, a capability for cre
 The launch replies with a copy capability for the new process, which `init` uses to copy the endpoints it needs from the module, such as the console's `Writer`.
 
 An invocation is meant to carry at most four capabilities, and most modules need more, so they receive their capabilities in a cap set.
-The cap set server, `caps`, is therefore the second module `init` starts.
-The first two modules, `console` and `caps`, receive their capabilities directly in the launch invocation; every later module receives a single cap set, and reads its capabilities from it by index.
+The boot modules' cap set server, `bootcaps`, is therefore the second module `init` starts.
+The first two modules, `console` and `bootcaps`, receive their capabilities directly in the launch invocation; every later module receives a single cap set, reads its capabilities from it by index at startup, and then deletes its capability to the set.
+`init` deletes its own capabilities to each set once the module is launched.
+
+Once boot is done, after its last launch, `init` releases `bootcaps` through its `Resource` interface, and `bootcaps` exits, taking every set with it.
+On a boot from the disk, that is after `checkpoint`; on the install media, after `login`.
+A set that would hold more than 30 capabilities takes none of the ones it is given, and `bootcaps` says so on the console; so does running out of sets, of which there are 100.
+Persistent processes have their own cap set server (#825).
 
 [NOTE]
 ====
@@ -91,22 +97,22 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 |===
 | Id | Server | Receives | Provides to `init`
 | 3 | `console` | The text buffer at `B8000`, as a device page; cursor ports `3D4` and `3D5` | `Writer` and `Output_Redirect`
-| 14 | `caps` | The console | `Constructor`, for creating cap sets
+| 14 | `bootcaps` | The console and the exit capability | `Constructor`, for creating cap sets, and `Resource`, to end it once boot is done
 | 4 | `mem` | Memory region queries, page-on, delete, trace | `Memory`, its `Checkpoint` endpoint, and `Memory_Restore`
-| 13 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
-| 5 | `pci` | PCI configuration ports `CF8` and `CFC` | Its device lookup endpoint
-| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Block devices: hd0, the system disk, and on the install media hd1, the install media
+| 13 | `timer` | The kernel's set-timeout and get-ticks, delete | `Set_Timer`
+| 5 | `pci` | PCI configuration ports `CF8` and `CFC`, delete | Its device lookup endpoint
+| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer, delete | Block devices: hd0, the system disk, and on the install media hd1, the install media
 | 7 | `store` | Delete, the console, trace | `Storage`, `Add_Backing_Store`, `Reserve_Storage` and `Storage_Checkpoint`
 | 12 | `elf` | Create-process, `Memory`, delete, rescind, trace | `Executable.Launch` and `Launch_Command`
-| 10 | `scan` | hd0 and the exit capability | `Partitions`
-| 11 | `partition` | hd0, and the swap partition's start, bound and block size | The swap partition's `Block_Device`, with 4096-byte blocks
+| 10 | `scan` | hd0, the exit capability, delete | `Partitions`
+| 11 | `partition` | hd0 and delete, and the swap partition's start, bound and block size | The swap partition's `Block_Device`, with 4096-byte blocks
 | 17 | `partition` | The same, for the log partition | The log partition's `Block_Device`, with 512-byte blocks
 | 18 | `partition` | Install media only: hd0's block 0 | `Block_Device`, for writing the MBR
 | 19 | `partition` | Install media only: the BIOS boot partition | `Block_Device`
 | 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
 | 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
-| 16 | `log` | The kernel's start-log capability | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, and the exit capability. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
+| 16 | `log` | The kernel's start-log capability, delete | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
 | 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
@@ -119,7 +125,7 @@ On a blank disk, `scan` first creates the partitions:
 
 `checkpoint` is launched last, after `restore` has finished.
 
-GRUB loads the modules in a different order, given by the `modules` list in `boot.yaml`: `init` first, then `console`, `mem`, `pci`, `ata`, `store`, `isofs` on the install media, `restore`, `scan`, `partition`, `elf`, `timer`, `caps`, `checkpoint` and `log`.
+GRUB loads the modules in a different order, given by the `modules` list in `boot.yaml`: `init` first, then `console`, `mem`, `pci`, `ata`, `store`, `isofs` on the install media, `restore`, `scan`, `partition`, `elf`, `timer`, `bootcaps`, `checkpoint` and `log`.
 `partition` is loaded once, and launched once for each partition server.
 
 [#restore-server]

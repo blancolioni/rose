@@ -20,9 +20,9 @@ An empty _Implemented by_ means that no server in the source serves that interfa
 [cols="2,2,4,2",options="header"]
 |===
 | Interface | Parents | Operations | Implemented by
-| `Cap` | | `Destroy`, `Get_Object_Id` | `caps`, `timer`
-| `Cap_Set` | | `Append`, `Get_Cap`, `Length` | `caps`
-| `Constructor` | | `Create` | `caps`
+| `Cap` | | `Destroy`, `Get_Object_Id` | `bootcaps`, `timer`
+| `Cap_Set` | | `Append`, `Get_Cap`, `Length` | `bootcaps`
+| `Constructor` | | `Create` | `bootcaps`
 | `Receiver` | | `Send_Cap` | `mem`
 | `Named` | | `Name` |
 | `Server` | | `Published_Interface` |
@@ -48,7 +48,7 @@ interface Cap_Set is
 end Cap_Set;
 ----
 
-`Constructor` creates a new object and returns a capability for it; the `caps` server uses it to create cap sets.
+`Constructor` creates a new object and returns a capability for it; the `bootcaps` server uses it to create cap sets.
 
 == Processes and Memory
 

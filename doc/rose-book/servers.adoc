@@ -5,7 +5,7 @@ Rose's services are user-space processes, and come in two kinds.
 Boot servers::
 Started by `init` from the boot modules, in the order given in <<Boot Sequence>>.
 Each boot server's cap 1 creates endpoints.
-`console` and `caps` receive their other capabilities directly when they are launched; every later boot server receives a cap set, whose `Get_Cap` is its cap 2, and reads its capabilities from it by index.
+`console` and `bootcaps` receive their other capabilities directly when they are launched; every later boot server receives a cap set, whose `Get_Cap` is its cap 2, reads its capabilities from it by index at startup, and then deletes its cap 2.
 
 Drivers::
 Installed from the install media by `restore-install`, through `exec`.
@@ -31,16 +31,20 @@ After a restore, `init` tells `console` to discard its output instead, so that t
 
 `console` registers the `Redirect` endpoint with `Rose.Server` itself, rather than through the generated `Output_Redirect` server package, whose instance table would not fit in the kernel heap that boot modules use before the memory server starts.
 
-=== `caps`
+=== `bootcaps`
 
-Holds cap sets, so that a process can pass many capabilities as one.
+Holds the boot servers' cap sets, so that `init` can pass each of them many capabilities as one.
 
-Provides:: `Constructor`, whose `Create` makes a new, empty cap set; `Cap_Set` (`Append`, `Get_Cap`, `Length`) for each set; and `Cap`, whose `Destroy` frees a set.
-Launched with:: The console.
-Used by:: `init`, to give every later boot server its capabilities, and the shell's run-time, to create cap sets.
+Provides:: `Constructor`, whose `Create` makes a new, empty cap set; `Cap_Set` (`Append`, `Get_Cap`, `Length`) for each set; `Cap`, whose `Destroy` frees a set; and `Resource`, whose `Release` ends the server.
+Launched with:: The console and the exit capability.
+Used by:: `init`, to give every later boot server its capabilities.
 
-A cap set holds up to 30 capabilities, and `caps` holds up to 100 sets.
-`Append` silently drops capabilities beyond the 30th.
+A cap set holds up to 30 capabilities, and `bootcaps` holds up to 100 sets.
+An `Append` that would take a set past 30 adds none of its capabilities, and `bootcaps` writes on the console which set it was and how many did not fit; a module that then finds a capability missing fails in the ordinary way.
+Running out of sets is reported on the console too, and `Create` returns a null capability.
+
+Once boot is done, after its last launch, `init` calls `Release`, and `bootcaps` exits: every capability to it fails from then on (#826).
+Persistent processes have their own cap set server (#825).
 
 === `mem`
 
@@ -55,7 +59,7 @@ Used by:: `elf`, to create the `Process` for each new process, and `checkpoint`.
 Multiplexes the kernel's single timeout.
 
 Provides:: `Timer`, whose `Set_Timer` invokes a capability after a number of milliseconds; and `Cap`, whose `Destroy` cancels a timer.
-Launched with:: The kernel's set-timeout and get-ticks.
+Launched with:: The kernel's set-timeout and get-ticks, and delete.
 Used by:: `init`, to wait, `ata` and `checkpoint`.
 
 `timer` keeps up to 100 timers, in ticks of 10 milliseconds, and sets the kernel's timeout for the earliest.
@@ -66,7 +70,7 @@ When a timer expires, it invokes the timer's capability without waiting for a re
 Scans the PCI bus.
 
 Provides:: A lookup of a device by its vendor and device ids, which returns a capability for that device.
-Launched with:: The PCI configuration ports `CF8` and `CFC`.
+Launched with:: The PCI configuration ports `CF8` and `CFC`, and delete.
 Used by:: `ata`, to find its controller.
 
 === `ata`
@@ -74,7 +78,7 @@ Used by:: `ata`, to find its controller.
 The driver for ATA disks.
 
 Provides:: `ATA`, and a `Block_Device` for each drive, chosen by the identifier of the interface capability: hd0 is the system disk, and hd1 is the install media.
-Launched with:: The PCI lookup, IRQs 46 and 47, the ports `1F0`–`1F7` and `3F6`, and the timer.
+Launched with:: The PCI lookup, IRQs 46 and 47, the ports `1F0`–`1F7` and `3F6`, the timer, and delete.
 Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 === `store`
@@ -111,7 +115,7 @@ Reads the partition table of the system disk.
 *This is the server that reformats the disk.*
 
 Provides:: `Partitions` (`Release`, `Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
-Launched with:: The console, hd0 and the exit capability.
+Launched with:: The console, hd0, the exit capability and delete.
 Used by:: `init`.
 
 If hd0 has no GPT partition table, `scan` writes one.
@@ -125,7 +129,7 @@ Serves one partition of a block device as a block device of its own.
 `init` starts one for each swap and log partition that `scan` finds.
 
 Provides:: `Block_Device`, whose block numbers are relative to the start of the partition.
-Launched with:: The console and the device, with the partition's start, its bound and its block size as launch words.
+Launched with:: The console, the device and delete, with the partition's start, its bound and its block size as launch words.
 Used by:: `store`, for the active swap partition, `restore`, and `log`, for the log partition.
 
 A partition's block size can be a multiple of the device's: the swap partitions have 4096-byte blocks on a disk of 512-byte blocks.
@@ -135,7 +139,7 @@ A partition's block size can be a multiple of the device's: the swap partitions 
 Reads the ISO 9660 file system on the install media.
 
 Provides:: `File_System`, whose `Root_Directory` returns the root; `Directory` for each directory, for lookup only; and `Reader` for the contents of a file, returned by `Directory.Read_File`.
-Launched with:: The console and hd1.
+Launched with:: The console, hd1 and delete.
 Used by:: `restore`, to read the programs it installs.
 
 `Get_Ordinary_File` returns no capability, and the file system cannot be written.

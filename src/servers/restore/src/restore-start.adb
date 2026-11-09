@@ -20,6 +20,15 @@ package body Restore.Start is
    --  Wait for a message that never comes.  Exit_Restore does this if
    --  restore has no exit cap.
 
+   --------------------
+   -- Delete_Cap_Set --
+   --------------------
+
+   procedure Delete_Cap_Set is
+   begin
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+   end Delete_Cap_Set;
+
    ------------------
    -- Exit_Restore --
    ------------------
@@ -85,6 +94,13 @@ package body Restore.Start is
       Next (Memory_Restore_Cap);
       Next (Restore_Derivations_Cap);
       Next (Exit_Cap);
+
+      declare
+         Delete_Cap : Rose.Capabilities.Capability;
+      begin
+         Next (Delete_Cap);
+         Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
+      end;
    end Get_Caps;
 
    ----------

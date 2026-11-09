@@ -1,6 +1,3 @@
-with Rose.Capabilities.Standard;
-with Rose.Interfaces.Cap_Set;
-
 package body Rose.System_Calls is
 
    Default_32_Bit : constant Boolean :=
@@ -9,23 +6,12 @@ package body Rose.System_Calls is
    type Local_Cap_Type is
      (Create_Endpoint, Delete_Cap, Rescind_Cap);
 
-   Cap_Loaded    : array (Local_Cap_Type) of Boolean := (others => False);
    Local_Cap     : array (Local_Cap_Type) of Rose.Capabilities.Capability :=
                                  (others => 0);
-   Set_Index        : constant array (Local_Cap_Type) of Rose.Words.Word :=
-                        (Create_Endpoint => 8,
-                         Delete_Cap      => 6,
-                         Rescind_Cap     => 7);
-
-   Get_Environment_Cap       : Rose.Capabilities.Capability := 0;
+   --  The caps given to Use_Capabilities, or null.
 
    Local_Create_Signal : Rose.Capabilities.Capability := 0;
    --  The Create_Signal cap given to Use_Capabilities (#708).
-
-   Caps_Given : Boolean := False;
-   --  True once the process has called Use_Capabilities: then it has
-   --  given every local cap it has, and does not look in an argument cap
-   --  set for the others. Only a process that exec starts has one.
 
    Have_Invoke_Buffer : Boolean := False;
    Invoke_Buffer_Addr : System.Address := System.Null_Address;
@@ -35,18 +21,14 @@ package body Rose.System_Calls is
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
 
-   function Get_Local_Cap
-     (Cap_Type : Local_Cap_Type)
-      return Rose.Capabilities.Capability;
-
    function Create_Endpoint_Capability return Rose.Capabilities.Capability
-   is (Get_Local_Cap (Create_Endpoint));
+   is (Local_Cap (Create_Endpoint));
 
    function Delete_Cap_Capability return Rose.Capabilities.Capability
-   is (Get_Local_Cap (Delete_Cap));
+   is (Local_Cap (Delete_Cap));
 
    function Rescind_Cap_Capability return Rose.Capabilities.Capability
-   is (Get_Local_Cap (Rescind_Cap));
+   is (Local_Cap (Rescind_Cap));
 
    procedure Enter_Kernel
      (Item : aliased in out Rose.Invocation.Invocation_Record);
@@ -363,49 +345,6 @@ package body Rose.System_Calls is
          return -Standard.Interfaces.Integer_64 (-Word - 1) - 1;
       end if;
    end Get_Integer_64;
-
-   -------------------
-   -- Get_Local_Cap --
-   -------------------
-
-   function Get_Local_Cap
-     (Cap_Type : Local_Cap_Type)
-      return Rose.Capabilities.Capability
-   is
-      use type Rose.Capabilities.Capability;
-   begin
-      if not Cap_Loaded (Cap_Type) and then Caps_Given then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      if not Cap_Loaded (Cap_Type) then
-         if Get_Environment_Cap = 0 then
-            declare
-               Params : aliased Rose.Invocation.Invocation_Record;
-            begin
-               Initialize_Send
-                 (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
-               Receive_Caps (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
-               Invoke_Capability (Params);
-               Get_Environment_Cap :=
-                 Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
-            end;
-         end if;
-
-         declare
-            Params : aliased Rose.Invocation.Invocation_Record;
-         begin
-            Initialize_Send (Params, Get_Environment_Cap);
-            Send_Word (Params, Set_Index (Cap_Type));
-            Receive_Caps (Params, 1);
-            Invoke_Capability (Params);
-            Local_Cap (Cap_Type) := Params.Caps (0);
-            Cap_Loaded (Cap_Type) := True;
-         end;
-      end if;
-
-      return Local_Cap (Cap_Type);
-   end Get_Local_Cap;
 
    -----------------
    -- Get_Word_32 --
@@ -1109,13 +1048,11 @@ package body Rose.System_Calls is
       begin
          if Cap /= 0 then
             Local_Cap (Cap_Type) := Cap;
-            Cap_Loaded (Cap_Type) := True;
          end if;
       end Use_Cap;
 
       use type Rose.Capabilities.Capability;
    begin
-      Caps_Given := True;
       Use_Cap (Create_Endpoint, Rose.System_Calls.Create_Endpoint);
       Use_Cap (Delete_Cap, Rose.System_Calls.Delete_Cap);
       Use_Cap (Rescind_Cap, Rose.System_Calls.Rescind_Cap);

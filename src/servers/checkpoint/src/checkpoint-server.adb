@@ -142,6 +142,10 @@ package body Checkpoint.Server is
         (Create_Endpoint => Create_Endpoint_Cap,
          Delete_Cap => Delete_Cap);
 
+      --  Nothing reads the cap set again (#826).
+
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+
       Rose.Interfaces.Timer.Client.Open_Cap_Set
         (Client    => Timer,
          Set_Timer => Timer_Cap);

@@ -39,8 +39,10 @@ package Init.Self_Tests is
    --  derived from it does not; and that a capability can be derived from
    --  to a depth of eight, and no more.  It reports each check on
    --  Standard_Output, and is True if they all passed.  It leaves two
-   --  derived capabilities in a cap set, which the caps server holds
+   --  derived capabilities in a cap set, which bootcaps holds
    --  (Create_Cap_Set is its constructor), so that a checkpoint has
-   --  derivation records that a restored process names.
+   --  derivation records that a restored process names. They go when
+   --  bootcaps ends after boot, until the test moves to the userland cap
+   --  set server (#825, #826).
 
 end Init.Self_Tests;

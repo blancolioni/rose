@@ -258,6 +258,10 @@ package body Mem.Server is
       Region_Range_Cap := Get_Cap (3);
       Start_Paging_Cap := Get_Cap (4);
 
+      --  Nothing reads the cap set again (#826).
+
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+
       Rose.Console_IO.Open (Console_Cap);
 
       Mem.Calls.Load_Memory_Map;
