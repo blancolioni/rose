@@ -37,7 +37,9 @@ if [ "$1" = "--update" ]; then
     exit 0
 fi
 
-if ! diff -u "$LIST" "$current"; then
+# git diff, not diff: the CI container has git but not diffutils.
+
+if ! git diff --no-index -- "$LIST" "$current"; then
     echo "check-endpoint-ids: the endpoint ids differ from $LIST." >&2
     echo "  A changed id breaks the restore of a checkpoint taken before" >&2
     echo "  it. If the change is meant, run scripts/check-endpoint-ids" >&2
