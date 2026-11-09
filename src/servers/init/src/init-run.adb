@@ -73,8 +73,13 @@ package body Init.Run is
                                  renames Init.Boot.Console_Redirect_Cap;
       Cap_Set_Cap            : Capability renames Init.Boot.Cap_Set_Cap;
       Storage_Cap            : Capability renames Init.Boot.Storage_Cap;
-      Reserve_Storage_Cap    : Capability
-                                 renames Init.Boot.Reserve_Storage_Cap;
+      Root_Bank_Cap          : Capability := Null_Capability;
+      Reserve_Bank_Cap       : Capability := Null_Capability;
+      --  The root bank's Bank interface and its Reserve_Storage endpoint
+      --  (ADR 0014, #449): exec and the command registry are launched
+      --  against it, exec launches everything else against it, and the
+      --  installer reserves from it.  #450 replaces it with a system
+      --  bank.
       Launch_Elf_Cap         : Capability renames Init.Boot.Launch_Elf_Cap;
       Launch_Command_Elf_Cap : Capability
                                  renames Init.Boot.Launch_Command_Elf_Cap;
@@ -220,6 +225,7 @@ package body Init.Run is
 
       Init.Boot.Start (Install);
       Init.Boot.Launch_Boot_Servers;
+      Init.Grants.Root_Bank (Storage_Cap, Root_Bank_Cap, Reserve_Bank_Cap);
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -293,8 +299,8 @@ package body Init.Run is
                declare
                   Exec_Cap : constant Rose.Capabilities.Capability :=
                                Init.Installer.Install_Exec_Library
-                                 (Storage_Cap     => Storage_Cap,
-                                  Reserve_Cap     => Reserve_Storage_Cap,
+                                 (Bank_Cap        => Root_Bank_Cap,
+                                  Reserve_Cap     => Reserve_Bank_Cap,
                                   Launch_Cap      => Launch_Elf_Cap,
                                   Launch_Command_Cap =>
                                     Launch_Command_Elf_Cap,
@@ -330,8 +336,8 @@ package body Init.Run is
                declare
                   Command_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Installer.Install_Command_Library
-                                    (Storage_Cap     => Storage_Cap,
-                                     Reserve_Cap     => Reserve_Storage_Cap,
+                                    (Bank_Cap        => Root_Bank_Cap,
+                                     Reserve_Cap     => Reserve_Bank_Cap,
                                      Launch_Cap      => Launch_Elf_Cap,
                                      Cap_Stream      => Params.Caps (0),
                                      Standard_Output => Console_Interface_Cap,

@@ -6,7 +6,7 @@ with Init.Calls;
 package Init.Installer is
 
    function Install_Exec_Library
-     (Storage_Cap     : Rose.Capabilities.Capability;
+     (Bank_Cap        : Rose.Capabilities.Capability;
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Launch_Command_Cap : Rose.Capabilities.Capability;
@@ -20,7 +20,7 @@ package Init.Installer is
    --  Launch_Command. Trace_Cap is for exec's trace events.
 
    function Install_Command_Library
-     (Storage_Cap     : Rose.Capabilities.Capability;
+     (Bank_Cap        : Rose.Capabilities.Capability;
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Cap_Stream      : Rose.Capabilities.Capability;

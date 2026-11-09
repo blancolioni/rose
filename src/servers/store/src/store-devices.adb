@@ -1782,19 +1782,6 @@ package body Store.Devices is
       return Reserve_From (Bank, Size);
    end Reserve_From_Bank;
 
-   ---------------------
-   -- Reserve_Storage --
-   ---------------------
-
-   function Reserve_Storage
-     (Size : Rose.Words.Word_64)
-      return Rose.Capabilities.Capability
-   is
-   begin
-      Create_Root_Bank;
-      return Reserve_From (Root_Bank, Size);
-   end Reserve_Storage;
-
    -------------------
    -- Restore_Banks --
    -------------------

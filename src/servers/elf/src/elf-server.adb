@@ -17,7 +17,7 @@ with Rose.Interfaces.Kernel_Process.Client;
 with Rose.Interfaces.Memory.Client;
 with Rose.Interfaces.Process.Client;
 with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Storage.Client;
+with Rose.Interfaces.Bank.Client;
 
 with Elf.Loader;
 
@@ -42,7 +42,7 @@ package body Elf.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       Name  : String;
       Image : Rose.Capabilities.Capability;
-      Store : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
@@ -50,14 +50,14 @@ package body Elf.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       Name  : String;
       Image : Rose.Capabilities.Capability;
-      Store : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
    function Launch_Process
      (Name    : String;
       Image   : Rose.Capabilities.Capability;
-      Store   : Rose.Capabilities.Capability;
+      Bank   : Rose.Capabilities.Capability;
       Caps    : Rose.Capabilities.Capability_Array;
       Command : Boolean)
       return Rose.Capabilities.Capability;
@@ -234,13 +234,13 @@ package body Elf.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       Name  : String;
       Image : Rose.Capabilities.Capability;
-      Store : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Launch_Process (Name, Image, Store, Caps, Command => False);
+      return Launch_Process (Name, Image, Bank, Caps, Command => False);
    end Launch;
 
    --------------------
@@ -251,13 +251,13 @@ package body Elf.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       Name  : String;
       Image : Rose.Capabilities.Capability;
-      Store : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability;
       Caps  : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Launch_Process (Name, Image, Store, Caps, Command => True);
+      return Launch_Process (Name, Image, Bank, Caps, Command => True);
    end Launch_Command;
 
    --------------------
@@ -267,7 +267,7 @@ package body Elf.Server is
    function Launch_Process
      (Name    : String;
       Image   : Rose.Capabilities.Capability;
-      Store   : Rose.Capabilities.Capability;
+      Bank   : Rose.Capabilities.Capability;
       Caps    : Rose.Capabilities.Capability_Array;
       Command : Boolean)
       return Rose.Capabilities.Capability
@@ -284,7 +284,7 @@ package body Elf.Server is
         .Client.Kernel_Process_Client;
       Process_Client : Rose.Interfaces.Process.Client.Process_Client;
       Region         : Rose.Interfaces.Region.Client.Region_Client;
-      Storage        : Rose.Interfaces.Storage.Client.Storage_Client;
+      Bank_Store     : Rose.Interfaces.Bank.Client.Bank_Client;
       Start          : Rose.Words.Word;
       Success        : Boolean;
 
@@ -298,7 +298,7 @@ package body Elf.Server is
       procedure Clean_Up is
       begin
          Rose.Interfaces.Region.Client.Close (Region);
-         Rose.Interfaces.Storage.Client.Close (Storage);
+         Rose.Interfaces.Bank.Client.Close (Bank_Store);
          Rose.Interfaces.Kernel_Process.Client.Close (Kernel_Client);
          Delete_Cap (Start_Cap);
          Delete_Cap (Initial_Cap);
@@ -318,7 +318,7 @@ package body Elf.Server is
 
       Rose.Trace.Event ("load " & Name);
       Rose.Interfaces.Region.Client.Open (Region, Image);
-      Rose.Interfaces.Storage.Client.Open (Storage, Store);
+      Rose.Interfaces.Bank.Client.Open (Bank_Store, Bank);
       Rose.Trace.Event ("regions opened");
 
       Create_Process
@@ -330,7 +330,7 @@ package body Elf.Server is
       if Kernel_Process = 0 then
          Rose.Console_IO.Put_Line ("elf: cannot create process " & Name);
          Rose.Interfaces.Region.Client.Close (Region);
-         Rose.Interfaces.Storage.Client.Close (Storage);
+         Rose.Interfaces.Bank.Client.Close (Bank_Store);
          for Cap of Caps loop
             Delete_Cap (Cap);
          end loop;
@@ -397,7 +397,7 @@ package body Elf.Server is
       end if;
 
       Elf.Loader.Load_Elf_Image
-        (Process_Client, Storage, Region, Start, Success);
+        (Process_Client, Bank_Store, Region, Start, Success);
       Rose.Trace.Event ("image loaded");
       if Success then
          Start_Process (Start_Cap, Start);

@@ -102,7 +102,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 13 | `timer` | The kernel's set-timeout and get-ticks, delete | `Set_Timer`
 | 5 | `pci` | PCI configuration ports `CF8` and `CFC`, delete | Its device lookup endpoint
 | 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer, delete | Block devices: hd0, the system disk, and on the install media hd1, the install media
-| 7 | `store` | Delete, the console, trace | `Storage`, `Add_Backing_Store`, `Reserve_Storage` and `Storage_Checkpoint`
+| 7 | `store` | Delete, the console, trace | `Storage`, `Add_Backing_Store` and `Storage_Checkpoint`
 | 12 | `elf` | Create-process, `Memory`, delete, rescind, trace | `Executable.Launch` and `Launch_Command`
 | 10 | `scan` | hd0, the exit capability, delete | `Partitions`
 | 11 | `partition` | hd0 and delete, and the swap partition's start, bound and block size | The swap partition's `Block_Device`, with 4096-byte blocks
