@@ -66,7 +66,7 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 32
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 8
+KERNEL_TABLE_VERSION = 9
 MAX_SAVED_INTERRUPTS = 32
 RECORDS_PER_PAGE = PAGE_SIZE // 4
 MAX_RECORD_PAGES = 4
@@ -262,14 +262,23 @@ def check_kernel_tables(log, first, last, verbose):
         if verbose:
             print("    interrupt %d -> process %d cap %d" % (vector, oid, cap))
 
-    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s%s"
+    # Version 9 has the interfaces of the boot set that wrote it after the
+    # interrupts (#375).
+    interfaces = ""
+    if version >= 9:
+        major, minor, level, digest = struct.unpack_from(
+            "<HHIQ", page, 40 + MAX_SAVED_INTERRUPTS * 16)
+        interfaces = ", interfaces %d.%d level %d" % (major, minor, level)
+
+    return True, ("kernel: %d process%s in %d pages, %d interrupt%s%s%s%s"
                   % (process_count, "" if process_count == 1 else "es",
                      page_count, interrupt_count,
                      "" if interrupt_count == 1 else "s",
                      "" if next_oid is None
                      else ", next object id %d" % next_oid,
                      "" if not record_count
-                     else ", %d derivation records" % record_count)), \
+                     else ", %d derivation records" % record_count,
+                     interfaces)), \
         page_count, oids
 
 

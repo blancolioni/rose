@@ -1,0 +1,85 @@
+#!/bin/sh
+# Test that a boot set refuses a checkpoint written with interfaces it
+# doesn't have, under QEMU (#375).
+#
+#   scripts/test-refuse [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test:
+#
+#   1. installs Rose on a new disk;
+#   2. raises the interface level that the last checkpoint records, with
+#      set-checkpoint-level.py, so that it is higher than this build's;
+#   3. boots from the disk, which has to refuse the checkpoint and say
+#      why, without restoring it;
+#   4. boots the install media with the same disk, which has to refuse it
+#      too, and not install a new system over it;
+#   5. checks that neither boot changed the disk;
+#   6. puts the level back, and boots from the disk, which has to restore
+#      the checkpoint again.
+#
+# It takes about five minutes, and needs qemu-system-i386, qemu-img and
+# python3. It exits with 0 if everything passed, and keeps the disk image
+# and QEMU's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+# In text mode, restore writes to the screen and not to the serial port,
+# so the test reads the screen.
+REFUSED="this boot set can't read the checkpoint"
+
+install_rose "$ISO"
+
+echo "Raising the interface level of the last checkpoint"
+python3 "$HERE/set-checkpoint-level.py" "$DISK" --add 1 \
+    || fail "cannot change the checkpoint's interface level"
+before=$(sha256sum "$DISK" | cut -d' ' -f1)
+
+echo "Booting from the disk, which has to refuse the checkpoint"
+: > "$WORK/serial"
+start_qemu
+choose_last_entry
+wait_for "$REFUSED" 120 \
+    || fail "the boot disk did not refuse the checkpoint"
+sleep 10
+screen > "$WORK/refused-screen.txt"
+grep "restore: log: entry" "$WORK/refused-screen.txt"
+grep -q -e "restore: done" -e "login:" "$WORK/refused-screen.txt" \
+    && fail "the boot disk went on after refusing the checkpoint"
+stop_qemu
+
+echo "Booting the install media, which has to refuse it too"
+: > "$WORK/serial"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+choose_last_entry
+wait_for "$REFUSED" 120 \
+    || fail "the install media did not refuse the checkpoint"
+sleep 10
+screen > "$WORK/refused-screen.txt"
+grep -q -e "installing instead" -e "creating system image" \
+    -e "User name:" "$WORK/refused-screen.txt" \
+    && fail "the install media installed over the checkpoint"
+stop_qemu
+
+after=$(sha256sum "$DISK" | cut -d' ' -f1)
+[ "$before" = "$after" ] || fail "a refused boot changed the disk"
+echo "The disk is unchanged"
+
+echo "Putting the level back, and booting from the disk"
+python3 "$HERE/set-checkpoint-level.py" "$DISK" --add -1 \
+    || fail "cannot change the checkpoint's interface level"
+: > "$WORK/serial"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 \
+    || fail "the boot disk did not restore the checkpoint"
+stop_qemu
+
+rm -rf "$WORK"
+echo "PASS"

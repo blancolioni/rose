@@ -10,7 +10,8 @@ project Restore is
        "../../library/kernelapi/generated",
        "../../library/kernelapi/system-calls",
        "../../library/kernelapi/system-calls-boot",
-       "../../library/kernelapi/arch/i686");
+       "../../library/kernelapi/arch/i686",
+       "../../../build/version");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("restore-driver.adb", "restore-install_driver.adb");

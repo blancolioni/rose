@@ -19,6 +19,7 @@ The two boots differ in their boot modules and in what they do when there is no 
 | GRUB menu | `boot/iso/grub/grub.cfg`, on the ISO | `boot/hd0/grub.cfg`, on the boot partition, `rose-boot`
 | Modules | 15: `init-install`, `restore-install`, `isofs`, and the 12 that both boots load | 14: `init`, `restore`, and the 12 that both boots load
 | A checkpoint on hd0 | Restored | Restored
+| A checkpoint on hd0 that this boot set can't read | `restore` says why, and the system stays idle: nothing is installed over it | `restore` says why, and the system stays idle
 | No checkpoint on hd0 | A new system is installed from the install media, and GRUB is written to hd0 (see <<first-boot>>) | `init` says "no system on this disk; boot the install media", and the system stays idle
 |===
 

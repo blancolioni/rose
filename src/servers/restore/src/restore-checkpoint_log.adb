@@ -2,6 +2,7 @@ with System.Storage_Elements;
 
 with Rose.Checkpoints;
 with Rose.Console_IO;
+with Rose.Interface_Level;
 with Rose.Limits;
 with Rose.System_Calls;
 
@@ -39,6 +40,10 @@ package body Restore.Checkpoint_Log is
       record
          Base, Bound : Rose.Words.Word_64;
       end record;
+
+   Refused_Count : Natural := 0;
+   --  The entries that this boot set can't read, in the last
+   --  Find_Checkpoint.
 
    Regions      : array (1 .. Max_Regions) of Region_Range;
    Region_Count : Natural := 0;
@@ -104,6 +109,23 @@ package body Restore.Checkpoint_Log is
    procedure Report_Bad_Entry
      (Location : Rose.Words.Word_64;
       Message  : String);
+
+   procedure Refuse_Version
+     (Location : Rose.Words.Word_64;
+      Tables   : String;
+      Version  : Rose.Words.Word_32;
+      Known    : Rose.Words.Word_32);
+   --  Report that the entry at Location has Tables of a Version that
+   --  this boot set doesn't know, and count it as refused.
+
+   function Interfaces_Readable return Boolean;
+   --  True if the boot set that wrote the kernel tables in Kernel_Header
+   --  had only interfaces that this one has (ADR 0031, section 2).
+
+   procedure Refuse_Interfaces (Location : Rose.Words.Word_64);
+   --  Report that the entry at Location, whose kernel tables are in
+   --  Kernel_Header, was written with interfaces that this boot set
+   --  doesn't have, and count it as refused.
 
    -----------------
    -- Check_Entry --
@@ -259,7 +281,14 @@ package body Restore.Checkpoint_Log is
       end if;
 
       if Kernel_Header.Version /= Rose.Checkpoints.Kernel_Table_Version then
-         Report_Bad_Entry (Location, "unknown kernel tables version");
+         Refuse_Version
+           (Location, "kernel tables", Kernel_Header.Version,
+            Rose.Checkpoints.Kernel_Table_Version);
+         return False;
+      end if;
+
+      if not Interfaces_Readable then
+         Refuse_Interfaces (Location);
          return False;
       end if;
 
@@ -364,7 +393,9 @@ package body Restore.Checkpoint_Log is
       end if;
 
       if Mem_Header.Version /= Rose.Checkpoints.Mem_Table_Version then
-         Report_Bad_Entry (Location, "unknown memory tables version");
+         Refuse_Version
+           (Location, "memory tables", Mem_Header.Version,
+            Rose.Checkpoints.Mem_Table_Version);
          return False;
       end if;
 
@@ -472,7 +503,9 @@ package body Restore.Checkpoint_Log is
       end if;
 
       if Store_Header.Version /= Rose.Checkpoints.Store_Table_Version then
-         Report_Bad_Entry (Location, "unknown storage tables version");
+         Refuse_Version
+           (Location, "storage tables", Store_Header.Version,
+            Rose.Checkpoints.Store_Table_Version);
          return False;
       end if;
 
@@ -542,6 +575,7 @@ package body Restore.Checkpoint_Log is
       Count    : Natural := 0;
       Bad      : Natural := 0;
    begin
+      Refused_Count := 0;
       Open (Reader, Reader_Cap);
 
       --  Read_Page returns its page in the invocation buffer.  The
@@ -580,9 +614,16 @@ package body Restore.Checkpoint_Log is
          if Bad = 0 then
             Rose.Console_IO.Put ("; all consistent");
          else
-            Rose.Console_IO.Put ("; ");
-            Rose.Console_IO.Put (Bad);
-            Rose.Console_IO.Put (" inconsistent");
+            if Bad > Refused_Count then
+               Rose.Console_IO.Put ("; ");
+               Rose.Console_IO.Put (Bad - Refused_Count);
+               Rose.Console_IO.Put (" inconsistent");
+            end if;
+            if Refused_Count > 0 then
+               Rose.Console_IO.Put ("; ");
+               Rose.Console_IO.Put (Refused_Count);
+               Rose.Console_IO.Put (" not readable by this boot set");
+            end if;
          end if;
       end if;
       Rose.Console_IO.New_Line;
@@ -591,6 +632,10 @@ package body Restore.Checkpoint_Log is
          Rose.Console_IO.Put ("restore: log: last entry should be ");
          Rose.Console_IO.Put (Natural (Last_Entry (Reader)));
          Rose.Console_IO.New_Line;
+      end if;
+
+      if Refused_Count > 0 then
+         Latest := 0;
       end if;
 
       if Latest /= 0 then
@@ -602,6 +647,80 @@ package body Restore.Checkpoint_Log is
       Rose.System_Calls.Use_Buffer (System.Null_Address, 0);
       return Latest;
    end Find_Checkpoint;
+
+   -------------------------
+   -- Interfaces_Readable --
+   -------------------------
+
+   function Interfaces_Readable return Boolean is
+      use Rose.Interface_Level;
+      use type Rose.Words.Word_16;
+   begin
+      return Kernel_Header.Interface_Major = Series_Major
+        and then Kernel_Header.Interface_Minor = Series_Minor
+        and then (Kernel_Header.Interface_Level < Level
+                  or else (Kernel_Header.Interface_Level = Level
+                           and then Kernel_Header.Interface_Hash = Hash));
+   end Interfaces_Readable;
+
+   -----------------------
+   -- Refuse_Interfaces --
+   -----------------------
+
+   procedure Refuse_Interfaces (Location : Rose.Words.Word_64) is
+   begin
+      Refused_Count := Refused_Count + 1;
+      Rose.Console_IO.Put ("restore: log: entry at ");
+      Rose.Console_IO.Put (Natural (Location));
+      Rose.Console_IO.Put (": interfaces ");
+      Rose.Console_IO.Put (Natural (Kernel_Header.Interface_Major));
+      Rose.Console_IO.Put (".");
+      Rose.Console_IO.Put (Natural (Kernel_Header.Interface_Minor));
+      Rose.Console_IO.Put (" level ");
+      Rose.Console_IO.Put (Natural (Kernel_Header.Interface_Level));
+      if Kernel_Header.Interface_Level = Rose.Interface_Level.Level then
+         Rose.Console_IO.Put (" with other endpoint ids");
+      end if;
+      Rose.Console_IO.Put ("; this boot set has ");
+      Rose.Console_IO.Put (Natural'(Rose.Interface_Level.Series_Major));
+      Rose.Console_IO.Put (".");
+      Rose.Console_IO.Put (Natural'(Rose.Interface_Level.Series_Minor));
+      Rose.Console_IO.Put (" level ");
+      Rose.Console_IO.Put (Natural'(Rose.Interface_Level.Level));
+      Rose.Console_IO.New_Line;
+   end Refuse_Interfaces;
+
+   --------------------
+   -- Refuse_Version --
+   --------------------
+
+   procedure Refuse_Version
+     (Location : Rose.Words.Word_64;
+      Tables   : String;
+      Version  : Rose.Words.Word_32;
+      Known    : Rose.Words.Word_32)
+   is
+   begin
+      Refused_Count := Refused_Count + 1;
+      Rose.Console_IO.Put ("restore: log: entry at ");
+      Rose.Console_IO.Put (Natural (Location));
+      Rose.Console_IO.Put (": ");
+      Rose.Console_IO.Put (Tables);
+      Rose.Console_IO.Put (" version ");
+      Rose.Console_IO.Put (Natural (Version));
+      Rose.Console_IO.Put ("; this boot set reads version ");
+      Rose.Console_IO.Put (Natural (Known));
+      Rose.Console_IO.New_Line;
+   end Refuse_Version;
+
+   -------------
+   -- Refused --
+   -------------
+
+   function Refused return Boolean is
+   begin
+      return Refused_Count > 0;
+   end Refused;
 
    ----------------------
    -- Report_Bad_Entry --
