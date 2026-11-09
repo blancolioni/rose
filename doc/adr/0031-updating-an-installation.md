@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-09
-- **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities)
+- **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), #824 (replacing a running persistent process), #825 (cap sets), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities)
 
 ## Context
 
@@ -30,7 +30,8 @@ The install media gets a third GRUB entry, **Update Rose**, next to its default 
 1. **It restores hd0's checkpoint with the new boot set.** If the checkpoint isn't compatible (section 2), `restore` refuses, says why, and stops. Nothing has been written to hd0, and booting without the install media boots the old set as before.
 2. **It writes the new boot set to hd0** (section 3), only after the restore has succeeded.
 3. **It updates the installed programs** (section 4).
-4. **It takes a checkpoint and restarts from hd0,** as an install does.
+4. **It replaces the persistent processes that can be replaced** (section 5).
+5. **It takes a checkpoint and restarts from hd0,** as an install does.
 
 The update boot is the only thing that writes to an installed disk's boot partition, as the install boot is the only thing that writes to an empty disk.
 
@@ -67,22 +68,37 @@ The update boot installs every program on the install media again, as the instal
 - **Unchanged programs** are skipped: the updater compares the image's size and contents with the installed one before installing it.
 - **Where it runs.** The updater is `restore-install`'s installer, which already has the code, the registry and `exec`. It runs on the update boot only, and isn't a persistent process.
 
-### 5. Persistent processes keep their code within a series
+### 5. Replacing persistent processes
 
-Within 0.4.x, a persistent process keeps the code it was installed with. An update doesn't replace `exec`, `file`, `directory`, the drivers, `auth`, the user server or a running session, and the release notes of each 0.4.x say which fixes need a new install to take effect.
+A persistent process is replaced with its new version only if its server implements `Replaceable` (#824), which is part of 0.4.0. Otherwise it keeps the code it was installed with.
 
-This is what makes the promise of section 2 hold. The persistent processes of a 0.4.0 checkpoint call the boot modules through the 0.4.0 interfaces, and the boot modules of every 0.4.x still answer them.
+- **Replaceable.** The old version exports its state, with the caps it holds in a cap set (#825), and the new version reads it at launch. The kernel then moves the old process's object ids to the new one, so clients keep their caps, and the old process ends. If the new version refuses the state, it ends, and the old one carries on. #824 has the design, and its own ADR decides the details.
+- **Which ones.** The long-lived servers whose state can be handed over, such as `file`, `directory`, `auth` and the user server, and drivers whose devices can be.
+- **Which ones not.**
+  - `exec`, which launches the new versions.
+  - The command registry, which the updater uses.
+  - Drivers whose devices can't be handed over safely.
+  - Running sessions, which are simpler to end and start again: the next login gets the new petal (section 4).
+- **The order.** The updater replaces servers one at a time, each after the programs are installed again, so that a new version can rely on the new commands. A server that fails to take over leaves the old one running, and the updater reports it and goes on.
 
-**Replacing a running process is left for a later ADR,** probably for 0.5. A cap names a persistent object id, not a process, so a supervisor that holds a process could start its new version, have the old one hand over its state through an explicit interface, have the kernel move the object ids to the new process, and end the old one. Clients would keep their caps. It needs ownership (ADR 0015) to say who may do this, and a handover interface for each server, so it waits for banks.
+The release notes of each 0.4.x say which fixes are in servers that aren't replaceable, and so need a new install to take effect.
+
+The promise of section 2 still holds. A replaced server answers the same endpoint ids as the one it replaces, because a new version within a series only adds to the interfaces. The persistent processes of a 0.4.0 checkpoint call the boot modules and the replaced servers through the 0.4.0 interfaces, and every 0.4.x still answers them.
 
 ### 6. Testing
 
-The restore test from the 0.4.0 image (#737) checks section 2 on every build. A second test runs an update boot on the 0.4.0 image with the current install media, checks that hd0 then boots the new set, that a command reports the new version, and that **Previous** still boots 0.4.0.
+The restore test from the 0.4.0 image (#737) checks section 2 on every build. A second test runs an update boot on the 0.4.0 image with the current install media, and checks:
+
+- that hd0 then boots the new set;
+- that a command reports the new version;
+- that a replaced server, such as `file`, reports the new version, and the files opened before the update still work;
+- that **Previous** still boots 0.4.0.
 
 ## Consequences
 
-- **A 0.4.x release can fix the kernel, the boot modules and the commands** without losing the checkpoint.
-- **It can't fix a persistent server.** A bug in `file`, `directory`, a driver or `exec` stays until a new install, or until section 5's replacement exists. Fixes for those wait for 0.5.0 or a fresh install.
+- **A 0.4.x release can fix the kernel, the boot modules, the commands and the replaceable servers** without losing the checkpoint.
+- **It can't fix a persistent process that isn't replaceable.** A bug in `exec`, the registry, or a driver that can't hand over its device stays until a new install.
+- **0.4.0 needs #824 and #825 before it is tagged.** `Replaceable` and the changes to `Cap_Set` are interfaces, and the interfaces freeze with the tag.
 - **The interfaces of 0.4.0 are frozen for the whole series.** Additions are allowed, and `check-endpoint-ids` enforces the rest.
 - **Updating needs the install media,** as installing does. A network update can use the same steps once there is a network (ADR 0007), with the media replaced by a downloaded image.
 - **The boot partition holds two boot sets,** about 7 MB of its 16 MiB. A much larger boot set needs a larger boot partition, which needs a new install.
@@ -93,5 +109,6 @@ The restore test from the 0.4.0 image (#737) checks section 2 on every build. A 
 - **Write the new boot set without restoring first.** Simpler, but a set that can't restore the checkpoint reaches the disk, and the user finds out at the next boot. The two slots would recover from that, but there would be no message saying why.
 - **An `update` command in the running system,** run with `sudo` after logging in, reading the install media through `isofs`. It would need a persistent process to hold caps to the install media's boot modules, which ADR 0008 avoids, and a privileged role to replace the boot partition. The update boot already has both, and nothing else is running.
 - **Commands as files, loaded at each launch.** Updating a command would then be replacing a file in a transaction (ADR 0026). But `exec` copies images into its region for good reasons, a program can't be changed under a running process and the launch cap is the program, and changing that is a larger decision than updating.
-- **Promise only that old code runs,** with no way to update. That is section 5 for persistent processes, but leaving the boot set and the commands frozen too would make every 0.4.x a fresh install, and the stable-restore promise of 0.4.0 would have no use.
+- **Promise only that old code runs,** with no way to update. Every 0.4.x would then be a fresh install, and the stable-restore promise of 0.4.0 would have no use.
+- **Leave persistent processes to a later series,** updating only the boot set and the commands in 0.4.x. It is less work for 0.4.0, but a bug in `file` or `directory` would need a fresh install for the whole series, and the servers added later, such as networking and the display, would have to retrofit a handover rather than be built with one.
 - **One boot set, overwritten in place.** It saves 3.6 MB, and loses the way back if a new set fails after the restore has succeeded.
