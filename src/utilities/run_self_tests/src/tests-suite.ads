@@ -1,4 +1,5 @@
 with Tests.Ada_Calendar;
+with Tests.Banks;
 with Tests.Clock;
 with Tests.Containers;
 with Tests.Directories;
@@ -63,6 +64,7 @@ package Tests.Suite is
                    Tests.Shared_Regions.Shared_Regions_Test'Access,
                    Tests.Screen.Screen_Test'Access,
                    Tests.Signals.Signal_Test'Access,
+                   Tests.Banks.Dependent_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
+- **Amended by:** #448, where the store raises a signal of the server's for a dependent object, rather than invoking a cap that it registered, and registrations aren't saved: a restored server adds them again (sections 3 and 7)
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0010](0010-resources.md) (resources), [ADR 0015](0015-process-ownership.md) (process ownership), #305 (allocate backing blocks on first write), #320 (reuse process table entries), #126 (the book's old Memory chapter)
 
 ## Context
@@ -47,6 +48,23 @@ The book's old Memory chapter (#126) described hierarchical space banks. Each pr
 - **Nobody needs to cooperate.** The store does the releasing, so destroying a bank works whatever the processes that reserved from it are doing.
 - **Objects can depend on a bank.** A server that creates an object on a client's behalf, such as mem with a process or a server with a slot for its client (ADR 0010), registers the object with the client's bank, giving a cap that the store invokes when the bank is destroyed. The server then removes the object. This is how a bank reclaims things that aren't storage, and how a client's bank pays for what a server keeps for it.
 
+#### Dependent objects (amendment, #448)
+
+Amended by #448. The store can't invoke a cap for each dependent object, for two reasons:
+
+- **Messages would be lost.** The kernel queues one message for each process, and a second one sent before the first is received replaces it ("lost queued message"). A server with several objects under a destroyed bank, such as mem with every process of a session, would hear of one.
+- **The store is on the pager path** (ADR 0008). It holds no caps to persistent processes, and saves its state as data, which can't hold a cap.
+
+So a dependent object is told by a signal, as `SIGCHLD` is replaced in ADR 0006 (section 2): the server is told that something happened, and asks what.
+
+- **`Bank.Add_Dependent (Signal)`** registers an object with a bank, and returns a cap for its `Dependent` interface, which the server keeps with the object. `Signal` is a signal cap for one of the server's own bits. It fails if the bank has been destroyed.
+- **When a bank is destroyed,** the store marks the dependents of it and of its sub-banks as destroyed, and raises each one's signal. Raising a signal is a kernel operation that never waits, and signals merge, so none is lost and the store never waits for a server.
+- **The server, when signalled,** asks `Destroyed` of the dependents it holds, removes the objects whose banks are gone, and releases their dependents.
+- **`Release`** ends a registration, when the server removes the object for its own reasons too. `Dependent` is a `Resource` (ADR 0010).
+- **A server that has ended** has no signal to raise: the raise fails, and the store drops the registration.
+
+This settles the open question on a server that doesn't answer: the store never waits for one.
+
 ### 4. A process reserves from its own bank
 
 - **Each process has its own bank,** a sub-bank of the bank that it was launched against (ADR 0015). Elf reserves the process's stack, heap and private data from it.
@@ -71,6 +89,8 @@ Physical memory remains a cache that mem manages for everyone. A bank's limit co
 
 Banks, their limits and the regions charged to them are saved in the store's checkpoint. A destroyed bank stays destroyed after a restore.
 
+Amended by #448: the registrations of dependent objects aren't saved. Each holds a signal cap of a persistent process, which the store can't save as data. A restored server adds its dependents again, when it is told that it has been restored (ADR 0004, ADR 0006). If a bank was destroyed in the meantime, `Add_Dependent` on its cap fails, and the server removes the object then.
+
 ## Consequences
 
 - **Every caller of `Reserve_Storage` needs a bank cap:** elf, the installer, and any server that reserves storage.
@@ -93,7 +113,7 @@ Banks, their limits and the regions charged to them are saved in the store's che
 - **The store's region table** is fixed in size. Should a bank's limit also count regions, not just pages?
 - **Moving storage between banks,** for example handing a file to another user. Is it a new reservation and a copy, or can a region be transferred?
 - **Reading a bank's usage,** for a shell command that reports what a job or a user is using.
-- **Destroying a dependent object.** If the server that registered the object doesn't answer, how long does the store wait before carrying on?
+- **Destroying a dependent object.** Settled by #448 (section 3): the store raises a signal and never waits.
 - **Charging dirty memory.** Should mem tell the store when a page is first dirtied, with a call that allocates its block and charges its bank, and is a no-op once the block exists? A process over its limit would then fail at the write, in mem's fault path. The alternative is to charge when the log is consolidated (#356), where a failed `Put` leaves the data in the log and the limit doesn't stop a process dirtying memory.
 
 ## Follow-up work

@@ -17,6 +17,7 @@ screen:
 	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/region.idl $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/restorable.idl $(INTERFACES)/bank.idl \
+	    $(INTERFACES)/dependent.idl \
 	    $(INTERFACES)/process.idl $(INTERFACES)/heap.idl \
 	    $(INTERFACES)/event_listener.idl $(INTERFACES)/event_source.idl
 	gprbuild $(GPRBUILD_CARGS)

@@ -15,6 +15,17 @@ interface Bank is
       Region_Limit : Word)
       return interface Bank;
 
+   function Add_Dependent
+     (Signal : Capability)
+      return interface Dependent;
+   --  Register an object that a server keeps on behalf of whoever holds
+   --  this bank, such as a process or a slot (ADR 0014, section 3).
+   --  Signal is a signal cap for one of the server's own bits (ADR
+   --  0006). When this bank, or a bank above it, is destroyed, the
+   --  storage server raises the signal, which never waits, and the
+   --  Dependent says Destroyed. Fails, with a null cap, if the bank has
+   --  been destroyed, or the storage server has no room for another.
+
    procedure Get_Usage
      (Pages        : out Word_64;
       Regions      : out Word;

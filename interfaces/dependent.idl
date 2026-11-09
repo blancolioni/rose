@@ -1,0 +1,20 @@
+--  An object that a server keeps on behalf of a bank's holder, which
+--  the bank's destruction reclaims (ADR 0014, section 3; #448).  The
+--  server registers the object with the bank (Bank.Add_Dependent), and
+--  keeps this cap with it.  When the bank, or a bank above it, is
+--  destroyed, the storage server raises the signal that the server gave
+--  it, and the server asks Destroyed of the dependents it holds, and
+--  removes the objects whose banks are gone.
+--
+--  Release ends the registration, when the server removes the object
+--  for its own reasons, and after it has removed one whose bank was
+--  destroyed.  Registrations aren't saved in a checkpoint: a server
+--  adds its dependents again when it is restored.
+
+interface Dependent : Resource is
+
+   function Destroyed return Boolean;
+   --  True once the bank that the object was registered with has been
+   --  destroyed.
+
+end Dependent;
