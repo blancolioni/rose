@@ -1,6 +1,6 @@
 #!/bin/sh
 # Write Rose.Build, the build id that the boot banners show after the
-# version: "Rose Version 0.3.0-dev (phoebe) [d87c2c8]".  The id is the
+# version: "Rose Version 0.4.0-dev (genki) [d87c2c8]".  The id is the
 # commit the build is from, with "-dirty" if the tree had uncommitted
 # changes, so that a screenshot or a bug report says which build it came
 # from.  A release built at its own tag (v<Version_String>) with no
