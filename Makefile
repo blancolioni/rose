@@ -202,10 +202,12 @@ config:
 	mkdir -p $(DRIVERDIR)
 	mkdir -p ./build/install/drivers
 
-# Rose.Build, the build id in the boot banners, in build/version.  It runs
-# on every build, and only rewrites the file when the id changes.
+# Rose.Build, the build id in the boot banners, and Rose.Interface_Level,
+# the interfaces that a checkpoint records (#375), in build/version.  They
+# run on every build, and only rewrite a file when it changes.
 version:
 	sh ./scripts/make-build-id
+	sh ./scripts/make-interface-level
 
 # What the build makes, and nothing else: the generated interfaces, the run-time
 # systems (which clean themselves), the programs' build directories, the

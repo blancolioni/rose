@@ -11,6 +11,16 @@ package Restore.Checkpoint_Log is
    --  complete checkpoint (the kernel's tables, the memory server's
    --  tables, and the memory server's pages), and write a summary to
    --  the console.  Return the location of the last consistent entry,
-   --  which is the checkpoint to restore from, or 0 if there is none.
+   --  which is the checkpoint to restore from, or 0 if there is none or
+   --  the log is Refused.
+
+   function Refused return Boolean;
+   --  True if Find_Checkpoint found an entry that this boot set can't
+   --  read: one of its tables has a version that this restore server
+   --  doesn't know, or it was written with interfaces that this boot set
+   --  doesn't have (ADR 0031, section 2).  Such an entry isn't skipped,
+   --  as an inconsistent one is, because restoring an older entry instead
+   --  would lose what was saved after it, and installing would lose the
+   --  lot.  Find_Checkpoint has said why.
 
 end Restore.Checkpoint_Log;

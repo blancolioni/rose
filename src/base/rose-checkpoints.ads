@@ -21,12 +21,13 @@ package Rose.Checkpoints is
    --  sends the interrupt to.
 
    Kernel_Table_Magic   : constant := 16#4B54_4142_4C45_5331#;
-   Kernel_Table_Version : constant := 8;
+   Kernel_Table_Version : constant := 9;
    --  Version 2 added the interrupts, version 3 the next object id,
    --  version 4 each process's FPU and SSE state, version 5 the packing
    --  of a capability's header, version 6 the derivation records
-   --  (ADR 0001), version 7 a table of 64 endpoints in each process, and
-   --  version 8 each process's signal bits (ADR 0006).
+   --  (ADR 0001), version 7 a table of 64 endpoints in each process,
+   --  version 8 each process's signal bits (ADR 0006), and version 9 the
+   --  interfaces of the boot set that wrote it (ADR 0031, #375).
 
    Max_Saved_Interrupts : constant := 32;
 
@@ -42,7 +43,7 @@ package Rose.Checkpoints is
      array (1 .. Max_Saved_Interrupts) of Saved_Interrupt
      with Pack, Size => Max_Saved_Interrupts * 128;
 
-   Kernel_Header_Bytes : constant := 40 + Max_Saved_Interrupts * 16;
+   Kernel_Header_Bytes : constant := 40 + Max_Saved_Interrupts * 16 + 16;
 
    type Kernel_Table_Header is
       record
@@ -63,6 +64,16 @@ package Rose.Checkpoints is
          --  Record_Count, as Saved_Record.  There are no pages if no
          --  record is in use.
          Interrupts      : Saved_Interrupt_Array;
+         Interface_Major : Rose.Words.Word_16 := 0;
+         Interface_Minor : Rose.Words.Word_16 := 0;
+         Interface_Level : Rose.Words.Word_32 := 0;
+         Interface_Hash  : Rose.Words.Word_64 := 0;
+         --  The interfaces of the boot set that wrote the checkpoint
+         --  (Rose.Interface_Level): its release series, the number of its
+         --  endpoint ids, and a hash of them.  A boot set restores the
+         --  checkpoint only if it has the same series and at least the
+         --  same level, and at the same level, the same hash (ADR 0031,
+         --  section 2).
          Reserved        : System.Storage_Elements.Storage_Array
                              (1 .. Rose.Limits.Page_Size
                                   - Kernel_Header_Bytes) :=
