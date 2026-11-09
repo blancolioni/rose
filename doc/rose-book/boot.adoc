@@ -226,7 +226,7 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 == Starting the Shell
 
 When a new system has been installed, `init` launches `checkpoint`.
-It then runs the self tests, launches `auth`, creates the first user, `fraser`, with a home directory (ADR 0003), through `auth`, checks that `fraser` can log in, and launches `login`.
+It then runs the self tests, launches `auth`, asks the person installing for the first user's name and password (#456), creates that user, with a home directory (ADR 0003), through `auth`, and checks that the user can log in. It then says that the system is installed, waits for enter, launches `login`, and restarts from the disk once the install's checkpoint is written (#413).
 
 `login` is a command (#457).
 Its roles give it the console, the system caps, the command registry and the timer, and its argument is `auth`.

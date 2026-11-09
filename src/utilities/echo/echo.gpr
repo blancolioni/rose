@@ -17,11 +17,12 @@ project Echo is
    package Builder is
       for Global_Configuration_Pragmas use "echo-pragmas.config";
       for Executable ("rose-core-echo_main.adb") use "echo-driver";
-      for Default_Switches ("ada") use ("-s", "-k", "-g", "-O3", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches;
+      for Default_Switches ("ada") use ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib", "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst") & Checks.Switches
+        & Checks.Optimisation_Switches;
    end Compiler;
 
    package Binder is

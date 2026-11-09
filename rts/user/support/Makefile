@@ -48,6 +48,11 @@ librose-util: $(OBJECTS)
 memchr.o memcmp.o memcpy.o memmove.o memset.o strlen.o: \
     GCC_OPTS += -O2 -fno-tree-loop-distribute-patterns
 
+# The rest of the RTS's C is optimised too (#789): the clock, the
+# unwinder's glue, the maths library and the personality routine.
+
+rose-time.o rose-unwind.o rose-libm.o raise-gcc.o: GCC_OPTS += -O2
+
 raise-gcc.o: gcc/raise-gcc.c
 	$(GCC) -c $(GCC_OPTS) $(RAISE_OPTS) gcc/raise-gcc.c -o raise-gcc.o
 

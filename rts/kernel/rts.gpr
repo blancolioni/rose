@@ -28,14 +28,14 @@ library project RTS is
    for Object_Dir   use Common.Build_Dir & "/obj";
 
    package Builder is
-      Ada_Switches := ("-gnat2012", "-O0", "-g3", "-x", "-gnatg",
+      Ada_Switches := ("-gnat2012", "-O2", "-g", "-x", "-gnatg",
                        "-gnatec=../../../gnat.adc", "-q");--, "-gnatd.n");
 
       for Default_Switches ("Ada") use Ada_Switches;
    end Builder;
 
    package Compiler is
-      for Default_Switches ("Ada") use ("-O0", "-g3", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib", "-m32", "-march=i586");
+      for Default_Switches ("Ada") use ("-O2", "-g", "-ffunction-sections", "-fdata-sections", "-nostdinc", "-nostdlib", "-m32", "-march=i586");
    end Compiler;
 
    for Library_Kind use "static";
