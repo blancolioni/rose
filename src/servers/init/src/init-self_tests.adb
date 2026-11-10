@@ -101,8 +101,7 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
-      Create_Cap_Set  : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability)
       return Boolean
    is
       Passed : Boolean := True;
@@ -162,10 +161,6 @@ package body Init.Self_Tests is
       Sibling : Rose.Capabilities.Capability;
       Chain   : Chain_Array;
       Length  : Natural;
-      Kept    : Rose.Capabilities.Capability;
-      Spare   : Rose.Capabilities.Capability;
-      Below   : Rose.Capabilities.Capability;
-      Held    : Rose.Capabilities.Capability;
    begin
       First   := Derive (Derive_Cap, Find_Cap);
       Child   := Derive (Derive_Cap, First);
@@ -200,33 +195,6 @@ package body Init.Self_Tests is
                 Length = Max_Depth and then Works (Chain (Max_Depth)));
          Delete_Chain (Chain, Length);
       end loop;
-
-      --  Two are kept, so that the checkpoint has derivation records to
-      --  restore (the boot test looks for them).  A record is the lowest
-      --  that is free, so Below, which is derived from Kept, has a lower
-      --  number than it: a restore has to put Kept back first.  Init is
-      --  not restored, so bootcaps holds them, in a cap set, and init
-      --  lets go of its own. Bootcaps ends after boot, and they go with
-      --  it, until the test moves to the userland cap set server (#825).
-
-      Spare := Derive (Derive_Cap, Find_Cap);
-      Kept  := Derive (Derive_Cap, Find_Cap);
-      Call_On (Delete_Cap, Spare);
-      Below := Derive (Derive_Cap, Kept);
-
-      Check ("two are derived to be kept",
-             Kept /= Rose.Capabilities.Null_Capability
-             and then Below /= Rose.Capabilities.Null_Capability
-             and then Works (Kept) and then Works (Below));
-
-      Held := Init.Calls.Create_Cap_Set_With
-        (Create_Cap_Set, (Kept, Below));
-
-      Check ("bootcaps holds them",
-             Held /= Rose.Capabilities.Null_Capability);
-
-      Call_On (Delete_Cap, Kept);
-      Call_On (Delete_Cap, Below);
 
       return Passed;
    end Derive_Test;
@@ -283,6 +251,81 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Run;
+
+   --------------------------
+   -- Start_Derived_Holder --
+   --------------------------
+
+   function Start_Derived_Holder
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Derive_Cap      : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "hold_derived");
+      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
+      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+      Spare      : Rose.Capabilities.Capability;
+      Parent     : Rose.Capabilities.Capability;
+      Child      : Rose.Capabilities.Capability;
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  A record is the lowest that is free, so Child, which is derived
+      --  from Parent, gets a lower number than it: a restore has to put
+      --  Parent back first.
+
+      Spare  := Derive (Derive_Cap, Commands);
+      Parent := Derive (Derive_Cap, Commands);
+      Call_On (Delete_Cap, Spare);
+      Child  := Derive (Derive_Cap, Parent);
+
+      if Parent = Rose.Capabilities.Null_Capability
+        or else Child = Rose.Capabilities.Null_Capability
+      then
+         return False;
+      end if;
+
+      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps, as src/utilities/hold_derived/
+      --  rose-core-hold_derived.idl declares them: Create_Endpoint,
+      --  Standard_Output and Rescind_Cap, then its arguments, Parent and
+      --  Child.  The command replies once it holds them.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Standard_Output);
+      Rose.System_Calls.Send_Cap (Params, Rescind_Cap);
+      Rose.System_Calls.Send_Cap (Params, Parent);
+      Rose.System_Calls.Send_Cap (Params, Child);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      --  Hold_derived has its own copies, which name the same records.
+
+      Call_On (Delete_Cap, Parent);
+      Call_On (Delete_Cap, Child);
+
+      return not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Params.Data (0) = Completed;
+   end Start_Derived_Holder;
 
    ---------------
    -- Test_Bank --

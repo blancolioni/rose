@@ -27,6 +27,9 @@
 #                    loader's tag of that type.  Ports, interrupts and
 #                    device pages are granted to the module
 #                    (Init.Grants), or to nobody with 'owner: none'.
+#                    Any of these but a name can have 'when: variant',
+#                    and is a null cap in the other variant.  Caps with
+#                    'when' come last.
 #     words          data words for the launch, if any
 #     exports        names for endpoints copied from it: an endpoint, or
 #                    {endpoint: e, identifier: n, when: variant}.
@@ -245,8 +248,12 @@ stages:
         log_reset: State.Reset_Endpoint
 
     # In the order Restore.Start takes them.  Only restore-install has
-    # the last five, to install from the install media, start a new log,
-    # and write the boot loader (#322).
+    # the last nine: five to install from the install media, start a new
+    # log, and write the boot loader (#322), and four to ask before it
+    # erases hd0 (#836).  It reads the keyboard controller itself,
+    # because the keyboard driver only starts after the install; the
+    # ports go to nobody, so that the driver can have them too.  The
+    # kernel's command line says whether to erase.
     - launch: restore
       oid: 9
       priority: file_system
@@ -271,6 +278,10 @@ stages:
         - {cap: mbr, when: install}
         - {cap: bios_boot, when: install}
         - {cap: boot_partition, when: install}
+        - {cap: timer, when: install}
+        - {ports: [in, 8, 0x64, 0x64], owner: none, when: install}
+        - {ports: [in, 8, 0x60, 0x60], owner: none, when: install}
+        - {boot_tag: 1, when: install}
 
   # After the restore server has restored a checkpoint or installed a new
   # system.

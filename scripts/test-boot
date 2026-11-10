@@ -7,8 +7,11 @@
 #
 #   1. installs Rose on a new disk, and waits for the install to finish;
 #   2. boots from the disk, which restores the checkpoint, checks that the
-#      kernel restored the derivation records that init's test left,
-#      logs in as the first user, and runs run_self_tests, which has to
+#      kernel restored the derivation records that init gave hold_derived,
+#      and that a restored process names them, and that hold_derived
+#      found its derived capability working and revoked by rescinding its
+#      parent (#691); then logs in as the first user, and runs
+#      run_self_tests, which has to
 #      pass every test, then keytest, which has to draw in the corners of
 #      the 80 by 24 screen and move its mark with the arrow keys (#734),
 #      then kilo, which has to make, save and read back a file, and drop
@@ -36,17 +39,26 @@ start_qemu
 choose_last_entry
 log_in
 
-# Init's derive test leaves two derived capabilities in a cap set, so the
-# install's checkpoint has two derivation records, which the kernel puts
-# back.  It counts the capabilities of the processes that it restored that
-# name them when the first one resumes, and none do: the caps server that
-# holds them is a boot module, which a restore starts again and does not
-# restore.
+# Init gives hold_derived, which is persistent, two derived capabilities,
+# so the install's checkpoint has two derivation records, which the kernel
+# puts back, and counts the capabilities of the restored processes that
+# name them when the first one resumes: hold_derived's (#691).
 records=$(grep -h "derivation records restored" "$WORK/serial" | tail -1)
 echo "$records"
 count=$(echo "$records" | sed -n 's/.*restored: \([0-9][0-9]*\).*/\1/p')
+named=$(echo "$records" | sed -n 's/.*capabilities: \([0-9][0-9]*\).*/\1/p')
 [ -n "$count" ] && [ "$count" -ge 2 ] \
     || fail "the kernel did not restore the derivation records"
+[ -n "$named" ] && [ "$named" -ge 2 ] \
+    || fail "no restored process names the derivation records"
+
+# Hold_derived checks its capabilities the first time it is restored,
+# and writes the result to the console, before the screen is cleared.
+screen > "$WORK/restored-screen.txt"
+grep "hold_derived:" "$WORK/restored-screen.txt" | tail -1
+grep -q "hold_derived: restored: the derived capability works" \
+    "$WORK/restored-screen.txt" \
+    || fail "hold_derived did not find its restored capability working and revocable"
 
 echo "Running the self tests"
 # The restored screen can still show the install's test result.

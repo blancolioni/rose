@@ -13,12 +13,27 @@ package body Restore.Start is
 
    Next_Cap_Index : Positive := 1;
 
-   procedure Exit_Restore;
-   --  End restore, and with it the caps it was given (#451).
-
    procedure Wait_Forever;
    --  Wait for a message that never comes.  Exit_Restore does this if
    --  restore has no exit cap.
+
+   -----------------
+   -- Add_Storage --
+   -----------------
+
+   procedure Add_Storage is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+
+      --  The storage server needs its backing store either way: a restore
+      --  recreates regions on it, and an install reserves them.
+
+      Rose.Console_IO.Put_Line ("restore: activating storage");
+
+      Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
+      Rose.System_Calls.Send_Cap (Params, Swap_Cap);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Add_Storage;
 
    --------------------
    -- Delete_Cap_Set --
@@ -119,7 +134,10 @@ package body Restore.Start is
    -- Prepare --
    -------------
 
-   procedure Prepare (Checkpoint : out Rose.Words.Word_64) is
+   procedure Prepare
+     (Checkpoint : out Rose.Words.Word_64;
+      Refuse     : Boolean := True)
+   is
       use type Rose.Capabilities.Capability;
    begin
       Rose.Console_IO.Open (Console_Cap);
@@ -155,31 +173,21 @@ package body Restore.Start is
       Checkpoint := Restore.Checkpoint_Log.Find_Checkpoint (Log_Reader_Cap);
 
       --  A checkpoint that this boot set can't read is neither restored
-      --  nor installed over (#375).  Restore exits before it has changed
+      --  nor installed over (#375), unless the person installing has
+      --  chosen to erase hd0 (#836).  Restore exits before it has changed
       --  anything, and the system idles with this on the screen.
 
-      if Restore.Checkpoint_Log.Refused then
+      if Refuse and then Restore.Checkpoint_Log.Refused then
          Rose.Console_IO.Put_Line
            ("restore: this boot set can't read the checkpoint on hd0, so it");
          Rose.Console_IO.Put_Line
            ("restore: neither restores it nor installs over it.  Boot the");
          Rose.Console_IO.Put_Line
-           ("restore: release that wrote it, from hd0 or its install media");
+           ("restore: release that wrote it, from hd0 or its install media,");
+         Rose.Console_IO.Put_Line
+           ("restore: or choose the install media's entry that erases hd0");
          Exit_Restore;
       end if;
-
-      --  The storage server needs its backing store either way: a restore
-      --  recreates regions on it, and an install reserves them.
-
-      Rose.Console_IO.Put_Line ("restore: activating storage");
-
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Add_Storage_Cap);
-         Rose.System_Calls.Send_Cap (Params, Swap_Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end;
    end Prepare;
 
    ------------------------
