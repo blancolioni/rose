@@ -41,6 +41,7 @@ login:
 	    $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/seekable.idl \
 	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \
 	    $(INTERFACES)/segment.idl \
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/heap.idl \

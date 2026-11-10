@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Text_IO;
 
 with Ada.Streams;
@@ -6,6 +7,8 @@ with System.Storage_Elements;
 with Rose.Capabilities;
 
 with Rose.Interfaces.File_Control.Client;
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
@@ -28,6 +31,63 @@ package body Tests.Processes is
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
 
+   -------------------
+   -- Bank_End_Test --
+   -------------------
+
+   function Bank_End_Test return Boolean is
+      use type Rose.Capabilities.Capability;
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Own     : constant Rose.Capabilities.Capability :=
+                  Rose.System_Calls.Own_Bank.Cap;
+   begin
+      Ada.Text_IO.Put ("Bank end test");
+
+      if Own = Rose.Capabilities.Null_Capability then
+         return Fail ("no bank of its own");
+      end if;
+
+      declare
+         Own_Bank : Rose.Interfaces.Bank.Client.Bank_Client :=
+                      Rose.Interfaces.Bank.Client.From_Cap (Own);
+         Sub_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+                      Own_Bank.Create_Sub_Bank (0, 0);
+         Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+                      Tests.Registry.Launcher ("file");
+         Server   : Rose.Interfaces.Process.Process_Object'Class :=
+                      Launcher.Launch (Sub_Bank.Bank_Cap, No_Caps);
+         Control  : Rose.Interfaces.File_Control.Client.File_Control_Client;
+         File     : Files.Writable_File_Client;
+      begin
+         Control.Open (Server.Published_Interface);
+         declare
+            Writable : Rose.Interfaces.Writable_File
+              .Writable_File_Object'Class := Control.Writable;
+         begin
+            File.Open (Writable.Writable_File_Cap);
+         end;
+         Tests.Files.Append (File, Hello);
+         if File.Size /= Hello'Length then
+            return Fail ("the file doesn't work");
+         end if;
+
+         --  Destroying the bank ends the process that was launched
+         --  against it, without asking it.
+
+         Sub_Bank.Destroy;
+
+         begin
+            Ada.Text_IO.Put (Storage_Count'Image (File.Size));
+            return Fail ("the file answers after its bank was destroyed");
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
+      end;
+
+      return True;
+   end Bank_End_Test;
+
    ----------------------
    -- End_Process_Test --
    ----------------------
@@ -37,7 +97,7 @@ package body Tests.Processes is
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("file");
       First    : Rose.Interfaces.Process.Process_Object'Class :=
-        Launcher.Launch (No_Caps);
+        Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       Control  : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File     : Files.Writable_File_Client;
    begin
@@ -74,7 +134,7 @@ package body Tests.Processes is
 
       declare
          Second      : Rose.Interfaces.Process.Process_Object'Class :=
-           Launcher.Launch (No_Caps);
+           Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps);
          Second_Control : Rose.Interfaces.File_Control.Client
            .File_Control_Client;
          Second_File    : Files.Writable_File_Client;

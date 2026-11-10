@@ -50,11 +50,13 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Exec_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Process_Class;
 
    overriding function Launch_Command
      (Item : in out Exec_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
@@ -73,11 +75,13 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Program_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Process_Class;
 
    overriding function Launch_Command
      (Item : in out Program_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
 
@@ -87,9 +91,11 @@ package body Exec.Server is
 
    procedure Send_Image
      (Params : in out Rose.Invocation.Invocation_Record;
-      Id     : Rose.Objects.Capability_Identifier);
-   --  Send the image and storage of program Id, as the ELF server's
-   --  Launch and Launch_Command take them.
+      Id     : Rose.Objects.Capability_Identifier;
+      Bank   : Rose.Capabilities.Capability);
+   --  Send the image of program Id and the bank to launch it against, as
+   --  the ELF server's Launch and Launch_Command take them: Bank, or
+   --  exec's own if Bank is null (ADR 0015, #750).
 
    function Result
      (Params : Rose.Invocation.Invocation_Record)
@@ -189,10 +195,11 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Exec_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Process_Class
    is
-      pragma Unreferenced (Item, Caps);
+      pragma Unreferenced (Item, Bank, Caps);
    begin
       Not_A_Program;
       return Rose.Interfaces.Process.Client.From_Cap
@@ -205,6 +212,7 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Program_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Process_Class
    is
@@ -212,7 +220,7 @@ package body Exec.Server is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Initialize_Send (Params, Create_Process_Cap);
-      Send_Image (Params, Item.Id);
+      Send_Image (Params, Item.Id, Bank);
       Exec.Library.Send_Install_Caps (Item.Id, Params);
 
       for Cap of Caps loop
@@ -226,6 +234,7 @@ package body Exec.Server is
       for Cap of Caps loop
          Delete_Cap (Cap);
       end loop;
+      Delete_Cap (Bank);
 
       return Rose.Interfaces.Process.Client.From_Cap (Result (Params));
    end Launch;
@@ -255,10 +264,11 @@ package body Exec.Server is
 
    overriding function Launch_Command
      (Item : in out Exec_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
-      pragma Unreferenced (Item, Caps);
+      pragma Unreferenced (Item, Bank, Caps);
    begin
       Not_A_Program;
       return Rose.Capabilities.Null_Capability;
@@ -270,6 +280,7 @@ package body Exec.Server is
 
    overriding function Launch_Command
      (Item : in out Program_Object;
+      Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
@@ -283,7 +294,7 @@ package body Exec.Server is
 
       Rose.Trace.Event ("launch command, program ", Natural (Item.Id));
       Initialize_Send (Params, Launch_Command_Cap);
-      Send_Image (Params, Item.Id);
+      Send_Image (Params, Item.Id, Bank);
 
       for Cap of Caps loop
          Send_Cap (Params, Cap);
@@ -298,6 +309,7 @@ package body Exec.Server is
       for Cap of Caps loop
          Delete_Cap (Cap);
       end loop;
+      Delete_Cap (Bank);
 
       return Result (Params);
    end Launch_Command;
@@ -367,11 +379,16 @@ package body Exec.Server is
 
    procedure Send_Image
      (Params : in out Rose.Invocation.Invocation_Record;
-      Id     : Rose.Objects.Capability_Identifier)
+      Id     : Rose.Objects.Capability_Identifier;
+      Bank   : Rose.Capabilities.Capability)
    is
+      use type Rose.Capabilities.Capability;
    begin
       Rose.System_Calls.Send_Cap (Params, Exec.Library.Image_Region (Id));
-      Rose.System_Calls.Send_Cap (Params, Bank_Cap);
+      Rose.System_Calls.Send_Cap
+        (Params,
+         (if Bank /= Rose.Capabilities.Null_Capability
+          then Bank else Bank_Cap));
    end Send_Image;
 
    -------------------------

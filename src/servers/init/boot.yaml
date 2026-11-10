@@ -131,6 +131,7 @@ stages:
       exports:
         mem: Memory.Memory_Interface
         memory_checkpoint: Memory.Checkpoint_Endpoint
+        mem_set_process_banks: Memory.Set_Process_Banks_Endpoint
         memory_restore: Memory_Restore.Memory_Restore_Interface
 
     - launch: timer
@@ -189,6 +190,12 @@ stages:
         # checkpoint.
         store_checkpoint: Storage_Checkpoint.Checkpoint_Endpoint
         store_restore: Storage_Checkpoint.Storage_Checkpoint_Interface
+        # For mem: which bank is each process's own (ADR 0015, #750).
+        process_banks: Process_Banks.Process_Banks_Interface
+
+    # Mem is launched before the store, so it is given the store's
+    # Process_Banks once the store is running, on every boot (#750).
+    - call: Connect_Process_Banks
 
     - launch: elf
       oid: 12

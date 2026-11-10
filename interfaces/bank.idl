@@ -40,4 +40,8 @@ interface Bank is
 
    procedure Destroy;
 
+   function Index return Word;
+   --  The bank's index in the storage server's table, which names it
+   --  to Process_Banks (#750). Knowing it grants nothing.
+
 end Bank;

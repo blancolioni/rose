@@ -3,8 +3,12 @@ interface Memory is
    type Page_Access_Type is (Read, Write, Execute);
    
    function New_Process
-     (Process     : interface Kernel_Process)
+     (Process     : interface Kernel_Process;
+      Bank        : interface Bank)
      return interface Process;
+   --  Bank is the bank that the process is launched against. Its own
+   --  bank is a new sub-bank of it (ADR 0015, #750), which
+   --  Process.Bank returns.
    
    procedure Register_Process
      (Process     : interface Process;
@@ -30,5 +34,15 @@ interface Memory is
      
    procedure Checkpoint
      (Append_Page : Capability);
+
+   procedure Set_Process_Banks
+     (Banks : interface Process_Banks);
+   --  The storage server's Process_Banks, which init gives mem at every
+   --  boot, once the store is running (#750).
+
+   procedure Processes_Ended;
+   --  The store has queued processes to end, because their banks were
+   --  destroyed: mem asks Process_Banks.Take_Ended for each, and ends
+   --  it. The store sends this without waiting.
 	 
 end Memory;

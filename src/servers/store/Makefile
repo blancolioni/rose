@@ -20,6 +20,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-bank-server.o \
 	$(BUILDDIR)/rose-interfaces-dependent.o \
 	$(BUILDDIR)/rose-interfaces-dependent-server.o \
+	$(BUILDDIR)/rose-interfaces-process_banks.o \
+	$(BUILDDIR)/rose-interfaces-process_banks-server.o \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \

@@ -63,6 +63,25 @@ set -- $(echo "$result" \
 [ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
     || fail "not every self test passed"
 
+# Each run launches the servers that it tests against its own bank, so
+# they end when it does. The third run used to fill the process table
+# and hang (#724, ADR 0015).
+for run in 2 3; do
+    echo "Running the self tests again ($run)"
+    type_text "clear
+"
+    sleep 5
+    type_text "run_self_tests
+"
+    wait_for "Test result:" 120 || fail "self tests run $run did not finish"
+    result=$(screen | grep "Test result:" | tail -1)
+    echo "$result"
+    set -- $(echo "$result" \
+        | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+    [ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
+        || fail "not every self test passed in run $run"
+done
+
 echo "Running keytest on the 80 by 24 text screen"
 check_keytest
 

@@ -49,6 +49,42 @@ package Store.Devices is
      (Id : Rose.Objects.Capability_Identifier);
    --  End the registration of dependent Id.
 
+   function Bank_Index
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word;
+   --  Bank Id's index, which names it to Process_Banks (#750).
+
+   function Create_Process_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Parent  : Rose.Words.Word;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability;
+   --  A new sub-bank of bank Parent that is Process's own (ADR 0015), or
+   --  the null cap.
+
+   function Process_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability;
+   --  Process's own bank, or the null cap.
+
+   procedure End_Process
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id);
+   --  Destroy Process's own bank, if it has one, and queue the processes
+   --  whose banks are below it to be ended.
+
+   procedure Set_Ended
+     (Id    : Rose.Objects.Capability_Identifier;
+      Ended : Rose.Capabilities.Capability);
+   --  The cap to send to, without waiting, when processes are queued to
+   --  be ended.
+
+   function Take_Ended
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Objects.Object_Id;
+   --  The next process queued to be ended, or zero.
+
    procedure Get_Usage
      (Id           : in     Rose.Objects.Capability_Identifier;
       Pages        :    out Rose.Words.Word_64;

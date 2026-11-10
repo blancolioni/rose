@@ -78,8 +78,38 @@ package Mem.Processes is
       Message : String);
 
    function New_Process
-     (Process_Cap : Rose.Capabilities.Capability)
+     (Process_Cap : Rose.Capabilities.Capability;
+      Bank_Cap    : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
+   --  Bank_Cap is the bank that the process is launched against: its own
+   --  bank is a new sub-bank of it (ADR 0015, #750).  Mem deletes
+   --  Bank_Cap.
+
+   procedure Set_Process_Banks (Banks_Cap : Rose.Capabilities.Capability);
+   --  The storage server's Process_Banks, which init gives mem at every
+   --  boot (#750).
+
+   procedure Set_Ended (Ended_Cap : Rose.Capabilities.Capability);
+   --  Give the store the cap to send to when it queues processes to end.
+
+   function Get_Bank_Cap
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability;
+   --  The cap for Process's own bank, or the null cap.  Mem keeps one,
+   --  and asks the store for it again after a restore.
+
+   procedure End_Bank (Process : Rose.Objects.Object_Id);
+   --  Process has ended: tell the store to destroy its own bank, which
+   --  ends the processes whose banks are below it.
+
+   function Find_By_Oid
+     (Oid : Rose.Objects.Object_Id)
+      return Process_Id;
+   --  The process whose object id is Oid, or 0.
+
+   function Take_Ended return Rose.Objects.Object_Id;
+   --  The next process to end because its bank was destroyed, from the
+   --  store's Process_Banks, or 0.
 
    function Register_Process
      (Process_Cap : Rose.Capabilities.Capability)

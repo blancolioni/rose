@@ -17,6 +17,7 @@ command:
 	    $(INTERFACES)/commands.idl \
 	    $(INTERFACES)/launch.idl \
 	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl $(INTERFACES)/resource.idl $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/segment.idl \
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/cap.idl \

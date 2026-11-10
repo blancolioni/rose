@@ -142,8 +142,10 @@ package body Store.Devices is
          Region_Limit : Rose.Words.Word := 0;
          Pages        : Rose.Words.Word_64 := 0;
          Regions      : Rose.Words.Word := 0;
+         Owner        : Rose.Objects.Object_Id := 0;
       end record;
-   --  A bank (ADR 0014).  Parent is zero for the root bank.  A limit of
+   --  A bank (ADR 0014).  Owner is the process whose own bank it is (ADR
+   --  0015, #750), or zero.  Parent is zero for the root bank.  A limit of
    --  zero is no limit.  Pages and Regions are what has been reserved
    --  from the bank and the banks below it: its pages are the blocks that
    --  have space on a device, and a subregion counts as a region.
@@ -173,6 +175,26 @@ package body Store.Devices is
      array (1 .. Max_Dependents) of Dependent_Record;
 
    Dependents : Dependent_Array;
+
+   Ended_Queue : array (1 .. Max_Banks) of Rose.Objects.Object_Id :=
+                   (others => 0);
+   Ended_Count : Natural := 0;
+   Ended_Cap   : Rose.Capabilities.Capability := 0;
+   --  The processes to end because their own banks were destroyed (ADR
+   --  0015, #750), which mem takes one at a time, and the cap of mem's
+   --  Processes_Ended, which the store sends to without waiting when it
+   --  queues one.  The queue isn't saved: mem empties it as soon as it is
+   --  told.
+
+   procedure Destroy_Bank_Tree
+     (Bank   : Natural;
+      Ending : Rose.Objects.Object_Id);
+   --  Destroy Bank and the banks below it, and queue the processes that
+   --  own them to be ended, apart from Ending, which has ended already.
+
+   procedure Ring_Ended;
+   --  If processes are queued to be ended, tell mem, by a send that
+   --  doesn't wait.
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
    --  Delete one of the storage server's own caps, if it isn't null.
@@ -453,6 +475,18 @@ package body Store.Devices is
       return 0;
    end Add_Dependent;
 
+   ----------------
+   -- Bank_Index --
+   ----------------
+
+   function Bank_Index
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word
+   is
+   begin
+      return Rose.Words.Word (Id);
+   end Bank_Index;
+
    ------------
    -- Charge --
    ------------
@@ -598,7 +632,7 @@ package body Store.Devices is
                  Page_Limit   => Banks (Index).Page_Limit,
                  Region_Limit =>
                    Rose.Words.Word_32 (Banks (Index).Region_Limit),
-                 Reserved     => 0);
+                 Owner        => Rose.Words.Word_32 (Banks (Index).Owner));
             if Bank_Slot = Banks_Per_Page then
                Append;
                Bank_Slot := 0;
@@ -621,6 +655,33 @@ package body Store.Devices is
          Rose.System_Calls.Invoke_Capability (Params);
       end;
    end Checkpoint;
+
+   -------------------------
+   -- Create_Process_Bank --
+   -------------------------
+
+   function Create_Process_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Parent  : Rose.Words.Word;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+      use type Rose.Capabilities.Capability;
+      Cap : constant Rose.Capabilities.Capability :=
+              Create_Sub_Bank
+                (Rose.Objects.Capability_Identifier (Parent), 0, 0);
+   begin
+      if Cap /= 0 then
+         for Bank of Banks loop
+            if Bank.In_Use and then Bank.Access_Cap = Cap then
+               Bank.Owner := Process;
+               exit;
+            end if;
+         end loop;
+      end if;
+      return Cap;
+   end Create_Process_Bank;
 
    ----------------------
    -- Create_Root_Bank --
@@ -830,7 +891,18 @@ package body Store.Devices is
    procedure Destroy_Bank
      (Id : Rose.Objects.Capability_Identifier)
    is
-      Bank   : constant Natural := Natural (Id);
+   begin
+      Destroy_Bank_Tree (Natural (Id), Ending => 0);
+   end Destroy_Bank;
+
+   -----------------------
+   -- Destroy_Bank_Tree --
+   -----------------------
+
+   procedure Destroy_Bank_Tree
+     (Bank   : Natural;
+      Ending : Rose.Objects.Object_Id)
+   is
       Doomed : array (1 .. Max_Banks) of Boolean := (others => False);
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -884,6 +956,26 @@ package body Store.Devices is
          end;
       end loop;
 
+      --  A process whose own bank is going ends too (ADR 0015).  Mem ends
+      --  it, when it is told.
+
+      for Index in Doomed'Range loop
+         if Doomed (Index)
+           and then Banks (Index).Owner /= 0
+           and then Banks (Index).Owner /= Ending
+         then
+            if Ended_Count < Ended_Queue'Last then
+               Ended_Count := Ended_Count + 1;
+               Ended_Queue (Ended_Count) := Banks (Index).Owner;
+            else
+               Rose.Console_IO.Put_Line
+                 ("store: too many processes to end at once");
+            end if;
+         end if;
+      end loop;
+
+      Ring_Ended;
+
       for Index in Doomed'Range loop
          if Doomed (Index) then
             Rose.System_Calls.Initialize_Send
@@ -896,7 +988,7 @@ package body Store.Devices is
             Banks (Index) := (others => <>);
          end if;
       end loop;
-   end Destroy_Bank;
+   end Destroy_Bank_Tree;
 
    -----------------
    -- Device_Page --
@@ -920,6 +1012,28 @@ package body Store.Devices is
          * Minimum_Block_Pages
          + Natural (Page mod Minimum_Block_Pages));
    end Device_Page;
+
+   -----------------
+   -- End_Process --
+   -----------------
+
+   procedure End_Process
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id)
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Process = 0 then
+         return;
+      end if;
+
+      for Index in Banks'Range loop
+         if Banks (Index).In_Use and then Banks (Index).Owner = Process then
+            Destroy_Bank_Tree (Index, Ending => Process);
+            return;
+         end if;
+      end loop;
+   end End_Process;
 
    ----------------
    -- Find_Entry --
@@ -1418,6 +1532,27 @@ package body Store.Devices is
 
    end New_Store;
 
+   ------------------
+   -- Process_Bank --
+   ------------------
+
+   function Process_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Process /= 0 then
+         for Bank of Banks loop
+            if Bank.In_Use and then Bank.Owner = Process then
+               return Bank.Access_Cap;
+            end if;
+         end loop;
+      end if;
+      return 0;
+   end Process_Bank;
+
    ---------
    -- Put --
    ---------
@@ -1823,6 +1958,7 @@ package body Store.Devices is
                        Rose.Objects.Capability_Identifier (Index)),
                   Page_Limit   => Saved.Page_Limit,
                   Region_Limit => Rose.Words.Word (Saved.Region_Limit),
+                  Owner        => Rose.Objects.Object_Id (Saved.Owner),
                   others       => <>);
             end if;
          end;
@@ -2053,6 +2189,55 @@ package body Store.Devices is
          end;
       end if;
    end Restore_Table_Page;
+
+   ----------------
+   -- Ring_Ended --
+   ----------------
+
+   procedure Ring_Ended is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Ended_Count > 0 and then Ended_Cap /= 0 then
+         Rose.System_Calls.Initialize_Send (Params, Ended_Cap);
+         Params.Control.Flags (Rose.Invocation.Block) := False;
+         Params.Control.Flags (Rose.Invocation.Create_Reply_Cap) := False;
+         Rose.System_Calls.Invoke_Capability (Params);
+      end if;
+   end Ring_Ended;
+
+   ---------------
+   -- Set_Ended --
+   ---------------
+
+   procedure Set_Ended
+     (Id    : Rose.Objects.Capability_Identifier;
+      Ended : Rose.Capabilities.Capability)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Delete_Cap (Ended_Cap);
+      Ended_Cap := Ended;
+      Ring_Ended;
+   end Set_Ended;
+
+   ----------------
+   -- Take_Ended --
+   ----------------
+
+   function Take_Ended
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Objects.Object_Id
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Ended_Count = 0 then
+         return 0;
+      end if;
+
+      Ended_Count := Ended_Count - 1;
+      return Ended_Queue (Ended_Count + 1);
+   end Take_Ended;
 
    --------------
    -- Uncharge --
