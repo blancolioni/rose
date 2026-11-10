@@ -28,5 +28,8 @@ user:
 	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/resource.idl \
+	    $(INTERFACES)/bank.idl \
+	    $(INTERFACES)/dependent.idl \
+	    $(INTERFACES)/region.idl \
 	    $(INTERFACES)/seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

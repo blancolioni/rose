@@ -2,7 +2,9 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
-- **Amended by:** #448, where the store raises a signal of the server's for a dependent object, rather than invoking a cap that it registered, and registrations aren't saved: a restored server adds them again (sections 3 and 7)
+- **Amended by:**
+  - #448, where the store raises a signal of the server's for a dependent object, rather than invoking a cap that it registered, and registrations aren't saved: a restored server adds them again (sections 3 and 7)
+  - #450, where init makes the system bank once, at the install, auth makes each user's bank, and the user server makes each session's (section 2)
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0010](0010-resources.md) (resources), [ADR 0015](0015-process-ownership.md) (process ownership), #305 (allocate backing blocks on first write), #320 (reuse process table entries), #126 (the book's old Memory chapter)
 
 ## Context
@@ -41,6 +43,28 @@ The book's old Memory chapter (#126) described hierarchical space banks. Each pr
 - **A bank can create sub-banks.** Each bank has exactly one parent, except the root bank, which the store holds.
 - **A sub-bank can have a limit,** in pages, and a limit on the number of regions. A reservation fails if it would take the bank, or any bank above it, over a limit. Storage reserved from a sub-bank counts against every bank above it. Pages count when the store has backing blocks for them (see 6), which today is when they are reserved.
 - **The system's banks follow who is responsible.** Init receives a system bank at boot. The user server creates a bank for each user, and each session gets a sub-bank of its user's bank.
+
+#### The system, users and sessions (amendment, #450)
+
+Amended by #450. The tree is:
+
+```
+root (the store's)
+└── system: init, at the install
+    ├── exec, the command registry, and what init launches
+    │   └── auth's own bank
+    │       └── a user's bank: auth, for each user
+    │           ├── the user's home directory and user server
+    │           └── a session's bank: the user server, for each login
+    │               └── petal, and the jobs it launches
+    └── the banks that `.caps` files grant
+```
+
+- **Init makes the system bank once, at the install.** It is a sub-bank of the root bank, with no limits. Init is a boot module, and launches the persistent servers only at the install. They keep their caps across a restore, and a restored init launches nothing, so nothing needs to find the system bank again. Exec's own bank is the system bank, so a launch with a null bank lands there, not in the root bank. The update boot (ADR 0031) will need a way to find it again, to launch servers that replace old ones (#830).
+- **Auth makes each user's bank,** not the user server. Auth is the process that creates users. A user's bank is a sub-bank of auth's own, and the user's home directory and user server are launched against it. The user server is given the bank, as an argument.
+- **The user server makes each session's bank,** through `User.New_Session`, as a sub-bank of the user's bank. Login asks for one at each login, launches petal against it, and destroys it when petal returns. That ends whatever the session left running, and releases what it reserved, beyond what petal's own bank already covers (ADR 0015).
+- **Ending auth ends every user.** The user banks are below auth's own bank, so destroying it would destroy them, with the users' home directories. That follows who is responsible: auth is what made them.
+- **The limits are all unset.** Choosing defaults for a user or a session is a separate step, once usage can be read (`Get_Usage`).
 
 ### 3. Destroying a bank reclaims everything reserved from it
 
@@ -122,4 +146,5 @@ Amended by #448: the registrations of dependent objects aren't saved. Each holds
 - Store: registration of dependent objects, and invoking them when a bank is destroyed (#448).
 - Elf, the installer and other reservers: reserve from a bank (#449).
 - Init: a system bank at boot. The user server: a bank for each user and each session (#450).
+- The update boot: a way for init to find the system bank again (#830).
 - ADR 0010: note that a server can charge a client's resource to the client's bank.

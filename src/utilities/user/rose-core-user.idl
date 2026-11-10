@@ -2,8 +2,9 @@ command Rose.Core.User : Create_Endpoint
   with Summary     => "Serve a user's User interface.",
        Description => """
           User serves the User interface of one user (ADR 0003): the
-          user's name, and the user's home directory. It returns the
-          interface, and then keeps serving it.
+          user's name, the user's home directory, and a bank for each
+          of the user's sessions. It returns the interface, and then
+          keeps serving it.
           """,
        Server      => User_Server.Start_Server,
        Live
@@ -12,6 +13,8 @@ is
      with Help => "the user's name";
    Home : in Writable_Directory
      with Help => "the user's home directory";
+   Bank : in Bank
+     with Help => "the user's bank, which sessions are sub-banks of";
    User : out User
      with Help => "the user's User interface";
 end Rose.Core.User;

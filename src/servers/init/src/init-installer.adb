@@ -10,7 +10,6 @@ with Rose.Interfaces.Reader.Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Init.Boot;
 with Init.Grants;
 
 package body Init.Installer is
@@ -232,8 +231,7 @@ package body Init.Installer is
             elsif N = "framebuffer" and then Count = 0 then
                Cap := Init.Grants.Framebuffer (Owner);
             elsif N = "bank" and then Count = 2 then
-               Cap := Init.Grants.Bank
-                 (Init.Boot.Storage_Cap, Values (1), Values (2));
+               Cap := Init.Grants.Bank (Values (1), Values (2));
             elsif N = "boot-tag" and then Count = 1
               and then Values (1) = 8
             then
