@@ -1,0 +1,162 @@
+= Files and Directories
+
+Rose has files and directories, but no file system.
+There is no on-disk format for them: no blocks to allocate, no inodes, no journal, nothing to mount and nothing to check after a crash.
+Each file and each directory is a process, and its contents are that process's memory.
+They last because every persistent process lasts: a checkpoint saves the memory of each one, and a restore brings it back (see <<Persistence>>).
+
+The only file system code in Rose is `isofs`, which reads the install media's ISO 9660 image, read-only.
+hd0 has no file system partition at all: only the boot partition, swap and the checkpoint log (see <<Drive Layout>>).
+
+== A File Is a Process
+
+The `file` server serves one file (see <<Servers>>).
+Its contents are a buffer in its own memory, which it reads and writes as any program reads and writes an array.
+
+* *Writing a file is writing memory.*
+  The first write to a page of the buffer makes the page dirty, as for any persistent process, and the next checkpoint saves it to the log.
+  A page that has never been written takes no memory and no space on the disk (#305).
+* *A file holds at most 64 KiB for now,* in a fixed buffer (#760).
+* *A file has no name.*
+  Its name is an entry in a directory, and the file's process knows nothing of it.
+
+The `directory` server serves one directory.
+Its entries are in its own memory too: for each one, the name, whether it is a file or a directory, and the caps of the process that serves it.
+
+* *Creating an entry launches a process.*
+  `Create_File` launches a new `file` process, and `Create_Directory` a new `directory` process, through the launch caps that each directory holds.
+  The directory keeps the new process's caps in the entry, and returns the new file or directory in its writable form.
+* *Deleting an entry ends its process.*
+  `Delete_File` and `Delete_Directory` end the process, and every cap to the file or directory fails from then on, whoever holds it.
+  A directory with entries can't be deleted.
+* *Renaming changes only the entry.*
+  The file or directory is the same process, so caps to it keep working under the new name.
+
+A process for each file is not as costly as it sounds.
+The code of every `file` process is the same read-only pages, which `mem` shares (#200), so each file costs its own data pages, its stack and a kernel process entry.
+Each server is written as an independent process, which talks to others only through their interfaces, so that a directory and its files can later run as tasks inside one kernel process, under a user-mode scheduler, without changing the servers.
+
+== Rights Are Types
+
+A file or directory comes in two forms, and the type of a cap says which right it gives (ADR 0002, ADR 0003):
+
+[cols="2,2,4",options="header"]
+|===
+| Interface | Parent | Adds
+| `File` | | `Size`, and readers: `Open_Reader`, `Open_Seekable_Reader`
+| `Writable_File` | `File` | Writers: `Append`, `Rewrite`; and `New_Version`
+| `Directory` | | Looking up entries: `Find_Entry`, `Directory_Entry_Name`, `Get_Ordinary_File`, `Get_Directory`, and the rest
+| `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory`, `Rename`, `Delete_File`, `Delete_Directory`
+|===
+
+* *Narrowing is free.*
+  An interface cap is a set of endpoint caps, one for each operation, so a `File` is the `Writable_File`'s caps for the `File` operations alone.
+  Petal passes `in File` from a writable file that it holds in this way.
+* *A directory hands out read-only children.*
+  `Get_Ordinary_File` and `Get_Directory` return `File` and `Directory`, even on a `Writable_Directory`.
+  Only the `Get_Writable_*` operations, which only a `Writable_Directory` has, return the writable forms.
+* *A file is not a stream.*
+  It opens readers and writers, each a `Resource` that its client releases when it is done (ADR 0009, ADR 0010).
+  A reader has its own position.
+  A writer has none: `Append` writes at the end of the file, and `Rewrite` empties the file first and then writes at its end, so any number of writers can be open at once.
+
+== No Global Namespace
+
+There is no root directory, and no path that every process shares.
+A directory doesn't know its parent, and has no `..` entry.
+A process can reach only the directories it holds caps to, and what is below them.
+
+Petal keeps a table of named directory caps, such as `home`, instead of a root and a working directory (ADR 0002, section 5).
+A path starts from one of them, written `[home]`, or from petal's current directory:
+
+----
+cd [home]/src/rose
+cd ..
+----
+
+Petal resolves each name with `Find_Entry`, one directory at a time.
+It handles `..` itself, from its own record of the names it walked down: `..` above the named directory it started from is an error, because there is nothing above it.
+
+== Commit and Rollback
+
+Writing to a `Writable_File` changes the file as each write is made.
+A command that needs its changes to take effect all at once, or not at all, works on a _version_ of the file instead (ADR 0026).
+
+[source,ada]
+----
+interface Transactional is
+   procedure Commit;
+   procedure Rollback;
+end Transactional;
+
+interface Transactional_Writable_File
+  : Writable_File, Transactional, Resource
+is
+end Transactional_Writable_File;
+----
+
+`Writable_File.New_Version` returns a version, which starts as a copy of the file:
+
+* *A version is read and written as the file is.*
+  It is a `Writable_File`, so a command opens readers and writers on it as it would on the file.
+  Nobody else sees what is written to it.
+* *`Commit` makes the version the file's contents,* and the version stays open for more changes.
+  The file's process copies the version's buffer to the file's in one call, so every other client of the file sees the old contents or the new ones, never a mixture.
+  A reader of the file that was past the new end moves back to it.
+* *`Rollback` drops the changes since the last commit,* by copying the file's contents back to the version.
+  It doesn't undo an earlier commit.
+* *`Release` ends the version* and drops whatever wasn't committed.
+  Every cap to the version, and every reader and writer opened on it, fails from then on, and the file can have another version.
+* *A file has at most one version at a time,* and versions don't nest: `New_Version` fails on a file that has a version, and on a version.
+* *The version belongs to the file's process,* which keeps a second buffer for it.
+  The directory takes no part.
+
+Holding a `Transactional_Writable_File` is the right to commit it, as the type is the right.
+Making a version gives no new right, since whoever holds a `Writable_File` can already change the file as they like: a version only lets them change it all at once.
+
+=== Committed Is Not Yet Saved
+
+A commit makes the version the file's contents, in the file's memory.
+It reaches the disk at the next checkpoint, as every other change to memory does, which is at most 30 seconds later.
+If the machine stops before then, the restore goes back to the last checkpoint, and the commit is lost with everything else since.
+
+What a checkpoint never does is save half of a change.
+A checkpoint is a snapshot of every persistent process at one moment (see <<Checkpoint Mode>>), so after a restore each file holds what it held at that moment, with its directory as it was at the same moment.
+A version that was being written is saved too, in the file's memory, and comes back as it was: still open, with its changes still not committed.
+
+=== Commands and Versions
+
+A command says in its signature whether it wants a file or a version, and petal binds the argument to match (ADR 0026, section 3):
+
+[cols="2,5",options="header"]
+|===
+| Argument | Petal binds
+| `in File` | The file, read-only.
+| `in Writable_File` | The file itself. Every write changes it as it is made, and the file must exist.
+| `in Transactional_Writable_File` | A version of the file, which the command commits. Petal creates the file first if there is none.
+|===
+
+* *The command commits, because only the command knows when its changes are done.*
+  `copy` commits its target once it has written the last byte.
+  A failed copy raises before it commits, so an existing target is left as it was.
+  The editor, `kilo`, commits each time it saves; quitting without saving commits nothing.
+* *Petal never commits a command's versions.*
+  When the command ends, whether it completed or failed, petal releases every version it made for it, which drops whatever wasn't committed.
+* *Petal commits a redirection,* because the redirection is petal's and not the command's (#338, #340).
+  For `>` or `>>`, petal makes a version of the file, gives the command a `Rewrite` or an `Append` writer of it as its output, commits the version if the command completed, and releases it either way.
+
+== Limits and Open Questions
+
+* *A new file exists before anything is committed to it* (ADR 0027).
+  Petal creates it before the command runs, so it is listed, empty, while the command writes its version, and stays, empty, if nothing is committed.
+  ADR 0027 leans towards a directory transaction that encloses the file's commit, and adds the name only when it commits.
+* *Directories have no versions* (#634).
+  `Create_File`, `Rename` and the deletes change a directory as they are made.
+* *There is no commit of several files at once.*
+  Each version is committed on its own.
+* *A file holds at most 64 KiB* (#760).
+* *One argument can't take a file that may or may not be writable* (#792).
+  It would accept an interface or its ancestor, such as a `Writable_File` if the user may write the file, and a `File` otherwise.
+* *Petal doesn't say why it can't write a file* (#752), for example because another command is writing a version of it.
+* *Changed memory must fit in RAM between checkpoints,* because nothing pages a persistent process's memory out except to the log; ADR 0028 proposes paging it to the log.
+  So the total size of the files changed in 30 seconds is bounded by memory, not by the disk.

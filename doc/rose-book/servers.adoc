@@ -295,11 +295,13 @@ Used by:: Everything installed after it, as its standard output, and the shell, 
 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
 
-Provides:: `Writable_File` (ADR 0003).
+Provides:: `Writable_File` (ADR 0003), its version as a `Transactional_Writable_File` (ADR 0026), and `File_Control`, which only its directory holds.
 Requests:: `create-endpoint`.
 Used by:: `directory`, which launches a `file` process for each file it creates.
 
-A file holds up to 1 MB, and every holder of the file shares one position in it.
+A file holds up to 64 KiB (#760).
+Each reader has its own position, and writers have none (ADR 0009).
+See <<Files and Directories>> for how files, versions and commits work.
 
 === `directory`
 
@@ -309,8 +311,8 @@ Provides:: `Writable_Directory` (ADR 0003).
 Requests:: `create-endpoint`.
 Used by:: `init`, for the first user's home directory, and the shell, as its current directory.
 
-Each entry of a directory is a `file` or `directory` process, launched when the entry is created.
-The directory holds the entry's writable interface, and hands out read-only ones.
+Each entry of a directory is a `file` or `directory` process, launched when the entry is created, and ended when the entry is deleted.
+The directory holds the entry's writable interface, and hands out read-only ones (see <<Files and Directories>>).
 
 === `user`
 
