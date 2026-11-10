@@ -54,6 +54,11 @@ trap 'rm -f "$current" "$tagged" "$gone"' EXIT
 # Check that every line of the list at $TAG is in $current.
 
 check_series() {
+    if ! git rev-parse --git-dir > /dev/null; then
+        echo "check-endpoint-ids: git cannot read the repository" >&2
+        exit 2
+    fi
+
     if ! git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
         if [ -z "$ENDPOINT_IDS_TAG" ] && [ "$RELEASE" = 0 ]; then
             echo "check-endpoint-ids: no tag $TAG yet, so the ids of the" \

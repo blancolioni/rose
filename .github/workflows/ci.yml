@@ -36,10 +36,14 @@ jobs:
 
       - uses: actions/checkout@v4
 
-      # The checkout has no tags, and check-endpoint-ids compares the endpoint
-      # ids with those at the first tag of the release series (#827).
+      # The container runs as root, but the checkout belongs to the runner,
+      # so git refuses it unless it's marked safe.  check-endpoint-ids
+      # compares the endpoint ids with those at the first tag of the
+      # release series (#827), and the checkout has no tags.
       - name: Fetch the tags
-        run: git fetch --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --depth=1 origin '+refs/tags/v*:refs/tags/v*'
 
       # idle needs Syn next to it.  Alire builds idle with the GNAT that is
       # installed above.
