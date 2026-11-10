@@ -1,0 +1,22 @@
+command Rose.Core.Hold_Derived
+  : Create_Endpoint, Standard_Output, Rescind_Cap
+  with Summary     => "Hold two derived capabilities across a restore.",
+       Description => """
+          Hold_Derived is a test of revocation across a restore (#691,
+          ADR 0001). Init launches it on a new install with two
+          capabilities that it derived from the command registry's
+          Commands interface: Parent, and Child, which is derived from
+          Parent. They are saved in its checkpoint, with their derivation
+          records. The first time it is restored, it checks that Child
+          still works, rescinds Parent, checks that Child no longer works
+          and Parent still does, and writes the result to standard
+          output. It never completes.
+          """,
+       Server      => Derived_Holder.Start_Server,
+       Live
+is
+   Parent : in Commands
+     with Help => "a capability derived from the registry's";
+   Child : in Commands
+     with Help => "a capability derived from Parent";
+end Rose.Core.Hold_Derived;
