@@ -2,4 +2,10 @@ interface User : Named is
 
    function Home_Directory return interface Writable_Directory;
 
+   function New_Session return interface Bank;
+   --  A bank for a new session of the user's: a sub-bank of the user's
+   --  bank, with no limits (ADR 0014, section 2; #450). Whoever ends the
+   --  session destroys it, which ends what the session launched and
+   --  releases what it reserved.
+
 end User;
