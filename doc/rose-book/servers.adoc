@@ -85,7 +85,7 @@ Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 Manages persistent storage, divided into regions of pages.
 
-Provides:: `Storage`, whose `Reserve_Storage` returns a new region, and whose `Add_Backing_Store` adds a block device; a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
+Provides:: `Storage`, whose `Add_Backing_Store` adds a block device, and whose `Get_Root_Bank` returns the bank that every other is below; a `Bank` for each bank, whose `Reserve_Storage` returns a new region (ADR 0014); a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
 Launched with:: Delete, the console and trace.
 Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
 

@@ -7,8 +7,14 @@
 # It sets WORK, a new directory for the test's files, DISK, the test's
 # disk image, MONITOR, QEMU's monitor, and the first user's name and
 # password.  The tests need qemu-system-i386, qemu-img and python3.
+#
+# WORK is made in ROSE_TEST_DIR, ~/scratch by default, and not in /tmp:
+# where /tmp is a small tmpfs, the disk images of a few tests, which a
+# failed test keeps, can fill it.
 
-WORK=$(mktemp -d /tmp/rose-test.XXXXXX)
+ROSE_TEST_DIR=${ROSE_TEST_DIR:-$HOME/scratch}
+mkdir -p "$ROSE_TEST_DIR" || exit 2
+WORK=$(mktemp -d "$ROSE_TEST_DIR/rose-test.XXXXXX") || exit 2
 DISK=$WORK/disk.img
 MONITOR=$WORK/monitor
 first_user=fraser

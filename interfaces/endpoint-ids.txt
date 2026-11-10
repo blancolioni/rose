@@ -58,8 +58,8 @@
 16#666C_7ADA_B818_3A36#  rose.interfaces.exec.install(in interface rose.interfaces.reader; in string; in capability_array) return interface rose.interfaces.launch
 16#975B_6584_3E43_0FD3#  rose.interfaces.exec.set_standard_output(in interface rose.interfaces.writer)
 16#1077_884A_7CEA_575E#  interface rose.interfaces.executable
-16#4098_1A02_9F44_9B68#  rose.interfaces.executable.launch(in string; in interface rose.interfaces.region; in interface rose.interfaces.storage; in capability_array) return interface rose.interfaces.process
-16#A5B0_23C9_5A48_BC30#  rose.interfaces.executable.launch_command(in string; in interface rose.interfaces.region; in interface rose.interfaces.storage; in capability_array) return capability
+16#F9B0_EA20_2E1F_D725#  rose.interfaces.executable.launch(in string; in interface rose.interfaces.region; in interface rose.interfaces.bank; in capability_array) return interface rose.interfaces.process
+16#6E7C_5935_279A_8233#  rose.interfaces.executable.launch_command(in string; in interface rose.interfaces.region; in interface rose.interfaces.bank; in capability_array) return capability
 16#7D9D_DE97_9C08_C7C9#  interface rose.interfaces.file
 16#F6D0_973E_DEDA_8E48#  rose.interfaces.file.size return storage_count
 16#6381_7DB6_34F9_9279#  rose.interfaces.file.open_reader return interface rose.interfaces.releasable_reader
@@ -161,7 +161,6 @@
 16#B01C_4A79_D5C6_3D0B#  interface rose.interfaces.state
 16#D9B4_27BC_F03C_2DA9#  rose.interfaces.state.reset
 16#5AE8_82FC_D31D_72B7#  interface rose.interfaces.storage
-16#86D6_B811_A34C_11D7#  rose.interfaces.storage.reserve_storage(in word_64) return interface rose.interfaces.region
 16#6555_3A91_81CF_BD6E#  rose.interfaces.storage.add_backing_store(in interface rose.interfaces.block_device)
 16#5296_9E5C_1A37_289A#  rose.interfaces.storage.get_root_bank return interface rose.interfaces.bank
 16#05FC_7BC9_CF20_A9DE#  interface rose.interfaces.storage_checkpoint

@@ -10,11 +10,6 @@ package Store.Devices is
      (Id     : in Rose.Objects.Capability_Identifier;
       Device : in Rose.Capabilities.Capability);
 
-   function Reserve_Storage
-     (Size : Rose.Words.Word_64)
-      return Rose.Capabilities.Capability;
-   --  Reserve a region from the root bank.
-
    function Get_Root_Bank
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;

@@ -302,7 +302,7 @@ package body Init.Installer is
    -----------------------------
 
    function Install_Command_Library
-     (Storage_Cap     : Rose.Capabilities.Capability;
+     (Bank_Cap        : Rose.Capabilities.Capability;
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Cap_Stream      : Rose.Capabilities.Capability;
@@ -335,7 +335,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Region));
       Rose.System_Calls.Send_Cap
-        (Params, Storage_Cap);
+        (Params, Bank_Cap);
       Grant_Caps (Cap_Reader, Params, Is_Driver => True);
       Rose.System_Calls.Send_Cap
         (Params, Standard_Output);
@@ -344,7 +344,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Send_Cap
-        (Params, Storage_Cap);
+        (Params, Bank_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -362,7 +362,7 @@ package body Init.Installer is
    --------------------------
 
    function Install_Exec_Library
-     (Storage_Cap     : Rose.Capabilities.Capability;
+     (Bank_Cap        : Rose.Capabilities.Capability;
       Reserve_Cap     : Rose.Capabilities.Capability;
       Launch_Cap      : Rose.Capabilities.Capability;
       Launch_Command_Cap : Rose.Capabilities.Capability;
@@ -400,7 +400,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Region));
       Rose.System_Calls.Send_Cap
-        (Params, Storage_Cap);
+        (Params, Bank_Cap);
       Grant_Caps (Cap_Reader, Params, Is_Driver => True);
       Rose.System_Calls.Send_Cap
         (Params, Standard_Output);
@@ -409,7 +409,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap
         (Params, Get_Interface_Cap (Exec_Region));
       Rose.System_Calls.Send_Cap
-        (Params, Storage_Cap);
+        (Params, Bank_Cap);
       Rose.System_Calls.Send_Cap
         (Params, Launch_Command_Cap);
       Rose.System_Calls.Send_Cap
