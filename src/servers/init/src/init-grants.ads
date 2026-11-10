@@ -72,4 +72,13 @@ package Init.Grants is
    --  either limit is zero, which would be no limit.  A bank is storage,
    --  not hardware, so it is not recorded.
 
+   procedure Root_Bank
+     (Storage : Rose.Capabilities.Capability;
+      Bank    : out Rose.Capabilities.Capability;
+      Reserve : out Rose.Capabilities.Capability);
+   --  Storage's root bank (ADR 0014): its Bank interface, which init
+   --  gives elf and exec to launch against, and its Reserve_Storage
+   --  endpoint, which the installer reserves from.  Null caps if
+   --  Storage is null.
+
 end Init.Grants;

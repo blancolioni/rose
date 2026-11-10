@@ -68,7 +68,9 @@ Its `Append` raises when the set can't take every capability it is given, and th
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint` | `mem`
 | `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
-| `Storage` | | `Reserve_Storage`, `Add_Backing_Store` | `store`
+| `Storage` | | `Add_Backing_Store`, `Get_Root_Bank` | `store`
+| `Bank` | | `Reserve_Storage`, `Create_Sub_Bank`, `Add_Dependent`, `Get_Usage`, `Destroy` | `store`
+| `Dependent` | `Resource` | `Destroyed` | `store`
 |===
 
 `Memory.New_Process` takes the kernel's `Kernel_Process` capability for a new process and returns a `Process`, which describes the process's address space as segments:
@@ -111,7 +113,7 @@ A nonpersistent segment has no region behind it.
 
 `Exec.Install` reads an executable from a stream and returns a `Launch` capability for it.
 `Exec.Set_Standard_Output` sets the standard output that `exec` gives the programs it launches, and uses itself; `init` sets it to the persistent console once that is running.
-`Executable.Launch` creates the process from an image in a region, and returns its `Process`.
+`Executable.Launch` creates the process from an image in a region, reserving its writable data, stack and heap from the bank it is given, and returns its `Process`.
 `Map` holds launch capabilities by name.
 
 A program is started in one of two ways:

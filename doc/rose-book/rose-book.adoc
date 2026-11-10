@@ -17,6 +17,8 @@ include::memory.adoc[leveloffset=+1]
 
 include::persistence.adoc[leveloffset=+1]
 
+include::files.adoc[leveloffset=+1]
+
 include::interfaces.adoc[leveloffset=+1]
 
 include::idl.adoc[leveloffset=+1]

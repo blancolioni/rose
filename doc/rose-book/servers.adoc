@@ -85,7 +85,7 @@ Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 Manages persistent storage, divided into regions of pages.
 
-Provides:: `Storage`, whose `Reserve_Storage` returns a new region, and whose `Add_Backing_Store` adds a block device; a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
+Provides:: `Storage`, whose `Add_Backing_Store` adds a block device, and whose `Get_Root_Bank` returns the bank that every other is below; a `Bank` for each bank, whose `Reserve_Storage` returns a new region (ADR 0014); a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
 Launched with:: Delete, the console and trace.
 Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
 
@@ -254,7 +254,7 @@ The boot modules have their own cap set server, `bootcaps`, which ends after boo
 
 Provides:: `Constructor`, whose `Create` makes a new, empty set; `Releasable_Cap_Set` for each set, with `Append`, `Get_Cap` and `Length` from `Cap_Set` and `Release` from `Resource`; and `Restorable`.
 Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`, and the persistent console's `Writer`, which the installer gives after them.
-Used by:: `init`, which gets `Constructor` from the installer, and keeps the derive test's capabilities in a set so that the checkpoint has derivation records to restore; and `run_self_tests`, through its `Cap_Set_Service` role.
+Used by:: `init`, which gets `Constructor` from the installer, and leaves one set, of the registry's `Commands` interface and the clock, for the boot test to find after a restore; and `run_self_tests`, through its `Cap_Set_Service` role.
 
 * *It is installed and restored,* so its sets, which are in its memory, and their capabilities, which are in its capability table, survive a restore.
   When it is restored it writes `caps: restored sets N; caps M` on the console, and the boot test compares the counts with the ones the install left.
@@ -314,11 +314,13 @@ Used by:: Everything installed after it, as its standard output, and the shell, 
 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
 
-Provides:: `Writable_File` (ADR 0003).
+Provides:: `Writable_File` (ADR 0003), its version as a `Transactional_Writable_File` (ADR 0026), and `File_Control`, which only its directory holds.
 Requests:: `create-endpoint`.
 Used by:: `directory`, which launches a `file` process for each file it creates.
 
-A file holds up to 1 MB, and every holder of the file shares one position in it.
+A file holds up to 64 KiB (#760).
+Each reader has its own position, and writers have none (ADR 0009).
+See <<Files and Directories>> for how files, versions and commits work.
 
 === `directory`
 
@@ -328,8 +330,8 @@ Provides:: `Writable_Directory` (ADR 0003).
 Requests:: `create-endpoint`.
 Used by:: `init`, for the first user's home directory, and the shell, as its current directory.
 
-Each entry of a directory is a `file` or `directory` process, launched when the entry is created.
-The directory holds the entry's writable interface, and hands out read-only ones.
+Each entry of a directory is a `file` or `directory` process, launched when the entry is created, and ended when the entry is deleted.
+The directory holds the entry's writable interface, and hands out read-only ones (see <<Files and Directories>>).
 
 === `user`
 

@@ -295,4 +295,32 @@ package body Init.Grants is
         and then Get_Word (12) = 0;
    end Read_Framebuffer_Tag;
 
+   ---------------
+   -- Root_Bank --
+   ---------------
+
+   procedure Root_Bank
+     (Storage : Rose.Capabilities.Capability;
+      Bank    : out Rose.Capabilities.Capability;
+      Reserve : out Rose.Capabilities.Capability)
+   is
+      use Rose.Interfaces.Bank.Client;
+      use Rose.Interfaces.Storage.Client;
+      use type Rose.Capabilities.Capability;
+      Store : Storage_Client;
+      Root  : Bank_Client;
+   begin
+      Bank := Rose.Capabilities.Null_Capability;
+      Reserve := Rose.Capabilities.Null_Capability;
+
+      if Storage = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Open (Store, Storage);
+      Root := Get_Root_Bank (Store);
+      Bank := Get_Interface_Cap (Root);
+      Reserve := Get_Reserve_Storage_Cap (Root);
+   end Root_Bank;
+
 end Init.Grants;

@@ -7,8 +7,14 @@
 # It sets WORK, a new directory for the test's files, DISK, the test's
 # disk image, MONITOR, QEMU's monitor, and the first user's name and
 # password.  The tests need qemu-system-i386, qemu-img and python3.
+#
+# WORK is made in ROSE_TEST_DIR, ~/scratch by default, and not in /tmp:
+# where /tmp is a small tmpfs, the disk images of a few tests, which a
+# failed test keeps, can fill it.
 
-WORK=$(mktemp -d /tmp/rose-test.XXXXXX)
+ROSE_TEST_DIR=${ROSE_TEST_DIR:-$HOME/scratch}
+mkdir -p "$ROSE_TEST_DIR" || exit 2
+WORK=$(mktemp -d "$ROSE_TEST_DIR/rose-test.XXXXXX") || exit 2
 DISK=$WORK/disk.img
 MONITOR=$WORK/monitor
 first_user=fraser
@@ -52,6 +58,25 @@ choose_last_entry () {
     while [ $i -lt 24 ]; do
         monitor "sendkey end"
         sleep 0.5
+        i=$((i + 1))
+    done
+    monitor "sendkey ret"
+}
+
+choose_entry () {
+    # choose_entry N: choose entry N of the GRUB menu, counting from 0,
+    # as choose_last_entry does, but with Home and then N presses of Down.
+    # On the install media with a disk that has Rose, entry 0 boots the
+    # disk, and entry 2 installs, erasing it (#836).
+    i=0
+    while [ $i -lt 24 ]; do
+        monitor "sendkey home"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    i=0
+    while [ $i -lt "$1" ]; do
+        monitor "sendkey down"
         i=$((i + 1))
     done
     monitor "sendkey ret"

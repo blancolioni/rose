@@ -15,12 +15,23 @@ package body Timer.Server is
 
    type Ticks_Type is new Rose.Words.Word_64;
 
+   --  Each entry holds two caps of the timer's own: Cap, the caller's,
+   --  which is invoked when the timer fires, and Control_Cap, the cap
+   --  that Set_Timer returned a copy of, for destroying it.  Both are
+   --  deleted when the timer fires or is destroyed, so that a caller
+   --  that waits again and again, as restore-install does while it reads
+   --  the keyboard (#836), doesn't fill the timer's cap table.
+
    type Timeout_Entry is
       record
-         Id      : Rose.Objects.Capability_Identifier;
-         Timeout : Ticks_Type;
-         Cap     : Rose.Capabilities.Capability;
+         Id          : Rose.Objects.Capability_Identifier;
+         Timeout     : Ticks_Type;
+         Cap         : Rose.Capabilities.Capability;
+         Control_Cap : Rose.Capabilities.Capability;
       end record;
+
+   procedure Delete_Caps (Item : Timeout_Entry);
+   --  Delete the caps that Item holds.
 
    Max_Timer_Count : constant := 100;
    type Timer_Count is range 0 .. Max_Timer_Count;
@@ -107,6 +118,16 @@ package body Timer.Server is
         + Ticks_Type (Params.Data (1)) * 2 ** 32;
    end Current_Ticks;
 
+   -----------------
+   -- Delete_Caps --
+   -----------------
+
+   procedure Delete_Caps (Item : Timeout_Entry) is
+   begin
+      Rose.System_Calls.Delete_Cap (Item.Cap);
+      Rose.System_Calls.Delete_Cap (Item.Control_Cap);
+   end Delete_Caps;
+
    -------------------
    -- Destroy_Timer --
    -------------------
@@ -117,6 +138,7 @@ package body Timer.Server is
    begin
       for Index in 1 .. Queue_Front loop
          if Queue (Index).Id = Id then
+            Delete_Caps (Queue (Index));
             Found := True;
          elsif Found then
             Queue (Index - 1) := Queue (Index);
@@ -168,6 +190,7 @@ package body Timer.Server is
       Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
       Params.Control.Flags (Rose.Invocation.Block) := False;
       Rose.System_Calls.Invoke_Capability (Params);
+      Delete_Caps (Timeout);
       Queue_Front := Queue_Front - 1;
       Update_Timer_Queue;
    end On_Timeout;
@@ -183,11 +206,17 @@ package body Timer.Server is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
+      New_Id    : constant Rose.Objects.Capability_Identifier := Next_Id;
       New_Entry : constant Timeout_Entry :=
                     Timeout_Entry'
-                      (Id      => Next_Id,
-                       Timeout => To_Ticks (Milliseconds) + Current_Ticks,
-                       Cap     => Cap);
+                      (Id          => New_Id,
+                       Timeout     => To_Ticks (Milliseconds) + Current_Ticks,
+                       Cap         => Cap,
+                       Control_Cap =>
+                         Rose.System_Calls.Server.Create_Endpoint
+                           (Create_Cap  => Create_Endpoint_Cap,
+                            Endpoint_Id => Rose.Interfaces.Cap.Cap_Interface,
+                            Identifier  => New_Id));
       Index     : Timer_Count := Queue_Front;
       Reset     : constant Boolean :=
                     (Queue_Front = 0
@@ -207,16 +236,7 @@ package body Timer.Server is
          Update_Timer_Queue;
       end if;
 
-      declare
-         Result_Cap : constant Rose.Capabilities.Capability :=
-                        Rose.System_Calls.Server.Create_Endpoint
-                          (Create_Cap  => Create_Endpoint_Cap,
-                           Endpoint_Id => Rose.Interfaces.Cap.Cap_Interface,
-                           Identifier  => New_Entry.Id);
-      begin
-         return Result_Cap;
-      end;
-
+      return New_Entry.Control_Cap;
    end Set_Timer;
 
    ---------------

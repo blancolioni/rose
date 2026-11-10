@@ -72,8 +72,13 @@ package body Init.Run is
       Console_Redirect_Cap   : Capability
                                  renames Init.Boot.Console_Redirect_Cap;
       Storage_Cap            : Capability renames Init.Boot.Storage_Cap;
-      Reserve_Storage_Cap    : Capability
-                                 renames Init.Boot.Reserve_Storage_Cap;
+      Root_Bank_Cap          : Capability := Null_Capability;
+      Reserve_Bank_Cap       : Capability := Null_Capability;
+      --  The root bank's Bank interface and its Reserve_Storage endpoint
+      --  (ADR 0014, #449): exec and the command registry are launched
+      --  against it, exec launches everything else against it, and the
+      --  installer reserves from it.  #450 replaces it with a system
+      --  bank.
       Launch_Elf_Cap         : Capability renames Init.Boot.Launch_Elf_Cap;
       Launch_Command_Elf_Cap : Capability
                                  renames Init.Boot.Launch_Command_Elf_Cap;
@@ -106,7 +111,8 @@ package body Init.Run is
       --  installer (#825), for the self tests' Cap_Set_Service role.
       Create_Cap_Set_Cap       : Rose.Capabilities.Capability :=
                                    Null_Capability;
-      --  Its Create cap, for the derive test.
+      --  Its Create cap, for the set that init leaves for the restore
+      --  test.
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -226,6 +232,7 @@ package body Init.Run is
 
       Init.Boot.Start (Install);
       Init.Boot.Launch_Boot_Servers;
+      Init.Grants.Root_Bank (Storage_Cap, Root_Bank_Cap, Reserve_Bank_Cap);
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -299,8 +306,8 @@ package body Init.Run is
                declare
                   Exec_Cap : constant Rose.Capabilities.Capability :=
                                Init.Installer.Install_Exec_Library
-                                 (Storage_Cap     => Storage_Cap,
-                                  Reserve_Cap     => Reserve_Storage_Cap,
+                                 (Bank_Cap        => Root_Bank_Cap,
+                                  Reserve_Cap     => Reserve_Bank_Cap,
                                   Launch_Cap      => Launch_Elf_Cap,
                                   Launch_Command_Cap =>
                                     Launch_Command_Elf_Cap,
@@ -336,8 +343,8 @@ package body Init.Run is
                declare
                   Command_Cap : constant Rose.Capabilities.Capability :=
                                   Init.Installer.Install_Command_Library
-                                    (Storage_Cap     => Storage_Cap,
-                                     Reserve_Cap     => Reserve_Storage_Cap,
+                                    (Bank_Cap        => Root_Bank_Cap,
+                                     Reserve_Cap     => Reserve_Bank_Cap,
                                      Launch_Cap      => Launch_Elf_Cap,
                                      Cap_Stream      => Params.Caps (0),
                                      Standard_Output => Console_Interface_Cap,
@@ -630,11 +637,26 @@ package body Init.Run is
          Standard_Output => Console_Stream_Cap,
          Derive_Cap      => Derive_Cap,
          Rescind_Cap     => Rescind_Cap,
-         Delete_Cap      => Delete_Cap,
-         Create_Cap_Set  => Create_Cap_Set_Cap)
+         Delete_Cap      => Delete_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: derive test failed" & NL);
+      end if;
+
+      --  A persistent holder of derived caps, which checks them after a
+      --  restore (#691).
+
+      if not Init.Self_Tests.Start_Derived_Holder
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Commands        => Commands_Cap,
+         Derive_Cap      => Derive_Cap,
+         Rescind_Cap     => Rescind_Cap,
+         Delete_Cap      => Delete_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: hold_derived did not start" & NL);
       end if;
 
       if not Init.Self_Tests.Run
@@ -650,6 +672,23 @@ package body Init.Run is
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);
+      end if;
+
+      --  A cap set that the checkpoint keeps, so that the boot test can
+      --  see that a set made before a checkpoint is there after a restore:
+      --  the cap set server reports its sets when it is restored (#825).
+      --  It holds the registry's Commands interface and the clock, which
+      --  are persistent too.
+
+      if Create_Cap_Set_Cap /= Null_Capability then
+         if Init.Calls.Create_Cap_Set_With
+           (Create_Cap_Set_Cap, (Commands_Cap, Clock_Cap))
+           = Null_Capability
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: no cap set for the restore test"
+               & NL);
+         end if;
       end if;
 
       --  The auth server, which keeps the users and their passwords
@@ -787,9 +826,10 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to launch login" & NL);
       end if;
 
-      --  Login is the last launch. The derive test's cap set is in the
-      --  userland cap set server, which is persistent, so the first
-      --  checkpoint has its derivation records (#825).
+      --  Login is the last launch. Init's derived capabilities are with
+      --  hold_derived (#691), and its test set with the userland cap set
+      --  server (#825), which are persistent, so the first checkpoint has
+      --  them.
 
       Init.Boot_Steps.End_Boot_Cap_Sets;
 

@@ -23,4 +23,10 @@ package Restore.Checkpoint_Log is
    --  would lose what was saved after it, and installing would lose the
    --  lot.  Find_Checkpoint has said why.
 
+   procedure Put_Last_Entry;
+   --  Write the location of the last entry that Find_Checkpoint found
+   --  the kernel's tables in, with their version, and the interface
+   --  level they were written with if this boot set reads that version.
+   --  Nothing if there was no such entry.
+
 end Restore.Checkpoint_Log;
