@@ -22,7 +22,8 @@ An empty _Implemented by_ means that no server in the source serves that interfa
 | Interface | Parents | Operations | Implemented by
 | `Cap` | | `Destroy`, `Get_Object_Id` | `bootcaps`, `timer`
 | `Cap_Set` | | `Append`, `Get_Cap`, `Length` | `bootcaps`
-| `Constructor` | | `Create` | `bootcaps`
+| `Releasable_Cap_Set` | `Cap_Set`, `Resource` | | `caps`
+| `Constructor` | | `Create` | `bootcaps`, `caps`
 | `Receiver` | | `Send_Cap` | `mem`
 | `Named` | | `Name` |
 | `Server` | | `Published_Interface` |
@@ -48,7 +49,11 @@ interface Cap_Set is
 end Cap_Set;
 ----
 
-`Constructor` creates a new object and returns a capability for it; the `bootcaps` server uses it to create cap sets.
+`Constructor` creates a new object and returns a capability for it; the `bootcaps` server uses it to create cap sets for the boot modules, and the `caps` driver to create them for persistent processes.
+
+`Releasable_Cap_Set` is a `Cap_Set` that is also a `Resource`: its holder releases it when it is done with it, which deletes the capabilities it holds, and every capability to the set fails afterwards.
+Its `Append` raises when the set can't take every capability it is given, and then adds none of them.
+`Cap_Set` itself is unchanged, so the boot modules' endpoint ids stay as they are (ADR 0031, section 2).
 
 == Processes and Memory
 

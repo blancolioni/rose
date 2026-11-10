@@ -44,5 +44,8 @@ run_self_tests:
 	    $(INTERFACES)/region.idl \
 	    $(INTERFACES)/bank.idl \
 	    $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/surface.idl
+	    $(INTERFACES)/surface.idl \
+	    $(INTERFACES)/constructor.idl \
+	    $(INTERFACES)/cap_set.idl \
+	    $(INTERFACES)/releasable_cap_set.idl
 	gprbuild $(GPRBUILD_CARGS)

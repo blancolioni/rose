@@ -13,6 +13,8 @@ package body Tests.Registry is
                            Rose.Capabilities.Null_Capability;
    Screen_Surface_Cap  : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   Cap_Sets_Cap        : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
 
    ----------
    -- Bank --
@@ -22,6 +24,15 @@ package body Tests.Registry is
    begin
       return Bank_Interface_Cap;
    end Bank;
+
+   --------------
+   -- Cap_Sets --
+   --------------
+
+   function Cap_Sets return Rose.Capabilities.Capability is
+   begin
+      return Cap_Sets_Cap;
+   end Cap_Sets;
 
    -----------
    -- Clock --
@@ -110,6 +121,15 @@ package body Tests.Registry is
    begin
       Bank_Interface_Cap := Bank;
    end Set_Bank;
+
+   ------------------
+   -- Set_Cap_Sets --
+   ------------------
+
+   procedure Set_Cap_Sets (Cap_Sets : Rose.Capabilities.Capability) is
+   begin
+      Cap_Sets_Cap := Cap_Sets;
+   end Set_Cap_Sets;
 
    ---------------
    -- Set_Clock --

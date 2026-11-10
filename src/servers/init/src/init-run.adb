@@ -71,7 +71,6 @@ package body Init.Run is
                                  renames Init.Boot.Console_Stream_Cap;
       Console_Redirect_Cap   : Capability
                                  renames Init.Boot.Console_Redirect_Cap;
-      Cap_Set_Cap            : Capability renames Init.Boot.Cap_Set_Cap;
       Storage_Cap            : Capability renames Init.Boot.Storage_Cap;
       Reserve_Storage_Cap    : Capability
                                  renames Init.Boot.Reserve_Storage_Cap;
@@ -101,6 +100,13 @@ package body Init.Run is
                                    Null_Capability;
       --  The screen driver's surface, from the installer, if there is a
       --  framebuffer (#582).
+      Cap_Sets_Cap             : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The userland cap set server's Constructor interface, from the
+      --  installer (#825), for the self tests' Cap_Set_Service role.
+      Create_Cap_Set_Cap       : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  Its Create cap, for the derive test.
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -407,6 +413,18 @@ package body Init.Run is
 
                Clock_Admin_Cap := Params.Caps (0);
                Clock_Cap := Params.Caps (1);
+            elsif Params.Data (1) = 95 then
+
+               --  The userland cap set server is running, and cap 0 is
+               --  its Constructor interface (#825).
+
+               declare
+                  Caps : Init.Calls.Array_Of_Capabilities (1 .. 1);
+               begin
+                  Cap_Sets_Cap := Params.Caps (0);
+                  Init.Calls.Get_Interface (Cap_Sets_Cap, Caps);
+                  Create_Cap_Set_Cap := Caps (1);
+               end;
             elsif Params.Data (1) = 98 then
 
                --  The persistent console is running.  The boot console
@@ -592,9 +610,9 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to find 'find'" & NL);
       end if;
 
-      if Cap_Set_Cap = Rose.Capabilities.Null_Capability then
+      if Cap_Sets_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
-           (Console_Stream_Cap, "init: unable to find 'cap_set'" & NL);
+           (Console_Stream_Cap, "init: no cap set server" & NL);
       end if;
 
       if Clock_Cap = Rose.Capabilities.Null_Capability then
@@ -613,7 +631,7 @@ package body Init.Run is
          Derive_Cap      => Derive_Cap,
          Rescind_Cap     => Rescind_Cap,
          Delete_Cap      => Delete_Cap,
-         Create_Cap_Set  => Cap_Set_Cap)
+         Create_Cap_Set  => Create_Cap_Set_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: derive test failed" & NL);
@@ -627,7 +645,8 @@ package body Init.Run is
          Clock           => Clock_Cap,
          Storage         => Storage_Cap,
          Screen          => Screen_Cap,
-         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap)
+         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap,
+         Cap_Sets        => Cap_Sets_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);
@@ -768,9 +787,9 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to launch login" & NL);
       end if;
 
-      --  Login is the last launch. The derive test's cap set goes with
-      --  bootcaps, so the first checkpoint has no derivation records for
-      --  it, until the test moves to the userland cap set server (#825).
+      --  Login is the last launch. The derive test's cap set is in the
+      --  userland cap set server, which is persistent, so the first
+      --  checkpoint has its derivation records (#825).
 
       Init.Boot_Steps.End_Boot_Cap_Sets;
 

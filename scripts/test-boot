@@ -7,7 +7,8 @@
 #
 #   1. installs Rose on a new disk, and waits for the install to finish;
 #   2. boots from the disk, which restores the checkpoint, checks that the
-#      kernel restored the derivation records that init's test left,
+#      kernel restored the derivation records that init's test left, and
+#      that the cap set server that holds them was restored with them,
 #      logs in as the first user, and runs run_self_tests, which has to
 #      pass every test, then keytest, which has to draw in the corners of
 #      the 80 by 24 screen and move its mark with the arrow keys (#734),
@@ -36,17 +37,26 @@ start_qemu
 choose_last_entry
 log_in
 
-# Init's derive test leaves two derived capabilities in a cap set, so the
-# install's checkpoint has two derivation records, which the kernel puts
-# back.  It counts the capabilities of the processes that it restored that
-# name them when the first one resumes, and none do: the caps server that
-# holds them is a boot module, which a restore starts again and does not
-# restore.
+# Init's derive test leaves two derived capabilities in a set of the
+# userland cap set server, caps, so the install's checkpoint has two
+# derivation records, which the kernel puts back.  It counts the
+# capabilities of the processes that it restored that name them when the
+# first one resumes: caps is restored, so its two do (#825).
 records=$(grep -h "derivation records restored" "$WORK/serial" | tail -1)
 echo "$records"
-count=$(echo "$records" | sed -n 's/.*restored: \([0-9][0-9]*\).*/\1/p')
+count=$(echo "$records" | sed -n 's/.*restored: \([0-9][0-9]*\);.*/\1/p')
+named=$(echo "$records" | sed -n 's/.*capabilities: \([0-9][0-9]*\).*/\1/p')
 [ -n "$count" ] && [ "$count" -ge 2 ] \
     || fail "the kernel did not restore the derivation records"
+[ -n "$named" ] && [ "$named" -ge 2 ] \
+    || fail "no restored capability names the derivation records"
+
+# caps writes what it holds when it is restored. The install's self tests
+# release their sets, so it holds init's one set, of two capabilities.
+caps=$(screen | grep "caps: restored" | tail -1)
+echo "$caps"
+echo "$caps" | grep -q "caps: restored sets 1; caps 2" \
+    || fail "the cap set server did not restore init's set"
 
 echo "Running the self tests"
 # The restored screen can still show the install's test result.

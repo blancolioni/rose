@@ -1,0 +1,11 @@
+--  A cap set made for one client, which is the client's to end: Release
+--  it when it is done with (ADR 0010).  Release deletes the caps that the
+--  set holds, and every cap to the set fails afterwards, whoever holds
+--  it.  The userland cap set server (src/drivers/caps) serves it, for
+--  persistent processes; the boot modules use plain Cap_Set (#825).
+--
+--  Append raises when the set can't take every cap it is given, and then
+--  adds none of them.
+
+interface Releasable_Cap_Set : Cap_Set, Resource is
+end Releasable_Cap_Set;

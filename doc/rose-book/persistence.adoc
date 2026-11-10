@@ -229,5 +229,5 @@ If there is none, it says that there is no system on the disk, and the install m
   If they are paged out again, it has to be decided whether swap becomes part of the restored state, or stays a cache that a restore can't trust past the last checkpoint.
 * *Persistent servers* (ADR 0008, proposed).
   `elf`, `pci` and `timer` are still boot modules, so the state that persistent processes keep in them, such as pending timeouts, is lost at a restore.
-  The boot modules' cap set server, `bootcaps`, ends once boot is done, and persistent processes have their own (#825).
+  The boot modules' cap set server, `bootcaps`, ends once boot is done, and persistent processes have their own, the `caps` driver, which is installed and restored (#825).
   ADR 0008 proposes installing them as persistent processes, and loading only the pager path on a boot from the disk.

@@ -205,9 +205,8 @@ package body Init.Self_Tests is
       --  restore (the boot test looks for them).  A record is the lowest
       --  that is free, so Below, which is derived from Kept, has a lower
       --  number than it: a restore has to put Kept back first.  Init is
-      --  not restored, so bootcaps holds them, in a cap set, and init
-      --  lets go of its own. Bootcaps ends after boot, and they go with
-      --  it, until the test moves to the userland cap set server (#825).
+      --  not restored, so the userland cap set server, which is, holds
+      --  them in a cap set, and init lets go of its own (#825).
 
       Spare := Derive (Derive_Cap, Find_Cap);
       Kept  := Derive (Derive_Cap, Find_Cap);
@@ -222,7 +221,7 @@ package body Init.Self_Tests is
       Held := Init.Calls.Create_Cap_Set_With
         (Create_Cap_Set, (Kept, Below));
 
-      Check ("bootcaps holds them",
+      Check ("the cap set server holds them",
              Held /= Rose.Capabilities.Null_Capability);
 
       Call_On (Delete_Cap, Kept);
@@ -243,7 +242,8 @@ package body Init.Self_Tests is
       Clock           : Rose.Capabilities.Capability;
       Storage         : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
-      Create_Signal   : Rose.Capabilities.Capability)
+      Create_Signal   : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -275,6 +275,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Test_Bank (Storage));
       Rose.System_Calls.Send_Cap (Params, Screen);
       Rose.System_Calls.Send_Cap (Params, Create_Signal);
+      Rose.System_Calls.Send_Cap (Params, Cap_Sets);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 
