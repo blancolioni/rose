@@ -56,7 +56,8 @@ check-targets:
 
 # Check that no endpoint id has changed (#736): a changed id breaks the
 # restore of a checkpoint taken before it. scripts/check-endpoint-ids
-# --update writes the list after a deliberate change.
+# --update writes the list after a deliberate change. Within a release
+# series, every id of the series' first tag must still be there (#827).
 check-endpoint-ids:
 	sh ./scripts/check-endpoint-ids
 
