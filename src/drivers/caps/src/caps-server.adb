@@ -129,8 +129,10 @@ package body Caps.Server is
    -- Append --
    ------------
 
-   --  The caps have arrived in this process's table already, so a set
-   --  that can't take them all deletes them, and takes none.
+   --  A set that can't take every cap takes none of them, and raises. The
+   --  caps have arrived in this process's table already, and the
+   --  generated handler deletes them when the operation raises
+   --  (idle#95), so they must not be kept or deleted here.
 
    overriding procedure Append
      (Item : in out Set_Object;
@@ -138,11 +140,6 @@ package body Caps.Server is
    is
    begin
       if Caps'Length > Limit - Used then
-         for Cap of Caps loop
-            if Cap /= Rose.Capabilities.Null_Capability then
-               Rose.System_Calls.Delete_Cap (Cap);
-            end if;
-         end loop;
          raise Cap_Set_Full with
            "the cap sets are full: " & Image (Used) & " caps are held";
       end if;
