@@ -1,6 +1,6 @@
 #!/bin/sh
 # Check the endpoint ids of every interface against interfaces/endpoint-ids.txt
-# (#736).
+# (#736), and against the list at the first tag of the release series (#827).
 #
 #   scripts/check-endpoint-ids            check, and fail on any difference
 #   scripts/check-endpoint-ids --update   write the file from the interfaces
@@ -14,14 +14,74 @@
 # the tree. Updating that file is a deliberate step in a PR, which a
 # reviewer can see.
 #
+# Within a release series the list is append-only (ADR 0031, section 2):
+# every line of the list at the series' first tag (v0.4.0 for 0.4) must
+# still be in the current list, unchanged, because a checkpoint from that
+# release holds those ids. New lines are allowed. The lists are compared
+# as sets, so the file stays sorted by name; the interface level is the
+# number of lines (scripts/make-interface-level).
+#
+# Before the first tag exists (X.Y.0-dev, or the X.Y.0 release itself
+# before it is tagged), the series check is skipped. After it, a missing
+# tag is an error, since it most likely means a clone without tags.
+# ENDPOINT_IDS_TAG names another tag to check against, for testing.
+#
 # Run from the top of the tree, by "make check-endpoint-ids", which the
 # build runs before the programs.
 
 IDLE=${IDLE:-idle}
 LIST=interfaces/endpoint-ids.txt
+VERSION=src/base/rose-version.ads
+
+version_part() {
+    sed -n "s/.*$1 *: constant := \([0-9]*\);.*/\1/p" $VERSION
+}
+
+MAJOR=$(version_part Version_Major)
+MINOR=$(version_part Version_Minor)
+RELEASE=$(version_part Version_Release)
+[ -n "$MAJOR" ] && [ -n "$MINOR" ] && [ -n "$RELEASE" ] || {
+    echo "check-endpoint-ids: no version in $VERSION" >&2
+    exit 2
+}
+TAG=${ENDPOINT_IDS_TAG:-v$MAJOR.$MINOR.0}
 
 current=$(mktemp) || exit 2
-trap 'rm -f "$current"' EXIT
+tagged=$(mktemp) || exit 2
+gone=$(mktemp) || exit 2
+trap 'rm -f "$current" "$tagged" "$gone"' EXIT
+
+# Check that every line of the list at $TAG is in $current.
+
+check_series() {
+    if ! git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
+        if [ -z "$ENDPOINT_IDS_TAG" ] && [ "$RELEASE" = 0 ]; then
+            echo "check-endpoint-ids: no tag $TAG yet, so the ids of the" \
+                 "series are not checked"
+            return 0
+        fi
+        echo "check-endpoint-ids: no tag $TAG to check the ids of the" \
+             "series against; fetch the tags (git fetch --tags)" >&2
+        return 1
+    fi
+
+    if ! git show "$TAG:$LIST" > "$tagged"; then
+        echo "check-endpoint-ids: no $LIST at $TAG" >&2
+        exit 2
+    fi
+
+    if LC_ALL=C grep -Fxv -f "$current" "$tagged" > "$gone"; then
+        echo "check-endpoint-ids: these endpoint ids of $TAG have changed" \
+             "or gone:" >&2
+        cat "$gone" >&2
+        echo "  Within a release series endpoint ids are append-only" >&2
+        echo "  (ADR 0031, section 2): checkpoints written by $TAG hold" >&2
+        echo "  them. Keep the old names and parameters, or pin the ids" >&2
+        echo "  in the IDL." >&2
+        return 1
+    fi
+    echo "check-endpoint-ids: every endpoint id of $TAG is still there"
+}
 
 # shellcheck disable=SC2046
 if ! LC_ALL=C $IDLE --list-endpoints -I interfaces \
@@ -34,6 +94,7 @@ fi
 if [ "$1" = "--update" ]; then
     cp "$current" "$LIST"
     echo "check-endpoint-ids: wrote $LIST"
+    check_series || exit 1
     exit 0
 fi
 
@@ -46,3 +107,5 @@ if ! git diff --no-index -- "$LIST" "$current"; then
     echo "  --update, and say so in the PR." >&2
     exit 1
 fi
+
+check_series || exit 1
