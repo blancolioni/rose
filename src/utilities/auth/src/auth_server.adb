@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Containers.Indefinite_Ordered_Maps;
 
 with System.Storage_Elements;
@@ -188,7 +189,8 @@ package body Auth_Server is
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (No_Caps);
+                   Launcher.Launch_Command
+                     (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -303,7 +305,8 @@ package body Auth_Server is
               Programs.Find ("directory");
             Process          : Rose.Interfaces.Process.Process_Object'Class :=
               Directory_Launch.Launch
-                ((File_Launch.Launch_Cap, Directory_Launch.Launch_Cap));
+                (Rose.System_Calls.Own_Bank.Cap,
+                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap));
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).

@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Containers.Vectors;
 with Ada.Unchecked_Deallocation;
 with System.Storage_Elements;
@@ -608,11 +609,13 @@ package body Directory.Server is
       No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
    begin
       if Kind = Rose.Interfaces.Directory.Ordinary_File then
-         return File_Launch.Launch (No_Caps);
+         return File_Launch.Launch
+           (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       else
          --  A subdirectory can create files and directories too.
          return Directory_Launch.Launch
-           ((File_Launch_Cap, Directory_Launch_Cap));
+           (Rose.System_Calls.Own_Bank.Cap,
+            (File_Launch_Cap, Directory_Launch_Cap));
       end if;
    end Launch;
 

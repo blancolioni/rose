@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Text_IO;
 
 with System.Storage_Elements;
@@ -41,7 +42,8 @@ package body Tests.Users is
       Padded      : constant Storage_Count :=
                       Storage_Count ((Name'Length + 3) / 4 * 4);
       Endpoint    : constant Rose.Capabilities.Capability :=
-                      User_Launch.Launch_Command (No_Caps);
+                      User_Launch.Launch_Command
+                        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       Params      : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -117,7 +119,8 @@ package body Tests.Users is
       --  buffer item: the length, little-endian, then the text, padded
       --  to four bytes.
 
-      Endpoint := User_Launch.Launch_Command (No_Caps);
+      Endpoint := User_Launch.Launch_Command
+                        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch a user");
       end if;

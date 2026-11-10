@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Text_IO;
 
 with Rose.Capabilities;
@@ -97,7 +98,8 @@ package body Tests.Rights is
       --  clock's Clock interface stands for the admin one: it reads, and
       --  can't set the time.
 
-      Endpoint := Launcher.Launch_Command (No_Caps);
+      Endpoint := Launcher.Launch_Command
+        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch the broker");
       end if;

@@ -1,0 +1,42 @@
+--  The storage server's record of each process's own bank (ADR 0015,
+--  #750). A process's bank is a sub-bank of the bank it was launched
+--  against, and ending the process destroys it, which ends the processes
+--  whose banks are below it. The store keeps which process owns a bank
+--  in its bank table, which a checkpoint saves, so that nothing has to
+--  hold a cap to a bank across a restore.
+--
+--  Only mem holds this interface. Init gives it to mem at every boot,
+--  once the store is running (boot.yaml).
+
+interface Process_Banks is
+
+   function Create_Process_Bank
+     (Parent  : Word;
+      Process : Object_Id)
+     return interface Bank;
+   --  A new sub-bank of the bank whose index is Parent (Bank.Index),
+   --  which is Process's own. A null cap if Parent doesn't exist, or the
+   --  store has no room for another bank.
+
+   function Process_Bank
+     (Process : Object_Id)
+     return interface Bank;
+   --  Process's own bank, or a null cap if it has none.
+
+   procedure End_Process
+     (Process : Object_Id);
+   --  Process has ended: destroy its bank, and its sub-banks. The
+   --  processes whose banks were among them are queued for Take_Ended.
+
+   procedure Set_Ended
+     (Ended : Capability);
+   --  The cap that the store sends to, without waiting, when it queues
+   --  processes to end, so that mem asks Take_Ended. Mem gives it again
+   --  at every boot.
+
+   function Take_Ended
+     return Object_Id;
+   --  The next process to end, because its bank was destroyed, or 0 if
+   --  there is none.
+
+end Process_Banks;

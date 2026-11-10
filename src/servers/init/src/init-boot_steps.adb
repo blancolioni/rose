@@ -26,6 +26,27 @@ package body Init.Boot_Steps is
    --  512-byte blocks, tell it so with Partition_Setup, and return its
    --  block device interface, which has blocks of Block_Size bytes.
 
+   ---------------------------
+   -- Connect_Process_Banks --
+   ---------------------------
+
+   procedure Connect_Process_Banks is
+      use Rose.Capabilities;
+   begin
+      if Init.Boot.Mem_Set_Process_Banks_Cap = Null_Capability
+        or else Init.Boot.Process_Banks_Cap = Null_Capability
+      then
+         Init.Calls.Send_String
+           (Init.Boot.Console_Stream_Cap,
+            "init: mem has no Process_Banks" & NL);
+         return;
+      end if;
+
+      Init.Calls.Send_Cap
+        (Init.Boot.Mem_Set_Process_Banks_Cap, Init.Boot.Process_Banks_Cap,
+         Data => (1 .. 0 => 0));
+   end Connect_Process_Banks;
+
    ----------
    -- Copy --
    ----------

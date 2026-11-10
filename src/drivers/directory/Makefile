@@ -29,6 +29,7 @@ directory:
 	    $(INTERFACES)/seekable.idl \
 	    $(INTERFACES)/launch.idl \
 	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \
 	    $(INTERFACES)/segment.idl \
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/cap.idl \

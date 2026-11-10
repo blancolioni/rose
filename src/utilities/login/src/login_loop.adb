@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Exceptions;
 
 with Ada.Streams;
@@ -213,7 +214,8 @@ package body Login_Loop is
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Commands.Find ("petal");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (No_Caps);
+                   Launcher.Launch_Command
+                     (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then

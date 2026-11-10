@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Text_IO;
 
 with Ada.Streams;
@@ -304,7 +305,8 @@ package body Tests.Directories is
         Tests.Registry.Launcher ("directory");
       Process  : Rose.Interfaces.Process.Process_Object'Class :=
         Launcher.Launch
-          ((Tests.Registry.Launcher_Cap ("file"),
+          (Rose.System_Calls.Own_Bank.Cap,
+           (Tests.Registry.Launcher_Cap ("file"),
             Tests.Registry.Launcher_Cap ("directory")));
       Top      : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
