@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-drawing prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-restore restore-fixture test-drawing prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -65,6 +65,19 @@ check-endpoint-ids:
 # minutes.
 test:
 	sh ./scripts/test-boot
+
+# The restore test (#737): this build has to restore the checkpoint of a
+# disk installed by its release series' first release, X.Y.0, whose
+# fixture is on the GitHub release.  Until X.Y.0 is released there is no
+# fixture, and it passes with a message.  CI runs it.
+test-restore:
+	sh ./scripts/test-restore-fixture
+
+# The fixture for test-restore: install images/rose.iso, edit a file, and
+# keep the disk, compressed, in images/fixtures.  At a release, upload it
+# to the release (scripts/make-restore-fixture).
+restore-fixture:
+	sh ./scripts/make-restore-fixture
 
 # The same with a framebuffer: the console on the screen's surface, and
 # the screen driver's keys and redraw after a restore (#582, #653).  It

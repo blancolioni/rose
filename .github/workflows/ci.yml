@@ -66,6 +66,12 @@ jobs:
       - name: Boot test
         run: make test
 
+      # The checkpoint of the series' first release, restored by this
+      # build (#737). It passes with a message until that release has a
+      # fixture.
+      - name: Restore test
+        run: make test-restore
+
       - name: Keep the logs of a failure
         if: failure()
         uses: actions/upload-artifact@v4
