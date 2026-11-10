@@ -618,11 +618,26 @@ package body Init.Run is
          Standard_Output => Console_Stream_Cap,
          Derive_Cap      => Derive_Cap,
          Rescind_Cap     => Rescind_Cap,
-         Delete_Cap      => Delete_Cap,
-         Create_Cap_Set  => Cap_Set_Cap)
+         Delete_Cap      => Delete_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: derive test failed" & NL);
+      end if;
+
+      --  A persistent holder of derived caps, which checks them after a
+      --  restore (#691).
+
+      if not Init.Self_Tests.Start_Derived_Holder
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Commands        => Commands_Cap,
+         Derive_Cap      => Derive_Cap,
+         Rescind_Cap     => Rescind_Cap,
+         Delete_Cap      => Delete_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: hold_derived did not start" & NL);
       end if;
 
       if not Init.Self_Tests.Run

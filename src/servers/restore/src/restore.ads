@@ -44,4 +44,17 @@ package Restore is
    --  Block devices for block 0 and the two boot partitions, for writing
    --  the boot loader (Restore.Boot_Disk).
 
+   Timer_Cap           : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Keyboard_Status_Cap : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   Keyboard_Data_Cap   : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  The timer, and the keyboard controller's status and data ports,
+   --  for asking the person installing (Restore.Ask, #836).
+   Command_Line_Cap    : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  Reads the kernel's command line, the boot loader's tag 1, which
+   --  has erase-hd0 for the install media's erasing entry.
+
 end Restore;
