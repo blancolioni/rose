@@ -221,9 +221,17 @@ class Generator:
                             [str(item["boot_tag"])])
                 else:
                     fail("%s: unknown cap %r" % (where, item))
+
+                # A grant for some variants only is made only in them,
+                # and is null in the others (#836).
+                v = variants & variants_of(item)
+                if not v:
+                    fail("%s: a grant for a variant this doesn't run in"
+                         % where)
                 grant = "Grant_%d" % (len(grants) + 1)
-                grants.append((grant, call))
-                caps.append((variants, grant))
+                grants.append((grant, call,
+                               condition(v) if v != variants else None))
+                caps.append((v, grant))
 
         cap_set_cap = self.use(cap_set, variants, where)
 
@@ -244,9 +252,17 @@ class Generator:
         out.line("")
         out.line("declare")
         out.indent()
-        for grant, (name_, args) in grants:
+        for grant, (name_, args), cond in grants:
             out.line("%s : constant Rose.Capabilities.Capability :=" % grant)
-            out.call(name_, args, ";")
+            if cond:
+                out.line("  (if %s" % cond)
+                out.line("   then")
+                out.indent(4)
+                out.call(name_, args, "")
+                out.dedent(4)
+                out.line("   else Rose.Capabilities.Null_Capability);")
+            else:
+                out.call(name_, args, ";")
         out.line("Copy_Cap : constant Rose.Capabilities.Capability :=")
         out.line("  Init.Calls.Launch_Boot_Module")
         out.indent(4)

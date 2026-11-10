@@ -45,6 +45,19 @@ package body Restore.Checkpoint_Log is
    --  The entries that this boot set can't read, in the last
    --  Find_Checkpoint.
 
+   type Entry_Summary is
+      record
+         Location        : Rose.Words.Word_64 := 0;
+         Version         : Rose.Words.Word_32 := 0;
+         Interface_Major : Rose.Words.Word_16 := 0;
+         Interface_Minor : Rose.Words.Word_16 := 0;
+         Interface_Level : Rose.Words.Word_32 := 0;
+      end record;
+
+   Last_Summary : Entry_Summary;
+   --  The last entry whose kernel tables Find_Checkpoint found, for
+   --  Put_Last_Entry.  Location is 0 if there is none.
+
    Regions      : array (1 .. Max_Regions) of Region_Range;
    Region_Count : Natural := 0;
    --  The regions in the current entry's storage tables.
@@ -278,6 +291,15 @@ package body Restore.Checkpoint_Log is
       then
          Report_Bad_Entry (Location, "expected the kernel's tables");
          return False;
+      end if;
+
+      Last_Summary := (Location => Location,
+                       Version  => Kernel_Header.Version,
+                       others   => <>);
+      if Kernel_Header.Version = Rose.Checkpoints.Kernel_Table_Version then
+         Last_Summary.Interface_Major := Kernel_Header.Interface_Major;
+         Last_Summary.Interface_Minor := Kernel_Header.Interface_Minor;
+         Last_Summary.Interface_Level := Kernel_Header.Interface_Level;
       end if;
 
       if Kernel_Header.Version /= Rose.Checkpoints.Kernel_Table_Version then
@@ -584,6 +606,7 @@ package body Restore.Checkpoint_Log is
       Bad      : Natural := 0;
    begin
       Refused_Count := 0;
+      Last_Summary := (others => <>);
       Open (Reader, Reader_Cap);
 
       --  Read_Page returns its page in the invocation buffer.  The
@@ -670,6 +693,31 @@ package body Restore.Checkpoint_Log is
                   or else (Kernel_Header.Interface_Level = Level
                            and then Kernel_Header.Interface_Hash = Hash));
    end Interfaces_Readable;
+
+   --------------------
+   -- Put_Last_Entry --
+   --------------------
+
+   procedure Put_Last_Entry is
+   begin
+      if Last_Summary.Location = 0 then
+         return;
+      end if;
+
+      Rose.Console_IO.Put ("restore: hd0 has a checkpoint at ");
+      Rose.Console_IO.Put (Natural (Last_Summary.Location));
+      Rose.Console_IO.Put (": kernel tables version ");
+      Rose.Console_IO.Put (Natural (Last_Summary.Version));
+      if Last_Summary.Version = Rose.Checkpoints.Kernel_Table_Version then
+         Rose.Console_IO.Put (", interfaces ");
+         Rose.Console_IO.Put (Natural (Last_Summary.Interface_Major));
+         Rose.Console_IO.Put (".");
+         Rose.Console_IO.Put (Natural (Last_Summary.Interface_Minor));
+         Rose.Console_IO.Put (" level ");
+         Rose.Console_IO.Put (Natural (Last_Summary.Interface_Level));
+      end if;
+      Rose.Console_IO.New_Line;
+   end Put_Last_Entry;
 
    -----------------------
    -- Refuse_Interfaces --
