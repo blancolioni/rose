@@ -17,10 +17,24 @@ package Restore.Start is
    --  Delete the cap to the set, once every cap has been taken from it
    --  (#826).
 
-   procedure Prepare (Checkpoint : out Rose.Words.Word_64);
-   --  Open the console, give the log server its device, and give the
-   --  storage server its backing store.  Checkpoint is the location of
-   --  the last complete entry in the log, or 0 if there is none.
+   procedure Prepare
+     (Checkpoint : out Rose.Words.Word_64;
+      Refuse     : Boolean := True);
+   --  Open the console, give the log server its device, and find the
+   --  last checkpoint.  Checkpoint is the location of the last complete
+   --  entry in the log, or 0 if there is none.  If the log has an entry
+   --  that this boot set can't read (Restore.Checkpoint_Log.Refused),
+   --  restore says so and exits, unless Refuse is False: then Checkpoint
+   --  is 0, for restore-install to ask whether to erase it (#836).
+
+   procedure Add_Storage;
+   --  Give the storage server its backing store, which a restore and an
+   --  install both need.  Nothing on hd0 has changed before this.
+
+   procedure Exit_Restore;
+   --  End restore, and with it the caps it was given (#451), without
+   --  telling init, which is left waiting.  The system idles with what
+   --  restore last wrote on the screen.
 
    procedure Restore_Checkpoint
      (Checkpoint : Rose.Words.Word_64;

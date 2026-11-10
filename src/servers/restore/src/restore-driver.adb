@@ -16,6 +16,7 @@ begin
    Restore.Start.Get_Caps;
    Restore.Start.Delete_Cap_Set;
    Restore.Start.Prepare (Checkpoint);
+   Restore.Start.Add_Storage;
 
    if Checkpoint /= 0 then
       Restore.Start.Restore_Checkpoint (Checkpoint, Restored);
