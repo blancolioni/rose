@@ -63,22 +63,24 @@ package Init.Grants is
    --  is not recorded.
 
    function Bank
-     (Storage : Rose.Capabilities.Capability;
-      Pages   : Rose.Words.Word;
+     (Pages   : Rose.Words.Word;
       Regions : Rose.Words.Word)
       return Rose.Capabilities.Capability;
-   --  A new sub-bank of Storage's root bank (ADR 0014), limited to Pages
-   --  pages and Regions regions, or the null cap if Storage is null or
-   --  either limit is zero, which would be no limit.  A bank is storage,
-   --  not hardware, so it is not recorded.
+   --  A new sub-bank of the system bank (ADR 0014), limited to Pages
+   --  pages and Regions regions, or the null cap if there is no system
+   --  bank or either limit is zero, which would be no limit.  A bank is
+   --  storage, not hardware, so it is not recorded.
 
-   procedure Root_Bank
+   procedure System_Bank
      (Storage : Rose.Capabilities.Capability;
       Bank    : out Rose.Capabilities.Capability;
       Reserve : out Rose.Capabilities.Capability);
-   --  Storage's root bank (ADR 0014): its Bank interface, which init
-   --  gives elf and exec to launch against, and its Reserve_Storage
-   --  endpoint, which the installer reserves from.  Null caps if
-   --  Storage is null.
+   --  A new sub-bank of Storage's root bank, with no limits: the system
+   --  bank (ADR 0014, section 2; #450).  Bank is its Bank interface,
+   --  which init gives elf and exec to launch against, and Reserve its
+   --  Reserve_Storage endpoint, which the installer reserves from.
+   --  Null caps if Storage is null.  Init makes it once, at the install:
+   --  the processes launched against it keep their caps across a
+   --  restore, and a restored init launches nothing.
 
 end Init.Grants;

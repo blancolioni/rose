@@ -143,7 +143,7 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 | `Directory` | | `Directory_Entry_Count`, `Directory_Entry_Name`, `Directory_Entry_Kind`, `Directory_Entry_Size`, `Find_Entry`, `Get_Ordinary_File`, `Get_Directory`, `Read_File` | `isofs`
 | `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory` | `directory`
 | `File_System` | | `Root_Directory` | `isofs`
-| `User` | `Named` | `Home_Directory` | `user`
+| `User` | `Named` | `Home_Directory`, `New_Session` | `user`
 | `Auth` | | `Login` | `auth`
 | `Auth_Admin` | | `New_User` | `auth`
 |===
@@ -152,6 +152,7 @@ Its one operation, `Launch`, is only an endpoint id: the arguments are encoded a
 The boot console implements it, so that its output can be handed over to the persistent console (see <<Boot Sequence>>).
 
 A `User` gives the user's name, through `Named`, and the user's home directory, as a `Writable_Directory` (ADR 0003).
+`New_Session` gives a `Bank` for one of the user's sessions, a sub-bank of the user's bank; login launches petal against it, and destroys it at the logout (ADR 0014).
 
 Files and directories come in a read-only and a writable form, so that the type of a capability says what right it grants (ADR 0002).
 A `File` can be read and sought, and a `Writable_File` can also be written, through writers that it opens (ADR 0009); a `Directory` can only be looked up, and a `Writable_Directory` can also create entries and return them in writable form.
