@@ -13,11 +13,16 @@
 #      why, without restoring it;
 #   4. boots the install media with the same disk, which has to refuse it
 #      too, and not install a new system over it;
-#   5. checks that neither boot changed the disk;
-#   6. puts the level back, and boots from the disk, which has to restore
-#      the checkpoint again.
+#   5. boots the install media's entry that erases hd0 (#836), which has
+#      to ask first, and answers no;
+#   6. checks that none of these boots changed the disk;
+#   7. puts the level back, and boots from the disk, which has to restore
+#      the checkpoint again;
+#   8. raises the level again, boots the erasing entry, and answers
+#      erase, which has to install a new system over the checkpoint;
+#   9. boots from the disk, which has to restore the new system.
 #
-# It takes about five minutes, and needs qemu-system-i386, qemu-img and
+# It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
 # and QEMU's files if anything failed.
 
@@ -33,6 +38,24 @@ command -v qemu-system-i386 > /dev/null || {
 # In text mode, restore writes to the screen and not to the serial port,
 # so the test reads the screen.
 REFUSED="this boot set can't read the checkpoint"
+ASKED="type erase and press enter"
+
+# The install media's entries, with a disk that has Rose: the disk, the
+# install, and the install that erases the disk.
+ERASE_ENTRY=2
+
+boot_erase_entry () {
+    # boot_erase_entry ANSWER: boot the erasing entry, wait for its
+    # question, and type ANSWER
+    : > "$WORK/serial"
+    start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+    choose_entry $ERASE_ENTRY
+    wait_for "$ASKED" 120 \
+        || fail "the erasing entry did not ask before erasing the disk"
+    screen | grep "restore: hd0 has a checkpoint"
+    type_text "$1
+"
+}
 
 install_rose "$ISO"
 
@@ -67,6 +90,17 @@ grep -q -e "installing instead" -e "creating system image" \
     && fail "the install media installed over the checkpoint"
 stop_qemu
 
+echo "Booting the erasing entry, and answering no"
+boot_erase_entry no
+wait_for "hd0 is unchanged" 30 \
+    || fail "the erasing entry did not stop when the answer was no"
+sleep 10
+screen > "$WORK/declined-screen.txt"
+grep -q -e "erasing hd0" -e "creating system image" \
+    -e "User name:" "$WORK/declined-screen.txt" \
+    && fail "the erasing entry erased the disk when the answer was no"
+stop_qemu
+
 after=$(sha256sum "$DISK" | cut -d' ' -f1)
 [ "$before" = "$after" ] || fail "a refused boot changed the disk"
 echo "The disk is unchanged"
@@ -79,6 +113,24 @@ start_qemu
 choose_last_entry
 wait_for "login:" 200 \
     || fail "the boot disk did not restore the checkpoint"
+stop_qemu
+
+echo "Raising the level again, and erasing the disk"
+python3 "$HERE/set-checkpoint-level.py" "$DISK" --add 1 \
+    || fail "cannot change the checkpoint's interface level"
+boot_erase_entry erase
+wait_for_install 400 || fail "the install over the old system did not finish"
+sleep 15
+stop_qemu
+
+echo "Booting from the disk, which has to restore the new system"
+: > "$WORK/serial"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 \
+    || fail "the boot disk did not restore the new system"
+screen | grep -q "$REFUSED" \
+    && fail "the boot disk still has the old checkpoint"
 stop_qemu
 
 rm -rf "$WORK"

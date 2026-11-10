@@ -112,7 +112,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
 | 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
 | 16 | `log` | The kernel's start-log capability, delete | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, and the three partition servers for the boot loader | (see <<restore-server>>)
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag | (see <<restore-server>>)
 | 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
@@ -213,6 +213,19 @@ Updating the kernel and boot modules on a disk that already has a checkpoint is 
 Both boots restore the system if hd0 has a checkpoint, so booting the install media on an installed disk restores the system rather than installing it again.
 The install media's GRUB menu goes further: when hd0's boot partition has a GRUB menu, its default entry loads that menu, so the machine boots hd0's own modules even with the install media still in (#413).
 Installing again is its next entry, `Install Rose`.
+
+A checkpoint that the boot set can't read, because of a table version it doesn't know or interfaces it doesn't have, is neither restored nor installed over (#375): `restore` says why and stops, before it has written anything to hd0.
+To put a new system on such a disk, the install media has a third entry, `Install Rose, erasing hd0` (#836).
+It puts `erase-hd0` on the kernel's command line, which `restore-install` reads through the boot loader's command line tag.
+Then, if hd0 has a checkpoint, readable or not, `restore-install` doesn't restore it.
+It shows where the checkpoint is, its kernel tables' version, and the interface level it was written with, and asks the person installing to type `erase`.
+For `erase`, it starts a new log and installs a new system, as on an empty disk.
+For anything else, it says that hd0 is unchanged and exits, and the system idles.
+
+`init` only has a keyboard once the install has launched the keyboard driver, so `restore-install` reads the keyboard controller's ports itself, waiting on the timer between reads (`Restore.Ask`).
+The ports are granted to nobody, so the keyboard driver can have them too.
+The entry boots in text mode, because with a framebuffer the boot console writes to the serial port until the console starts, and the question wouldn't be seen.
+
 `restore` brings back the persistent processes as they were at the checkpoint, in this order:
 
 . the storage server's regions;
