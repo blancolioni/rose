@@ -188,7 +188,6 @@ stages:
       exports:
         storage: Storage.Storage_Interface
         add_storage: Storage.Add_Backing_Store_Endpoint
-        reserve_storage: Storage.Reserve_Storage_Endpoint
         # For the checkpoint server, to add the region table to each
         # checkpoint.
         store_checkpoint: Storage_Checkpoint.Checkpoint_Endpoint

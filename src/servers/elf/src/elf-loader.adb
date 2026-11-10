@@ -14,7 +14,7 @@ package body Elf.Loader is
 
    use Rose.Interfaces.Region.Client;
    use Rose.Interfaces.Process.Client;
-   use Rose.Interfaces.Storage.Client;
+   use Rose.Interfaces.Bank.Client;
 
    Stack_Bound : constant := 16#E000_0000#;
    Stack_Size  : constant := 16#0004_0000#;
@@ -42,7 +42,7 @@ package body Elf.Loader is
       Header : out Elf.Format.Elf_Header);
 
    procedure Scan_Program_Headers
-     (Store      : Storage_Client;
+     (Bank      : Bank_Client;
       Region     : Region_Client;
       Base       : Rose.Objects.Object_Id;
       Process    : Process_Client;
@@ -53,7 +53,7 @@ package body Elf.Loader is
    --  trusted: Success is False if they are not valid (see Elf.Segments).
 
    procedure Process_Program_Header
-     (Top_Store    : Storage_Client;
+     (Top_Bank    : Bank_Client;
       Image_Region : Region_Client;
       Process      : Process_Client;
       Base_Object  : Rose.Objects.Object_Id;
@@ -72,7 +72,7 @@ package body Elf.Loader is
 
    procedure Load_Elf_Image
      (Process : Rose.Interfaces.Process.Client.Process_Client;
-      Store   : Rose.Interfaces.Storage.Client.Storage_Client;
+      Bank   : Rose.Interfaces.Bank.Client.Bank_Client;
       Image   : Rose.Interfaces.Region.Client.Region_Client;
       Start   : out Rose.Words.Word;
       Success : out Boolean)
@@ -114,7 +114,7 @@ package body Elf.Loader is
 
       Start := Header.E_Entry;
       Scan_Program_Headers
-        (Store, Image, Base, Process, Header, Image_Size, Success);
+        (Bank, Image, Base, Process, Header, Image_Size, Success);
       if not Success then
          return;
       end if;
@@ -124,7 +124,7 @@ package body Elf.Loader is
          use type Rose.Words.Word;
          Region : Rose.Interfaces.Region.Client.Region_Client :=
            Reserve_Storage
-             (Store, Rose.Words.Word_64 (Stack_Size));
+             (Bank, Rose.Words.Word_64 (Stack_Size));
       begin
          Add_Segment
            (Item          => Process,
@@ -144,7 +144,7 @@ package body Elf.Loader is
          use type Rose.Words.Word;
          Region : Rose.Interfaces.Region.Client.Region_Client :=
            Reserve_Storage
-             (Store, Rose.Words.Word_64 (Heap_Size));
+             (Bank, Rose.Words.Word_64 (Heap_Size));
       begin
          Add_Segment
            (Item          => Process,
@@ -167,7 +167,7 @@ package body Elf.Loader is
    ----------------------------
 
    procedure Process_Program_Header
-     (Top_Store    : Storage_Client;
+     (Top_Bank    : Bank_Client;
       Image_Region : Region_Client;
       Process      : Process_Client;
       Base_Object  : Rose.Objects.Object_Id;
@@ -215,7 +215,7 @@ package body Elf.Loader is
             else
                Region :=
                  Reserve_Storage
-                   (Top_Store, Word_64 (Memory_Size));
+                   (Top_Bank, Word_64 (Memory_Size));
                Region_Offset := 0;
                Rose.Trace.Event ("storage reserved, bytes ",
                                  Natural (Memory_Size));
@@ -330,7 +330,7 @@ package body Elf.Loader is
    --------------------------
 
    procedure Scan_Program_Headers
-     (Store      : Storage_Client;
+     (Bank      : Bank_Client;
       Region     : Region_Client;
       Base       : Rose.Objects.Object_Id;
       Process    : Process_Client;
@@ -362,7 +362,7 @@ package body Elf.Loader is
             Item : Elf.Segments.Segment renames List.Items (I);
          begin
             Process_Program_Header
-              (Top_Store    => Store,
+              (Top_Bank    => Bank,
                Image_Region => Region,
                Process      => Process,
                Base_Object  => Base,

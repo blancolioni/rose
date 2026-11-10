@@ -1,9 +1,12 @@
 interface Executable is
 
+   --  Bank is the bank that the process's storage is reserved from: its
+   --  writable data, its stack and its heap (ADR 0014, section 4).
+
    function Launch
      (Name  : String;
       Image : interface Region;
-      Store : interface Storage;
+      Bank  : interface Bank;
       Caps  : Capability_Array)
      return interface Process;
 
@@ -13,7 +16,7 @@ interface Executable is
    function Launch_Command
      (Name  : String;
       Image : interface Region;
-      Store : interface Storage;
+      Bank  : interface Bank;
       Caps  : Capability_Array)
      return Capability;
 

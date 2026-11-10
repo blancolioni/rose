@@ -15,8 +15,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o \
 	$(BUILDDIR)/rose-interfaces-command_endpoint.o \
 	$(BUILDDIR)/rose-interfaces-executable.o \
 	$(BUILDDIR)/rose-interfaces-executable-server.o \
@@ -30,7 +28,6 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-dependent-client.o \
 	$(BUILDDIR)/rose-interfaces-region.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-storage-client.o \
 	$(BUILDDIR)/rose-interfaces-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-writer-client.o \
 	$(BUILDDIR)/rose-server.o \
