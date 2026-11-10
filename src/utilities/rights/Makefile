@@ -33,6 +33,9 @@ rights:
 	    $(INTERFACES)/seekable_reader.idl \
 	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/resource.idl \
+	    $(INTERFACES)/bank.idl \
+	    $(INTERFACES)/dependent.idl \
+	    $(INTERFACES)/region.idl \
 	    $(INTERFACES)/seekable.idl
 	gprbuild $(GPRBUILD_CARGS)
 

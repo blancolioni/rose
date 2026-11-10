@@ -1,5 +1,6 @@
 with Rose.Server;
 
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.User.Server;
 with Rose.Interfaces.Writable_Directory.Client;
 
@@ -28,11 +29,19 @@ package body User_Server is
      (Item : in out User_Object)
       return Writable_Directory_Class;
 
+   subtype Bank_Class is Rose.Interfaces.Bank.Bank_Object'Class;
+
+   overriding function New_Session
+     (Item : in out User_Object)
+      return Bank_Class;
+
    Context   : Rose.Server.Server_Context;
    The_User  : aliased User_Object;
    User_Name : String (1 .. Max_Name_Length);
    Name_Last : Natural := 0;
    Home_Cap  : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   Bank_Cap  : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
 
    -------------------
@@ -41,12 +50,14 @@ package body User_Server is
 
    procedure Create_Server
      (User_Name : String;
-      Home      : Rose.Capabilities.Capability)
+      Home      : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability)
    is
    begin
       Name_Last := User_Name'Length;
       User_Server.User_Name (1 .. Name_Last) := User_Name;
       Home_Cap := Home;
+      Bank_Cap := Bank;
       Rose.Interfaces.User.Server.Publish (Context, The_User'Access);
    end Create_Server;
 
@@ -91,6 +102,21 @@ package body User_Server is
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.User.Server.Cap_Of
          (Item, Rose.Interfaces.User.Named_Interface));
+
+   -----------------
+   -- New_Session --
+   -----------------
+
+   overriding function New_Session
+     (Item : in out User_Object)
+      return Bank_Class
+   is
+      pragma Unreferenced (Item);
+      User_Bank : Rose.Interfaces.Bank.Client.Bank_Client :=
+                    Rose.Interfaces.Bank.Client.From_Cap (Bank_Cap);
+   begin
+      return User_Bank.Create_Sub_Bank (0, 0);
+   end New_Session;
 
    ------------------
    -- Start_Server --
