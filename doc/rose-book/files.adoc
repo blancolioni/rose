@@ -107,7 +107,10 @@ end Transactional_Writable_File;
   It doesn't undo an earlier commit.
 * *`Release` ends the version* and drops whatever wasn't committed.
   Every cap to the version, and every reader and writer opened on it, fails from then on, and the file can have another version.
-* *A file has at most one version at a time,* and versions don't nest: `New_Version` fails on a file that has a version, and on a version.
+* *A file has at most one version at a time.*
+  `New_Version` fails on a file that already has a version.
+* *Versions don't nest.*
+  A version is a `Writable_File`, so it has `New_Version` too, but calling it on a version fails.
 * *The version belongs to the file's process,* which keeps a second buffer for it.
   The directory takes no part.
 
@@ -126,7 +129,7 @@ A version that was being written is saved too, in the file's memory, and comes b
 
 === Commands and Versions
 
-A command says in its signature whether it wants a file or a version, and petal binds the argument to match (ADR 0026, section 3):
+A command says in its signature whether it wants a file or a version (see <<commands>>), and petal binds the argument to match (ADR 0026, section 3):
 
 [cols="2,5",options="header"]
 |===
