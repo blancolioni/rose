@@ -87,7 +87,7 @@ The promise of section 2 still holds. A replaced server answers the same endpoin
 
 ### 6. Testing
 
-The restore test from the 0.4.0 image (#737) checks section 2 on every build. A second test runs an update boot on the 0.4.0 image with the current install media, and checks:
+The restore test from the 0.4.0 image (#737) checks section 2 on every build. The image is a disk that 0.4.0 installed and used, made by `scripts/make-restore-fixture` and uploaded to the 0.4.0 release; `scripts/test-restore-fixture` writes the build's boot set onto a copy, restores it, and runs the self tests. A second test runs an update boot on the 0.4.0 image with the current install media, and checks:
 
 - that hd0 then boots the new set;
 - that a command reports the new version;
