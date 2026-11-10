@@ -129,7 +129,7 @@ A version that was being written is saved too, in the file's memory, and comes b
 
 === Commands and Versions
 
-A command says in its signature whether it wants a file or a version, and petal binds the argument to match (ADR 0026, section 3):
+A command says in its signature whether it wants a file or a version (see <<commands>>), and petal binds the argument to match (ADR 0026, section 3):
 
 [cols="2,5",options="header"]
 |===
