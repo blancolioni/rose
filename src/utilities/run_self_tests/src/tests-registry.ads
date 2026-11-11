@@ -33,6 +33,13 @@ package Tests.Registry is
    function Screen return Rose.Capabilities.Capability;
    --  The screen's surface, or the null cap.
 
+   procedure Set_Cap_Sets (Cap_Sets : Rose.Capabilities.Capability);
+   --  The userland cap set server's Constructor, which Run_Self_Tests is
+   --  given for its Cap_Set_Service role (#825), or the null cap.
+
+   function Cap_Sets return Rose.Capabilities.Capability;
+   --  The cap set server's Constructor, or the null cap.
+
    function Create_Endpoint return Rose.Capabilities.Capability;
    --  The create endpoint cap that Run_Self_Tests is given for its
    --  Create_Endpoint role.

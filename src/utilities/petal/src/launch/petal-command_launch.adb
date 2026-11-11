@@ -936,7 +936,9 @@ package body Petal.Command_Launch is
                when Create_Signal_Cap =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.System_Calls.Create_Signal_Capability;
-               when Storage_Service_Cap | Screen_Service_Cap =>
+               when Storage_Service_Cap | Screen_Service_Cap
+                  | Cap_Set_Service_Cap
+               =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.Capabilities.Null_Capability;
                when Other_Role_Cap =>

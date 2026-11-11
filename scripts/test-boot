@@ -10,7 +10,8 @@
 #      kernel restored the derivation records that init gave hold_derived,
 #      and that a restored process names them, and that hold_derived
 #      found its derived capability working and revoked by rescinding its
-#      parent (#691); then logs in as the first user, and runs
+#      parent (#691), and that the cap set server was restored with
+#      init's set (#825); then logs in as the first user, and runs
 #      run_self_tests, which has to
 #      pass every test, then keytest, which has to draw in the corners of
 #      the 80 by 24 screen and move its mark with the arrow keys (#734),
@@ -60,6 +61,13 @@ grep "hold_derived:" "$WORK/restored-screen.txt" | tail -1
 grep -q "hold_derived: restored: the derived capability works" \
     "$WORK/restored-screen.txt" \
     || fail "hold_derived did not find its restored capability working and revocable"
+
+# caps writes what it holds when it is restored. Init leaves it one set,
+# of two capabilities, for this check (#825); the install's self tests
+# release theirs.
+grep "caps: restored" "$WORK/restored-screen.txt" | tail -1
+grep -q "caps: restored sets 1; caps 2" "$WORK/restored-screen.txt" \
+    || fail "the cap set server did not restore init's set"
 
 echo "Running the self tests"
 # The restored screen can still show the install's test result.

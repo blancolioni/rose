@@ -1,0 +1,53 @@
+with "../../../projects/checks.gpr";
+
+project Caps is
+
+   --  The userland cap set server (#825), built with the userland
+   --  run-time system and the user-mode IDL target, whose packages the
+   --  Makefile generates in build/generated.
+
+   for Source_Dirs use ("src", "build/generated");
+   for Source_Files use
+      ("caps.ads",
+       "caps-driver.adb",
+       "caps-server.ads",
+       "caps-server.adb",
+       "rose-interfaces-cap_set.ads",
+       "rose-interfaces-constructor.ads",
+       "rose-interfaces-constructor-server.ads",
+       "rose-interfaces-constructor-server.adb",
+       "rose-interfaces-releasable_cap_set.ads",
+       "rose-interfaces-releasable_cap_set-server.ads",
+       "rose-interfaces-releasable_cap_set-server.adb",
+       "rose-interfaces-resource.ads",
+       "rose-interfaces-restorable.ads",
+       "rose-interfaces-restorable-server.ads",
+       "rose-interfaces-restorable-server.adb");
+   for Object_Dir use "./build/obj";
+   for Exec_Dir use "./build/bin";
+   for Main use ("caps-driver.adb");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Executable ("caps-driver.adb") use "caps";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("ada") use ("-E");
+   end Binder;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../../rts/user/start/start.o");
+   end Linker;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end Caps;

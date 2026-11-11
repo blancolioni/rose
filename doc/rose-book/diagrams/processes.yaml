@@ -40,6 +40,8 @@ processes:
                note: registry}
   home:       {at: [250, 255], kind: persistent, label: directory,
                note: home}
+  caps:       {at: [640, 255], kind: persistent, label: caps,
+               note: cap sets}
   keyboard:   {at: [860, 255], kind: persistent, label: keyboard,
                note: IRQ 33}
   file:       {at: [90, 345], kind: persistent, label: file, note: .petalrc}
@@ -93,6 +95,7 @@ calls:
   - {from: home, to: exec, label: launch}
   - {from: command, to: exec, label: launch}
   - {from: keyboard, to: vga, label: keys}
+  - {from: tests, to: caps, label: Create, when: install}
   - {from: exec, to: vga, label: stdout}
   - {from: exec, to: elf, label: launch}
   - {from: exec, to: store, label: binaries, label_at: [400, 405]}

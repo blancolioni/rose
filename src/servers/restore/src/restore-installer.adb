@@ -49,6 +49,9 @@ package body Restore.Installer is
                               Rose.Capabilities.Null_Capability;
    Terminal_Cap           : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+   Console_Writer_Cap     : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
+   --  The Terminal's Writer, for init and for Requires_Console.
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array
      (1 .. Rose.Limits.Page_Size)
@@ -109,6 +112,10 @@ package body Restore.Installer is
    procedure Send_Screen (Surface_Cap : Rose.Capabilities.Capability);
    --  Give init the screen driver's surface (#582). Nothing is sent if
    --  there is none, as for the clock.
+
+   procedure Send_Cap_Sets (Constructor_Cap : Rose.Capabilities.Capability);
+   --  Give init the Constructor of the userland cap set server (#825).
+   --  Nothing is sent if there is none, as for the clock.
 
    ------------
    -- Append --
@@ -476,6 +483,8 @@ package body Restore.Installer is
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
          elsif Flags (Requires_Screen) then
             Rose.System_Calls.Send_Cap (Params, Screen_Surface_Cap);
+         elsif Flags (Requires_Console) then
+            Rose.System_Calls.Send_Cap (Params, Console_Writer_Cap);
          end if;
 
          Rose.System_Calls.Receive_Caps (Params, 1);
@@ -516,6 +525,12 @@ package body Restore.Installer is
                                 (Reply.Caps (0)));
                         end if;
 
+                        if Flags (Provides_Cap_Sets) then
+                           Send_Cap_Sets
+                             (Get_Public_Interface_From_Process
+                                (Reply.Caps (0)));
+                        end if;
+
                         if Flags (Provides_Screen) then
                            Screen_Surface_Cap :=
                              Get_Public_Interface_From_Process
@@ -533,9 +548,10 @@ package body Restore.Installer is
                            Terminal_Cap :=
                              Get_Public_Interface_From_Process
                                (Reply.Caps (0));
-                           Send_Console
-                             (Get_Ancestor_Interface
-                                (Terminal_Cap, Writer_Ancestor));
+                           Console_Writer_Cap :=
+                             Get_Ancestor_Interface
+                               (Terminal_Cap, Writer_Ancestor);
+                           Send_Console (Console_Writer_Cap);
                            if Flags (Provides_Input_Stream) then
                               Input_Stream_Cap :=
                                 Get_Ancestor_Interface
@@ -585,6 +601,28 @@ package body Restore.Installer is
          Directory := Get_Directory (Parent, Index);
       end if;
    end Open_Directory;
+
+   -------------------
+   -- Send_Cap_Sets --
+   -------------------
+
+   procedure Send_Cap_Sets
+     (Constructor_Cap : Rose.Capabilities.Capability)
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Constructor_Cap = Rose.Capabilities.Null_Capability then
+         Rose.Console_IO.Put_Line ("restore: no cap set constructor");
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+      Rose.System_Calls.Send_Cap (Params, Constructor_Cap);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(95));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Send_Cap_Sets;
 
    ----------------
    -- Send_Clock --
