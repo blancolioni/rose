@@ -40,11 +40,9 @@ package body Init.Self_Tests is
    --  The test bank's limits: the shared segment test reserves one
    --  region of two pages (ADR 0025).
 
-   function Test_Bank
-     (Storage : Rose.Capabilities.Capability)
-      return Rose.Capabilities.Capability;
-   --  A new sub-bank of Storage's root bank, or the null cap if Storage
-   --  is null.
+   function Test_Bank return Rose.Capabilities.Capability;
+   --  A new sub-bank of the system bank, or the null cap if there is no
+   --  system bank.
 
    function Works
      (Cap : Rose.Capabilities.Capability)
@@ -209,7 +207,6 @@ package body Init.Self_Tests is
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
-      Storage         : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
       Create_Signal   : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability)
@@ -229,7 +226,8 @@ package body Init.Self_Tests is
 
       Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -241,7 +239,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Clock);
-      Rose.System_Calls.Send_Cap (Params, Test_Bank (Storage));
+      Rose.System_Calls.Send_Cap (Params, Test_Bank);
       Rose.System_Calls.Send_Cap (Params, Screen);
       Rose.System_Calls.Send_Cap (Params, Create_Signal);
       Rose.System_Calls.Send_Cap (Params, Cap_Sets);
@@ -299,7 +297,8 @@ package body Init.Self_Tests is
 
       Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -332,10 +331,8 @@ package body Init.Self_Tests is
    -- Test_Bank --
    ---------------
 
-   function Test_Bank
-     (Storage : Rose.Capabilities.Capability)
-      return Rose.Capabilities.Capability
-   is (Init.Grants.Bank (Storage, Test_Page_Limit, Test_Region_Limit));
+   function Test_Bank return Rose.Capabilities.Capability
+   is (Init.Grants.Bank (Test_Page_Limit, Test_Region_Limit));
 
    -----------
    -- Works --

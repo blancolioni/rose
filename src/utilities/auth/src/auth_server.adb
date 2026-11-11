@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Containers.Indefinite_Ordered_Maps;
 
 with System.Storage_Elements;
@@ -11,6 +12,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Auth.Server;
 with Rose.Interfaces.Auth_Admin.Server;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
@@ -103,11 +105,12 @@ package body Auth_Server is
 
    function Launch_User
      (Name : String;
-      Home : Rose.Capabilities.Capability)
+      Home : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
-   --  Launch the user program as a command with Name and Home (its
-   --  declaration is src/utilities/user/rose-core-user.idl), and return
-   --  the User interface from the reply, or null.
+   --  Launch the user program as a command with Name, Home and Bank (its
+   --  declaration is src/utilities/user/rose-core-user.idl), against
+   --  Bank, and return the User interface from the reply, or null.
 
    ---------------
    -- Admin_Cap --
@@ -180,7 +183,8 @@ package body Auth_Server is
 
    function Launch_User
      (Name : String;
-      Home : Rose.Capabilities.Capability)
+      Home : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
       use type Rose.Words.Word;
@@ -188,7 +192,7 @@ package body Auth_Server is
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (No_Caps);
+                   Launcher.Launch_Command (Bank, No_Caps);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -202,6 +206,7 @@ package body Auth_Server is
       Rose.System_Calls.Send_Cap
         (Params, Rose.System_Calls.Create_Endpoint_Capability);
       Rose.System_Calls.Send_Cap (Params, Home);
+      Rose.System_Calls.Send_Cap (Params, Bank);
       Rose.System_Calls.Start_Items (Params);
       Rose.System_Calls.Send_Text_Item (Params, Name);
       Rose.System_Calls.Receive_Words (Params, 1);
@@ -270,9 +275,30 @@ package body Auth_Server is
       return User_Class
    is
       pragma Unreferenced (Item);
-      New_Item : User_Record;
-      Home     : Rose.Capabilities.Capability;
-      User     : Rose.Capabilities.Capability;
+      New_Item  : User_Record;
+      Home      : Rose.Capabilities.Capability;
+      User      : Rose.Capabilities.Capability;
+      User_Bank : Rose.Interfaces.Bank.Client.Bank_Client;
+
+      function Give_Up return User_Class;
+      --  Destroy the user's bank, which ends whatever was launched
+      --  against it, and return No_User.
+
+      -------------
+      -- Give_Up --
+      -------------
+
+      function Give_Up return User_Class is
+      begin
+         begin
+            User_Bank.Destroy;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
+         return No_User;
+      end Give_Up;
+
    begin
       if Name'Length = 0 or else Name'Length > Max_Name_Length
         or else Users.Contains (Name)
@@ -292,6 +318,24 @@ package body Auth_Server is
       Hash_Password
         (Password, New_Item.Salt, New_Item.Iterations, New_Item.Hash);
 
+      --  The user's bank (ADR 0014, section 2; #450): the user's home
+      --  directory and user server are launched against it, and each of
+      --  the user's sessions is a sub-bank of it. It is a sub-bank of
+      --  auth's own bank, which is in the system bank.
+
+      declare
+         Own : Rose.Interfaces.Bank.Client.Bank_Client :=
+                 Rose.Interfaces.Bank.Client.From_Cap
+                   (Rose.System_Calls.Own_Bank.Cap);
+         Sub : Rose.Interfaces.Bank.Bank_Object'Class :=
+                 Own.Create_Sub_Bank (0, 0);
+      begin
+         User_Bank.Open (Sub.Bank_Cap);
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return No_User;
+      end;
+
       --  The home directory, which can create files and directories
       --  (ADR 0003). A program that can't be found raises.
 
@@ -303,28 +347,31 @@ package body Auth_Server is
               Programs.Find ("directory");
             Process          : Rose.Interfaces.Process.Process_Object'Class :=
               Directory_Launch.Launch
-                ((File_Launch.Launch_Cap, Directory_Launch.Launch_Cap));
+                (User_Bank.Get_Interface_Cap,
+                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap));
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).
 
             if Process.Process_Cap = Rose.Capabilities.Null_Capability then
-               return No_User;
+               return Give_Up;
             end if;
             Home := Process.Published_Interface;
          end;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
-            return No_User;
+            return Give_Up;
       end;
 
       if Home = Rose.Capabilities.Null_Capability then
-         return No_User;
+         return Give_Up;
       end if;
 
-      User := Launch_User (New_Item.Name (1 .. New_Item.Name_Last), Home);
+      User := Launch_User
+        (New_Item.Name (1 .. New_Item.Name_Last), Home,
+         User_Bank.Get_Interface_Cap);
       if User = Rose.Capabilities.Null_Capability then
-         return No_User;
+         return Give_Up;
       end if;
 
       New_Item.User := User;

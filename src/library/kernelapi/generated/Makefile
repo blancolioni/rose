@@ -6,7 +6,7 @@ IDL=cap block_device file_system directory file file_control \
     writable_directory writable_file user \
     resource releasable_reader releasable_writer seekable_reader \
     reader writer stream seekable storage storage_checkpoint \
-    dependent bank state \
+    dependent bank process_banks state \
     ata partitions partition_setup keyboard_handler interrupt_handler \
     launch exec region executable memory memory_restore process segment \
     server \

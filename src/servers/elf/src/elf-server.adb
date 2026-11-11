@@ -285,6 +285,9 @@ package body Elf.Server is
       Process_Client : Rose.Interfaces.Process.Client.Process_Client;
       Region         : Rose.Interfaces.Region.Client.Region_Client;
       Bank_Store     : Rose.Interfaces.Bank.Client.Bank_Client;
+      Process_Bank   : Rose.Interfaces.Bank.Client.Bank_Client;
+      --  The process's own bank (ADR 0015, #750), which mem makes as a
+      --  sub-bank of Bank_Store, the bank it is launched against.
       Start          : Rose.Words.Word;
       Success        : Boolean;
 
@@ -299,6 +302,7 @@ package body Elf.Server is
       begin
          Rose.Interfaces.Region.Client.Close (Region);
          Rose.Interfaces.Bank.Client.Close (Bank_Store);
+         Rose.Interfaces.Bank.Client.Close (Process_Bank);
          Rose.Interfaces.Kernel_Process.Client.Close (Kernel_Client);
          Delete_Cap (Start_Cap);
          Delete_Cap (Initial_Cap);
@@ -343,7 +347,9 @@ package body Elf.Server is
       Process_Client :=
         Rose.Interfaces.Memory.Client.New_Process
           (Item    => Memory_Client,
-           Process => Kernel_Client);
+           Process => Kernel_Client,
+           Bank    => Bank_Store);
+      Process_Bank := Rose.Interfaces.Process.Client.Bank (Process_Client);
       Rose.Trace.Event ("mem process");
 
       declare
@@ -396,8 +402,17 @@ package body Elf.Server is
          end;
       end if;
 
-      Elf.Loader.Load_Elf_Image
-        (Process_Client, Bank_Store, Region, Start, Success);
+      --  Without a bank of its own, as before mem has the store's
+      --  Process_Banks, the process is charged to the launch's bank.
+
+      if Rose.Interfaces.Bank.Client.Get_Interface_Cap (Process_Bank) /= 0
+      then
+         Elf.Loader.Load_Elf_Image
+           (Process_Client, Process_Bank, Region, Start, Success);
+      else
+         Elf.Loader.Load_Elf_Image
+           (Process_Client, Bank_Store, Region, Start, Success);
+      end if;
       Rose.Trace.Event ("image loaded");
       if Success then
          Start_Process (Start_Cap, Start);

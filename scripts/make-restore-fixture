@@ -1,0 +1,80 @@
+#!/bin/sh
+# Make the fixture of the restore test (#737, ADR 0031 section 6): a disk
+# with Rose installed and used, compressed.
+#
+#   scripts/make-restore-fixture [ISO] [OUT]
+#
+# ISO is the install image, images/rose.iso by default. OUT is
+# images/fixtures/rose-VERSION-hd0.qcow2 by default, where VERSION is
+# Rose.Version's Version_String. The script:
+#
+#   1. installs Rose on a new disk, as test-boot does;
+#   2. boots from the disk, logs in as the first user, and edits a file,
+#      notes, with kilo, so that the checkpoint has a file in the user's
+#      home directory, and logs out;
+#   3. waits for a checkpoint, stops the machine, and checks the log;
+#   4. writes the disk to OUT, compressed (qemu-img convert -c).
+#
+# The first user's name and password are qemu-test-lib.sh's, which
+# test-restore-fixture logs in with.
+#
+# At a release X.Y.0, the fixture of the release's ISO is uploaded to the
+# release on GitHub, as rose-X.Y.0-hd0.qcow2, where test-restore-fixture
+# finds it:
+#
+#   scripts/make-restore-fixture images/rose.iso
+#   gh release upload vX.Y.0 images/fixtures/rose-X.Y.0-hd0.qcow2
+#
+# It takes about ten minutes, and needs qemu-system-i386, qemu-img and
+# python3.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+VERSION=$(sed -n 's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
+    "$HERE/../src/base/rose-version.ads")
+OUT=${2:-images/fixtures/rose-$VERSION-hd0.qcow2}
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+install_rose "$ISO"
+
+echo "Booting from the disk, and editing a file with kilo"
+start_qemu
+choose_last_entry
+log_in
+check_kilo
+
+# Log out (#458), so that the checkpoint is at the login prompt, where the
+# test logs in. A checkpoint taken during a session restores the session.
+echo "Logging out"
+type_text "clear
+"
+sleep 3
+press ctrl-d
+wait_for "login:" 60 || fail "logging out did not bring back the login prompt"
+
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" || {
+    cat "$WORK/check-log.txt"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+mkdir -p "$(dirname "$OUT")"
+qemu-img convert -c -O qcow2 "$DISK" "$OUT.new" \
+    && mv -f "$OUT.new" "$OUT" || {
+    rm -f "$OUT.new"
+    echo "FAIL: could not write $OUT; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "Wrote $OUT ($(du -h "$OUT" | cut -f1))"

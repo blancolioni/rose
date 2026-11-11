@@ -1,4 +1,5 @@
 
+with Rose.System_Calls.Own_Bank;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Commands.Client;
@@ -64,7 +65,7 @@ package body Tests.Registry is
       Program : Rose.Interfaces.Launch.Launch_Object'Class :=
         Launcher (Name);
       Process : Rose.Interfaces.Process.Process_Object'Class :=
-        Program.Launch (Caps);
+        Program.Launch (Rose.System_Calls.Own_Bank.Cap, Caps);
       use type Rose.Capabilities.Capability;
    begin
 

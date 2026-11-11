@@ -4,6 +4,11 @@ name: CI
 # every pull request and every push to main.  Fedora 43 is what the build is
 # known to work on (see the README).  QEMU has no KVM on a hosted runner, so
 # the boot test is slow.
+#
+# A pull request that changes only the docs (doc/ and Markdown files) skips
+# the build.  The workflow still runs, because main's ruleset requires the
+# build-and-boot check, and a job skipped by its "if" counts as passed;
+# a workflow that didn't run would leave the check waiting for ever.
 
 on:
   pull_request:
@@ -15,7 +20,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Pushes to main always build.  A pull request builds unless every
+      # file it changes is under doc/ or is Markdown.
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+              code=true
+          elif git diff --name-only "origin/$BASE...HEAD" \
+                  | grep -qvE '^doc/|\.md$'; then
+              code=true
+          else
+              code=false
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Build and boot: $code"
+
   build-and-boot:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     container: fedora:43
     timeout-minutes: 90
@@ -25,6 +59,10 @@ jobs:
       # them.
       SYN_REF: main
       IDLE_REF: main
+      # The boot tests make their directories here (qemu-test-lib.sh),
+      # which is where "Keep the logs of a failure" looks. Their default,
+      # ~/scratch, is for the dev server, whose /tmp is small.
+      ROSE_TEST_DIR: /tmp
     steps:
       - name: Install the build requirements
         run: |
@@ -35,6 +73,15 @@ jobs:
               curl unzip
 
       - uses: actions/checkout@v4
+
+      # The container runs as root, but the checkout belongs to the runner,
+      # so git refuses it unless it's marked safe.  check-endpoint-ids
+      # compares the endpoint ids with those at the first tag of the
+      # release series (#827), and the checkout has no tags.
+      - name: Fetch the tags
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --depth=1 origin '+refs/tags/v*:refs/tags/v*'
 
       # idle needs Syn next to it.  Alire builds idle with the GNAT that is
       # installed above.
@@ -65,6 +112,12 @@ jobs:
 
       - name: Boot test
         run: make test
+
+      # The checkpoint of the series' first release, restored by this
+      # build (#737). It passes with a message until that release has a
+      # fixture.
+      - name: Restore test
+        run: make test-restore
 
       - name: Keep the logs of a failure
         if: failure()

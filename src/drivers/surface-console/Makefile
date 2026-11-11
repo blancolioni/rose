@@ -19,5 +19,6 @@ surface_console:
 	    $(INTERFACES)/stream.idl $(INTERFACES)/terminal.idl \
 	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/region.idl $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \
 	    $(INTERFACES)/heap.idl
 	gprbuild $(GPRBUILD_CARGS)

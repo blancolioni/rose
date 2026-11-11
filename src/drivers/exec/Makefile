@@ -20,6 +20,7 @@ exec:
 	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/region.idl \
 	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/segment.idl \
 	    $(INTERFACES)/server.idl \
 	    $(INTERFACES)/cap.idl \

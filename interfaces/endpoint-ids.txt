@@ -10,6 +10,7 @@
 16#EFCE_0218_4E9E_EED3#  rose.interfaces.bank.add_dependent(in capability) return interface rose.interfaces.dependent
 16#C5D3_9ADD_B33A_C8A6#  rose.interfaces.bank.get_usage(out word_64; out word; out word_64; out word)
 16#CA78_0884_E555_0CB1#  rose.interfaces.bank.destroy
+16#9076_29CD_A848_7116#  rose.interfaces.bank.index return word
 16#0BF4_E8D8_2E3F_6917#  interface rose.interfaces.block_device
 16#4431_2F67_3CD7_F8A0#  rose.interfaces.block_device.get_parameters(out rose.interfaces.block_device.block_address_type; out rose.interfaces.block_device.block_size_type)
 16#9B9A_57E4_0082_DE86#  rose.interfaces.block_device.read_blocks(in rose.interfaces.block_device.block_address_type; in natural; out storage_array)
@@ -85,8 +86,8 @@
 16#97E0_F4CF_03DA_966F#  interface rose.interfaces.keyboard_handler
 16#713D_0CE6_3817_492E#  rose.interfaces.keyboard_handler.handle_key(in word; in word)
 16#8B8B_A324_FA51_3FD2#  interface rose.interfaces.launch
-16#0024_E58B_C4E2_D951#  rose.interfaces.launch.launch(in capability_array) return interface rose.interfaces.process
-16#D74B_62A6_3FD9_8B4F#  rose.interfaces.launch.launch_command(in capability_array) return capability
+16#F26C_131F_0472_0A02#  rose.interfaces.launch.launch(in capability; in capability_array) return interface rose.interfaces.process
+16#2514_8530_3D12_BF7C#  rose.interfaces.launch.launch_command(in capability; in capability_array) return capability
 16#2B7A_157F_3FEB_540B#  rose.interfaces.launch.metadata return string
 16#C7CA_C984_F618_7623#  interface rose.interfaces.log_reader
 16#2264_5FD9_F514_46C1#  rose.interfaces.log_reader.first_entry return word_64
@@ -99,11 +100,13 @@
 16#B099_5A45_B696_3539#  rose.interfaces.map.remove(in string)
 16#6F71_B915_0360_A468#  rose.interfaces.map.get_commands return interface rose.interfaces.commands
 16#FEDF_783E_C50B_9397#  interface rose.interfaces.memory
-16#9C0F_B258_5D0D_57AC#  rose.interfaces.memory.new_process(in interface rose.interfaces.kernel_process) return interface rose.interfaces.process
+16#D904_12DC_BA76_11D4#  rose.interfaces.memory.new_process(in interface rose.interfaces.kernel_process; in interface rose.interfaces.bank) return interface rose.interfaces.process
 16#304F_9F2E_1855_5B72#  rose.interfaces.memory.register_process(in interface rose.interfaces.process; in word; in word; in word; in word; in word; in word; in word; in word)
 16#DFE0_E916_1CA7_CA5A#  rose.interfaces.memory.page_fault(in object_id; in word; in word; in rose.interfaces.memory.page_access_type)
 16#FB32_D564_D01F_6E0C#  rose.interfaces.memory.take_physical_memory(in word; out word; out word)
 16#77E6_970E_9F4B_AFD2#  rose.interfaces.memory.checkpoint(in capability)
+16#14B6_1E68_EC74_90A1#  rose.interfaces.memory.set_process_banks(in interface rose.interfaces.process_banks)
+16#C6FF_E804_6FDA_02A0#  rose.interfaces.memory.processes_ended
 16#6DFB_9506_9A74_F957#  interface rose.interfaces.memory_restore
 16#4BE4_666D_53B8_0254#  rose.interfaces.memory_restore.restore_process(in capability; in natural)
 16#6A23_7017_1DC9_0FCB#  rose.interfaces.memory_restore.restore_segment(in natural; in word; in word; in word; in word; in capability; in word)
@@ -121,8 +124,15 @@
 16#3FA3_F914_4D19_19B6#  rose.interfaces.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64; out word_64)
 16#F4F1_4934_3371_44AC#  interface rose.interfaces.process
 16#84E9_2BC1_73C0_9EF0#  rose.interfaces.process.heap_interface return interface rose.interfaces.heap
+16#5701_CABC_4303_7749#  rose.interfaces.process.bank return interface rose.interfaces.bank
 16#AEEE_DB40_0E56_F441#  rose.interfaces.process.exit_process(in natural)
 16#E48D_1336_1015_9C78#  rose.interfaces.process.publish_interface(in capability)
+16#046D_FE90_75EC_8D08#  interface rose.interfaces.process_banks
+16#940C_ADB1_2B09_6B69#  rose.interfaces.process_banks.create_process_bank(in word; in object_id) return interface rose.interfaces.bank
+16#3FD9_BEBF_0EE6_D0A5#  rose.interfaces.process_banks.process_bank(in object_id) return interface rose.interfaces.bank
+16#6135_2803_46CF_AF82#  rose.interfaces.process_banks.end_process(in object_id)
+16#FC79_F0C6_C289_39D6#  rose.interfaces.process_banks.set_ended(in capability)
+16#8416_FC33_DB87_913A#  rose.interfaces.process_banks.take_ended return object_id
 16#C52D_213D_B844_4345#  interface rose.interfaces.reader
 16#0CA9_5C46_2427_9D3A#  rose.interfaces.reader.read(out stream_element_array; out stream_element_offset)
 16#5825_D21E_9BA2_3704#  interface rose.interfaces.receiver
@@ -200,6 +210,7 @@
 16#9003_751E_D4E8_2BCB#  interface rose.interfaces.transactional_writable_file
 16#FF5B_41DC_81E6_D4CF#  interface rose.interfaces.user
 16#5499_7FB1_8539_BD8C#  rose.interfaces.user.home_directory return interface rose.interfaces.writable_directory
+16#58D7_2102_C0AC_49B1#  rose.interfaces.user.new_session return interface rose.interfaces.bank
 16#1B76_378E_8626_4E05#  interface rose.interfaces.writable_directory
 16#6525_20BC_2A95_9498#  rose.interfaces.writable_directory.get_writable_file(in positive) return interface rose.interfaces.writable_file
 16#A8B1_E205_A263_7381#  rose.interfaces.writable_directory.get_writable_directory(in positive) return interface rose.interfaces.writable_directory

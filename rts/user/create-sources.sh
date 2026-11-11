@@ -25,7 +25,7 @@ DIRS="$DIRS build/gnat-src"
 # directories, so that they use these specs and not other copies.
 
 IDLE=${IDLE:-idle}
-INTERFACES="process heap cap_set segment server cap region reader writer
+INTERFACES="process heap cap_set segment server cap region reader writer bank dependent resource
 signalled"
 mkdir -p build/idl build/interfaces
 IDL_FILES=""

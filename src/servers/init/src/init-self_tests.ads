@@ -8,7 +8,6 @@ package Init.Self_Tests is
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
-      Storage         : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
       Create_Signal   : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability)
@@ -18,8 +17,8 @@ package Init.Self_Tests is
    --  with the caps of its roles (src/utilities/run_self_tests/
    --  rose-core-run_self_tests.idl): Standard_Output, Create_Endpoint,
    --  Commands, the registry's Commands interface, Clock, the clock's
-   --  Clock interface, a sub-bank of the root bank of Storage, the
-   --  storage server's Storage interface, for its Storage_Service role,
+   --  Clock interface, a sub-bank of the system bank (Init.Grants), for
+   --  its Storage_Service role,
    --  Screen, the screen driver's surface or the null cap, for its
    --  Screen_Service role (#582), and Create_Signal, the kernel cap that
    --  makes signal caps, for its Create_Signal role (#708), and Cap_Sets,

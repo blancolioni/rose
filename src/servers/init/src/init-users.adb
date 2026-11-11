@@ -359,7 +359,8 @@ package body Init.Users is
 
       Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
       end if;
@@ -417,7 +418,8 @@ package body Init.Users is
 
       Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -474,7 +476,8 @@ package body Init.Users is
 
       Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command (Launcher, No_Caps);
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
       end if;

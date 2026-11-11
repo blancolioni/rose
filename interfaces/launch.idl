@@ -1,7 +1,15 @@
 interface Launch is
 
+   --  Bank is a cap for the bank to launch against (ADR 0015, #750),
+   --  usually the caller's own (Rose.System_Calls.Own_Bank_Cap). The new
+   --  process's own bank is a sub-bank of it, so ending the caller ends
+   --  the process. A null cap launches against the launcher's own bank.
+   --  It is a plain cap, so that every caller doesn't need the Bank
+   --  interface's client.
+
    function Launch
-     (Caps : Capability_Array)
+     (Bank : Capability;
+      Caps : Capability_Array)
      return interface Process;
 
    --  Start the program as a command (ADR 0002): its process starts with
@@ -9,7 +17,8 @@ interface Launch is
    --  endpoint cap, which the shell calls with the command's arguments.
 
    function Launch_Command
-     (Caps : Capability_Array)
+     (Bank : Capability;
+      Caps : Capability_Array)
      return Capability;
 
    --  The command's metadata, from the .rose_command section of its

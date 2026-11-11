@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with Ada.Text_IO;
 
 with System.Storage_Elements;
@@ -6,11 +7,20 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
+with Ada.Streams;
+
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Client;
+with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Launch;
+with Rose.Interfaces.Objects;
+with Rose.Interfaces.Process;
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File;
+with Rose.Interfaces.Writable_File.Client;
 
+with Tests.Files;
 with Tests.Registry;
 
 package body Tests.Users is
@@ -32,7 +42,9 @@ package body Tests.Users is
 
    function Create_User
      (Name : String;
-      Home : Rose.Capabilities.Capability)
+      Home : Rose.Capabilities.Capability;
+      Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
       return Rose.Capabilities.Capability
    is
       User_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
@@ -40,8 +52,12 @@ package body Tests.Users is
       No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
       Padded      : constant Storage_Count :=
                       Storage_Count ((Name'Length + 3) / 4 * 4);
+      User_Bank   : constant Rose.Capabilities.Capability :=
+                      (if Bank = Rose.Capabilities.Null_Capability
+                       then Rose.System_Calls.Own_Bank.Cap
+                       else Bank);
       Endpoint    : constant Rose.Capabilities.Capability :=
-                      User_Launch.Launch_Command (No_Caps);
+                      User_Launch.Launch_Command (User_Bank, No_Caps);
       Params      : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -61,6 +77,7 @@ package body Tests.Users is
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Home);
+      Rose.System_Calls.Send_Cap (Params, User_Bank);
       Rose.System_Calls.Send_Buffer
         (Params, 4 + Padded, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);
@@ -88,6 +105,121 @@ package body Tests.Users is
       Ada.Text_IO.Put (Message);
       return False;
    end Fail;
+
+   ------------------
+   -- Session_Test --
+   ------------------
+
+   function Session_Test return Boolean is
+      use Ada.Streams;
+      use type Rose.Words.Word_64;
+      package Files renames Rose.Interfaces.Writable_File.Client;
+      Hello   : constant Stream_Element_Array (1 .. 5) :=
+                  (Character'Pos ('h'), Character'Pos ('e'),
+                   Character'Pos ('l'), Character'Pos ('l'),
+                   Character'Pos ('o'));
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Own     : Rose.Interfaces.Bank.Client.Bank_Client :=
+                  Rose.Interfaces.Bank.Client.From_Cap
+                    (Rose.System_Calls.Own_Bank.Cap);
+      User_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Own.Create_Sub_Bank (0, 0);
+
+      function Check return Boolean;
+      --  The test itself, so that the user's bank is destroyed however
+      --  it ends.
+
+      -----------
+      -- Check --
+      -----------
+
+      function Check return Boolean is
+         Home : Rose.Interfaces.Writable_Directory.Client
+           .Writable_Directory_Client;
+         User : Rose.Interfaces.User.Client.User_Client;
+         Before_Pages, Pages, Page_Limit : Rose.Words.Word_64;
+         Before_Regions, Regions, Region_Limit : Rose.Words.Word;
+      begin
+         Home.Open
+           (Tests.Registry.Launch
+              ("directory",
+               (Tests.Registry.Launcher_Cap ("file"),
+                Tests.Registry.Launcher_Cap ("directory"))));
+         User.Open
+           (Create_User
+              ("session", Home.Get_Interface_Cap, User_Bank.Bank_Cap));
+         if User.User_Cap = Rose.Capabilities.Null_Capability then
+            return Fail ("cannot launch a user");
+         end if;
+
+         User_Bank.Get_Usage
+           (Before_Pages, Before_Regions, Page_Limit, Region_Limit);
+
+         declare
+            Session  : Rose.Interfaces.Bank.Bank_Object'Class :=
+                         User.New_Session;
+            Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+                         Tests.Registry.Launcher ("file");
+            Server   : Rose.Interfaces.Process.Process_Object'Class :=
+                         Launcher.Launch (Session.Bank_Cap, No_Caps);
+            Control  : Rose.Interfaces.File_Control.Client
+              .File_Control_Client;
+            File     : Files.Writable_File_Client;
+         begin
+            Control.Open (Server.Published_Interface);
+            declare
+               Writable : Rose.Interfaces.Writable_File
+                 .Writable_File_Object'Class := Control.Writable;
+            begin
+               File.Open (Writable.Writable_File_Cap);
+            end;
+            Tests.Files.Append (File, Hello);
+            if File.Size /= Hello'Length then
+               return Fail ("the file doesn't work");
+            end if;
+
+            User_Bank.Get_Usage (Pages, Regions, Page_Limit, Region_Limit);
+            if Regions <= Before_Regions then
+               return Fail ("the session's storage is not in the user's");
+            end if;
+
+            --  Ending the session destroys its bank, which ends the
+            --  server without asking it.
+
+            Session.Destroy;
+
+            begin
+               Ada.Text_IO.Put (Storage_Count'Image (File.Size));
+               return Fail ("the file answers after the session ended");
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end;
+
+         User_Bank.Get_Usage (Pages, Regions, Page_Limit, Region_Limit);
+         if Pages /= Before_Pages or else Regions /= Before_Regions then
+            Ada.Text_IO.Put
+              (Rose.Words.Word_64'Image (Before_Pages)
+               & Rose.Words.Word'Image (Before_Regions)
+               & Rose.Words.Word_64'Image (Pages)
+               & Rose.Words.Word'Image (Regions));
+            return Fail ("the session's storage was not released");
+         end if;
+
+         return True;
+      end Check;
+
+      Result : Boolean;
+   begin
+      Ada.Text_IO.Put ("Session test");
+      Result := Check;
+
+      --  The user's bank ends the user and its home directory.
+
+      User_Bank.Destroy;
+      return Result;
+   end Session_Test;
 
    ---------------
    -- User_Test --
@@ -117,7 +249,8 @@ package body Tests.Users is
       --  buffer item: the length, little-endian, then the text, padded
       --  to four bytes.
 
-      Endpoint := User_Launch.Launch_Command (No_Caps);
+      Endpoint := User_Launch.Launch_Command
+                        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch a user");
       end if;
@@ -132,6 +265,7 @@ package body Tests.Users is
         (Params,
          Tests.Registry.Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Home.Get_Interface_Cap);
+      Rose.System_Calls.Send_Cap (Params, Rose.System_Calls.Own_Bank.Cap);
       Rose.System_Calls.Send_Buffer (Params, 8, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Receive_Caps (Params, 1);

@@ -4,8 +4,10 @@ with Rose.Trace;
 with Rose.System_Calls.Server;
 with Rose.Limits;
 
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Heap;
 with Rose.Interfaces.Process;
+with Rose.Interfaces.Process_Banks.Client;
 with Rose.Interfaces.Kernel_Process.Client;
 
 with Mem.Calls;
@@ -77,8 +79,11 @@ package body Mem.Processes is
          Heap         : Rose.Capabilities.Capability;
          Server       : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := 0;
+         Bank_Cap      : Rose.Capabilities.Capability := 0;
          Faults        : Fault_Count_Array;
       end record;
+   --  Bank_Cap is the cap for the process's own bank (#750), which mem
+   --  asks the store for when it is first needed, and keeps.
 
    subtype Real_Process_Id is
      Process_Id range 1 .. Rose.Limits.Max_Processes;
@@ -87,6 +92,11 @@ package body Mem.Processes is
      array (Real_Process_Id) of aliased Memory_Process_Record;
 
    Process_Table : Memory_Process_Table;
+
+   Process_Banks : Rose.Interfaces.Process_Banks.Client.Process_Banks_Client;
+   Have_Banks    : Boolean := False;
+   --  The storage server's record of each process's own bank (#750), from
+   --  Set_Process_Banks.
 
    function Identifier_Of
      (Oid : Rose.Objects.Object_Id)
@@ -330,6 +340,18 @@ package body Mem.Processes is
       Count.Ticks := Count.Ticks + Ticks;
    end Count_Fault;
 
+   --------------
+   -- End_Bank --
+   --------------
+
+   procedure End_Bank (Process : Rose.Objects.Object_Id) is
+   begin
+      if Have_Banks then
+         Rose.Interfaces.Process_Banks.Client.End_Process
+           (Process_Banks, Process);
+      end if;
+   end End_Bank;
+
    -------------------
    -- Fault_Process --
    -------------------
@@ -347,6 +369,28 @@ package body Mem.Processes is
       Fault (P.Process);
       P.State := Faulted;
    end Fault_Process;
+
+   -----------------
+   -- Find_By_Oid --
+   -----------------
+
+   function Find_By_Oid
+     (Oid : Rose.Objects.Object_Id)
+      return Process_Id
+   is
+      use type Rose.Objects.Object_Id;
+   begin
+      if Oid /= 0 then
+         for Pid in Process_Table'Range loop
+            if Process_Table (Pid).State /= Available
+              and then Process_Table (Pid).Oid = Oid
+            then
+               return Pid;
+            end if;
+         end loop;
+      end if;
+      return 0;
+   end Find_By_Oid;
 
    ------------------
    -- Find_Process --
@@ -367,6 +411,33 @@ package body Mem.Processes is
       end loop;
       return 0;
    end Find_Process;
+
+   ------------------
+   -- Get_Bank_Cap --
+   ------------------
+
+   function Get_Bank_Cap
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if not Is_Valid_Process_Id (Process) then
+         return 0;
+      end if;
+
+      declare
+         P : Memory_Process_Record renames Process_Table (Process);
+      begin
+         if P.Bank_Cap = 0 and then Have_Banks then
+            P.Bank_Cap :=
+              Rose.Interfaces.Bank.Client.Get_Interface_Cap
+                (Rose.Interfaces.Process_Banks.Client.Process_Bank
+                   (Process_Banks, P.Oid));
+         end if;
+         return P.Bank_Cap;
+      end;
+   end Get_Bank_Cap;
 
    ------------------
    -- Get_Heap_Cap --
@@ -701,6 +772,8 @@ package body Mem.Processes is
       Delete (P.Heap);
       Delete (P.Server);
       Delete (P.Interface_Cap);
+      Delete (P.Bank_Cap);
+      P.Bank_Cap := 0;
       P.State := Available;
    end Kill_Process;
 
@@ -709,14 +782,35 @@ package body Mem.Processes is
    -----------------
 
    function New_Process
-     (Process_Cap : Rose.Capabilities.Capability)
+     (Process_Cap : Rose.Capabilities.Capability;
+      Bank_Cap    : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
-      Pid : constant Process_Id := Register_Process (Process_Cap);
-      Cap : Rose.Capabilities.Capability;
+      use type Rose.Capabilities.Capability;
+      Pid    : constant Process_Id := Register_Process (Process_Cap);
+      Cap    : Rose.Capabilities.Capability;
+      Launch : Rose.Interfaces.Bank.Client.Bank_Client;
    begin
       if Pid = 0 then
+         Rose.System_Calls.Delete_Cap (Bank_Cap);
          return 0;
+      end if;
+
+      --  The process's own bank, a sub-bank of the one it is launched
+      --  against (ADR 0015).  The store records that it is the process's,
+      --  so mem need not keep the cap across a restore.
+
+      if Have_Banks and then Bank_Cap /= 0 then
+         Rose.Interfaces.Bank.Client.Open (Launch, Bank_Cap);
+         Process_Table (Pid).Bank_Cap :=
+           Rose.Interfaces.Bank.Client.Get_Interface_Cap
+             (Rose.Interfaces.Process_Banks.Client.Create_Process_Bank
+                (Process_Banks,
+                 Parent  => Rose.Interfaces.Bank.Client.Index (Launch),
+                 Process => Process_Table (Pid).Oid));
+         Rose.Interfaces.Bank.Client.Close (Launch);
+      else
+         Rose.System_Calls.Delete_Cap (Bank_Cap);
       end if;
 
       Cap :=
@@ -906,6 +1000,7 @@ package body Mem.Processes is
               Server       => 0,
               Process      => Client,
               Interface_Cap => 0,
+              Bank_Cap      => 0,
               Faults        => <>);
       end;
 
@@ -1162,6 +1257,7 @@ package body Mem.Processes is
                   Identifier_Of
                     (Rose.Interfaces.Kernel_Process.Client.Get_Object_Id
                        (Client))),
+           Bank_Cap      => 0,
            Faults        => <>);
    end Restore_Process;
 
@@ -1341,6 +1437,28 @@ package body Mem.Processes is
       end loop;
    end Save_Process;
 
+   ---------------
+   -- Set_Ended --
+   ---------------
+
+   procedure Set_Ended (Ended_Cap : Rose.Capabilities.Capability) is
+   begin
+      if Have_Banks then
+         Rose.Interfaces.Process_Banks.Client.Set_Ended
+           (Process_Banks, Ended_Cap);
+      end if;
+   end Set_Ended;
+
+   -----------------------
+   -- Set_Process_Banks --
+   -----------------------
+
+   procedure Set_Process_Banks (Banks_Cap : Rose.Capabilities.Capability) is
+   begin
+      Rose.Interfaces.Process_Banks.Client.Open (Process_Banks, Banks_Cap);
+      Have_Banks := True;
+   end Set_Process_Banks;
+
    ---------------------------------
    -- Set_Published_Interface_Cap --
    ---------------------------------
@@ -1389,6 +1507,18 @@ package body Mem.Processes is
    begin
       return Store_Reads;
    end Store_Read_Count;
+
+   ----------------
+   -- Take_Ended --
+   ----------------
+
+   function Take_Ended return Rose.Objects.Object_Id is
+   begin
+      if not Have_Banks then
+         return 0;
+      end if;
+      return Rose.Interfaces.Process_Banks.Client.Take_Ended (Process_Banks);
+   end Take_Ended;
 
    -------------------------
    -- Unmap_Segment_Pages --

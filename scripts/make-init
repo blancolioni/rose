@@ -581,11 +581,13 @@ def rewrite_grub(path, modules):
     result = []
     in_run = False
     for line in lines:
-        m = re.match(r"(\s*)module2\s", line)
+        m = re.match(r"(\s*)module2\s+(\S*/)", line)
         if m:
             if not in_run:
-                result.extend("%smodule2 /boot/%s %s" % (m.group(1), name,
-                                                         name)
+                # Each run keeps the directory of its first line: /boot/
+                # on the install media, and / in a boot set's tar (#828).
+                result.extend("%smodule2 %s%s %s" % (m.group(1), m.group(2),
+                                                     name, name)
                               for name in modules)
             in_run = True
         else:

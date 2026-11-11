@@ -1,3 +1,4 @@
+with Rose.System_Calls.Own_Bank;
 with System.Storage_Elements;
 
 with Ada_Text_IO;
@@ -958,7 +959,8 @@ package body Petal.Command_Launch is
 
          Rose.Trace.Event ("arguments bound");
          begin
-            Endpoint := Client.Launch_Command (No_Caps);
+            Endpoint := Client.Launch_Command
+              (Rose.System_Calls.Own_Bank.Cap, No_Caps);
          exception
             when Invocation_Error =>
                Endpoint := Rose.Capabilities.Null_Capability;
