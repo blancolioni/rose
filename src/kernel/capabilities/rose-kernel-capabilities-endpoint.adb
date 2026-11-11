@@ -59,6 +59,15 @@ package body Rose.Kernel.Capabilities.Endpoint is
          return;
       end if;
 
+      --  A retired process has handed its object id to its new version,
+      --  and the caps that still reach it named the new version's
+      --  launch-time object id (ADR 0032).
+
+      if Is_Retired (Pid) then
+         Return_Error (Params, Rose.Invocation.Invalid_Capability);
+         return;
+      end if;
+
       if not Is_Valid_Endpoint_Index (Pid, Endpoint_Index) then
          Rose.Boot.Console.Put ("endpoint-cap: invalid endpoint ");
          Rose.Boot.Console.Put (Rose.Words.Word_8 (Endpoint_Index));
@@ -142,9 +151,14 @@ package body Rose.Kernel.Capabilities.Endpoint is
       Params     : Rose.Invocation.Invocation_Access)
    is
       Receiver_Blocked : constant Boolean :=
-                           Rose.Kernel.Processes.Is_Blocked_On_Endpoint
-                             (Pid            => Receiver,
-                              Endpoint_Index => Endpoint);
+                           not Rose.Kernel.Processes.Is_Held
+                                 (Receiver, Endpoint)
+                           and then
+                             Rose.Kernel.Processes.Is_Blocked_On_Endpoint
+                               (Pid            => Receiver,
+                                Endpoint_Index => Endpoint);
+      --  A call to a process whose calls are held waits, as if the
+      --  process were busy (ADR 0032).
    begin
       if Receiver_Blocked then
          Rose.Kernel.Processes.Send_To_Endpoint

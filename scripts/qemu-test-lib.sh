@@ -175,15 +175,21 @@ install_rose () {
     stop_qemu
 
     # Init's own tests run during the install, and report on the screen.
-    if grep -q -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt"
+    if grep -q -e ": FAIL" -e "test failed" "$WORK/install-screen.txt"
     then
-        grep -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt" \
+        grep -e ": FAIL" -e "test failed" "$WORK/install-screen.txt" \
             | sort -u
         echo "FAIL: one of init's tests failed"
         exit 1
     fi
-    echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
-        | grep -c ': ok') of its checks seen ok"
+    echo "init's derive and swap tests: $(sort -u "$WORK/install-screen.txt" \
+        | grep -c ': ok') of their checks seen ok"
+
+    # The screen can scroll past init's tests between two looks at it, as
+    # it does on a slow machine, so the swap test (ADR 0032, #862) is
+    # checked in the serial log, where the kernel writes the swap.
+    grep -a "takes over from" "$WORK/serial" \
+        || { echo "FAIL: init's swap test did not swap its probes"; exit 1; }
 
     # The install's run of the self tests is the one that has the cap set
     # server, which petal doesn't give (#825).
@@ -199,6 +205,28 @@ install_rose () {
             exit 1
             ;;
     esac
+
+    # The test of Replaceable needs the cap set server too (#865). A
+    # failure's message can wrap, so its line is kept whole, and only a
+    # line that says PASS, and wasn't skipped, passes.
+    replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replacement" ] \
+        || replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+                             | tail -1)
+    echo "$replacement"
+    case "$replacement" in
+        *skipped*|"")
+            echo "FAIL: the install's replacement test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replacement test did not pass"
+            exit 1
+            ;;
+    esac
 }
 
 wait_for_install () {
@@ -210,7 +238,8 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" -e "Cap set test.*\(PASS\|FAIL\)" \
+        grep -e "derive test" -e "swap test" -e "Cap set test.*\(PASS\|FAIL\)" \
+            -e "Replacement test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
@@ -304,3 +333,4 @@ check_kilo () {
     screen | grep -q "^hello from kilo" \
         || fail "the file lost its first line"
 }
+                                                                                                                                                                                                                                                                

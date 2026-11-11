@@ -1,0 +1,20 @@
+--  A server that a new version of its program can take over from (ADR
+--  0032). The old version answers it, and only the new one calls it,
+--  which mem launches with this interface as its Previous argument (#865,
+--  #866). Neither operation changes the old version, so that it carries
+--  on as it was if the handover fails.
+--
+--  State is the old version's state as a stream, starting with a format
+--  version (Rose.Replacement writes and reads it). Caps is the caps that
+--  the old version holds, in a fresh set, each named in the state. Each
+--  is the caller's to release when it is done with it.
+
+interface Replaceable is
+
+   function State
+     return interface Releasable_Reader;
+
+   function Caps
+     return interface Releasable_Cap_Set;
+
+end Replaceable;

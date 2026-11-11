@@ -72,11 +72,22 @@ package Rose.Init_Capabilities is
    --  #708).  Init grants it to any program that asks for
    --  create-signal, as it grants create-endpoint.
 
-   Restored_Endpoint_Cap  : constant := 30;
+   --  Replacing a running process (ADR 0032, #862): hold the calls to a
+   --  process, release them, swap two processes' object ids and
+   --  endpoints, and ask what a process is doing. See
+   --  Rose.Kernel.Capabilities.Kernel_Caps. Init runs the swap test with
+   --  them, and they are for mem's Replace_Process (#866).
+
+   Hold_Calls_Cap         : constant := 30;
+   Release_Calls_Cap      : constant := 31;
+   Swap_Processes_Cap     : constant := 32;
+   Process_State_Cap      : constant := 33;
+
+   Restored_Endpoint_Cap  : constant := 34;
    --  Makes an endpoint cap to a restored process (#829).  Only the
    --  install media's restore server has it, for the update boot.
 
-   Last_Cap               : constant := 30;
+   Last_Cap               : constant := 34;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

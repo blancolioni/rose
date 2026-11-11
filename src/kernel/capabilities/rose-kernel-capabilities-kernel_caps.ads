@@ -58,7 +58,30 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  (ADR 0001).  Only the restore server has this cap, and calls it
    --  before it restores any process.
 
-   Restored_Endpoint_Endpoint : constant Rose.Objects.Endpoint_Index := 19;
+   --  Replacing a running process (ADR 0032, #862). Each names the
+   --  processes it acts on by the caps it is sent: an endpoint cap to one
+   --  of a process's objects, or a process cap. Only init has these caps,
+   --  and it gives them to mem.
+
+   Hold_Calls_Endpoint        : constant Rose.Objects.Endpoint_Index := 19;
+   --  Hold the calls to the process of cap 0, except those to its
+   --  endpoint whose id is in data words 0 and 1, if there is one.
+
+   Release_Calls_Endpoint     : constant Rose.Objects.Endpoint_Index := 20;
+   --  End the hold on the calls to the process of cap 0, which gets them.
+
+   Swap_Processes_Endpoint    : constant Rose.Objects.Endpoint_Index := 21;
+   --  The process of cap 1 takes the object id and endpoints of the
+   --  process of cap 0, whose calls are held, and keeps them held. The
+   --  process of cap 0 is retired: calls to it fail until it is ended.
+   --  An error, and nothing changed, if the swap cannot be made.
+
+   Process_State_Endpoint     : constant Rose.Objects.Endpoint_Index := 22;
+   --  Reply with what the process of cap 0 is doing, in data word 0: 1 if
+   --  it is waiting to receive, 2 if it is in a call of its own, and 0
+   --  otherwise.
+
+   Restored_Endpoint_Endpoint : constant Rose.Objects.Endpoint_Index := 23;
    --  Data words 0 and 1 are the object id of a restored process, words 2
    --  and 3 an endpoint id, and word 4 a capability identifier.  Reply
    --  with an endpoint cap to that endpoint of the process, if it has

@@ -411,6 +411,24 @@ That is the identifier of the capabilities that a kernel-target server creates w
 A server's table of objects grows as objects are attached (idle#83), and a released resource's slot is used again when it can be.
 An invocation whose identifier has no object gets the error `Invalid_Operation`, and so does one through the capabilities of a released object.
 
+[[replaceable-servers]]
+A new version of a replaceable server (ADR 0032, #865) gives each of its objects the identifier that it had in the old version, because clients' capabilities name it.
+`Attach` takes an optional `Identifier`: 0, the default, gives the object a new one, as before.
+`Identifier_Of` returns an attached object's identifier, for the server to save in its state.
+The old version answers the `Replaceable` interface through `Rose.Replacement` (`src/library/replacement`), which the server's package attaches to its context with the procedure that writes its state.
+`State` returns the state as a `Releasable_Reader`:
+
+. a header and version;
+. the identifiers in use, from `Rose.Server.Write_Identifiers`;
+. the server's named capabilities, each with its index in the set that `Caps` returns;
+. what the server writes, starting with its own format version.
+
+The new version's main calls `Rose.Replacement.Take_Over`.
+It reads the header, marks the identifiers in use with `Rose.Server.Read_Identifiers`, so that `New_Identifier` gives out none of them, and takes the named capabilities from the set.
+It then calls the server's `Read_State`, which attaches nothing: the command does that afterwards, with the identifiers that were read.
+Neither `State` nor `Caps` changes the old version.
+The test server `replaceable_test`, and the self test that takes over from it, show the whole pattern.
+
 Server packages declare only interfaces, so one type can implement several, and one object can serve each of them.
 `X_Interface` adds nothing to `X_Object`, but it extends it, so an object that a program serves is also an `X_Object` within that program, and can be passed wherever an `X_Object'Class` is expected.
 
@@ -650,6 +668,8 @@ No aspect is required: anything a declaration must have is part of its syntax, a
 | `Description` | An extended description, printed by `--help` after the options. Usually a text block or a text file (see <<string-values>>). Without it, there is no description.
 | `Authors` | Who wrote the command, printed by `--version` as "Written by ...". Without it, the package's `Authors` is used.
 | `Version`, `Copyright` | Override the package's version or copyright for this command. Without them, the package's values are used.
+| `Server` | A procedure that the generated main calls after it replies to the launch call, to serve. It never returns. For example, `+Server => User_Server.Start_Server+`.
+| `Replaceable` | A package of a server command whose new versions can take over from it (ADR 0032, #865). The command also needs `Server` and the `Cap_Set_Service` role. It is given the version that it replaces as an argument, `Previous`, the cap after its other caps, or no cap for a fresh start. The generated main reads that version's state with the package's `Read_State` before it calls the command (see <<replaceable-servers>>).
 |===
 
 ==== Arguments

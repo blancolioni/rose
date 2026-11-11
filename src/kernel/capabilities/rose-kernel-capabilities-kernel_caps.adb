@@ -61,6 +61,20 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       Name : out String;
       Last : out Natural);
 
+   procedure Handover
+     (Endpoint : Rose.Objects.Endpoint_Index;
+      Params   : Rose.Invocation.Invocation_Access);
+   --  Hold_Calls, Release_Calls, Swap_Processes and Process_State (ADR
+   --  0032).
+
+   function Sent_Process
+     (Params : Rose.Invocation.Invocation_Access;
+      Index  : Rose.Invocation.Capability_Index)
+      return Rose.Kernel.Processes.Process_Id;
+   --  The process that the cap Params sent at Index names, if it is an
+   --  endpoint cap or a process cap that the caller holds; otherwise
+   --  Null_Process_Id.
+
    -----------------
    -- Decode_Name --
    -----------------
@@ -343,6 +357,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Rose.Kernel.Processes.Ready);
 
          when Enter_Checkpoint_Endpoint =>
+
+            --  A checkpoint never holds a process half handed over (ADR
+            --  0032, section 5).
+
+            if Rose.Kernel.Processes.Handover_In_Progress then
+               Rose.Boot.Console.Put_Line
+                 ("kernel: no checkpoint during a handover");
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
             if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
               or else not Params.Control.Flags
                 (Rose.Invocation.Writable_Buffer)
@@ -643,6 +669,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Set_Current_State (Current_Process_Id, Ready);
             end;
 
+         when Hold_Calls_Endpoint | Release_Calls_Endpoint
+            | Swap_Processes_Endpoint | Process_State_Endpoint
+         =>
+            Handover (Cap.Header.Endpoint, Params);
+
          when Read_Boot_Tag_Endpoint =>
             if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
               or else not Params.Control.Flags
@@ -682,6 +713,86 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       end case;
    end Handle;
 
+   --------------
+   -- Handover --
+   --------------
+
+   procedure Handover
+     (Endpoint : Rose.Objects.Endpoint_Index;
+      Params   : Rose.Invocation.Invocation_Access)
+   is
+      use Rose.Kernel.Processes;
+      use type Rose.Invocation.Parameter_Word_Index;
+      use type Rose.Objects.Endpoint_Id;
+      use type Rose.Objects.Endpoint_Index;
+      Swap   : constant Boolean := Endpoint = Swap_Processes_Endpoint;
+      First  : constant Process_Id := Sent_Process (Params, 0);
+      Second : constant Process_Id :=
+                 (if Swap then Sent_Process (Params, 1) else Null_Process_Id);
+      State  : Rose.Words.Word := 0;
+   begin
+      if First = Null_Process_Id
+        or else (Swap and then Second = Null_Process_Id)
+        or else (Endpoint = Hold_Calls_Endpoint and then Is_Retired (First))
+      then
+         Return_Error (Params, Rose.Invocation.Request_Error);
+         return;
+      end if;
+
+      case Endpoint is
+         when Hold_Calls_Endpoint =>
+            declare
+               Except : Rose.Objects.Endpoint_Id := 0;
+            begin
+               if Params.Control.Flags (Rose.Invocation.Send_Words) then
+                  Except := Rose.Objects.Endpoint_Id (Params.Data (0));
+                  if Params.Control.Last_Sent_Word >= 1 then
+                     Except := Except
+                       + 2 ** 32 * Rose.Objects.Endpoint_Id (Params.Data (1));
+                  end if;
+               end if;
+               Hold_Calls (First, Except);
+            end;
+
+         when Release_Calls_Endpoint =>
+            Release_Calls (First);
+
+         when Swap_Processes_Endpoint =>
+            declare
+               Success : Boolean;
+            begin
+               Swap_Processes (First, Second, Success);
+               if not Success then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+            end;
+
+         when Process_State_Endpoint =>
+            State :=
+              (case Current_Activity (First) is
+                  when Other     => 0,
+                  when Receiving => 1,
+                  when Calling   => 2);
+
+         when others =>
+            null;
+      end case;
+
+      Params.all :=
+        (Control =>
+           (Flags  => (Rose.Invocation.Reply => True,
+                       others                => False),
+            others => <>),
+         others  => <>);
+
+      if Endpoint = Process_State_Endpoint then
+         Rose.Invocation.Send_Word (Params.all, State);
+      end if;
+
+      Set_Current_State (Current_Process_Id, Ready);
+   end Handover;
+
    -----------------
    -- Process_Cap --
    -----------------
@@ -703,6 +814,40 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
          Payload =>
            Rose.Kernel.Processes.To_Object_Id (Pid));
    end Process_Cap;
+
+   ------------------
+   -- Sent_Process --
+   ------------------
+
+   function Sent_Process
+     (Params : Rose.Invocation.Invocation_Access;
+      Index  : Rose.Invocation.Capability_Index)
+      return Rose.Kernel.Processes.Process_Id
+   is
+      use Rose.Kernel.Processes;
+      use type Rose.Capabilities.Layout.Capability_Type;
+      use type Rose.Invocation.Capability_Index;
+      Pid    : constant Process_Id := Current_Process_Id;
+      Layout : Rose.Capabilities.Layout.Capability_Layout;
+   begin
+      if not Params.Control.Flags (Rose.Invocation.Send_Caps)
+        or else Index > Params.Control.Last_Sent_Cap
+        or else not Has_Cap (Pid, Params.Caps (Index))
+      then
+         return Null_Process_Id;
+      end if;
+
+      Get_Cap (Pid, Params.Caps (Index), Layout);
+
+      if Layout.Header.Cap_Type /= Rose.Capabilities.Layout.Endpoint_Cap
+        and then Layout.Header.Cap_Type
+          /= Rose.Capabilities.Layout.Process_Cap
+      then
+         return Null_Process_Id;
+      end if;
+
+      return To_Process_Id (Layout.Payload);
+   end Sent_Process;
 
    -----------------
    -- Write_Image --

@@ -148,6 +148,9 @@
 16#DE1E_C096_EB30_EC5B#  interface rose.interfaces.releasable_cap_set
 16#2141_50E4_45A6_BD6A#  interface rose.interfaces.releasable_reader
 16#3E83_E0CB_5F20_FE7B#  interface rose.interfaces.releasable_writer
+16#CE33_89C2_D92C_A2D1#  interface rose.interfaces.replaceable
+16#320E_8BCA_70D0_9E9E#  rose.interfaces.replaceable.state return interface rose.interfaces.releasable_reader
+16#2503_4CD8_9EA2_D5EB#  rose.interfaces.replaceable.caps return interface rose.interfaces.releasable_cap_set
 16#F49B_1FE7_07D3_B4B5#  interface rose.interfaces.resource
 16#7F24_9764_E75A_970F#  rose.interfaces.resource.release
 16#28F5_3FA7_7891_7414#  interface rose.interfaces.restorable
