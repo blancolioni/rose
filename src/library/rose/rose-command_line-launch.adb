@@ -86,6 +86,12 @@ package body Rose.Command_Line.Launch is
       return Rose.Capabilities.Capability
    is
    begin
+      --  A cap that was not sent is the null cap, as for the Previous
+      --  argument of a replaceable server that is started fresh (#865).
+
+      if Index >= Rose.Invocation.Sent_Cap_Count (Call.Params) then
+         return Rose.Capabilities.Null_Capability;
+      end if;
       return Call.Params.Caps (Rose.Invocation.Capability_Index (Index));
    end Cap_Argument;
 
