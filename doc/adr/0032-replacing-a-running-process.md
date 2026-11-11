@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-11
-- **Related:** #824 (this decision), #825 (userland cap sets), #831 (directory, auth and the user server), #830 (the update boot replaces servers), #116 (derivation records), #234 (four caps an invocation), [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0031](0031-updating-an-installation.md) (updating an installation)
+- **Related:** #824 (this decision), #825 (userland cap sets), #831 (directory, auth and the user server), #830 (the update boot replaces servers), #116 (derivation records), #234 (four caps an invocation), [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0031](0031-updating-an-installation.md) (updating an installation), #881 (saved state, section 10)
 
 ## Context
 
@@ -112,15 +112,32 @@ The updater reports a replacement that failed, and goes on to the next server (A
 
 The update test (ADR 0031, section 6) replaces `file`, whose open files have to keep working. Its contents come across in its state stream, so replacing it costs as much as the file. Then `directory`, `auth` and the user server (#831), whose state is mostly names and caps. Drivers implement `Replaceable` only if their device can be handed over safely: an interrupt or a device page can go in the cap set, but the device's own state can't be read back by the new version.
 
+### 10. A saved state, of which a handover is a case
+
+A server's state stream (section 2) is not only for a handover. A program can save it to a file, or send it over the network, and another instance of the program can start from it. A handover is one case of this: the state comes from a live predecessor, with its caps, and the new instance takes over its identity. Saving and restoring is the general case, with no caps and a new identity (#881).
+
+- **`Saveable`** has `State`. **`Replaceable` descends from it** and adds `Caps`. A cap to `Saveable` lets its holder save the server, but not take its caps or replace it. Mem still tests for `in Replaceable'Class` (section 2).
+- **A state can be saved at any time between calls.** A server handles one call at a time, so `State`, or a save that the server makes itself in one of its own handlers, always sees a whole state. As in a handover, saving changes nothing.
+- **Caps don't go into a saved state.** A cap is an entry in a kernel table, not bytes. A saved state names the caps that the server held, but carries none of them.
+- **A cap's name in the state is also a cap argument of the server's command.** A fresh launch gives the cap as that argument. A handover gives it from the cap set, and a restore from the arguments again. `Read_State` looks each cap up by name, and doesn't know where it came from. A missing cap fails a restore, as it fails a handover.
+- **A restored instance is a new instance, not a replacement.** It has its own object id, so the old instance's clients don't reach it, and the old instance goes on running. The identifiers in the stream are kept: in a new process they name nothing that a client already holds, so reusing them is harmless.
+- **The replies a server owes don't go into a saved state.** They can only be moved, in a live handover (section 4).
+- **The format rule is the same,** but a saved file can be much older than a predecessor. A version reads every format of its series that a saved state may have.
+
+`Rose.Replacement` gives a server both: **`Save`** writes the same stream as `State` to a `Writer`, and **`Restore`** reads one from a `Reader`, taking caps from the command's arguments. idle's `Replaceable` aspect also generates a **`Saved : in Reader`** argument, reserved as `Previous` is (section 8). The generated main takes over if it is given `Previous`, restores if it is given `Saved`, starts fresh if it is given neither, and refuses both.
+
+Moving a server's clients to a restored copy, and carrying a state over the network, aren't part of this. Whatever carries the bytes is the program's business.
+
 ## Consequences
 
 - **A 0.4.x can fix `file`, `directory`, `auth` and the user server** without losing the checkpoint, once each implements `Replaceable`.
-- **0.4.0 has to ship the interfaces:** `Replaceable`, `Memory.Replace_Process` and `Process_Banks.Hand_Over`. They freeze with the tag (ADR 0031).
+- **0.4.0 has to ship the interfaces:** `Saveable`, `Replaceable`, `Memory.Replace_Process` and `Process_Banks.Hand_Over`. They freeze with the tag (ADR 0031).
 - **The new version is a new program, not a patched one.** It has its own bank, cap table and layout, and drops what it no longer needs.
 - **A handover costs the size of the server's state stream.** For most servers that is names and caps, but a server that holds data, such as `file`, streams all of it, and needs room for both copies until the old version ends.
 - **The processes a server launched survive its replacement,** in the same bank tree, under the new version.
 - **Each server owns its format,** and has to read its predecessor's for the whole series. Changing a format is a deliberate act, with a version word and a reader for the old one.
 - **Clients don't notice,** except that calls during a handover take longer.
+- **A replaceable server can also save its state** to a file or elsewhere, and a new instance can start from it, with caps given as arguments (section 10).
 - **A server that never becomes idle,** because it is always in a call of its own, can't be replaced.
 
 ## Alternatives considered
@@ -137,6 +154,7 @@ The update test (ADR 0031, section 6) replaces `file`, whose open files have to 
 
 ## Open questions
 
+- **Whether a server can be `Saveable` without being `Replaceable`.** It costs nothing in the interfaces, but the IDL aspect is `Replaceable` for now.
 - **Reply caps with a buffer** (#878). A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Should the kernel move the mapping, or should a server never defer a call that holds a buffer?
 - **Handing reply caps out once** (#879). `Caps` may be called more than once, but the reply caps can be in only one set, and releasing that set leaves their callers blocked.
 - **How long to wait** for the old version to become idle, and for the new version to finish. A fixed limit, or one the updater gives?
@@ -149,5 +167,6 @@ The update test (ADR 0031, section 6) replaces `file`, whose open files have to 
 - Kernel: move single-use caps, rather than copy them, when they are sent (#864). Derivation parents need nothing new: they go in the cap set as other caps do.
 - Reply caps whose calls hold a buffer (#878), and `Caps` handing reply caps out once (#879).
 - `Replaceable`, `Rose.Server`'s part of it, and the IDL aspect (idle).
+- `Saveable`, `Rose.Replacement.Save` and `Restore`, and the `Saved` argument in idle (#881).
 - `file` replaceable, and a test that replaces it on a restored system with files open.
 - #831: `directory`, `auth` and the user server.
