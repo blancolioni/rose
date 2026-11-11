@@ -1,0 +1,23 @@
+command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
+  with Summary     => "Serve a name that a new version can take over.",
+       Description => """
+          Replaceable_Test is the test server of the Replaceable
+          interface (ADR 0032, #865). It serves a Named interface whose
+          name is the one it was given, followed by how many times Name
+          was called before. Its state is that name and count, and the
+          identifier of its Named object. It holds one cap, the cap set
+          server's Constructor, which it names cap-set-service.
+          Run_Self_Tests launches it, reads its state and caps, and then
+          launches a second one that takes over from it.
+          """,
+       Server      => Replaceable_Test_Server.Start_Server,
+       Replaceable => Replaceable_Test_Server,
+       Live
+is
+   Name : String
+     with Help => "the name it serves, unless it takes over another";
+   Served : out Named
+     with Help => "its Named interface";
+   Control : out Replaceable
+     with Help => "its Replaceable interface";
+end Rose.Core.Replaceable_Test;

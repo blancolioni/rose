@@ -1,5 +1,6 @@
 with Ada.Containers.Hashed_Maps;
 with Ada.Containers.Vectors;
+with Ada.Streams;
 
 with Rose.Capabilities;
 with Rose.Invocation;
@@ -46,6 +47,22 @@ package Rose.Server is
    --  Identifier can be given out again. Call it only once every cap
    --  with Identifier has been rescinded, so that none can reach the next
    --  object to have it.
+
+   --  A new version of a replaceable server gives its objects the
+   --  identifiers that they had in the old version, which clients' caps
+   --  name (ADR 0032, #865). The old version writes the identifiers in
+   --  use, and the new one reads them before it attaches its objects.
+
+   procedure Write_Identifiers
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class);
+   --  Write the identifiers in use. The same identifiers are written the
+   --  same way, whatever was given out and freed before.
+
+   procedure Read_Identifiers
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class);
+   --  Mark the identifiers that Write_Identifiers wrote in use, so that
+   --  New_Identifier gives out none of them, and give out new ones from
+   --  after the highest of them.
 
    procedure Receive_Message
      (Context : in out Server_Context);
