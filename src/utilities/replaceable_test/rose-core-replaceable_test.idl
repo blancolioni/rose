@@ -4,11 +4,20 @@ command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
           Replaceable_Test is the test server of the Replaceable
           interface (ADR 0032, #865). It serves a Named interface whose
           name is the one it was given, followed by how many times Name
-          was called before. Its state is that name and count, and the
-          identifier of its Named object. It holds one cap, the cap set
-          server's Constructor, which it names cap-set-service.
+          was called before, and a Held_Call interface whose Wait it
+          defers until Answer (#879). Its state is that name and count,
+          and the identifiers of its objects. It holds one cap, the cap
+          set server's Constructor, which it names cap-set-service. A new
+          version refuses to take over from one called refuse.
           Run_Self_Tests launches it, reads its state and caps, and then
           launches a second one that takes over from it.
+
+          Given a Target, it is a helper instead: once it has started, it
+          calls Target's Wait, and then its name is what Wait returned,
+          as "waited N", or "waited error" if the call failed. A helper
+          called repeat calls Wait_With instead, which sends a buffer,
+          and calls it again each time it fails, until it is answered:
+          its name is then "waited N after E errors".
           """,
        Server      => Replaceable_Test_Server.Start_Server,
        Replaceable => Replaceable_Test_Server,
@@ -16,8 +25,12 @@ command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
 is
    Name : String
      with Help => "the name it serves, unless it takes over another";
+   Target : in Held_Call
+     with Help => "the server whose Wait a helper calls, or none";
    Served : out Named
      with Help => "its Named interface";
    Control : out Replaceable
      with Help => "its Replaceable interface";
+   Held : out Held_Call
+     with Help => "its Held_Call interface";
 end Rose.Core.Replaceable_Test;

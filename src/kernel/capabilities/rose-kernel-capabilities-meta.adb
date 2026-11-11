@@ -350,7 +350,7 @@ package body Rose.Kernel.Capabilities.Meta is
          when Delete_Cap =>
             if Params.Control.Flags (Rose.Invocation.Send_Caps) then
                for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
-                  Rose.Kernel.Processes.Delete_Cap
+                  Rose.Kernel.Processes.Discard_Cap
                     (Rose.Kernel.Processes.Current_Process_Id,
                      Params.Caps (Cap_Index));
                end loop;

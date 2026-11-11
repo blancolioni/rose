@@ -717,6 +717,59 @@ package body Rose.Kernel.Processes is
       Rose.Kernel.Page_Table.Disable_Page_Writes (Addr);
    end Disable_Write_Pages;
 
+   -----------------
+   -- Discard_Cap --
+   -----------------
+
+   procedure Discard_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability)
+   is
+      use type Rose.Capabilities.Layout.Capability_Type;
+   begin
+      if Cap_Tables.Is_Active (Process_Table (Pid).Caps, Cap) then
+         declare
+            Layout : constant Rose.Capabilities.Layout.Capability_Layout :=
+              Cap_Layout (Pid, Cap);
+         begin
+            if Layout.Header.Cap_Type = Rose.Capabilities.Layout.Reply_Cap
+            then
+               declare
+                  Caller : constant Process_Id :=
+                    To_Process_Id (Layout.Payload);
+               begin
+                  if Caller /= Null_Process_Id
+                    and then Caller /= Pid
+                    and then Process_Table (Caller).State = Blocked
+                    and then Process_Table (Caller).Flags (Wait_Reply)
+                  then
+                     Wake_With_Error (Caller, Rose.Invocation.Closed);
+
+                     --  The server that received the call may still have
+                     --  the caller's buffer mapped, and goes on running,
+                     --  unlike one that is killed. A caller has one call
+                     --  at a time, so every slot that names it is this
+                     --  call's: free them, so that the server can't write
+                     --  pages that the caller now uses for something
+                     --  else, and doesn't run out of slots.
+
+                     for Server in Process_Table'Range loop
+                        if Server /= Caller
+                          and then Process_Table (Server).State
+                            not in Available | Killed
+                        then
+                           Unmap_Invocation_Buffer (Server, Caller);
+                        end if;
+                     end loop;
+                  end if;
+               end;
+            end if;
+         end;
+      end if;
+
+      Delete_Cap (Pid, Cap);
+   end Discard_Cap;
+
    --------------------
    -- Drop_Reference --
    --------------------
