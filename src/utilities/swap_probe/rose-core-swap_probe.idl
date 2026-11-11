@@ -1,0 +1,20 @@
+command Rose.Core.Swap_Probe : Create_Endpoint
+  with Summary     => "Answer a number, for the test of replacing a process.",
+       Description => """
+          Swap_Probe is part of init's test of the kernel's part of
+          replacing a running process (ADR 0032, #862). It serves Named,
+          whose Name is its Number, in decimal. If it is given a Target,
+          it calls Target's Name before it serves, and answers with that
+          instead: init's test holds the calls to Target, so this call
+          waits through the swap. It never completes.
+          """,
+       Server      => Swap_Probe_Server.Start_Server,
+       Live
+is
+   Number : Natural
+     with Help => "the number it answers";
+   Target : in Named
+     with Help => "a probe to ask for its name, or the null cap";
+   Probe : out Named
+     with Help => "its Named interface";
+end Rose.Core.Swap_Probe;

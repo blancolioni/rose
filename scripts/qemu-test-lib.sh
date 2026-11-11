@@ -175,15 +175,21 @@ install_rose () {
     stop_qemu
 
     # Init's own tests run during the install, and report on the screen.
-    if grep -q -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt"
+    if grep -q -e ": FAIL" -e "test failed" "$WORK/install-screen.txt"
     then
-        grep -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt" \
+        grep -e ": FAIL" -e "test failed" "$WORK/install-screen.txt" \
             | sort -u
         echo "FAIL: one of init's tests failed"
         exit 1
     fi
-    echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
-        | grep -c ': ok') of its checks seen ok"
+    echo "init's derive and swap tests: $(sort -u "$WORK/install-screen.txt" \
+        | grep -c ': ok') of their checks seen ok"
+
+    # The screen can scroll past init's tests between two looks at it, as
+    # it does on a slow machine, so the swap test (ADR 0032, #862) is
+    # checked in the serial log, where the kernel writes the swap.
+    grep -a "takes over from" "$WORK/serial" \
+        || { echo "FAIL: init's swap test did not swap its probes"; exit 1; }
 
     # The install's run of the self tests is the one that has the cap set
     # server, which petal doesn't give (#825).
@@ -232,7 +238,7 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" -e "Cap set test.*\(PASS\|FAIL\)" \
+        grep -e "derive test" -e "swap test" -e "Cap set test.*\(PASS\|FAIL\)" \
             -e "Replacement test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
@@ -327,3 +333,4 @@ check_kilo () {
     screen | grep -q "^hello from kilo" \
         || fail "the file lost its first line"
 }
+                                                                                                                                                                                                                                                                

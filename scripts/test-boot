@@ -5,7 +5,8 @@
 #
 # ISO is the install image, images/rose.iso by default. The test:
 #
-#   1. installs Rose on a new disk, and waits for the install to finish;
+#   1. installs Rose on a new disk, waits for the install to finish, and
+#      checks that init's derive test (#116) and swap test (#862) passed;
 #   2. boots from the disk, which restores the checkpoint, checks that the
 #      kernel restored the derivation records that init gave hold_derived,
 #      and that a restored process names them, and that hold_derived
