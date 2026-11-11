@@ -185,9 +185,11 @@ install_rose () {
     echo "init's derive and swap tests: $(sort -u "$WORK/install-screen.txt" \
         | grep -c ': ok') of their checks seen ok"
 
-    # The swap test's last checks follow the release (ADR 0032, #862).
-    grep -q "swap test: release the calls: ok" "$WORK/install-screen.txt" \
-        || { echo "FAIL: init's swap test was not seen to finish"; exit 1; }
+    # The screen can scroll past init's tests between two looks at it, as
+    # it does on a slow machine, so the swap test (ADR 0032, #862) is
+    # checked in the serial log, where the kernel writes the swap.
+    grep -a "takes over from" "$WORK/serial" \
+        || { echo "FAIL: init's swap test did not swap its probes"; exit 1; }
 
     # The install's run of the self tests is the one that has the cap set
     # server, which petal doesn't give (#825).
