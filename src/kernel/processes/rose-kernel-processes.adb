@@ -2732,10 +2732,13 @@ package body Rose.Kernel.Processes is
    is
       Current_Process : Kernel_Process_Entry renames
                           Process_Table (Pid);
-      Rec             : Registered_Endpoint_Record renames
-                          Current_Process.Endpoints (Endpoint);
    begin
-      Rec.Receive_Cap := Receive_Cap;
+      --  The kernel has no range checks, and an index outside the array
+      --  writes into the fields around it (#861).
+
+      if Endpoint in Registered_Endpoint_Index then
+         Current_Process.Endpoints (Endpoint).Receive_Cap := Receive_Cap;
+      end if;
    end Set_Receive_Cap;
 
    ----------------
