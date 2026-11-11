@@ -42,8 +42,12 @@ package Restore.Start is
    --  Restore the checkpoint at Checkpoint.  Restored is False if it
    --  can't be restored.
 
-   procedure Finish (Restored : Boolean);
+   procedure Finish
+     (Restored : Boolean;
+      Updated  : Boolean := False);
    --  Tell init whether a checkpoint was restored, and if so, let the
-   --  restored processes run once init replies.  Never returns.
+   --  restored processes run once init replies.  Updated says that the
+   --  update boot has written this boot set to hd0 (#828), so that init
+   --  takes a checkpoint and restarts into it.  Never returns.
 
 end Restore.Start;

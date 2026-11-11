@@ -9,6 +9,12 @@
 --  before it installs over a checkpoint, readable or not, and if the
 --  answer isn't "erase", it exits with hd0 unchanged, and the system
 --  idles.
+--
+--  The update entry puts update-hd0 there (#828, ADR 0031).  Then
+--  restore-install never installs.  It restores hd0's checkpoint with
+--  this boot set, and only if that works, writes the set to hd0's boot
+--  partition (Restore.Boot_Sets), and init restarts into it.  If
+--  anything stops it before then, hd0 still boots its old set.
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -21,6 +27,7 @@ with Rose.Directories;
 
 with Restore.Ask;
 with Restore.Boot_Disk;
+with Restore.Boot_Sets;
 with Restore.Checkpoint_Log;
 with Restore.Command_Line;
 with Restore.Installer.Default;
@@ -31,6 +38,74 @@ procedure Restore.Install_Driver is
    Checkpoint : Rose.Words.Word_64;
    Restored   : Boolean := False;
    Erasing    : Boolean;
+   Updating   : Boolean;
+
+   procedure Open_Install_Media;
+   --  Open the install media's file system, for Rose.Directories
+
+   procedure Update;
+   --  The update boot: restore the checkpoint, write this boot set to
+   --  hd0, and tell init.  Exits with hd0 unchanged if any of these
+   --  fails.  Never returns.
+
+   ------------------------
+   -- Open_Install_Media --
+   ------------------------
+
+   procedure Open_Install_Media is
+      use Rose.Interfaces.File_System.Client;
+      File_System : File_System_Client;
+   begin
+      Open_Cap_Set (File_System, Install_Media_Cap);
+      Rose.Directories.Open_Root_File_System (File_System);
+   end Open_Install_Media;
+
+   ------------
+   -- Update --
+   ------------
+
+   procedure Update is
+      Partition : Restore.Boot_Sets.Boot_Partition;
+      Found     : Boolean;
+      Written   : Boolean;
+   begin
+      if Checkpoint = 0 then
+         Rose.Console_IO.Put_Line
+           ("restore: hd0 has no checkpoint to update; install Rose "
+            & "instead");
+         Restore.Start.Exit_Restore;
+      end if;
+
+      --  Before anything changes, check that hd0's boot partition has
+      --  two slots, and find the current one.
+
+      Restore.Boot_Sets.Find (Partition, Found);
+      if not Found then
+         Rose.Console_IO.Put_Line ("restore: hd0 is unchanged");
+         Restore.Start.Exit_Restore;
+      end if;
+
+      --  Restoring with this boot set before writing it tests the set
+      --  against this disk's own checkpoint.
+
+      Restore.Start.Add_Storage;
+      Restore.Start.Restore_Checkpoint (Checkpoint, Restored);
+      if not Restored then
+         Rose.Console_IO.Put_Line
+           ("restore: this boot set can't restore hd0's checkpoint, so "
+            & "hd0 is unchanged");
+         Restore.Start.Exit_Restore;
+      end if;
+
+      Open_Install_Media;
+      Restore.Boot_Sets.Write_Update (Partition, Written);
+      if not Written then
+         Restore.Start.Exit_Restore;
+      end if;
+
+      Restore.Start.Finish (Restored => True, Updated => True);
+   end Update;
+
 begin
    Restore.Start.Get_Caps;
    Restore.Start.Next (Install_Media_Cap);
@@ -45,8 +120,14 @@ begin
    Restore.Start.Delete_Cap_Set;
 
    Erasing := Restore.Command_Line.Has_Argument ("erase-hd0");
+   Updating := not Erasing
+     and then Restore.Command_Line.Has_Argument ("update-hd0");
 
    Restore.Start.Prepare (Checkpoint, Refuse => not Erasing);
+
+   if Updating then
+      Update;
+   end if;
 
    if Erasing
      and then (Checkpoint /= 0 or else Restore.Checkpoint_Log.Refused)
@@ -101,9 +182,9 @@ begin
             Source      => Restore.Installer.Default.Iterate_Steps'Access);
       end;
 
-      --  So that the disk boots without the install media.  Only a new
-      --  system writes it; updating it on a disk that has a checkpoint
-      --  is #828.
+      --  So that the disk boots without the install media.  A new
+      --  system writes the whole boot partition, with this boot set in
+      --  slot a; an update writes only a slot and the menu (Update).
 
       Restore.Boot_Disk.Write_Boot_Loader;
    end if;

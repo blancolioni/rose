@@ -73,6 +73,7 @@ INSTALL_OBJECTS= \
 	$(BUILDDIR)/restore-install_driver.o \
 	$(BUILDDIR)/restore-ask.o \
 	$(BUILDDIR)/restore-command_line.o \
+	$(BUILDDIR)/restore-boot_sets.o \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-port_io.o \
 	$(BUILDDIR)/rose-interfaces-timeout.o \
