@@ -2,6 +2,7 @@ with Rose.Boot.Console;
 
 with Rose.Kernel.Debug;
 with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Capabilities.Meta;
 
 package body Rose.Kernel.Capabilities.Processes is
@@ -136,6 +137,16 @@ package body Rose.Kernel.Capabilities.Processes is
                Rose.Kernel.Processes.Ready);
 
          when Faulted_Process_Endpoint =>
+
+            --  The memory server has found a fault it can't handle. Its
+            --  report goes to the console, which can be gone from the
+            --  screen, so the process's state goes to the serial log, with
+            --  the instruction it faulted at.
+
+            Rose.Boot.Console.Put ("kernel: process faulted: ");
+            Rose.Kernel.Processes.Debug.Put (Pid);
+            Rose.Boot.Console.New_Line;
+            Rose.Kernel.Processes.Debug.Report_Process (Pid);
 
             Rose.Kernel.Processes.Set_Current_State
               (Pid, Rose.Kernel.Processes.Faulted);
