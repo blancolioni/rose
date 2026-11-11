@@ -32,14 +32,19 @@ package Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability)
       return Boolean;
    --  Derive capabilities from Find_Cap, the registry's, and check what
    --  rescinding one of them does (ADR 0001, #116): the capability goes on
    --  working, and so do its parent and its siblings, but what was
    --  derived from it does not; and that a capability can be derived from
-   --  to a depth of eight, and no more.  It reports each check on
-   --  Standard_Output, and is True if they all passed.
+   --  to a depth of eight, and no more.  If Cap_Sets, the Create cap of
+   --  the userland cap set server, isn't null, also check that a parent
+   --  passed through a cap set survives its holder's copy (ADR 0032,
+   --  #864): deleting the holder's copy leaves its child working, and the
+   --  copy taken from the set still revokes the child.  It reports each
+   --  check on Standard_Output, and is True if they all passed.
 
    function Swap_Test
      (Find_Cap        : Rose.Capabilities.Capability;

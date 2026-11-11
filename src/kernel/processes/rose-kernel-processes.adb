@@ -73,6 +73,25 @@ package body Rose.Kernel.Processes is
    --  The record that Layout was derived from, if any, and the records
    --  above it have not been revoked.
 
+   function Is_Repeated_Single_Use
+     (Pid       : Process_Id;
+      Params    : Rose.Invocation.Invocation_Record;
+      Cap_Index : Rose.Invocation.Capability_Index)
+      return Boolean;
+   --  The cap that Params sends at Cap_Index is a single-use cap of Pid's
+   --  that it sends at an earlier index too.  It arrives once, at the
+   --  first (ADR 0032, #864).
+
+   procedure Move_Single_Use_Caps
+     (Pid    : Process_Id;
+      Params : Rose.Invocation.Invocation_Record);
+   --  Params, from Pid, has been delivered with its caps.  A single-use
+   --  cap, such as a reply cap, is moved, not copied, so that it is still
+   --  used once: empty each one in Pid's table.  The slot stays held, so
+   --  that its number isn't given to another cap that Pid would take for
+   --  it; nothing can be sent or invoked through it, and deleting it
+   --  frees it (ADR 0032, #864).
+
    procedure Wake_Waiting_Processes (Pid : Process_Id);
    --  Wake each process that is waiting on Pid, which is being killed,
    --  as if its call had failed: those blocked sending to it, and those
@@ -343,9 +362,15 @@ package body Rose.Kernel.Processes is
       --  It still takes a number in the other table, which holds nothing,
       --  since those that follow are at numbers that count on it.
 
+      --  A single-use cap moves, as it does in a message (ADR 0032, #864).
+
       if Has_Cap (From_Process_Id, Cap) then
          Copy_Cap_Layout (From_Process_Id, Cap,
                           To_Process_Id, To_Cap);
+         if Cap_Layout (From_Process_Id, Cap).Header.Single_Use then
+            Set_Cap (From_Process_Id, Cap,
+                     Rose.Capabilities.Layout.Empty_Capability);
+         end if;
       end if;
    end Copy_Cap;
 
@@ -1369,6 +1394,34 @@ package body Rose.Kernel.Processes is
         and then Endpoint /= Handovers (Pid).Except;
    end Is_Held;
 
+   ----------------------------
+   -- Is_Repeated_Single_Use --
+   ----------------------------
+
+   function Is_Repeated_Single_Use
+     (Pid       : Process_Id;
+      Params    : Rose.Invocation.Invocation_Record;
+      Cap_Index : Rose.Invocation.Capability_Index)
+      return Boolean
+   is
+      use type Rose.Capabilities.Capability;
+      use type Rose.Invocation.Capability_Index;
+      Cap : constant Rose.Capabilities.Capability := Params.Caps (Cap_Index);
+   begin
+      if Cap_Index = 0 or else not Cap_Layout (Pid, Cap).Header.Single_Use
+      then
+         return False;
+      end if;
+
+      for Earlier in 0 .. Cap_Index - 1 loop
+         if Params.Caps (Earlier) = Cap then
+            return True;
+         end if;
+      end loop;
+
+      return False;
+   end Is_Repeated_Single_Use;
+
    ----------------
    -- Is_Retired --
    ----------------
@@ -1609,6 +1662,28 @@ package body Rose.Kernel.Processes is
              (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page);
    end Mapped_Physical_Page;
+
+   --------------------------
+   -- Move_Single_Use_Caps --
+   --------------------------
+
+   procedure Move_Single_Use_Caps
+     (Pid    : Process_Id;
+      Params : Rose.Invocation.Invocation_Record)
+   is
+      use type Rose.Capabilities.Capability;
+      Cap : Rose.Capabilities.Capability;
+   begin
+      for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+         Cap := Params.Caps (Cap_Index);
+         if Cap /= Rose.Capabilities.Null_Capability
+           and then Has_Cap (Pid, Cap)
+           and then Cap_Layout (Pid, Cap).Header.Single_Use
+         then
+            Set_Cap (Pid, Cap, Rose.Capabilities.Layout.Empty_Capability);
+         end if;
+      end loop;
+   end Move_Single_Use_Caps;
 
    -------------
    -- New_Cap --
@@ -2145,6 +2220,8 @@ package body Rose.Kernel.Processes is
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
             if Params.Caps (Cap_Index) /= Null_Capability
               and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+              and then not Is_Repeated_Single_Use
+                (From_Process_Id, Params, Cap_Index)
             then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
@@ -2183,6 +2260,8 @@ package body Rose.Kernel.Processes is
                To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
+
+         Move_Single_Use_Caps (From_Process_Id, Params);
       end if;
 
       if Params.Control.Flags (Rose.Invocation.Send_Buffer)
@@ -2480,6 +2559,8 @@ package body Rose.Kernel.Processes is
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
             if Params.Caps (Cap_Index) /= Null_Capability
               and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
+              and then not Is_Repeated_Single_Use
+                (From_Process_Id, Params, Cap_Index)
             then
                declare
                   From_Cap : constant Capability := Params.Caps (Cap_Index);
@@ -2518,6 +2599,8 @@ package body Rose.Kernel.Processes is
                To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
+
+         Move_Single_Use_Caps (From_Process_Id, Params);
       end if;
 
       Set_Current_State (To_Process_Id, Ready);
