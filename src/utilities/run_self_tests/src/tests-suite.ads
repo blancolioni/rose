@@ -50,6 +50,7 @@ package Tests.Suite is
                    Tests.Directories.Directory_Test'Access,
                    Tests.Directories.Version_Test'Access,
                    Tests.Users.User_Test'Access,
+                   Tests.Users.Session_Test'Access,
                    Tests.Numerics.Numerics_Test'Access,
                    Tests.Numerics.Arrays_Test'Access,
                    Tests.Float_Text.Float_Text_Test'Access,

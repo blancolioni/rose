@@ -15,7 +15,8 @@
 #      pass every test, then keytest, which has to draw in the corners of
 #      the 80 by 24 screen and move its mark with the arrow keys (#734),
 #      then kilo, which has to make, save and read back a file, and drop
-#      a change that isn't saved (#735);
+#      a change that isn't saved (#735); then logs out and in again,
+#      which ends the first session's bank and makes another (#450);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent.
 #
@@ -99,6 +100,20 @@ check_keytest
 
 echo "Editing a file with kilo"
 check_kilo
+
+# An end of file logs out of petal (#458). Login then destroys the
+# session's bank, and makes a new one from the user's bank for the next
+# session (#450).
+echo "Logging out, and in again"
+type_text "clear
+"
+sleep 3
+press ctrl-d
+wait_for "login:" 60 || fail "logging out did not bring back the login prompt"
+log_in
+type_text "echo second session
+"
+wait_for "^second session" 20 || fail "the second session does not run commands"
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

@@ -37,6 +37,10 @@ package body Init.Grants is
 
    Last_Owner : Owner_Id := 1000;
 
+   System_Bank_Client : Rose.Interfaces.Bank.Client.Bank_Client;
+   Have_System_Bank   : Boolean := False;
+   --  The system bank, once System_Bank has made it
+
    function Claim
      (Kind        : Grant_Kind;
       Owner       : Owner_Id;
@@ -62,27 +66,21 @@ package body Init.Grants is
    ----------
 
    function Bank
-     (Storage : Rose.Capabilities.Capability;
-      Pages   : Rose.Words.Word;
+     (Pages   : Rose.Words.Word;
       Regions : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
       use Rose.Interfaces.Bank.Client;
-      use Rose.Interfaces.Storage.Client;
-      use type Rose.Capabilities.Capability;
-      Store : Storage_Client;
    begin
-      if Storage = Rose.Capabilities.Null_Capability
+      if not Have_System_Bank
         or else Pages = 0
         or else Regions = 0
       then
          return Rose.Capabilities.Null_Capability;
       end if;
 
-      Open (Store, Storage);
       return Get_Interface_Cap
-        (Create_Sub_Bank
-           (Get_Root_Bank (Store), Word_64 (Pages), Regions));
+        (Create_Sub_Bank (System_Bank_Client, Word_64 (Pages), Regions));
    end Bank;
 
    --------------
@@ -295,11 +293,11 @@ package body Init.Grants is
         and then Get_Word (12) = 0;
    end Read_Framebuffer_Tag;
 
-   ---------------
-   -- Root_Bank --
-   ---------------
+   -----------------
+   -- System_Bank --
+   -----------------
 
-   procedure Root_Bank
+   procedure System_Bank
      (Storage : Rose.Capabilities.Capability;
       Bank    : out Rose.Capabilities.Capability;
       Reserve : out Rose.Capabilities.Capability)
@@ -308,7 +306,6 @@ package body Init.Grants is
       use Rose.Interfaces.Storage.Client;
       use type Rose.Capabilities.Capability;
       Store : Storage_Client;
-      Root  : Bank_Client;
    begin
       Bank := Rose.Capabilities.Null_Capability;
       Reserve := Rose.Capabilities.Null_Capability;
@@ -318,9 +315,10 @@ package body Init.Grants is
       end if;
 
       Open (Store, Storage);
-      Root := Get_Root_Bank (Store);
-      Bank := Get_Interface_Cap (Root);
-      Reserve := Get_Reserve_Storage_Cap (Root);
-   end Root_Bank;
+      System_Bank_Client := Create_Sub_Bank (Get_Root_Bank (Store), 0, 0);
+      Bank := Get_Interface_Cap (System_Bank_Client);
+      Reserve := Get_Reserve_Storage_Cap (System_Bank_Client);
+      Have_System_Bank := Bank /= Rose.Capabilities.Null_Capability;
+   end System_Bank;
 
 end Init.Grants;

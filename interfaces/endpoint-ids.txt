@@ -209,6 +209,7 @@
 16#9003_751E_D4E8_2BCB#  interface rose.interfaces.transactional_writable_file
 16#FF5B_41DC_81E6_D4CF#  interface rose.interfaces.user
 16#5499_7FB1_8539_BD8C#  rose.interfaces.user.home_directory return interface rose.interfaces.writable_directory
+16#58D7_2102_C0AC_49B1#  rose.interfaces.user.new_session return interface rose.interfaces.bank
 16#1B76_378E_8626_4E05#  interface rose.interfaces.writable_directory
 16#6525_20BC_2A95_9498#  rose.interfaces.writable_directory.get_writable_file(in positive) return interface rose.interfaces.writable_file
 16#A8B1_E205_A263_7381#  rose.interfaces.writable_directory.get_writable_directory(in positive) return interface rose.interfaces.writable_directory

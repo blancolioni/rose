@@ -25,6 +25,10 @@ jobs:
       # them.
       SYN_REF: main
       IDLE_REF: main
+      # The boot tests make their directories here (qemu-test-lib.sh),
+      # which is where "Keep the logs of a failure" looks. Their default,
+      # ~/scratch, is for the dev server, whose /tmp is small.
+      ROSE_TEST_DIR: /tmp
     steps:
       - name: Install the build requirements
         run: |
@@ -35,6 +39,15 @@ jobs:
               curl unzip
 
       - uses: actions/checkout@v4
+
+      # The container runs as root, but the checkout belongs to the runner,
+      # so git refuses it unless it's marked safe.  check-endpoint-ids
+      # compares the endpoint ids with those at the first tag of the
+      # release series (#827), and the checkout has no tags.
+      - name: Fetch the tags
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git fetch --depth=1 origin '+refs/tags/v*:refs/tags/v*'
 
       # idle needs Syn next to it.  Alire builds idle with the GNAT that is
       # installed above.
@@ -65,6 +78,12 @@ jobs:
 
       - name: Boot test
         run: make test
+
+      # The checkpoint of the series' first release, restored by this
+      # build (#737). It passes with a message until that release has a
+      # fixture.
+      - name: Restore test
+        run: make test-restore
 
       - name: Keep the logs of a failure
         if: failure()

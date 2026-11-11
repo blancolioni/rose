@@ -6,6 +6,7 @@ procedure Rose.Core.User
   (Name : String;
    Home : in out
      Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
+   Bank : in out Rose.Interfaces.Bank.Bank_Object'Class;
    User : out Rose.Capabilities.Capability)
 is
 begin
@@ -20,6 +21,7 @@ begin
 
    User_Server.Create_Server
      (User_Name => Name,
-      Home      => Home.Writable_Directory_Cap);
+      Home      => Home.Writable_Directory_Cap,
+      Bank      => Bank.Bank_Cap);
    User := User_Server.Interface_Cap;
 end Rose.Core.User;
