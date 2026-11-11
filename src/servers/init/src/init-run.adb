@@ -109,6 +109,9 @@ package body Init.Run is
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
       --  the programs it would have installed are running already.
+      Updated            : Boolean := False;
+      --  Set if, as well, the update boot has written the install
+      --  media's boot set to hd0 (#828), so that init restarts into it.
       Restore_Reply_Cap    : Rose.Capabilities.Capability := 0;
       --  The reply cap of the restore server's last message.
 
@@ -280,15 +283,16 @@ package body Init.Run is
             Rose.System_Calls.Receive_Buffer (Params, 4096);
             Rose.System_Calls.Invoke_Capability (Params);
             --  The restore server's last message has no caps.  Its first
-            --  data word is 1 if it restored a checkpoint.  The restore
-            --  init installs nothing, so that is the only message it
-            --  takes.
+            --  data word is 1 if it restored a checkpoint, and 2 if it
+            --  did, and updated hd0's boot set too.  The restore init
+            --  installs nothing, so that is the only message it takes.
 
             if not Install
               or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
             then
                Restored := Params.Control.Flags (Rose.Invocation.Send_Words)
-                 and then Params.Data (0) = 1;
+                 and then Params.Data (0) in 1 .. 2;
+               Updated := Restored and then Params.Data (0) = 2;
                Restore_Reply_Cap := Params.Reply_Cap;
                exit;
             end if;
@@ -586,6 +590,20 @@ package body Init.Run is
             Rose.System_Calls.Initialize_Reply (Reply, Restore_Reply_Cap);
             Rose.System_Calls.Invoke_Capability (Reply);
          end;
+
+         --  After an update, restart from hd0 once a checkpoint is in
+         --  the log, as an install does, so that the machine boots the
+         --  new set from hd0 (#828).
+
+         if Updated then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "update complete; restarting from hd0"
+               & NL);
+            if Take_Checkpoint then
+               Wait (3000);
+               Init.Calls.Send (Restart_Cap);
+            end if;
+         end if;
 
          Init.Calls.Send (Exit_Cap);
          return;
