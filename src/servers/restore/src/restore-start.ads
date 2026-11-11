@@ -43,11 +43,15 @@ package Restore.Start is
    --  can't be restored.
 
    procedure Finish
-     (Restored : Boolean;
-      Updated  : Boolean := False);
+     (Restored     : Boolean;
+      Updated      : Boolean := False;
+      After_Resume : access procedure := null);
    --  Tell init whether a checkpoint was restored, and if so, let the
    --  restored processes run once init replies.  Updated says that the
    --  update boot has written this boot set to hd0 (#828), so that init
-   --  takes a checkpoint and restarts into it.  Never returns.
+   --  takes a checkpoint and restarts into it.  After_Resume, if there
+   --  is one, runs once the restored processes are running, and init
+   --  waits for it before it takes the checkpoint (#829).  Never
+   --  returns.
 
 end Restore.Start;

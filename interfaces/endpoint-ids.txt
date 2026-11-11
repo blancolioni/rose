@@ -58,6 +58,7 @@
 16#4279_2F9D_69F2_5EA9#  interface rose.interfaces.exec
 16#666C_7ADA_B818_3A36#  rose.interfaces.exec.install(in interface rose.interfaces.reader; in string; in capability_array) return interface rose.interfaces.launch
 16#975B_6584_3E43_0FD3#  rose.interfaces.exec.set_standard_output(in interface rose.interfaces.writer)
+16#F1BA_71FB_1C5F_52B8#  rose.interfaces.exec.update(in interface rose.interfaces.reader; in string; in capability_array) return interface rose.interfaces.launch
 16#1077_884A_7CEA_575E#  interface rose.interfaces.executable
 16#F9B0_EA20_2E1F_D725#  rose.interfaces.executable.launch(in string; in interface rose.interfaces.region; in interface rose.interfaces.bank; in capability_array) return interface rose.interfaces.process
 16#6E7C_5935_279A_8233#  rose.interfaces.executable.launch_command(in string; in interface rose.interfaces.region; in interface rose.interfaces.bank; in capability_array) return capability

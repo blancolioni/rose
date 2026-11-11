@@ -61,8 +61,9 @@ package body Restore.Start is
    ------------
 
    procedure Finish
-     (Restored : Boolean;
-      Updated  : Boolean := False)
+     (Restored     : Boolean;
+      Updated      : Boolean := False;
+      After_Resume : access procedure := null)
    is
    begin
       Rose.Console_IO.Put_Line ("restore: done");
@@ -89,6 +90,24 @@ package body Restore.Start is
       if Restored then
          Restore.Checkpoints.Resume_Processes;
          Rose.Console_IO.Put_Line ("restore: restored processes are running");
+      end if;
+
+      --  After an update, init waits for this second message before it
+      --  takes its checkpoint, so that the checkpoint has what
+      --  After_Resume did (#829).
+
+      if Restored and then Updated then
+         if After_Resume /= null then
+            After_Resume.all;
+         end if;
+
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+            Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(3));
+            Rose.System_Calls.Invoke_Capability (Params);
+         end;
       end if;
 
       Exit_Restore;

@@ -44,14 +44,16 @@ The kernel sets up the console, the memory map, its heap, the page table and the
 The idle process has object id 1, and `init` has object id 2.
 The kernel then switches its log output to the serial port and starts the clock.
 
-`init` starts with a fixed set of 23 capabilities, at the indices given in `Rose.Init_Capabilities` (#115):
+`init` starts with a fixed set of 34 capabilities, at the indices given in `Rose.Init_Capabilities` (#115):
 
 * the boot capability, for launching boot modules, and create-process, for `elf`;
-* capabilities for creating endpoints, deleting and rescinding caps, and exiting;
+* capabilities for creating endpoints and signal caps, deriving, deleting and rescinding caps, and exiting;
 * the memory map: reserving memory, counting and getting memory regions, and page-on;
 * the clock: set-timeout and get-ticks;
-* checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process and restore-interrupt;
-* trace events, and writing the system image;
+* checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process, restore-interrupt and restore-derivations;
+* replacing a running process: hold-calls, release-calls, swap-processes and process-state (ADR 0032, #862), which init gives to `mem`;
+* restored-endpoint, which makes an endpoint cap to a restored process, so that the update boot can call the restored `exec` and command registry (#829); only `restore-install` gets it;
+* restarting the machine, trace events, and writing the system image;
 * five _root capabilities_, for I/O ports, interrupts, device pages, device ranges and boot tags.
 
 A root capability makes capabilities for hardware.
@@ -112,7 +114,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
 | 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
 | 16 | `log` | The kernel's start-log capability, delete | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag | (see <<restore-server>>)
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag, and restored-endpoint, for calling the restored `exec` and command registry on the update boot (#829) | (see <<restore-server>>)
 | 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 

@@ -2,7 +2,7 @@
 
 - **Status:** Proposed
 - **Date:** 2026-11-09
-- **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), #824 (replacing a running persistent process), #825 (cap sets), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities)
+- **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), #824 (replacing a running persistent process), #825 (cap sets), #829 (installing the commands again), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities)
 
 ## Context
 
@@ -62,11 +62,13 @@ The boot partition holds two boot sets, in `/boot/a` and `/boot/b`, and `/boot/g
 
 The update boot installs every program on the install media again, as the install boot does, with one difference: the programs that are restored are left running.
 
-- **Commands.** For each command, the updater calls `Exec.Install` with the new image, and replaces the registry's entry with `Map.Add`, which replaces a name that is already there. Petal finds the new launch cap at the next `Commands.Find`, so the next run of the command has the new code. A command that is running finishes with its old code.
-- **Installed capabilities.** A command with installed arguments (ADR 0029) is given them again, resolved from its install manifest as the installer does.
-- **The old image.** `exec` keeps the old image's region until nothing holds its launch cap. Until banks can tell `exec` that, it needs an `Exec.Uninstall`, which the updater calls for the old launch cap after `Map.Add`. A process still running the old image keeps its own pages.
-- **Unchanged programs** are skipped: the updater compares the image's size and contents with the installed one before installing it.
-- **Where it runs.** The updater is `restore-install`'s installer, which already has the code, the registry and `exec`. It runs on the update boot only, and isn't a persistent process.
+- **Commands.** For each command, the updater calls `Exec.Update` with the new image and the command's name, and replaces the registry's entry with `Map.Add`, which replaces a name that is already there. Petal finds the new launch cap at the next `Commands.Find`, so the next run of the command has the new code. A command that is running finishes with its old code.
+- **Unchanged programs.** `Exec.Update` compares the new image, page for page, with the installed program of that name. If they are the same, it gives back the pages it wrote and returns the installed program's launch cap, so an update that changes nothing doesn't grow `exec`'s region. The comparison is by name, in `exec`, because a server can't tell which of its own objects a cap passed to it names.
+- **Installed capabilities.** A command with installed arguments (ADR 0029) is given them again, resolved from its install manifest as the installer does. A cap's number says nothing about what it names, so a program with install caps always counts as changed.
+- **The old image is retired, not freed.** A program's read-only segments, its code included, are mapped from `exec`'s region and shared by every process running it, and `exec` doesn't know which processes those are. So `Exec.Update` retires the old version: launching it fails from then on, and its pages stay. Freeing them waits until banks can show that nothing maps them (ADR 0014).
+- **`file` and `directory` are left as they are.** Every directory process holds their launch caps, to create what is in it, and retiring the old versions would stop it. Their new code comes when they are replaced (section 5, ADR 0032).
+- **Where it runs.** The updater is `restore-install`'s installer, which has the install media. It runs on the update boot only, once the restored processes are running, and isn't a persistent process. Init waits for it before taking the checkpoint that it restarts into.
+- **How it reaches `exec` and the registry.** Nothing on the update boot holds a cap to them: init held `Exec.Install` and `Map.Add` on the install boot, and exits. So the kernel gives restore-install, and nothing else, a cap that makes an endpoint cap to a restored process for an endpoint it has registered. The updater finds `exec` and the registry by the interface endpoints they answer, `Exec` and `Map`, which are unique (section 2), with identifier 0, which names a server's first object. An `exec` installed before `Exec.Update` existed has no cap for it, and then the commands are left as they are.
 
 ### 5. Replacing persistent processes
 
