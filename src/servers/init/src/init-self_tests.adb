@@ -2,8 +2,12 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
+with Rose.Init_Capabilities;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Named.Client;
 
+with Init.Boot_Steps;
 with Init.Calls;
 with Init.Grants;
 
@@ -34,6 +38,31 @@ package body Init.Self_Tests is
       Cap        : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
    --  A derived copy of Cap, or the null capability if there is none.
+
+   procedure Kernel_Call
+     (Kernel_Cap : Rose.Capabilities.Capability;
+      First      : Rose.Capabilities.Capability;
+      Second     : Rose.Capabilities.Capability;
+      Success    : out Boolean;
+      Result     : out Rose.Words.Word);
+   --  Invoke one of init's handover caps (ADR 0032) with the processes
+   --  that First and Second, unless it is null, name. Success is False if
+   --  the kernel refused, and Result is the reply's data word, or 0.
+
+   function Launch_Probe
+     (Launch_Cap      : Rose.Capabilities.Capability;
+      Bank            : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Number          : Natural;
+      Target          : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+   --  Launch swap_probe through Launch_Cap, against Bank, with Number and
+   --  Target, and return its Named interface, or the null cap if it did
+   --  not start.
+
+   Probe_Page_Limit   : constant := 2048;
+   Probe_Region_Limit : constant := 128;
+   --  The swap test's bank, which holds three probes.
 
    Test_Page_Limit   : constant := 16;
    Test_Region_Limit : constant := 4;
@@ -197,6 +226,85 @@ package body Init.Self_Tests is
       return Passed;
    end Derive_Test;
 
+   -----------------
+   -- Kernel_Call --
+   -----------------
+
+   procedure Kernel_Call
+     (Kernel_Cap : Rose.Capabilities.Capability;
+      First      : Rose.Capabilities.Capability;
+      Second     : Rose.Capabilities.Capability;
+      Success    : out Boolean;
+      Result     : out Rose.Words.Word)
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Kernel_Cap);
+      Rose.System_Calls.Send_Cap (Params, First);
+      if Second /= Rose.Capabilities.Null_Capability then
+         Rose.System_Calls.Send_Cap (Params, Second);
+      end if;
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      Success := not Params.Control.Flags (Rose.Invocation.Error);
+      Result :=
+        (if Success
+           and then Params.Control.Flags (Rose.Invocation.Send_Words)
+         then Params.Data (0)
+         else 0);
+   end Kernel_Call;
+
+   ------------------
+   -- Launch_Probe --
+   ------------------
+
+   function Launch_Probe
+     (Launch_Cap      : Rose.Capabilities.Capability;
+      Bank            : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Number          : Natural;
+      Target          : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Words.Word;
+      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
+      Launcher : Rose.Interfaces.Launch.Client.Launch_Client;
+      Endpoint : Rose.Capabilities.Capability;
+      Params   : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Bank, No_Caps);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      --  Its role's cap and its arguments, as src/utilities/swap_probe/
+      --  rose-core-swap_probe.idl declares them: Create_Endpoint, then
+      --  Target, and Number in the first data word. It replies with its
+      --  Named interface, before it asks Target.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Target);
+      Rose.System_Calls.Send_Word (Params, Number);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else Params.Data (0) /= Completed
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Params.Caps (0);
+   end Launch_Probe;
+
    ---------
    -- Run --
    ---------
@@ -324,6 +432,177 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Start_Derived_Holder;
+
+   ---------------
+   -- Swap_Test --
+   ---------------
+
+   function Swap_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Derive_Cap      : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      package Named renames Rose.Interfaces.Named.Client;
+      package Init_Caps renames Rose.Init_Capabilities;
+
+      Calling : constant Rose.Words.Word := 2;
+      --  Process_State's word for a process in a call of its own.
+
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+                     Init.Calls.Find_In_Map (Find_Cap, "swap_probe");
+      Bank_Cap   : constant Rose.Capabilities.Capability :=
+                     Init.Grants.Bank (Probe_Page_Limit, Probe_Region_Limit);
+      Bank       : Rose.Interfaces.Bank.Client.Bank_Client;
+
+      Passed     : Boolean := True;
+      Probe_1    : Rose.Capabilities.Capability;
+      Probe_2    : Rose.Capabilities.Capability;
+      Probe_3    : Rose.Capabilities.Capability;
+      Client_1   : Named.Named_Client;
+      Client_2   : Named.Named_Client;
+      Client_3   : Named.Named_Client;
+      Derived    : Named.Named_Client;
+      Ok         : Boolean;
+      State      : Rose.Words.Word := 0;
+
+      function Answers
+        (Client   : Named.Named_Client;
+         Expected : String)
+         return Boolean;
+      --  Client's Name is Expected.
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      function Refused (Client : Named.Named_Client) return Boolean;
+      --  A call to Client's Name fails.
+
+      -------------
+      -- Answers --
+      -------------
+
+      function Answers
+        (Client   : Named.Named_Client;
+         Expected : String)
+         return Boolean
+      is
+         Text : String (1 .. 16);
+         Last : Natural;
+      begin
+         Named.Name (Client, Text, Last);
+         return not Named.Has_Error
+           and then Last in Text'Range
+           and then Text (1 .. Last) = Expected;
+      end Answers;
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String
+           (Standard_Output,
+            "swap test: " & Name & (if Ok then ": ok" else ": FAIL")
+            & NL);
+         Passed := Passed and then Ok;
+      end Check;
+
+      -------------
+      -- Refused --
+      -------------
+
+      function Refused (Client : Named.Named_Client) return Boolean is
+         Text : String (1 .. 16);
+         Last : Natural;
+      begin
+         Named.Name (Client, Text, Last);
+         return Named.Has_Error;
+      end Refused;
+
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability
+        or else Bank_Cap = Rose.Capabilities.Null_Capability
+      then
+         return False;
+      end if;
+
+      Rose.Interfaces.Bank.Client.Open (Bank, Bank_Cap);
+
+      Probe_1 := Launch_Probe (Launch_Cap, Bank_Cap, Create_Endpoint, 1,
+                               Rose.Capabilities.Null_Capability);
+      Probe_2 := Launch_Probe (Launch_Cap, Bank_Cap, Create_Endpoint, 2,
+                               Rose.Capabilities.Null_Capability);
+
+      if Probe_1 = Rose.Capabilities.Null_Capability
+        or else Probe_2 = Rose.Capabilities.Null_Capability
+      then
+         Check ("launch probes 1 and 2", False);
+         Rose.Interfaces.Bank.Client.Destroy (Bank);
+         return False;
+      end if;
+
+      Named.Open (Client_1, Probe_1);
+      Named.Open (Client_2, Probe_2);
+      Check ("probes 1 and 2 answer their numbers",
+             Answers (Client_1, "1") and then Answers (Client_2, "2"));
+
+      Named.Open_Cap_Set
+        (Derived, Derive (Derive_Cap, Named.Get_Name_Cap (Client_1)));
+
+      --  Hold every call to probe 1, and launch probe 3, which calls it
+      --  once its launch call has returned. Wait until that call waits.
+
+      Kernel_Call (Init_Caps.Hold_Calls_Cap, Probe_1,
+                   Rose.Capabilities.Null_Capability, Ok, State);
+      Check ("hold the calls to probe 1", Ok);
+
+      Probe_3 := Launch_Probe (Launch_Cap, Bank_Cap, Create_Endpoint, 3,
+                               Probe_1);
+      Check ("launch probe 3",
+             Probe_3 /= Rose.Capabilities.Null_Capability);
+
+      if Probe_3 /= Rose.Capabilities.Null_Capability then
+         for Attempt in 1 .. 100 loop
+            Kernel_Call (Init_Caps.Process_State_Cap, Probe_3,
+                         Rose.Capabilities.Null_Capability, Ok, State);
+            exit when not Ok or else State = Calling;
+            Init.Boot_Steps.Wait (10);
+         end loop;
+         Check ("probe 3's call to probe 1 waits",
+                Ok and then State = Calling);
+      end if;
+
+      Kernel_Call (Init_Caps.Swap_Processes_Cap, Probe_1, Probe_2, Ok, State);
+      Check ("swap probes 1 and 2", Ok);
+
+      --  Probe_1 now names probe 2's process, which has the calls held.
+
+      Kernel_Call (Init_Caps.Release_Calls_Cap, Probe_1,
+                   Rose.Capabilities.Null_Capability, Ok, State);
+      Check ("release the calls", Ok);
+
+      Check ("a cap to probe 1 reaches probe 2", Answers (Client_1, "2"));
+      Check ("a cap derived from one reaches probe 2",
+             Answers (Derived, "2"));
+
+      if Probe_3 /= Rose.Capabilities.Null_Capability then
+         Named.Open (Client_3, Probe_3);
+         Check ("probe 3's waiting call was answered by probe 2",
+                Answers (Client_3, "2"));
+      end if;
+
+      Check ("a cap to probe 2 is refused", Refused (Client_2));
+
+      --  Ending the bank ends the three probes, including probe 1's
+      --  process, which is retired.
+
+      Rose.Interfaces.Bank.Client.Destroy (Bank);
+      return Passed;
+   end Swap_Test;
 
    ---------------
    -- Test_Bank --

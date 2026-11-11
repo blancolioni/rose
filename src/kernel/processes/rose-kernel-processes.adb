@@ -45,6 +45,18 @@ package body Rose.Kernel.Processes is
    --  and the page table change count then (#717). It is kept out of the
    --  process table, so that a checkpoint never saves it.
 
+   type Handover_Record is
+      record
+         Held    : Boolean := False;
+         Except  : Rose.Objects.Endpoint_Index := 0;
+         Retired : Boolean := False;
+      end record;
+
+   Handovers : array (Kernel_Process_Table'Range) of Handover_Record;
+   --  Each process's part in a handover (Hold_Calls, Swap_Processes). It
+   --  is kept out of the process table, as Checked_Records is: a
+   --  checkpoint never starts while a handover is in progress.
+
    procedure Release_Entry (Pid : Process_Id);
 
    procedure Add_Reference
@@ -557,6 +569,36 @@ package body Rose.Kernel.Processes is
 
    end Create_Process_Table_Entry;
 
+   ----------------------
+   -- Current_Activity --
+   ----------------------
+
+   function Current_Activity
+     (Pid : Process_Id)
+      return Activity
+   is
+      use type Rose.Capabilities.Capability;
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      if P.State /= Blocked then
+         return Other;
+      elsif P.Flags (Wait_Reply)
+        or else P.Flags (Checkpoint_Reply_Held)
+      then
+         return Calling;
+      elsif P.Receive_Cap /= Rose.Capabilities.Null_Capability
+        and then P.Current_Params.Cap = P.Receive_Cap
+      then
+
+         --  Receive and Receive_Any set both. A process that waits for a
+         --  receiver has its send cap in its current invocation instead.
+
+         return Receiving;
+      else
+         return Calling;
+      end if;
+   end Current_Activity;
+
    ----------------
    -- Delete_Cap --
    ----------------
@@ -1042,6 +1084,20 @@ package body Rose.Kernel.Processes is
 
    end Handle_Page_Fault;
 
+   --------------------------
+   -- Handover_In_Progress --
+   --------------------------
+
+   function Handover_In_Progress return Boolean is
+   begin
+      for Handover of Handovers loop
+         if Handover.Held or else Handover.Retired then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Handover_In_Progress;
+
    -------------
    -- Has_Cap --
    -------------
@@ -1177,6 +1233,25 @@ package body Rose.Kernel.Processes is
       return Mem_Process /= 0;
    end Have_Process_Handlers;
 
+   ----------------
+   -- Hold_Calls --
+   ----------------
+
+   procedure Hold_Calls
+     (Pid    : Process_Id;
+      Except : Rose.Objects.Endpoint_Id)
+   is
+      use type Rose.Objects.Endpoint_Id;
+   begin
+
+      --  Find_Endpoint would find a free slot for the null id.
+
+      Handovers (Pid).Held := True;
+      Handovers (Pid).Except :=
+        (if Except = Rose.Objects.Null_Endpoint_Id then 0
+         else Find_Endpoint (Pid, Except));
+   end Hold_Calls;
+
    ----------------------------
    -- Is_Blocked_On_Endpoint --
    ----------------------------
@@ -1278,6 +1353,33 @@ package body Rose.Kernel.Processes is
       return Endpoint /= 0
         and then Process_Table (Pid).Command_Endpoint = Endpoint;
    end Is_Command_Endpoint;
+
+   -------------
+   -- Is_Held --
+   -------------
+
+   function Is_Held
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean
+   is
+      use type Rose.Objects.Endpoint_Index;
+   begin
+      return Handovers (Pid).Held
+        and then Endpoint /= Handovers (Pid).Except;
+   end Is_Held;
+
+   ----------------
+   -- Is_Retired --
+   ----------------
+
+   function Is_Retired
+     (Pid : Process_Id)
+      return Boolean
+   is
+   begin
+      return Handovers (Pid).Retired;
+   end Is_Retired;
 
    ------------------
    -- Is_User_Page --
@@ -1393,6 +1495,7 @@ package body Rose.Kernel.Processes is
       end if;
 
       Wake_Waiting_Processes (Process);
+      Handovers (Process) := (others => <>);
 
       if Process = Current_Process_Id then
          P.State := Available;
@@ -1574,14 +1677,18 @@ package body Rose.Kernel.Processes is
             Prev   : Kernel_Process_Access := null;
             Mapped : Boolean;
          begin
-            if Endpoint /= 0 then
-               while It /= null
-                 and then It.Waiting_Endpoint /= Endpoint
-               loop
-                  Prev := It;
-                  It := It.Waiting_Next;
-               end loop;
-            end if;
+
+            --  While its calls are held, a process takes only the calls
+            --  to the endpoint that the hold excepts (Hold_Calls).
+
+            while It /= null
+              and then ((Endpoint /= 0
+                         and then It.Waiting_Endpoint /= Endpoint)
+                        or else Is_Held (Receiver_Id, It.Waiting_Endpoint))
+            loop
+               Prev := It;
+               It := It.Waiting_Next;
+            end loop;
 
             if It = null then
                return Null_Process_Id;
@@ -1688,6 +1795,48 @@ package body Rose.Kernel.Processes is
    end Receive_Any;
 
    -------------------
+   -- Release_Calls --
+   -------------------
+
+   procedure Release_Calls
+     (Pid : Process_Id)
+   is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      Handovers (Pid).Held := False;
+      Handovers (Pid).Except := 0;
+
+      --  A process that is not waiting to receive takes the calls that
+      --  wait when it next receives, as it would after any busy spell.
+
+      if Current_Activity (Pid) /= Receiving then
+         return;
+      end if;
+
+      declare
+         Endpoint : constant Rose.Objects.Endpoint_Index :=
+                      (if P.Flags (Receive_Any) then 0
+                       else Cap_Layout (Pid, P.Receive_Cap).Header.Endpoint);
+         Sender   : constant Process_Id :=
+                      Next_Blocked_Sender (Pid, Endpoint);
+      begin
+         if Sender /= Null_Process_Id then
+            declare
+               S : Kernel_Process_Entry renames Process_Table (Sender);
+            begin
+               Send_To_Endpoint
+                 (From_Process_Id => Sender,
+                  To_Process_Id   => Pid,
+                  Sender_Cap      => S.Current_Params.Cap,
+                  Endpoint        => S.Waiting_Endpoint,
+                  Identifier      => S.Waiting_Cap_Id,
+                  Params          => S.Current_Params);
+            end;
+         end if;
+      end;
+   end Release_Calls;
+
+   -------------------
    -- Release_Entry --
    -------------------
 
@@ -1698,6 +1847,7 @@ package body Rose.Kernel.Processes is
       Me  : constant Kernel_Process_Access := P'Access;
    begin
       Rose.Kernel.Processes.Queue.Remove_Process (Pid);
+      Handovers (Pid) := (others => <>);
 
       --  A process that went while it waited to send is still on its
       --  receiver's list.
@@ -2870,6 +3020,344 @@ package body Rose.Kernel.Processes is
    begin
       Process_Table (Process).Flags (Trace) := False;
    end Stop_Trace;
+
+   --------------------
+   -- Swap_Processes --
+   --------------------
+
+   procedure Swap_Processes
+     (Old_Pid : Process_Id;
+      New_Pid : Process_Id;
+      Success : out Boolean)
+   is
+      use Rose.Capabilities.Layout;
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Endpoint_Id;
+      use type Rose.Objects.Endpoint_Index;
+      use type Rose.Objects.Object_Id;
+      use type Rose.Objects.Rescinded_Count;
+      use type Rose.Words.Word_32;
+
+      Old_Entry : Kernel_Process_Entry renames Process_Table (Old_Pid);
+      New_Entry : Kernel_Process_Entry renames Process_Table (New_Pid);
+      Old_Oid   : constant Rose.Objects.Object_Id := Old_Entry.Oid;
+      New_Oid   : constant Rose.Objects.Object_Id := New_Entry.Oid;
+
+      Map    : array (Registered_Endpoint_Index)
+        of Rose.Objects.Endpoint_Index := (others => 0);
+      --  Where each of New_Pid's endpoints goes in its new table.
+
+      Source : array (Registered_Endpoint_Index)
+        of Rose.Objects.Endpoint_Index := (others => 0);
+      --  Which of New_Pid's endpoints each index of the new table holds.
+
+      Table  : Registered_Endpoint_Array;
+      --  New_Pid's new endpoint table: Old_Pid's endpoints at their own
+      --  indices, then those that only New_Pid has, in the free ones.
+
+      Needed : Natural := 0;
+      --  The caps New_Pid needs: one for each reply cap of a call that
+      --  waits for Old_Pid, and one for each of Old_Pid's endpoint caps
+      --  where New_Pid has none.
+
+      function Old_Has (Index : Rose.Objects.Endpoint_Index) return Boolean
+      is (Old_Entry.Endpoints (Index).Endpoint /= 0
+          and then Old_Entry.Endpoints (Index).Send_Cap
+            /= Rose.Capabilities.Null_Capability);
+      --  True if Index is one of Old_Pid's endpoints, with a send cap that
+      --  the calls through its clients' caps are checked against.
+
+      procedure Fail (Reason : String);
+
+      ----------
+      -- Fail --
+      ----------
+
+      procedure Fail (Reason : String) is
+      begin
+         Debug.Put (Old_Pid);
+         Rose.Boot.Console.Put (" -> ");
+         Debug.Put (New_Pid);
+         Rose.Boot.Console.Put (": cannot swap: ");
+         Rose.Boot.Console.Put_Line (Reason);
+         Success := False;
+      end Fail;
+
+   begin
+      Success := False;
+
+      if Old_Pid = New_Pid
+        or else not Handovers (Old_Pid).Held
+        or else Handovers (Old_Pid).Retired
+        or else Handovers (New_Pid).Held
+        or else Handovers (New_Pid).Retired
+      then
+         Fail ("not a handover");
+         return;
+      end if;
+
+      if Current_Activity (Old_Pid) = Calling
+        or else Current_Activity (New_Pid) = Calling
+      then
+
+         --  The reply to the call would go to the other process, which
+         --  has its object id by then.
+
+         Fail ("a process is in a call");
+         return;
+      end if;
+
+      if Old_Entry.Flags (Message_Queued) then
+         Fail ("a message is queued");
+         return;
+      end if;
+
+      for I in Registered_Endpoint_Index loop
+         if Old_Entry.Endpoints (I).Endpoint /= 0 then
+            declare
+               J : constant Rose.Objects.Endpoint_Index :=
+                     Find_Endpoint (New_Pid, Old_Entry.Endpoints (I).Endpoint);
+            begin
+               if J = 0 then
+                  Fail ("the new process lacks an endpoint");
+                  return;
+               end if;
+               Table (I).Endpoint := Old_Entry.Endpoints (I).Endpoint;
+               Map (J) := I;
+               Source (I) := J;
+            end;
+         end if;
+      end loop;
+
+      for J in Registered_Endpoint_Index loop
+         if New_Entry.Endpoints (J).Endpoint /= 0 and then Map (J) = 0 then
+            declare
+               K : Rose.Objects.Endpoint_Index := 0;
+            begin
+               for I in Registered_Endpoint_Index loop
+                  if Table (I).Endpoint = 0 then
+                     K := I;
+                     exit;
+                  end if;
+               end loop;
+
+               if K = 0 then
+                  Fail ("no room for the new process's endpoints");
+                  return;
+               end if;
+
+               Table (K).Endpoint := New_Entry.Endpoints (J).Endpoint;
+               Map (J) := K;
+               Source (K) := J;
+            end;
+         end if;
+      end loop;
+
+      declare
+         It : Kernel_Process_Access := Old_Entry.Waiting_First;
+      begin
+         while It /= null loop
+            if It.Current_Params.Control.Flags
+              (Rose.Invocation.Create_Reply_Cap)
+            then
+               Needed := Needed + 1;
+            end if;
+            It := It.Waiting_Next;
+         end loop;
+      end;
+
+      for I in Registered_Endpoint_Index loop
+         if Old_Has (I)
+           and then New_Entry.Endpoints (Source (I)).Send_Cap
+             = Rose.Capabilities.Null_Capability
+         then
+            Needed := Needed + 1;
+         end if;
+      end loop;
+
+      declare
+         Spare      : Rose.Capabilities.Capability_Array (1 .. Needed);
+         Next_Spare : Positive := 1;
+
+         New_Send   : array (Registered_Endpoint_Index)
+           of Capability_Layout;
+         --  The layouts of New_Pid's endpoint caps before they change.
+
+         function Take_Spare return Rose.Capabilities.Capability;
+
+         ----------------
+         -- Take_Spare --
+         ----------------
+
+         function Take_Spare return Rose.Capabilities.Capability is
+         begin
+            Next_Spare := Next_Spare + 1;
+            return Spare (Next_Spare - 1);
+         end Take_Spare;
+
+      begin
+         if Needed > 0 then
+            Create_Caps (New_Pid, Spare);
+            if Spare (1) = Rose.Capabilities.Null_Capability then
+               Fail ("the new process is out of caps");
+               return;
+            end if;
+         end if;
+
+         --  Nothing fails from here on.
+
+         for J in Registered_Endpoint_Index loop
+            New_Send (J) :=
+              Cap_Layout (New_Pid, New_Entry.Endpoints (J).Send_Cap);
+         end loop;
+
+         --  New_Pid's caps to its own endpoints follow them to their new
+         --  indices, and name the object id that it takes. An endpoint
+         --  cap to one of Old_Pid's endpoints takes the count of
+         --  Old_Pid's, so that its clients' caps stay valid, unless it was
+         --  rescinded already.
+
+         for Cap in 1 .. Cap_Tables.Last_Cap (New_Entry.Caps) loop
+            if Cap_Tables.Is_Active (New_Entry.Caps, Cap) then
+               declare
+                  Layout : Capability_Layout := Cap_Layout (New_Pid, Cap);
+                  J      : constant Rose.Objects.Endpoint_Index :=
+                             Layout.Header.Endpoint;
+               begin
+                  if Layout.Payload = New_Oid
+                    and then (Layout.Header.Cap_Type = Endpoint_Cap
+                              or else Layout.Header.Cap_Type = Receive_Cap)
+                  then
+                     if J in Registered_Endpoint_Index
+                       and then Map (J) /= 0
+                     then
+                        if Layout.Header.Cap_Type = Endpoint_Cap
+                          and then Old_Has (Map (J))
+                        then
+                           declare
+                              Old_Send : constant Capability_Layout :=
+                                Cap_Layout
+                                  (Old_Pid,
+                                   Old_Entry.Endpoints (Map (J)).Send_Cap);
+                           begin
+                              Layout.Header.Rescinded_Count :=
+                                (if Cap_Tables.Same_Count
+                                   (Layout, New_Send (J))
+                                 then Old_Send.Header.Rescinded_Count
+                                 else Old_Send.Header.Rescinded_Count + 1);
+                           end;
+                        end if;
+                        Layout.Header.Endpoint := Map (J);
+                     end if;
+                     Layout.Payload := Old_Oid;
+                     Set_Cap (New_Pid, Cap, Layout);
+                  end if;
+               end;
+            end if;
+         end loop;
+
+         for I in Registered_Endpoint_Index loop
+            if Table (I).Endpoint /= 0 then
+               declare
+                  J : constant Rose.Objects.Endpoint_Index := Source (I);
+               begin
+                  Table (I).Receive_Cap := New_Entry.Endpoints (J).Receive_Cap;
+                  Table (I).Send_Cap := New_Entry.Endpoints (J).Send_Cap;
+
+                  if Old_Has (I) then
+                     if Table (I).Send_Cap = Rose.Capabilities.Null_Capability
+                     then
+                        Table (I).Send_Cap := Take_Spare;
+                     end if;
+                     Set_Cap
+                       (New_Pid, Table (I).Send_Cap,
+                        Cap_Layout
+                          (Old_Pid, Old_Entry.Endpoints (I).Send_Cap));
+                  end if;
+               end;
+            end if;
+         end loop;
+
+         if New_Entry.Command_Endpoint in Registered_Endpoint_Index then
+            New_Entry.Command_Endpoint := Map (New_Entry.Command_Endpoint);
+         end if;
+
+         New_Entry.Endpoints := Table;
+
+         --  Calls that wait for New_Pid were made to its launch-time
+         --  object id, which Old_Pid takes, and fail as calls to Old_Pid
+         --  will. Those that wait for Old_Pid wait for New_Pid, with their
+         --  reply caps in its table.
+
+         declare
+            It : Kernel_Process_Access := New_Entry.Waiting_First;
+         begin
+            New_Entry.Waiting_First := null;
+            while It /= null loop
+               declare
+                  Sender : constant Kernel_Process_Access := It;
+               begin
+                  It := It.Waiting_Next;
+                  Sender.Waiting_Next := null;
+                  if Sender.Current_Params.Control.Flags
+                    (Rose.Invocation.Create_Reply_Cap)
+                  then
+                     Delete_Cap (New_Pid, Sender.Current_Params.Reply_Cap);
+                  end if;
+                  Wake_With_Error (Sender.Pid, Rose.Invocation.Closed);
+               end;
+            end loop;
+         end;
+
+         New_Entry.Waiting_First := Old_Entry.Waiting_First;
+         Old_Entry.Waiting_First := null;
+
+         declare
+            It : Kernel_Process_Access := New_Entry.Waiting_First;
+         begin
+            while It /= null loop
+               if It.Current_Params.Control.Flags
+                 (Rose.Invocation.Create_Reply_Cap)
+               then
+                  declare
+                     Reply_Cap : constant Rose.Capabilities.Capability :=
+                                   It.Current_Params.Reply_Cap;
+                     New_Cap   : constant Rose.Capabilities.Capability :=
+                                   Take_Spare;
+                  begin
+                     Set_Cap (New_Pid, New_Cap,
+                              Cap_Layout (Old_Pid, Reply_Cap));
+                     Delete_Cap (Old_Pid, Reply_Cap);
+                     It.Current_Params.Reply_Cap := New_Cap;
+                  end;
+               end if;
+               It := It.Waiting_Next;
+            end loop;
+         end;
+      end;
+
+      New_Entry.Signals := New_Entry.Signals or Old_Entry.Signals;
+      Old_Entry.Signals := 0;
+
+      Old_Entry.Oid := New_Oid;
+      New_Entry.Oid := Old_Oid;
+
+      Handovers (New_Pid) :=
+        (Held    => True,
+         Except  => Handovers (Old_Pid).Except,
+         Retired => False);
+      Handovers (Old_Pid) :=
+        (Held    => False,
+         Except  => 0,
+         Retired => True);
+
+      Debug.Put (New_Pid);
+      Rose.Boot.Console.Put (": takes over from ");
+      Debug.Put (Old_Pid);
+      Rose.Boot.Console.New_Line;
+
+      Success := True;
+   end Swap_Processes;
 
    ----------------------
    -- Switch_FPU_State --

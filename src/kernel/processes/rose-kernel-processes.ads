@@ -486,6 +486,62 @@ package Rose.Kernel.Processes is
    function Page_Fault_Count
      return Natural;
 
+   --  Replacing a running process (ADR 0032, sections 4 and 6, #862).
+   --  Mem holds a process's calls while its new version takes over, and
+   --  then swaps the two processes' identities. The state that this
+   --  keeps is outside the process table, so a checkpoint never saves
+   --  it, and Handover_In_Progress keeps checkpoints out until it is
+   --  over.
+
+   procedure Hold_Calls
+     (Pid    : Process_Id;
+      Except : Rose.Objects.Endpoint_Id);
+   --  Calls to Pid wait, as if it were busy, until Release_Calls, except
+   --  calls to its endpoint Except, which the new version uses during the
+   --  handover. Pid's receives take only calls to Except meanwhile. If
+   --  Except is not one of Pid's endpoints, every call waits.
+
+   procedure Release_Calls
+     (Pid : Process_Id);
+   --  End the hold on Pid's calls, and give Pid the first that waits if
+   --  it is already waiting to receive.
+
+   function Is_Held
+     (Pid      : Process_Id;
+      Endpoint : Rose.Objects.Endpoint_Index)
+      return Boolean;
+   --  True if a call to Endpoint of Pid has to wait (Hold_Calls).
+
+   function Is_Retired
+     (Pid : Process_Id)
+      return Boolean;
+   --  True if Pid's identity has gone to its new version (Swap_Processes),
+   --  so that calls to it fail until it is ended.
+
+   type Activity is (Other, Receiving, Calling);
+   --  Receiving: blocked, waiting for a message. Calling: blocked in a
+   --  call of its own, waiting for its receiver or for the reply.
+
+   function Current_Activity
+     (Pid : Process_Id)
+      return Activity;
+
+   procedure Swap_Processes
+     (Old_Pid : Process_Id;
+      New_Pid : Process_Id;
+      Success : out Boolean);
+   --  New_Pid takes Old_Pid's object id, and its endpoints at the same
+   --  indices, so that every cap that names Old_Pid's objects reaches
+   --  New_Pid's objects of the same endpoint ids and identifiers. Old_Pid
+   --  is retired, with New_Pid's object id. The calls that wait for
+   --  Old_Pid wait for New_Pid, and go on waiting until Release_Calls.
+   --  Success is False, and nothing changes, if Old_Pid's calls are not
+   --  held, New_Pid lacks one of Old_Pid's endpoints, a message is queued
+   --  for Old_Pid, or New_Pid has no room for the endpoints or the caps.
+
+   function Handover_In_Progress return Boolean;
+   --  True if any process has its calls held or is retired.
+
    procedure Enter_Checkpoint;
    procedure Leave_Checkpoint;
 

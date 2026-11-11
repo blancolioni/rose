@@ -38,6 +38,23 @@ package Init.Self_Tests is
    --  to a depth of eight, and no more.  It reports each check on
    --  Standard_Output, and is True if they all passed.
 
+   function Swap_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Derive_Cap      : Rose.Capabilities.Capability)
+      return Boolean;
+   --  The kernel's part of replacing a running process (ADR 0032, #862).
+   --  Launch three swap_probe commands, found through Find_Cap, in a test
+   --  bank: probes 1 and 2, which answer their numbers, and probe 3,
+   --  which asks probe 1 while probe 1's calls are held, so its call
+   --  waits. Swap probes 1 and 2, release the calls, and check that
+   --  init's caps to probe 1, and a cap derived from one, reach probe 2;
+   --  that probe 3's waiting call was answered by probe 2; and that
+   --  init's caps to probe 2 are refused. Destroying the bank ends the
+   --  probes. It reports each check on Standard_Output, and is True if
+   --  they all passed.
+
    function Start_Derived_Holder
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;

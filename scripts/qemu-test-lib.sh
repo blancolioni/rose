@@ -175,15 +175,19 @@ install_rose () {
     stop_qemu
 
     # Init's own tests run during the install, and report on the screen.
-    if grep -q -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt"
+    if grep -q -e ": FAIL" -e "test failed" "$WORK/install-screen.txt"
     then
-        grep -e ": FAIL" -e "derive test failed" "$WORK/install-screen.txt" \
+        grep -e ": FAIL" -e "test failed" "$WORK/install-screen.txt" \
             | sort -u
         echo "FAIL: one of init's tests failed"
         exit 1
     fi
-    echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
-        | grep -c ': ok') of its checks seen ok"
+    echo "init's derive and swap tests: $(sort -u "$WORK/install-screen.txt" \
+        | grep -c ': ok') of their checks seen ok"
+
+    # The swap test's last checks follow the release (ADR 0032, #862).
+    grep -q "swap test: release the calls: ok" "$WORK/install-screen.txt" \
+        || { echo "FAIL: init's swap test was not seen to finish"; exit 1; }
 }
 
 wait_for_install () {
@@ -195,7 +199,7 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" "$WORK/install-now.txt" \
+        grep -e "derive test" -e "swap test" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
         grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
