@@ -4,7 +4,6 @@ with Rose.Checkpoints;
 with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.Limits;
-with Rose.Objects;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Log_Reader.Client;
@@ -341,6 +340,45 @@ package body Restore.Checkpoints is
       end loop;
       return 0;
    end Find_Restored;
+
+   -----------------
+   -- Find_Server --
+   -----------------
+
+   function Find_Server
+     (Interface_Id : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Objects.Endpoint_Id;
+   begin
+      if Restored_Endpoint_Cap = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      for P of Restored (1 .. Restored_Count) loop
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Restored_Endpoint_Cap);
+            Rose.Invocation.Send_Object_Id
+              (Params, Rose.Objects.Object_Id (P.Oid));
+            Rose.System_Calls.Send_Word
+              (Params, Rose.Words.Word (Interface_Id mod 2 ** 32));
+            Rose.System_Calls.Send_Word
+              (Params, Rose.Words.Word (Interface_Id / 2 ** 32));
+            Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+            Rose.System_Calls.Receive_Caps (Params, 1);
+            Rose.System_Calls.Invoke_Capability (Params);
+            if not Params.Control.Flags (Rose.Invocation.Error)
+              and then Params.Control.Flags (Rose.Invocation.Send_Caps)
+            then
+               return Params.Caps (0);
+            end if;
+         end;
+      end loop;
+
+      return Rose.Capabilities.Null_Capability;
+   end Find_Server;
 
    ----------
    -- Read --

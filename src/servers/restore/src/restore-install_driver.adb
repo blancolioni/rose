@@ -11,10 +11,12 @@
 --  idles.
 --
 --  The update entry puts update-hd0 there (#828, ADR 0031).  Then
---  restore-install never installs.  It restores hd0's checkpoint with
---  this boot set, and only if that works, writes the set to hd0's boot
---  partition (Restore.Boot_Sets), and init restarts into it.  If
---  anything stops it before then, hd0 still boots its old set.
+--  restore-install never installs a new system.  It restores hd0's
+--  checkpoint with this boot set, and only if that works, writes the set
+--  to hd0's boot partition (Restore.Boot_Sets).  Once the restored
+--  processes run, it installs the commands again in the restored exec
+--  (#829), and init then restarts into the new set.  If anything stops
+--  it before the set is written, hd0 still boots its old set.
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -40,6 +42,8 @@ procedure Restore.Install_Driver is
    Erasing    : Boolean;
    Updating   : Boolean;
 
+   Install_Media : Rose.Interfaces.File_System.Client.File_System_Client;
+
    procedure Open_Install_Media;
    --  Open the install media's file system, for Rose.Directories
 
@@ -48,16 +52,30 @@ procedure Restore.Install_Driver is
    --  hd0, and tell init.  Exits with hd0 unchanged if any of these
    --  fails.  Never returns.
 
+   procedure Install_Commands_Again;
+   --  Install the install media's commands in the restored exec and
+   --  registry (#829), once the restored processes are running.
+
+   ----------------------------
+   -- Install_Commands_Again --
+   ----------------------------
+
+   procedure Install_Commands_Again is
+   begin
+      Restore.Installer.Update
+        (File_System => Install_Media,
+         Source      => Restore.Installer.Default.Iterate_Steps'Access);
+   end Install_Commands_Again;
+
    ------------------------
    -- Open_Install_Media --
    ------------------------
 
    procedure Open_Install_Media is
       use Rose.Interfaces.File_System.Client;
-      File_System : File_System_Client;
    begin
-      Open_Cap_Set (File_System, Install_Media_Cap);
-      Rose.Directories.Open_Root_File_System (File_System);
+      Open_Cap_Set (Install_Media, Install_Media_Cap);
+      Rose.Directories.Open_Root_File_System (Install_Media);
    end Open_Install_Media;
 
    ------------
@@ -103,7 +121,10 @@ procedure Restore.Install_Driver is
          Restore.Start.Exit_Restore;
       end if;
 
-      Restore.Start.Finish (Restored => True, Updated => True);
+      Restore.Start.Finish
+        (Restored     => True,
+         Updated      => True,
+         After_Resume => Install_Commands_Again'Access);
    end Update;
 
 begin
@@ -117,6 +138,7 @@ begin
    Restore.Start.Next (Keyboard_Status_Cap);
    Restore.Start.Next (Keyboard_Data_Cap);
    Restore.Start.Next (Command_Line_Cap);
+   Restore.Start.Next (Restored_Endpoint_Cap);
    Restore.Start.Delete_Cap_Set;
 
    Erasing := Restore.Command_Line.Has_Argument ("erase-hd0");

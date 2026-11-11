@@ -1,5 +1,7 @@
 with System.Storage_Elements;
 
+with Ada.Containers.Vectors;
+
 with Rose.Invocation;
 with Rose.Objects;
 
@@ -48,6 +50,13 @@ package body Exec.Server is
      (Item   : in out Exec_Object;
       Output : in out Rose.Interfaces.Writer.Writer_Object'Class);
 
+   overriding function Update
+     (Item         : in out Exec_Object;
+      Executable   : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name         : String;
+      Install_Caps : Rose.Capabilities.Capability_Array)
+      return Launch_Class;
+
    overriding function Launch
      (Item : in out Exec_Object;
       Bank : Rose.Capabilities.Capability;
@@ -89,6 +98,22 @@ package body Exec.Server is
 
    type Program_Access is access Program_Object;
 
+   package Program_Vectors is
+     new Ada.Containers.Vectors (Positive, Program_Access);
+
+   Programs : Program_Vectors.Vector;
+   --  The object of each program, by its number in Exec.Library, so
+   --  that Update can give the installed version's Launch again.
+
+   function Launch_Of
+     (Id : Rose.Objects.Capability_Identifier)
+      return Launch_Class;
+   --  The Launch interface of program Id, whose object is made the first
+   --  time; or a null cap if Id is 0.
+
+   procedure Check_Not_Retired (Id : Rose.Objects.Capability_Identifier);
+   --  Fail a launch of a program that Update has replaced (#829).
+
    procedure Send_Image
      (Params : in out Rose.Invocation.Invocation_Record;
       Id     : Rose.Objects.Capability_Identifier;
@@ -121,6 +146,18 @@ package body Exec.Server is
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
+
+   -----------------------
+   -- Check_Not_Retired --
+   -----------------------
+
+   procedure Check_Not_Retired (Id : Rose.Objects.Capability_Identifier) is
+   begin
+      if Exec.Library.Is_Retired (Id) then
+         raise Constraint_Error
+           with "exec: a newer version replaced this program";
+      end if;
+   end Check_Not_Retired;
 
    -------------------
    -- Create_Server --
@@ -171,22 +208,10 @@ package body Exec.Server is
       return Launch_Class
    is
       pragma Unreferenced (Item);
-      use type Rose.Objects.Capability_Identifier;
       Id : constant Rose.Objects.Capability_Identifier :=
         Exec.Library.Install (Executable, Name, Install_Caps);
    begin
-      if Id = 0 then
-         return Rose.Interfaces.Launch.Client.From_Cap
-           (Rose.Capabilities.Null_Capability);
-      end if;
-
-      declare
-         Program : constant Program_Access := new Program_Object'(Id => Id);
-      begin
-         Rose.Interfaces.Launch.Server.Attach (Context, Program);
-         return Rose.Interfaces.Launch.Client.From_Cap
-           (Rose.Interfaces.Launch.Server.Cap_Of (Program.all));
-      end;
+      return Launch_Of (Id);
    end Install;
 
    ------------
@@ -219,6 +244,7 @@ package body Exec.Server is
       use Rose.System_Calls;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+      Check_Not_Retired (Item.Id);
       Initialize_Send (Params, Create_Process_Cap);
       Send_Image (Params, Item.Id, Bank);
       Exec.Library.Send_Install_Caps (Item.Id, Params);
@@ -289,6 +315,8 @@ package body Exec.Server is
       Name   : String (1 .. 16);
       Last   : Natural;
    begin
+      Check_Not_Retired (Item.Id);
+
       --  A command has only the caps it is given (ADR 0002): no install
       --  caps, and no console.
 
@@ -314,6 +342,40 @@ package body Exec.Server is
       return Result (Params);
    end Launch_Command;
 
+   ---------------
+   -- Launch_Of --
+   ---------------
+
+   function Launch_Of
+     (Id : Rose.Objects.Capability_Identifier)
+      return Launch_Class
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      if Id = 0 then
+         return Rose.Interfaces.Launch.Client.From_Cap
+           (Rose.Capabilities.Null_Capability);
+      end if;
+
+      while Programs.Last_Index < Positive (Id) loop
+         Programs.Append (null);
+      end loop;
+
+      if Programs (Positive (Id)) = null then
+         declare
+            Program : constant Program_Access :=
+                        new Program_Object'(Id => Id);
+         begin
+            Rose.Interfaces.Launch.Server.Attach (Context, Program);
+            Programs (Positive (Id)) := Program;
+         end;
+      end if;
+
+      return Rose.Interfaces.Launch.Client.From_Cap
+        (Rose.Interfaces.Launch.Server.Cap_Of
+           (Programs (Positive (Id)).all));
+   end Launch_Of;
+
    --------------
    -- Metadata --
    --------------
@@ -336,6 +398,7 @@ package body Exec.Server is
       Text : String (1 .. 4096);
       Last : Natural;
    begin
+      Check_Not_Retired (Item.Id);
       Exec.Library.Get_Metadata (Item.Id, Text, Last);
       return Text (1 .. Last);
    end Metadata;
@@ -413,5 +476,27 @@ package body Exec.Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   ------------
+   -- Update --
+   ------------
+
+   overriding function Update
+     (Item         : in out Exec_Object;
+      Executable   : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name         : String;
+      Install_Caps : Rose.Capabilities.Capability_Array)
+      return Launch_Class
+   is
+      pragma Unreferenced (Item);
+      Changed : Boolean;
+      Id      : constant Rose.Objects.Capability_Identifier :=
+        Exec.Library.Update (Executable, Name, Install_Caps, Changed);
+   begin
+      if Changed then
+         Exec.Output.Put_Line ("exec: new version of " & Name);
+      end if;
+      return Launch_Of (Id);
+   end Update;
 
 end Exec.Server;

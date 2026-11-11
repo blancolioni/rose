@@ -9,10 +9,15 @@ with Rose.Invocation;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Directory.Client;
+with Rose.Interfaces.Exec.Client;
 with Rose.Interfaces.File.Client;
+with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Map.Client;
 with Rose.Interfaces.Releasable_Reader.Client.Conversions;
 with Rose.Interfaces.Process;
 with Rose.Interfaces.Reader.Client;
+
+with Restore.Checkpoints;
 
 package body Restore.Installer is
 
@@ -72,6 +77,37 @@ package body Restore.Installer is
       Flags     : Install_Flag_Array);
    --  Install Name from Directory, which is Root_Path/Category. The
    --  path is only for messages.
+
+   type Program_Handler is access
+     procedure (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+                Root_Path : String;
+                Category  : String;
+                Name      : String;
+                Action    : Install_Action;
+                Flags     : Install_Flag_Array);
+
+   procedure For_Each_Program
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator;
+      Handle      : Program_Handler;
+      Found       : out Boolean);
+   --  Call Handle for each program Source gives, with its category's
+   --  directory in /rose/install. Found is False if there is no
+   --  /rose/install.
+
+   Exec_Client : Rose.Interfaces.Exec.Client.Exec_Client;
+   Map_Client  : Rose.Interfaces.Map.Client.Map_Client;
+   --  The restored exec and command registry, for Update.
+
+   procedure Update_Executable
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Root_Path : String;
+      Category  : String;
+      Name      : String;
+      Action    : Install_Action;
+      Flags     : Install_Flag_Array);
+   --  Install Name from Directory again in the restored exec, if it is a
+   --  saved program, and add it to the restored registry.
 
    procedure Open_Directory
      (Parent    : Rose.Interfaces.Directory.Client.Directory_Client;
@@ -155,6 +191,107 @@ package body Restore.Installer is
          return 0;
       end if;
    end Find_File;
+
+   ----------------------
+   -- For_Each_Program --
+   ----------------------
+
+   procedure For_Each_Program
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator;
+      Handle      : Program_Handler;
+      Found       : out Boolean)
+   is
+      use Rose.Interfaces.Directory.Client;
+      Install_Path       : constant String := "/rose/install";
+      Install_Directory  : Directory_Client;
+      Category_Directory : Directory_Client;
+      Category_Name      : String (1 .. 100);
+      Category_Last      : Natural := 0;
+      Have_Category      : Boolean := False;
+
+      procedure Process_Executable
+        (Name     : String;
+         Category : String;
+         Action   : Install_Action;
+         Flags    : Install_Flag_Array);
+
+      ------------------------
+      -- Process_Executable --
+      ------------------------
+
+      procedure Process_Executable
+        (Name     : String;
+         Category : String;
+         Action   : Install_Action;
+         Flags    : Install_Flag_Array)
+      is
+         Install_Flags : Install_Flag_Array := Flags;
+      begin
+         Install_Flags (Is_Driver) := Category = "drivers";
+
+         if not Have_Category
+           or else Category_Name (1 .. Category_Last) /= Category
+         then
+            if Category = "" then
+               Category_Directory := Install_Directory;
+               Have_Category := True;
+            else
+               Open_Directory
+                 (Install_Directory, Category, Category_Directory,
+                  Have_Category);
+            end if;
+
+            if not Have_Category then
+               Rose.Console_IO.Put ("install: cannot find directory ");
+               Rose.Console_IO.Put (Install_Path);
+               Rose.Console_IO.Put ("/");
+               Rose.Console_IO.Put (Category);
+               Rose.Console_IO.New_Line;
+               return;
+            end if;
+
+            --  A name too long to remember is opened every time.
+
+            if Category'Length <= Category_Name'Length then
+               Category_Last := Category'Length;
+               Category_Name (1 .. Category_Last) := Category;
+            else
+               Have_Category := False;
+            end if;
+         end if;
+
+         Handle
+           (Directory => Category_Directory,
+            Root_Path => Install_Path,
+            Category  => Category,
+            Name      => Name,
+            Action    => Action,
+            Flags     => Install_Flags);
+      end Process_Executable;
+
+   begin
+
+      declare
+         Rose_Directory : Directory_Client;
+      begin
+         Open_Directory
+           (Rose.Interfaces.File_System.Client.Root_Directory (File_System),
+            "rose", Rose_Directory, Found);
+         if Found then
+            Open_Directory
+              (Rose_Directory, "install", Install_Directory, Found);
+         end if;
+      end;
+
+      if not Found then
+         Rose.Console_IO.Put_Line
+           ("install: cannot find directory /rose/install");
+         return;
+      end if;
+
+      Source (Process_Executable'Access);
+   end For_Each_Program;
 
    ----------------------------
    -- Get_Ancestor_Interface --
@@ -255,102 +392,13 @@ package body Restore.Installer is
      (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
       Source      : Step_Iterator)
    is
-      use Rose.Interfaces.Directory.Client;
-      Install_Path       : constant String := "/rose/install";
-      Install_Directory  : Directory_Client;
-      Category_Directory : Directory_Client;
-      Category_Name      : String (1 .. 100);
-      Category_Last      : Natural := 0;
-      Have_Category      : Boolean := False;
-      Found              : Boolean;
-
-      procedure Process_Executable
-        (Name     : String;
-         Category : String;
-         Action   : Install_Action;
-         Flags    : Install_Flag_Array);
-
-      ------------------------
-      -- Process_Executable --
-      ------------------------
-
-      procedure Process_Executable
-        (Name     : String;
-         Category : String;
-         Action   : Install_Action;
-         Flags    : Install_Flag_Array)
-      is
-         Install_Flags : Install_Flag_Array := Flags;
-      begin
-         Install_Flags (Is_Driver) := Category = "drivers";
-
-         if not Have_Category
-           or else Category_Name (1 .. Category_Last) /= Category
-         then
-            if Category = "" then
-               Category_Directory := Install_Directory;
-               Have_Category := True;
-            else
-               Open_Directory
-                 (Install_Directory, Category, Category_Directory,
-                  Have_Category);
-            end if;
-
-            if not Have_Category then
-               Rose.Console_IO.Put ("install: cannot find directory ");
-               Rose.Console_IO.Put (Install_Path);
-               Rose.Console_IO.Put ("/");
-               Rose.Console_IO.Put (Category);
-               Rose.Console_IO.New_Line;
-               return;
-            end if;
-
-            --  A name too long to remember is opened every time.
-
-            if Category'Length <= Category_Name'Length then
-               Category_Last := Category'Length;
-               Category_Name (1 .. Category_Last) := Category;
-            else
-               Have_Category := False;
-            end if;
-         end if;
-
-         Install_Executable
-           (Directory => Category_Directory,
-            Root_Path => Install_Path,
-            Category  => Category,
-            Name      => Name,
-            Action    => Action,
-            Flags     => Install_Flags);
-      end Process_Executable;
-
+      Found : Boolean;
    begin
-
-      declare
-         Rose_Directory : Directory_Client;
-      begin
-         Open_Directory
-           (Rose.Interfaces.File_System.Client.Root_Directory (File_System),
-            "rose", Rose_Directory, Found);
-         if Found then
-            Open_Directory
-              (Rose_Directory, "install", Install_Directory, Found);
-         end if;
-      end;
-
+      For_Each_Program
+        (File_System, Source, Install_Executable'Access, Found);
       if not Found then
-         Rose.Console_IO.Put_Line
-           ("install: cannot find directory /rose/install");
          return;
       end if;
-
-      --  Process_Executable ("exec", "", Launch);
-      --  Process_Executable ("command", "drivers", Launch)
-
-      --  Launch_Executable (Exec_Path, Exec_Cap);
-      --  Launch_Executable (Command_Path, Command_Cap);
-
-      Source (Process_Executable'Access);
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -682,5 +730,107 @@ package body Restore.Installer is
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(96));
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Screen;
+
+   ------------
+   -- Update --
+   ------------
+
+   procedure Update
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator)
+   is
+      use Rose.Capabilities;
+      Exec_Cap : constant Capability :=
+                   Restore.Checkpoints.Find_Server
+                     (Rose.Interfaces.Exec.Exec_Interface);
+      Map_Cap  : constant Capability :=
+                   Restore.Checkpoints.Find_Server
+                     (Rose.Interfaces.Map.Map_Interface);
+      Found    : Boolean;
+   begin
+      if Exec_Cap = Null_Capability or else Map_Cap = Null_Capability then
+         Rose.Console_IO.Put_Line
+           ("restore: cannot find the restored exec and command registry, "
+            & "so the commands are unchanged");
+         return;
+      end if;
+
+      Rose.Interfaces.Exec.Client.Open (Exec_Client, Exec_Cap);
+      Rose.Interfaces.Map.Client.Open (Map_Client, Map_Cap);
+
+      --  An exec installed before Exec.Update has no cap for it.
+
+      if Rose.Interfaces.Exec.Client.Get_Update_Cap (Exec_Client)
+        = Null_Capability
+      then
+         Rose.Console_IO.Put_Line
+           ("restore: the restored exec can't update programs, so the "
+            & "commands are unchanged");
+         return;
+      end if;
+
+      Rose.Console_IO.Put_Line ("restore: installing the commands again");
+      For_Each_Program
+        (File_System, Source, Update_Executable'Access, Found);
+   end Update;
+
+   -----------------------
+   -- Update_Executable --
+   -----------------------
+
+   procedure Update_Executable
+     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+      Root_Path : String;
+      Category  : String;
+      Name      : String;
+      Action    : Install_Action;
+      Flags     : Install_Flag_Array)
+   is
+      pragma Unreferenced (Root_Path, Category, Flags);
+      use Rose.Interfaces.Directory.Client;
+      use Rose.Interfaces.Releasable_Reader.Client;
+      use type Rose.Capabilities.Capability;
+      No_Caps    : constant Rose.Capabilities.Capability_Array (1 .. 0) :=
+                     (others => <>);
+      Exec_Index : Natural;
+      Reader     : Releasable_Reader_Client;
+   begin
+      if Action /= Save or else Name = "file" or else Name = "directory" then
+         return;
+      end if;
+
+      Exec_Index := Find_File (Directory, Name);
+      if Exec_Index = 0 then
+         Rose.Console_IO.Put_Line ("restore: cannot find " & Name);
+         return;
+      end if;
+
+      Reader :=
+        Rose.Interfaces.File.Client.Open_Reader
+          (Get_Ordinary_File (Directory, Exec_Index));
+
+      declare
+         Launch : constant Rose.Interfaces.Launch.Client.Launch_Client :=
+                    Rose.Interfaces.Exec.Client.Update
+                      (Exec_Client, Conversions.To_Reader (Reader), Name,
+                       No_Caps);
+      begin
+         if Rose.Interfaces.Exec.Client.Has_Error
+           or else Rose.Interfaces.Launch.Client.Get_Interface_Cap (Launch)
+           = Rose.Capabilities.Null_Capability
+         then
+            Rose.Console_IO.Put_Line
+              ("restore: cannot install " & Name & " again");
+         else
+            Rose.Interfaces.Map.Client.Add (Map_Client, Name, Launch);
+            if Rose.Interfaces.Map.Client.Has_Error then
+               Rose.Console_IO.Put_Line
+                 ("restore: cannot add " & Name & " to the registry");
+            end if;
+         end if;
+      end;
+
+      Release (Reader);
+   end Update_Executable;
 
 end Restore.Installer;

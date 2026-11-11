@@ -282,6 +282,9 @@ stages:
         - {ports: [in, 8, 0x64, 0x64], owner: none, when: install}
         - {ports: [in, 8, 0x60, 0x60], owner: none, when: install}
         - {boot_tag: 1, when: install}
+        # Calls the restored exec and command registry on the update boot
+        # (#829).
+        - {cap: restored_endpoint, when: install}
 
   # After the restore server has restored a checkpoint or installed a new
   # system.

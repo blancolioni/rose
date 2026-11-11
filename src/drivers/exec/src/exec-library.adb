@@ -28,6 +28,9 @@ package body Exec.Library is
                              Rose.Capabilities.Null_Capability;
          Metadata_Offset : Storage_Count := 0;
          Metadata_Length : Storage_Count := 0;
+         Retired         : Boolean := False;
+         --  A newer version replaced it (Update). Its pages are kept,
+         --  because the processes still running it map them.
       end record;
 
    package Program_Vectors is
@@ -69,6 +72,23 @@ package body Exec.Library is
    Next_Entry : Positive := 1;
    --  The pages of images that Read_Image read last. Reading section
    --  headers goes back and forth between the headers and their names.
+
+   function Padded (Name : String) return Installed_Program_Name;
+   --  Name as a program record holds it: cut, or padded with spaces.
+
+   procedure Write_Image
+     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name      : String;
+      Caps      : Rose.Capabilities.Capability_Array;
+      Old       : Natural;
+      Item      : out Installed_Program_Record;
+      Same      : out Boolean;
+      Success   : out Boolean);
+   --  Copy ELF_Image into the region's free pages, and make Item the
+   --  program record for it, which is not added yet. Same is True if Old
+   --  is a program whose image is the same, page for page, and neither
+   --  has install caps. Success is False, and nothing is kept, if the
+   --  image doesn't fit.
 
    procedure Find_Metadata (Program : in out Installed_Program_Record);
    --  Find the .rose_command section of Program's ELF image, if it has
@@ -255,62 +275,44 @@ package body Exec.Library is
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Objects.Capability_Identifier
    is
+      Item    : Installed_Program_Record;
+      Same    : Boolean;
+      Success : Boolean;
    begin
+      Write_Image (ELF_Image, Name, Caps, 0, Item, Same, Success);
+      if not Success then
+         return 0;
+      end if;
 
-      --  The program is added once its image is in the region, so one
-      --  that doesn't fit leaves nothing behind.
-
-      declare
-         use type Ada.Streams.Stream_Element_Offset;
-         use type Rose.Objects.Object_Id;
-         Buffer  : Page_Buffer;
-         Data    : Ada.Streams.Stream_Element_Array (1 .. Buffer'Length)
-           with Import, Address => Buffer'Address;
-         --  Buffer, as the image is read.
-         Last    : Ada.Streams.Stream_Element_Offset;
-         Install : Installed_Program_Record;
-      begin
-         Install.Caps := (others => 0);
-         Install.Caps (1 .. Caps'Length) := Caps;
-
-         Install.Name := (others => ' ');
-
-         if Name'Length <= Max_Name_Length then
-            Install.Name (1 .. Name'Length) := Name;
-         else
-            Install.Name :=
-              Name (Name'First .. Name'First + Max_Name_Length - 1);
-         end if;
-
-         Install.ELF_Base := Next_Page;
-
-         loop
-            ELF_Image.Read (Data, Last);
-            exit when Last < Data'First;
-
-            --  An image that doesn't fit is not installed, rather than
-            --  installed with its last pages missing (#669).
-
-            if Next_Page >= Page_Bound then
-               Exec.Output.Put_Line ("exec: no room for " & Name);
-               Next_Page := Install.ELF_Base;
-               return 0;
-            end if;
-
-            Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
-              (others => 0);
-            Region.Put (Next_Page, Buffer);
-            Next_Page := Next_Page + 1;
-         end loop;
-         Install.ELF_Bound := Next_Page;
-
-         Find_Metadata (Install);
-         Installed_Programs.Append (Install);
-      end;
-
+      Find_Metadata (Item);
+      Installed_Programs.Append (Item);
       return Rose.Objects.Capability_Identifier
         (Installed_Programs.Last_Index);
    end Install;
+
+   ----------------
+   -- Is_Retired --
+   ----------------
+
+   function Is_Retired
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is (not Is_Installed (Id) or else Program (Id).Retired);
+
+   ------------
+   -- Padded --
+   ------------
+
+   function Padded (Name : String) return Installed_Program_Name is
+      Result : Installed_Program_Name := (others => ' ');
+   begin
+      if Name'Length <= Max_Name_Length then
+         Result (1 .. Name'Length) := Name;
+      else
+         Result := Name (Name'First .. Name'First + Max_Name_Length - 1);
+      end if;
+      return Result;
+   end Padded;
 
    ----------------
    -- Read_Image --
@@ -408,5 +410,140 @@ package body Exec.Library is
       end loop;
       return Result;
    end Unsigned;
+
+   ------------
+   -- Update --
+   ------------
+
+   function Update
+     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name      : String;
+      Caps      : Rose.Capabilities.Capability_Array;
+      Changed   : out Boolean)
+      return Rose.Objects.Capability_Identifier
+   is
+      Old     : Natural := 0;
+      Item    : Installed_Program_Record;
+      Same    : Boolean;
+      Success : Boolean;
+   begin
+      Changed := False;
+
+      --  The newest version that isn't retired is the installed one.
+
+      for Id in reverse 1 .. Installed_Programs.Last_Index loop
+         if not Installed_Programs (Id).Retired
+           and then Installed_Programs (Id).Name = Padded (Name)
+         then
+            Old := Id;
+            exit;
+         end if;
+      end loop;
+
+      Write_Image (ELF_Image, Name, Caps, Old, Item, Same, Success);
+      if not Success then
+         return 0;
+      end if;
+
+      if Same then
+
+         --  The pages just written are the installed version's again:
+         --  give them back, so that the region doesn't grow.
+
+         Next_Page := Item.ELF_Base;
+         return Rose.Objects.Capability_Identifier (Old);
+      end if;
+
+      Find_Metadata (Item);
+      Installed_Programs.Append (Item);
+      Changed := True;
+
+      if Old /= 0 then
+         Installed_Programs (Old).Retired := True;
+      end if;
+
+      return Rose.Objects.Capability_Identifier
+        (Installed_Programs.Last_Index);
+   end Update;
+
+   -----------------
+   -- Write_Image --
+   -----------------
+
+   procedure Write_Image
+     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name      : String;
+      Caps      : Rose.Capabilities.Capability_Array;
+      Old       : Natural;
+      Item      : out Installed_Program_Record;
+      Same      : out Boolean;
+      Success   : out Boolean)
+   is
+      use type Ada.Streams.Stream_Element_Offset;
+      use type Rose.Objects.Object_Id;
+      use type Rose.Capabilities.Capability;
+      Buffer     : Page_Buffer;
+      Data       : Ada.Streams.Stream_Element_Array (1 .. Buffer'Length)
+        with Import, Address => Buffer'Address;
+      --  Buffer, as the image is read.
+      Last       : Ada.Streams.Stream_Element_Offset;
+      Old_Page   : Page_Buffer;
+      Old_Base   : Rose.Objects.Object_Id := 0;
+      Old_Bound  : Rose.Objects.Object_Id := 0;
+      Page_Index : Rose.Objects.Object_Id := 0;
+   begin
+      Item.Caps := (others => 0);
+      Item.Caps (1 .. Caps'Length) := Caps;
+      Item.Name := Padded (Name);
+      Item.ELF_Base := Next_Page;
+
+      --  Install caps can't be compared, since a cap's number says
+      --  nothing about what it is, so a program with any is changed.
+
+      Same := Old /= 0
+        and then Caps'Length = 0
+        and then Installed_Programs (Old).Caps (1) = 0;
+
+      if Old /= 0 then
+         Old_Base := Installed_Programs (Old).ELF_Base;
+         Old_Bound := Installed_Programs (Old).ELF_Bound;
+      end if;
+
+      loop
+         ELF_Image.Read (Data, Last);
+         exit when Last < Data'First;
+
+         --  An image that doesn't fit is not installed, rather than
+         --  installed with its last pages missing (#669).
+
+         if Next_Page >= Page_Bound then
+            Exec.Output.Put_Line ("exec: no room for " & Name);
+            Next_Page := Item.ELF_Base;
+            Same := False;
+            Success := False;
+            return;
+         end if;
+
+         Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
+           (others => 0);
+         Region.Put (Next_Page, Buffer);
+
+         if Same then
+            if Old_Base + Page_Index < Old_Bound then
+               Region.Get (Old_Base + Page_Index, Old_Page);
+               Same := Old_Page = Buffer;
+            else
+               Same := False;
+            end if;
+         end if;
+
+         Next_Page := Next_Page + 1;
+         Page_Index := Page_Index + 1;
+      end loop;
+
+      Item.ELF_Bound := Next_Page;
+      Same := Same and then Old_Base + Page_Index = Old_Bound;
+      Success := True;
+   end Write_Image;
 
 end Exec.Library;
