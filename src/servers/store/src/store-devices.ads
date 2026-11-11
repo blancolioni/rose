@@ -85,6 +85,16 @@ package Store.Devices is
       return Rose.Objects.Object_Id;
    --  The next process queued to be ended, or zero.
 
+   procedure Hand_Over
+     (Id          : Rose.Objects.Capability_Identifier;
+      Old_Process : Rose.Objects.Object_Id;
+      New_Process : Rose.Objects.Object_Id);
+   --  Swap the owners of the two processes' banks, and move every
+   --  sub-bank of Old_Process's former bank under New_Process's former
+   --  bank, with its charges (ADR 0032, section 6, #863).  The banks
+   --  must be siblings; if they aren't, or either is missing, nothing
+   --  changes.
+
    procedure Get_Usage
      (Id           : in     Rose.Objects.Capability_Identifier;
       Pages        :    out Rose.Words.Word_64;

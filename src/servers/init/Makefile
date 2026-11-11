@@ -32,6 +32,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-file-client.o \
 	$(BUILDDIR)/rose-interfaces-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-launch-client.o \
+	$(BUILDDIR)/rose-interfaces-process_banks-client.o \
 	$(BUILDDIR)/rose-interfaces-named-client.o \
 	$(BUILDDIR)/rose-interfaces-partitions.o \
 	$(BUILDDIR)/rose-interfaces-partitions-client.o \
