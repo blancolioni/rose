@@ -25,6 +25,23 @@ FILE_SYSTEM_OBJECTS= \
 BLOCK_DEVICE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-block_device.o \
 	$(BUILDDIR)/rose-interfaces-block_device-client.o
+UPDATE_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-exec.o \
+	$(BUILDDIR)/rose-interfaces-exec-client.o \
+	$(BUILDDIR)/rose-interfaces-launch.o \
+	$(BUILDDIR)/rose-interfaces-launch-client.o \
+	$(BUILDDIR)/rose-interfaces-process.o \
+	$(BUILDDIR)/rose-interfaces-process-client.o \
+	$(BUILDDIR)/rose-interfaces-map.o \
+	$(BUILDDIR)/rose-interfaces-map-client.o \
+	$(BUILDDIR)/rose-interfaces-commands.o \
+	$(BUILDDIR)/rose-interfaces-commands-client.o \
+	$(BUILDDIR)/rose-interfaces-bank.o \
+	$(BUILDDIR)/rose-interfaces-bank-client.o \
+	$(BUILDDIR)/rose-interfaces-dependent.o \
+	$(BUILDDIR)/rose-interfaces-dependent-client.o \
+	$(BUILDDIR)/rose-interfaces-heap.o \
+	$(BUILDDIR)/rose-interfaces-heap-client.o
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-log_reader-client.o
@@ -85,6 +102,7 @@ INSTALL_OBJECTS= \
 	$(FILE_OBJECTS) \
 	$(FILE_SYSTEM_OBJECTS) \
 	$(BLOCK_DEVICE_OBJECTS) \
+	$(UPDATE_OBJECTS) \
 	$(COMMON_OBJECTS)
 
 all: restore $(RELOC)

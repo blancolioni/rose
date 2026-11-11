@@ -19,6 +19,24 @@ package Exec.Library is
    --  Install the program in ELF_Image, and return its number, or 0 if
    --  there is no room for it.
 
+   function Update
+     (ELF_Image  : in out Rose.Interfaces.Reader.Reader_Object'Class;
+      Name       : String;
+      Caps       : Rose.Capabilities.Capability_Array;
+      Changed    : out Boolean)
+     return Rose.Objects.Capability_Identifier;
+   --  Install ELF_Image as the new version of the program installed as
+   --  Name (#829). If its image is the same, and neither has install
+   --  caps, return the installed version's number, with Changed False.
+   --  Otherwise install it, retire the installed version, and return the
+   --  new number with Changed True. 0 if there is no room for it.
+
+   function Is_Retired
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  True if Update replaced program Id, or there is no program Id.
+   --  A retired program can't be launched, but its pages are kept.
+
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;

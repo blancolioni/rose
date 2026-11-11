@@ -56,5 +56,9 @@ package Restore is
                            Rose.Capabilities.Null_Capability;
    --  Reads the kernel's command line, the boot loader's tag 1, which
    --  has erase-hd0 for the install media's erasing entry.
+   Restored_Endpoint_Cap : Rose.Capabilities.Capability :=
+                             Rose.Capabilities.Null_Capability;
+   --  Makes an endpoint cap to a restored process, so that the update
+   --  boot can call the restored exec and command registry (#829).
 
 end Restore;

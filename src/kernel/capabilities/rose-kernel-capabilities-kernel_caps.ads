@@ -58,6 +58,13 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  (ADR 0001).  Only the restore server has this cap, and calls it
    --  before it restores any process.
 
+   Restored_Endpoint_Endpoint : constant Rose.Objects.Endpoint_Index := 19;
+   --  Data words 0 and 1 are the object id of a restored process, words 2
+   --  and 3 an endpoint id, and word 4 a capability identifier.  Reply
+   --  with an endpoint cap to that endpoint of the process, if it has
+   --  one, so that the update boot can call the restored exec and command
+   --  registry (#829, ADR 0031).  Only restore-install has this cap.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

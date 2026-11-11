@@ -1,4 +1,5 @@
 with Rose.Capabilities;
+with Rose.Objects;
 with Rose.Words;
 
 package Restore.Checkpoints is
@@ -27,5 +28,14 @@ package Restore.Checkpoints is
    --  tells the memory server about a new boot module only if it is
    --  waiting for a message, and running processes keep it busy with
    --  their page faults.
+
+   function Find_Server
+     (Interface_Id : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability;
+   --  A cap to the interface endpoint Interface_Id, with identifier 0,
+   --  of the first restored process that has it, or null if none has.
+   --  Calling it returns the caps of the interface of the server's first
+   --  object, as a published interface does.  Only restore-install can
+   --  do this, for the update boot (#829).
 
 end Restore.Checkpoints;

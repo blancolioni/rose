@@ -540,6 +540,64 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Set_Current_State (Current_Process_Id, Ready);
             end;
 
+         when Restored_Endpoint_Endpoint =>
+            declare
+               use Rose.Kernel.Processes;
+               use type Rose.Capabilities.Capability;
+               use type Rose.Invocation.Parameter_Word_Index;
+               use type Rose.Objects.Endpoint_Id;
+               use type Rose.Objects.Endpoint_Index;
+               Pid      : Process_Id;
+               Endpoint : Rose.Objects.Endpoint_Id;
+               Local    : Rose.Objects.Endpoint_Index;
+               New_Cap  : Rose.Capabilities.Capability;
+            begin
+               if not Params.Control.Flags (Rose.Invocation.Send_Words)
+                 or else Params.Control.Last_Sent_Word < 4
+               then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
+
+               Pid :=
+                 To_Process_Id (Rose.Invocation.Get_Object_Id (Params.all, 0));
+               Endpoint :=
+                 Rose.Objects.Endpoint_Id (Params.Data (2))
+                 + 2 ** 32 * Rose.Objects.Endpoint_Id (Params.Data (3));
+
+               --  Only the endpoints the process registered itself: this
+               --  makes no new ones.
+
+               Local :=
+                 (if Pid = Null_Process_Id then 0
+                  else Find_Endpoint (Pid, Endpoint));
+               if Local = 0 then
+                  Return_Error (Params, Rose.Invocation.Invalid_Object);
+                  return;
+               end if;
+
+               New_Cap := Create_Cap (Current_Process_Id);
+               if New_Cap = Rose.Capabilities.Null_Capability then
+                  Return_Error (Params, Rose.Invocation.Out_Of_Capabilities);
+                  return;
+               end if;
+
+               Set_Cap
+                 (Current_Process_Id, New_Cap,
+                  Rose.Capabilities.Layout.Endpoint_Capability
+                    (To_Object_Id (Pid), Local,
+                     Rose.Objects.Capability_Identifier (Params.Data (4))));
+
+               Params.all :=
+                 (Control =>
+                    (Flags  => (Rose.Invocation.Reply => True,
+                                others                => False),
+                     others => <>),
+                  others  => <>);
+               Rose.Invocation.Send_Cap (Params.all, New_Cap);
+               Set_Current_State (Current_Process_Id, Ready);
+            end;
+
          when Restart_Endpoint =>
             Rose.Boot.Console.Put_Line ("kernel: restarting");
             Rose.Arch.Restart;

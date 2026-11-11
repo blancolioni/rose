@@ -44,14 +44,15 @@ The kernel sets up the console, the memory map, its heap, the page table and the
 The idle process has object id 1, and `init` has object id 2.
 The kernel then switches its log output to the serial port and starts the clock.
 
-`init` starts with a fixed set of 23 capabilities, at the indices given in `Rose.Init_Capabilities` (#115):
+`init` starts with a fixed set of 30 capabilities, at the indices given in `Rose.Init_Capabilities` (#115):
 
 * the boot capability, for launching boot modules, and create-process, for `elf`;
-* capabilities for creating endpoints, deleting and rescinding caps, and exiting;
+* capabilities for creating endpoints and signal caps, deriving, deleting and rescinding caps, and exiting;
 * the memory map: reserving memory, counting and getting memory regions, and page-on;
 * the clock: set-timeout and get-ticks;
-* checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process and restore-interrupt;
-* trace events, and writing the system image;
+* checkpoints and restore: enter and leave checkpoint, start-log, and restore-process, resume-process, restore-interrupt and restore-derivations;
+* restored-endpoint, which makes an endpoint cap to a restored process, so that the update boot can call the restored `exec` and command registry (#829); only `restore-install` gets it;
+* restarting the machine, trace events, and writing the system image;
 * five _root capabilities_, for I/O ports, interrupts, device pages, device ranges and boot tags.
 
 A root capability makes capabilities for hardware.

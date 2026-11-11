@@ -130,7 +130,9 @@ package body Rose.Kernel.Processes.Init is
            Init_Caps.Derive_Cap             =>
              Layout (Meta_Cap, Meta.Derive_Cap),
            Init_Caps.Restore_Derivations_Cap =>
-             Kernel (Kernel_Caps.Restore_Derivations_Endpoint));
+             Kernel (Kernel_Caps.Restore_Derivations_Endpoint),
+           Init_Caps.Restored_Endpoint_Cap =>
+             Kernel (Kernel_Caps.Restored_Endpoint_Endpoint));
 
    begin
       for Index in Layouts'Range loop

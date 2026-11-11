@@ -72,7 +72,11 @@ package Rose.Init_Capabilities is
    --  #708).  Init grants it to any program that asks for
    --  create-signal, as it grants create-endpoint.
 
-   Last_Cap               : constant := 29;
+   Restored_Endpoint_Cap  : constant := 30;
+   --  Makes an endpoint cap to a restored process (#829).  Only the
+   --  install media's restore server has it, for the update boot.
+
+   Last_Cap               : constant := 30;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

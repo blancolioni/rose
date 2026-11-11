@@ -50,4 +50,17 @@ package Restore.Installer is
    --  Install the programs Source gives from /rose/install in
    --  File_System.
 
+   procedure Update
+     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+      Source      : Step_Iterator);
+   --  The update boot (ADR 0031, section 4; #829): install the saved
+   --  programs Source gives from /rose/install in File_System again, in
+   --  the restored exec, with Exec.Update, and replace their entries in
+   --  the restored command registry. The restored processes must be
+   --  running. Launched programs are persistent, and are left as they
+   --  are. So are file and directory, whose launch caps every directory
+   --  process holds: retiring their old versions would stop those
+   --  directories creating anything, and their new code comes with
+   --  replacing them (ADR 0032).
+
 end Restore.Installer;

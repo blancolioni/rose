@@ -596,6 +596,23 @@ package body Init.Run is
          --  new set from hd0 (#828).
 
          if Updated then
+
+            --  restore-install installs the commands again in the
+            --  restored exec once the processes run, and then sends its
+            --  second message (#829). The checkpoint waits for it.
+
+            declare
+               Params : aliased Rose.Invocation.Invocation_Record;
+               Reply  : aliased Rose.Invocation.Invocation_Record;
+            begin
+               Rose.System_Calls.Initialize_Receive
+                 (Params, Install_Receiver);
+               Rose.System_Calls.Receive_Words (Params, 1);
+               Rose.System_Calls.Invoke_Capability (Params);
+               Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
+               Rose.System_Calls.Invoke_Capability (Reply);
+            end;
+
             Init.Calls.Send_String
               (Console_Stream_Cap, "update complete; restarting from hd0"
                & NL);
