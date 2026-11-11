@@ -7,6 +7,7 @@ with Rose.System_Calls.Client;
 with Rose.Interfaces.Storage.Server;
 with Rose.Interfaces.Bank.Server;
 with Rose.Interfaces.Dependent.Server;
+with Rose.Interfaces.Process_Banks.Server;
 with Rose.Interfaces.Region.Server;
 with Rose.Interfaces.Storage_Checkpoint.Server;
 with Rose.Interfaces.Reader.Server;
@@ -50,7 +51,15 @@ package body Store.Server is
          Store.Devices.Add_Dependent'Access,
          Store.Devices.Get_Usage'Access,
          Store.Devices.Destroy_Bank'Access,
+         Store.Devices.Bank_Index'Access,
          Instanced => True);
+      Rose.Interfaces.Process_Banks.Server.Attach_Interface
+        (Server_Context,
+         Create_Process_Bank => Store.Devices.Create_Process_Bank'Access,
+         Process_Bank        => Store.Devices.Process_Bank'Access,
+         End_Process         => Store.Devices.End_Process'Access,
+         Set_Ended           => Store.Devices.Set_Ended'Access,
+         Take_Ended          => Store.Devices.Take_Ended'Access);
       Rose.Interfaces.Dependent.Server.Attach_Interface
         (Server_Context,
          Release   => Store.Devices.Release_Dependent'Access,

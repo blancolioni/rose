@@ -16,7 +16,7 @@ The two boots differ in their boot modules and in what they do when there is no 
 [cols="1,3,3",options="header"]
 |===
 | | Install media | Boot disk
-| GRUB menu | `boot/iso/grub/grub.cfg`, on the ISO | `boot/hd0/grub.cfg`, on the boot partition, `rose-boot`
+| GRUB menu | `boot/iso/grub/grub.cfg`, on the ISO | `boot/hd0/grub.cfg`, on the boot partition, `rose-boot`, which shows the entries of the current boot set's own menu, `boot/hd0/menu.cfg` (see <<boot-sets>>)
 | Modules | 15: `init-install`, `restore-install`, `isofs`, and the 12 that both boots load | 14: `init`, `restore`, and the 12 that both boots load
 | A checkpoint on hd0 | Restored | Restored
 | A checkpoint on hd0 that this boot set can't read | `restore` says why, and the system stays idle: nothing is installed over it | `restore` says why, and the system stays idle
@@ -29,7 +29,7 @@ The "trace launches" entry and the last entry, "text mode", keep the VGA text mo
 With a framebuffer, the screen is blank until the console starts, and then it shows the early messages (see <<handing-over-the-console>>).
 
 The boot sequence is described in `src/servers/init/boot.yaml` (#374).
-The build turns it into the Ada package `Init.Boot` with `scripts/make-init`, and writes the `module2` lines of both GRUB menus from it.
+The build turns it into the Ada package `Init.Boot` with `scripts/make-init`, and writes from it the `module2` lines of the install media's menu and of the boot set's menu.
 The boot description names each boot module, the object id it is launched with, its priority, the capabilities it is given and the endpoints `init` keeps from it.
 The few steps that aren't wiring, such as launching the partition servers, are written by hand in `Init.Boot_Steps`.
 What `init` does after the boot servers, installing a new system and launching the shell, is in `src/servers/init/src/init-run.adb`.
@@ -191,28 +191,63 @@ Both learn that there is a framebuffer from the boot loader's framebuffer tag.
 === Writing the boot loader
 
 When the programs are installed, `restore-install` writes GRUB to hd0, so that the disk boots without the install media (#322).
-The build makes three files for it with `scripts/make-boot-disk`, and puts them on the install media in `/rose/install/boot`:
+The build makes the files for it with `scripts/make-boot-disk`, and puts them on the install media in `/rose/install/boot`:
 
 [cols="1,2,4",options="header"]
 |===
 | File | Written to | Holds
 | `boot.img` | hd0's block 0, the MBR | GRUB's first stage, which loads `core.img`. Only the boot code, the first 440 bytes, is written: the rest of the block holds the protective MBR's partition entry and signature, which the partition table needs.
 | `core.img` | `bios-boot` | GRUB's second stage, which reads the boot partition
-| `boot.fat` | `rose-boot` | The FAT file system: GRUB's menu, `boot/hd0/grub.cfg`, its modules, the kernel and the boot disk's boot modules
+| `boot.fat` | `rose-boot` | The FAT file system: GRUB's menu and modules, and two slots for boot sets, the first with this build's (see <<boot-sets>>)
+| `boot-set.tar` | A slot of `rose-boot`, by an update | This build's boot set: the kernel, the boot disk's boot modules, and their menu entries
+| `grub-a.cfg`, `grub-b.cfg` | `rose-boot`'s menu, by an update | The menu with this build's set in slot `a` or `b`, and an entry for the previous set in the other
 |===
 
-`restore-install` writes them through the install media's three extra partition servers.
+A new install writes the first three through the install media's three extra partition servers.
 A file that is missing, or doesn't fit its partition, is reported and left out.
+An update writes only a slot and the menu (see <<updating>>).
 
-The boot loader is written only when a new system is installed.
-Updating the kernel and boot modules on a disk that already has a checkpoint is #375.
+[#boot-sets]
+=== Boot sets
+
+The boot partition holds two boot sets (#828, ADR 0031).
+Each is a tar file, `/boot/a.tar` and `/boot/b.tar`, of a fixed 3 MiB: the kernel, the boot disk's boot modules, and `menu.cfg`, the set's own GRUB entries, from `boot/hd0/menu.cfg`.
+The paths in `menu.cfg` are in the tar, so a set's entries load that set's own modules, whatever the other set has.
+
+The partition's menu, `/boot/grub/grub.cfg`, from `boot/hd0/grub.cfg`, opens the current set with GRUB's `loopback` and `tar`, and shows its entries.
+Its first line names the current set and its version, such as `# rose-boot-set b 0.4.1 (genki)`.
+After an update, it has one more entry, `Previous: Rose` and the version of the other set, which opens that set's menu.
+
+An update changes the boot partition without a FAT writer.
+`make-boot-disk` places the two slots and the menu so that each is contiguous and starts on a 4096-byte block of the partition server, with `scripts/boot-fat-layout`, and fails if they don't fit.
+The menu is padded to one block, so it is written at once.
+An update reads the FAT only to find the three files (`Restore.Boot_Sets`), and overwrites their blocks in place: the FAT and the directories never change.
+
+[#updating]
+=== Updating an installed system
+
+A new release reaches an installed disk from its install media, without losing the checkpoint (ADR 0031).
+When hd0 has Rose, the install media's menu has an entry `Update Rose on hd0` after its default entry, which puts `update-hd0` on the kernel's command line.
+It loads the install media's boot set, in the install variant, and `restore-install`:
+
+. finds the last checkpoint. One that this boot set can't read is refused, as in any boot (see <<restore-boot>>), and with no checkpoint there is nothing to update;
+. reads which slot of the boot partition is current. A disk installed before boot sets has one set, not two, and can only be installed again;
+. restores the checkpoint with this boot set, which tests the set against the disk's own checkpoint before anything is written;
+. writes this build's boot set to the slot that isn't current, and then the menu, which makes that slot current and names the old set as `Previous`;
+. tells `init`, which, as after an install, takes a checkpoint and restarts the machine, which then boots the new set from hd0.
+
+If any step before the menu fails, `restore-install` says why and exits, and hd0 still boots the set it had.
+Each refusal leaves hd0 exactly as it was.
+The entry boots in text mode, so that a refusal is on the screen.
+
+Reinstalling the commands (#829) and replacing persistent servers (#830) will be further steps of the update, before `init` is told.
 
 [#restore-boot]
 == Restore Boot
 
 Both boots restore the system if hd0 has a checkpoint, so booting the install media on an installed disk restores the system rather than installing it again.
 The install media's GRUB menu goes further: when hd0's boot partition has a GRUB menu, its default entry loads that menu, so the machine boots hd0's own modules even with the install media still in (#413).
-Installing again is its next entry, `Install Rose`.
+Its next entry, `Update Rose on hd0`, puts the install media's boot set on hd0 and keeps the checkpoint (see <<updating>>), and installing again is the entry after that, `Install Rose`.
 
 A checkpoint that the boot set can't read, because of a table version it doesn't know or interfaces it doesn't have, is neither restored nor installed over (#375): `restore` says why and stops, before it has written anything to hd0.
 To put a new system on such a disk, the install media has a third entry, `Install Rose, erasing hd0` (#836).

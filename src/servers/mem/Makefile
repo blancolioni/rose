@@ -30,6 +30,12 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-process-server.o \
 	$(BUILDDIR)/rose-interfaces-receiver-server.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
+	$(BUILDDIR)/rose-interfaces-bank.o \
+	$(BUILDDIR)/rose-interfaces-bank-client.o \
+	$(BUILDDIR)/rose-interfaces-dependent.o \
+	$(BUILDDIR)/rose-interfaces-dependent-client.o \
+	$(BUILDDIR)/rose-interfaces-process_banks.o \
+	$(BUILDDIR)/rose-interfaces-process_banks-client.o \
 	$(BUILDDIR)/rose-interfaces-reader.o \
 	$(BUILDDIR)/rose-interfaces-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-writer.o \

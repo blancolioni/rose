@@ -60,22 +60,29 @@ package body Restore.Start is
    -- Finish --
    ------------
 
-   procedure Finish (Restored : Boolean) is
+   procedure Finish
+     (Restored : Boolean;
+      Updated  : Boolean := False)
+   is
    begin
       Rose.Console_IO.Put_Line ("restore: done");
 
       --  Init waits for a message without caps.  Its data word tells init
       --  whether the installed programs are running already, restored
-      --  from the checkpoint.  After a restore, init replies once it has
-      --  started its last boot modules, and only then can the restored
-      --  processes run (see Restore.Checkpoints).
+      --  from the checkpoint: 0 if not, 1 if they are, and 2 if they are
+      --  and the update boot has written this boot set to hd0, so that
+      --  init restarts into it (#828).  After a restore, init replies
+      --  once it has started its last boot modules, and only then can
+      --  the restored processes run (see Restore.Checkpoints).
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
       begin
          Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Word
-           (Params, Rose.Words.Word'(if Restored then 1 else 0));
+           (Params,
+            Rose.Words.Word'
+              (if not Restored then 0 elsif Updated then 2 else 1));
          Rose.System_Calls.Invoke_Capability (Params);
       end;
 

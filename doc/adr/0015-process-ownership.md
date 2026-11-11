@@ -2,6 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
+- **Amended by:** #750, where the store, not mem, records which bank is each process's own, a process asks for its bank rather than starting with it, `Launch`'s bank is a plain cap, and the store tells mem of processes to end by a send that doesn't wait (sections 1, 2 and 6)
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 8 and 9), [ADR 0006](0006-signals.md) (signals, section 3), [ADR 0014](0014-banks.md) (banks), #424 (end a child process), #346 (delete files and directories), #142 (background job handles), #320 (reuse process table entries)
 
 ## Context
@@ -38,6 +39,32 @@ A process that launches another can end it, but nothing ends the processes that 
 - **Destroying the bank ends the subtree.** The store destroys the bank's sub-banks, deepest first. For each process that depends on one of them, the store invokes mem, which ends that process. The storage of all of them is released.
 - **Mem and the store orchestrate ending, not the processes.** Nothing in the processes being ended has to run, so ending works for a process that is blocked, faulting or misbehaving.
 
+#### Who keeps the link between a process and its bank (amendment, #750)
+
+Amended by #750. Mem can't hold a cap for each process's bank, as section 2 has it. Mem is a boot module: it isn't restored, and at a restore it has its tables back as data, but none of its caps. The kernel has no way to say which of the store's banks a cap names, so mem couldn't even record which bank it had. So the store keeps the link, as data in its bank table, which its checkpoint saves (ADR 0014, section 7).
+
+- **`Process_Banks`,** an interface of the store's that only mem holds. Init gives it to mem at every boot, once the store is running, because mem is launched first.
+  - **`Create_Process_Bank (Parent, Process)`** makes a sub-bank of the bank with index `Parent` (`Bank.Index`), and records that it is `Process`'s own.
+  - **`Process_Bank (Process)`** gives the cap for it again.
+  - **`End_Process (Process)`** destroys it, with the banks below it.
+  - **`Take_Ended`** gives the processes whose own banks were among them, one at a time.
+- **Launching (section 1).**
+  - Elf gives the launch's bank to `Memory.New_Process`, which makes the process's own bank.
+  - Elf then asks the new process's `Process.Bank` for it, and reserves the process's storage from it.
+- **Ending (section 2).** `Destroy` and `Exit_Process` end the process in mem, then call `End_Process`.
+- **Ending the processes below.**
+  - When the store destroys a bank that is some process's own, by `End_Process` or by `Bank.Destroy`, it queues that process.
+  - The store then sends to mem's `Processes_Ended`, without waiting. The kernel queues one message for each process, and a second one replaces the first, but that is all a doorbell needs: mem takes every queued process each time it is told.
+  - Mem ends each one as it does for `Destroy`, without calling `End_Process`, since the bank is gone.
+  - Mem's boot-module server has no signal handlers, which a dependent object of ADR 0014 uses, so mem isn't a dependent of the banks.
+- **A process asks for its own bank, rather than starting with it (section 1).**
+  - `Process.Bank` gives it, and `Rose.System_Calls.Own_Bank.Cap` asks once and keeps it.
+  - A cap in a fixed place in every process's cap table would have moved the caps that every driver expects.
+- **`Launch` and `Launch_Command` take the bank as a plain cap,** not as an `interface Bank`, so that every program that launches another doesn't need the `Bank` interface's client.
+  - **A null cap means the launcher's own bank:** exec's, the root bank until init gives it a system bank (#450). Init launches its servers that way for now.
+  - Programs launch against their own bank: petal, login, auth, the directory server and the self tests.
+- **The kernel's kill operation (ADR 0006, section 3)** doesn't tell mem, so a killed process's bank isn't destroyed yet. That is a follow-up.
+
 ### 3. Running independently means launching against another bank
 
 - **A process launched against a bank that the launcher doesn't own is independent of the launcher.** Its bank is not under the launcher's, so it ends when that other bank is destroyed, not when the launcher ends.
@@ -58,6 +85,8 @@ A process that launches another can end it, but nothing ends the processes that 
 ### 6. Persistence
 
 Banks and their dependent objects are saved in the store's checkpoint (ADR 0014, section 7), and mem's process table is saved in mem's. A destroyed bank and its processes are gone from both before the next checkpoint, so they don't come back on restore.
+
+Amended by #750: which process owns a bank is saved in the store's bank table, so nothing holds a cap to a bank across a restore. The store's queue of processes to end isn't saved, because mem empties it as soon as it is told. A checkpoint taken in between would restore a process whose bank is gone: it can still run, but reserving storage fails. Ending it at the restore is a follow-up.
 
 ## Consequences
 
@@ -84,9 +113,8 @@ Banks and their dependent objects are saved in the store's checkpoint (ADR 0014,
 
 ## Follow-up work
 
-- `Launch` takes a bank. Elf creates the process's bank, reserves from it, and passes it to `Memory.New_Process` (#449).
-- Mem: register each process with its bank, end a process when the store invokes it, and destroy the process's bank on `Destroy`, `Exit_Process` and kill (#750).
-- The run-time system gives each process a cap for its own bank (#449).
+- Done: `Launch` takes a bank, elf reserves from the bank it is given (#449), and mem makes each process's own bank, ends a process whose bank was destroyed, and destroys a process's bank on `Destroy` and `Exit_Process` (#750). A process asks for its bank through `Process.Bank` (#750).
+- Mem: destroy the bank of a process that the kernel's kill operation ends.
 - Init launches servers against the system bank (#450).
 - #424 (done): the directory server keeps each entry's `Process` cap, and destroys it on delete (#346).
 - Petal gives the commands it runs a bank (#517). The self tests launch against a sub-bank and destroy it, so that a run leaves nothing behind (#724).

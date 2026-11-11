@@ -1,0 +1,125 @@
+#!/bin/sh
+# The restore test (#737, ADR 0031 section 2 and section 6): this build's
+# kernel and boot modules have to restore the checkpoint of a disk that
+# the release series' first release installed.
+#
+#   scripts/test-restore-fixture [FIXTURE]
+#
+# FIXTURE is a disk that make-restore-fixture wrote. Without it, the test
+# uses the fixture of this build's release series X.Y: the disk installed
+# by release X.Y.0, rose-X.Y.0-hd0.qcow2, which is uploaded to the
+# release on GitHub. It is downloaded once, to images/fixtures. If the
+# release has no fixture, which is so until X.Y.0 is released, the test
+# says so and passes.
+#
+# The test:
+#
+#   1. writes this build's boot set (build/install/boot, from
+#      make-boot-disk) onto a copy of the fixture, where the installer
+#      puts it, with write-boot-set.py;
+#   2. boots from the copy, which has to restore the fixture's
+#      checkpoint, show the login prompt, and let the first user log in;
+#   3. runs run_self_tests, which has to pass every test, and checks that
+#      the file that make-restore-fixture left, notes, is still there;
+#   4. waits for a checkpoint, stops the machine, and runs check-log.py
+#      on the copy, which has to find the log consistent.
+#
+# A restore that fails, or that the boot set refuses, fails the test.
+# Only a fixture of the same series is restored: a later series refuses
+# it, as it should, and updating it is the update test's (#830).
+#
+# It takes about five minutes, and needs qemu-system-i386, qemu-img,
+# python3 and, to download the fixture, curl. It exits with 0 if
+# everything passed, and keeps the disk image and QEMU's files if
+# anything failed.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+BOOT_SET=$HERE/../build/install/boot
+
+if [ $# -ge 1 ]; then
+    FIXTURE=$1
+else
+    VERSION=$(sed -n \
+        's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
+        "$HERE/../src/base/rose-version.ads")
+    SERIES=$(echo "$VERSION" | sed -n 's/^\([0-9]*\.[0-9]*\)\..*/\1/p')
+    [ -n "$SERIES" ] || {
+        echo "no release series in the version, $VERSION"
+        exit 2
+    }
+    NAME=rose-$SERIES.0-hd0.qcow2
+    FIXTURE=$HERE/../images/fixtures/$NAME
+    if [ ! -f "$FIXTURE" ]; then
+        URL=https://github.com/blancolioni/rose/releases/download/v$SERIES.0/$NAME
+        mkdir -p "$(dirname "$FIXTURE")" || exit 2
+        if curl -fsL -o "$FIXTURE.part" "$URL"; then
+            mv -f "$FIXTURE.part" "$FIXTURE"
+        else
+            rm -f "$FIXTURE.part"
+            echo "No $SERIES.0 fixture yet ($URL); nothing to restore"
+            exit 0
+        fi
+    fi
+fi
+
+[ -f "$FIXTURE" ] || { echo "no fixture: $FIXTURE"; exit 2; }
+for file in boot.img core.img boot.fat; do
+    [ -f "$BOOT_SET/$file" ] || {
+        echo "no boot set: $BOOT_SET/$file; build Rose first"
+        exit 2
+    }
+done
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+echo "Writing this build's boot set onto $(basename "$FIXTURE")"
+qemu-img convert -O raw "$FIXTURE" "$DISK" || fail "could not copy the fixture"
+python3 "$HERE/write-boot-set.py" "$DISK" "$BOOT_SET" \
+    || fail "could not write the boot set"
+
+echo "Booting this build, which restores the fixture's checkpoint"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 || fail "no login prompt: the checkpoint was not restored"
+screen > "$WORK/restored-screen.txt"
+grep -e "restore:" -e "refus" "$WORK/restored-screen.txt"
+log_in
+
+echo "Running the self tests"
+type_text "clear
+"
+sleep 5
+type_text "run_self_tests
+"
+wait_for "Test result:" 120 || fail "the self tests did not finish"
+result=$(screen | grep "Test result:" | tail -1)
+echo "$result"
+set -- $(echo "$result" \
+    | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+[ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
+    || fail "not every self test passed"
+
+echo "Reading the file that the fixture's user left"
+type_text "clear
+"
+sleep 3
+type_text "cat notes
+"
+wait_for "^hello from kilo" 20 || fail "the fixture's file is gone"
+
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" || {
+    cat "$WORK/check-log.txt"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "PASS"

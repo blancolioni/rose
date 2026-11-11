@@ -334,7 +334,9 @@ package Rose.Checkpoints is
          Parent       : Rose.Words.Word_32 := 0;
          Page_Limit   : Rose.Words.Word_64 := 0;
          Region_Limit : Rose.Words.Word_32 := 0;
-         Reserved     : Rose.Words.Word_32 := 0;
+         Owner        : Rose.Words.Word_32 := 0;
+         --  The object id of the process whose own bank it is (ADR 0015,
+         --  #750), or zero.  Process object ids fit in 32 bits.
       end record
      with Pack, Size => 192;
 

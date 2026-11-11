@@ -1,6 +1,11 @@
 interface Process : Segment, Server, Cap is
 
    function Heap_Interface return interface Heap;
+
+   function Bank return interface Bank;
+   --  The process's own bank (ADR 0015, #750): a sub-bank of the bank it
+   --  was launched against, destroyed when the process ends. A null cap
+   --  if it has none, as a boot module hasn't.
    
    procedure Exit_Process
      (Exit_Status : Natural);

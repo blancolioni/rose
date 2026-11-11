@@ -38,8 +38,29 @@ package body Mem.Server is
 
    function New_Process
      (Id          : Rose.Objects.Capability_Identifier;
-      Process     : Rose.Capabilities.Capability)
+      Process     : Rose.Capabilities.Capability;
+      Bank        : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
+
+   procedure Set_Process_Banks
+     (Id    : Rose.Objects.Capability_Identifier;
+      Banks : Rose.Capabilities.Capability);
+
+   procedure Processes_Ended (Id : Rose.Objects.Capability_Identifier);
+
+   function Process_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
+   procedure End_Process
+     (Pid       : Process_Id;
+      Bank_Gone : Boolean);
+
+   procedure Drain_Ended;
+   --  End every process that the store has queued, because their banks
+   --  were destroyed.
+   --  End process Pid, and unless its bank is gone already, tell the store
+   --  to destroy it (ADR 0015, #750).
 
    procedure Exit_Process
      (Id          : Rose.Objects.Capability_Identifier;
@@ -272,7 +293,9 @@ package body Mem.Server is
          Register_Process => Register_Process'Access,
          Page_Fault     => Page_Fault'Access,
          Take_Physical_Memory => Take_Physical_Memory'Access,
-         Checkpoint => Checkpoint'Access);
+         Checkpoint => Checkpoint'Access,
+         Set_Process_Banks => Set_Process_Banks'Access,
+         Processes_Ended => Processes_Ended'Access);
 
       Rose.Interfaces.Process.Server.Attach_Interface
         (Server_Context => Server,
@@ -284,6 +307,7 @@ package body Mem.Server is
          Get_Object_Id  => Mem.Processes.Get_Object_Id'Access,
          Exit_Process   => Exit_Process'Access,
          Heap_Interface => Heap_Interface'Access,
+         Bank           => Process_Bank'Access,
          Publish_Interface => Publish_Interface'Access,
          Instanced      => True);
 
@@ -337,12 +361,66 @@ package body Mem.Server is
       Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
       if Pid /= 0 then
-         Mem.Processes.Release_Shared_Segments (Pid);
-         Mem.Page_Table.Delete_All (Pid);
-         Mem.Processes.Kill_Process (Pid);
+         End_Process (Pid, Bank_Gone => False);
       end if;
       Remove_Instances (Id);
    end Destroy;
+
+   -----------------
+   -- Drain_Ended --
+   -----------------
+
+   procedure Drain_Ended is
+      use type Rose.Objects.Object_Id;
+   begin
+      --  The store has destroyed the banks of these processes, so they
+      --  end, and their caps stop working.
+
+      loop
+         declare
+            Oid : constant Rose.Objects.Object_Id :=
+                    Mem.Processes.Take_Ended;
+            Pid : Process_Id;
+         begin
+            exit when Oid = 0;
+            Pid := Mem.Processes.Find_By_Oid (Oid);
+            if Pid /= 0 then
+               declare
+                  Identifier : constant Rose.Objects.Capability_Identifier :=
+                                 Mem.Processes.Process_Identifier (Pid);
+               begin
+                  End_Process (Pid, Bank_Gone => True);
+                  Remove_Instances (Identifier);
+               end;
+            end if;
+         end;
+      end loop;
+   end Drain_Ended;
+
+   -----------------
+   -- End_Process --
+   -----------------
+
+   procedure End_Process
+     (Pid       : Process_Id;
+      Bank_Gone : Boolean)
+   is
+      Oid : constant Rose.Objects.Object_Id :=
+              Mem.Processes.Process_Object_Id (Pid);
+   begin
+      Mem.Processes.Release_Shared_Segments (Pid);
+      Mem.Page_Table.Delete_All (Pid);
+      Mem.Processes.Kill_Process (Pid);
+      if not Bank_Gone then
+         Mem.Processes.End_Bank (Oid);
+
+         --  The store queued the processes below, and sent to
+         --  Processes_Ended while mem was waiting for it, which mem
+         --  doesn't see then.  So mem ends them now.
+
+         Drain_Ended;
+      end if;
+   end End_Process;
 
    ------------------
    -- Exit_Process --
@@ -356,9 +434,7 @@ package body Mem.Server is
       Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
    begin
       if Pid /= 0 then
-         Mem.Processes.Release_Shared_Segments (Pid);
-         Mem.Page_Table.Delete_All (Pid);
-         Mem.Processes.Kill_Process (Pid);
+         End_Process (Pid, Bank_Gone => False);
       end if;
       Remove_Instances (Id);
    end Exit_Process;
@@ -386,12 +462,13 @@ package body Mem.Server is
 
    function New_Process
      (Id          : Rose.Objects.Capability_Identifier;
-      Process     : Rose.Capabilities.Capability)
+      Process     : Rose.Capabilities.Capability;
+      Bank        : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Mem.Processes.New_Process (Process);
+      return Mem.Processes.New_Process (Process, Bank);
    end New_Process;
 
    -------------------
@@ -598,6 +675,28 @@ package body Mem.Server is
 
    end Page_Fault;
 
+   ------------------
+   -- Process_Bank --
+   ------------------
+
+   function Process_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      return Mem.Processes.Get_Bank_Cap (Mem.Processes.Find_Process (Id));
+   end Process_Bank;
+
+   ---------------------
+   -- Processes_Ended --
+   ---------------------
+
+   procedure Processes_Ended (Id : Rose.Objects.Capability_Identifier) is
+      pragma Unreferenced (Id);
+   begin
+      Drain_Ended;
+   end Processes_Ended;
+
    ----------------------
    -- Protection_Fault --
    ----------------------
@@ -783,6 +882,25 @@ package body Mem.Server is
          New_Virtual_Bound =>
            Rose.Addresses.Virtual_Page_Address (New_Bound));
    end Request_New_Bound;
+
+   -----------------------
+   -- Set_Process_Banks --
+   -----------------------
+
+   procedure Set_Process_Banks
+     (Id    : Rose.Objects.Capability_Identifier;
+      Banks : Rose.Capabilities.Capability)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Mem.Processes.Set_Process_Banks (Banks);
+
+      --  The store tells mem of processes to end by sending to
+      --  Processes_Ended, without waiting.
+
+      Mem.Processes.Set_Ended
+        (Rose.Interfaces.Memory.Server.Get_Processes_Ended_Cap);
+   end Set_Process_Banks;
 
    -----------------------
    -- Shared_Page_Fault --

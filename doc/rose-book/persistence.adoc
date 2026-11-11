@@ -210,7 +210,7 @@ hd0 has a GPT partition table, with a protective MBR, and four partitions, each 
 |===
 | Partition | Size | Contents
 | `bios-boot` | 1 MiB | GRUB's `core.img`.
-| `rose-boot` | 16 MiB | An EFI System Partition with a FAT file system: GRUB's menu and modules, the kernel, and the boot disk's boot modules.
+| `rose-boot` | 16 MiB | An EFI System Partition with a FAT file system: GRUB's menu and modules, and two boot sets, each a kernel and the boot disk's boot modules (see <<boot-sets>>).
 | `rose-swap` | Half of the rest | `store`'s backing store, in 4K blocks, which `store` gives to regions as their pages are written.
 | `rose-log` | The rest | The checkpoint log, which `log` writes in 4K pages.
 |===

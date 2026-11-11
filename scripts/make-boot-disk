@@ -5,7 +5,17 @@
 #   boot.img  GRUB's MBR code, for the first 440 bytes of block 0
 #   core.img  GRUB's core image, for the BIOS boot partition
 #   boot.fat  a FAT image of the boot partition, with GRUB's menu and
-#             modules, the kernel and the boot disk's boot modules
+#             modules, and two slots for boot sets, of which the first
+#             has this build's
+#
+# and for the update boot (#828), which writes a boot set to a disk that
+# has one already (Restore.Boot_Sets):
+#
+#   boot-set.tar        this build's boot set: the kernel, the boot
+#                       disk's boot modules, and their menu entries
+#   grub-a.cfg          the boot partition's menu with the set in slot a,
+#   grub-b.cfg          or b, and an entry for the previous set in the
+#                       other
 #
 # The disk layout is scan's (#321): the BIOS boot partition starts at
 # block 2048 and is 1 MiB, and the boot partition follows it and is
@@ -23,9 +33,17 @@ BIOS_BOOT_START=2048
 BIOS_BOOT_BLOCKS=2048
 BOOT_PARTITION_BYTES=$((16 * 1024 * 1024))
 
-# The boot disk's boot modules: the ones boot/hd0/grub.cfg loads, which
+# Each slot of the boot partition holds one boot set, as a tar file of
+# this size, and the menu is one block of the boot partition's partition
+# server.  The update boot writes them in place, so each is contiguous
+# and starts on a block (scripts/boot-fat-layout).
+SLOT_BYTES=$((3 * 1024 * 1024))
+MENU_BYTES=4096
+LAYOUT=./scripts/boot-fat-layout
+
+# The boot disk's boot modules: the ones boot/hd0/menu.cfg loads, which
 # come from src/servers/init/boot.yaml (#374).
-MODULES=$(awk '$1 == "module2" && !seen[$3]++ { print $3 }' boot/hd0/grub.cfg)
+MODULES=$(awk '$1 == "module2" && !seen[$3]++ { print $3 }' boot/hd0/menu.cfg)
 
 # Write the 64-bit little-endian value $2 at byte offset $3 of file $1.
 put_word_64 () {
@@ -59,6 +77,53 @@ if [ $CORE_BLOCKS -gt $BIOS_BOOT_BLOCKS ]; then
     exit 1
 fi
 
+# The boot set (#828): the kernel and modules, and menu.cfg, the set's
+# own menu entries, which the boot partition's menu loads.
+
+SET=$OUT/set
+rm -rf $SET
+mkdir -p $SET
+sed "s/@VERSION@/$ROSE_VERSION/g" boot/hd0/menu.cfg > $SET/menu.cfg
+cp $TMP/kernel $SET/kernel
+for module in $MODULES; do
+    cp $TMP/$module $SET/$module
+done
+rm -f $OUT/boot-set.tar
+(cd $SET && tar --format=ustar --owner=0 --group=0 \
+     -cf ../boot-set.tar menu.cfg kernel $MODULES)
+rm -rf $SET
+
+SET_BYTES=$(stat -c %s $OUT/boot-set.tar)
+if [ $SET_BYTES -gt $SLOT_BYTES ]; then
+    echo "make-boot-disk: the boot set is $SET_BYTES bytes," \
+         "more than a slot's $SLOT_BYTES" >&2
+    exit 1
+fi
+
+# The boot partition's menu, with the boot set in slot $1 and the other
+# slot $2.  With previous, it has an entry for the set in the other slot,
+# whose version the update boot fills in.  It is padded with newlines to
+# MENU_BYTES.
+
+write_menu () {
+    sed -e "s/@VERSION@/$ROSE_VERSION/g" -e "s/@SLOT@/$1/g" \
+        -e "s/@OTHER@/$2/g" boot/hd0/grub.cfg > $4
+    if [ "$3" != previous ]; then
+        sed -i '/^### previous/,/^### end previous/d' $4
+    fi
+    MENU_SIZE=$(stat -c %s $4)
+    if [ $MENU_SIZE -gt $MENU_BYTES ]; then
+        echo "make-boot-disk: boot/hd0/grub.cfg is $MENU_SIZE bytes," \
+             "more than $MENU_BYTES" >&2
+        exit 1
+    fi
+    head -c $((MENU_BYTES - MENU_SIZE)) /dev/zero | tr '\0' '\n' >> $4
+}
+
+write_menu a b none $OUT/grub.cfg
+write_menu a b previous $OUT/grub-a.cfg
+write_menu b a previous $OUT/grub-b.cfg
+
 # The boot partition
 
 rm -f $OUT/boot.fat
@@ -66,8 +131,6 @@ truncate -s $BOOT_PARTITION_BYTES $OUT/boot.fat
 mformat -i $OUT/boot.fat -v ROSE-BOOT ::
 mmd -i $OUT/boot.fat ::/boot ::/boot/grub ::/boot/grub/i386-pc \
     ::/boot/grub/fonts ::/boot/grub/images
-sed "s/@VERSION@/$ROSE_VERSION/g" boot/hd0/grub.cfg > $OUT/grub.cfg
-mcopy -i $OUT/boot.fat $OUT/grub.cfg ::/boot/grub/grub.cfg
 
 # The menu's font and background (boot/hd0/grub.cfg).
 
@@ -76,10 +139,37 @@ mcopy -i $OUT/boot.fat boot/iso/images/rose-splash.png \
     ::/boot/grub/images/rose-splash.png
 mcopy -i $OUT/boot.fat $GRUB_DIR/*.mod $GRUB_DIR/*.lst \
     ::/boot/grub/i386-pc/
-mcopy -i $OUT/boot.fat $TMP/kernel ::/boot/kernel
-for module in $MODULES; do
-    mcopy -i $OUT/boot.fat $TMP/$module ::/boot/$module
-done
 
-echo "make-boot-disk: core.img $CORE_BLOCKS blocks; boot partition" \
+# Copy $1 to $2 on the boot partition, starting on a block.  mtools
+# allocates the first free clusters, so a file of padding before it, if
+# it needs one, moves it to the next block.  The padding is never
+# written again.
+
+PADS=0
+place () {
+    FREE=$($LAYOUT $OUT/boot.fat next-free)
+    PAD=$(( (MENU_BYTES - FREE % MENU_BYTES) % MENU_BYTES ))
+    if [ $PAD -gt 0 ]; then
+        PADS=$((PADS + 1))
+        head -c $PAD /dev/zero > $OUT/pad
+        mcopy -i $OUT/boot.fat $OUT/pad ::/boot/pad$PADS
+        rm -f $OUT/pad
+    fi
+    mcopy -i $OUT/boot.fat $1 $2
+}
+
+cp $OUT/boot-set.tar $OUT/slot.tar
+truncate -s $SLOT_BYTES $OUT/slot.tar
+place $OUT/grub.cfg ::/boot/grub/grub.cfg
+place $OUT/slot.tar ::/boot/a.tar
+rm -f $OUT/slot.tar
+truncate -s $SLOT_BYTES $OUT/slot.tar
+place $OUT/slot.tar ::/boot/b.tar
+rm -f $OUT/slot.tar
+
+$LAYOUT $OUT/boot.fat check \
+    boot/grub/grub.cfg boot/a.tar boot/b.tar > /dev/null
+
+echo "make-boot-disk: core.img $CORE_BLOCKS blocks; boot set" \
+     "$SET_BYTES bytes; boot partition" \
      "$(mdir -i $OUT/boot.fat :: | grep 'bytes free' | sed 's/^ *//')"

@@ -12,5 +12,21 @@ hold_derived:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated 	    rose-core-hold_derived.idl $(INTERFACES)/rose-core.idl 	    $(INTERFACES)/commands.idl 	    $(INTERFACES)/launch.idl 	    $(INTERFACES)/process.idl 	    $(INTERFACES)/segment.idl 	    $(INTERFACES)/server.idl 	    $(INTERFACES)/heap.idl 	    $(INTERFACES)/cap.idl 	    $(INTERFACES)/restorable.idl 	    $(INTERFACES)/writer.idl 	    $(INTERFACES)/stream.idl
+	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	    rose-core-hold_derived.idl $(INTERFACES)/rose-core.idl \
+	    $(INTERFACES)/commands.idl \
+	    $(INTERFACES)/launch.idl \
+	    $(INTERFACES)/process.idl \
+	    $(INTERFACES)/bank.idl \
+	    $(INTERFACES)/dependent.idl \
+	    $(INTERFACES)/resource.idl \
+	    $(INTERFACES)/region.idl \
+	    $(INTERFACES)/reader.idl \
+	    $(INTERFACES)/segment.idl \
+	    $(INTERFACES)/server.idl \
+	    $(INTERFACES)/heap.idl \
+	    $(INTERFACES)/cap.idl \
+	    $(INTERFACES)/restorable.idl \
+	    $(INTERFACES)/writer.idl \
+	    $(INTERFACES)/stream.idl
 	gprbuild $(GPRBUILD_CARGS)

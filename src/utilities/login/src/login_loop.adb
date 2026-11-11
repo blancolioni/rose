@@ -9,6 +9,7 @@ with Rose.Version;
 with Rose.Words;
 
 with Rose.Interfaces.Auth.Client;
+with Rose.Interfaces.Bank;
 with Rose.Interfaces.Cap;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch;
@@ -210,13 +211,20 @@ package body Login_Loop is
      (User : in out Rose.Interfaces.User.User_Object'Class)
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
+
+      --  The session's bank (ADR 0014, section 2; #450), a sub-bank of
+      --  the user's. Petal is launched against it, and so its jobs are
+      --  in it too.
+
+      Session  : Rose.Interfaces.Bank.Bank_Object'Class := User.New_Session;
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Commands.Find ("petal");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (No_Caps);
+                   Launcher.Launch_Command (Session.Bank_Cap, No_Caps);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
+         Session.Destroy;
          Put ("login: cannot run petal" & LF);
          return;
       end if;
@@ -246,6 +254,11 @@ package body Login_Loop is
       Rose.System_Calls.Invoke_Capability (Params);
 
       Rose.System_Calls.Delete_Cap (Endpoint);
+
+      --  Ending the session destroys its bank: whatever the session
+      --  left running ends, and what it reserved is released.
+
+      Session.Destroy;
    end Run_Petal;
 
    --------------

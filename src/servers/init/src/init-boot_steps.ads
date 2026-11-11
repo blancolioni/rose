@@ -29,6 +29,10 @@ package Init.Boot_Steps is
    --  (#826). Init's own caps to it are deleted.
 
    procedure Load_Partitions;
+
+   procedure Connect_Process_Banks;
+   --  Give mem the storage server's Process_Banks (ADR 0015, #750), which
+   --  records each process's own bank. Mem is launched before the store.
    --  Launch partition servers for the swap and log partitions that scan
    --  found on hd0.  The install media's init also launches them for the
    --  BIOS boot partition, the boot partition, and block 0, which
