@@ -4,6 +4,11 @@ name: CI
 # every pull request and every push to main.  Fedora 43 is what the build is
 # known to work on (see the README).  QEMU has no KVM on a hosted runner, so
 # the boot test is slow.
+#
+# A pull request that changes only the docs (doc/ and Markdown files) skips
+# the build.  The workflow still runs, because main's ruleset requires the
+# build-and-boot check, and a job skipped by its "if" counts as passed;
+# a workflow that didn't run would leave the check waiting for ever.
 
 on:
   pull_request:
@@ -15,7 +20,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Pushes to main always build.  A pull request builds unless every
+      # file it changes is under doc/ or is Markdown.
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+              code=true
+          elif git diff --name-only "origin/$BASE...HEAD" \
+                  | grep -qvE '^doc/|\.md$'; then
+              code=true
+          else
+              code=false
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Build and boot: $code"
+
   build-and-boot:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     container: fedora:43
     timeout-minutes: 90
