@@ -990,11 +990,21 @@ package body Mem.Server is
       Amount :    out Rose.Words.Word)
    is
       pragma Unreferenced (Id);
+      use type Rose.Words.Word;
    begin
       Start := Rose.Words.Word
         (Mem.Physical_Map.Take_Memory
            (Rose.Addresses.Physical_Bytes (Size)));
-      Amount := Size;
+
+      --  The kernel adds nothing to its heap for an amount of zero.
+
+      if Start = 0 then
+         Rose.Console_IO.Put_Line
+           ("mem: no free memory for the kernel heap");
+         Amount := 0;
+      else
+         Amount := Size;
+      end if;
    end Take_Physical_Memory;
 
 end Mem.Server;

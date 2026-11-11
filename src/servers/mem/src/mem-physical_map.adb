@@ -202,15 +202,61 @@ package body Mem.Physical_Map is
    -- Take_Memory --
    -----------------
 
+   --  The kernel's heap needs contiguous pages. They are the highest run
+   --  of free pages in the first region, and are marked allocated, so
+   --  that no process is given one of them afterwards. Taking the top of
+   --  the region by moving its bound gave the kernel pages that processes
+   --  had, and left them in the allocation map, so that processes were
+   --  given pages of the kernel's heap later, and the kernel's writes to
+   --  them overwrote the processes' memory.
+
    function Take_Memory
      (Size : Rose.Addresses.Physical_Bytes)
       return Rose.Addresses.Physical_Address
    is
+      use type Rose.Words.Word;
+      Region     : Physical_Region renames Region_Table (1);
       Page_Count : constant Physical_Page_Address :=
                      Physical_Page_Address (Size / Rose.Limits.Page_Size);
+
+      function Block
+        (Page : Physical_Page_Address)
+         return Physical_Page_Address
+      is (Region.Map_Base + (Page - Region.Base) / Allocated_Block'Size);
+
+      function Bit
+        (Page : Physical_Page_Address)
+         return Allocated_Block
+      is (2 ** Natural ((Page - Region.Base) mod Allocated_Block'Size));
+
+      Page : Physical_Page_Address := Region.Bound;
+      Run  : Physical_Page_Address := 0;
+      --  The free pages from Page up, below the last allocated page that
+      --  was seen.
    begin
-      Region_Table (1).Bound := Region_Table (1).Bound - Page_Count;
-      return Physical_Page_To_Address (Region_Table (1).Bound);
+      if Number_Of_Regions = 0 or else Page_Count = 0 then
+         return 0;
+      end if;
+
+      while Page > Region.Base loop
+         Page := Page - 1;
+         if (Allocation_Map (Block (Page)) and Bit (Page)) = 0 then
+            Run := Run + 1;
+            if Run = Page_Count then
+               for Taken in Page .. Page + Page_Count - 1 loop
+                  Allocation_Map (Block (Taken)) :=
+                    Allocation_Map (Block (Taken)) or Bit (Taken);
+               end loop;
+               Current_Allocated_Pages :=
+                 Current_Allocated_Pages + Rose.Words.Word (Page_Count);
+               return Physical_Page_To_Address (Page);
+            end if;
+         else
+            Run := 0;
+         end if;
+      end loop;
+
+      return 0;
    end Take_Memory;
 
 end Mem.Physical_Map;
