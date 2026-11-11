@@ -234,10 +234,6 @@ package body Init.Run is
 
       Init.Boot.Start (Install);
       Init.Boot.Launch_Boot_Servers;
-      if Install then
-         Init.Grants.System_Bank
-           (Storage_Cap, System_Bank_Cap, Reserve_Bank_Cap);
-      end if;
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;
@@ -308,6 +304,15 @@ package body Init.Run is
 
             if Do_Exec then
                Do_Exec := False;
+
+               --  The system bank is made only now, when a new system is
+               --  installed. On the update boot the install media restores
+               --  a checkpoint instead, and a bank made before the restore
+               --  would take the number of the checkpoint's own system
+               --  bank (#873).
+
+               Init.Grants.System_Bank
+                 (Storage_Cap, System_Bank_Cap, Reserve_Bank_Cap);
 
                declare
                   Exec_Cap : constant Rose.Capabilities.Capability :=

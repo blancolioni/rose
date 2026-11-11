@@ -105,7 +105,13 @@ package body Mem.Processes is
    --  The identifier of the caps for the process with object id Oid. The
    --  kernel uses it too, when the process exits (#697).
 
-   Next_Pid     : Real_Process_Id := 1;
+   Last_Boot_Pid : constant Real_Process_Id := 24;
+   --  Slots 1 to 24 are for boot modules, and the rest for launched
+   --  processes (Register_Process, #873). The install media boots about
+   --  19 modules.
+
+   Next_Boot_Pid     : Real_Process_Id := 1;
+   Next_Launched_Pid : Real_Process_Id := Last_Boot_Pid + 1;
 
    procedure Report_Segment (Segment : Segment_Record);
 
@@ -787,7 +793,8 @@ package body Mem.Processes is
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
-      Pid    : constant Process_Id := Register_Process (Process_Cap);
+      Pid    : constant Process_Id :=
+                 Register_Process (Process_Cap, Boot_Module => False);
       Cap    : Rose.Capabilities.Capability;
       Launch : Rose.Interfaces.Bank.Client.Bank_Client;
    begin
@@ -949,15 +956,25 @@ package body Mem.Processes is
    ----------------------
 
    function Register_Process
-     (Process_Cap : Rose.Capabilities.Capability)
+     (Process_Cap : Rose.Capabilities.Capability;
+      Boot_Module : Boolean)
       return Process_Id
    is
+      First  : constant Real_Process_Id :=
+                 (if Boot_Module then Real_Process_Id'First
+                  else Last_Boot_Pid + 1);
+      Last   : constant Real_Process_Id :=
+                 (if Boot_Module then Last_Boot_Pid
+                  else Real_Process_Id'Last);
+      Next_Pid : Real_Process_Id :=
+                   (if Boot_Module then Next_Boot_Pid
+                    else Next_Launched_Pid);
       Start  : constant Process_Id := Next_Pid;
       Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
    begin
       while Process_Table (Next_Pid).State /= Available loop
-         if Next_Pid = Process_Table'Last then
-            Next_Pid := Process_Table'First;
+         if Next_Pid = Last then
+            Next_Pid := First;
          else
             Next_Pid := Next_Pid + 1;
          end if;
@@ -966,6 +983,12 @@ package body Mem.Processes is
             return 0;
          end if;
       end loop;
+
+      if Boot_Module then
+         Next_Boot_Pid := Next_Pid;
+      else
+         Next_Launched_Pid := Next_Pid;
+      end if;
 
       Rose.Interfaces.Kernel_Process.Client.Open (Client, Process_Cap);
 
