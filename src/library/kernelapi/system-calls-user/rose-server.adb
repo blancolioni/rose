@@ -259,6 +259,27 @@ package body Rose.Server is
       end;
    end Publish_Interface;
 
+   ----------------------
+   -- Read_Identifiers --
+   ----------------------
+
+   procedure Read_Identifiers
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class)
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Count      : Natural;
+      Identifier : Rose.Objects.Capability_Identifier;
+   begin
+      Natural'Read (Stream, Count);
+      for I in 1 .. Count loop
+         Rose.Objects.Capability_Identifier'Read (Stream, Identifier);
+         In_Use (Identifier) := True;
+         if Identifier > Last_Given then
+            Last_Given := Identifier;
+         end if;
+      end loop;
+   end Read_Identifiers;
+
    ---------------------
    -- Receive_Message --
    ---------------------
@@ -516,5 +537,28 @@ package body Rose.Server is
            (Params, Rose.Invocation.Invalid_Endpoint);
       end if;
    end Unblock_Endpoint;
+
+   -----------------------
+   -- Write_Identifiers --
+   -----------------------
+
+   procedure Write_Identifiers
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class)
+   is
+      Count : Natural := 0;
+   begin
+      for Used of In_Use loop
+         if Used then
+            Count := Count + 1;
+         end if;
+      end loop;
+
+      Natural'Write (Stream, Count);
+      for Identifier in In_Use'Range loop
+         if In_Use (Identifier) then
+            Rose.Objects.Capability_Identifier'Write (Stream, Identifier);
+         end if;
+      end loop;
+   end Write_Identifiers;
 
 end Rose.Server;
