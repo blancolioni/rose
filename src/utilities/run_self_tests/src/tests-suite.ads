@@ -14,6 +14,7 @@ with Tests.Invalid_Caps;
 with Tests.Memory;
 with Tests.Numerics;
 with Tests.Processes;
+with Tests.Replacement;
 with Tests.Rights;
 with Tests.Screen;
 with Tests.Secondary_Stack;
@@ -69,6 +70,7 @@ package Tests.Suite is
                    Tests.Signals.Signal_Test'Access,
                    Tests.Banks.Dependent_Test'Access,
                    Tests.Cap_Sets.Cap_Set_Test'Access,
+                   Tests.Replacement.Replacement_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

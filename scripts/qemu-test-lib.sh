@@ -205,6 +205,28 @@ install_rose () {
             exit 1
             ;;
     esac
+
+    # The test of Replaceable needs the cap set server too (#865). A
+    # failure's message can wrap, so its line is kept whole, and only a
+    # line that says PASS, and wasn't skipped, passes.
+    replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replacement" ] \
+        || replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+                             | tail -1)
+    echo "$replacement"
+    case "$replacement" in
+        *skipped*|"")
+            echo "FAIL: the install's replacement test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replacement test did not pass"
+            exit 1
+            ;;
+    esac
 }
 
 wait_for_install () {
@@ -217,6 +239,7 @@ wait_for_install () {
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
         grep -e "derive test" -e "swap test" -e "Cap set test.*\(PASS\|FAIL\)" \
+            -e "Replacement test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
