@@ -59,7 +59,9 @@ The caps that the old version holds to other servers, and the callbacks its clie
 
 - **The old version must be between calls.** Mem waits until it is blocked receiving. If it is blocked in a call of its own, to another server, mem waits for that to finish, up to a limit, and then gives up (section 7).
 - **The kernel holds new calls to the old version's object id,** as it holds replies during a checkpoint. The new version's calls to `Replaceable` are the exception: they are answered, or the handover could never finish.
-- **Replies that the old version owes move to the new one.** The old version puts each reply cap it holds in the cap set, under a name in its state, such as the console's pending `Read`. The new version answers them when it is ready. A reply cap is moved into the set, not copied, so it is still answered exactly once.
+- **Replies that the old version owes move to the new one.** The old version puts each reply cap it holds in the cap set, under a name in its state, such as the console's pending `Read`. The new version answers them when it is ready. A reply cap is moved into the set, not copied, so it is still answered exactly once: the kernel moves every single-use cap that is sent, whether in a call, a reply or a new process's first caps, rather than copying it (#864). The sender's slot keeps its number but holds nothing, so a cap set server that gives a reply cap out a second time gives the null cap, and deleting the slot frees it.
+  - **A moved reply carries words and caps, but not the caller's buffer,** which the kernel mapped into the old version only. Answering into the buffer, as a console's `Read` does, is #878.
+  - **Reply caps can go into only one set,** so `Caps` has to hand them out once, to the new version, and they have to come back to the old version if the handover fails (#879).
 - **The held calls are released to the new version** once it has taken over (section 6), or to the old one if the handover fails (section 7).
 
 ### 5. Checkpoints during a handover
@@ -87,7 +89,9 @@ The processes that the old version launched, such as the directory server's file
 
 The new version's `Rose.Server` reattaches its objects to the identifiers it has been given, which the state records. The new version can also create endpoints that the old one didn't have, for operations that the new release adds (ADR 0031, section 2). A client finds them by asking for the newer interface, which descends from the old one, and keeps using the old one if it doesn't.
 
-Caps that clients hold, including caps derived from the old version's (#116), name the object id, endpoint and identifier, not the process, so they reach the new version with nothing changed. Derivation records whose parent cap is in the old version's cap table are kept by moving the parent into the cap set, where the new version takes it (see the open questions).
+Caps that clients hold, including caps derived from the old version's (#116), name the object id, endpoint and identifier, not the process, so they reach the new version with nothing changed.
+
+A derived cap whose parent is in the old version's cap table goes on working when the old version ends. Ending a process deletes its caps, and deleting a parent doesn't revoke what was derived from it: only rescinding does (ADR 0001). What the old version's end would lose is the power to revoke the children. So a server that may want to revoke what it handed out puts the parent in the cap set, as any other cap. A copy of a derived cap has the same derivation record, so the copy that the new version takes from the set can rescind the children, as the old version's could (#864).
 
 ### 7. Failure
 
@@ -133,8 +137,8 @@ The update test (ADR 0031, section 6) replaces `file`, whose open files have to 
 
 ## Open questions
 
-- **Reply caps in a cap set.** A reply cap is answered once, by its holder. Moving one into a cap set, and out to another process, needs the kernel's support: the cap set server must move it, not copy it.
-- **Derivation parents.** If a derived cap's parent (#116) is in the old version's cap table and isn't taken, ending the old version deletes it, which revokes the derived caps. Should the cap set refuse to drop a parent that has children, or should mem move such parents to the new version itself?
+- **Reply caps with a buffer** (#878). A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Should the kernel move the mapping, or should a server never defer a call that holds a buffer?
+- **Handing reply caps out once** (#879). `Caps` may be called more than once, but the reply caps can be in only one set, and releasing that set leaves their callers blocked.
 - **How long to wait** for the old version to become idle, and for the new version to finish. A fixed limit, or one the updater gives?
 
 ## Follow-up work
@@ -142,7 +146,8 @@ The update test (ADR 0031, section 6) replaces `file`, whose open files have to 
 - Kernel: swap two processes' object ids and endpoint tables, and hold calls to an object id except on one endpoint.
 - Mem: `Memory.Replace_Process`, and no checkpoint during a handover.
 - Store: `Process_Banks.Hand_Over`, which swaps two banks' owners and moves one's sub-banks under the other.
-- Cap sets (#825): moving reply caps and derivation parents.
+- Kernel: move single-use caps, rather than copy them, when they are sent (#864). Derivation parents need nothing new: they go in the cap set as other caps do.
+- Reply caps whose calls hold a buffer (#878), and `Caps` handing reply caps out once (#879).
 - `Replaceable`, `Rose.Server`'s part of it, and the IDL aspect (idle).
 - `file` replaceable, and a test that replaces it on a restored system with files open.
 - #831: `directory`, `auth` and the user server.

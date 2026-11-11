@@ -4,9 +4,11 @@ with Rose.Words;
 
 with Rose.Init_Capabilities;
 with Rose.Interfaces.Bank.Client;
+with Rose.Interfaces.Constructor.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Process_Banks.Client;
+with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Objects;
 
 with Init.Boot_Steps;
@@ -130,7 +132,8 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability)
       return Boolean
    is
       Passed : Boolean := True;
@@ -224,6 +227,53 @@ package body Init.Self_Tests is
                 Length = Max_Depth and then Works (Chain (Max_Depth)));
          Delete_Chain (Chain, Length);
       end loop;
+
+      --  Deleting a parent, as ending its holder does, doesn't revoke
+      --  what was derived from it: only rescinding does (ADR 0032, #864).
+
+      First := Derive (Derive_Cap, Find_Cap);
+      Child := Derive (Derive_Cap, First);
+      Call_On (Delete_Cap, First);
+      Check ("deleting a parent leaves its child working", Works (Child));
+      Call_On (Delete_Cap, Child);
+
+      --  A parent that goes through a cap set, as a handover's caps do,
+      --  keeps its power to revoke: the copy taken from the set is the
+      --  parent, with the same derivation record.
+
+      if Cap_Sets /= Rose.Capabilities.Null_Capability then
+         declare
+            package Sets renames Rose.Interfaces.Releasable_Cap_Set.Client;
+            Service : Rose.Interfaces.Constructor.Client.Constructor_Client;
+            Set     : Sets.Releasable_Cap_Set_Client;
+            Taken   : Rose.Capabilities.Capability;
+         begin
+            Rose.Interfaces.Constructor.Client.Open (Service, Cap_Sets);
+            Sets.Open
+              (Set, Rose.Interfaces.Constructor.Client.Create (Service));
+
+            First := Derive (Derive_Cap, Find_Cap);
+            Child := Derive (Derive_Cap, First);
+            Sets.Append (Set, (1 => First));
+            Call_On (Delete_Cap, First);
+
+            Check ("a parent in a cap set leaves its child working",
+                   not Sets.Has_Error and then Works (Child));
+
+            Taken := Sets.Get_Cap (Set, 1);
+            Check ("the parent taken from the set works",
+                   Taken /= Rose.Capabilities.Null_Capability
+                   and then Works (Taken));
+
+            Call_On (Rescind_Cap, Taken);
+            Check ("rescinding it revokes the child",
+                   Works (Taken) and then not Works (Child));
+
+            Call_On (Delete_Cap, Taken);
+            Call_On (Delete_Cap, Child);
+            Sets.Release (Set);
+         end;
+      end if;
 
       return Passed;
    end Derive_Test;
