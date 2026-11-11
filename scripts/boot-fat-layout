@@ -1,0 +1,123 @@
+#!/usr/bin/env python3
+"""Find files in the boot partition's FAT16 image (#828).
+
+The update boot overwrites the boot partition's slot files and its menu
+in place, through the partition server, without changing the FAT or a
+directory (Restore.Boot_Sets).  So each of those files has to be
+contiguous, and start and end on a boundary of the partition server's
+4096-byte blocks.  scripts/make-boot-disk uses this to place them, and to
+check that it has.
+
+Usage:
+  boot-fat-layout IMAGE next-free     print the byte offset of the first
+                                      free cluster
+  boot-fat-layout IMAGE check PATH... check that each file is contiguous
+                                      and block aligned, and print its
+                                      byte offset and size
+"""
+
+import struct
+import sys
+
+BLOCK = 4096
+
+
+class Fat16:
+
+    def __init__(self, path):
+        with open(path, "rb") as f:
+            self.image = f.read()
+        (bytes_per_sector, self.sectors_per_cluster, reserved, fats,
+         root_entries, total_16, _, fat_sectors) = struct.unpack_from(
+             "<HBHBHHBH", self.image, 11)
+        if bytes_per_sector != 512:
+            sys.exit("boot-fat-layout: %d-byte sectors" % bytes_per_sector)
+        total = total_16 or struct.unpack_from("<I", self.image, 32)[0]
+        self.fat = reserved * 512
+        self.root = (reserved + fats * fat_sectors) * 512
+        self.root_entries = root_entries
+        self.data = self.root + root_entries * 32
+        self.cluster_bytes = self.sectors_per_cluster * 512
+        self.clusters = (total * 512 - self.data) // self.cluster_bytes
+        if not 4085 <= self.clusters < 65525:
+            sys.exit("boot-fat-layout: not FAT16")
+
+    def next_cluster(self, cluster):
+        return struct.unpack_from("<H", self.image, self.fat + 2 * cluster)[0]
+
+    def offset(self, cluster):
+        return self.data + (cluster - 2) * self.cluster_bytes
+
+    def chain(self, cluster):
+        while 2 <= cluster < 0xFFF8:
+            yield cluster
+            cluster = self.next_cluster(cluster)
+
+    def entries(self, cluster):
+        """The short directory entries of a directory, or of the root
+        directory if cluster is None."""
+        if cluster is None:
+            areas = [(self.root, self.root_entries * 32)]
+        else:
+            areas = [(self.offset(c), self.cluster_bytes)
+                     for c in self.chain(cluster)]
+        for start, length in areas:
+            for at in range(start, start + length, 32):
+                entry = self.image[at:at + 32]
+                if entry[0] == 0:
+                    return
+                if entry[0] == 0xE5 or entry[11] == 0x0F:
+                    continue
+                yield (entry[0:11], entry[11],
+                       struct.unpack_from("<H", entry, 26)[0],
+                       struct.unpack_from("<I", entry, 28)[0])
+
+    def find(self, path):
+        cluster = None
+        size = 0
+        for part in path.strip("/").split("/"):
+            base, _, ext = part.upper().partition(".")
+            name = (base.ljust(8) + ext.ljust(3)).encode()
+            for entry_name, _, first, entry_size in self.entries(cluster):
+                if entry_name == name:
+                    cluster, size = first, entry_size
+                    break
+            else:
+                sys.exit("boot-fat-layout: no " + path)
+        return cluster, size
+
+    def next_free(self):
+        for cluster in range(2, self.clusters + 2):
+            if self.next_cluster(cluster) == 0:
+                return self.offset(cluster)
+        sys.exit("boot-fat-layout: no free cluster")
+
+
+def main():
+    if len(sys.argv) < 3:
+        sys.exit(__doc__)
+    fs = Fat16(sys.argv[1])
+    if sys.argv[2] == "next-free":
+        print(fs.next_free())
+    elif sys.argv[2] == "check":
+        failed = False
+        for path in sys.argv[3:]:
+            first, size = fs.find(path)
+            chain = list(fs.chain(first))
+            start = fs.offset(first)
+            if (chain != list(range(first, first + len(chain)))
+                    or start % BLOCK != 0 or size % BLOCK != 0
+                    or size == 0
+                    or len(chain) * fs.cluster_bytes != size):
+                print("boot-fat-layout: %s is not contiguous and block "
+                      "aligned" % path, file=sys.stderr)
+                failed = True
+            else:
+                print(path, start, size)
+        sys.exit(1 if failed else 0)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == "__main__":
+    main()
