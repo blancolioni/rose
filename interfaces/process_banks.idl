@@ -39,4 +39,17 @@ interface Process_Banks is
    --  The next process to end, because its bank was destroyed, or 0 if
    --  there is none.
 
+   procedure Hand_Over
+     (Old_Process : Object_Id;
+      New_Process : Object_Id);
+   --  Old_Process is being replaced by New_Process, and the kernel has
+   --  swapped their object ids (ADR 0032, section 6). Swap the owners of
+   --  their banks, so that each stays with the process that uses it, and
+   --  move every sub-bank of Old_Process's former bank, with its subtree
+   --  and its charges, under New_Process's former bank. The two banks
+   --  must be siblings, so no bank above them changes its total. Nothing
+   --  changes if either process has no bank, they are the same process,
+   --  or their banks aren't siblings: that is a mistake in mem, and the
+   --  store says so on the console.
+
 end Process_Banks;

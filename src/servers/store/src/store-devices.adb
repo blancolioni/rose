@@ -1282,6 +1282,105 @@ package body Store.Devices is
       end if;
    end Get_Usage;
 
+   ---------------
+   -- Hand_Over --
+   ---------------
+
+   procedure Hand_Over
+     (Id          : Rose.Objects.Capability_Identifier;
+      Old_Process : Rose.Objects.Object_Id;
+      New_Process : Rose.Objects.Object_Id)
+   is
+      pragma Unreferenced (Id);
+
+      procedure Refuse (Reason : String);
+      --  Say why nothing changed.
+
+      ------------
+      -- Refuse --
+      ------------
+
+      procedure Refuse (Reason : String) is
+      begin
+         Rose.Console_IO.Put ("storage: hand over ");
+         Rose.Console_IO.Put (Old_Process);
+         Rose.Console_IO.Put (" to ");
+         Rose.Console_IO.Put (New_Process);
+         Rose.Console_IO.Put (": ");
+         Rose.Console_IO.Put_Line (Reason);
+      end Refuse;
+
+      Old_Bank : Natural := 0;
+      New_Bank : Natural := 0;
+      Pages    : Rose.Words.Word_64 := 0;
+      Regions  : Rose.Words.Word := 0;
+   begin
+      if Old_Process = 0 or else New_Process = 0 then
+         Refuse ("no process");
+         return;
+      elsif Old_Process = New_Process then
+         Refuse ("the same process");
+         return;
+      end if;
+
+      for Index in Banks'Range loop
+         if Banks (Index).In_Use then
+            if Banks (Index).Owner = Old_Process then
+               Old_Bank := Index;
+            elsif Banks (Index).Owner = New_Process then
+               New_Bank := Index;
+            end if;
+         end if;
+      end loop;
+
+      if Old_Bank = 0 or else New_Bank = 0 then
+         Refuse ("a process has no bank");
+         return;
+      elsif Banks (Old_Bank).Parent /= Banks (New_Bank).Parent then
+         Refuse ("their banks aren't siblings");
+         return;
+      end if;
+
+      --  What the sub-banks of the old bank hold.  Moving them changes
+      --  only the two banks' totals, since every bank above them is above
+      --  both, so only the new bank's own limits can be broken.
+
+      for Bank of Banks loop
+         if Bank.In_Use and then Bank.Parent = Old_Bank then
+            Pages := Pages + Bank.Pages;
+            Regions := Regions + Bank.Regions;
+         end if;
+      end loop;
+
+      declare
+         Target : Bank_Record renames Banks (New_Bank);
+      begin
+         if (Target.Page_Limit /= 0
+             and then Target.Pages + Pages > Target.Page_Limit)
+           or else
+             (Target.Region_Limit /= 0
+              and then Target.Regions + Regions > Target.Region_Limit)
+         then
+            Refuse ("the new bank's limits are too low");
+            return;
+         end if;
+      end;
+
+      Banks (Old_Bank).Owner := New_Process;
+      Banks (New_Bank).Owner := Old_Process;
+
+      for Bank of Banks loop
+         if Bank.In_Use and then Bank.Parent = Old_Bank then
+            Bank.Parent := New_Bank;
+         end if;
+      end loop;
+
+      Banks (Old_Bank).Pages := Banks (Old_Bank).Pages - Pages;
+      Banks (Old_Bank).Regions := Banks (Old_Bank).Regions - Regions;
+      Banks (New_Bank).Pages := Banks (New_Bank).Pages + Pages;
+      Banks (New_Bank).Regions := Banks (New_Bank).Regions + Regions;
+   end Hand_Over;
+
    ------------------
    -- Insert_Entry --
    ------------------

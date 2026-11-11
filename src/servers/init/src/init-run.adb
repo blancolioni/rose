@@ -698,6 +698,19 @@ package body Init.Run is
            (Console_Stream_Cap, "init: swap test failed" & NL);
       end if;
 
+      --  The store's part: a replaced process's sub-banks move to its
+      --  successor (ADR 0032, #863).
+
+      if not Init.Self_Tests.Hand_Over_Test
+        (Find_Cap        => Find_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Process_Banks   => Init.Boot.Process_Banks_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: hand over test failed" & NL);
+      end if;
+
       --  A persistent holder of derived caps, which checks them after a
       --  restore (#691).
 
