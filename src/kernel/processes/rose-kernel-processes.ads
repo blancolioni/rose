@@ -183,6 +183,9 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id;
       Endpoint    : Rose.Objects.Endpoint_Index;
       Receive_Cap : Rose.Capabilities.Capability);
+   --  Record Receive_Cap as the receive cap of the process's registered
+   --  endpoint Endpoint. Nothing is recorded for an index that is not a
+   --  registered endpoint.
 
    function Find_Receive_Cap
      (Pid        : Process_Id;
