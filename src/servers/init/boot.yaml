@@ -62,7 +62,7 @@ modules:
 
 grub:
   install: boot/iso/grub/grub.cfg
-  disk: boot/hd0/grub.cfg
+  disk: boot/hd0/menu.cfg
 
 priorities:
   memory: 2
