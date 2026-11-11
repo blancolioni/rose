@@ -15,7 +15,9 @@ package Restore.Installer is
       Requires_Framebuffer,
       Provides_Screen,
       Requires_No_Framebuffer,
-      Requires_Screen);
+      Requires_Screen,
+      Provides_Cap_Sets,
+      Requires_Console);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
@@ -34,6 +36,11 @@ package Restore.Installer is
    --  is given the screen driver's surface after its own caps, as the
    --  console on the surface is (#653). A program has at most one of
    --  Requires_Keyboard_Interface and Requires_Screen.
+   --  Provides_Cap_Sets: the program is the userland cap set server
+   --  (#825), whose Constructor init gets. Requires_Console: the program
+   --  is given the persistent console's Writer after its own caps, in
+   --  place of the keyboard or the surface, so that it can write to the
+   --  console; it has neither of the other two.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 

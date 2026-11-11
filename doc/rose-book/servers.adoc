@@ -247,6 +247,25 @@ Used by:: `init`, which gets both interfaces from the installer; `login`, `petal
   It is the only way that the real time goes backwards.
   Only `init` and the rights broker hold `Clock_Admin`, and nothing calls `Set_Realtime` yet (#552).
 
+=== `caps`
+
+Holds cap sets for persistent processes (#825).
+The boot modules have their own cap set server, `bootcaps`, which ends after boot.
+
+Provides:: `Constructor`, whose `Create` makes a new, empty set; `Releasable_Cap_Set` for each set, with `Append`, `Get_Cap` and `Length` from `Cap_Set` and `Release` from `Resource`; and `Restorable`.
+Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`, and the persistent console's `Writer`, which the installer gives after them.
+Used by:: `init`, which gets `Constructor` from the installer, and leaves one set, of the registry's `Commands` interface and the clock, for the boot test to find after a restore; and `run_self_tests`, through its `Cap_Set_Service` role.
+
+* *It is installed and restored,* so its sets, which are in its memory, and their capabilities, which are in its capability table, survive a restore.
+  When it is restored it writes `caps: restored sets N; caps M` on the console, and the boot test compares the counts with the ones the install left.
+* *The sets share one limit.* Every capability in every set is a capability in the server's own table, which holds 4095, and the server keeps 128 of them for itself.
+  A set also costs the server up to seven capabilities of its own: the set's, its four operations' and its two ancestors'.
+  A set has no limit of its own, so a single set can hold nearly 4000.
+* *A full set raises.* An `Append` whose capabilities would go past the limit adds none of them, deletes the copies that arrived, and raises; so does `Create`, if there is no room for another set.
+  If the kernel finds the table full while it delivers the capabilities, it gives the caller `Out_Of_Capabilities`, and nothing is added either.
+* *`Release` deletes the set's capabilities* and rescinds every capability to the set. The server keeps the released set's memory for the next `Create`.
+* *Every set is charged to the server.* `Create` takes no bank, so the memory of a set is not charged to whoever made it, and destroying their bank doesn't free it.
+
 === `screen`
 
 The driver for the boot loader's linear framebuffer, which gives out the whole screen as one surface (ADR 0022, #582).

@@ -58,6 +58,14 @@ package body Restore.Installer.Default is
       Process ("clock", "drivers", Launch,
                (Provides_Clock => True, others => False));
 
+      --  The cap sets of persistent processes, which a restore keeps
+      --  (#825). It writes to the console when it is restored.
+
+      Process ("caps", "drivers", Launch,
+               (Provides_Cap_Sets => True,
+                Requires_Console  => True,
+                others            => False));
+
       --  Saved, not launched: each file and directory is its own
       --  process, launched when it is created (ADR 0003).
 

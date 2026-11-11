@@ -784,7 +784,8 @@ package body Mem.Server is
    is
       pragma Unreferenced (Id);
       Pid : constant Process_Id :=
-                     Mem.Processes.Register_Process (Process);
+                     Mem.Processes.Register_Process
+                       (Process, Boot_Module => True);
       function A
         (Value : Rose.Words.Word)
          return Rose.Addresses.Virtual_Page_Address

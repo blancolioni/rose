@@ -184,6 +184,21 @@ install_rose () {
     fi
     echo "init's derive test: $(sort -u "$WORK/install-screen.txt" \
         | grep -c ': ok') of its checks seen ok"
+
+    # The install's run of the self tests is the one that has the cap set
+    # server, which petal doesn't give (#825).
+    if grep -q "self tests failed" "$WORK/install-screen.txt"; then
+        echo "FAIL: the install's self tests failed"
+        exit 1
+    fi
+    cap_sets=$(grep "Cap set test" "$WORK/install-screen.txt" | tail -1)
+    echo "$cap_sets"
+    case "$cap_sets" in
+        *skipped*|*FAIL*|"")
+            echo "FAIL: the install's cap set test did not pass"
+            exit 1
+            ;;
+    esac
 }
 
 wait_for_install () {
@@ -195,7 +210,8 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" "$WORK/install-now.txt" \
+        grep -e "derive test" -e "Cap set test.*\(PASS\|FAIL\)" \
+            -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
         grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
