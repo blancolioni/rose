@@ -144,6 +144,7 @@
 16#B95A_AE43_CCA3_5AA4#  rose.interfaces.region.read return interface rose.interfaces.reader
 16#8A5E_5926_CE26_449F#  rose.interfaces.region.create_subregion(in object_id; in object_id; in word) return interface rose.interfaces.region
 16#83EF_A172_3FAC_CC0C#  rose.interfaces.region.release
+16#DE1E_C096_EB30_EC5B#  interface rose.interfaces.releasable_cap_set
 16#2141_50E4_45A6_BD6A#  interface rose.interfaces.releasable_reader
 16#3E83_E0CB_5F20_FE7B#  interface rose.interfaces.releasable_writer
 16#F49B_1FE7_07D3_B4B5#  interface rose.interfaces.resource

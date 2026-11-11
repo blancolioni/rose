@@ -69,17 +69,18 @@ package Petal.Signatures is
    type Role_Cap_Kind is
      (Create_Endpoint_Cap, Delete_Cap, Rescind_Cap, Find_Command_Cap,
       Console_Cap, Clock_Service_Cap, Storage_Service_Cap,
-      Screen_Service_Cap, Create_Signal_Cap, Other_Role_Cap);
+      Screen_Service_Cap, Create_Signal_Cap, Cap_Set_Service_Cap,
+      Other_Role_Cap);
    --  A cap that one of the command's roles needs, other than a stream:
    --  a system cap, a bank for the Storage_Service role, which petal
    --  doesn't have yet and gives as the null cap (ADR 0025), the screen
    --  for the Screen_Service role, which petal gives as the null cap too
-   --  (#582), petal's own cap that makes signal caps for the
-   --  Create_Signal role, which it doesn't have yet either (#708), the
-   --  command
-   --  registry's Commands interface for the
-   --  Find_Command role (#460), the console's Terminal for the Console
-   --  role (#454), or a role the shell does not supply.
+   --  (#582), the cap set server for the Cap_Set_Service role, which
+   --  petal gives as the null cap as well (#825), petal's own cap that
+   --  makes signal caps for the Create_Signal role, which it doesn't have
+   --  yet either (#708), the command registry's Commands interface for
+   --  the Find_Command role (#460), the console's Terminal for the
+   --  Console role (#454), or a role the shell does not supply.
 
    type Role_Cap_Record is
       record

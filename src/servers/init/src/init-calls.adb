@@ -129,8 +129,12 @@ package body Init.Calls is
       pragma Unreferenced (Length);
       Cap_Params   : aliased Rose.Invocation.Invocation_Record;
    begin
+
+      --  The set is a Releasable_Cap_Set (#825), whose interface gives
+      --  Release as well, after Cap_Set's three.
+
       Rose.System_Calls.Initialize_Send (Cap_Params, Cap_Set);
-      Rose.System_Calls.Receive_Caps (Cap_Params, 3);
+      Rose.System_Calls.Receive_Caps (Cap_Params, 4);
       Rose.System_Calls.Invoke_Capability (Cap_Params);
       Append := Cap_Params.Caps (0);
       Get_Cap := Cap_Params.Caps (1);

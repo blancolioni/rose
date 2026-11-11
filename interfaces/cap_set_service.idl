@@ -1,0 +1,4 @@
+role Cap_Set_Service : Constructor;
+--  The userland cap set server's Constructor (#825). Run_Self_Tests has
+--  it, for the test of cap sets: init gives it. Petal gives none, and a
+--  command must work without it.

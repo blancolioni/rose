@@ -71,7 +71,6 @@ package body Init.Run is
                                  renames Init.Boot.Console_Stream_Cap;
       Console_Redirect_Cap   : Capability
                                  renames Init.Boot.Console_Redirect_Cap;
-      Cap_Set_Cap            : Capability renames Init.Boot.Cap_Set_Cap;
       Storage_Cap            : Capability renames Init.Boot.Storage_Cap;
       System_Bank_Cap        : Capability := Null_Capability;
       Reserve_Bank_Cap       : Capability := Null_Capability;
@@ -105,6 +104,14 @@ package body Init.Run is
                                    Null_Capability;
       --  The screen driver's surface, from the installer, if there is a
       --  framebuffer (#582).
+      Cap_Sets_Cap             : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  The userland cap set server's Constructor interface, from the
+      --  installer (#825), for the self tests' Cap_Set_Service role.
+      Create_Cap_Set_Cap       : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  Its Create cap, for the set that init leaves for the restore
+      --  test.
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -419,6 +426,18 @@ package body Init.Run is
 
                Clock_Admin_Cap := Params.Caps (0);
                Clock_Cap := Params.Caps (1);
+            elsif Params.Data (1) = 95 then
+
+               --  The userland cap set server is running, and cap 0 is
+               --  its Constructor interface (#825).
+
+               declare
+                  Caps : Init.Calls.Array_Of_Capabilities (1 .. 1);
+               begin
+                  Cap_Sets_Cap := Params.Caps (0);
+                  Init.Calls.Get_Interface (Cap_Sets_Cap, Caps);
+                  Create_Cap_Set_Cap := Caps (1);
+               end;
             elsif Params.Data (1) = 98 then
 
                --  The persistent console is running.  The boot console
@@ -618,9 +637,9 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to find 'find'" & NL);
       end if;
 
-      if Cap_Set_Cap = Rose.Capabilities.Null_Capability then
+      if Cap_Sets_Cap = Rose.Capabilities.Null_Capability then
          Init.Calls.Send_String
-           (Console_Stream_Cap, "init: unable to find 'cap_set'" & NL);
+           (Console_Stream_Cap, "init: no cap set server" & NL);
       end if;
 
       if Clock_Cap = Rose.Capabilities.Null_Capability then
@@ -680,10 +699,28 @@ package body Init.Run is
          Commands        => Commands_Cap,
          Clock           => Clock_Cap,
          Screen          => Screen_Cap,
-         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap)
+         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap,
+         Cap_Sets        => Cap_Sets_Cap)
       then
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: self tests failed" & NL);
+      end if;
+
+      --  A cap set that the checkpoint keeps, so that the boot test can
+      --  see that a set made before a checkpoint is there after a restore:
+      --  the cap set server reports its sets when it is restored (#825).
+      --  It holds the registry's Commands interface and the clock, which
+      --  are persistent too.
+
+      if Create_Cap_Set_Cap /= Null_Capability then
+         if Init.Calls.Create_Cap_Set_With
+           (Create_Cap_Set_Cap, (Commands_Cap, Clock_Cap))
+           = Null_Capability
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: no cap set for the restore test"
+               & NL);
+         end if;
       end if;
 
       --  The auth server, which keeps the users and their passwords
@@ -821,9 +858,10 @@ package body Init.Run is
            (Console_Stream_Cap, "init: unable to launch login" & NL);
       end if;
 
-      --  Login is the last launch. The derive test's cap set goes with
-      --  bootcaps, so the first checkpoint has no derivation records for
-      --  it, until the test moves to the userland cap set server (#825).
+      --  Login is the last launch. Init's derived capabilities are with
+      --  hold_derived (#691), and its test set with the userland cap set
+      --  server (#825), which are persistent, so the first checkpoint has
+      --  them.
 
       Init.Boot_Steps.End_Boot_Cap_Sets;
 

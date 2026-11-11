@@ -188,6 +188,21 @@ install_rose () {
     # The swap test's last checks follow the release (ADR 0032, #862).
     grep -q "swap test: release the calls: ok" "$WORK/install-screen.txt" \
         || { echo "FAIL: init's swap test was not seen to finish"; exit 1; }
+
+    # The install's run of the self tests is the one that has the cap set
+    # server, which petal doesn't give (#825).
+    if grep -q "self tests failed" "$WORK/install-screen.txt"; then
+        echo "FAIL: the install's self tests failed"
+        exit 1
+    fi
+    cap_sets=$(grep "Cap set test" "$WORK/install-screen.txt" | tail -1)
+    echo "$cap_sets"
+    case "$cap_sets" in
+        *skipped*|*FAIL*|"")
+            echo "FAIL: the install's cap set test did not pass"
+            exit 1
+            ;;
+    esac
 }
 
 wait_for_install () {
@@ -199,7 +214,8 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" -e "swap test" "$WORK/install-now.txt" \
+        grep -e "derive test" -e "swap test" -e "Cap set test.*\(PASS\|FAIL\)" \
+            -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
         grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
@@ -292,3 +308,4 @@ check_kilo () {
     screen | grep -q "^hello from kilo" \
         || fail "the file lost its first line"
 }
+                                                                                                                                                                                                                                                                
