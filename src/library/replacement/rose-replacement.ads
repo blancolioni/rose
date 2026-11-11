@@ -13,7 +13,13 @@ package Rose.Replacement is
    --  and the new version is launched with that interface as its
    --  Previous argument. A command with idle's Replaceable aspect does
    --  both: its server package attaches the interface with Attach, and
-   --  its generated main calls Take_Over before the command.
+   --  its generated main calls Start before the command.
+   --
+   --  The same state can be saved, and another instance of the program
+   --  can start from it, as its Saved argument (section 10, #881). A
+   --  saved state carries no caps: the new instance is given them as the
+   --  command's arguments, which its main names, and Read_State takes
+   --  them by name in either case.
    --
    --  The state is a stream: this package's header, the identifiers in
    --  use (Rose.Server.Write_Identifiers), the server's named caps, each
@@ -28,7 +34,10 @@ package Rose.Replacement is
    --  parents, and Constructor.
 
    type Named_Caps is tagged private;
-   --  The caps that a server holds, each with a name.
+   --  The caps that a server holds, each with a name. A cap that a
+   --  restored instance is given as an argument has the argument's name,
+   --  as the IDL spells it, so a server names each cap that it is also
+   --  given as an argument by that argument's name.
 
    procedure Add
      (Named : in out Named_Caps;
@@ -69,6 +78,14 @@ package Rose.Replacement is
    function Replaceable_Cap return Rose.Capabilities.Capability;
    --  The cap of the Replaceable interface, once it is attached.
 
+   function Saveable_Cap return Rose.Capabilities.Capability;
+   --  The cap of the same object's Saveable interface, once it is
+   --  attached, which gives the state but not the caps.
+
+   procedure Save (To : Rose.Capabilities.Capability);
+   --  Write the state that State gives to the Writer To, for the server
+   --  to save itself. It must be attached.
+
    procedure Take_Over
      (Previous   : Rose.Capabilities.Capability;
       Read_State : not null Read_State_Procedure);
@@ -78,8 +95,30 @@ package Rose.Replacement is
    --  server's part, and release the state and the set. Nothing is done
    --  for the null cap, which is a fresh start.
 
+   procedure Restore
+     (Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure);
+   --  If Saved is a cap, a Reader of a state that Save or State wrote:
+   --  read it, mark its identifiers in use, and call Read_State with the
+   --  server's part and Arguments, the caps that the command was given,
+   --  in place of the caps that the state names. Nothing is done for the
+   --  null cap.
+
+   procedure Start
+     (Previous   : Rose.Capabilities.Capability;
+      Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure);
+   --  Take over from Previous if it is a cap, restore from Saved if it
+   --  is, and start fresh if neither is. Raises Bad_Start if both are,
+   --  which fails the launch. A replaceable command's main calls it.
+
    Bad_State : exception;
    --  The state is not one that this package wrote.
+
+   Bad_Start : exception;
+   --  A server is given both a version to take over and a saved state.
 
 private
 

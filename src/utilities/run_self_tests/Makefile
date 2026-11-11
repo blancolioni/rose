@@ -48,5 +48,6 @@ run_self_tests:
 	    $(INTERFACES)/constructor.idl \
 	    $(INTERFACES)/cap_set.idl \
 	    $(INTERFACES)/releasable_cap_set.idl \
-	    $(INTERFACES)/replaceable.idl
+	    $(INTERFACES)/replaceable.idl \
+	    $(INTERFACES)/saveable.idl
 	gprbuild $(GPRBUILD_CARGS)
