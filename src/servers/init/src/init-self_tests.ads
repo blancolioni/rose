@@ -58,6 +58,22 @@ package Init.Self_Tests is
    --  probes. It reports each check on Standard_Output, and is True if
    --  they all passed.
 
+   function Hand_Over_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Process_Banks   : Rose.Capabilities.Capability)
+      return Boolean;
+   --  The store's part of replacing a running process (ADR 0032, #863).
+   --  Through Process_Banks, the store's interface for mem, make two
+   --  sibling process banks in a test bank, for made-up processes Old and
+   --  New, and launch a swap_probe, found through Find_Cap, against a
+   --  sub-bank of Old's. Hand Old's bank over to New, and check that the
+   --  owners swapped and the probe's charges moved; then end New, as mem
+   --  ends the old version after the swap, and check that the probe
+   --  still answers. Destroying the test bank ends the probe. It reports
+   --  each check on Standard_Output, and is True if they all passed.
+
    function Start_Derived_Holder
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;

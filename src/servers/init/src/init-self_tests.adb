@@ -6,6 +6,8 @@ with Rose.Init_Capabilities;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Named.Client;
+with Rose.Interfaces.Process_Banks.Client;
+with Rose.Objects;
 
 with Init.Boot_Steps;
 with Init.Calls;
@@ -225,6 +227,202 @@ package body Init.Self_Tests is
 
       return Passed;
    end Derive_Test;
+
+   --------------------
+   -- Hand_Over_Test --
+   --------------------
+
+   function Hand_Over_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Process_Banks   : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      use type Rose.Words.Word_64;
+      package Bank_Client renames Rose.Interfaces.Bank.Client;
+      package Named renames Rose.Interfaces.Named.Client;
+      package PB renames Rose.Interfaces.Process_Banks.Client;
+
+      Old_Process : constant Rose.Objects.Object_Id := 16#7FFF_FFF0#;
+      New_Process : constant Rose.Objects.Object_Id := 16#7FFF_FFF1#;
+      --  Object ids that no process has, so mem ignores them.
+
+      type Usage is
+         record
+            Pages   : Rose.Words.Word_64 := 0;
+            Regions : Rose.Words.Word := 0;
+         end record;
+
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+                     Init.Calls.Find_In_Map (Find_Cap, "swap_probe");
+      Bank_Cap   : constant Rose.Capabilities.Capability :=
+                     Init.Grants.Bank (Probe_Page_Limit, Probe_Region_Limit);
+
+      Passed     : Boolean := True;
+      Banks      : PB.Process_Banks_Client;
+      Test       : Bank_Client.Bank_Client;
+      Old_Bank   : Bank_Client.Bank_Client;
+      New_Bank   : Bank_Client.Bank_Client;
+      Sub_Bank   : Bank_Client.Bank_Client;
+      Probe      : Rose.Capabilities.Capability;
+      Client     : Named.Named_Client;
+      Old_Before : Usage;
+      New_Before : Usage;
+      Sub_Usage  : Usage;
+      Test_Usage : Usage;
+
+      function Answers return Boolean;
+      --  The probe's Name is 4.
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      function Index_Of (Process : Rose.Objects.Object_Id)
+                         return Rose.Words.Word;
+      --  The index of Process's bank, or 0 if it has none.
+
+      function Usage_Of (Bank : Bank_Client.Bank_Client) return Usage;
+      --  What has been reserved from Bank and below it.
+
+      -------------
+      -- Answers --
+      -------------
+
+      function Answers return Boolean is
+         Text : String (1 .. 16);
+         Last : Natural;
+      begin
+         Named.Name (Client, Text, Last);
+         return not Named.Has_Error
+           and then Last in Text'Range
+           and then Text (1 .. Last) = "4";
+      end Answers;
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String
+           (Standard_Output,
+            "hand over test: " & Name & (if Ok then ": ok" else ": FAIL")
+            & NL);
+         Passed := Passed and then Ok;
+      end Check;
+
+      --------------
+      -- Index_Of --
+      --------------
+
+      function Index_Of (Process : Rose.Objects.Object_Id)
+                         return Rose.Words.Word
+      is
+         Bank : constant Bank_Client.Bank_Client :=
+                  PB.Process_Bank (Banks, Process);
+      begin
+         if Bank_Client.Get_Interface_Cap (Bank)
+           = Rose.Capabilities.Null_Capability
+         then
+            return 0;
+         end if;
+         return Bank_Client.Index (Bank);
+      end Index_Of;
+
+      --------------
+      -- Usage_Of --
+      --------------
+
+      function Usage_Of (Bank : Bank_Client.Bank_Client) return Usage is
+         Result       : Usage;
+         Page_Limit   : Rose.Words.Word_64;
+         Region_Limit : Rose.Words.Word;
+      begin
+         Bank_Client.Get_Usage
+           (Bank, Result.Pages, Result.Regions, Page_Limit, Region_Limit);
+         return Result;
+      end Usage_Of;
+
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability
+        or else Bank_Cap = Rose.Capabilities.Null_Capability
+        or else Process_Banks = Rose.Capabilities.Null_Capability
+      then
+         return False;
+      end if;
+
+      PB.Open (Banks, Process_Banks);
+      Bank_Client.Open (Test, Bank_Cap);
+
+      Old_Bank :=
+        PB.Create_Process_Bank (Banks, Bank_Client.Index (Test), Old_Process);
+      New_Bank :=
+        PB.Create_Process_Bank (Banks, Bank_Client.Index (Test), New_Process);
+
+      if Bank_Client.Get_Interface_Cap (Old_Bank)
+        = Rose.Capabilities.Null_Capability
+        or else Bank_Client.Get_Interface_Cap (New_Bank)
+        = Rose.Capabilities.Null_Capability
+      then
+         Check ("make the two process banks", False);
+         Bank_Client.Destroy (Test);
+         return False;
+      end if;
+
+      Sub_Bank := Bank_Client.Create_Sub_Bank (Old_Bank, 0, 0);
+      Probe := Launch_Probe (Launch_Cap,
+                             Bank_Client.Get_Interface_Cap (Sub_Bank),
+                             Create_Endpoint, 4,
+                             Rose.Capabilities.Null_Capability);
+      if Probe = Rose.Capabilities.Null_Capability then
+         Check ("launch a probe below the old bank", False);
+         Bank_Client.Destroy (Test);
+         return False;
+      end if;
+
+      Named.Open (Client, Probe);
+      Check ("the probe answers", Answers);
+
+      Old_Before := Usage_Of (Old_Bank);
+      New_Before := Usage_Of (New_Bank);
+      Sub_Usage := Usage_Of (Sub_Bank);
+      Test_Usage := Usage_Of (Test);
+      Check ("the probe's storage is charged to the old bank",
+             Sub_Usage.Regions > 0
+             and then Old_Before.Regions >= Sub_Usage.Regions);
+
+      PB.Hand_Over (Banks, Old_Process, New_Process);
+
+      Check ("the owners are swapped",
+             Index_Of (New_Process) = Bank_Client.Index (Old_Bank)
+             and then Index_Of (Old_Process) = Bank_Client.Index (New_Bank));
+      Check ("the sub-bank keeps its charges",
+             Usage_Of (Sub_Bank) = Sub_Usage);
+      Check ("its charges moved to the new bank",
+             Usage_Of (Old_Bank)
+             = (Old_Before.Pages - Sub_Usage.Pages,
+                Old_Before.Regions - Sub_Usage.Regions)
+             and then Usage_Of (New_Bank)
+             = (New_Before.Pages + Sub_Usage.Pages,
+                New_Before.Regions + Sub_Usage.Regions));
+      Check ("the bank above them is unchanged",
+             Usage_Of (Test) = Test_Usage);
+
+      --  Mem ends the old version, which now has New's object id, and the
+      --  store destroys its bank.
+
+      PB.End_Process (Banks, New_Process);
+
+      Check ("the old bank is gone", Index_Of (New_Process) = 0);
+      Check ("the probe still answers", Answers);
+
+      --  Destroying the test bank ends the probe.
+
+      Bank_Client.Destroy (Test);
+      return Passed;
+   end Hand_Over_Test;
 
    -----------------
    -- Kernel_Call --

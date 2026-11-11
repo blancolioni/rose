@@ -182,7 +182,7 @@ install_rose () {
         echo "FAIL: one of init's tests failed"
         exit 1
     fi
-    echo "init's derive and swap tests: $(sort -u "$WORK/install-screen.txt" \
+    echo "init's derive, swap and hand over tests: $(sort -u "$WORK/install-screen.txt" \
         | grep -c ': ok') of their checks seen ok"
 
     # The screen can scroll past init's tests between two looks at it, as
@@ -238,7 +238,8 @@ wait_for_install () {
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" -e "swap test" -e "Cap set test.*\(PASS\|FAIL\)" \
+        grep -e "derive test" -e "swap test" -e "hand over test" \
+            -e "Cap set test.*\(PASS\|FAIL\)" \
             -e "Replacement test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"

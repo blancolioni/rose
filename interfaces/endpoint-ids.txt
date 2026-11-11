@@ -133,6 +133,7 @@
 16#6135_2803_46CF_AF82#  rose.interfaces.process_banks.end_process(in object_id)
 16#FC79_F0C6_C289_39D6#  rose.interfaces.process_banks.set_ended(in capability)
 16#8416_FC33_DB87_913A#  rose.interfaces.process_banks.take_ended return object_id
+16#8DCF_CDC3_9FB9_904B#  rose.interfaces.process_banks.hand_over(in object_id; in object_id)
 16#C52D_213D_B844_4345#  interface rose.interfaces.reader
 16#0CA9_5C46_2427_9D3A#  rose.interfaces.reader.read(out stream_element_array; out stream_element_offset)
 16#5825_D21E_9BA2_3704#  interface rose.interfaces.receiver
