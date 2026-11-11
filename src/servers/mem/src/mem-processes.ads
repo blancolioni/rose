@@ -112,8 +112,14 @@ package Mem.Processes is
    --  store's Process_Banks, or 0.
 
    function Register_Process
-     (Process_Cap : Rose.Capabilities.Capability)
+     (Process_Cap : Rose.Capabilities.Capability;
+      Boot_Module : Boolean)
       return Process_Id;
+   --  Give the kernel process Process_Cap a slot. Boot modules have slots
+   --  of their own, below every launched process's, because the install
+   --  media boots more of them than hd0 does: a slot a launched process
+   --  had at a checkpoint must still be free when an update boot
+   --  restores it (#873). 0 if there is no free slot.
 
    function Get_Heap_Cap
      (Process : Process_Id)
