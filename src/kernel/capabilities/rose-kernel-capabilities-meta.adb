@@ -130,7 +130,12 @@ package body Rose.Kernel.Capabilities.Meta is
                Local_Endpoint, Identifier));
       end if;
 
-      if Receive_Cap /= Null_Capability then
+      --  A receive-any cap (Endpoint_Id = 0) belongs to no registered
+      --  endpoint, so there is nowhere to record it. Recording it at
+      --  endpoint 0 wrote before the endpoint array, over the process's
+      --  cap page addresses (#861).
+
+      if Receive_Cap /= Null_Capability and then Local_Endpoint /= 0 then
          Rose.Kernel.Processes.Set_Receive_Cap
            (Process_Id, Local_Endpoint, Receive_Cap);
       end if;
