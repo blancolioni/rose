@@ -19,6 +19,7 @@ auth:
 	    $(INTERFACES)/user.idl \
 	    $(INTERFACES)/named.idl \
 	    $(INTERFACES)/commands.idl \
+	    $(INTERFACES)/constructor.idl \
 	    $(INTERFACES)/launch.idl \
 	    $(INTERFACES)/process.idl \
 	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \

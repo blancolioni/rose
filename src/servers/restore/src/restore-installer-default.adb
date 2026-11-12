@@ -90,6 +90,7 @@ package body Restore.Installer.Default is
       Process ("login", "bin", Save, Default_Flags);
       Process ("run_self_tests", "bin", Save, Default_Flags);
       Process ("hold_derived", "bin", Save, Default_Flags);
+      Process ("hold_file", "bin", Save, Default_Flags);
       Process ("swap_probe", "bin", Save, Default_Flags);
 
       --  The test server of the Replaceable interface, which

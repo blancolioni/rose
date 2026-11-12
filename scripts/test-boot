@@ -63,6 +63,14 @@ grep -q "hold_derived: restored: the derived capability works" \
     "$WORK/restored-screen.txt" \
     || fail "hold_derived did not find its restored capability working and revocable"
 
+# Hold_file holds a file that init replaced with a new version during the
+# install, with a writer and a reader open, and checks them the first time
+# it is restored (#867).
+grep "hold_file:" "$WORK/restored-screen.txt" | tail -1
+grep -q "hold_file: restored: the replaced file has its contents" \
+    "$WORK/restored-screen.txt" \
+    || fail "hold_file did not find its replaced file intact after the restore"
+
 # caps writes what it holds when it is restored. Init leaves it one set,
 # of two capabilities, for this check (#825); the install's self tests
 # release theirs.

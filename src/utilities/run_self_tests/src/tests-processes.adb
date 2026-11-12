@@ -6,12 +6,12 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
-with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
+with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Files;
@@ -23,6 +23,8 @@ package body Tests.Processes is
    use System.Storage_Elements;
 
    package Files renames Rose.Interfaces.Writable_File.Client;
+   package Directories renames
+     Rose.Interfaces.Writable_Directory.Client;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -37,7 +39,6 @@ package body Tests.Processes is
 
    function Bank_End_Test return Boolean is
       use type Rose.Capabilities.Capability;
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
       Own     : constant Rose.Capabilities.Capability :=
                   Rose.System_Calls.Own_Bank.Cap;
    begin
@@ -52,20 +53,12 @@ package body Tests.Processes is
                       Rose.Interfaces.Bank.Client.From_Cap (Own);
          Sub_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
                       Own_Bank.Create_Sub_Bank (0, 0);
-         Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
-                      Tests.Registry.Launcher ("file");
-         Server   : Rose.Interfaces.Process.Process_Object'Class :=
-                      Launcher.Launch (Sub_Bank.Bank_Cap, No_Caps);
-         Control  : Rose.Interfaces.File_Control.Client.File_Control_Client;
          File     : Files.Writable_File_Client;
       begin
-         Control.Open (Server.Published_Interface);
-         declare
-            Writable : Rose.Interfaces.Writable_File
-              .Writable_File_Object'Class := Control.Writable;
-         begin
-            File.Open (Writable.Writable_File_Cap);
-         end;
+         File.Open (Tests.Registry.Launch_File (Sub_Bank.Bank_Cap));
+         if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+            return Fail ("no file server");
+         end if;
          Tests.Files.Append (File, Hello);
          if File.Size /= Hello'Length then
             return Fail ("the file doesn't work");
@@ -93,36 +86,38 @@ package body Tests.Processes is
    ----------------------
 
    function End_Process_Test return Boolean is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
-        Tests.Registry.Launcher ("file");
-      First    : Rose.Interfaces.Process.Process_Object'Class :=
-        Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps);
-      Control  : Rose.Interfaces.File_Control.Client.File_Control_Client;
-      File     : Files.Writable_File_Client;
+        Tests.Registry.Launcher ("directory");
+
+      function Launch_Directory
+        return Rose.Interfaces.Process.Process_Object'Class
+      is (Launcher.Launch
+            (Rose.System_Calls.Own_Bank.Cap,
+             (Tests.Registry.Launcher_Cap ("file"),
+              Tests.Registry.Launcher_Cap ("directory"),
+              Tests.Registry.Cap_Sets)));
+      --  A directory, which is launched with Launch and so has a Process
+      --  cap, as a file did before it was a command (#867).
+
+      First     : Rose.Interfaces.Process.Process_Object'Class :=
+        Launch_Directory;
+      Directory : Directories.Writable_Directory_Client;
    begin
       Ada.Text_IO.Put ("End process test");
 
-      Control.Open (First.Published_Interface);
-      declare
-         Writable : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
-           Control.Writable;
-      begin
-         File.Open (Writable.Writable_File_Cap);
-      end;
-      Tests.Files.Append (File, Hello);
-      if File.Size /= Hello'Length then
-         return Fail ("the file doesn't work");
+      Directory.Open (First.Published_Interface);
+      if Directory.Directory_Entry_Count /= 0 then
+         return Fail ("the directory doesn't work");
       end if;
 
-      --  The launcher ends the file's process. The caps that are held for
-      --  it then fail (#320).
+      --  The launcher ends the directory's process. The caps that are
+      --  held for it then fail (#320).
 
       First.Destroy;
 
       begin
-         Ada.Text_IO.Put (Storage_Count'Image (File.Size));
-         return Fail ("the file answers after its process ended");
+         Ada.Text_IO.Put (Natural'Image (Directory.Directory_Entry_Count));
+         return Fail ("the directory answers after its process ended");
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
             null;
@@ -133,20 +128,11 @@ package body Tests.Processes is
       --  again must not reach it.
 
       declare
-         Second      : Rose.Interfaces.Process.Process_Object'Class :=
-           Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps);
-         Second_Control : Rose.Interfaces.File_Control.Client
-           .File_Control_Client;
-         Second_File    : Files.Writable_File_Client;
+         Second           : Rose.Interfaces.Process.Process_Object'Class :=
+           Launch_Directory;
+         Second_Directory : Directories.Writable_Directory_Client;
       begin
-         Second_Control.Open (Second.Published_Interface);
-         declare
-            Writable : Rose.Interfaces.Writable_File
-              .Writable_File_Object'Class :=
-                Second_Control.Writable;
-         begin
-            Second_File.Open (Writable.Writable_File_Cap);
-         end;
+         Second_Directory.Open (Second.Published_Interface);
 
          begin
             First.Destroy;
@@ -156,9 +142,8 @@ package body Tests.Processes is
          end;
 
          begin
-            Tests.Files.Append (Second_File, Hello);
-            if Second_File.Size /= Hello'Length then
-               return Fail ("wrong size in the second file");
+            if Second_Directory.Directory_Entry_Count /= 0 then
+               return Fail ("the second directory doesn't work");
             end if;
          exception
             when Rose.Interfaces.Objects.Invocation_Error =>

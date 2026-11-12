@@ -14,14 +14,18 @@ with Rose.Interfaces.Constructor.Client;
 with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Named.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
+with Rose.Interfaces.Releasable_Writer;
 with Rose.Interfaces.Replaceable.Client;
 with Rose.Interfaces.Replacement;
 with Rose.Interfaces.Replacement.Client;
 with Rose.Interfaces.Replacer.Client;
 with Rose.Interfaces.Saveable.Client;
+with Rose.Interfaces.Transactional_Writable_File;
+with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Registry;
 
@@ -149,6 +153,234 @@ package body Tests.Replacement is
       when others =>
          return "(no name)";
    end Name_Of;
+
+   -----------------------
+   -- Replace_File_Test --
+   -----------------------
+
+   function Replace_File_Test return Boolean is
+      use Ada.Streams;
+      use System.Storage_Elements;
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      function Bytes (Text : String) return Stream_Element_Array;
+
+      function Read_All
+        (Reader : in out Rose.Interfaces.Releasable_Reader
+           .Releasable_Reader_Object'Class)
+         return String;
+      --  What Reader reads until it reaches the end.
+
+      -----------
+      -- Bytes --
+      -----------
+
+      function Bytes (Text : String) return Stream_Element_Array is
+         Result : Stream_Element_Array (1 .. Text'Length);
+      begin
+         for I in Text'Range loop
+            Result (Stream_Element_Offset (I - Text'First + 1)) :=
+              Character'Pos (Text (I));
+         end loop;
+         return Result;
+      end Bytes;
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      --------------
+      -- Read_All --
+      --------------
+
+      function Read_All
+        (Reader : in out Rose.Interfaces.Releasable_Reader
+           .Releasable_Reader_Object'Class)
+         return String
+      is
+         Buffer : Stream_Element_Array (1 .. 64);
+         Last   : Stream_Element_Offset;
+         Result : String (1 .. 256);
+         Length : Natural := 0;
+      begin
+         loop
+            Reader.Read (Buffer, Last);
+            exit when Last < Buffer'First;
+            for Item of Buffer (Buffer'First .. Last) loop
+               exit when Length = Result'Last;
+               Length := Length + 1;
+               Result (Length) := Character'Val (Item);
+            end loop;
+         end loop;
+         return Result (1 .. Length);
+      end Read_All;
+
+   begin
+      Ada.Text_IO.Put ("Replace file test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  As in Replace_Process_Test, everything is in a bank of the
+      --  test's own, which it destroys at the end (#724).
+
+      declare
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Tests.Registry.File_Endpoint (Test_Bank.Bank_Cap);
+         Served    : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+         File      : Rose.Interfaces.Writable_File.Client
+           .Writable_File_Client;
+      begin
+         if Endpoint /= Null_Cap then
+            begin
+               Tests.Registry.Start_File (Endpoint, Served, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Served = Null_Cap or else Control = Null_Cap then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": the file did not start");
+            return False;
+         end if;
+
+         File.Open (Served);
+
+         declare
+            First   : Rose.Interfaces.Releasable_Writer
+              .Releasable_Writer_Object'Class := File.Rewrite;
+            Writer  : Rose.Interfaces.Releasable_Writer
+              .Releasable_Writer_Object'Class := File.Append;
+            Reader  : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class := File.Open_Reader;
+            Start   : Stream_Element_Array (1 .. 2);
+            Last    : Stream_Element_Offset;
+         begin
+            First.Write (Bytes ("hello"));
+            First.Release;
+            Reader.Read (Start, Last);
+            Check ("the reader did not start", Last = Start'Last);
+
+            --  A version, with a writer of its own, which is open across
+            --  the handover too.
+
+            declare
+               Version        : Rose.Interfaces.Transactional_Writable_File
+                 .Transactional_Writable_File_Object'Class :=
+                   File.New_Version;
+               Version_Writer : Rose.Interfaces.Releasable_Writer
+                 .Releasable_Writer_Object'Class := Version.Append;
+               Replacement    : Rose.Interfaces.Replacement
+                 .Replacement_Object'Class :=
+                   Replacer.Replace_Process (Control);
+               Committed      : Boolean := False;
+            begin
+               Check ("no replacement",
+                      Replacement.Replacement_Cap /= Null_Cap);
+
+               if Replacement.Replacement_Cap /= Null_Cap then
+                  declare
+                     Ready       : Boolean := False;
+                     Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                       Replacement.Bank;
+                     New_Version : Rose.Capabilities.Capability;
+                     New_Served  : Rose.Capabilities.Capability;
+                     New_Control : Rose.Capabilities.Capability;
+                  begin
+                     for Attempt in 1 .. 100_000 loop
+                        Ready := Replacement.Ready;
+                        exit when Ready;
+                     end loop;
+                     Check ("the old version is never ready", Ready);
+
+                     New_Version :=
+                       Tests.Registry.File_Endpoint (Sibling.Bank_Cap);
+                     Check ("the new version did not launch",
+                            New_Version /= Null_Cap);
+
+                     if Ready and then New_Version /= Null_Cap then
+                        Replacement.Allow (New_Version);
+                        begin
+                           Tests.Registry.Start_File
+                             (New_Version, New_Served, New_Control,
+                              Previous => Control);
+                           Committed := Replacement.Commit;
+                        exception
+                           when Rose.Interfaces.Objects.Invocation_Error =>
+                              Check ("the new version refused", False);
+                        end;
+                     end if;
+                  end;
+
+                  Check ("the replacement did not commit", Committed);
+                  Replacement.Release;
+               end if;
+
+               --  Until a replacement commits or is released, the old
+               --  version's calls are held, so nothing is asked of the
+               --  file unless it committed.
+
+               if Committed then
+                  Writer.Write (Bytes (" world"));
+                  Check ("the reader did not go on",
+                         Read_All (Reader) = "llo world");
+                  Check ("the size is wrong", File.Size = 11);
+
+                  Version_Writer.Write (Bytes ("!"));
+                  Version.Commit;
+                  Check ("the version did not commit",
+                         File.Size = 6);
+
+                  declare
+                     Again : Rose.Interfaces.Releasable_Reader
+                       .Releasable_Reader_Object'Class := File.Open_Reader;
+                  begin
+                     Check ("the file is not the version's",
+                            Read_All (Again) = "hello!");
+                     Again.Release;
+                  end;
+
+                  Version_Writer.Release;
+                  Version.Release;
+                  Writer.Release;
+                  Reader.Release;
+               end if;
+            end;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to the file failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_File_Test;
 
    --------------------------
    -- Replace_Process_Test --

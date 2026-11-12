@@ -14,15 +14,17 @@ project File is
    for Source_Dirs use
       ("../../../rts/user/build/interfaces",
        "src",
-       "build/generated");
+       "build/generated",
+       "../../library/rose",
+       "../../library/replacement");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
-   for Main use ("file-driver.adb");
+   for Main use ("rose-core-file_main.adb");
 
    package Builder is
       for Global_Configuration_Pragmas use "file-pragmas.config";
       for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
-      for Executable ("file-driver.adb") use "file";
+      for Executable ("rose-core-file_main.adb") use "file";
    end Builder;
 
    package Compiler is

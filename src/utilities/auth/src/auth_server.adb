@@ -90,6 +90,9 @@ package body Auth_Server is
    Users     : User_Maps.Map;
    Context   : Rose.Server.Server_Context;
    Programs  : Rose.Interfaces.Commands.Client.Commands_Client;
+   Cap_Sets  : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   --  The cap set server's Constructor, for the home directories.
    The_Auth  : aliased Auth_Object;
    The_Admin : aliased Admin_Object;
 
@@ -152,9 +155,13 @@ package body Auth_Server is
    -- Create_Server --
    -------------------
 
-   procedure Create_Server (Commands : Rose.Capabilities.Capability) is
+   procedure Create_Server
+     (Commands        : Rose.Capabilities.Capability;
+      Cap_Set_Service : Rose.Capabilities.Capability)
+   is
    begin
       Rose.Interfaces.Commands.Client.Open (Programs, Commands);
+      Cap_Sets := Cap_Set_Service;
       Rose.Interfaces.Auth.Server.Publish (Context, The_Auth'Access);
       Rose.Interfaces.Auth_Admin.Server.Attach (Context, The_Admin'Access);
    end Create_Server;
@@ -348,7 +355,8 @@ package body Auth_Server is
             Process          : Rose.Interfaces.Process.Process_Object'Class :=
               Directory_Launch.Launch
                 (User_Bank.Get_Interface_Cap,
-                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap));
+                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap,
+                  Cap_Sets));
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).

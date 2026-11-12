@@ -339,6 +339,7 @@ package body Init.Users is
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
       Auth            : out Rose.Capabilities.Capability;
       Admin           : out Rose.Capabilities.Capability)
    is
@@ -366,11 +367,13 @@ package body Init.Users is
       end if;
 
       --  Its roles' caps, as src/utilities/auth/rose-core-auth.idl
-      --  declares them: Create_Endpoint, then Find_Command.
+      --  declares them: Create_Endpoint, Find_Command, then
+      --  Cap_Set_Service.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
+      Rose.System_Calls.Send_Cap (Params, Cap_Sets);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Receive_Caps (Params, 2);
       Rose.System_Calls.Invoke_Capability (Params);

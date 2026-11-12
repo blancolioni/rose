@@ -1,0 +1,22 @@
+command Rose.Core.Hold_File
+  : Create_Endpoint, Standard_Output, Delete_Cap, Find_Command,
+    Cap_Set_Service
+  with Summary     => "Hold a replaced file's streams across a restore.",
+       Description => """
+          Hold_File is a test of replacing a file server, and of the
+          checkpoint taken after it (#867, ADR 0032). Init launches it on
+          a new install. It launches a file of its own, writes hello to
+          it, opens a writer and a reader, and reads two bytes, and
+          returns the file's Replaceable interface. Init then replaces
+          the file's process with a new version, and the checkpoint saves
+          the new version. The first time Hold_File is restored, it
+          checks that the file still has its contents, that the writer
+          still writes, and that the reader goes on from where it was,
+          and writes the result to standard output. It never completes.
+          """,
+       Server      => File_Holder.Start_Server,
+       Live
+is
+   Control : out Replaceable
+     with Help => "the file's Replaceable interface, for its replacement";
+end Rose.Core.Hold_File;

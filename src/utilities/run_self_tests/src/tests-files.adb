@@ -10,7 +10,6 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.File.Client;
-with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Releasable_Writer.Client;
@@ -92,8 +91,6 @@ package body Tests.Files is
    ---------------------
 
    function Cap_Stream_Test return Boolean is
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
-      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Writer  : aliased Writers.Releasable_Writer_Client;
       Reader  : aliased Readers.Releasable_Reader_Client;
@@ -102,18 +99,12 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("Cap stream test");
 
-      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+      File.Open (Tests.Registry.Launch_File);
 
-      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+      if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
          Ada.Text_IO.Put (": no file server");
          return False;
       end if;
-
-      declare
-         Writable : Writable_File_Class := Control.Writable;
-      begin
-         File.Open (Writable.Writable_File_Cap);
-      end;
 
       Writer.Open (Writer_Cap (File));
       declare
@@ -166,8 +157,6 @@ package body Tests.Files is
    ---------------
 
    function File_Test return Boolean is
-      No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
-      Control   : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File      : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Read_Only : Rose.Interfaces.File.Client.File_Client;
       First     : Readers.Releasable_Reader_Client;
@@ -178,21 +167,12 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("File test");
 
-      --  The file's process publishes File_Control, which gives the file
-      --  itself (#141).
+      File.Open (Tests.Registry.Launch_File);
 
-      Control.Open (Tests.Registry.Launch ("file", No_Caps));
-
-      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+      if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
          Ada.Text_IO.Put (": no file server");
          return False;
       end if;
-
-      declare
-         Writable : Writable_File_Class := Control.Writable;
-      begin
-         File.Open (Writable.Writable_File_Cap);
-      end;
 
       Append (File, Hello);
       if File.Size /= Hello'Length then
@@ -508,8 +488,6 @@ package body Tests.Files is
    ---------------------------
 
    function Untouched_Buffer_Test return Boolean is
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
-      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       Reader  : Readers.Releasable_Reader_Client;
       Buffer  : Stream_Element_Array (1 .. 256);
@@ -546,18 +524,12 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("Untouched buffer test");
 
-      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+      File.Open (Tests.Registry.Launch_File);
 
-      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+      if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
          Ada.Text_IO.Put (": no file server");
          return False;
       end if;
-
-      declare
-         Writable : Writable_File_Class := Control.Writable;
-      begin
-         File.Open (Writable.Writable_File_Cap);
-      end;
 
       --  Two pages read-only, and the third writable, which mem maps for
       --  writing.
@@ -631,8 +603,6 @@ package body Tests.Files is
    -----------------
 
    function Writer_Test return Boolean is
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
-      Control : Rose.Interfaces.File_Control.Client.File_Control_Client;
       File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
       First   : Writers.Releasable_Writer_Client;
       Second  : Writers.Releasable_Writer_Client;
@@ -680,18 +650,12 @@ package body Tests.Files is
    begin
       Ada.Text_IO.Put ("Writer test");
 
-      Control.Open (Tests.Registry.Launch ("file", No_Caps));
+      File.Open (Tests.Registry.Launch_File);
 
-      if Control.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
+      if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability then
          Ada.Text_IO.Put (": no file server");
          return False;
       end if;
-
-      declare
-         Writable : Writable_File_Class := Control.Writable;
-      begin
-         File.Open (Writable.Writable_File_Cap);
-      end;
 
       --  Two writers at once: every write goes at the end of the file,
       --  whichever writer makes it.

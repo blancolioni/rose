@@ -27,7 +27,6 @@ run_self_tests:
 	    $(INTERFACES)/writable_file.idl \
 	    $(INTERFACES)/transactional_writable_file.idl \
 	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file_control.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/releasable_reader.idl \
 	    $(INTERFACES)/releasable_writer.idl \
@@ -53,4 +52,7 @@ run_self_tests:
 	    $(INTERFACES)/replacer.idl \
 	    $(INTERFACES)/replacement.idl \
 	    ../replaceable_test/held_call.idl
+	$(IDLE) --target user --command-client -I $(INTERFACES) \
+	    -o build/generated \
+	    ../../drivers/file/rose-core-file.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

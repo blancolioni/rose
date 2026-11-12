@@ -11,10 +11,8 @@ with Ada.Streams;
 
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File;
@@ -118,7 +116,6 @@ package body Tests.Users is
                   (Character'Pos ('h'), Character'Pos ('e'),
                    Character'Pos ('l'), Character'Pos ('l'),
                    Character'Pos ('o'));
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
       Own     : Rose.Interfaces.Bank.Client.Bank_Client :=
                   Rose.Interfaces.Bank.Client.From_Cap
                     (Rose.System_Calls.Own_Bank.Cap);
@@ -144,7 +141,8 @@ package body Tests.Users is
            (Tests.Registry.Launch
               ("directory",
                (Tests.Registry.Launcher_Cap ("file"),
-                Tests.Registry.Launcher_Cap ("directory"))));
+                Tests.Registry.Launcher_Cap ("directory"),
+                Tests.Registry.Cap_Sets)));
          User.Open
            (Create_User
               ("session", Home.Get_Interface_Cap, User_Bank.Bank_Cap));
@@ -158,21 +156,13 @@ package body Tests.Users is
          declare
             Session  : Rose.Interfaces.Bank.Bank_Object'Class :=
                          User.New_Session;
-            Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
-                         Tests.Registry.Launcher ("file");
-            Server   : Rose.Interfaces.Process.Process_Object'Class :=
-                         Launcher.Launch (Session.Bank_Cap, No_Caps);
-            Control  : Rose.Interfaces.File_Control.Client
-              .File_Control_Client;
             File     : Files.Writable_File_Client;
          begin
-            Control.Open (Server.Published_Interface);
-            declare
-               Writable : Rose.Interfaces.Writable_File
-                 .Writable_File_Object'Class := Control.Writable;
-            begin
-               File.Open (Writable.Writable_File_Cap);
-            end;
+            File.Open (Tests.Registry.Launch_File (Session.Bank_Cap));
+            if File.Get_Interface_Cap = Rose.Capabilities.Null_Capability
+            then
+               return Fail ("no file server");
+            end if;
             Tests.Files.Append (File, Hello);
             if File.Size /= Hello'Length then
                return Fail ("the file doesn't work");

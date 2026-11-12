@@ -2,6 +2,13 @@ package Tests.Replacement is
 
    function Replacement_Test return Boolean;
 
+   function Replace_File_Test return Boolean;
+   --  Replace a running file server through mem's Replacer (ADR 0032,
+   --  #867), with a writer, a reader and a version open: after the
+   --  handover, the writer still writes, the reader goes on from where it
+   --  was, the version still commits, and the file has every byte.
+   --  Skipped without the Replace_Process role.
+
    function Replace_Process_Test return Boolean;
    --  Replace a running replaceable_test server through mem's Replacer
    --  (ADR 0032, #866): its clients' caps reach the new version, which

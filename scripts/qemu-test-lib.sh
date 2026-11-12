@@ -249,6 +249,46 @@ install_rose () {
             exit 1
             ;;
     esac
+
+    # So is the test of replacing a file server with files open (#867).
+    replace_file=$(grep "Replace file test" "$WORK/install-screen.txt" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replace_file" ] \
+        || replace_file=$(grep "Replace file test" \
+                              "$WORK/install-screen.txt" | tail -1)
+    echo "$replace_file"
+    case "$replace_file" in
+        *skipped*|"")
+            echo "FAIL: the install's replace file test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replace file test did not pass"
+            exit 1
+            ;;
+    esac
+
+    # Init replaces the file that hold_file holds, which the restore then
+    # checks (#867). Its line can scroll off the screen, as the swap
+    # test's can, so when it isn't seen, the kernel's swap of a file
+    # before the self tests start stands for it. A FAIL on the screen is
+    # caught above.
+    init_replace=$(grep "init: file replace test" "$WORK/install-screen.txt" \
+        | tail -1)
+    if [ -n "$init_replace" ]; then
+        echo "$init_replace"
+        case "$init_replace" in
+            *PASS*) ;;
+            *) echo "FAIL: init did not replace hold_file's file"; exit 1 ;;
+        esac
+    else
+        awk '/run_self_tests\[/ { exit }
+             /\/file\[.\]: takes over from / { print; found = 1; exit }
+             END { exit !found }' "$WORK/serial" \
+            || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
+    fi
 }
 
 wait_for_install () {
@@ -263,6 +303,7 @@ wait_for_install () {
         grep -e "derive test" -e "swap test" -e "hand over test" \
             -e "Cap set test.*\(PASS\|FAIL\)" \
             -e "Replacement test" -e "Replace process test" \
+            -e "Replace file test" -e "file replace test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"

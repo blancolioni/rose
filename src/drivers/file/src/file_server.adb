@@ -1,11 +1,9 @@
-with Ada.Streams;
 with System.Storage_Elements;
 
-with Rose.Capabilities;
+with Rose.Objects;
 with Rose.Server;
 with Rose.Words;
 
-with Rose.Interfaces.File_Control.Server;
 with Rose.Interfaces.Releasable_Reader;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Releasable_Writer;
@@ -18,27 +16,44 @@ with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Transactional_Writable_File.Client;
 with Rose.Interfaces.Transactional_Writable_File.Server;
 with Rose.Interfaces.Writable_File;
-with Rose.Interfaces.Writable_File.Client;
 with Rose.Interfaces.Writable_File.Server;
 
-package body File.Server is
+package body File_Server is
 
    use Ada.Streams;
    use System.Storage_Elements;
+   use type Rose.Capabilities.Capability;
+   use type Rose.Words.Word_32;
 
    package Reader_Server renames Rose.Interfaces.Seekable_Reader.Server;
    package Writer_Server renames Rose.Interfaces.Releasable_Writer.Server;
-   package File_Server renames Rose.Interfaces.Writable_File.Server;
+   package File_Interfaces renames Rose.Interfaces.Writable_File.Server;
    package Version_Server renames
      Rose.Interfaces.Transactional_Writable_File.Server;
    package Versions renames Rose.Interfaces.Transactional_Writable_File;
 
-   subtype Writable_File_Class is
-     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
    subtype Version_Class is
      Versions.Transactional_Writable_File_Object'Class;
    subtype Writer_Class is
      Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class;
+
+   Format : constant Rose.Words.Word_32 := 1;
+   --  The version of this server's part of the state (#867):
+   --
+   --    the file's identifier
+   --    for the file, then the version: its length, then its contents
+   --    whether the version is open, and if it is, its identifier
+   --    the number of open readers, then for each, its identifier,
+   --      buffer, whether it has ended, and position
+   --    the number of open writers, then for each, its identifier,
+   --      buffer, and whether it has ended
+   --
+   --  The version's contents are written only while it is open, since
+   --  nothing reads them otherwise: a reader of a released version has
+   --  ended.
+
+   Service_Name : constant String := "Cap_Set_Service";
+   --  The name of its argument, so that a restore finds it.
 
    Max_Size : constant := 2 ** 16;
    --  A file holds at most 64 KiB for now (#215), in a fixed buffer. A
@@ -86,18 +101,18 @@ package body File.Server is
    --  The file is an object served through Writable_File.
 
    type File_Object is
-     limited new File_Server.Writable_File_Interface with null record;
+     limited new File_Interfaces.Writable_File_Interface with null record;
 
    overriding function File_Cap
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
-   is (File_Server.Cap_Of
+   is (File_Interfaces.Cap_Of
          (Item, Rose.Interfaces.Writable_File.File_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
-   is (File_Server.Cap_Of (Item));
+   is (File_Interfaces.Cap_Of (Item));
 
    overriding function Size
      (Item : in out File_Object)
@@ -214,14 +229,17 @@ package body File.Server is
    type Reader_Object is
      limited new Reader_Server.Seekable_Reader_Interface with
       record
-         Open     : Boolean := False;
-         Buffer   : Buffer_Index := File_Buffer;
+         Open       : Boolean := False;
+         Buffer     : Buffer_Index := File_Buffer;
          --  What the reader reads.
-         Ended    : Boolean := False;
+         Ended      : Boolean := False;
          --  The reader read a version that has been released.
-         Position : Storage_Count := 0;
+         Position   : Storage_Count := 0;
          --  The number of bytes before the next one to read.
-         Next     : Reader_Access;
+         Identifier : Rose.Objects.Capability_Identifier := 0;
+         --  The identifier it had in the version that this one took
+         --  over from, which Create_Server attaches it with, or 0.
+         Next       : Reader_Access;
          --  The next reader in the pool.
       end record;
 
@@ -282,12 +300,14 @@ package body File.Server is
    type Writer_Object is
      limited new Writer_Server.Releasable_Writer_Interface with
       record
-         Open   : Boolean := False;
-         Buffer : Buffer_Index := File_Buffer;
+         Open       : Boolean := False;
+         Buffer     : Buffer_Index := File_Buffer;
          --  What the writer writes.
-         Ended  : Boolean := False;
+         Ended      : Boolean := False;
          --  The writer wrote a version that has been released.
-         Next   : Writer_Access;
+         Identifier : Rose.Objects.Capability_Identifier := 0;
+         --  As a reader's.
+         Next       : Writer_Access;
          --  The next writer in the pool.
       end record;
 
@@ -319,30 +339,44 @@ package body File.Server is
 
    Ended_Version : exception;
 
-   --  Only the directory holds File_Control, which the process publishes.
-   --  Everyone else is given the file's Writable_File, or its File.
-
-   type Control_Object is
-     limited new Rose.Interfaces.File_Control.Server.File_Control_Interface
-     with null record;
-
-   overriding function File_Control_Cap
-     (Item : in out Control_Object)
-      return Rose.Capabilities.Capability
-   is (Rose.Interfaces.File_Control.Server.Cap_Of (Item));
-
-   overriding function Writable
-     (Item : in out Control_Object)
-      return Writable_File_Class;
-
-   Context     : Rose.Server.Server_Context;
+   Context     : aliased Rose.Server.Server_Context;
    The_File    : aliased File_Object;
    The_Version : aliased Version_Object;
-   Control     : aliased Control_Object;
    Readers     : Reader_Access;
    --  Every reader that has been opened, open or not.
    Writers     : Writer_Access;
    --  Every writer that has been opened, open or not.
+
+   Endpoint_Version : aliased Version_Object;
+   Endpoint_Reader  : aliased Reader_Object;
+   Endpoint_Writer  : aliased Writer_Object;
+   --  Objects that are attached when the server starts, and never given
+   --  out. A server package registers its endpoints when its first object
+   --  is attached, so without them, a version that had opened a version,
+   --  a reader or a writer, would have endpoints that a new version that
+   --  hasn't lacks, and the kernel would refuse to swap them (#866). The
+   --  reader and writer have ended, so a call to them fails.
+
+   Service_Cap : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   File_Id     : Rose.Objects.Capability_Identifier := 0;
+   Version_Id  : Rose.Objects.Capability_Identifier := 0;
+   --  The identifiers that the file and its version had in the version
+   --  of the program that this one took over from, or 0.
+   Taken_Over  : Boolean := False;
+   --  The state was read, from an old version or a saved one.
+
+   procedure Read_Contents
+     (Stream : not null access Root_Stream_Type'Class;
+      Buffer : Buffer_Index);
+   --  Read the length and the contents of Buffer, as Write_Contents
+   --  wrote them.
+
+   procedure Write_Contents
+     (Stream : not null access Root_Stream_Type'Class;
+      Buffer : Buffer_Index;
+      Length : Storage_Count);
+   --  Write Length, then the first Length bytes of Buffer, in one piece.
 
    -----------
    -- Check --
@@ -402,13 +436,52 @@ package body File.Server is
    -- Create_Server --
    -------------------
 
-   --  The file is attached first, so that a cap with identifier 0, such
-   --  as a restore notice's, reaches it.
+   --  The file is attached first, so that a fresh one gets the first
+   --  identifier. A server that took over attaches each object with the
+   --  identifier it had, which the caps that clients hold name.
 
-   procedure Create_Server is
+   procedure Create_Server
+     (Cap_Set_Service : Rose.Capabilities.Capability;
+      Served          : out Rose.Capabilities.Capability;
+      Control         : out Rose.Capabilities.Capability)
+   is
+      Reader : Reader_Access := Readers;
+      Writer : Writer_Access := Writers;
    begin
-      File_Server.Attach (Context, The_File'Access);
-      Rose.Interfaces.File_Control.Server.Publish (Context, Control'Access);
+      if not Taken_Over then
+         Service_Cap := Cap_Set_Service;
+      end if;
+
+      File_Interfaces.Attach (Context, The_File'Access, File_Id);
+      if The_Version.Open then
+         Version_Server.Attach (Context, The_Version'Access, Version_Id);
+      end if;
+
+      while Reader /= null loop
+         if Reader.Open then
+            Reader_Server.Attach (Context, Reader, Reader.Identifier);
+         end if;
+         Reader := Reader.Next;
+      end loop;
+
+      while Writer /= null loop
+         if Writer.Open then
+            Writer_Server.Attach (Context, Writer, Writer.Identifier);
+         end if;
+         Writer := Writer.Next;
+      end loop;
+
+      Endpoint_Reader.Ended := True;
+      Endpoint_Writer.Ended := True;
+      Version_Server.Attach (Context, Endpoint_Version'Access);
+      Reader_Server.Attach (Context, Endpoint_Reader'Access);
+      Writer_Server.Attach (Context, Endpoint_Writer'Access);
+
+      Rose.Replacement.Attach
+        (Context'Access, Write_State'Access, Service_Cap);
+
+      Served := The_File.Writable_File_Cap;
+      Control := Rose.Replacement.Replaceable_Cap;
    end Create_Server;
 
    -----------------
@@ -565,6 +638,104 @@ package body File.Server is
       Position := Position + Count;
    end Read;
 
+   -------------------
+   -- Read_Contents --
+   -------------------
+
+   procedure Read_Contents
+     (Stream : not null access Root_Stream_Type'Class;
+      Buffer : Buffer_Index)
+   is
+      Length : Storage_Count;
+   begin
+      Storage_Count'Read (Stream, Length);
+      if Length > Max_Size then
+         raise Rose.Replacement.Bad_State with "file: too long";
+      end if;
+
+      declare
+         Data : Stream_Element_Array (1 .. Stream_Element_Offset (Length))
+           with Import, Address => Contents (Buffer)'Address;
+         Next : Stream_Element_Offset := Data'First;
+         Last : Stream_Element_Offset;
+      begin
+         while Next <= Data'Last loop
+            Read (Stream.all, Data (Next .. Data'Last), Last);
+            if Last < Next then
+               raise Rose.Replacement.Bad_State with "file: state ends";
+            end if;
+            Next := Last + 1;
+         end loop;
+      end;
+
+      Lengths (Buffer) := Length;
+   end Read_Contents;
+
+   ----------------
+   -- Read_State --
+   ----------------
+
+   procedure Read_State
+     (Stream : not null access Root_Stream_Type'Class;
+      Named  : Rose.Replacement.Named_Caps)
+   is
+      Version : Rose.Words.Word_32;
+      Count   : Natural;
+   begin
+      Rose.Words.Word_32'Read (Stream, Version);
+      if Version /= Format then
+         raise Rose.Replacement.Bad_State with "file: unknown format";
+      end if;
+
+      Rose.Objects.Capability_Identifier'Read (Stream, File_Id);
+      Read_Contents (Stream, File_Buffer);
+      Read_Contents (Stream, Version_Buffer);
+      Boolean'Read (Stream, The_Version.Open);
+      if The_Version.Open then
+         Rose.Objects.Capability_Identifier'Read (Stream, Version_Id);
+      end if;
+
+      Natural'Read (Stream, Count);
+      for I in 1 .. Count loop
+         declare
+            Reader : constant Reader_Access := new Reader_Object;
+         begin
+            Rose.Objects.Capability_Identifier'Read
+              (Stream, Reader.Identifier);
+            Buffer_Index'Read (Stream, Reader.Buffer);
+            Boolean'Read (Stream, Reader.Ended);
+            Storage_Count'Read (Stream, Reader.Position);
+            Reader.Position :=
+              Storage_Count'Min (Reader.Position, Lengths (Reader.Buffer));
+            Reader.Open := True;
+            Reader.Next := Readers;
+            Readers := Reader;
+         end;
+      end loop;
+
+      Natural'Read (Stream, Count);
+      for I in 1 .. Count loop
+         declare
+            Writer : constant Writer_Access := new Writer_Object;
+         begin
+            Rose.Objects.Capability_Identifier'Read
+              (Stream, Writer.Identifier);
+            Buffer_Index'Read (Stream, Writer.Buffer);
+            Boolean'Read (Stream, Writer.Ended);
+            Writer.Open := True;
+            Writer.Next := Writers;
+            Writers := Writer;
+         end;
+      end loop;
+
+      Service_Cap := Named.Cap (Service_Name);
+      if Service_Cap = Rose.Capabilities.Null_Capability then
+         raise Rose.Replacement.Bad_State with "file: no " & Service_Name;
+      end if;
+
+      Taken_Over := True;
+   end Read_State;
+
    -------------
    -- Release --
    -------------
@@ -653,16 +824,6 @@ package body File.Server is
       Rose.Server.Start_Server (Context);
    end Start_Server;
 
-   --------------
-   -- Writable --
-   --------------
-
-   overriding function Writable
-     (Item : in out Control_Object)
-      return Writable_File_Class
-   is (Rose.Interfaces.Writable_File.Client.From_Cap
-         (The_File.Writable_File_Cap));
-
    -----------
    -- Write --
    -----------
@@ -697,4 +858,86 @@ package body File.Server is
       Write (Item.Buffer, Data);
    end Write;
 
-end File.Server;
+   --------------------
+   -- Write_Contents --
+   --------------------
+
+   procedure Write_Contents
+     (Stream : not null access Root_Stream_Type'Class;
+      Buffer : Buffer_Index;
+      Length : Storage_Count)
+   is
+      Data : Stream_Element_Array (1 .. Stream_Element_Offset (Length))
+        with Import, Address => Contents (Buffer)'Address;
+   begin
+      Storage_Count'Write (Stream, Length);
+      Write (Stream.all, Data);
+   end Write_Contents;
+
+   -----------------
+   -- Write_State --
+   -----------------
+
+   procedure Write_State
+     (Stream : not null access Root_Stream_Type'Class;
+      Named  : in out Rose.Replacement.Named_Caps)
+   is
+      Count  : Natural := 0;
+      Reader : Reader_Access := Readers;
+      Writer : Writer_Access := Writers;
+   begin
+      Rose.Words.Word_32'Write (Stream, Format);
+      Rose.Objects.Capability_Identifier'Write
+        (Stream, File_Interfaces.Identifier_Of (The_File'Access));
+      Write_Contents (Stream, File_Buffer, Lengths (File_Buffer));
+      Write_Contents
+        (Stream, Version_Buffer,
+         (if The_Version.Open then Lengths (Version_Buffer) else 0));
+      Boolean'Write (Stream, The_Version.Open);
+      if The_Version.Open then
+         Rose.Objects.Capability_Identifier'Write
+           (Stream, Version_Server.Identifier_Of (The_Version'Access));
+      end if;
+
+      while Reader /= null loop
+         if Reader.Open then
+            Count := Count + 1;
+         end if;
+         Reader := Reader.Next;
+      end loop;
+      Natural'Write (Stream, Count);
+      Reader := Readers;
+      while Reader /= null loop
+         if Reader.Open then
+            Rose.Objects.Capability_Identifier'Write
+              (Stream, Reader_Server.Identifier_Of (Reader));
+            Buffer_Index'Write (Stream, Reader.Buffer);
+            Boolean'Write (Stream, Reader.Ended);
+            Storage_Count'Write (Stream, Reader.Position);
+         end if;
+         Reader := Reader.Next;
+      end loop;
+
+      Count := 0;
+      while Writer /= null loop
+         if Writer.Open then
+            Count := Count + 1;
+         end if;
+         Writer := Writer.Next;
+      end loop;
+      Natural'Write (Stream, Count);
+      Writer := Writers;
+      while Writer /= null loop
+         if Writer.Open then
+            Rose.Objects.Capability_Identifier'Write
+              (Stream, Writer_Server.Identifier_Of (Writer));
+            Buffer_Index'Write (Stream, Writer.Buffer);
+            Boolean'Write (Stream, Writer.Ended);
+         end if;
+         Writer := Writer.Next;
+      end loop;
+
+      Named.Add (Service_Name, Service_Cap);
+   end Write_State;
+
+end File_Server;
