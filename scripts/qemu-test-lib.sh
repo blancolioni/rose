@@ -271,10 +271,24 @@ install_rose () {
     esac
 
     # Init replaces the file that hold_file holds, which the restore then
-    # checks (#867).
-    grep "file replace test" "$WORK/install-screen.txt" | tail -1
-    grep -q "init: file replace test: PASS" "$WORK/install-screen.txt" \
-        || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
+    # checks (#867). Its line can scroll off the screen, as the swap
+    # test's can, so when it isn't seen, the kernel's swap of a file
+    # before the self tests start stands for it. A FAIL on the screen is
+    # caught above.
+    init_replace=$(grep "init: file replace test" "$WORK/install-screen.txt" \
+        | tail -1)
+    if [ -n "$init_replace" ]; then
+        echo "$init_replace"
+        case "$init_replace" in
+            *PASS*) ;;
+            *) echo "FAIL: init did not replace hold_file's file"; exit 1 ;;
+        esac
+    else
+        awk '/run_self_tests\[/ { exit }
+             /\/file\[.\]: takes over from / { print; found = 1; exit }
+             END { exit !found }' "$WORK/serial" \
+            || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
+    fi
 }
 
 wait_for_install () {
