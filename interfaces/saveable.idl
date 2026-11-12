@@ -1,0 +1,14 @@
+--  A server whose state can be saved (ADR 0032, section 10, #881). State
+--  is the server's state as a stream, starting with a format version
+--  (Rose.Replacement writes and reads it), which another instance of the
+--  program can start from, as its Saved argument. It changes nothing, and
+--  carries no caps: a cap named in the state is given to the new instance
+--  as the command's argument of that name. The reader is the caller's to
+--  release when it is done with it.
+
+interface Saveable is
+
+   function State
+     return interface Releasable_Reader;
+
+end Saveable;
