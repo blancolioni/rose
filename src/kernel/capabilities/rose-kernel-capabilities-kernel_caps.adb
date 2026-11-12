@@ -741,8 +741,15 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
       case Endpoint is
          when Hold_Calls_Endpoint =>
+
+            --  An optional second cap names the one process whose calls
+            --  get through the hold: the new version (#866).
+
             declare
-               Except : Rose.Objects.Endpoint_Id := 0;
+               use type Rose.Invocation.Capability_Index;
+               Except  : Rose.Objects.Endpoint_Id := 0;
+               Caller  : Process_Id := Null_Process_Id;
+               Success : Boolean;
             begin
                if Params.Control.Flags (Rose.Invocation.Send_Words) then
                   Except := Rose.Objects.Endpoint_Id (Params.Data (0));
@@ -751,7 +758,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                        + 2 ** 32 * Rose.Objects.Endpoint_Id (Params.Data (1));
                   end if;
                end if;
-               Hold_Calls (First, Except);
+               if Params.Control.Last_Sent_Cap >= 1 then
+                  Caller := Sent_Process (Params, 1);
+                  if Caller = Null_Process_Id then
+                     Return_Error (Params, Rose.Invocation.Request_Error);
+                     return;
+                  end if;
+               end if;
+               Hold_Calls (First, Except, Caller, Success);
+               if not Success then
+                  Return_Error (Params, Rose.Invocation.Request_Error);
+                  return;
+               end if;
             end;
 
          when Release_Calls_Endpoint =>
@@ -788,6 +806,7 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
       if Endpoint = Process_State_Endpoint then
          Rose.Invocation.Send_Word (Params.all, State);
+         Rose.Invocation.Send_Object_Id (Params.all, To_Object_Id (First));
       end if;
 
       Set_Current_State (Current_Process_Id, Ready);

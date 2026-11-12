@@ -43,6 +43,31 @@ package Mem.Processes is
      (Process : Rose.Objects.Object_Id)
       return Process_Id;
 
+   --  Replacing a running process (ADR 0032, #866).
+
+   function Is_Launched (Process : Process_Id) return Boolean;
+   --  Process is in use, and was launched, not a boot module, which the
+   --  update boot replaces with the boot set (ADR 0031, section 3).
+
+   function Parent_Bank
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability;
+   --  The bank that Process's own bank is a sub-bank of, from the store,
+   --  or the null cap.
+
+   procedure Swap_Records (Old, New_Version : Process_Id);
+   --  The kernel has swapped the two processes' object ids: New_Version
+   --  has Old's, and Old has New_Version's launch-time one. Swap what
+   --  names a process by its object id, so that each slot's record goes
+   --  on matching the process in it: the object id, the cap of the
+   --  kernel process, which names it by object id, and mem's caps for
+   --  it, whose identifier comes from it (#616). The segments, page
+   --  tables and bank stay with the slot.
+
+   procedure Hand_Over_Banks (Old_Oid, New_Oid : Rose.Objects.Object_Id);
+   --  The store's Hand_Over (#863), with the two processes' object ids
+   --  before the swap.
+
    function Get_Process_Heap_Bound
      (Process : Process_Id)
       return Rose.Addresses.Virtual_Page_Address;

@@ -95,6 +95,13 @@ package Store.Devices is
    --  must be siblings; if they aren't, or either is missing, nothing
    --  changes.
 
+   function Parent_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability;
+   --  The bank that Process's own bank is a sub-bank of, or the null cap
+   --  if it has none, or its bank is the root (#866).
+
    procedure Get_Usage
      (Id           : in     Rose.Objects.Capability_Identifier;
       Pages        :    out Rose.Words.Word_64;

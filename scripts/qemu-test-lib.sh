@@ -227,6 +227,28 @@ install_rose () {
             exit 1
             ;;
     esac
+
+    # The test of replacing a running server needs mem's Replacer, which
+    # only the install's run has (#866). It is checked as the test of
+    # Replaceable is.
+    replace=$(grep "Replace process test" "$WORK/install-screen.txt" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replace" ] \
+        || replace=$(grep "Replace process test" "$WORK/install-screen.txt" \
+                         | tail -1)
+    echo "$replace"
+    case "$replace" in
+        *skipped*|"")
+            echo "FAIL: the install's replace process test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replace process test did not pass"
+            exit 1
+            ;;
+    esac
 }
 
 wait_for_install () {
@@ -240,7 +262,7 @@ wait_for_install () {
         screen > "$WORK/install-now.txt"
         grep -e "derive test" -e "swap test" -e "hand over test" \
             -e "Cap set test.*\(PASS\|FAIL\)" \
-            -e "Replacement test" \
+            -e "Replacement test" -e "Replace process test" \
             -e "self tests failed" "$WORK/install-now.txt" \
             >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"

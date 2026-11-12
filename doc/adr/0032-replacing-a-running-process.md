@@ -28,9 +28,11 @@ A persistent process is launched once and then restored, never relaunched (ADR 0
 
 ### 1. Who may replace a process
 
-Replacing is a privileged operation, **`Memory.Replace_Process`**, whose cap only init's install path and the update boot's installer get, as the Create cap never leaves init.
+Replacing is a privileged operation, **`Replacer.Replace_Process`**, which mem serves, and whose cap only init's install path and the update boot's installer get, as the Create cap never leaves init. The install's run of the self tests gets it too, through its `Replace_Process` role (#866).
 
-- **It is mem's operation,** not one on the `Process` cap. Mem keeps the process table and the link between a process and its bank, both of which change. Mem does the kernel's part with a kernel operation that only mem holds (section 6).
+- **It is mem's operation,** not one on the `Process` cap. Mem keeps the process table and the link between a process and its bank, both of which change. Mem does the kernel's part with kernel operations that only mem holds (section 6).
+- **It isn't on the `Memory` interface,** which elf holds. Mem exports `Replace_Process` as a cap of its own.
+- **The caller drives it.** Mem serves one call at a time, and can't wait inside one: elf calls back into mem to launch the new version, and both versions page-fault to mem during the handover. So `Replace_Process` holds the old version's calls and returns a **`Replacement`**, a resource with which the caller makes each step, and mem does only the privileged ones (section 6).
 - **It isn't given to owners.** In the update boot, the installer doesn't own the persistent servers, so ownership wouldn't let it replace them. A narrower right for an owner, such as auth replacing a user server, can be added later.
 - **It isn't a role** that petal or `sudo` can grant (ADR 0021). Nothing in a running system replaces a process.
 
@@ -49,7 +51,7 @@ A server can be replaced only if its process implements the `Replaceable` interf
 
 The new version is launched with the old version's `Replaceable` as an argument. It builds its own state from the state stream and the cap set, and takes only what it needs from them. Nothing is given to it that it doesn't ask for.
 
-- **It gets a fresh bank of its own,** a sibling of the old version's: mem launches it against the old bank's parent.
+- **It gets a fresh bank of its own,** a sibling of the old version's: the caller launches it against the old bank's parent, which `Replacement.Bank` gives (the store's `Process_Banks.Parent_Bank`).
 - **It builds its storage in that bank,** from the state stream. A file server's contents, for example, come across in its stream, and the new version writes them into regions of its own.
 - **The old version's own storage is released** when the old process ends, with its bank (section 6). The banks below the old bank, which belong to the processes it launched, aren't: they move to the new bank (section 6).
 - **It accepts or refuses** by how its launch call ends. It completes if the new version has read the state and taken what it needs. It fails, by raising, if the new version can't read the format, or a cap it needs is missing.
@@ -58,8 +60,8 @@ The caps that the old version holds to other servers, and the callbacks its clie
 
 ### 4. Calls during the handover
 
-- **The old version must be between calls.** Mem waits until it is blocked receiving. If it is blocked in a call of its own, to another server, mem waits for that to finish, up to a limit, and then gives up (section 7).
-- **The kernel holds new calls to the old version's object id,** as it holds replies during a checkpoint. The new version's calls to `Replaceable` are the exception: they are answered, or the handover could never finish.
+- **The old version must be between calls.** `Replacement.Ready` is True once it is blocked receiving. The caller asks until it is, up to a limit of the caller's, and gives up if it never is (section 7). The updater chooses the limit.
+- **The kernel holds new calls to the old version's object id,** as it holds replies during a checkpoint. The new version's calls are the exception: `Replacement.Allow`, with the new version's command endpoint, lets the calls of that one process through, to `Replaceable` and to the state's reader, or the handover could never finish.
 - **Replies that the old version owes move to the new one.** A server defers a call with `Rose.Server.Block_Current_Request`, which keeps the call and its reply cap until `Unblock_Endpoint` answers it, as a console does with a pending `Read`. So the deferred calls move with nothing for the server to do (#879): the state lists each one, and `Replies` moves their reply caps into a set. The new version defers each call again, and answers it as the old version would have. A reply cap is moved, not copied, so it is still answered exactly once: the kernel moves every single-use cap that is sent, whether in a call, a reply or a new process's first caps, rather than copying it (#864). The sender's slot keeps its number but holds nothing, so a cap set server that gives a reply cap out a second time gives the null cap, and deleting the slot frees it.
   - **The reply caps stay in the set until the handover is decided.** The old version keeps a cap to the set, and whichever version next serves a call takes them out: the new version once it has taken over, since the held calls reach it then, or the old version, if the handover failed (section 7). Calls to `Replaceable`, and to the readers of the state, don't count, since the handover makes them. Neither version knows how the handover ended, but only the one that is serving calls can take the caps.
   - **Deleting a reply cap fails its call.** When a reply cap is deleted, the kernel wakes its caller with an error, if the caller is waiting for that reply, since a moved cap has no other copy (#879). So a set of reply caps that is released before either version takes them fails their calls, rather than leaving the callers blocked for good, as ending a process that holds a reply cap already does.
@@ -68,14 +70,14 @@ The caps that the old version holds to other servers, and the callbacks its clie
 
 ### 5. Checkpoints during a handover
 
-Mem doesn't start a checkpoint while a handover is in progress, and a handover doesn't start while a checkpoint is running. A checkpoint therefore never holds a process half handed over, two processes with the same object id, or a bank tree half moved.
+No checkpoint starts while a handover is in progress, and no handover starts while a checkpoint is running. A checkpoint therefore never holds a process half handed over, two processes with the same object id, or a bank tree half moved. The kernel keeps both rules: it refuses to enter a checkpoint while any process is held or retired (#862), and refuses to hold a process's calls during a checkpoint, so that `Replace_Process` fails then (#866).
 
 ### 6. Taking over: the kernel moves the identity
 
-When the new version's launch call completes, mem makes the switch:
+When the new version's launch call has completed, the caller commits the replacement (`Replacement.Commit`), and mem makes the switch:
 
 1. **The kernel swaps the two processes' object ids, and gives the new version the old version's endpoint table.** The new version now answers the old version's object id, with each of the old version's endpoints at the same index, so that every client's cap names the same endpoint id and identifier as before. The kernel moves the new version's own caps to its endpoints, and its endpoints that the old version didn't have, to the indices they now have. The swap fails, with nothing changed, if the new version lacks one of the old version's endpoints. The old version takes the new one's launch-time object id, and is retired: calls to it fail until mem ends it. This is mem's kernel operation, and it is the only part that needs the kernel (#862).
-2. **Mem swaps its own records** of the two processes, and calls the store's **`Process_Banks.Hand_Over (Old, New)`**. The store swaps the two banks' owners, so that each bank stays with the process that uses it, and moves every sub-bank of the old bank, with its subtree and its charges, under the new bank.
+2. **Mem swaps its own records** of the two processes: the object id, the kernel process cap, and its own caps for the process, whose identifier comes from the object id. The kernel gives the new version's caps to mem the identifier of the object id it takes, in the swap. Mem then calls the store's **`Process_Banks.Hand_Over (Old, New)`**. The store swaps the two banks' owners, so that each bank stays with the process that uses it, and moves every sub-bank of the old bank, with its subtree and its charges, under the new bank.
 3. **The kernel releases the held calls,** which now reach the new version.
 4. **Mem ends the old version** as it ends any process. Its bank, which now holds only the old version's own storage, is destroyed.
 
@@ -99,9 +101,9 @@ A derived cap whose parent is in the old version's cap table goes on working whe
 
 Until step 1 of section 6, nothing has changed for the old version or its clients.
 
-- **If the new version refuses, crashes, or doesn't finish in time,** mem ends it, which destroys its fresh bank, and releases the held calls to the old version. The new version hasn't served a call, so the reply caps of the deferred calls are still in their set, and the old version takes them back before it serves its next call (section 4).
-- **If the old version doesn't become idle in time,** mem doesn't launch the new version, and reports why.
-- **From step 1 on, the handover is committed.** Each later step is mem's own, or the store's, and can't be refused.
+- **If the new version refuses, crashes, or doesn't finish in time,** the caller releases the replacement without committing it. Mem ends the new version, which destroys its fresh bank, and releases the held calls to the old version. The new version hasn't served a call, so the reply caps of the deferred calls are still in their set, and the old version takes them back before it serves its next call (section 4).
+- **If the old version doesn't become idle in time,** the caller doesn't launch the new version, and releases the replacement, which releases the held calls.
+- **`Replacement.Commit` is step 1.** It is False, with nothing changed, if the kernel refuses the swap. From then on the handover is committed: each later step is mem's own, or the store's, and can't be refused.
 
 The updater reports a replacement that failed, and goes on to the next server (ADR 0031, section 5).
 
@@ -158,12 +160,11 @@ Moving a server's clients to a restored copy, and carrying a state over the netw
 
 - **Whether a server can be `Saveable` without being `Replaceable`.** It costs nothing in the interfaces, but the IDL aspect is `Replaceable` for now.
 - **Reply caps with a buffer** (#878). A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Should the kernel move the mapping, or should a server never defer a call that holds a buffer?
-- **How long to wait** for the old version to become idle, and for the new version to finish. A fixed limit, or one the updater gives?
 
 ## Follow-up work
 
 - Kernel: swap two processes' object ids and endpoint tables, and hold calls to an object id except on one endpoint.
-- Mem: `Memory.Replace_Process`, and no checkpoint during a handover.
+- Mem: `Replacer.Replace_Process` and the `Replacement` that the caller drives, and no handover during a checkpoint (#866).
 - Store: `Process_Banks.Hand_Over`, which swaps two banks' owners and moves one's sub-banks under the other.
 - Kernel: move single-use caps, rather than copy them, when they are sent (#864). Derivation parents need nothing new: they go in the cap set as other caps do.
 - Reply caps whose calls hold a buffer (#878).

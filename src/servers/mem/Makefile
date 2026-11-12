@@ -29,6 +29,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-process-server.o \
 	$(BUILDDIR)/rose-interfaces-receiver-server.o \
+	$(BUILDDIR)/rose-interfaces-replacement.o \
+	$(BUILDDIR)/rose-interfaces-replacement-server.o \
+	$(BUILDDIR)/rose-interfaces-replacer.o \
+	$(BUILDDIR)/rose-interfaces-replacer-server.o \
 	$(BUILDDIR)/rose-interfaces-region-client.o \
 	$(BUILDDIR)/rose-interfaces-bank.o \
 	$(BUILDDIR)/rose-interfaces-bank-client.o \
