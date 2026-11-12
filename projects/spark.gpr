@@ -67,13 +67,17 @@ project Spark is
    for Runtime ("ada") use external ("ROSE_USER_RTS", "rts/user/build/i686-rose");
 
    package Compiler is
-      --  gnatprove is a 64-bit program, and -m32 gives it the target's
-      --  sizes, such as a 32-bit address.  src/boot is only for the units
+      --  gnatprove is a 64-bit program, and -m32 alone doesn't give it the
+      --  target's sizes: it takes them from i686.atp, which GNAT writes
+      --  with "gcc -c -m32 -gnatet=i686.atp" on any unit.  Without it,
+      --  Address is 64 bits, and a record representation clause that
+      --  gives one 32 bits fails (#692).  src/boot is only for the units
       --  that the SPARK packages with: a directory that has none of the
       --  listed files in it is not searched, and listing the specs makes
       --  gnatprove try to generate code for them.
       for Default_Switches ("ada") use
         ("-m32", "-gnat2020", "-gnatVa",
+         "-gnateT=" & Project'Project_Dir & "i686.atp",
          "-I" & Project'Project_Dir & "../src/boot",
          "-I" & Project'Project_Dir & "../src/kernel");
    end Compiler;
