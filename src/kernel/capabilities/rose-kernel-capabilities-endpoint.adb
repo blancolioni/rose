@@ -152,7 +152,7 @@ package body Rose.Kernel.Capabilities.Endpoint is
    is
       Receiver_Blocked : constant Boolean :=
                            not Rose.Kernel.Processes.Is_Held
-                                 (Receiver, Endpoint)
+                                 (Receiver, Endpoint, Sender)
                            and then
                              Rose.Kernel.Processes.Is_Blocked_On_Endpoint
                                (Pid            => Receiver,

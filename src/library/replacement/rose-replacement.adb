@@ -155,6 +155,13 @@ package body Rose.Replacement is
    Reader_Ids : Identifier_Vectors.Vector;
    --  The identifiers of the readers of State that are not released.
 
+   Endpoint_Reader : aliased State_Reader;
+   --  A reader that is attached with the Replaceable interface, and never
+   --  given out. The first reader that is attached registers the reader's
+   --  endpoints, so without it, a version that has served State would
+   --  have endpoints that a new version, which hasn't, lacks, and the
+   --  kernel would refuse to swap them (#866).
+
    --  The reply caps of the deferred calls (#879). In the old version,
    --  Replies_Given is set once Replies has moved them into Replies_Set,
    --  and Given_Slots holds the slot that each one left, by its index in
@@ -260,6 +267,8 @@ package body Rose.Replacement is
       Constructor.Open (Cap_Set_Service);
       Rose.Interfaces.Replaceable.Server.Attach
         (Context.all, The_Server'Access);
+      Rose.Interfaces.Releasable_Reader.Server.Attach
+        (Context.all, Endpoint_Reader'Access);
       Rose.Server.Set_Receive_Hook (Context.all, Before_Call'Access);
       Attached := True;
    end Attach;

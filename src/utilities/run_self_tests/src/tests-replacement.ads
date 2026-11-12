@@ -1,6 +1,13 @@
 package Tests.Replacement is
 
    function Replacement_Test return Boolean;
+
+   function Replace_Process_Test return Boolean;
+   --  Replace a running replaceable_test server through mem's Replacer
+   --  (ADR 0032, #866): its clients' caps reach the new version, which
+   --  answers the call it deferred and a call made during the handover,
+   --  and a refused replacement leaves the old version running, still
+   --  owing its deferred call. Skipped without the Replace_Process role.
    --  The Replaceable interface (ADR 0032, #865), with the test server
    --  replaceable_test:
    --

@@ -503,12 +503,18 @@ package Rose.Kernel.Processes is
    --  over.
 
    procedure Hold_Calls
-     (Pid    : Process_Id;
-      Except : Rose.Objects.Endpoint_Id);
+     (Pid     : Process_Id;
+      Except  : Rose.Objects.Endpoint_Id;
+      Caller  : Process_Id;
+      Success : out Boolean);
    --  Calls to Pid wait, as if it were busy, until Release_Calls, except
-   --  calls to its endpoint Except, which the new version uses during the
-   --  handover. Pid's receives take only calls to Except meanwhile. If
-   --  Except is not one of Pid's endpoints, every call waits.
+   --  calls to its endpoint Except, and calls from Caller, which is the
+   --  new version during the handover (#866). Pid's receives take only
+   --  those calls meanwhile. If Except is not one of Pid's endpoints, and
+   --  Caller is null, every call waits. Holding a process whose calls are
+   --  held already sets its Except and Caller again. Success is False,
+   --  and nothing changes, during a checkpoint, which would save Pid
+   --  half handed over (ADR 0032, section 5).
 
    procedure Release_Calls
      (Pid : Process_Id);
@@ -517,9 +523,11 @@ package Rose.Kernel.Processes is
 
    function Is_Held
      (Pid      : Process_Id;
-      Endpoint : Rose.Objects.Endpoint_Index)
+      Endpoint : Rose.Objects.Endpoint_Index;
+      Caller   : Process_Id)
       return Boolean;
-   --  True if a call to Endpoint of Pid has to wait (Hold_Calls).
+   --  True if a call from Caller to Endpoint of Pid has to wait
+   --  (Hold_Calls).
 
    function Is_Retired
      (Pid : Process_Id)
@@ -544,6 +552,8 @@ package Rose.Kernel.Processes is
    --  New_Pid's objects of the same endpoint ids and identifiers. Old_Pid
    --  is retired, with New_Pid's object id. The calls that wait for
    --  Old_Pid wait for New_Pid, and go on waiting until Release_Calls.
+   --  New_Pid's caps to mem's objects for it, whose identifier comes from
+   --  its object id, take the identifier of the object id it takes.
    --  Success is False, and nothing changes, if Old_Pid's calls are not
    --  held, New_Pid lacks one of Old_Pid's endpoints, a message is queued
    --  for Old_Pid, or New_Pid has no room for the endpoints or the caps.

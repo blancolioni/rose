@@ -1631,6 +1631,32 @@ package body Store.Devices is
 
    end New_Store;
 
+   -----------------
+   -- Parent_Bank --
+   -----------------
+
+   function Parent_Bank
+     (Id      : Rose.Objects.Capability_Identifier;
+      Process : Rose.Objects.Object_Id)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Process /= 0 then
+         for Bank of Banks loop
+            if Bank.In_Use and then Bank.Owner = Process then
+               if Bank.Parent in Banks'Range
+                 and then Banks (Bank.Parent).In_Use
+               then
+                  return Banks (Bank.Parent).Access_Cap;
+               end if;
+               return 0;
+            end if;
+         end loop;
+      end if;
+      return 0;
+   end Parent_Bank;
+
    ------------------
    -- Process_Bank --
    ------------------

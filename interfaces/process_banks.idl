@@ -52,4 +52,12 @@ interface Process_Banks is
    --  or their banks aren't siblings: that is a mistake in mem, and the
    --  store says so on the console.
 
+   function Parent_Bank
+     (Process : Object_Id)
+     return interface Bank;
+   --  The bank that Process's own bank is a sub-bank of, or a null cap if
+   --  Process has no bank, or its bank is the root. A new version of
+   --  Process is launched against it, so that its bank is a sibling of
+   --  Process's, as Hand_Over needs (ADR 0032, #866).
+
 end Process_Banks;

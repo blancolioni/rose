@@ -8,6 +8,8 @@ with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Constructor.Client;
 with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
@@ -16,6 +18,9 @@ with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
 with Rose.Interfaces.Replaceable.Client;
+with Rose.Interfaces.Replacement;
+with Rose.Interfaces.Replacement.Client;
+with Rose.Interfaces.Replacer.Client;
 with Rose.Interfaces.Saveable.Client;
 
 with Tests.Registry;
@@ -49,15 +54,20 @@ package body Tests.Replacement is
      Rose.Capabilities.Null_Capability;
 
    function Start
-     (Name     : String;
-      Previous : Rose.Capabilities.Capability := Null_Cap;
-      Saved    : Rose.Capabilities.Capability := Null_Cap;
-      Target   : Rose.Capabilities.Capability := Null_Cap)
+     (Name        : String;
+      Previous    : Rose.Capabilities.Capability := Null_Cap;
+      Saved       : Rose.Capabilities.Capability := Null_Cap;
+      Target      : Rose.Capabilities.Capability := Null_Cap;
+      Bank        : Rose.Capabilities.Capability := Null_Cap;
+      Replacement : Rose.Capabilities.Capability := Null_Cap)
       return Started;
    --  Launch replaceable_test as a command, with Name, with Previous and
    --  Saved if they are caps, and with Target, which makes it a helper
    --  that waits on Target, and return its interfaces, or null caps if
-   --  the launch or its call failed.
+   --  the launch or its call failed. It is launched against Bank, or the
+   --  test's own bank if Bank is null. If Replacement isn't null, it is
+   --  the new version of that replacement, which is told of it (Allow)
+   --  before its launch call.
 
    function Is_Started (Server : Started) return Boolean
    is (Server.Served /= Rose.Capabilities.Null_Capability
@@ -68,8 +78,12 @@ package body Tests.Replacement is
    function Name_Of (Server : Started) return String;
    --  What Server's Named interface says.
 
-   function Wait_For_Caller (Server : Started) return Boolean;
-   --  Ask Server how many calls of Wait it has deferred until it has one,
+   function Wait_For_Caller
+     (Server : Started;
+      Count  : Positive := 1)
+      return Boolean;
+   --  Ask Server how many calls of Wait it has deferred until it has
+   --  Count of them,
    --  which gives a helper started for it time to call. False if it never
    --  has one. A helper whose call has just failed takes a while to call
    --  again, since it unwinds an exception, and it runs only when a timer
@@ -135,6 +149,291 @@ package body Tests.Replacement is
       when others =>
          return "(no name)";
    end Name_Of;
+
+   --------------------------
+   -- Replace_Process_Test --
+   --------------------------
+
+   function Replace_Process_Test return Boolean is
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      function Wait_Until_Ready
+        (Replacement : in out Rose.Interfaces.Replacement
+           .Replacement_Object'Class)
+         return Boolean;
+      --  Ask Replacement until the old version is between calls.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      ----------------------
+      -- Wait_Until_Ready --
+      ----------------------
+
+      function Wait_Until_Ready
+        (Replacement : in out Rose.Interfaces.Replacement
+           .Replacement_Object'Class)
+         return Boolean
+      is
+      begin
+         for Attempt in 1 .. 100_000 loop
+            if Replacement.Ready then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Wait_Until_Ready;
+
+   begin
+      Ada.Text_IO.Put ("Replace process test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  Everything runs in a bank of the test's own, which ends every
+      --  process launched in it when it is destroyed, so that the test
+      --  leaves no servers behind (#724).
+
+      declare
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         In_Bank   : constant Rose.Capabilities.Capability :=
+           Test_Bank.Bank_Cap;
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+      begin
+         Check ("no test bank", In_Bank /= Null_Cap);
+
+         --  A replacement that commits.
+
+         declare
+            Old_Version : constant Started :=
+              Start ("gina", Bank => In_Bank);
+         begin
+            Check ("the old version did not start",
+                   Is_Started (Old_Version));
+
+            if Is_Started (Old_Version) then
+               declare
+                  Name : constant String := Name_Of (Old_Version);
+               begin
+                  Check ("old " & Name, Name = "gina 0");
+               end;
+
+               declare
+                  Deferred    : constant Started :=
+                    Start ("helper", Target => Old_Version.Held,
+                           Bank => In_Bank);
+                  Replacement : Rose.Interfaces.Replacement
+                    .Replacement_Object'Class :=
+                      Replacer.Replace_Process (Old_Version.Control);
+               begin
+                  Check ("the deferred call was not made",
+                         Is_Started (Deferred));
+
+                  --  The helper's call is deferred before the hold, which
+                  --  lets no call reach the old version but the new
+                  --  version's.
+
+                  Check ("no replacement",
+                         Replacement.Replacement_Cap /= Null_Cap);
+
+                  if Replacement.Replacement_Cap /= Null_Cap then
+                     declare
+                        Held_Up : constant Started :=
+                          Start ("repeat", Target => Old_Version.Held,
+                                 Bank => In_Bank);
+                        --  Its call, to Wait_With, is made while the old
+                        --  version's calls are held, and waits. It isn't
+                        --  Wait, which has room for one deferred call.
+                        Ready   : constant Boolean :=
+                          Wait_Until_Ready (Replacement);
+                        Sibling : Rose.Interfaces.Bank.Bank_Object'Class :=
+                          Replacement.Bank;
+                        New_Version : constant Started :=
+                          Start ("ignored",
+                                 Previous    => Old_Version.Control,
+                                 Bank        => Sibling.Bank_Cap,
+                                 Replacement =>
+                                   Replacement.Replacement_Cap);
+                        Committed   : Boolean;
+                     begin
+                        Check ("the second helper did not start",
+                               Is_Started (Held_Up));
+                        Check ("the old version is never ready", Ready);
+                        Check ("the new version did not start",
+                               Is_Started (New_Version));
+                        Committed :=
+                          Is_Started (New_Version)
+                          and then Replacement.Commit;
+                        Check ("the replacement did not commit", Committed);
+
+                        --  Until a replacement commits or is released,
+                        --  the old version's calls are held, and a call
+                        --  to it would wait for good.
+
+                        if not Committed then
+                           Replacement.Release;
+                           Test_Bank.Destroy;
+                           return False;
+                        end if;
+
+                        --  The old version's caps reach the new version,
+                        --  which took its name and count. The new
+                        --  version's own launch-time caps reached the
+                        --  process that has that object id now, the old
+                        --  version, which has ended.
+
+                        declare
+                           Name : constant String := Name_Of (Old_Version);
+                        begin
+                           Check ("replaced " & Name, Name = "gina 1");
+                        end;
+
+                        declare
+                           Name : constant String := Name_Of (New_Version);
+                        begin
+                           Check ("the retired one answered " & Name,
+                                  Name = "(no name)");
+                        end;
+
+                        --  The new version answers both calls: the one it
+                        --  took over, and the one made during the
+                        --  handover, which it deferred in turn.
+
+                        declare
+                           Held : Rose.Interfaces.Held_Call.Client
+                             .Held_Call_Client :=
+                               Rose.Interfaces.Held_Call.Client.From_Cap
+                                 (Old_Version.Held);
+                        begin
+                           Check ("the new version has not both calls",
+                                  Wait_For_Caller (Old_Version, 2));
+                           Held.Answer (11);
+                        end;
+
+                        declare
+                           Name : constant String := Name_Of (Deferred);
+                        begin
+                           Check ("deferred " & Name, Name = "waited 11");
+                        end;
+
+                        declare
+                           Name : constant String := Name_Of (Held_Up);
+                        begin
+                           Check ("held " & Name,
+                                  Name = "waited 11 after 0 errors");
+                        end;
+                     end;
+
+                     Replacement.Release;
+                  end if;
+               end;
+            end if;
+         end;
+
+         --  A replacement that the new version refuses, by failing its
+         --  launch, doesn't commit, and releasing it leaves the old
+         --  version as it was, with the call that it deferred.
+
+         declare
+            Old_Version : constant Started :=
+              Start ("refuse", Bank => In_Bank);
+         begin
+            Check ("the refused one did not start",
+                   Is_Started (Old_Version));
+
+            if Is_Started (Old_Version) then
+               declare
+                  Deferred    : constant Started :=
+                    Start ("helper", Target => Old_Version.Held,
+                           Bank => In_Bank);
+                  Waited      : constant Boolean :=
+                    Wait_For_Caller (Old_Version);
+                  Replacement : Rose.Interfaces.Replacement
+                    .Replacement_Object'Class :=
+                      Replacer.Replace_Process (Old_Version.Control);
+               begin
+                  Check ("the third helper's call was not deferred",
+                         Is_Started (Deferred) and then Waited);
+                  Check ("no second replacement",
+                         Replacement.Replacement_Cap /= Null_Cap);
+
+                  if Replacement.Replacement_Cap /= Null_Cap then
+                     declare
+                        Ready   : constant Boolean :=
+                          Wait_Until_Ready (Replacement);
+                        Sibling : Rose.Interfaces.Bank.Bank_Object'Class :=
+                          Replacement.Bank;
+                     begin
+                        Check ("the refused one is never ready", Ready);
+                        Check ("a version took over from refuse",
+                               not Is_Started
+                                 (Start ("barry",
+                                         Previous    => Old_Version.Control,
+                                         Bank        => Sibling.Bank_Cap,
+                                         Replacement =>
+                                           Replacement.Replacement_Cap)));
+                        Check ("a refused replacement committed",
+                               not Replacement.Commit);
+                     end;
+                     Replacement.Release;
+                  end if;
+
+                  declare
+                     Name : constant String := Name_Of (Old_Version);
+                  begin
+                     Check ("kept " & Name, Name = "refuse 0");
+                  end;
+
+                  declare
+                     Held : Rose.Interfaces.Held_Call.Client
+                       .Held_Call_Client :=
+                         Rose.Interfaces.Held_Call.Client.From_Cap
+                           (Old_Version.Held);
+                  begin
+                     Check ("the old version lost its deferred call",
+                            Held.Waiting = 1);
+                     Held.Answer (12);
+                  end;
+
+                  declare
+                     Name : constant String := Name_Of (Deferred);
+                  begin
+                     Check ("kept deferred " & Name, Name = "waited 12");
+                  end;
+               end;
+            end if;
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+
+   exception
+      when others =>
+         Ada.Text_IO.Put (": raised");
+         return False;
+   end Replace_Process_Test;
 
    ----------------------
    -- Replacement_Test --
@@ -494,10 +793,12 @@ package body Tests.Replacement is
    -----------
 
    function Start
-     (Name     : String;
-      Previous : Rose.Capabilities.Capability := Null_Cap;
-      Saved    : Rose.Capabilities.Capability := Null_Cap;
-      Target   : Rose.Capabilities.Capability := Null_Cap)
+     (Name        : String;
+      Previous    : Rose.Capabilities.Capability := Null_Cap;
+      Saved       : Rose.Capabilities.Capability := Null_Cap;
+      Target      : Rose.Capabilities.Capability := Null_Cap;
+      Bank        : Rose.Capabilities.Capability := Null_Cap;
+      Replacement : Rose.Capabilities.Capability := Null_Cap)
       return Started
    is
       use System.Storage_Elements;
@@ -506,13 +807,25 @@ package body Tests.Replacement is
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("replaceable_test");
       Endpoint : constant Rose.Capabilities.Capability :=
-        Launcher.Launch_Command (Rose.System_Calls.Own_Bank.Cap, No_Caps);
+        Launcher.Launch_Command
+          ((if Bank /= Null_Cap then Bank
+            else Rose.System_Calls.Own_Bank.Cap),
+           No_Caps);
       Padded   : constant Storage_Offset :=
         Storage_Offset ((Name'Length + 3) / 4 * 4);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
          return (others => <>);
+      end if;
+
+      if Replacement /= Null_Cap then
+         declare
+            R : Rose.Interfaces.Replacement.Client.Replacement_Client :=
+              Rose.Interfaces.Replacement.Client.From_Cap (Replacement);
+         begin
+            R.Allow (Endpoint);
+         end;
       end if;
 
       --  The launch call: the create endpoint cap, the cap set server's
@@ -590,12 +903,16 @@ package body Tests.Replacement is
    -- Wait_For_Caller --
    ---------------------
 
-   function Wait_For_Caller (Server : Started) return Boolean is
+   function Wait_For_Caller
+     (Server : Started;
+      Count  : Positive := 1)
+      return Boolean
+   is
       Held : Rose.Interfaces.Held_Call.Client.Held_Call_Client :=
         Rose.Interfaces.Held_Call.Client.From_Cap (Server.Held);
    begin
       for Attempt in 1 .. 100_000 loop
-         if Held.Waiting > 0 then
+         if Held.Waiting >= Count then
             return True;
          end if;
       end loop;

@@ -49,6 +49,7 @@ package body Rose.Kernel.Processes is
       record
          Held    : Boolean := False;
          Except  : Rose.Objects.Endpoint_Index := 0;
+         Caller  : Process_Id := Null_Process_Id;
          Retired : Boolean := False;
       end record;
 
@@ -1316,11 +1317,17 @@ package body Rose.Kernel.Processes is
    ----------------
 
    procedure Hold_Calls
-     (Pid    : Process_Id;
-      Except : Rose.Objects.Endpoint_Id)
+     (Pid     : Process_Id;
+      Except  : Rose.Objects.Endpoint_Id;
+      Caller  : Process_Id;
+      Success : out Boolean)
    is
       use type Rose.Objects.Endpoint_Id;
    begin
+      if Active_Checkpoint then
+         Success := False;
+         return;
+      end if;
 
       --  Find_Endpoint would find a free slot for the null id.
 
@@ -1328,6 +1335,8 @@ package body Rose.Kernel.Processes is
       Handovers (Pid).Except :=
         (if Except = Rose.Objects.Null_Endpoint_Id then 0
          else Find_Endpoint (Pid, Except));
+      Handovers (Pid).Caller := Caller;
+      Success := True;
    end Hold_Calls;
 
    ----------------------------
@@ -1438,13 +1447,16 @@ package body Rose.Kernel.Processes is
 
    function Is_Held
      (Pid      : Process_Id;
-      Endpoint : Rose.Objects.Endpoint_Index)
+      Endpoint : Rose.Objects.Endpoint_Index;
+      Caller   : Process_Id)
       return Boolean
    is
       use type Rose.Objects.Endpoint_Index;
    begin
       return Handovers (Pid).Held
-        and then Endpoint /= Handovers (Pid).Except;
+        and then Endpoint /= Handovers (Pid).Except
+        and then (Handovers (Pid).Caller = Null_Process_Id
+                  or else Caller /= Handovers (Pid).Caller);
    end Is_Held;
 
    ----------------------------
@@ -1807,12 +1819,13 @@ package body Rose.Kernel.Processes is
          begin
 
             --  While its calls are held, a process takes only the calls
-            --  to the endpoint that the hold excepts (Hold_Calls).
+            --  that the hold excepts (Hold_Calls).
 
             while It /= null
               and then ((Endpoint /= 0
                          and then It.Waiting_Endpoint /= Endpoint)
-                        or else Is_Held (Receiver_Id, It.Waiting_Endpoint))
+                        or else Is_Held
+                          (Receiver_Id, It.Waiting_Endpoint, It.Pid))
             loop
                Prev := It;
                It := It.Waiting_Next;
@@ -1933,6 +1946,7 @@ package body Rose.Kernel.Processes is
    begin
       Handovers (Pid).Held := False;
       Handovers (Pid).Except := 0;
+      Handovers (Pid).Caller := Null_Process_Id;
 
       --  A process that is not waiting to receive takes the calls that
       --  wait when it next receives, as it would after any busy spell.
@@ -3168,6 +3182,7 @@ package body Rose.Kernel.Processes is
    is
       use Rose.Capabilities.Layout;
       use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Capability_Identifier;
       use type Rose.Objects.Endpoint_Id;
       use type Rose.Objects.Endpoint_Index;
       use type Rose.Objects.Object_Id;
@@ -3205,6 +3220,14 @@ package body Rose.Kernel.Processes is
 
       procedure Fail (Reason : String);
 
+      function Mem_Identifier
+        (Oid : Rose.Objects.Object_Id)
+         return Rose.Objects.Capability_Identifier;
+      --  Rose.Objects.Process_Identifier (Oid), without its 64-bit
+      --  division, which the kernel has no support for: 2 ** 16 is 1
+      --  modulo 2 ** 16 - 1, so Oid is congruent to the sum of its four
+      --  16-bit digits.
+
       ----------
       -- Fail --
       ----------
@@ -3218,6 +3241,24 @@ package body Rose.Kernel.Processes is
          Rose.Boot.Console.Put_Line (Reason);
          Success := False;
       end Fail;
+
+      --------------------
+      -- Mem_Identifier --
+      --------------------
+
+      function Mem_Identifier
+        (Oid : Rose.Objects.Object_Id)
+         return Rose.Objects.Capability_Identifier
+      is
+         Sum : Rose.Words.Word_32 := 0;
+         X   : Rose.Objects.Object_Id := Oid;
+      begin
+         for Digit in 1 .. 4 loop
+            Sum := Sum + Rose.Words.Word_32 (X and 16#FFFF#);
+            X := X / 2 ** 16;
+         end loop;
+         return Rose.Objects.Capability_Identifier (Sum mod (2 ** 16 - 1) + 1);
+      end Mem_Identifier;
 
    begin
       Success := False;
@@ -3255,6 +3296,15 @@ package body Rose.Kernel.Processes is
                      Find_Endpoint (New_Pid, Old_Entry.Endpoints (I).Endpoint);
             begin
                if J = 0 then
+                  Rose.Boot.Console.Put ("swap: missing endpoint ");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_32
+                       (Old_Entry.Endpoints (I).Endpoint / 2 ** 32));
+                  Rose.Boot.Console.Put ("_");
+                  Rose.Boot.Console.Put
+                    (Rose.Words.Word_32
+                       (Old_Entry.Endpoints (I).Endpoint mod 2 ** 32));
+                  Rose.Boot.Console.New_Line;
                   Fail ("the new process lacks an endpoint");
                   return;
                end if;
@@ -3387,6 +3437,20 @@ package body Rose.Kernel.Processes is
                      end if;
                      Layout.Payload := Old_Oid;
                      Set_Cap (New_Pid, Cap, Layout);
+
+                  --  Mem's caps for a process have an identifier from the
+                  --  process's object id (#616). New_Pid's, which mem made
+                  --  at its launch, follow it to the object id that it
+                  --  takes, as mem's records of the two do (#866).
+
+                  elsif Mem_Process /= Null_Process_Id
+                    and then Layout.Header.Cap_Type = Endpoint_Cap
+                    and then Layout.Payload = Process_Table (Mem_Process).Oid
+                    and then Layout.Header.Identifier
+                      = Mem_Identifier (New_Oid)
+                  then
+                     Layout.Header.Identifier := Mem_Identifier (Old_Oid);
+                     Set_Cap (New_Pid, Cap, Layout);
                   end if;
                end;
             end if;
@@ -3478,13 +3542,18 @@ package body Rose.Kernel.Processes is
       Old_Entry.Oid := New_Oid;
       New_Entry.Oid := Old_Oid;
 
+      --  The new version's own calls needed no exception, so its hold
+      --  takes none: until Release_Calls, every call to it waits.
+
       Handovers (New_Pid) :=
         (Held    => True,
          Except  => Handovers (Old_Pid).Except,
+         Caller  => Null_Process_Id,
          Retired => False);
       Handovers (Old_Pid) :=
         (Held    => False,
          Except  => 0,
+         Caller  => Null_Process_Id,
          Retired => True);
 
       Debug.Put (New_Pid);
