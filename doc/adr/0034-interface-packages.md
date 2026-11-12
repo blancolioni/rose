@@ -41,13 +41,13 @@ Each interface is a child of a **group**, which is a child of `Rose.Interfaces`:
 | `Common` | `Named`, `Resource`, `Transactional` | |
 | `Streams` | `Reader`, `Writer`, `Stream`, `Releasable_Reader`, `Releasable_Writer`, `Seekable`, `Seekable_Reader`, `Output_Redirect` | `Standard_Input`, `Standard_Output`, `Standard_Error`, `Standard_IO` |
 | `Processes` | `Process`, `Kernel_Process`, `Segment`, `Heap`, `Server`, `Launch`, `Exec`, `Executable`, `Memory`, `Signalled`, `Restorable`, `Replaceable`, `Saveable` | |
-| `Storage` | `Storage`, `Bank`, `Region`, `Dependent`, `Process_Banks` | `Storage_Service` |
+| `Storage` | `Store` (was `Storage`), `Bank`, `Region`, `Dependent`, `Process_Banks` | `Storage_Service` |
 | `Checkpoints` | `Checkpointer`, `Kernel_Log`, `Log_Reader`, `Memory_Restore`, `Storage_Checkpoint`, `State` | |
 | `Devices` | `ATA`, `Block` (was `Block_Device`, #841), `Partitions`, `Partition_Setup`, `Interrupt_Handler`, `Event_Listener`, `Event_Source` | |
 | `Time` | `Clock`, `Clock_Admin`, `Timer`, `Timeout` | `Clock_Service`, `Clock_Admin_Service`, `Timer_Service` |
 | `Files` | `File`, `Writable_File`, `Transactional_Writable_File`, `File_Control`, `Directory`, `Writable_Directory`, `File_System` | |
 | `Users` | `Auth`, `Auth_Admin`, `User`, `Rights`, `Rights_Admin` | `Rights_Service`, `Rights_Admin_Service` |
-| `Commands` | `Commands`, `Map`, `Command_Endpoint` | `Find_Command` |
+| `Commands` | `Lookup` (was `Commands`), `Map`, `Command_Endpoint` | `Find_Command` |
 | `Screens` | `Terminal`, `Surface` | `Console`, `Screen_Service` |
 
 How the less obvious ones were placed:
@@ -57,6 +57,11 @@ How the less obvious ones were placed:
 - **`Checkpoints`** holds each server's part in a checkpoint or a restore, so `Memory_Restore` and `Storage_Checkpoint` are there, not with `Memory` and `Storage`.
 - **`Devices`** holds the drivers' interfaces, and the callbacks that drivers use: `Interrupt_Handler` and the events.
 - **`Screens`,** not `Display`, so that the display server's interface can be `Screens.Display` when it comes.
+
+Two interfaces are renamed, so that no name repeats its group:
+
+- **`Commands` becomes `Commands.Lookup`.** It is the part of the command registry that finds commands by name (#460), which `Map` extends with `Add`.
+- **`Storage` becomes `Storage.Store`.** It is the storage server itself: it takes backing store, and gives the root bank, which every other bank is below.
 
 Roles have no ids, so the tag doesn't freeze where they are. They move with their interfaces, so that a role is found beside what it grants.
 
@@ -80,7 +85,7 @@ idle's change and Rose's land together:
 1. **idle:** dotted interface names, the file lookup, the generated group packages, and the endpoint text.
 2. **Rose:**
    - move and rename the IDL files;
-   - rename `Block_Device` to `Block` (#841);
+   - rename `Block_Device` to `Block` (#841), `Commands` to `Lookup` and `Storage` to `Store`;
    - remove the four unused interfaces;
    - regenerate `endpoint-ids.txt`;
    - update every `with Rose.Interfaces.X` in the tree.
@@ -105,11 +110,10 @@ The series check isn't run until the tag exists, so every id can change once now
 
 ## Open questions
 
-- **Two names repeat their group:** `Commands.Commands` and `Storage.Storage`. They could become `Commands.Lookup` (the find-only part of the registry, which `Map` extends) and `Storage.Store`. Renaming costs nothing extra in this change.
 - **Other renames for the series.** Anything that is wanted before the freeze has to be decided now, as #841 was.
 
 ## Follow-up work
 
 - idle: dotted interface names, GNAT file lookup, generated group packages, and the endpoint text.
-- Rose: the move, the removals, #841, the new `endpoint-ids.txt`, and the `with` clauses.
+- Rose: the move, the removals, the renames (#841, `Lookup`, `Store`), the new `endpoint-ids.txt`, and the `with` clauses.
 - The book's IDL chapter: the package structure.
