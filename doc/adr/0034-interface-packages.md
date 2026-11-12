@@ -41,9 +41,9 @@ Each interface is a child of a **group**, which is a child of `Rose.Interfaces`:
 | `Common` | `Named`, `Resource`, `Transactional` | |
 | `Streams` | `Reader`, `Writer`, `Stream`, `Releasable_Reader`, `Releasable_Writer`, `Seekable`, `Seekable_Reader`, `Output_Redirect` | `Standard_Input`, `Standard_Output`, `Standard_Error`, `Standard_IO` |
 | `Processes` | `Process`, `Kernel_Process`, `Segment`, `Heap`, `Server`, `Launch`, `Exec`, `Executable`, `Memory`, `Signalled`, `Restorable`, `Replaceable`, `Saveable` | |
-| `Storage` | `Store` (was `Storage`), `Bank`, `Region`, `Dependent`, `Process_Banks` | `Storage_Service` |
+| `Storage` | `Store` (was `Storage`), `Bank`, `Region`, `Dependent`, `Process_Banks`, `Block_Array` (was `Block_Device`, #841), `Partitions`, `Partition_Setup` | `Storage_Service` |
 | `Checkpoints` | `Checkpointer`, `Kernel_Log`, `Log_Reader`, `Memory_Restore`, `Storage_Checkpoint`, `State` | |
-| `Devices` | `ATA`, `Block` (was `Block_Device`, #841), `Partitions`, `Partition_Setup`, `Interrupt_Handler`, `Event_Listener`, `Event_Source` | |
+| `Devices` | `ATA`, `Interrupt_Handler`, `Event_Listener`, `Event_Source` | |
 | `Time` | `Clock`, `Clock_Admin`, `Timer`, `Timeout` | `Clock_Service`, `Clock_Admin_Service`, `Timer_Service` |
 | `Files` | `File`, `Writable_File`, `Transactional_Writable_File`, `File_Control`, `Directory`, `Writable_Directory`, `File_System` | |
 | `Users` | `Auth`, `Auth_Admin`, `User`, `Rights`, `Rights_Admin` | `Rights_Service`, `Rights_Admin_Service` |
@@ -55,13 +55,23 @@ How the less obvious ones were placed:
 - **`Common`** holds the mix-ins that interfaces of several groups descend from. An interface used by only one group goes in that group, as `Seekable` goes in `Streams`.
 - **`Processes`** holds what a process is, and what the kernel or mem sends to one: `Signalled` and `Restorable`. `Replaceable` and `Saveable` are there because they are about a server's process, not its objects.
 - **`Checkpoints`** holds each server's part in a checkpoint or a restore, so `Memory_Restore` and `Storage_Checkpoint` are there, not with `Memory` and `Storage`.
-- **`Devices`** holds the drivers' interfaces, and the callbacks that drivers use: `Interrupt_Handler` and the events.
+- **`Storage`** holds where data is kept: memory, in banks and regions, and the backing store under it, in block arrays. `Partitions` and `Partition_Setup` are there too, because they describe how a block array is divided.
+- **`Devices`** holds the drivers' interfaces, and the callbacks that drivers use: `Interrupt_Handler` and the events. An interface that a driver serves, but that something other than a driver can serve too, goes with what it is for and not here. `Block_Array` is the example: `ata` serves one for each disk, but the partition server serves one for each partition, and a RAM disk, the encryption layer of ADR 0019, or an image in a file could serve one as well. `ATA.Get_Device` returns a `Storage.Block_Array`: a device gives one, rather than being one.
 - **`Screens`,** not `Display`, so that the display server's interface can be `Screens.Display` when it comes.
 
-Two interfaces are renamed, so that no name repeats its group:
+Three interfaces are renamed. Two of them would otherwise repeat their group's name:
 
 - **`Commands` becomes `Commands.Lookup`.** It is the part of the command registry that finds commands by name (#460), which `Map` extends with `Add`.
 - **`Storage` becomes `Storage.Store`.** It is the storage server itself: it takes backing store, and gives the root bank, which every other bank is below.
+
+The third is named for what it is (#841):
+
+- **`Block_Device` becomes `Storage.Block_Array`.** It is a numbered array of blocks of one size, which may or may not be a device. `Block` alone would name one block, and `Block_Store` would sit beside `Store` and ask which store is meant.
+
+`Block_Array` changes in two other ways while its ids change:
+
+- **`Device_Size_Type` goes.** No operation uses it, and only `Rose.Devices.Block` passes it on.
+- **`Max_Block_Size` becomes 65536,** so `Block_Size_Type` is `range 0 .. 65536`. The range isn't in the endpoint ids, but a 0.4.0 client restored on a later 0.4.x checks every block size it is given against it, so widening it later would break those clients. Rose's own block arrays keep 512- and 2048-byte blocks, and the client library's one-block buffer in `Rose.Devices.Block.Client` stays at 4096 bytes until something serves larger blocks.
 
 Roles have no ids, so the tag doesn't freeze where they are. They move with their interfaces, so that a role is found beside what it grants.
 
@@ -85,7 +95,7 @@ idle's change and Rose's land together:
 1. **idle:** dotted interface names, the file lookup, the generated group packages, and the endpoint text.
 2. **Rose:**
    - move and rename the IDL files;
-   - rename `Block_Device` to `Block` (#841), `Commands` to `Lookup` and `Storage` to `Store`;
+   - rename `Block_Device` to `Block_Array` (#841), with its two changes, `Commands` to `Lookup` and `Storage` to `Store`;
    - remove the four unused interfaces;
    - regenerate `endpoint-ids.txt`;
    - update every `with Rose.Interfaces.X` in the tree.
