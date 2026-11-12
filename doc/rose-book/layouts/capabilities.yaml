@@ -162,8 +162,8 @@ diagrams:
       - {words: 2, name: Endpoint Id}
       - - [16, Identifier]
         - [8, unused]
-        - [4, Error]
-        - [4, Extra]
+        - [5, Error]
+        - [3, Extra]
       - {words: 16, name: Parameter words (16), height: 3}
       - {words: 16, name: Capabilities (16), height: 3}
       - {words: 1, name: Buffer address}

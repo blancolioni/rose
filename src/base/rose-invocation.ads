@@ -86,8 +86,6 @@ is
    type Capability_Words is
      array (Capability_Index) of Rose.Capabilities.Capability;
 
-   type Error_Index is mod 2 ** 4;
-
    type Control_Word_Header is new Word_8;
 
    type Word_3 is mod 2 ** 3;
@@ -119,7 +117,29 @@ is
          Buffer_Address : System.Address := System.Null_Address;
          Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
-     with Pack, Size => 40 * 4 * 8;
+     with Size => 40 * 4 * 8;
+
+   --  The layout is fixed, because the kernel, every process and every
+   --  checkpoint share it. Error has five bits, for up to 32 errors: one
+   --  more than that, and this clause no longer compiles, rather than
+   --  Extra_Errors shrinking without a word (#692). The book's diagram,
+   --  doc/rose-book/layouts/capabilities.yaml, is checked against it.
+
+   for Invocation_Record use
+      record
+         Control        at   0 range  0 .. 31;
+         Cap            at   4 range  0 .. 31;
+         Reply_Cap      at   8 range  0 .. 31;
+         Endpoint       at  12 range  0 .. 63;
+         Identifier     at  20 range  0 .. 15;
+         Unused         at  20 range 16 .. 23;
+         Error          at  20 range 24 .. 28;
+         Extra_Errors   at  20 range 29 .. 31;
+         Data           at  24 range  0 .. 16 * 32 - 1;
+         Caps           at  88 range  0 .. 16 * 32 - 1;
+         Buffer_Address at 152 range  0 .. 31;
+         Buffer_Length  at 156 range  0 .. 31;
+      end record;
 
    type Invocation_Access is access all Invocation_Record;
 
