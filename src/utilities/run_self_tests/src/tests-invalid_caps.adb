@@ -19,6 +19,9 @@ package body Tests.Invalid_Caps is
    begin
       Ada.Text_IO.Put ("Invalid cap test");
 
+      --  The kernel logs this call on serial as "invoke: bad cap 00",
+      --  once per run of the self tests, and that is expected (#803).
+
       Rose.System_Calls.Initialize_Send
         (Params, Rose.Capabilities.Null_Capability);
       Rose.System_Calls.Invoke_Capability (Params);
