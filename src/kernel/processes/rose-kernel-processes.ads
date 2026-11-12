@@ -117,6 +117,15 @@ package Rose.Kernel.Processes is
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability);
 
+   procedure Discard_Cap
+     (Pid : Process_Id;
+      Cap : Rose.Capabilities.Capability);
+   --  Delete Cap, which Pid gives up with the Delete cap. If it is a reply
+   --  cap whose caller is waiting for the reply, the call fails with
+   --  Closed: a single-use cap is moved, not copied (#864), so no one
+   --  else holds it, and the caller would otherwise wait for good (#879).
+   --  The caller's buffer is then unmapped from the server that has it.
+
    procedure Set_Cap
      (Pid    : Process_Id;
       Cap    : Rose.Capabilities.Capability;

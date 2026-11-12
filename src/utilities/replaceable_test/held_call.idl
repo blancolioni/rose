@@ -1,0 +1,22 @@
+--  A call that its server defers, for the Replacement test (#879). It is
+--  Replaceable_Test's own interface, not one of the system's, so that it
+--  doesn't freeze with them (ADR 0031).
+--
+--  Wait is deferred until Answer is called, and then returns Answer's
+--  Value. Its reply is words only, so that a new version can answer it
+--  (#878). Wait_With is Wait with Text, which is sent in a buffer, so
+--  that its server holds the caller's buffer while it defers the call.
+--  Waiting is the number of calls of either that are deferred, and
+--  Answer answers both.
+
+interface Held_Call is
+
+   function Wait return Natural;
+
+   function Wait_With (Text : String) return Natural;
+
+   function Waiting return Natural;
+
+   procedure Answer (Value : Natural);
+
+end Held_Call;
