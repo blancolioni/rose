@@ -258,11 +258,27 @@ For an interface `X` declared in `x.idl`, it writes three packages:
 | One handler access type per method, and procedures to register handlers with a `Rose.Server` context.
 |===
 
+[[interface-capability-pages]]
+==== Invoking an interface capability
+
+Invoking an interface capability returns a capability for each method, in the order of the index constants in the interface package (`X_Index`, from 0, and `Subprogram_Count`).
+The request has up to three words:
+
+. 0 for the methods. A word `N` greater than 0 asks instead for the interface capability of the `N`th ancestor, which is a single capability.
+. The index of the first capability wanted, 0 if the word is not sent.
+. The number of capabilities wanted, `Max_Capabilities` if the word is not sent.
+
+The reply has the capabilities from the first one asked for, up to that number and `Max_Capabilities`, and no more, so a client can ask for exactly the capabilities it keeps.
+A first index past the last method fails with `Invalid_Operation`.
+Generated clients ask a page at a time, and code written by hand uses `Rose.System_Calls.Get_Interface_Cap` for one capability and `Get_Interface_Caps` for several (idle#101).
+A server that answers an interface capability by hand, as the kernel does for `Kernel_Process`, follows the same rules.
+
 ==== Client packages
 
 `X_Client` holds the interface capability and one capability for each method.
 
 * `Open (Client, Interface_Cap)` invokes the interface capability, which replies with the method capabilities, and stores them.
+  An invocation carries at most `Rose.Invocation.Max_Capabilities` capabilities, so `Open` asks for them a page at a time (see <<interface-capability-pages>>).
 * `Open_Cap_Set` builds a client from method capabilities the caller already has.
 * `Close` releases the client.
 * Each method becomes a subprogram that takes the client as its first parameter.

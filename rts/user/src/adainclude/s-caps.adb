@@ -22,13 +22,10 @@ package body System.Caps is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       if Exit_Process_Cap = 0 then
-         Rose.System_Calls.Initialize_Send
-           (Params, System.Standard_Caps.Process_Interface_Cap);
-         Rose.System_Calls.Receive_Caps
-           (Params, Rose.Interfaces.Process.Subprogram_Count);
-         Rose.System_Calls.Invoke_Capability (Params);
          Exit_Process_Cap :=
-           Params.Caps (Rose.Interfaces.Process.Exit_Process_Index);
+           Rose.System_Calls.Get_Interface_Cap
+             (System.Standard_Caps.Process_Interface_Cap,
+              Rose.Interfaces.Process.Exit_Process_Index);
       end if;
 
       Rose.System_Calls.Initialize_Send

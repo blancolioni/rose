@@ -340,22 +340,19 @@ package body Rose.CRTL is
    ----------------
 
    procedure Start_Heap is
-      Params   : aliased Rose.Invocation.Invocation_Record;
-      Heap_Cap : Rose.Capabilities.Capability;
+      use type Rose.Capabilities.Capability;
+      Params    : aliased Rose.Invocation.Invocation_Record;
+      Heap_Cap  : Rose.Capabilities.Capability;
+      Heap_Caps : Rose.Capabilities.Capability_Array
+                    (1 .. Rose.Interfaces.Heap.Subprogram_Count);
    begin
       Heap_Started := True;
 
       Rose.System_Calls.Initialize_Send
-        (Params, Rose.Capabilities.Standard.Process_Interface_Cap);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Process.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-      if Params.Control.Flags (Rose.Invocation.Error) then
-         return;
-      end if;
-
-      Rose.System_Calls.Initialize_Send
-        (Params, Params.Caps (Rose.Interfaces.Process.Heap_Interface_Index));
+        (Params,
+         Rose.System_Calls.Get_Interface_Cap
+           (Rose.Capabilities.Standard.Process_Interface_Cap,
+            Rose.Interfaces.Process.Heap_Interface_Index));
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
       if Params.Control.Flags (Rose.Invocation.Error) then
@@ -363,17 +360,14 @@ package body Rose.CRTL is
       end if;
       Heap_Cap := Params.Caps (0);
 
-      Rose.System_Calls.Initialize_Send (Params, Heap_Cap);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Heap.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-      if Params.Control.Flags (Rose.Invocation.Error) then
+      Rose.System_Calls.Get_Interface_Caps (Heap_Cap, Heap_Caps);
+      if Heap_Caps (1) = Rose.Capabilities.Null_Capability then
          return;
       end if;
       Current_Bound_Cap :=
-        Params.Caps (Rose.Interfaces.Heap.Current_Bound_Index);
+        Heap_Caps (Rose.Interfaces.Heap.Current_Bound_Index + 1);
       Request_Bound_Cap :=
-        Params.Caps (Rose.Interfaces.Heap.Request_New_Bound_Index);
+        Heap_Caps (Rose.Interfaces.Heap.Request_New_Bound_Index + 1);
 
       Heap_Base := Current_Bound;
       Heap_Top := Heap_Base;

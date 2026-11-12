@@ -21,6 +21,15 @@ package body Rose.System_Calls is
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word);
 
+   procedure Get_Page
+     (Interface_Cap : Rose.Capabilities.Capability;
+      First         : Natural;
+      Caps          : out Rose.Capabilities.Capability_Array);
+   --  Ask the interface whose cap is Interface_Cap for the caps of the
+   --  Caps'Length subprograms from the one whose index is First, which
+   --  must fit in one invocation, and put them in Caps; null caps for
+   --  those that do not arrive.
+
    function Create_Endpoint_Capability return Rose.Capabilities.Capability
    is (Local_Cap (Create_Endpoint));
 
@@ -346,6 +355,76 @@ package body Rose.System_Calls is
       end if;
    end Get_Integer_64;
 
+   -----------------------
+   -- Get_Interface_Cap --
+   -----------------------
+
+   function Get_Interface_Cap
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Index         : Natural)
+      return Rose.Capabilities.Capability
+   is
+      Caps : Rose.Capabilities.Capability_Array (1 .. 1);
+   begin
+      Get_Page (Interface_Cap, Index, Caps);
+      return Caps (1);
+   end Get_Interface_Cap;
+
+   ------------------------
+   -- Get_Interface_Caps --
+   ------------------------
+
+   procedure Get_Interface_Caps
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Caps          : out Rose.Capabilities.Capability_Array)
+   is
+      First : Natural := 0;
+   begin
+      Caps := (others => Rose.Capabilities.Null_Capability);
+      while First < Caps'Length loop
+         declare
+            Count : constant Natural :=
+                      Natural'Min (Rose.Invocation.Max_Capabilities,
+                                   Caps'Length - First);
+         begin
+            Get_Page
+              (Interface_Cap, First,
+               Caps (Caps'First + First .. Caps'First + First + Count - 1));
+            First := First + Count;
+         end;
+      end loop;
+   end Get_Interface_Caps;
+
+   --------------
+   -- Get_Page --
+   --------------
+
+   procedure Get_Page
+     (Interface_Cap : Rose.Capabilities.Capability;
+      First         : Natural;
+      Caps          : out Rose.Capabilities.Capability_Array)
+   is
+      use Rose.Invocation;
+      Params : aliased Invocation_Record;
+   begin
+      Caps := (others => Rose.Capabilities.Null_Capability);
+      Initialize_Send (Params, Interface_Cap);
+      Send_Word (Params, Natural'(0));
+      Send_Word (Params, First);
+      Send_Word (Params, Natural'(Caps'Length));
+      Receive_Caps (Params, Caps'Length);
+      Invoke_Capability (Params);
+
+      if Params.Control.Flags (Error) then
+         return;
+      end if;
+
+      for I in 0 .. Natural'Min (Caps'Length, Sent_Cap_Count (Params)) - 1
+      loop
+         Caps (Caps'First + I) := Params.Caps (Capability_Index (I));
+      end loop;
+   end Get_Page;
+
    -----------------
    -- Get_Word_32 --
    -----------------
@@ -554,6 +633,7 @@ package body Rose.System_Calls is
       if Item.Control.Flags (Rose.Invocation.Error)
         and then Item.Error in Rose.Invocation.No_Invoke_Buffer
                              | Rose.Invocation.Buffer_Too_Small
+                             | Rose.Invocation.Too_Many_Capabilities
       then
          return;
       end if;
@@ -711,6 +791,16 @@ package body Rose.System_Calls is
       if not Params.Control.Flags (Rose.Invocation.Send_Caps) then
          Params.Control.Flags (Rose.Invocation.Send_Caps) := True;
          Params.Control.Last_Sent_Cap := 0;
+      elsif Params.Control.Last_Sent_Cap
+        = Rose.Invocation.Capability_Index'Last
+      then
+
+         --  The index would wrap around and replace the first cap.
+
+         Params.Control.Flags (Rose.Invocation.Error) := True;
+         Params.Error := Rose.Invocation.Too_Many_Capabilities;
+         Params.Cap := 0;
+         return;
       else
          Params.Control.Last_Sent_Cap :=
            Params.Control.Last_Sent_Cap + 1;

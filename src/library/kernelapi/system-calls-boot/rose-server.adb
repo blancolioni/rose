@@ -103,16 +103,11 @@ package body Rose.Server is
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.Capabilities.Standard.Process_Interface_Cap);
-      Rose.System_Calls.Receive_Caps
-        (Params, Rose.Interfaces.Process.Subprogram_Count);
-      Rose.System_Calls.Invoke_Capability (Params);
-
       declare
          Publish_Cap : constant Rose.Capabilities.Capability :=
-                         Params.Caps
-                           (Rose.Interfaces.Process.Publish_Interface_Index);
+                         Rose.System_Calls.Get_Interface_Cap
+                           (Rose.Capabilities.Standard.Process_Interface_Cap,
+                            Rose.Interfaces.Process.Publish_Interface_Index);
       begin
          Rose.System_Calls.Initialize_Send (Params, Publish_Cap);
          Rose.System_Calls.Send_Cap (Params, Interface_Cap);

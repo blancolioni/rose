@@ -22,9 +22,10 @@ package Rose.System_Calls is
 
    procedure Invoke_Capability
      (Item : aliased in out Rose.Invocation.Invocation_Record);
-   --  If Item already has the error No_Invoke_Buffer, set by a send
-   --  routine that had no invoke buffer to use, it returns without
-   --  entering the kernel and Item keeps that error.
+   --  If Item already has an error that a send routine set, it returns
+   --  without entering the kernel and Item keeps that error:
+   --  No_Invoke_Buffer, Buffer_Too_Small, or Too_Many_Capabilities if
+   --  Send_Cap had no room for another cap.
 
    procedure Invoke
      (Cap       : Rose.Capabilities.Capability;
@@ -89,6 +90,8 @@ package Rose.System_Calls is
    procedure Send_Cap
      (Params : in out Rose.Invocation.Invocation_Record;
       Cap    : Rose.Capabilities.Capability);
+   --  If Params already holds as many caps as an invocation carries, it
+   --  gets the error Too_Many_Capabilities instead (idle#101).
 
    procedure Send_Buffer
       (Params   : in out Rose.Invocation.Invocation_Record;
@@ -223,6 +226,29 @@ package Rose.System_Calls is
    procedure Receive_Caps
      (Params : in out Rose.Invocation.Invocation_Record;
       Count  : Natural);
+
+   --  Invoking the cap of an interface returns the caps of its
+   --  subprograms, in the order of the index constants in its interface
+   --  package. An invocation carries at most
+   --  Rose.Invocation.Max_Capabilities caps, so they are asked for a page
+   --  at a time, with the words 0 (the subprograms, not an ancestor), the
+   --  index of the first and the number wanted (idle#101).
+
+   function Get_Interface_Cap
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Index         : Natural)
+      return Rose.Capabilities.Capability;
+   --  The cap of the subprogram whose index constant is Index, from the
+   --  interface whose cap is Interface_Cap, or a null cap if the
+   --  invocation fails. Only that cap is asked for.
+
+   procedure Get_Interface_Caps
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Caps          : out Rose.Capabilities.Capability_Array);
+   --  The caps of the first Caps'Length subprograms of the interface
+   --  whose cap is Interface_Cap, in the order of their index constants,
+   --  from Caps'First. Those that the server did not send, or that an
+   --  invocation that failed did not get, are null.
 
    function Create_Endpoint_Capability return Rose.Capabilities.Capability;
    function Delete_Cap_Capability return Rose.Capabilities.Capability;
