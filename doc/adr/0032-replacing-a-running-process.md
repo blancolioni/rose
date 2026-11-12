@@ -133,7 +133,7 @@ Moving a server's clients to a restored copy, and carrying a state over the netw
 - **A 0.4.x can fix `file`, `directory`, `auth` and the user server** without losing the checkpoint, once each implements `Replaceable`.
 - **0.4.0 has to ship the interfaces:** `Saveable`, `Replaceable`, `Memory.Replace_Process` and `Process_Banks.Hand_Over`. They freeze with the tag (ADR 0031).
 - **The new version is a new program, not a patched one.** It has its own bank, cap table and layout, and drops what it no longer needs.
-- **A handover costs the size of the server's state stream.** For most servers that is names and caps, but a server that holds data, such as `file`, streams all of it, and needs room for both copies until the old version ends.
+- **A handover costs the size of the server's state stream.** For most servers that is names and caps, but a server that holds data, such as `file`, streams all of it, and needs room for both copies until the old version ends. [ADR 0033](0033-bulk-data-across-a-handover.md) (#885) moves such data without copying it.
 - **The processes a server launched survive its replacement,** in the same bank tree, under the new version.
 - **Each server owns its format,** and has to read its predecessor's for the whole series. Changing a format is a deliberate act, with a version word and a reader for the old one.
 - **Clients don't notice,** except that calls during a handover take longer.
