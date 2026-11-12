@@ -98,4 +98,22 @@ package Init.Self_Tests is
    --  the first time it is restored, it checks that Child still works
    --  and is revoked when it rescinds Parent.  True if it was launched.
 
+   function Replace_Held_File
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
+      Replace_Process : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Launch the hold_file command, found through Find_Cap, with
+   --  Create_Endpoint, Standard_Output, Delete_Cap, Commands and Cap_Sets
+   --  for its roles. It launches a file, and holds a writer and a reader
+   --  of it. Then replace the file's process with a new version, through
+   --  Replace_Process, mem's Replacer (#867, ADR 0032). Hold_file is
+   --  persistent, so the checkpoint saves it and the new version of the
+   --  file, and the first time it is restored, it checks the file and its
+   --  streams. True if the replacement committed.
+
 end Init.Self_Tests;

@@ -69,4 +69,32 @@ package Tests.Registry is
    --  Launch the program Name with Caps, and return the interface that
    --  it publishes, or the null cap if the launch failed.
 
+   --  The file server is a command, Rose.Core.File (#867).
+
+   function File_Endpoint
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability;
+   --  Launch the file command against Bank, or Run_Self_Tests' own bank if
+   --  it is null, and return its command endpoint, or the null cap if the
+   --  launch failed.
+
+   procedure Start_File
+     (Endpoint : Rose.Capabilities.Capability;
+      Served   : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability);
+   --  Make the launch call of the file command whose endpoint is Endpoint,
+   --  taking over from Previous if it is a cap, and return its file and
+   --  its Replaceable interface. Raises Invocation_Error if the call
+   --  fails.
+
+   function Launch_File
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability;
+   --  Launch a new file against Bank, as File_Endpoint does, and return
+   --  its Writable_File, or the null cap if the launch failed.
+
 end Tests.Registry;

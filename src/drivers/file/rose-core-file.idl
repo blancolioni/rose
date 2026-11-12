@@ -1,0 +1,26 @@
+command Rose.Core.File : Create_Endpoint, Delete_Cap, Cap_Set_Service
+  with Summary     => "Serve a file.",
+       Description => """
+          File serves one file (ADR 0003): its contents, the readers and
+          writers opened on it, and at most one version of it (ADR 0026).
+          A directory launches it for each file it creates, against a
+          bank of the file's own, and destroys that bank to delete the
+          file. A file holds at most 64 KiB (#215).
+
+          A new version of the program can take over from a running one
+          (ADR 0032, #867). Its state is the contents of the file and of
+          its version, and the readers and writers that are open, so
+          that their caps keep working. The contents come across in the
+          state, so a handover costs as much as the file. It holds one
+          cap, the cap set server's Constructor, which it names
+          Cap_Set_Service, as its argument is named.
+          """,
+       Server      => File_Server.Start_Server,
+       Replaceable => File_Server,
+       Live
+is
+   Served : out Writable_File
+     with Help => "the file";
+   Control : out Replaceable
+     with Help => "its Replaceable interface, which its directory keeps";
+end Rose.Core.File;

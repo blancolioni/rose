@@ -728,6 +728,25 @@ package body Init.Run is
            (Console_Stream_Cap, "init: hold_derived did not start" & NL);
       end if;
 
+      --  A persistent holder of a file that init replaces, which checks
+      --  the file and its streams after a restore (#867).
+
+      if Init.Self_Tests.Replace_Held_File
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Delete_Cap      => Delete_Cap,
+         Commands        => Commands_Cap,
+         Cap_Sets        => Cap_Sets_Cap,
+         Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: file replace test: PASS" & NL);
+      else
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: file replace test: FAIL" & NL);
+      end if;
+
       if not Init.Self_Tests.Run
         (Find_Cap        => Find_Cap,
          Standard_Output => Console_Stream_Cap,
@@ -767,6 +786,7 @@ package body Init.Run is
         (Find_Cap        => Find_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
          Commands        => Commands_Cap,
+         Cap_Sets        => Cap_Sets_Cap,
          Auth            => Auth_Cap,
          Admin           => Auth_Admin_Cap);
       if Auth_Cap = Null_Capability

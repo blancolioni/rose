@@ -6,7 +6,8 @@ all: directory
 
 # directory is built with the userland run-time system (#490), and serves
 # Writable_Directory through the user-mode IDL target (#528). The
-# interfaces it uses, with their parents, are generated here.
+# interfaces it uses, with their parents, are generated here, and the
+# client of the file command, which it launches (#867, idle#103).
 
 directory:
 	mkdir -p build/obj
@@ -18,7 +19,6 @@ directory:
 	    $(INTERFACES)/writable_file.idl \
 	    $(INTERFACES)/transactional_writable_file.idl \
 	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file_control.idl \
 	    $(INTERFACES)/file.idl \
 	    $(INTERFACES)/releasable_reader.idl \
 	    $(INTERFACES)/releasable_writer.idl \
@@ -35,4 +35,7 @@ directory:
 	    $(INTERFACES)/cap.idl \
 	    $(INTERFACES)/heap.idl \
 	    $(INTERFACES)/region.idl
+	$(IDLE) --target user --command-client -I $(INTERFACES) \
+	    -o build/generated \
+	    ../file/rose-core-file.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

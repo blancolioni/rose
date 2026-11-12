@@ -95,7 +95,8 @@ package body Tests.Directories is
         (Tests.Registry.Launch
            ("directory",
             (Tests.Registry.Launcher_Cap ("file"),
-             Tests.Registry.Launcher_Cap ("directory"))));
+             Tests.Registry.Launcher_Cap ("directory"),
+             Tests.Registry.Cap_Sets)));
 
       if Top.Writable_Directory_Cap = Rose.Capabilities.Null_Capability then
          return Fail ("no directory server");
@@ -307,7 +308,8 @@ package body Tests.Directories is
         Launcher.Launch
           (Rose.System_Calls.Own_Bank.Cap,
            (Tests.Registry.Launcher_Cap ("file"),
-            Tests.Registry.Launcher_Cap ("directory")));
+            Tests.Registry.Launcher_Cap ("directory"),
+            Tests.Registry.Cap_Sets));
       Top      : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
 

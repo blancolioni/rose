@@ -116,6 +116,13 @@ The updater reports a replacement that failed, and goes on to the next server (A
 
 The update test (ADR 0031, section 6) replaces `file`, whose open files have to keep working. Its contents come across in its state stream, so replacing it costs as much as the file. Then `directory`, `auth` and the user server (#831), whose state is mostly names and caps. Drivers implement `Replaceable` only if their device can be handed over safely: an interrupt or a device page can go in the cap set, but the device's own state can't be read back by the new version.
 
+`file` is replaceable since #867:
+
+- **It is a command,** `Rose.Core.File`, with the `Replaceable` aspect. The directory launches each file with `Launch_Command` and the command's generated client (idle#103), so the caller has the new process's command endpoint for `Allow`, and the launch call can carry `Previous`.
+- **Each file runs in a bank of its own,** below the directory's. The new version is launched against the same bank, which deleting the entry destroys.
+- **Its state** is the contents of the file and of its version, and the version, readers and writers that are open, each with its identifier, and a reader with its position.
+- **A new version has every endpoint that the old one had,** whether or not it has a version, a reader or a writer open: it attaches one of each that it never gives out, as `Rose.Replacement` attaches a state reader. Otherwise the kernel refuses the swap.
+
 ### 10. A saved state, of which a handover is a case
 
 A server's state stream (section 2) is not only for a handover. A program can save it to a file, or send it over the network, and another instance of the program can start from it. A handover is one case of this: the state comes from a live predecessor, with its caps, and the new instance takes over its identity. Saving and restoring is the general case, with no caps and a new identity (#881).

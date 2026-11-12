@@ -72,6 +72,7 @@ package Tests.Suite is
                    Tests.Cap_Sets.Cap_Set_Test'Access,
                    Tests.Replacement.Replacement_Test'Access,
                    Tests.Replacement.Replace_Process_Test'Access,
+                   Tests.Replacement.Replace_File_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

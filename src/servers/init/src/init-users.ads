@@ -15,10 +15,12 @@ package Init.Users is
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
       Auth            : out Rose.Capabilities.Capability;
       Admin           : out Rose.Capabilities.Capability);
    --  Launch auth as a command, and return its Auth and Auth_Admin
-   --  interfaces, or null caps if the launch fails.
+   --  interfaces, or null caps if the launch fails. Cap_Sets is the cap
+   --  set server's Constructor, its Cap_Set_Service.
 
    Max_Name_Length     : constant := 64;
    Max_Password_Length : constant := 128;

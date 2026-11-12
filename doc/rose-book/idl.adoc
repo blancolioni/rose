@@ -550,6 +550,11 @@ For a command (see <<commands>>), the user-mode target generates the same three 
 * *A server command* attaches an `aliased` object, and sets each `out` interface parameter to the capability for one of the interfaces it attached the object to, from `X.Server.Interface_Cap`.
   The main replies with those capabilities, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
 * *The metadata* is the same for both targets.
+* *The client*, `<Command>_Client`, is for a program that launches the command (idle#103).
+  Its procedure `Call` makes the launch call on a command endpoint, which `Launch.Launch_Command` returns: the endpoint, then the role members and arguments in the order of the main's signature, and, for a replaceable server, `Previous` and `Saved`, which default to the null cap.
+  Role members and interface arguments are caps, and an `out` interface is an `out` cap.
+  It is made of the calls of `Rose.Command_Line.Launch_Client`, the caller's half of `Rose.Command_Line.Launch`, and raises `Invocation_Error`, with the command's message, if the call or the command fails.
+  `idle --command-client` generates only the clients of the commands it is given, for a program that has the command's IDL but not its server: the `directory` server launches `file` this way (#867).
 
 The main and the metadata are the same for both targets, and so is the spec of a command without capability arguments, such as `echo`, which is built with the user-mode target (#371).
 The user-mode target generates every command (idle#43, idle#44, idle#45).

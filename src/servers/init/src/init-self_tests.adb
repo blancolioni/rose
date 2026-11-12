@@ -9,6 +9,8 @@ with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Process_Banks.Client;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
+with Rose.Interfaces.Replacement.Client;
+with Rose.Interfaces.Replacer.Client;
 with Rose.Objects;
 
 with Init.Boot_Steps;
@@ -552,6 +554,140 @@ package body Init.Self_Tests is
 
       return Params.Caps (0);
    end Launch_Probe;
+
+   -----------------------
+   -- Replace_Held_File --
+   -----------------------
+
+   function Replace_Held_File
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
+      Replace_Process : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Holder_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "hold_file");
+      File_Cap   : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "file");
+      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
+      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+      Control    : Rose.Capabilities.Capability;
+      Replacer   : Rose.Interfaces.Replacer.Client.Replacer_Client;
+
+      function Completes return Boolean
+      is (not Params.Control.Flags (Rose.Invocation.Error)
+          and then Params.Control.Flags (Rose.Invocation.Send_Words)
+          and then Params.Data (0) = Completed
+          and then Params.Control.Flags (Rose.Invocation.Send_Caps));
+      --  The launch call in Params completed, with caps.
+
+   begin
+      if Holder_Cap = Rose.Capabilities.Null_Capability
+        or else File_Cap = Rose.Capabilities.Null_Capability
+        or else Replace_Process = Rose.Capabilities.Null_Capability
+        or else Cap_Sets = Rose.Capabilities.Null_Capability
+      then
+         return False;
+      end if;
+
+      Rose.Interfaces.Launch.Client.Open (Launcher, Holder_Cap);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps, as src/utilities/hold_file/
+      --  rose-core-hold_file.idl declares them: Create_Endpoint,
+      --  Standard_Output, Delete_Cap, Find_Command and Cap_Set_Service. It
+      --  replies with the file's Replaceable, once it holds the file.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+      Rose.System_Calls.Send_Cap (Params, Standard_Output);
+      Rose.System_Calls.Send_Cap (Params, Delete_Cap);
+      Rose.System_Calls.Send_Cap (Params, Commands);
+      Rose.System_Calls.Send_Cap (Params, Cap_Sets);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if not Completes then
+         return False;
+      end if;
+      Control := Params.Caps (0);
+
+      --  The replacement, as an updater makes it (ADR 0032, section 1):
+      --  the new version is launched against the old one's parent bank,
+      --  and only its calls reach the old version until Commit.
+
+      Rose.Interfaces.Replacer.Client.Open (Replacer, Replace_Process);
+
+      declare
+         package Replacements renames Rose.Interfaces.Replacement.Client;
+         Replacement : constant Replacements.Replacement_Client :=
+           Rose.Interfaces.Replacer.Client.Replace_Process
+             (Replacer, Control);
+         Ready       : Boolean := False;
+         Committed   : Boolean := False;
+      begin
+         if Replacements.Get_Interface_Cap (Replacement)
+           = Rose.Capabilities.Null_Capability
+         then
+            return False;
+         end if;
+
+         for Attempt in 1 .. 100_000 loop
+            Ready := Replacements.Ready (Replacement);
+            exit when Ready;
+         end loop;
+
+         if Ready then
+            declare
+               Sibling : constant Rose.Interfaces.Bank.Client.Bank_Client :=
+                 Replacements.Bank (Replacement);
+            begin
+               Rose.Interfaces.Launch.Client.Open (Launcher, File_Cap);
+               Endpoint :=
+                 Rose.Interfaces.Launch.Client.Launch_Command
+                   (Launcher,
+                    Rose.Interfaces.Bank.Client.Get_Interface_Cap (Sibling),
+                    No_Caps);
+            end;
+
+            if Endpoint /= Rose.Capabilities.Null_Capability then
+               Replacements.Allow (Replacement, Endpoint);
+
+               --  The file command's launch call, as src/drivers/file/
+               --  rose-core-file.idl declares it: Create_Endpoint,
+               --  Delete_Cap and Cap_Set_Service, then Previous.
+
+               Rose.System_Calls.Initialize_Send (Params, Endpoint);
+               Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+               Rose.System_Calls.Send_Cap (Params, Delete_Cap);
+               Rose.System_Calls.Send_Cap (Params, Cap_Sets);
+               Rose.System_Calls.Send_Cap (Params, Control);
+               Rose.System_Calls.Receive_Words (Params, 1);
+               Rose.System_Calls.Receive_Caps (Params, 2);
+               Rose.System_Calls.Invoke_Capability (Params);
+
+               Committed :=
+                 Completes and then Replacements.Commit (Replacement);
+            end if;
+         end if;
+
+         Replacements.Release (Replacement);
+         return Committed;
+      end;
+   end Replace_Held_File;
 
    ---------
    -- Run --

@@ -3,13 +3,15 @@ with Ada.Containers.Vectors;
 with Ada.Unchecked_Deallocation;
 with System.Storage_Elements;
 
+with Rose.Core.File_Client;
 with Rose.Server;
 with Rose.System_Calls;
 
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Directory.Client;
 with Rose.Interfaces.File;
 with Rose.Interfaces.File.Client;
-with Rose.Interfaces.File_Control.Client;
 with Rose.Interfaces.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
@@ -30,8 +32,6 @@ package body Directory.Server is
 
    subtype Writable_Directory_Class is
      Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
-   subtype Writable_File_Class is
-     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
 
    Max_Name_Length : constant := 64;
    --  The longest name, which petal and the commands share.
@@ -42,17 +42,22 @@ package body Directory.Server is
          Name_Last : Natural := 0;
          Kind      : Rose.Interfaces.Directory.File_Kind;
          File      : File_Clients.Writable_File_Client;
-         Control   : Rose.Interfaces.File_Control.Client.File_Control_Client;
-         --  A file's File_Control, which only the directory holds (#141).
+         Handover  : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         --  A file's Replaceable interface, which only the directory
+         --  holds, for a new version of the file server (#867).
+         Bank      : Rose.Interfaces.Bank.Client.Bank_Client;
+         --  A file's own bank, a sub-bank of the directory's, which its
+         --  process was launched against. Its Destroy ends the process,
+         --  and any version that replaced it, when the entry is deleted.
          Child     : Directory_Clients.Writable_Directory_Client;
          Read_Only : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
          --  The read-only interface of the file or directory, made the
          --  first time it is asked for.
          Process   : Rose.Interfaces.Process.Client.Process_Client;
-         --  The file or directory's process, which Launch returned. Its
-         --  Destroy ends the process when the entry is deleted (#424,
-         --  #346).
+         --  A directory's process, which Launch returned. Its Destroy
+         --  ends the process when the entry is deleted (#424, #346).
       end record;
 
    --  The directory is one object, served through Writable_Directory
@@ -177,13 +182,17 @@ package body Directory.Server is
    function Find (Name : String) return Natural;
    --  The index of the entry Name, or 0 if there is none.
 
-   procedure Insert_Entry
-     (Name          : String;
-      Kind          : Rose.Interfaces.Directory.File_Kind;
-      Interface_Cap : Rose.Capabilities.Capability;
-      Process_Cap   : Rose.Capabilities.Capability);
-   --  Add the entry Name for the process Process_Cap, which publishes
-   --  Interface_Cap.
+   function Insert_Entry
+     (Name : String;
+      Kind : Rose.Interfaces.Directory.File_Kind)
+      return Boolean;
+   --  Launch a file or directory, and add it as the entry Name. False,
+   --  with nothing added, if the launch fails.
+
+   procedure Launch_File (Item : in out Entry_Record);
+   --  Make a bank for a new file, and launch the file command against it.
+   --  Raises Invocation_Error if either fails, and then destroys the bank,
+   --  if there is one.
 
    function Is_Kind
      (Index : Positive;
@@ -196,12 +205,6 @@ package body Directory.Server is
    --  the entry. Destroy raises Invocation_Error if the process can't be
    --  ended, and then nothing changes.
 
-   function Launch
-     (Kind : Rose.Interfaces.Directory.File_Kind)
-      return Rose.Interfaces.Process.Process_Object'Class;
-   --  Launch a file or directory process. It raises Invocation_Error if
-   --  the launch fails.
-
    ---------------
    -- Add_Entry --
    ---------------
@@ -211,11 +214,9 @@ package body Directory.Server is
       Kind : Rose.Interfaces.Directory.File_Kind)
       return Rose.Capabilities.Capability
    is
-      Existing      : constant Natural := Find (Name);
-      Interface_Cap : Rose.Capabilities.Capability;
-      Process_Cap   : Rose.Capabilities.Capability;
-      Saved_Name    : String (1 .. Max_Name_Length);
-      Saved_Last    : Natural;
+      Existing   : constant Natural := Find (Name);
+      Saved_Name : String (1 .. Max_Name_Length);
+      Saved_Last : Natural;
    begin
       if Existing > 0 then
          if Entries (Existing).Kind /= Kind then
@@ -237,23 +238,9 @@ package body Directory.Server is
       Saved_Name (1 .. Name'Length) := Name;
       Saved_Last := Name'Length;
 
-      declare
-         Process : Rose.Interfaces.Process.Process_Object'Class :=
-           Launch (Kind);
-      begin
-         Interface_Cap := Process.Published_Interface;
-         Process_Cap := Process.Process_Cap;
-      exception
-         when Rose.Interfaces.Objects.Invocation_Error =>
-            return Rose.Capabilities.Null_Capability;
-      end;
-
-      if Interface_Cap = Rose.Capabilities.Null_Capability then
+      if not Insert_Entry (Saved_Name (1 .. Saved_Last), Kind) then
          return Rose.Capabilities.Null_Capability;
       end if;
-
-      Insert_Entry
-        (Saved_Name (1 .. Saved_Last), Kind, Interface_Cap, Process_Cap);
 
       declare
          Added : Entry_Record renames Entries.Last_Element.all;
@@ -566,58 +553,107 @@ package body Directory.Server is
    -- Insert_Entry --
    ------------------
 
-   --  A file's process publishes its File_Control, which gives the file
-   --  itself (#141).
+   --  A file is the file command, Rose.Core.File, which returns its
+   --  Writable_File (#867). A directory's process publishes its
+   --  Writable_Directory.
 
-   procedure Insert_Entry
-     (Name          : String;
-      Kind          : Rose.Interfaces.Directory.File_Kind;
-      Interface_Cap : Rose.Capabilities.Capability;
-      Process_Cap   : Rose.Capabilities.Capability)
+   function Insert_Entry
+     (Name : String;
+      Kind : Rose.Interfaces.Directory.File_Kind)
+      return Boolean
    is
+      New_Entry : Entry_Access := new Entry_Record;
    begin
-      Entries.Append (new Entry_Record);
+      New_Entry.Name (1 .. Name'Length) := Name;
+      New_Entry.Name_Last := Name'Length;
+      New_Entry.Kind := Kind;
 
-      declare
-         New_Entry : Entry_Record renames Entries.Last_Element.all;
-      begin
-         New_Entry.Name (1 .. Name'Length) := Name;
-         New_Entry.Name_Last := Name'Length;
-         New_Entry.Kind := Kind;
-         New_Entry.Process.Open (Process_Cap);
-         if Kind = Rose.Interfaces.Directory.Ordinary_File then
-            New_Entry.Control.Open (Interface_Cap);
-            declare
-               File : Writable_File_Class := New_Entry.Control.Writable;
-            begin
-               New_Entry.File.Open (File.Writable_File_Cap);
-            end;
-         else
+      if Kind = Rose.Interfaces.Directory.Ordinary_File then
+         begin
+            Launch_File (New_Entry.all);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Free (New_Entry);
+               return False;
+         end;
+      else
+
+         --  A subdirectory can create files and directories too.
+
+         declare
+            Process : Rose.Interfaces.Process.Process_Object'Class :=
+              Directory_Launch.Launch
+                (Rose.System_Calls.Own_Bank.Cap,
+                 (File_Launch_Cap, Directory_Launch_Cap,
+                  Cap_Set_Service_Cap));
+            Interface_Cap : constant Rose.Capabilities.Capability :=
+              Process.Published_Interface;
+         begin
+            New_Entry.Process.Open (Process.Process_Cap);
+            if Interface_Cap = Rose.Capabilities.Null_Capability then
+               New_Entry.Process.Destroy;
+               New_Entry.Process.Close;
+               Free (New_Entry);
+               return False;
+            end if;
             New_Entry.Child.Open (Interface_Cap);
-         end if;
-      end;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Free (New_Entry);
+               return False;
+         end;
+      end if;
+
+      Entries.Append (New_Entry);
+      return True;
    end Insert_Entry;
 
-   ------------
-   -- Launch --
-   ------------
+   -----------------
+   -- Launch_File --
+   -----------------
 
-   function Launch
-     (Kind : Rose.Interfaces.Directory.File_Kind)
-      return Rose.Interfaces.Process.Process_Object'Class
-   is
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+   --  The file runs in a bank of its own, so that a new version of it,
+   --  which is launched against the same bank, is ended with it too
+   --  (ADR 0032, section 3).
+
+   procedure Launch_File (Item : in out Entry_Record) is
+      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
+      Own      : Rose.Interfaces.Bank.Client.Bank_Client;
+      Endpoint : Rose.Capabilities.Capability;
+      Served   : Rose.Capabilities.Capability;
    begin
-      if Kind = Rose.Interfaces.Directory.Ordinary_File then
-         return File_Launch.Launch
-           (Rose.System_Calls.Own_Bank.Cap, No_Caps);
-      else
-         --  A subdirectory can create files and directories too.
-         return Directory_Launch.Launch
-           (Rose.System_Calls.Own_Bank.Cap,
-            (File_Launch_Cap, Directory_Launch_Cap));
-      end if;
-   end Launch;
+      Own.Open (Rose.System_Calls.Own_Bank.Cap);
+      declare
+         Sub : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+      begin
+         Item.Bank.Open (Sub.Bank_Cap);
+      end;
+
+      begin
+         Endpoint :=
+           File_Launch.Launch_Command (Item.Bank.Bank_Cap, No_Caps);
+         if Endpoint = Rose.Capabilities.Null_Capability then
+            raise Rose.Interfaces.Objects.Invocation_Error
+              with "cannot launch a file";
+         end if;
+
+         Rose.Core.File_Client.Call
+           (Endpoint        => Endpoint,
+            Create_Endpoint => Rose.System_Calls.Create_Endpoint_Capability,
+            Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
+            Cap_Set_Service => Cap_Set_Service_Cap,
+            Served          => Served,
+            Control         => Item.Handover);
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            Item.Bank.Destroy;
+            Item.Bank.Close;
+            raise;
+      end;
+
+      Item.File.Open (Served);
+   end Launch_File;
 
    ------------------
    -- Remove_Entry --
@@ -627,16 +663,23 @@ package body Directory.Server is
       Removed : Entry_Access := Entries (Index);
       Item    : Entry_Record renames Removed.all;
    begin
-      Item.Process.Destroy;
+      if Item.Kind = Rose.Interfaces.Directory.Ordinary_File then
+         Item.Bank.Destroy;
+      else
+         Item.Process.Destroy;
+      end if;
 
       --  Closing the clients deletes their caps, including the read-only
       --  interface, which is the one the client fetched.
 
-      Item.Process.Close;
       if Item.Kind = Rose.Interfaces.Directory.Ordinary_File then
+         Item.Bank.Close;
          Item.File.Close;
-         Item.Control.Close;
+         if Item.Handover /= Rose.Capabilities.Null_Capability then
+            Rose.System_Calls.Delete_Cap (Item.Handover);
+         end if;
       else
+         Item.Process.Close;
          Item.Child.Close;
       end if;
 

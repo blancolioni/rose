@@ -66,8 +66,6 @@
 16#F6D0_973E_DEDA_8E48#  rose.interfaces.file.size return storage_count
 16#6381_7DB6_34F9_9279#  rose.interfaces.file.open_reader return interface rose.interfaces.releasable_reader
 16#0526_06A0_72F0_088B#  rose.interfaces.file.open_seekable_reader return interface rose.interfaces.seekable_reader
-16#77B2_61C3_FD8E_237C#  interface rose.interfaces.file_control
-16#26A6_F317_B13E_F8DE#  rose.interfaces.file_control.writable return interface rose.interfaces.writable_file
 16#B981_5D88_125C_0CE8#  interface rose.interfaces.file_system
 16#BB28_83E4_7C66_31AF#  rose.interfaces.file_system.root_directory return interface rose.interfaces.directory
 16#C07B_A29D_620B_0DDF#  interface rose.interfaces.heap

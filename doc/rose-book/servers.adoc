@@ -314,9 +314,12 @@ Used by:: Everything installed after it, as its standard output, and the shell, 
 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
 
-Provides:: `Writable_File` (ADR 0003), its version as a `Transactional_Writable_File` (ADR 0026), and `File_Control`, which only its directory holds.
-Requests:: `create-endpoint`.
-Used by:: `directory`, which launches a `file` process for each file it creates.
+Provides:: `Writable_File` (ADR 0003), its version as a `Transactional_Writable_File` (ADR 0026), and `Replaceable` (ADR 0032), which only its directory holds.
+Requests:: nothing: it is a command, `Rose.Core.File`, with the roles `Create_Endpoint`, `Delete_Cap` and `Cap_Set_Service` (#867).
+Used by:: `directory`, which launches a `file` process for each file it creates, in a bank of the file's own, with the command's generated client.
+
+A new version of `file` can take over from a running one (ADR 0032, #867).
+Its state is the file's contents and its version's, and the readers and writers that are open, each with the identifier it had, so that clients' caps keep working.
 
 A file holds up to 64 KiB (#760).
 Each reader has its own position, and writers have none (ADR 0009).
@@ -331,6 +334,8 @@ Requests:: `create-endpoint`.
 Used by:: `init`, for the first user's home directory, and the shell, as its current directory.
 
 Each entry of a directory is a `file` or `directory` process, launched when the entry is created, and ended when the entry is deleted.
+A file runs in a bank of its own, below the directory's, which deleting the entry destroys, so that a new version of the file that replaced it ends too.
+A directory is launched with the `file` and `directory` launch caps and the cap set server's `Constructor`, which it gives each file and subdirectory (#867).
 The directory holds the entry's writable interface, and hands out read-only ones (see <<Files and Directories>>).
 
 === `user`

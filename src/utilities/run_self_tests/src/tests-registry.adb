@@ -2,7 +2,10 @@
 with Rose.System_Calls.Own_Bank;
 with Rose.System_Calls;
 
+with Rose.Core.File_Client;
+
 with Rose.Interfaces.Commands.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
 
 package body Tests.Registry is
@@ -55,6 +58,30 @@ package body Tests.Registry is
       return Rose.System_Calls.Create_Endpoint_Capability;
    end Create_Endpoint;
 
+   -------------------
+   -- File_Endpoint --
+   -------------------
+
+   function File_Endpoint
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+        Launcher ("file");
+   begin
+      return Program.Launch_Command
+        ((if Bank = Rose.Capabilities.Null_Capability
+          then Rose.System_Calls.Own_Bank.Cap
+          else Bank),
+         No_Caps);
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end File_Endpoint;
+
    ------------
    -- Launch --
    ------------
@@ -80,6 +107,31 @@ package body Tests.Registry is
 
       return Process.Published_Interface;
    end Launch;
+
+   -----------------
+   -- Launch_File --
+   -----------------
+
+   function Launch_File
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      Endpoint : constant Rose.Capabilities.Capability :=
+        File_Endpoint (Bank);
+      Served   : Rose.Capabilities.Capability;
+      Control  : Rose.Capabilities.Capability;
+   begin
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      Start_File (Endpoint, Served, Control);
+      return Served;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Launch_File;
 
    --------------
    -- Launcher --
@@ -180,5 +232,27 @@ package body Tests.Registry is
    begin
       Screen_Surface_Cap := Screen;
    end Set_Screen;
+
+   ----------------
+   -- Start_File --
+   ----------------
+
+   procedure Start_File
+     (Endpoint : Rose.Capabilities.Capability;
+      Served   : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+   is
+   begin
+      Rose.Core.File_Client.Call
+        (Endpoint        => Endpoint,
+         Create_Endpoint => Create_Endpoint,
+         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
+         Cap_Set_Service => Cap_Sets_Cap,
+         Served          => Served,
+         Control         => Control,
+         Previous        => Previous);
+   end Start_File;
 
 end Tests.Registry;

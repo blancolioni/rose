@@ -45,7 +45,7 @@ Each interface is a child of a **group**, which is a child of `Rose.Interfaces`:
 | `Checkpoints` | `Checkpointer`, `Kernel_Log`, `Log_Reader`, `Memory_Restore`, `Storage_Checkpoint`, `State` | |
 | `Devices` | `ATA`, `Interrupt_Handler`, `Event_Listener`, `Event_Source` | |
 | `Time` | `Clock`, `Clock_Admin`, `Timer`, `Timeout` | `Clock_Service`, `Clock_Admin_Service`, `Timer_Service` |
-| `Files` | `File`, `Writable_File`, `Transactional_Writable_File`, `File_Control`, `Directory`, `Writable_Directory`, `File_System` | |
+| `Files` | `File`, `Writable_File`, `Transactional_Writable_File`, `Directory`, `Writable_Directory`, `File_System` | |
 | `Users` | `Auth`, `Auth_Admin`, `User`, `Rights`, `Rights_Admin` | `Rights_Service`, `Rights_Admin_Service` |
 | `Commands` | `Lookup` (was `Commands`), `Map`, `Command_Endpoint` | `Find_Command` |
 | `Screens` | `Terminal`, `Surface` | `Console`, `Screen_Service` |
