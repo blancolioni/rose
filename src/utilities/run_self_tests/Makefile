@@ -50,5 +50,7 @@ run_self_tests:
 	    $(INTERFACES)/releasable_cap_set.idl \
 	    $(INTERFACES)/replaceable.idl \
 	    $(INTERFACES)/saveable.idl \
+	    $(INTERFACES)/replacer.idl \
+	    $(INTERFACES)/replacement.idl \
 	    ../replaceable_test/held_call.idl
 	gprbuild $(GPRBUILD_CARGS)

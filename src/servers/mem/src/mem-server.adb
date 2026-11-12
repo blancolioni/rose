@@ -15,6 +15,8 @@ with Rose.Interfaces.Memory.Server;
 with Rose.Interfaces.Memory_Restore.Server;
 with Rose.Interfaces.Process.Server;
 with Rose.Interfaces.Receiver.Server;
+with Rose.Interfaces.Replacement.Server;
+with Rose.Interfaces.Replacer.Server;
 with Rose.Interfaces.Segment;
 
 with Rose.Interfaces.Region.Client;
@@ -22,6 +24,7 @@ with Rose.Interfaces.Region.Client;
 with Rose.Server;
 with Rose.System_Calls;
 with Rose.System_Calls.Client;
+with Rose.System_Calls.Server;
 
 with Mem.Calls;
 with Mem.Checkpoints;
@@ -35,6 +38,85 @@ with Mem.Virtual_Map;
 package body Mem.Server is
 
    Server : Rose.Server.Server_Context;
+
+   --  Replacing a running process (ADR 0032, #866). The caller drives
+   --  the replacement, since mem can't wait for the new version while it
+   --  has page faults to serve: mem holds the old version's calls, lets
+   --  the new version's through, and makes the switch.
+
+   Hold_Calls_Cap     : Rose.Capabilities.Capability := 0;
+   Release_Calls_Cap  : Rose.Capabilities.Capability := 0;
+   Swap_Processes_Cap : Rose.Capabilities.Capability := 0;
+   Process_State_Cap  : Rose.Capabilities.Capability := 0;
+   --  The kernel's handover caps (#862), which init gives mem.
+
+   type Replacement_Record is
+      record
+         Active          : Boolean := False;
+         Committed       : Boolean := False;
+         Identifier      : Rose.Objects.Capability_Identifier := 0;
+         Replacement_Cap : Rose.Capabilities.Capability := 0;
+         Old_Cap         : Rose.Capabilities.Capability := 0;
+         Old_Pid         : Process_Id := 0;
+         New_Cap         : Rose.Capabilities.Capability := 0;
+         New_Oid         : Rose.Objects.Object_Id := 0;
+      end record;
+   --  The one replacement in progress. Old_Cap and New_Cap name the two
+   --  processes to the kernel: caps to their objects, which the caller
+   --  gave. Mem's slot of the new version is found by New_Oid, since
+   --  the process can end before the replacement does.
+
+   Current_Replacement  : Replacement_Record;
+   Last_Replacement_Id  : Rose.Objects.Capability_Identifier := 0;
+
+   procedure Kernel_Activity
+     (Cap      : Rose.Capabilities.Capability;
+      Activity : out Rose.Words.Word;
+      Oid      : out Rose.Objects.Object_Id);
+   --  What the process that Cap names is doing (the kernel's
+   --  Process_State: 1 receiving, 2 in a call, 0 otherwise), and its
+   --  object id, or 0 for both if Cap names no process.
+
+   function Kernel_Handover
+     (Op     : Rose.Capabilities.Capability;
+      First  : Rose.Capabilities.Capability;
+      Second : Rose.Capabilities.Capability := 0)
+      return Boolean;
+   --  Invoke the kernel's handover cap Op on the processes that First
+   --  and, if it isn't null, Second name. False if the kernel refused.
+
+   function Is_Current
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is (Current_Replacement.Active
+       and then Rose.Objects."=" (Id, Current_Replacement.Identifier));
+
+   procedure End_Replacement;
+   --  Forget the current replacement, and delete its caps.
+
+   function Replace_Process
+     (Id  : Rose.Objects.Capability_Identifier;
+      Old : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability;
+
+   function Replacement_Ready
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean;
+
+   function Replacement_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+
+   procedure Allow_New_Version
+     (Id          : Rose.Objects.Capability_Identifier;
+      New_Version : Rose.Capabilities.Capability);
+
+   function Commit_Replacement
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean;
+
+   procedure Release_Replacement
+     (Id : Rose.Objects.Capability_Identifier);
 
    function New_Process
      (Id          : Rose.Objects.Capability_Identifier;
@@ -229,6 +311,40 @@ package body Mem.Server is
          Shared        => (Flags and Segment_Shared) /= 0);
    end Add_Segment;
 
+   -----------------------
+   -- Allow_New_Version --
+   -----------------------
+
+   procedure Allow_New_Version
+     (Id          : Rose.Objects.Capability_Identifier;
+      New_Version : Rose.Capabilities.Capability)
+   is
+      use type Rose.Objects.Object_Id;
+      R        : Replacement_Record renames Current_Replacement;
+      Activity : Rose.Words.Word;
+      Oid      : Rose.Objects.Object_Id;
+   begin
+      if not Is_Current (Id) or else R.Committed then
+         Rose.System_Calls.Delete_Cap (New_Version);
+         return;
+      end if;
+
+      Kernel_Activity (New_Version, Activity, Oid);
+      if Oid = 0
+        or else not Mem.Processes.Is_Launched
+          (Mem.Processes.Get_Process_Id (Oid))
+        or else Oid = Mem.Processes.Process_Object_Id (R.Old_Pid)
+        or else not Kernel_Handover (Hold_Calls_Cap, R.Old_Cap, New_Version)
+      then
+         Rose.System_Calls.Delete_Cap (New_Version);
+         return;
+      end if;
+
+      Rose.System_Calls.Delete_Cap (R.New_Cap);
+      R.New_Cap := New_Version;
+      R.New_Oid := Oid;
+   end Allow_New_Version;
+
    ----------------
    -- Checkpoint --
    ----------------
@@ -257,6 +373,74 @@ package body Mem.Server is
       Mem.Checkpoints.Checkpoint (Append'Access);
    end Checkpoint;
 
+   ------------------------
+   -- Commit_Replacement --
+   ------------------------
+
+   function Commit_Replacement
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      use type Rose.Objects.Object_Id;
+      use type Rose.Words.Word;
+      R        : Replacement_Record renames Current_Replacement;
+      New_Pid  : Process_Id;
+      Old_Oid  : Rose.Objects.Object_Id;
+      Activity : Rose.Words.Word;
+      Unused   : Rose.Objects.Object_Id;
+   begin
+      if not Is_Current (Id) or else R.Committed or else R.New_Oid = 0 then
+         return False;
+      end if;
+
+      New_Pid := Mem.Processes.Get_Process_Id (R.New_Oid);
+      if New_Pid = 0 then
+         return False;
+      end if;
+
+      --  The old version must be between calls (ADR 0032, section 4).
+      --  The kernel checks the rest, and changes nothing if it refuses.
+
+      Kernel_Activity (R.Old_Cap, Activity, Unused);
+      if Activity /= 1 then
+         return False;
+      end if;
+
+      Old_Oid := Mem.Processes.Process_Object_Id (R.Old_Pid);
+
+      if not Kernel_Handover (Swap_Processes_Cap, R.Old_Cap, R.New_Cap) then
+         return False;
+      end if;
+
+      --  Committed: nothing from here on can be refused (section 7).
+      --  The new version answers the old one's object id now, and the old
+      --  version has the new one's launch-time id, so mem's records and
+      --  the store's bank owners follow them. Old_Cap names the old
+      --  object id, which is the new version's now, so releasing its
+      --  calls releases the new version's.
+
+      Mem.Processes.Swap_Records (R.Old_Pid, New_Pid);
+      Mem.Processes.Hand_Over_Banks (Old_Oid, R.New_Oid);
+
+      if not Kernel_Handover (Release_Calls_Cap, R.Old_Cap) then
+         Rose.Console_IO.Put_Line ("mem: replacement: cannot release calls");
+      end if;
+
+      --  The old version, in its own slot, ends with its own bank, which
+      --  now holds only its own storage.
+
+      declare
+         Old_Identifier : constant Rose.Objects.Capability_Identifier :=
+           Mem.Processes.Process_Identifier (R.Old_Pid);
+      begin
+         End_Process (R.Old_Pid, Bank_Gone => False);
+         Remove_Instances (Old_Identifier);
+      end;
+
+      R.Committed := True;
+      return True;
+   end Commit_Replacement;
+
    -------------------
    -- Create_Server --
    -------------------
@@ -278,6 +462,11 @@ package body Mem.Server is
       Region_Count_Cap := Get_Cap (2);
       Region_Range_Cap := Get_Cap (3);
       Start_Paging_Cap := Get_Cap (4);
+
+      Hold_Calls_Cap     := Get_Cap (7);
+      Release_Calls_Cap  := Get_Cap (8);
+      Swap_Processes_Cap := Get_Cap (9);
+      Process_State_Cap  := Get_Cap (10);
 
       --  Nothing reads the cap set again (#826).
 
@@ -332,6 +521,21 @@ package body Mem.Server is
          Restore_Zero_Segment => Mem.Processes.Restore_Zero_Segment'Access,
          Restore_Page         => Mem.Processes.Restore_Page'Access,
          Restore_Shared_Page  => Mem.Processes.Restore_Shared_Page'Access);
+
+      --  Attached after Memory_Restore, for the same reason (#866).
+
+      Rose.Interfaces.Replacer.Server.Attach_Interface
+        (Server_Context  => Server,
+         Replace_Process => Replace_Process'Access);
+
+      Rose.Interfaces.Replacement.Server.Attach_Interface
+        (Server_Context => Server,
+         Release        => Release_Replacement'Access,
+         Ready          => Replacement_Ready'Access,
+         Bank           => Replacement_Bank'Access,
+         Allow          => Allow_New_Version'Access,
+         Commit         => Commit_Replacement'Access,
+         Instanced      => True);
 
    end Create_Server;
 
@@ -422,6 +626,19 @@ package body Mem.Server is
       end if;
    end End_Process;
 
+   ---------------------
+   -- End_Replacement --
+   ---------------------
+
+   procedure End_Replacement is
+      R : Replacement_Record renames Current_Replacement;
+   begin
+      Rose.System_Calls.Delete_Cap (R.Old_Cap);
+      Rose.System_Calls.Delete_Cap (R.New_Cap);
+      Rose.System_Calls.Delete_Cap (R.Replacement_Cap);
+      R := (others => <>);
+   end End_Replacement;
+
    ------------------
    -- Exit_Process --
    ------------------
@@ -455,6 +672,67 @@ package body Mem.Server is
 
       return Mem.Processes.Get_Heap_Cap (Pid);
    end Heap_Interface;
+
+   ---------------------
+   -- Kernel_Activity --
+   ---------------------
+
+   procedure Kernel_Activity
+     (Cap      : Rose.Capabilities.Capability;
+      Activity : out Rose.Words.Word;
+      Oid      : out Rose.Objects.Object_Id)
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Activity := 0;
+      Oid := 0;
+
+      if Process_State_Cap = 0 or else Cap = 0 then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Process_State_Cap);
+      Rose.System_Calls.Send_Cap (Params, Cap);
+      Rose.System_Calls.Receive_Words
+        (Params, 1 + Rose.Invocation.Object_Id_Words);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Natural (Params.Control.Last_Sent_Word)
+          >= Rose.Invocation.Object_Id_Words
+      then
+         Activity := Params.Data (0);
+         Oid := Rose.Invocation.Get_Object_Id (Params, 1);
+      end if;
+   end Kernel_Activity;
+
+   ---------------------
+   -- Kernel_Handover --
+   ---------------------
+
+   function Kernel_Handover
+     (Op     : Rose.Capabilities.Capability;
+      First  : Rose.Capabilities.Capability;
+      Second : Rose.Capabilities.Capability := 0)
+      return Boolean
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Op = 0 or else First = 0 then
+         return False;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Op);
+      Rose.System_Calls.Send_Cap (Params, First);
+      if Second /= 0 then
+         Rose.System_Calls.Send_Cap (Params, Second);
+      end if;
+      Rose.System_Calls.Invoke_Capability (Params);
+      return not Params.Control.Flags (Rose.Invocation.Error);
+   end Kernel_Handover;
 
    -----------------
    -- New_Process --
@@ -834,6 +1112,53 @@ package body Mem.Server is
          Resizable     => False);
    end Register_Process;
 
+   -------------------------
+   -- Release_Replacement --
+   -------------------------
+
+   procedure Release_Replacement
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      use type Rose.Objects.Object_Id;
+      R : Replacement_Record renames Current_Replacement;
+   begin
+      if not Is_Current (Id) then
+         return;
+      end if;
+
+      --  A replacement that didn't commit fails: the new version ends,
+      --  with its fresh bank, and the old one gets its calls (section 7).
+      --  The old version takes back its deferred calls' reply caps when
+      --  it next serves a call (#879).
+
+      if not R.Committed then
+         if R.New_Oid /= 0 then
+            declare
+               New_Pid : constant Process_Id :=
+                 Mem.Processes.Get_Process_Id (R.New_Oid);
+            begin
+               if New_Pid /= 0 then
+                  declare
+                     New_Identifier : constant
+                       Rose.Objects.Capability_Identifier :=
+                         Mem.Processes.Process_Identifier (New_Pid);
+                  begin
+                     End_Process (New_Pid, Bank_Gone => False);
+                     Remove_Instances (New_Identifier);
+                  end;
+               end if;
+            end;
+         end if;
+
+         if not Kernel_Handover (Release_Calls_Cap, R.Old_Cap) then
+            Rose.Console_IO.Put_Line
+              ("mem: replacement: cannot release calls");
+         end if;
+      end if;
+
+      End_Replacement;
+   end Release_Replacement;
+
    ----------------------
    -- Remove_Instances --
    ----------------------
@@ -863,6 +1188,92 @@ package body Mem.Server is
         (Process      => Pid,
          Virtual_Base => Rose.Addresses.Virtual_Page_Address (Virtual_Base));
    end Remove_Segment;
+
+   ---------------------
+   -- Replace_Process --
+   ---------------------
+
+   function Replace_Process
+     (Id  : Rose.Objects.Capability_Identifier;
+      Old : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+      use type Rose.Objects.Object_Id;
+      use type Rose.Objects.Capability_Identifier;
+      Activity : Rose.Words.Word;
+      Oid      : Rose.Objects.Object_Id;
+      Pid      : Process_Id;
+   begin
+      if Current_Replacement.Active then
+         Rose.System_Calls.Delete_Cap (Old);
+         return 0;
+      end if;
+
+      Kernel_Activity (Old, Activity, Oid);
+      Pid := (if Oid = 0 then 0 else Mem.Processes.Get_Process_Id (Oid));
+
+      --  Holding fails during a checkpoint (ADR 0032, section 5).
+
+      if not Mem.Processes.Is_Launched (Pid)
+        or else not Kernel_Handover (Hold_Calls_Cap, Old)
+      then
+         Rose.System_Calls.Delete_Cap (Old);
+         return 0;
+      end if;
+
+      Last_Replacement_Id := Last_Replacement_Id + 1;
+      Current_Replacement :=
+        (Active          => True,
+         Committed       => False,
+         Identifier      => Last_Replacement_Id,
+         Replacement_Cap =>
+           Rose.System_Calls.Server.Create_Endpoint
+             (Create_Cap  => Create_Endpoint_Cap,
+              Endpoint_Id =>
+                Rose.Interfaces.Replacement.Replacement_Interface,
+              Identifier  => Last_Replacement_Id),
+         Old_Cap         => Old,
+         Old_Pid         => Pid,
+         New_Cap         => 0,
+         New_Oid         => 0);
+
+      return Current_Replacement.Replacement_Cap;
+   end Replace_Process;
+
+   ----------------------
+   -- Replacement_Bank --
+   ----------------------
+
+   function Replacement_Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if not Is_Current (Id) then
+         return 0;
+      end if;
+      return Mem.Processes.Parent_Bank (Current_Replacement.Old_Pid);
+   end Replacement_Bank;
+
+   -----------------------
+   -- Replacement_Ready --
+   -----------------------
+
+   function Replacement_Ready
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Activity : Rose.Words.Word;
+      Unused   : Rose.Objects.Object_Id;
+   begin
+      if not Is_Current (Id) or else Current_Replacement.Committed then
+         return False;
+      end if;
+      Kernel_Activity (Current_Replacement.Old_Cap, Activity, Unused);
+      return Activity = 1;
+   end Replacement_Ready;
 
    ----------------------
    -- Request_Heap_Top --

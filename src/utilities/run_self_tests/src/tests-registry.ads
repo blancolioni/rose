@@ -40,6 +40,13 @@ package Tests.Registry is
    function Cap_Sets return Rose.Capabilities.Capability;
    --  The cap set server's Constructor, or the null cap.
 
+   procedure Set_Replacer (Replacer : Rose.Capabilities.Capability);
+   --  Mem's Replacer, which Run_Self_Tests is given for its
+   --  Replace_Process role on a fresh install (#866), or the null cap.
+
+   function Replacer return Rose.Capabilities.Capability;
+   --  Mem's Replacer, or the null cap.
+
    function Create_Endpoint return Rose.Capabilities.Capability;
    --  The create endpoint cap that Run_Self_Tests is given for its
    --  Create_Endpoint role.

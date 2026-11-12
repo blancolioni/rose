@@ -16,6 +16,8 @@ package body Tests.Registry is
                            Rose.Capabilities.Null_Capability;
    Cap_Sets_Cap        : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   Replacer_Cap        : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
 
    ----------
    -- Bank --
@@ -105,6 +107,15 @@ package body Tests.Registry is
       return Program.Launch_Cap;
    end Launcher_Cap;
 
+   --------------
+   -- Replacer --
+   --------------
+
+   function Replacer return Rose.Capabilities.Capability is
+   begin
+      return Replacer_Cap;
+   end Replacer;
+
    ------------
    -- Screen --
    ------------
@@ -151,6 +162,15 @@ package body Tests.Registry is
    begin
       Registry.Open (Commands.Commands_Cap);
    end Set_Commands;
+
+   ------------------
+   -- Set_Replacer --
+   ------------------
+
+   procedure Set_Replacer (Replacer : Rose.Capabilities.Capability) is
+   begin
+      Replacer_Cap := Replacer;
+   end Set_Replacer;
 
    ----------------
    -- Set_Screen --

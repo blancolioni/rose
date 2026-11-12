@@ -135,6 +135,7 @@
 16#FC79_F0C6_C289_39D6#  rose.interfaces.process_banks.set_ended(in capability)
 16#8416_FC33_DB87_913A#  rose.interfaces.process_banks.take_ended return object_id
 16#8DCF_CDC3_9FB9_904B#  rose.interfaces.process_banks.hand_over(in object_id; in object_id)
+16#E9D5_4805_5B22_8EFC#  rose.interfaces.process_banks.parent_bank(in object_id) return interface rose.interfaces.bank
 16#C52D_213D_B844_4345#  interface rose.interfaces.reader
 16#0CA9_5C46_2427_9D3A#  rose.interfaces.reader.read(out stream_element_array; out stream_element_offset)
 16#5825_D21E_9BA2_3704#  interface rose.interfaces.receiver
@@ -152,6 +153,13 @@
 16#CE33_89C2_D92C_A2D1#  interface rose.interfaces.replaceable
 16#2503_4CD8_9EA2_D5EB#  rose.interfaces.replaceable.caps return interface rose.interfaces.releasable_cap_set
 16#7339_07CC_A1C9_6086#  rose.interfaces.replaceable.replies return interface rose.interfaces.releasable_cap_set
+16#9C0D_600F_59B3_932E#  interface rose.interfaces.replacement
+16#518A_5EE9_DA48_EC32#  rose.interfaces.replacement.ready return boolean
+16#00E6_0E24_A907_89F3#  rose.interfaces.replacement.bank return interface rose.interfaces.bank
+16#A8FF_1A65_ECB2_8309#  rose.interfaces.replacement.allow(in capability)
+16#CC2D_3EB5_D05D_2EDA#  rose.interfaces.replacement.commit return boolean
+16#1B50_4336_07F2_ACF4#  interface rose.interfaces.replacer
+16#77E6_7251_B920_61AE#  rose.interfaces.replacer.replace_process(in capability) return interface rose.interfaces.replacement
 16#F49B_1FE7_07D3_B4B5#  interface rose.interfaces.resource
 16#7F24_9764_E75A_970F#  rose.interfaces.resource.release
 16#28F5_3FA7_7891_7414#  interface rose.interfaces.restorable

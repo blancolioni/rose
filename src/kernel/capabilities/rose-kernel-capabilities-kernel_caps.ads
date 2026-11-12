@@ -65,7 +65,10 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
 
    Hold_Calls_Endpoint        : constant Rose.Objects.Endpoint_Index := 19;
    --  Hold the calls to the process of cap 0, except those to its
-   --  endpoint whose id is in data words 0 and 1, if there is one.
+   --  endpoint whose id is in data words 0 and 1, if there is one, and
+   --  those from the process of cap 1, if it is sent: the new version
+   --  (#866). Sent again for a held process, it sets those again. An
+   --  error, and nothing held, during a checkpoint.
 
    Release_Calls_Endpoint     : constant Rose.Objects.Endpoint_Index := 20;
    --  End the hold on the calls to the process of cap 0, which gets them.
@@ -79,7 +82,8 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    Process_State_Endpoint     : constant Rose.Objects.Endpoint_Index := 22;
    --  Reply with what the process of cap 0 is doing, in data word 0: 1 if
    --  it is waiting to receive, 2 if it is in a call of its own, and 0
-   --  otherwise.
+   --  otherwise; and its object id, in the words that follow, so that mem
+   --  can find the process that a cap names (#866).
 
    Restored_Endpoint_Endpoint : constant Rose.Objects.Endpoint_Index := 23;
    --  Data words 0 and 1 are the object id of a restored process, words 2

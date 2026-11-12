@@ -600,6 +600,18 @@ package body Mem.Processes is
    end Get_Virtual_Address;
 
    ---------------------
+   -- Hand_Over_Banks --
+   ---------------------
+
+   procedure Hand_Over_Banks (Old_Oid, New_Oid : Rose.Objects.Object_Id) is
+   begin
+      if Have_Banks then
+         Rose.Interfaces.Process_Banks.Client.Hand_Over
+           (Process_Banks, Old_Oid, New_Oid);
+      end if;
+   end Hand_Over_Banks;
+
+   ---------------------
    -- Initialize_Page --
    ---------------------
 
@@ -652,6 +664,17 @@ package body Mem.Processes is
          end if;
       end loop;
    end Initialize_Page;
+
+   -----------------
+   -- Is_Launched --
+   -----------------
+
+   function Is_Launched (Process : Process_Id) return Boolean is
+   begin
+      return Process in Real_Process_Id
+        and then Process > Last_Boot_Pid
+        and then Process_Table (Process).State /= Available;
+   end Is_Launched;
 
    -------------------------
    -- Is_Valid_Process_Id --
@@ -885,6 +908,23 @@ package body Mem.Processes is
       end loop;
       return False;
    end Overlaps;
+
+   -----------------
+   -- Parent_Bank --
+   -----------------
+
+   function Parent_Bank
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if not Have_Banks or else Process not in Real_Process_Id then
+         return 0;
+      end if;
+      return Rose.Interfaces.Bank.Client.Get_Interface_Cap
+        (Rose.Interfaces.Process_Banks.Client.Parent_Bank
+           (Process_Banks, Process_Table (Process).Oid));
+   end Parent_Bank;
 
    ------------------------
    -- Process_Identifier --
@@ -1530,6 +1570,33 @@ package body Mem.Processes is
    begin
       return Store_Reads;
    end Store_Read_Count;
+
+   ------------------
+   -- Swap_Records --
+   ------------------
+
+   procedure Swap_Records (Old, New_Version : Process_Id) is
+      A : Memory_Process_Record renames Process_Table (Old);
+      B : Memory_Process_Record renames Process_Table (New_Version);
+      Oid           : constant Rose.Objects.Object_Id := A.Oid;
+      Process       : constant Kernel_Process_Client := A.Process;
+      Heap          : constant Rose.Capabilities.Capability := A.Heap;
+      Server        : constant Rose.Capabilities.Capability := A.Server;
+      Interface_Cap : constant Rose.Capabilities.Capability :=
+                        A.Interface_Cap;
+   begin
+      A.Oid := B.Oid;
+      A.Process := B.Process;
+      A.Heap := B.Heap;
+      A.Server := B.Server;
+      A.Interface_Cap := B.Interface_Cap;
+
+      B.Oid := Oid;
+      B.Process := Process;
+      B.Heap := Heap;
+      B.Server := Server;
+      B.Interface_Cap := Interface_Cap;
+   end Swap_Records;
 
    ----------------
    -- Take_Ended --

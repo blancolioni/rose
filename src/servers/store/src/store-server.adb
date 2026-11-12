@@ -60,7 +60,8 @@ package body Store.Server is
          End_Process         => Store.Devices.End_Process'Access,
          Set_Ended           => Store.Devices.Set_Ended'Access,
          Take_Ended          => Store.Devices.Take_Ended'Access,
-         Hand_Over           => Store.Devices.Hand_Over'Access);
+         Hand_Over           => Store.Devices.Hand_Over'Access,
+         Parent_Bank         => Store.Devices.Parent_Bank'Access);
       Rose.Interfaces.Dependent.Server.Attach_Interface
         (Server_Context,
          Release   => Store.Devices.Release_Dependent'Access,

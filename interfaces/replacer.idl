@@ -1,0 +1,24 @@
+--  Replacing a running process with a new version of its program (ADR
+--  0032, section 1, #866). Mem serves it, and only init has it: init's
+--  install path, the update boot's installer, and the install's run of
+--  the self tests (the Replace_Process role).
+--
+--  Replace_Process starts the replacement of the process that Old names,
+--  which is any cap to one of its objects, such as its Replaceable: it
+--  holds the process's calls, and returns the replacement, which the
+--  caller drives (Replacement). The null cap if Old names no process
+--  that mem launched, a replacement is in progress already, or a
+--  checkpoint is.
+--
+--  Mem doesn't call Old to test that the process is Replaceable: a call
+--  could wait for a page fault that mem has to serve. A process that
+--  isn't Replaceable can't be taken over, so the new version's launch
+--  fails, and the replacement can't commit.
+
+interface Replacer is
+
+   function Replace_Process
+     (Old : Capability)
+     return interface Replacement;
+
+end Replacer;

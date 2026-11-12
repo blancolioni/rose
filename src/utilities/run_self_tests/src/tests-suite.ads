@@ -71,6 +71,7 @@ package Tests.Suite is
                    Tests.Banks.Dependent_Test'Access,
                    Tests.Cap_Sets.Cap_Set_Test'Access,
                    Tests.Replacement.Replacement_Test'Access,
+                   Tests.Replacement.Replace_Process_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 
 end Tests.Suite;

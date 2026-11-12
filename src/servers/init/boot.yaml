@@ -130,12 +130,14 @@ stages:
       oid: 4
       priority: memory
       caps: [console_interface, region_count, get_region, page_on, delete,
-             trace]
+             trace, hold_calls, release_calls, swap_processes,
+             process_state]
       exports:
         mem: Memory.Memory_Interface
         memory_checkpoint: Memory.Checkpoint_Endpoint
         mem_set_process_banks: Memory.Set_Process_Banks_Endpoint
         memory_restore: Memory_Restore.Memory_Restore_Interface
+        mem_replace_process: Replacer.Replacer_Interface
 
     - launch: timer
       oid: 13

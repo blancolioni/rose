@@ -1,0 +1,5 @@
+role Replace_Process : Replacer;
+--  Mem's Replacer, which replaces a running process (ADR 0032, #866).
+--  Run_Self_Tests has it on a fresh install, for the test of replacing a
+--  server: init gives it. Petal gives none, and a command must work
+--  without it.

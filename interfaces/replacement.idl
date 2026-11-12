@@ -1,0 +1,42 @@
+--  A replacement of a running process by a new version of its program
+--  (ADR 0032, #866), which mem makes with Replacer.Replace_Process. Mem
+--  serves one call at a time, and both versions page-fault to it during
+--  the handover, so it can't launch the new version itself: the holder
+--  of the replacement does, and mem does the privileged steps.
+--
+--  1. Ready is True once the old version is between calls, blocked
+--     receiving. The caller asks until it is, up to a limit of its own.
+--  2. The caller launches the new version against Bank, the bank that
+--     the old version's own bank is a sub-bank of, so that the two banks
+--     are siblings.
+--  3. Allow, with the new version's command endpoint, lets the new
+--     version's calls, and only those, reach the old version, whose
+--     other calls are held.
+--  4. The caller makes the new version's launch call, with the old
+--     version's Replaceable as its Previous argument. The new version
+--     takes over the old one's state, caps and deferred calls.
+--  5. Commit, once that call has completed, makes the switch: the new
+--     version takes the old one's identity and bank tree, the held calls
+--     reach it, and mem ends the old version. It is False, and nothing
+--     changed, if the switch couldn't be made: the new version lacks an
+--     endpoint of the old one's, the old version is in a call, or a call
+--     is queued for it. Mem is a boot module, whose operations can't
+--     fail by raising, so Commit says whether it committed.
+--
+--  Releasing a replacement that didn't commit fails the handover: mem
+--  ends the new version, if there is one, and releases the held calls to
+--  the old version, which goes on as it was, and takes back the reply
+--  caps of its deferred calls (#879). After a Commit, Release only ends
+--  the replacement.
+
+interface Replacement : Resource is
+
+   function Ready return Boolean;
+
+   function Bank return interface Bank;
+
+   procedure Allow (New_Version : Capability);
+
+   function Commit return Boolean;
+
+end Replacement;
