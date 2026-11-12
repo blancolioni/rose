@@ -1,6 +1,6 @@
 # 32. Replacing a running persistent process
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-11
 - **Related:** #824 (this decision), #825 (userland cap sets), #831 (directory, auth and the user server), #830 (the update boot replaces servers), #116 (derivation records), #234 (four caps an invocation), [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0031](0031-updating-an-installation.md) (updating an installation), #881 (saved state, section 10)
 
@@ -28,7 +28,7 @@ A persistent process is launched once and then restored, never relaunched (ADR 0
 
 ### 1. Who may replace a process
 
-Replacing is a privileged operation, **`Replacer.Replace_Process`**, which mem serves, and whose cap only init's install path and the update boot's installer get, as the Create cap never leaves init. The install's run of the self tests gets it too, through its `Replace_Process` role (#866).
+Replacing is a privileged operation, **`Replacer.Replace_Process`**, which mem serves, and whose cap only init's install path and the update boot's installer (#830) get, as the Create cap never leaves init. The install's run of the self tests gets it too, through its `Replace_Process` role (#866).
 
 - **It is mem's operation,** not one on the `Process` cap. Mem keeps the process table and the link between a process and its bank, both of which change. Mem does the kernel's part with kernel operations that only mem holds (section 6).
 - **It isn't on the `Memory` interface,** which elf holds. Mem exports `Replace_Process` as a cap of its own.
@@ -165,18 +165,26 @@ Moving a server's clients to a restored copy, and carrying a state over the netw
 
 ## Open questions
 
-- **Whether a server can be `Saveable` without being `Replaceable`.** It costs nothing in the interfaces, but the IDL aspect is `Replaceable` for now.
-- **Reply caps with a buffer** (#878). A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Should the kernel move the mapping, or should a server never defer a call that holds a buffer?
+None. The two that were open when this was proposed are settled:
+
+- **A server can be `Saveable` without being `Replaceable`.** `Replaceable` descends from `Saveable` (#881), so the interfaces allow it. The IDL aspect is `Replaceable` only, and a `Saveable` aspect can be added when a server needs one.
+- **Reply caps with a buffer** are #878, for 0.5.0. A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Only the servers that defer such calls, such as the consoles, wait for it: `file` and the servers of #831 don't defer calls.
 
 ## Follow-up work
 
-- Kernel: swap two processes' object ids and endpoint tables, and hold calls to an object id except on one endpoint.
-- Mem: `Replacer.Replace_Process` and the `Replacement` that the caller drives, and no handover during a checkpoint (#866).
-- Store: `Process_Banks.Hand_Over`, which swaps two banks' owners and moves one's sub-banks under the other.
+Done:
+
+- Kernel: hold calls to a process except on one endpoint, and swap two processes' object ids and endpoint tables (#862).
+- Store: `Process_Banks.Hand_Over`, which swaps two banks' owners and moves one's sub-banks under the other (#863).
 - Kernel: move single-use caps, rather than copy them, when they are sent (#864). Derivation parents need nothing new: they go in the cap set as other caps do.
-- Reply caps whose calls hold a buffer (#878).
+- `Replaceable`, `Rose.Server`'s part of it, and the IDL aspect (#865).
+- Mem: `Replacer.Replace_Process` and the `Replacement` that the caller drives, and no handover during a checkpoint (#866).
 - `Replies`, which hands the reply caps out once, and the kernel failing a call whose reply cap is deleted (#879).
-- `Replaceable`, `Rose.Server`'s part of it, and the IDL aspect (idle).
 - `Saveable`, `Rose.Replacement.Save` and `Restore`, and the `Saved` argument in idle (#881).
-- `file` replaceable, and a test that replaces it on a restored system with files open.
-- #831: `directory`, `auth` and the user server.
+- `file` replaceable (#867). Only the install has the `Replacer`, so a self test replaces a file with a writer, a reader and a version open, and init replaces a file during the install that `hold_file` checks after the restore.
+
+Still to do:
+
+- Reply caps whose calls hold a buffer (#878).
+- `directory`, `auth` and the user server (#831).
+- The update boot replaces the restored `Replaceable` servers, and the update test replaces `file` on a restored system (#830).
