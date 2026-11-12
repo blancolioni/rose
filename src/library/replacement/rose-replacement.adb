@@ -176,6 +176,26 @@ package body Rose.Replacement is
    Given_Slots   : Cap_Vectors.Vector;
    Taken_Calls   : Call_Vectors.Vector;
 
+   Launch_Arguments : Named_Caps;
+   --  The command's cap arguments, which Start was given. State, Save and
+   --  Caps hand them over after the caps that the server names, so that
+   --  a new version can take any that its caller doesn't give (#901).
+
+   --  A handover that Arguments has begun, and Take_Over finishes: the
+   --  old version's state, read up to the server's part, and its caps.
+
+   Pending          : Boolean := False;
+   Pending_Previous : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   Pending_Reader   : aliased Rose.Interfaces.Releasable_Reader.Client
+     .Releasable_Reader_Client;
+   Pending_Input    : aliased Rose.Streams.Reader_Stream
+     (Pending_Reader'Access);
+   Pending_Set      : aliased Rose.Interfaces.Releasable_Cap_Set.Client
+     .Releasable_Cap_Set_Client;
+   Pending_Named    : Named_Caps;
+   Pending_Calls    : Call_Vectors.Vector;
+
    procedure Write_Snapshot
      (Into       : in out Buffer_Stream'Class;
       Named      : out Named_Caps;
@@ -197,6 +217,18 @@ package body Rose.Replacement is
    --  its deferred calls into Calls. If Set is not null, add each cap to
    --  Named, with its cap in Set; if it is null, skip them, as a restore
    --  does. Movable is False if a deferred call can't move (Can_Move).
+
+   procedure Abandon_Take_Over;
+   --  Release the old version's state and caps, if a handover is pending.
+
+   procedure Add_Arguments (Named : in out Named_Caps);
+   --  Add each of Launch_Arguments that is a cap, and whose name Named
+   --  doesn't have a cap for already.
+
+   procedure Begin_Take_Over (Previous : Rose.Capabilities.Capability);
+   --  Open the state and the caps of Previous, the old version's
+   --  Replaceable interface, and read the state up to the server's part,
+   --  into the pending handover.
 
    function Deferred_Calls return Call_Vectors.Vector;
    --  The calls that the server has deferred with a reply cap, in the
@@ -238,6 +270,31 @@ package body Rose.Replacement is
    procedure Forget_Replies;
    --  Release Replies_Set, and forget it.
 
+   -----------------------
+   -- Abandon_Take_Over --
+   -----------------------
+
+   procedure Abandon_Take_Over is
+   begin
+      if not Pending then
+         return;
+      end if;
+
+      Pending := False;
+      begin
+         Pending_Reader.Release;
+      exception
+         when others =>
+            null;
+      end;
+      begin
+         Pending_Set.Release;
+      exception
+         when others =>
+            null;
+      end;
+   end Abandon_Take_Over;
+
    ---------
    -- Add --
    ---------
@@ -251,6 +308,52 @@ package body Rose.Replacement is
       Named.Caps.Append
         (Named_Cap'(Ada.Strings.Unbounded.To_Unbounded_String (Name), Cap));
    end Add;
+
+   -------------------
+   -- Add_Arguments --
+   -------------------
+
+   procedure Add_Arguments (Named : in out Named_Caps) is
+   begin
+      for Item of Launch_Arguments.Caps loop
+         if Item.Cap /= Rose.Capabilities.Null_Capability
+           and then Named.Cap (Ada.Strings.Unbounded.To_String (Item.Name))
+             = Rose.Capabilities.Null_Capability
+         then
+            Named.Caps.Append (Item);
+         end if;
+      end loop;
+   end Add_Arguments;
+
+   ---------------
+   -- Arguments --
+   ---------------
+
+   function Arguments
+     (Previous : Rose.Capabilities.Capability;
+      Given    : Named_Caps)
+      return Named_Caps
+   is
+      Result : Named_Caps := Given;
+   begin
+      if Previous = Rose.Capabilities.Null_Capability then
+         return Result;
+      end if;
+
+      if not Pending or else Pending_Previous /= Previous then
+         Abandon_Take_Over;
+         Begin_Take_Over (Previous);
+      end if;
+
+      for Item of Result.Caps loop
+         if Item.Cap = Rose.Capabilities.Null_Capability then
+            Item.Cap :=
+              Pending_Named.Cap (Ada.Strings.Unbounded.To_String (Item.Name));
+         end if;
+      end loop;
+
+      return Result;
+   end Arguments;
 
    ------------
    -- Attach --
@@ -302,6 +405,62 @@ package body Rose.Replacement is
          Replies_Taken := False;
          Replies_Set := Rose.Capabilities.Null_Capability;
    end Before_Call;
+
+   ---------------------
+   -- Begin_Take_Over --
+   ---------------------
+
+   procedure Begin_Take_Over (Previous : Rose.Capabilities.Capability) is
+      Old     : Rose.Interfaces.Replaceable.Client.Replaceable_Client;
+      Movable : Boolean;
+   begin
+      Old.Open (Previous);
+
+      declare
+         Reader : Rose.Interfaces.Releasable_Reader
+           .Releasable_Reader_Object'Class := Old.State;
+      begin
+         Pending_Reader.Open (Reader.Releasable_Reader_Cap);
+      end;
+
+      Pending := True;
+      Pending_Previous := Previous;
+
+      declare
+         Set : Rose.Interfaces.Releasable_Cap_Set
+           .Releasable_Cap_Set_Object'Class := Old.Caps;
+      begin
+         Pending_Set.Open (Set.Releasable_Cap_Set_Cap);
+      end;
+
+      Pending_Named.Caps.Clear;
+      Read_Prefix
+        (Pending_Input'Access, Pending_Set'Access, Pending_Named,
+         Pending_Calls, Movable);
+      if not Movable then
+         raise Bad_State with
+           "Rose.Replacement: a deferred call has a buffer or caps";
+      end if;
+
+      --  The reply caps are taken from the set only once this version
+      --  serves a call, which is after it has taken over. Until then they
+      --  stay in the set, where the old version takes them back if the
+      --  handover fails.
+
+      if not Pending_Calls.Is_Empty then
+         declare
+            Replies : Rose.Interfaces.Releasable_Cap_Set
+              .Releasable_Cap_Set_Object'Class := Old.Replies;
+         begin
+            Replies_Set := Replies.Releasable_Cap_Set_Cap;
+         end;
+      end if;
+
+   exception
+      when others =>
+         Abandon_Take_Over;
+         raise;
+   end Begin_Take_Over;
 
    --------------
    -- Can_Move --
@@ -368,6 +527,7 @@ package body Rose.Replacement is
       Next    : Positive := 1;
    begin
       Writer (Discard'Access, Named);
+      Add_Arguments (Named);
 
       --  A call carries at most Max_Capabilities caps.
 
@@ -737,7 +897,11 @@ package body Rose.Replacement is
       then
          raise Bad_Start with
            "Rose.Replacement: both a version to take over and a saved state";
-      elsif Previous /= Rose.Capabilities.Null_Capability then
+      end if;
+
+      Launch_Arguments := Arguments;
+
+      if Previous /= Rose.Capabilities.Null_Capability then
          Take_Over (Previous, Read_State);
       else
          Restore (Saved, Arguments, Read_State);
@@ -836,61 +1000,26 @@ package body Rose.Replacement is
          return;
       end if;
 
-      declare
-         Old    : Rose.Interfaces.Replaceable.Client.Replaceable_Client;
-      begin
-         Old.Open (Previous);
+      --  The main has begun the handover already if it called Arguments.
 
-         declare
-            Reader : aliased Rose.Interfaces.Releasable_Reader
-              .Releasable_Reader_Object'Class := Old.State;
-            Set    : aliased Rose.Interfaces.Releasable_Cap_Set
-              .Releasable_Cap_Set_Object'Class := Old.Caps;
-            Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
-            Named   : Named_Caps;
-            Calls   : Call_Vectors.Vector;
-            Movable : Boolean;
-         begin
-            Read_Prefix (Input'Access, Set'Access, Named, Calls, Movable);
-            if not Movable then
-               raise Bad_State with
-                 "Rose.Replacement: a deferred call has a buffer or caps";
-            end if;
+      if not Pending or else Pending_Previous /= Previous then
+         Abandon_Take_Over;
+         Begin_Take_Over (Previous);
+      end if;
 
-            --  The reply caps are taken from the set only once this
-            --  version serves a call, which is after it has taken over.
-            --  Until then they stay in the set, where the old version
-            --  takes them back if the handover fails.
+      Read_State (Pending_Input'Access, Pending_Named);
 
-            if not Calls.Is_Empty then
-               declare
-                  Replies : Rose.Interfaces.Releasable_Cap_Set
-                    .Releasable_Cap_Set_Object'Class := Old.Replies;
-               begin
-                  Replies_Set := Replies.Releasable_Cap_Set_Cap;
-               end;
-            end if;
+      Pending := False;
+      Pending_Reader.Release;
+      Pending_Set.Release;
 
-            Read_State (Input'Access, Named);
+      Taken_Calls := Pending_Calls;
+      Replies_Taken := not Pending_Calls.Is_Empty;
 
-            Reader.Release;
-            Set.Release;
-
-            Taken_Calls := Calls;
-            Replies_Taken := not Calls.Is_Empty;
-
-         exception
-            when others =>
-               begin
-                  Reader.Release;
-                  Set.Release;
-               exception
-                  when others =>
-                     null;
-               end;
-               raise;
-         end;
-      end;
+   exception
+      when others =>
+         Abandon_Take_Over;
+         raise;
    end Take_Over;
 
    ------------------
@@ -994,6 +1123,7 @@ package body Rose.Replacement is
         (if With_Calls then Deferred_Calls else Call_Vectors.Empty_Vector);
    begin
       Writer (Server_Part'Access, Named);
+      Add_Arguments (Named);
 
       Rose.Words.Word_32'Write (Into'Access, Magic);
       Rose.Words.Word_32'Write (Into'Access, Version);

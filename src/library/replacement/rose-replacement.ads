@@ -21,6 +21,11 @@ package Rose.Replacement is
    --  command's arguments, which its main names, and Read_State takes
    --  them by name in either case.
    --
+   --  The old version also hands over its command's cap arguments, which
+   --  Start was given, so that its caller can launch the new version with
+   --  Previous alone (#901). The main of the new version takes each one
+   --  that its caller left null from the old version (Arguments).
+   --
    --  The state is a stream: this package's header, the identifiers in
    --  use (Rose.Server.Write_Identifiers), the server's named caps, each
    --  with its index in the cap set that Caps returns, the calls that the
@@ -52,8 +57,9 @@ package Rose.Replacement is
    type Named_Caps is tagged private;
    --  The caps that a server holds, each with a name. A cap that a
    --  restored instance is given as an argument has the argument's name,
-   --  as the IDL spells it, so a server names each cap that it is also
-   --  given as an argument by that argument's name.
+   --  as the IDL spells it. The command's cap arguments are handed over
+   --  under those names without the server naming them, after the caps
+   --  that it does name.
 
    procedure Add
      (Named : in out Named_Caps;
@@ -125,6 +131,18 @@ package Rose.Replacement is
    --  in place of the caps that the state names. Nothing is done for the
    --  null cap.
 
+   function Arguments
+     (Previous : Rose.Capabilities.Capability;
+      Given    : Named_Caps)
+      return Named_Caps;
+   --  The command's cap arguments, Given, as the main received them, by
+   --  their IDL names. If Previous is a cap, the old version's Replaceable
+   --  interface, each argument that is null in Given is the old version's
+   --  cap of the same name, or still null if it has none. This begins the
+   --  handover: the old version's state is read up to the server's part,
+   --  and Start then reads the rest, so the state is read once. A
+   --  replaceable command's main calls it before it uses any argument.
+
    procedure Start
      (Previous   : Rose.Capabilities.Capability;
       Saved      : Rose.Capabilities.Capability;
@@ -133,6 +151,8 @@ package Rose.Replacement is
    --  Take over from Previous if it is a cap, restore from Saved if it
    --  is, and start fresh if neither is. Raises Bad_Start if both are,
    --  which fails the launch. A replaceable command's main calls it.
+   --  Arguments are the command's cap arguments, which this version
+   --  hands over in turn when it is replaced.
 
    Bad_State : exception;
    --  The state is not one that this package wrote, or, in a handover, it
