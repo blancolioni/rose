@@ -28,6 +28,14 @@ package body Restore.Installer is
      (Cap            : Rose.Capabilities.Capability;
       Interface_Caps : out Array_Of_Capabilities);
 
+   procedure Open_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities);
+   --  The caps of the first Interface_Caps'Length subprograms of the
+   --  interface whose cap is Cap, in the order of their index constants,
+   --  asked for a page at a time (idle#101). Get_Interface is for a cap
+   --  that isn't an interface's: it takes every cap of the reply.
+
    function Get_Public_Interface_From_Process
      (Process_Cap : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
@@ -371,7 +379,7 @@ package body Restore.Installer is
                         Rose.Capabilities.Null_Capability;
    begin
       --  get process interface caps
-      Get_Interface (Process_Cap, Caps);
+      Open_Interface (Process_Cap, Caps);
 
       Public_Cap :=
         Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
@@ -649,6 +657,20 @@ package body Restore.Installer is
          Directory := Get_Directory (Parent, Index);
       end if;
    end Open_Directory;
+
+   --------------------
+   -- Open_Interface --
+   --------------------
+
+   procedure Open_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities)
+   is
+      Caps : Rose.Capabilities.Capability_Array (Interface_Caps'Range);
+   begin
+      Rose.System_Calls.Get_Interface_Caps (Cap, Caps);
+      Interface_Caps := Array_Of_Capabilities (Caps);
+   end Open_Interface;
 
    -------------------
    -- Send_Cap_Sets --

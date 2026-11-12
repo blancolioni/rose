@@ -171,7 +171,7 @@ package body Init.Run is
          Interface_Cap : Rose.Capabilities.Capability := Null_Capability;
       begin
          --  get process interface caps
-         Init.Calls.Get_Interface (Process_Cap, Caps);
+         Init.Calls.Open_Interface (Process_Cap, Caps);
 
          Public_Cap :=
            Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
@@ -339,7 +339,7 @@ package body Init.Run is
                        (Console_Stream_Cap,
                         "unable to find exec interface" & NL);
                   else
-                     Init.Calls.Get_Interface (Public_Cap, Caps);
+                     Init.Calls.Open_Interface (Public_Cap, Caps);
                      Install_Cap :=
                        Caps (Rose.Interfaces.Exec.Install_Index + 1);
                      Set_Output_Cap :=
@@ -370,7 +370,7 @@ package body Init.Run is
                begin
                   Add_Cap := Null_Capability;
                   for I in 1 .. 4 loop
-                     Init.Calls.Get_Interface (Public_Cap, Caps);
+                     Init.Calls.Open_Interface (Public_Cap, Caps);
                      Find_Cap := Caps (Rose.Interfaces.Map.Find_Index + 1);
                      Add_Cap := Caps (Rose.Interfaces.Map.Add_Index + 1);
                      exit when Add_Cap /= Null_Capability;
@@ -440,7 +440,7 @@ package body Init.Run is
                   Caps : Init.Calls.Array_Of_Capabilities (1 .. 1);
                begin
                   Cap_Sets_Cap := Params.Caps (0);
-                  Init.Calls.Get_Interface (Cap_Sets_Cap, Caps);
+                  Init.Calls.Open_Interface (Cap_Sets_Cap, Caps);
                   Create_Cap_Set_Cap := Caps (1);
                end;
             elsif Params.Data (1) = 98 then
@@ -472,7 +472,7 @@ package body Init.Run is
                   end Send_Console;
 
                begin
-                  Init.Calls.Get_Interface (Console_Interface_Cap, Caps);
+                  Init.Calls.Open_Interface (Console_Interface_Cap, Caps);
                   Console_Stream_Cap := Caps (1);
                   Init.Calls.Set_Console (Console_Stream_Cap);
                   Send_Console (Console_Redirect_Cap);
@@ -550,7 +550,7 @@ package body Init.Run is
                         Launch_Caps : Init.Calls.Array_Of_Capabilities
                           (1 .. 3);
                      begin
-                        Init.Calls.Get_Interface (Launch, Launch_Caps);
+                        Init.Calls.Open_Interface (Launch, Launch_Caps);
                         Rose.System_Calls.Send_Cap (Reply, Launch_Caps (1));
                      end;
                   elsif Params.Data (1) = 1 then

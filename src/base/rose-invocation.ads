@@ -62,14 +62,17 @@ is
       Undefined_Error,
       No_Invoke_Buffer,
       Buffer_Too_Small,
-      Exception_Raised);
+      Exception_Raised,
+      Too_Many_Capabilities);
    --  No_Invoke_Buffer is reported by the user library, and never by the
    --  kernel, when a process sends text or a storage array without having
    --  set up an invoke buffer (#239). Buffer_Too_Small is reported by the
    --  user library too, when the items of an invocation do not fit in the
    --  invoke buffer (idle#58). Exception_Raised is sent by a generated
    --  server when the handler of an operation raises an exception
-   --  (idle#60).
+   --  (idle#60). Too_Many_Capabilities is reported by the user library,
+   --  when a process sends more capabilities than an invocation carries
+   --  (idle#101).
 
    use type Rose.Capabilities.Capability;
    use type Rose.Objects.Object_Id;

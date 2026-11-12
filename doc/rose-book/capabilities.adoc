@@ -401,4 +401,4 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 |===
 
 An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability` (the capability is null, has no handler, or is not valid), `Out_Of_Capabilities`, `Out_Of_Endpoints`, `Unknown_Request`, `Request_Error`, `No_Access`, `Request_Would_Block`, `Closed`, `Invalid_Endpoint`, `Invalid_Operation`, `Invalid_Object`, `Operation_Not_Implemented`, `Missing_Data`, `Unknown_Error` and `Undefined_Error`.
-The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, and a generated server reports `Exception_Raised` when the handler of an operation raises an exception.
+The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, and `Too_Many_Capabilities` when `Send_Cap` has no room for another capability; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.

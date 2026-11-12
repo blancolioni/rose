@@ -94,4 +94,12 @@ package Init.Calls is
      (Cap            : Rose.Capabilities.Capability;
       Interface_Caps : out Array_Of_Capabilities);
 
+   procedure Open_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities);
+   --  The caps of the first Interface_Caps'Length subprograms of the
+   --  interface whose cap is Cap, in the order of their index constants,
+   --  asked for a page at a time (idle#101). Get_Interface is for a cap
+   --  that isn't an interface's: it takes every cap of the reply.
+
 end Init.Calls;

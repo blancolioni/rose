@@ -26,22 +26,13 @@ package body Rose.System_Calls.Own_Bank is
       end if;
       Asked := True;
 
-      --  The Process interface gives its endpoints, and the Bank
+      --  The Process interface gives the Bank endpoint, and the Bank
       --  endpoint gives the bank.
 
-      Initialize_Send
-        (Params, Rose.Capabilities.Standard.Process_Interface_Cap);
-      Receive_Caps (Params, Rose.Interfaces.Process.Subprogram_Count);
-      Invoke_Capability (Params);
-
-      if Params.Control.Flags (Error) then
-         return Bank_Cap;
-      end if;
-
-      --  The endpoints come in the order of the interface's operations,
-      --  as System.Caps finds Exit_Process.
-
-      Endpoint := Params.Caps (Rose.Interfaces.Process.Bank_Index);
+      Endpoint :=
+        Get_Interface_Cap
+          (Rose.Capabilities.Standard.Process_Interface_Cap,
+           Rose.Interfaces.Process.Bank_Index);
 
       if Endpoint /= Rose.Capabilities.Null_Capability then
          Initialize_Send (Params, Endpoint);

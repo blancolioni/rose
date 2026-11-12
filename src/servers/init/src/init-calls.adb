@@ -256,7 +256,7 @@ package body Init.Calls is
       Params      : aliased Rose.Invocation.Invocation_Record;
       Launch_Caps : Array_Of_Capabilities (1 .. 3);
    begin
-      Get_Interface (Launch_Cap, Launch_Caps);
+      Open_Interface (Launch_Cap, Launch_Caps);
       Params.Cap := Launch_Caps (1);
       Params.Control.Flags := (Send             => True,
                                Send_Words       => False,
@@ -381,6 +381,20 @@ package body Init.Calls is
       end if;
 
    end Launch_Boot_Module;
+
+   --------------------
+   -- Open_Interface --
+   --------------------
+
+   procedure Open_Interface
+     (Cap            : Rose.Capabilities.Capability;
+      Interface_Caps : out Array_Of_Capabilities)
+   is
+      Caps : Rose.Capabilities.Capability_Array (Interface_Caps'Range);
+   begin
+      Rose.System_Calls.Get_Interface_Caps (Cap, Caps);
+      Interface_Caps := Array_Of_Capabilities (Caps);
+   end Open_Interface;
 
    -------------
    -- Receive --
