@@ -79,6 +79,39 @@ package Rose.Server is
      (Context  : in out Server_Context;
       Endpoint : Rose.Objects.Endpoint_Id);
 
+   --  A call that a handler blocks with Block_Current_Request is deferred:
+   --  Rose.Server keeps it, with its reply cap, until Unblock_Endpoint
+   --  answers it. A new version of a replaceable server takes over the
+   --  old version's deferred calls (ADR 0032, #879).
+
+   type Receive_Hook is access procedure
+     (Params : Rose.Invocation.Invocation_Record);
+
+   procedure Set_Receive_Hook
+     (Context : in out Server_Context;
+      Hook    : Receive_Hook);
+   --  Call Hook with each message that Context receives, before it is
+   --  handled. Rose.Replacement takes the reply caps of a handover in it.
+
+   procedure Update_Deferred_Calls
+     (Context : in out Server_Context;
+      Update  : not null access procedure
+        (Params : in out Rose.Invocation.Invocation_Record;
+         Keep   : in out Boolean));
+   --  Call Update with each deferred call, in the order of the handlers,
+   --  with Keep True. The call stays deferred, as Update leaves Params, if
+   --  Keep is still True, and is forgotten, with no reply, if not.
+
+   procedure Defer_Call
+     (Context  : in out Server_Context;
+      Params   : Rose.Invocation.Invocation_Record;
+      Deferred : out Boolean);
+   --  Keep Params as a deferred call of the handler that would serve it,
+   --  as if that handler had blocked it, so that Unblock_Endpoint answers
+   --  it, and set Deferred. Deferred is False, and nothing is kept, if no
+   --  handler would serve it, or if that handler has a deferred call
+   --  already.
+
    --  Signals (ADR 0006, #708). A process makes signal caps for its own
    --  bits with Rose.System_Calls.Create_Signal_Cap, and gives them to
    --  whoever is to signal it. When it next receives, the kernel sends
@@ -191,6 +224,7 @@ private
          Endpoints      : Endpoint_Array;
          Block_Reply    : Boolean := False;
          Has_Signals    : Boolean := False;
+         Hook           : Receive_Hook := null;
       end record;
 
    type Server_Instance is limited

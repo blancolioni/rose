@@ -7,7 +7,7 @@ all: run_self_tests
 # The spec of Rose.Core.Run_Self_Tests, its main and its metadata, and the
 # package Rose.Core, and the interfaces that the tests use with their
 # parents, are generated from IDL (ADR 0002, #460) for the user target
-# (#528).
+# (#528). Held_Call is replaceable_test's own test interface (#879).
 
 run_self_tests:
 	mkdir -p build/obj
@@ -49,5 +49,6 @@ run_self_tests:
 	    $(INTERFACES)/cap_set.idl \
 	    $(INTERFACES)/releasable_cap_set.idl \
 	    $(INTERFACES)/replaceable.idl \
-	    $(INTERFACES)/saveable.idl
+	    $(INTERFACES)/saveable.idl \
+	    ../replaceable_test/held_call.idl
 	gprbuild $(GPRBUILD_CARGS)
