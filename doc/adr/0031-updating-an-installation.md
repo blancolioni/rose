@@ -46,6 +46,15 @@ A boot set can restore a checkpoint if two things match.
 
 For the level to mean anything, `endpoint-ids.txt` is **append-only within a series**. After `v0.4.0` is tagged, `make check-endpoint-ids` also compares the file with the one at the series' first tag, and fails if any line of it has changed or gone. A 0.4.x can add interfaces and operations, and can't change or remove one. Changing one waits for 0.5.0, which starts a new series and doesn't restore 0.4 checkpoints.
 
+**An interface or operation that is no longer wanted is retired, not removed.** A restored process may still call it, so it can't go away within the series:
+
+- **Servers go on answering it,** as they did. A server can answer it through the operation that replaces it, but a call that worked in 0.4.0 still works.
+- **New code avoids it.** A new server doesn't implement a retired interface unless a client from the series needs it, and a new client doesn't call it.
+- **The IDL marks it,** with a comment on the line before the operation or interface: `--  Retired in 0.4.N (#issue): use X instead.` Its line stays in `endpoint-ids.txt`.
+- **Removing it waits for the next series.**
+
+This isn't the retired program image of section 4, which can't be launched any more. A retired operation still works.
+
 A refused restore prints both sides, such as `checkpoint: interfaces 0.4 level 213; this boot set: 0.5 level 190`, and the boot stops as when there is no checkpoint.
 
 This is #375's point 1 and point 2. Converting old formats, so that 0.5 could restore 0.4, is left for later.
@@ -101,7 +110,7 @@ The restore test from the 0.4.0 image (#737) checks section 2 on every build. Th
 - **A 0.4.x release can fix the kernel, the boot modules, the commands and the replaceable servers** without losing the checkpoint.
 - **It can't fix a persistent process that isn't replaceable.** A bug in `exec`, the registry, or a driver that can't hand over its device stays until a new install.
 - **0.4.0 needs #824 and #825 before it is tagged.** `Replaceable` and the changes to `Cap_Set` are interfaces, and the interfaces freeze with the tag.
-- **The interfaces of 0.4.0 are frozen for the whole series.** Additions are allowed, and `check-endpoint-ids` enforces the rest.
+- **The interfaces of 0.4.0 are frozen for the whole series.** Additions are allowed, and so is retiring an interface or operation (section 2). `check-endpoint-ids` enforces the rest.
 - **Updating needs the install media,** as installing does. A network update can use the same steps once there is a network (ADR 0007), with the media replaced by a downloaded image.
 - **The boot partition holds two boot sets,** about 7 MB of its 16 MiB. A much larger boot set needs a larger boot partition, which needs a new install.
 - **An update boot is a restore,** so it runs the restore path with a new boot set, which is what #737 tests.
