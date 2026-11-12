@@ -120,6 +120,37 @@ package body Rose.Server is
          Endpoint_Id, Identifier);
    end Create_Endpoint;
 
+   ----------------
+   -- Defer_Call --
+   ----------------
+
+   procedure Defer_Call
+     (Context  : in out Server_Context;
+      Params   : Rose.Invocation.Invocation_Record;
+      Deferred : out Boolean)
+   is
+   begin
+      Deferred := False;
+      for I in 1 .. Context.Endpoint_Count loop
+         declare
+            use type Rose.Objects.Endpoint_Id;
+            Rec : Endpoint_Record renames Context.Endpoints (I);
+         begin
+            if Rec.Endpoint = Params.Endpoint
+              and then (Rec.Owns = null
+                        or else Rec.Owns (Params.Identifier))
+            then
+               if not Rec.Blocked then
+                  Rec.Blocked := True;
+                  Rec.Params := Params;
+                  Deferred := True;
+               end if;
+               return;
+            end if;
+         end;
+      end loop;
+   end Defer_Call;
+
    ---------------------
    -- Free_Identifier --
    ---------------------
@@ -309,6 +340,10 @@ package body Rose.Server is
 
       Rose.System_Calls.Invoke_Capability (Params);
 
+      if Context.Hook /= null then
+         Context.Hook (Params);
+      end if;
+
       declare
          Handled : Boolean := False;
          Matched : Boolean := False;
@@ -451,6 +486,18 @@ package body Rose.Server is
          null;
    end Set_Instance_Cap;
 
+   ----------------------
+   -- Set_Receive_Hook --
+   ----------------------
+
+   procedure Set_Receive_Hook
+     (Context : in out Server_Context;
+      Hook    : Receive_Hook)
+   is
+   begin
+      Context.Hook := Hook;
+   end Set_Receive_Hook;
+
    ------------------------
    -- Set_Signal_Handler --
    ------------------------
@@ -537,6 +584,32 @@ package body Rose.Server is
            (Params, Rose.Invocation.Invalid_Endpoint);
       end if;
    end Unblock_Endpoint;
+
+   ---------------------------
+   -- Update_Deferred_Calls --
+   ---------------------------
+
+   procedure Update_Deferred_Calls
+     (Context : in out Server_Context;
+      Update  : not null access procedure
+        (Params : in out Rose.Invocation.Invocation_Record;
+         Keep   : in out Boolean))
+   is
+   begin
+      for I in 1 .. Context.Endpoint_Count loop
+         declare
+            Rec  : Endpoint_Record renames Context.Endpoints (I);
+            Keep : Boolean := True;
+         begin
+            if Rec.Blocked then
+               Update (Rec.Params, Keep);
+               if not Keep then
+                  Rec.Blocked := False;
+               end if;
+            end if;
+         end;
+      end loop;
+   end Update_Deferred_Calls;
 
    -----------------------
    -- Write_Identifiers --

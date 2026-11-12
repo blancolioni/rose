@@ -23,10 +23,26 @@ package Rose.Replacement is
    --
    --  The state is a stream: this package's header, the identifiers in
    --  use (Rose.Server.Write_Identifiers), the server's named caps, each
-   --  with its index in the cap set that Caps returns, and then whatever
-   --  the server writes, which starts with its own format version. A
-   --  server writes and reads only its part, with stream attributes, and
-   --  names the caps it holds.
+   --  with its index in the cap set that Caps returns, the calls that the
+   --  server has deferred (Rose.Server.Block_Current_Request), each with
+   --  its index in the set that Replies returns, and then whatever the
+   --  server writes, which starts with its own format version. A server
+   --  writes and reads only its part, with stream attributes, and names
+   --  the caps it holds.
+   --
+   --  The deferred calls move to the new version with nothing for the
+   --  server to do (#879). Their reply caps can be in only one place, so
+   --  Replies gives them out once, in a set that the old version keeps a
+   --  cap to. Whichever version next serves a call takes them from the
+   --  set: the new version, once it has taken over, which defers each
+   --  call again with its reply cap, or the old version, if the handover
+   --  failed, which puts each back. Calls on Replaceable, and on the
+   --  readers of State, don't count, since the handover makes them. A
+   --  signal does count, so one that reaches the old version during a
+   --  handover takes the reply caps back, and the new version then has
+   --  none: those calls fail when the old version ends. A saved state has
+   --  no deferred calls, since their replies can only move in a handover:
+   --  Save writes none, and Restore ignores any that State listed.
    --
    --  Only replaceable servers list this package's directory in their
    --  project, because it needs their generated packages of Replaceable,
@@ -71,9 +87,11 @@ package Rose.Replacement is
       Write_State     : not null Write_State_Procedure;
       Cap_Set_Service : Rose.Capabilities.Capability);
    --  Answer Replaceable in Context, which the server serves: State with
-   --  what Write_State writes, and Caps with what it names, in a new set
-   --  from Cap_Set_Service, the cap set server's Constructor. Context is
-   --  kept, to attach the reader of each State to.
+   --  what Write_State writes, Caps with what it names, and Replies with
+   --  the reply caps of Context's deferred calls, each in a new set from
+   --  Cap_Set_Service, the cap set server's Constructor. Context is kept,
+   --  to attach the reader of each State to, and to take the reply caps
+   --  in before it serves a call.
 
    function Replaceable_Cap return Rose.Capabilities.Capability;
    --  The cap of the Replaceable interface, once it is attached.
@@ -92,8 +110,10 @@ package Rose.Replacement is
    --  If Previous is a cap, the old version's Replaceable interface: read
    --  its state and caps, mark its identifiers in use, so that the new
    --  version's objects can be given them, call Read_State with the
-   --  server's part, and release the state and the set. Nothing is done
-   --  for the null cap, which is a fresh start.
+   --  server's part, and release the state and the set of caps. If the
+   --  old version has deferred calls, also take the set of their replies,
+   --  whose caps the new version takes before it serves its first call.
+   --  Nothing is done for the null cap, which is a fresh start.
 
    procedure Restore
      (Saved      : Rose.Capabilities.Capability;
@@ -115,7 +135,9 @@ package Rose.Replacement is
    --  which fails the launch. A replaceable command's main calls it.
 
    Bad_State : exception;
-   --  The state is not one that this package wrote.
+   --  The state is not one that this package wrote, or, in a handover, it
+   --  has a deferred call that can't move: one with a buffer, which was
+   --  mapped into the old version only (#878), or with caps.
 
    Bad_Start : exception;
    --  A server is given both a version to take over and a saved state.
