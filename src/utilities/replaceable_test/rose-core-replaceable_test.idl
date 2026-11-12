@@ -6,9 +6,11 @@ command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
           name is the one it was given, followed by how many times Name
           was called before. Its state is that name and count, and the
           identifier of its Named object. It holds one cap, the cap set
-          server's Constructor, which it names cap-set-service.
-          Run_Self_Tests launches it, reads its state and caps, and then
-          launches a second one that takes over from it.
+          server's Constructor, which it names Cap_Set_Service, as its
+          argument is named, so that a restored one takes it from its
+          argument (ADR 0032, section 10, #881). Run_Self_Tests launches
+          it, reads its state and caps, launches a second one that takes
+          over from it, and a third one that restores its saved state.
           """,
        Server      => Replaceable_Test_Server.Start_Server,
        Replaceable => Replaceable_Test_Server,
@@ -20,4 +22,6 @@ is
      with Help => "its Named interface";
    Control : out Replaceable
      with Help => "its Replaceable interface";
+   Saver : out Saveable
+     with Help => "its Saveable interface";
 end Rose.Core.Replaceable_Test;

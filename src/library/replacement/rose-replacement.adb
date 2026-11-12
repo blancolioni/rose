@@ -4,8 +4,10 @@ with Rose.Interfaces.Constructor.Client;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Releasable_Reader.Server;
+with Rose.Interfaces.Reader.Client;
 with Rose.Interfaces.Replaceable.Client;
 with Rose.Interfaces.Replaceable.Server;
+with Rose.Interfaces.Writer.Client;
 with Rose.Invocation;
 with Rose.Streams;
 with Rose.Words;
@@ -107,6 +109,12 @@ package body Rose.Replacement is
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Replaceable.Server.Cap_Of (Item));
 
+   overriding function Saveable_Cap
+     (Item : in out Replaceable_Server)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Replaceable.Server.Cap_Of
+         (Item, Rose.Interfaces.Replaceable.Saveable_Interface));
+
    overriding function State
      (Item : in out Replaceable_Server)
       return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class;
@@ -125,6 +133,16 @@ package body Rose.Replacement is
    procedure Write_Snapshot
      (Into  : in out Buffer_Stream'Class;
       Named : out Named_Caps);
+
+   procedure Read_Prefix
+     (Input : not null access Root_Stream_Type'Class;
+      Set   : access Rose.Interfaces.Releasable_Cap_Set
+                .Releasable_Cap_Set_Object'Class;
+      Named : in out Named_Caps);
+   --  Read this package's part of a state, from Input: check its header,
+   --  mark its identifiers in use, and read the names of its caps. If Set
+   --  is not null, add each to Named, with its cap in Set; if it is null,
+   --  skip them, as a restore does.
    --  The state: the header, the identifiers, the named caps and the
    --  server's part.
 
@@ -267,6 +285,43 @@ package body Rose.Replacement is
       Last := Buffer'First + Count - 1;
    end Read;
 
+   -----------------
+   -- Read_Prefix --
+   -----------------
+
+   procedure Read_Prefix
+     (Input : not null access Root_Stream_Type'Class;
+      Set   : access Rose.Interfaces.Releasable_Cap_Set
+                .Releasable_Cap_Set_Object'Class;
+      Named : in out Named_Caps)
+   is
+      Header : Rose.Words.Word_32;
+      Format : Rose.Words.Word_32;
+      Count  : Natural;
+   begin
+      Rose.Words.Word_32'Read (Input, Header);
+      Rose.Words.Word_32'Read (Input, Format);
+      if Header /= Magic or else Format /= Version then
+         raise Bad_State with
+           "Rose.Replacement: not a state that it can read";
+      end if;
+
+      Rose.Server.Read_Identifiers (Input);
+
+      Natural'Read (Input, Count);
+      for I in 1 .. Count loop
+         declare
+            Name  : constant String := String'Input (Input);
+            Index : Positive;
+         begin
+            Positive'Read (Input, Index);
+            if Set /= null then
+               Named.Add (Name, Set.Get_Cap (Index));
+            end if;
+         end;
+      end loop;
+   end Read_Prefix;
+
    -------------
    -- Release --
    -------------
@@ -289,6 +344,88 @@ package body Rose.Replacement is
       end if;
       return Rose.Interfaces.Replaceable.Server.Cap_Of (The_Server);
    end Replaceable_Cap;
+
+   -------------
+   -- Restore --
+   -------------
+
+   procedure Restore
+     (Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure)
+   is
+   begin
+      if Saved = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      declare
+         Reader : aliased Rose.Interfaces.Reader.Client.Reader_Client :=
+           Rose.Interfaces.Reader.Client.From_Cap (Saved);
+         Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
+         Unused : Named_Caps;
+      begin
+         Read_Prefix (Input'Access, null, Unused);
+         Read_State (Input'Access, Arguments);
+      end;
+   end Restore;
+
+   ----------
+   -- Save --
+   ----------
+
+   procedure Save (To : Rose.Capabilities.Capability) is
+      Snapshot : aliased Buffer_Stream;
+      Named    : Named_Caps;
+      Writer   : aliased Rose.Interfaces.Writer.Client.Writer_Client :=
+        Rose.Interfaces.Writer.Client.From_Cap (To);
+      Output   : aliased Rose.Streams.Writer_Stream (Writer'Access);
+   begin
+      if not Attached then
+         raise Program_Error with "Rose.Replacement: Save before Attach";
+      end if;
+      Write_Snapshot (Snapshot, Named);
+      if Snapshot.Length > 0 then
+         Output.Write (Snapshot.Data (1 .. Snapshot.Length));
+      end if;
+      Free (Snapshot.Data);
+   end Save;
+
+   ------------------
+   -- Saveable_Cap --
+   ------------------
+
+   function Saveable_Cap return Rose.Capabilities.Capability is
+   begin
+      if not Attached then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      return Rose.Interfaces.Replaceable.Server.Cap_Of
+        (The_Server, Rose.Interfaces.Replaceable.Saveable_Interface);
+   end Saveable_Cap;
+
+   -----------
+   -- Start --
+   -----------
+
+   procedure Start
+     (Previous   : Rose.Capabilities.Capability;
+      Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure)
+   is
+   begin
+      if Previous /= Rose.Capabilities.Null_Capability
+        and then Saved /= Rose.Capabilities.Null_Capability
+      then
+         raise Bad_Start with
+           "Rose.Replacement: both a version to take over and a saved state";
+      elsif Previous /= Rose.Capabilities.Null_Capability then
+         Take_Over (Previous, Read_State);
+      else
+         Restore (Saved, Arguments, Read_State);
+      end if;
+   end Start;
 
    -----------
    -- State --
@@ -338,34 +475,12 @@ package body Rose.Replacement is
          declare
             Reader : aliased Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Old.State;
-            Set    : Rose.Interfaces.Releasable_Cap_Set
+            Set    : aliased Rose.Interfaces.Releasable_Cap_Set
               .Releasable_Cap_Set_Object'Class := Old.Caps;
             Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
-            Header : Rose.Words.Word_32;
-            Format : Rose.Words.Word_32;
-            Count  : Natural;
             Named  : Named_Caps;
          begin
-            Rose.Words.Word_32'Read (Input'Access, Header);
-            Rose.Words.Word_32'Read (Input'Access, Format);
-            if Header /= Magic or else Format /= Version then
-               raise Bad_State with
-                 "Rose.Replacement: not a state that it can read";
-            end if;
-
-            Rose.Server.Read_Identifiers (Input'Access);
-
-            Natural'Read (Input'Access, Count);
-            for I in 1 .. Count loop
-               declare
-                  Name  : constant String := String'Input (Input'Access);
-                  Index : Positive;
-               begin
-                  Positive'Read (Input'Access, Index);
-                  Named.Add (Name, Set.Get_Cap (Index));
-               end;
-            end loop;
-
+            Read_Prefix (Input'Access, Set'Access, Named);
             Read_State (Input'Access, Named);
 
             Reader.Release;

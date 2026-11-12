@@ -18,6 +18,8 @@ replaceable_test:
 	    rose-core-replaceable_test.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/named.idl \
 	    $(INTERFACES)/replaceable.idl \
+	    $(INTERFACES)/saveable.idl \
+	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/releasable_reader.idl \
 	    $(INTERFACES)/reader.idl \
 	    $(INTERFACES)/resource.idl \

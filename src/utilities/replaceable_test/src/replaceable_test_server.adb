@@ -12,7 +12,8 @@ package body Replaceable_Test_Server is
    Format : constant Rose.Words.Word_32 := 1;
    --  The version of this server's part of the state.
 
-   Service_Name : constant String := "cap-set-service";
+   Service_Name : constant String := "Cap_Set_Service";
+   --  The name of its argument, so that a restore finds it.
 
    type Named_Server is
      new Rose.Interfaces.Named.Server.Named_Interface with null record;
@@ -42,7 +43,8 @@ package body Replaceable_Test_Server is
      (Name            : String;
       Cap_Set_Service : Rose.Capabilities.Capability;
       Served          : out Rose.Capabilities.Capability;
-      Control         : out Rose.Capabilities.Capability)
+      Control         : out Rose.Capabilities.Capability;
+      Saver           : out Rose.Capabilities.Capability)
    is
    begin
       if not Taken_Over then
@@ -57,6 +59,7 @@ package body Replaceable_Test_Server is
 
       Served := Rose.Interfaces.Named.Server.Cap_Of (The_Named);
       Control := Rose.Replacement.Replaceable_Cap;
+      Saver := Rose.Replacement.Saveable_Cap;
    end Create_Server;
 
    ----------
