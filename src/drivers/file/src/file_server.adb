@@ -882,6 +882,9 @@ package body File_Server is
      (Stream : not null access Root_Stream_Type'Class;
       Named  : in out Rose.Replacement.Named_Caps)
    is
+      pragma Unreferenced (Named);
+      --  Its one cap, Cap_Set_Service, is its command's argument, which
+      --  Rose.Replacement hands over (#901).
       Count  : Natural := 0;
       Reader : Reader_Access := Readers;
       Writer : Writer_Access := Writers;
@@ -937,7 +940,6 @@ package body File_Server is
          Writer := Writer.Next;
       end loop;
 
-      Named.Add (Service_Name, Service_Cap);
    end Write_State;
 
 end File_Server;
