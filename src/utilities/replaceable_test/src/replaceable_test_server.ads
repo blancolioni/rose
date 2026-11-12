@@ -15,9 +15,9 @@ package Replaceable_Test_Server is
    procedure Read_State
      (Stream : not null access Ada.Streams.Root_Stream_Type'Class;
       Named  : Rose.Replacement.Named_Caps);
-   --  The state of the version that this one takes over from, which the
-   --  main reads before it calls the command. It refuses, by raising, to
-   --  take over from one called refuse.
+   --  The state of the version that this one takes over from, or of a
+   --  saved one, which the main reads before it calls the command. It
+   --  refuses, by raising, to start from one called refuse.
 
    procedure Create_Server
      (Name            : String;
@@ -25,11 +25,13 @@ package Replaceable_Test_Server is
       Target          : Rose.Capabilities.Capability;
       Served          : out Rose.Capabilities.Capability;
       Control         : out Rose.Capabilities.Capability;
+      Saver           : out Rose.Capabilities.Capability;
       Held            : out Rose.Capabilities.Capability);
    --  Attach the Named, Held_Call and Replaceable interfaces, and return
-   --  their caps. Name and Cap_Set_Service are used only by a version that
-   --  took over from none. If Target isn't null, the server is a helper,
-   --  which calls Target's Wait when it starts.
+   --  their caps, and that of the Saveable interface. Name and
+   --  Cap_Set_Service are used only by a server that neither took over nor
+   --  restored. If Target isn't null, the server is a helper, which calls
+   --  Target's Wait when it starts.
 
    procedure Start_Server;
    --  Serve, and never return. A helper first calls its target's Wait.

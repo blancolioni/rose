@@ -7,10 +7,12 @@ command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
           was called before, and a Held_Call interface whose Wait it
           defers until Answer (#879). Its state is that name and count,
           and the identifiers of its objects. It holds one cap, the cap
-          set server's Constructor, which it names cap-set-service. A new
-          version refuses to take over from one called refuse.
-          Run_Self_Tests launches it, reads its state and caps, and then
-          launches a second one that takes over from it.
+          set server's Constructor, which it names Cap_Set_Service, as its
+          argument is named, so that a restored one takes it from its
+          argument (ADR 0032, section 10, #881). A new version refuses to
+          take over from one called refuse. Run_Self_Tests launches it,
+          reads its state and caps, launches a second one that takes over
+          from it, and a third one that restores its saved state.
 
           Given a Target, it is a helper instead: once it has started, it
           calls Target's Wait, and then its name is what Wait returned,
@@ -31,6 +33,8 @@ is
      with Help => "its Named interface";
    Control : out Replaceable
      with Help => "its Replaceable interface";
+   Saver : out Saveable
+     with Help => "its Saveable interface";
    Held : out Held_Call
      with Help => "its Held_Call interface";
 end Rose.Core.Replaceable_Test;

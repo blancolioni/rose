@@ -1,14 +1,14 @@
 --  A server that a new version of its program can take over from (ADR
 --  0032). The old version answers it, and only the new one calls it,
 --  which mem launches with this interface as its Previous argument (#865,
---  #866). State and Caps don't change the old version, so that it
---  carries on as it was if the handover fails, and either may be called
---  any number of times.
+--  #866). State and Caps don't change the old version, so that it carries
+--  on as it was if the handover fails, and either may be called any
+--  number of times.
 --
---  State is the old version's state as a stream, starting with a format
---  version (Rose.Replacement writes and reads it). Caps is the caps that
---  the old version holds, in a fresh set, each named in the state. Each
---  is the caller's to release when it is done with it.
+--  State, from Saveable, is the old version's state as a stream (section
+--  10, #881). Caps is the caps that the old version holds, in a fresh set,
+--  each named in the state. Each is the caller's to release when it is
+--  done with it.
 --
 --  Replies is the reply caps of the calls that the old version has
 --  deferred, which the state lists, in a fresh set (#879). A reply cap is
@@ -18,10 +18,7 @@
 --  the new version once it has taken over, and the old one if the
 --  handover failed. Releasing the set before then fails the calls.
 
-interface Replaceable is
-
-   function State
-     return interface Releasable_Reader;
+interface Replaceable : Saveable is
 
    function Caps
      return interface Releasable_Cap_Set;

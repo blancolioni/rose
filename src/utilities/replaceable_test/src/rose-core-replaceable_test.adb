@@ -7,6 +7,7 @@ procedure Rose.Core.Replaceable_Test
    Target          : in out Rose.Interfaces.Held_Call.Held_Call_Object'Class;
    Served          : out Rose.Capabilities.Capability;
    Control         : out Rose.Capabilities.Capability;
+   Saver           : out Rose.Capabilities.Capability;
    Held            : out Rose.Capabilities.Capability)
 is
 begin
@@ -16,5 +17,6 @@ begin
       Target          => Target.Held_Call_Cap,
       Served          => Served,
       Control         => Control,
+      Saver           => Saver,
       Held            => Held);
 end Rose.Core.Replaceable_Test;

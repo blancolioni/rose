@@ -16,6 +16,7 @@ with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
 with Rose.Interfaces.Replaceable.Client;
+with Rose.Interfaces.Saveable.Client;
 
 with Tests.Registry;
 
@@ -36,26 +37,32 @@ package body Tests.Replacement is
            Rose.Capabilities.Null_Capability;
          Control : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
+         Saver   : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
          Held    : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
       end record;
-   --  The Named, Replaceable and Held_Call interfaces of a server.
+   --  The Named, Replaceable, Saveable and Held_Call interfaces of a
+   --  server.
+
+   Null_Cap : constant Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
 
    function Start
      (Name     : String;
-      Previous : Rose.Capabilities.Capability :=
-        Rose.Capabilities.Null_Capability;
-      Target   : Rose.Capabilities.Capability :=
-        Rose.Capabilities.Null_Capability)
+      Previous : Rose.Capabilities.Capability := Null_Cap;
+      Saved    : Rose.Capabilities.Capability := Null_Cap;
+      Target   : Rose.Capabilities.Capability := Null_Cap)
       return Started;
-   --  Launch replaceable_test as a command, with Name, with Previous if it
-   --  is a cap, and with Target, which makes it a helper that waits on
-   --  Target, and return its interfaces, or null caps if the launch or its
-   --  call failed.
+   --  Launch replaceable_test as a command, with Name, with Previous and
+   --  Saved if they are caps, and with Target, which makes it a helper
+   --  that waits on Target, and return its interfaces, or null caps if
+   --  the launch or its call failed.
 
    function Is_Started (Server : Started) return Boolean
    is (Server.Served /= Rose.Capabilities.Null_Capability
        and then Server.Control /= Rose.Capabilities.Null_Capability
+       and then Server.Saver /= Rose.Capabilities.Null_Capability
        and then Server.Held /= Rose.Capabilities.Null_Capability);
 
    function Name_Of (Server : Started) return String;
@@ -281,6 +288,83 @@ package body Tests.Replacement is
             Check ("old " & Name, Name = "fred 2");
          end;
 
+         --  A third one restores the first's saved state, which it gets
+         --  through the Saveable interface. It starts from the first's
+         --  name and count, takes its cap from its own argument, as the
+         --  state carries none, and is a new instance: the first goes on
+         --  as it was (ADR 0032, section 10, #881).
+
+         declare
+            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
+            Saved    : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class := Saveable.State;
+            Restored : constant Started :=
+              Start ("anne", Saved => Saved.Reader_Cap);
+         begin
+            Saved.Release;
+            Check ("the restored one did not start", Is_Started (Restored));
+
+            if Is_Started (Restored) then
+               declare
+                  Name : constant String := Name_Of (Restored);
+               begin
+                  Check ("restored " & Name, Name = "fred 3");
+               end;
+
+               declare
+                  Copy : Rose.Interfaces.Replaceable.Client
+                    .Replaceable_Client :=
+                      Rose.Interfaces.Replaceable.Client.From_Cap
+                        (Restored.Control);
+                  Set  : Rose.Interfaces.Releasable_Cap_Set
+                    .Releasable_Cap_Set_Object'Class := Copy.Caps;
+               begin
+                  Check ("the restored one has no Cap_Set_Service",
+                         Set.Length = 1);
+                  Set.Release;
+               end;
+            end if;
+         end;
+
+         declare
+            Name : constant String := Name_Of (Old_Version);
+         begin
+            Check ("first after restore " & Name, Name = "fred 3");
+         end;
+
+         --  Both a version to take over and a saved state fail the
+         --  launch, and so does a stream that isn't a state: here, a state
+         --  without its first word.
+
+         declare
+            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
+            Saved    : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class := Saveable.State;
+         begin
+            Check ("both a version and a state started",
+                   not Is_Started
+                     (Start ("both",
+                             Previous => Old_Version.Control,
+                             Saved    => Saved.Reader_Cap)));
+            Saved.Release;
+         end;
+
+         declare
+            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
+            Saved    : Rose.Interfaces.Releasable_Reader
+              .Releasable_Reader_Object'Class := Saveable.State;
+            Skipped  : Ada.Streams.Stream_Element_Array (1 .. 4);
+            Last     : Ada.Streams.Stream_Element_Offset;
+         begin
+            Saved.Read (Skipped, Last);
+            Check ("a bad state started",
+                   not Is_Started (Start ("bad", Saved => Saved.Reader_Cap)));
+            Saved.Release;
+         end;
+
          --  Releasing a set that holds a reply cap fails the call, rather
          --  than leaving its caller blocked for good, and frees the slot
          --  where the server has the caller's buffer. The helper's calls
@@ -411,10 +495,9 @@ package body Tests.Replacement is
 
    function Start
      (Name     : String;
-      Previous : Rose.Capabilities.Capability :=
-        Rose.Capabilities.Null_Capability;
-      Target   : Rose.Capabilities.Capability :=
-        Rose.Capabilities.Null_Capability)
+      Previous : Rose.Capabilities.Capability := Null_Cap;
+      Saved    : Rose.Capabilities.Capability := Null_Cap;
+      Target   : Rose.Capabilities.Capability := Null_Cap)
       return Started
    is
       use System.Storage_Elements;
@@ -434,9 +517,11 @@ package body Tests.Replacement is
 
       --  The launch call: the create endpoint cap, the cap set server's
       --  Constructor, the target, which is null unless it is a helper,
-      --  and, if there is one, the version to take over from, and the
-      --  name as one buffer item, its length little-endian and then its
-      --  text, padded to four bytes.
+      --  the version to take over from and the saved state, each if there
+      --  is one, and the name as one buffer item, its length
+      --  little-endian and then its text, padded to four bytes. A saved
+      --  state without a version sends a null cap in the version's place,
+      --  as petal does.
 
       Name_Buffer (1 .. 4 + Padded) := (others => 0);
       Name_Buffer (1) := Storage_Element (Name'Length);
@@ -449,13 +534,16 @@ package body Tests.Replacement is
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Cap_Sets);
       Rose.System_Calls.Send_Cap (Params, Target);
-      if Previous /= Rose.Capabilities.Null_Capability then
+      if Previous /= Null_Cap or else Saved /= Null_Cap then
          Rose.System_Calls.Send_Cap (Params, Previous);
+      end if;
+      if Saved /= Null_Cap then
+         Rose.System_Calls.Send_Cap (Params, Saved);
       end if;
       Rose.System_Calls.Send_Buffer
         (Params, 4 + Padded, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 3);
+      Rose.System_Calls.Receive_Caps (Params, 4);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -468,7 +556,8 @@ package body Tests.Replacement is
 
       return (Served  => Params.Caps (0),
               Control => Params.Caps (1),
-              Held    => Params.Caps (2));
+              Saver   => Params.Caps (2),
+              Held    => Params.Caps (3));
    end Start;
 
    --------------

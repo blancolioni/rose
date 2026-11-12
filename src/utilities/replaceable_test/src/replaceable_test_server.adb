@@ -17,7 +17,8 @@ package body Replaceable_Test_Server is
    --  The version of this server's part of the state. Version 2 has the
    --  identifier of the Held_Call object (#879).
 
-   Service_Name : constant String := "cap-set-service";
+   Service_Name : constant String := "Cap_Set_Service";
+   --  The name of its argument, so that a restore finds it.
 
    Refused_Name : constant String := "refuse";
    --  A new version refuses to take over from a server with this name.
@@ -108,6 +109,7 @@ package body Replaceable_Test_Server is
       Target          : Rose.Capabilities.Capability;
       Served          : out Rose.Capabilities.Capability;
       Control         : out Rose.Capabilities.Capability;
+      Saver           : out Rose.Capabilities.Capability;
       Held            : out Rose.Capabilities.Capability)
    is
    begin
@@ -126,6 +128,7 @@ package body Replaceable_Test_Server is
 
       Served := Rose.Interfaces.Named.Server.Cap_Of (The_Named);
       Control := Rose.Replacement.Replaceable_Cap;
+      Saver := Rose.Replacement.Saveable_Cap;
       Held := Rose.Interfaces.Held_Call.Server.Cap_Of (The_Held);
    end Create_Server;
 

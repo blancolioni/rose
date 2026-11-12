@@ -4,8 +4,10 @@ with Rose.Interfaces.Constructor.Client;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader.Client;
 with Rose.Interfaces.Releasable_Reader.Server;
+with Rose.Interfaces.Reader.Client;
 with Rose.Interfaces.Replaceable.Client;
 with Rose.Interfaces.Replaceable.Server;
+with Rose.Interfaces.Writer.Client;
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Streams;
@@ -124,6 +126,12 @@ package body Rose.Replacement is
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Replaceable.Server.Cap_Of (Item));
 
+   overriding function Saveable_Cap
+     (Item : in out Replaceable_Server)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Replaceable.Server.Cap_Of
+         (Item, Rose.Interfaces.Replaceable.Saveable_Interface));
+
    overriding function State
      (Item : in out Replaceable_Server)
       return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class;
@@ -162,10 +170,26 @@ package body Rose.Replacement is
    Taken_Calls   : Call_Vectors.Vector;
 
    procedure Write_Snapshot
-     (Into  : in out Buffer_Stream'Class;
-      Named : out Named_Caps);
+     (Into       : in out Buffer_Stream'Class;
+      Named      : out Named_Caps;
+      With_Calls : Boolean);
    --  The state: the header, the identifiers, the named caps, the
-   --  deferred calls and the server's part.
+   --  deferred calls and the server's part. The list of deferred calls is
+   --  empty unless With_Calls: only a handover can move them, so a state
+   --  that Save writes has none (section 10).
+
+   procedure Read_Prefix
+     (Input : not null access Root_Stream_Type'Class;
+      Set   : access Rose.Interfaces.Releasable_Cap_Set
+                .Releasable_Cap_Set_Object'Class;
+      Named   : in out Named_Caps;
+      Calls   : out Call_Vectors.Vector;
+      Movable : out Boolean);
+   --  Read this package's part of a state, from Input: check its header,
+   --  mark its identifiers in use, read the names of its caps, and read
+   --  its deferred calls into Calls. If Set is not null, add each cap to
+   --  Named, with its cap in Set; if it is null, skip them, as a restore
+   --  does. Movable is False if a deferred call can't move (Can_Move).
 
    function Deferred_Calls return Call_Vectors.Vector;
    --  The calls that the server has deferred with a reply cap, in the
@@ -473,6 +497,72 @@ package body Rose.Replacement is
       Last := Buffer'First + Count - 1;
    end Read;
 
+   -----------------
+   -- Read_Prefix --
+   -----------------
+
+   procedure Read_Prefix
+     (Input : not null access Root_Stream_Type'Class;
+      Set   : access Rose.Interfaces.Releasable_Cap_Set
+                .Releasable_Cap_Set_Object'Class;
+      Named   : in out Named_Caps;
+      Calls   : out Call_Vectors.Vector;
+      Movable : out Boolean)
+   is
+      Header : Rose.Words.Word_32;
+      Format : Rose.Words.Word_32;
+      Count  : Natural;
+   begin
+      Calls.Clear;
+      Movable := True;
+
+      Rose.Words.Word_32'Read (Input, Header);
+      Rose.Words.Word_32'Read (Input, Format);
+      if Header /= Magic or else Format /= Version then
+         raise Bad_State with
+           "Rose.Replacement: not a state that it can read";
+      end if;
+
+      Rose.Server.Read_Identifiers (Input);
+
+      Natural'Read (Input, Count);
+      for I in 1 .. Count loop
+         declare
+            Name  : constant String := String'Input (Input);
+            Index : Positive;
+         begin
+            Positive'Read (Input, Index);
+            if Set /= null then
+               Named.Add (Name, Set.Get_Cap (Index));
+            end if;
+         end;
+      end loop;
+
+      Natural'Read (Input, Count);
+      for I in 1 .. Count loop
+         declare
+            Endpoint   : Rose.Objects.Endpoint_Id;
+            Identifier : Rose.Objects.Capability_Identifier;
+            Control    : Rose.Invocation.Control_Word;
+            Data       : Rose.Invocation.Parameter_Words;
+            Can_Go     : Boolean;
+            Call       : Rose.Invocation.Invocation_Record;
+         begin
+            Rose.Objects.Endpoint_Id'Read (Input, Endpoint);
+            Rose.Objects.Capability_Identifier'Read (Input, Identifier);
+            Rose.Invocation.Control_Word'Read (Input, Control);
+            Rose.Invocation.Parameter_Words'Read (Input, Data);
+            Boolean'Read (Input, Can_Go);
+            Movable := Movable and then Can_Go;
+            Call.Control := Control;
+            Call.Endpoint := Endpoint;
+            Call.Identifier := Identifier;
+            Call.Data := Data;
+            Calls.Append (Call);
+         end;
+      end loop;
+   end Read_Prefix;
+
    -------------
    -- Release --
    -------------
@@ -558,6 +648,93 @@ package body Rose.Replacement is
       return Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
    end Replies;
 
+   -------------
+   -- Restore --
+   -------------
+
+   procedure Restore
+     (Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure)
+   is
+   begin
+      if Saved = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      --  A saved state's deferred calls, if a State listed any, are
+      --  ignored: their replies can only move in a handover.
+
+      declare
+         Reader : aliased Rose.Interfaces.Reader.Client.Reader_Client :=
+           Rose.Interfaces.Reader.Client.From_Cap (Saved);
+         Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
+         Unused  : Named_Caps;
+         Calls   : Call_Vectors.Vector;
+         Movable : Boolean;
+      begin
+         Read_Prefix (Input'Access, null, Unused, Calls, Movable);
+         Read_State (Input'Access, Arguments);
+      end;
+   end Restore;
+
+   ----------
+   -- Save --
+   ----------
+
+   procedure Save (To : Rose.Capabilities.Capability) is
+      Snapshot : aliased Buffer_Stream;
+      Named    : Named_Caps;
+      Writer   : aliased Rose.Interfaces.Writer.Client.Writer_Client :=
+        Rose.Interfaces.Writer.Client.From_Cap (To);
+      Output   : aliased Rose.Streams.Writer_Stream (Writer'Access);
+   begin
+      if not Attached then
+         raise Program_Error with "Rose.Replacement: Save before Attach";
+      end if;
+      Write_Snapshot (Snapshot, Named, With_Calls => False);
+      if Snapshot.Length > 0 then
+         Output.Write (Snapshot.Data (1 .. Snapshot.Length));
+      end if;
+      Free (Snapshot.Data);
+   end Save;
+
+   ------------------
+   -- Saveable_Cap --
+   ------------------
+
+   function Saveable_Cap return Rose.Capabilities.Capability is
+   begin
+      if not Attached then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      return Rose.Interfaces.Replaceable.Server.Cap_Of
+        (The_Server, Rose.Interfaces.Replaceable.Saveable_Interface);
+   end Saveable_Cap;
+
+   -----------
+   -- Start --
+   -----------
+
+   procedure Start
+     (Previous   : Rose.Capabilities.Capability;
+      Saved      : Rose.Capabilities.Capability;
+      Arguments  : Named_Caps;
+      Read_State : not null Read_State_Procedure)
+   is
+   begin
+      if Previous /= Rose.Capabilities.Null_Capability
+        and then Saved /= Rose.Capabilities.Null_Capability
+      then
+         raise Bad_Start with
+           "Rose.Replacement: both a version to take over and a saved state";
+      elsif Previous /= Rose.Capabilities.Null_Capability then
+         Take_Over (Previous, Read_State);
+      else
+         Restore (Saved, Arguments, Read_State);
+      end if;
+   end Start;
+
    -----------
    -- State --
    -----------
@@ -571,7 +748,7 @@ package body Rose.Replacement is
       Named    : Named_Caps;
       Reader   : constant State_Reader_Access := new State_Reader;
    begin
-      Write_Snapshot (Snapshot, Named);
+      Write_Snapshot (Snapshot, Named, With_Calls => True);
       Reader.Data := Snapshot.Data;
       Reader.Length := Snapshot.Length;
 
@@ -658,63 +835,18 @@ package body Rose.Replacement is
          declare
             Reader : aliased Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Old.State;
-            Set    : Rose.Interfaces.Releasable_Cap_Set
+            Set    : aliased Rose.Interfaces.Releasable_Cap_Set
               .Releasable_Cap_Set_Object'Class := Old.Caps;
             Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
-            Header : Rose.Words.Word_32;
-            Format : Rose.Words.Word_32;
-            Count  : Natural;
-            Named  : Named_Caps;
-            Calls  : Call_Vectors.Vector;
+            Named   : Named_Caps;
+            Calls   : Call_Vectors.Vector;
+            Movable : Boolean;
          begin
-            Rose.Words.Word_32'Read (Input'Access, Header);
-            Rose.Words.Word_32'Read (Input'Access, Format);
-            if Header /= Magic or else Format /= Version then
+            Read_Prefix (Input'Access, Set'Access, Named, Calls, Movable);
+            if not Movable then
                raise Bad_State with
-                 "Rose.Replacement: not a state that it can read";
+                 "Rose.Replacement: a deferred call has a buffer or caps";
             end if;
-
-            Rose.Server.Read_Identifiers (Input'Access);
-
-            Natural'Read (Input'Access, Count);
-            for I in 1 .. Count loop
-               declare
-                  Name  : constant String := String'Input (Input'Access);
-                  Index : Positive;
-               begin
-                  Positive'Read (Input'Access, Index);
-                  Named.Add (Name, Set.Get_Cap (Index));
-               end;
-            end loop;
-
-            Natural'Read (Input'Access, Count);
-            for I in 1 .. Count loop
-               declare
-                  Endpoint   : Rose.Objects.Endpoint_Id;
-                  Identifier : Rose.Objects.Capability_Identifier;
-                  Control    : Rose.Invocation.Control_Word;
-                  Data       : Rose.Invocation.Parameter_Words;
-                  Movable    : Boolean;
-                  Call       : Rose.Invocation.Invocation_Record;
-               begin
-                  Rose.Objects.Endpoint_Id'Read (Input'Access, Endpoint);
-                  Rose.Objects.Capability_Identifier'Read
-                    (Input'Access, Identifier);
-                  Rose.Invocation.Control_Word'Read (Input'Access, Control);
-                  Rose.Invocation.Parameter_Words'Read (Input'Access, Data);
-                  Boolean'Read (Input'Access, Movable);
-                  if not Movable then
-                     raise Bad_State with
-                       "Rose.Replacement: a deferred call has a buffer"
-                       & " or caps";
-                  end if;
-                  Call.Control := Control;
-                  Call.Endpoint := Endpoint;
-                  Call.Identifier := Identifier;
-                  Call.Data := Data;
-                  Calls.Append (Call);
-               end;
-            end loop;
 
             --  The reply caps are taken from the set only once this
             --  version serves a call, which is after it has taken over.
@@ -844,11 +976,13 @@ package body Rose.Replacement is
    --------------------
 
    procedure Write_Snapshot
-     (Into  : in out Buffer_Stream'Class;
-      Named : out Named_Caps)
+     (Into       : in out Buffer_Stream'Class;
+      Named      : out Named_Caps;
+      With_Calls : Boolean)
    is
       Server_Part : aliased Buffer_Stream;
-      Calls       : constant Call_Vectors.Vector := Deferred_Calls;
+      Calls       : constant Call_Vectors.Vector :=
+        (if With_Calls then Deferred_Calls else Call_Vectors.Empty_Vector);
    begin
       Writer (Server_Part'Access, Named);
 
