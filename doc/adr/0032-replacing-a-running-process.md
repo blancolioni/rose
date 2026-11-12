@@ -42,7 +42,8 @@ A server can be replaced only if its process implements the `Replaceable` interf
 
 - **`State return interface Reader`** gives the old version's state as a stream. It starts with a format version, and the rest is the server's own format. Ada's stream attributes, and the containers' stream support, do most of the work. A new version reads at least its predecessor's format.
 - **`Caps return interface Cap_Set`** gives the caps that the old version holds, in a cap set (#825). The state has a section that names each cap and gives its index in the set, and the new version takes each one by name as it reads the state.
-- **Neither may change the old version's state.** If the handover fails, the old version goes on from where it was.
+- **`Replies return interface Cap_Set`** gives the reply caps of the calls that the old version has deferred, in a cap set. The state lists each deferred call, with its index in the set (section 4).
+- **`State` and `Caps` don't change the old version's state,** and may be called any number of times. If the handover fails, the old version goes on from where it was. `Replies` is the exception: a reply cap is moved, not copied, so it gives them out once, and raises if they are out already (#879).
 
 ### 3. The new version pulls what it needs
 
@@ -59,9 +60,10 @@ The caps that the old version holds to other servers, and the callbacks its clie
 
 - **The old version must be between calls.** Mem waits until it is blocked receiving. If it is blocked in a call of its own, to another server, mem waits for that to finish, up to a limit, and then gives up (section 7).
 - **The kernel holds new calls to the old version's object id,** as it holds replies during a checkpoint. The new version's calls to `Replaceable` are the exception: they are answered, or the handover could never finish.
-- **Replies that the old version owes move to the new one.** The old version puts each reply cap it holds in the cap set, under a name in its state, such as the console's pending `Read`. The new version answers them when it is ready. A reply cap is moved into the set, not copied, so it is still answered exactly once: the kernel moves every single-use cap that is sent, whether in a call, a reply or a new process's first caps, rather than copying it (#864). The sender's slot keeps its number but holds nothing, so a cap set server that gives a reply cap out a second time gives the null cap, and deleting the slot frees it.
-  - **A moved reply carries words and caps, but not the caller's buffer,** which the kernel mapped into the old version only. Answering into the buffer, as a console's `Read` does, is #878.
-  - **Reply caps can go into only one set,** so `Caps` has to hand them out once, to the new version, and they have to come back to the old version if the handover fails (#879).
+- **Replies that the old version owes move to the new one.** A server defers a call with `Rose.Server.Block_Current_Request`, which keeps the call and its reply cap until `Unblock_Endpoint` answers it, as a console does with a pending `Read`. So the deferred calls move with nothing for the server to do (#879): the state lists each one, and `Replies` moves their reply caps into a set. The new version defers each call again, and answers it as the old version would have. A reply cap is moved, not copied, so it is still answered exactly once: the kernel moves every single-use cap that is sent, whether in a call, a reply or a new process's first caps, rather than copying it (#864). The sender's slot keeps its number but holds nothing, so a cap set server that gives a reply cap out a second time gives the null cap, and deleting the slot frees it.
+  - **The reply caps stay in the set until the handover is decided.** The old version keeps a cap to the set, and whichever version next serves a call takes them out: the new version once it has taken over, since the held calls reach it then, or the old version, if the handover failed (section 7). Calls to `Replaceable`, and to the readers of the state, don't count, since the handover makes them. Neither version knows how the handover ended, but only the one that is serving calls can take the caps.
+  - **Deleting a reply cap fails its call.** When a reply cap is deleted, the kernel wakes its caller with an error, if the caller is waiting for that reply, since a moved cap has no other copy (#879). So a set of reply caps that is released before either version takes them fails their calls, rather than leaving the callers blocked for good, as ending a process that holds a reply cap already does.
+  - **A moved reply carries words and caps, but not the caller's buffer,** which the kernel mapped into the old version only. Answering into the buffer, as a console's `Read` does, is #878. Until then, a new version refuses to take over a deferred call that has a buffer, or caps.
 - **The held calls are released to the new version** once it has taken over (section 6), or to the old one if the handover fails (section 7).
 
 ### 5. Checkpoints during a handover
@@ -97,7 +99,7 @@ A derived cap whose parent is in the old version's cap table goes on working whe
 
 Until step 1 of section 6, nothing has changed for the old version or its clients.
 
-- **If the new version refuses, crashes, or doesn't finish in time,** mem ends it, which destroys its fresh bank, gives back to the old version any reply caps moved into the cap set, and releases the held calls to the old version.
+- **If the new version refuses, crashes, or doesn't finish in time,** mem ends it, which destroys its fresh bank, and releases the held calls to the old version. The new version hasn't served a call, so the reply caps of the deferred calls are still in their set, and the old version takes them back before it serves its next call (section 4).
 - **If the old version doesn't become idle in time,** mem doesn't launch the new version, and reports why.
 - **From step 1 on, the handover is committed.** Each later step is mem's own, or the store's, and can't be refused.
 
@@ -105,7 +107,7 @@ The updater reports a replacement that failed, and goes on to the next server (A
 
 ### 8. Tooling
 
-- **`Rose.Server`** answers `Replaceable` for a server, and holds the server's identifiers, so a server writes only its state's stream attributes, and its list of named caps.
+- **`Rose.Server`** answers `Replaceable` for a server, and holds the server's identifiers and deferred calls, so a server writes only its state's stream attributes, and its list of named caps.
 - **An IDL `Replaceable` aspect** on a server command (idle) generates the `Previous : in Replaceable` argument, and a main that reads the state if it is given one, and starts fresh if it isn't.
 
 ### 9. The first servers
@@ -121,7 +123,7 @@ A server's state stream (section 2) is not only for a handover. A program can sa
 - **Caps don't go into a saved state.** A cap is an entry in a kernel table, not bytes. A saved state names the caps that the server held, but carries none of them.
 - **A cap's name in the state is also a cap argument of the server's command.** A fresh launch gives the cap as that argument. A handover gives it from the cap set, and a restore from the arguments again. `Read_State` looks each cap up by name, and doesn't know where it came from. A missing cap fails a restore, as it fails a handover.
 - **A restored instance is a new instance, not a replacement.** It has its own object id, so the old instance's clients don't reach it, and the old instance goes on running. The identifiers in the stream are kept: in a new process they name nothing that a client already holds, so reusing them is harmless.
-- **The replies a server owes don't go into a saved state.** They can only be moved, in a live handover (section 4).
+- **The replies a server owes don't go into a saved state.** They can only be moved, in a live handover (section 4). `State` lists the deferred calls, for a handover (#879), so `Save` writes the list empty, and `Restore` ignores one that isn't.
 - **The format rule is the same,** but a saved file can be much older than a predecessor. A version reads every format of its series that a saved state may have.
 
 `Rose.Replacement` gives a server both: **`Save`** writes the same stream as `State` to a `Writer`, and **`Restore`** reads one from a `Reader`, taking caps from the command's arguments. idle's `Replaceable` aspect also generates a **`Saved : in Reader`** argument, reserved as `Previous` is (section 8). The generated main takes over if it is given `Previous`, restores if it is given `Saved`, starts fresh if it is given neither, and refuses both.
@@ -156,7 +158,6 @@ Moving a server's clients to a restored copy, and carrying a state over the netw
 
 - **Whether a server can be `Saveable` without being `Replaceable`.** It costs nothing in the interfaces, but the IDL aspect is `Replaceable` for now.
 - **Reply caps with a buffer** (#878). A moved reply cap can't answer into the caller's buffer, which was mapped into the old version only. Should the kernel move the mapping, or should a server never defer a call that holds a buffer?
-- **Handing reply caps out once** (#879). `Caps` may be called more than once, but the reply caps can be in only one set, and releasing that set leaves their callers blocked.
 - **How long to wait** for the old version to become idle, and for the new version to finish. A fixed limit, or one the updater gives?
 
 ## Follow-up work
@@ -165,7 +166,8 @@ Moving a server's clients to a restored copy, and carrying a state over the netw
 - Mem: `Memory.Replace_Process`, and no checkpoint during a handover.
 - Store: `Process_Banks.Hand_Over`, which swaps two banks' owners and moves one's sub-banks under the other.
 - Kernel: move single-use caps, rather than copy them, when they are sent (#864). Derivation parents need nothing new: they go in the cap set as other caps do.
-- Reply caps whose calls hold a buffer (#878), and `Caps` handing reply caps out once (#879).
+- Reply caps whose calls hold a buffer (#878).
+- `Replies`, which hands the reply caps out once, and the kernel failing a call whose reply cap is deleted (#879).
 - `Replaceable`, `Rose.Server`'s part of it, and the IDL aspect (idle).
 - `Saveable`, `Rose.Replacement.Save` and `Restore`, and the `Saved` argument in idle (#881).
 - `file` replaceable, and a test that replaces it on a restored system with files open.

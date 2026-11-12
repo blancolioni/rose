@@ -9,6 +9,7 @@ with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
 with Rose.Interfaces.Constructor.Client;
+with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Releasable_Cap_Set;
@@ -30,16 +31,50 @@ package body Tests.Replacement is
    --  shares a buffer by its pages, and the receiver sees it at the start
    --  of the first, so it starts a page.
 
-   procedure Start
+   type Started is
+      record
+         Served  : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         Control : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         Saver   : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+         Held    : Rose.Capabilities.Capability :=
+           Rose.Capabilities.Null_Capability;
+      end record;
+   --  The Named, Replaceable, Saveable and Held_Call interfaces of a
+   --  server.
+
+   Null_Cap : constant Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+
+   function Start
      (Name     : String;
-      Previous : Rose.Capabilities.Capability;
-      Saved    : Rose.Capabilities.Capability;
-      Served   : out Rose.Capabilities.Capability;
-      Control  : out Rose.Capabilities.Capability;
-      Saver    : out Rose.Capabilities.Capability);
-   --  Launch replaceable_test as a command, with Name, and with Previous
-   --  and Saved if they are caps, and return its Named, Replaceable and
-   --  Saveable interfaces, or null caps if the launch or its call failed.
+      Previous : Rose.Capabilities.Capability := Null_Cap;
+      Saved    : Rose.Capabilities.Capability := Null_Cap;
+      Target   : Rose.Capabilities.Capability := Null_Cap)
+      return Started;
+   --  Launch replaceable_test as a command, with Name, with Previous and
+   --  Saved if they are caps, and with Target, which makes it a helper
+   --  that waits on Target, and return its interfaces, or null caps if
+   --  the launch or its call failed.
+
+   function Is_Started (Server : Started) return Boolean
+   is (Server.Served /= Rose.Capabilities.Null_Capability
+       and then Server.Control /= Rose.Capabilities.Null_Capability
+       and then Server.Saver /= Rose.Capabilities.Null_Capability
+       and then Server.Held /= Rose.Capabilities.Null_Capability);
+
+   function Name_Of (Server : Started) return String;
+   --  What Server's Named interface says.
+
+   function Wait_For_Caller (Server : Started) return Boolean;
+   --  Ask Server how many calls of Wait it has deferred until it has one,
+   --  which gives a helper started for it time to call. False if it never
+   --  has one. A helper whose call has just failed takes a while to call
+   --  again, since it unwinds an exception, and it runs only when a timer
+   --  interrupt takes the processor from this test and its server, which
+   --  call each other in turn, so the limit is high.
 
    function State_Of
      (Control : Rose.Capabilities.Capability)
@@ -87,6 +122,20 @@ package body Tests.Replacement is
       return State (Start .. State'Last);
    end After_Identifiers;
 
+   -------------
+   -- Name_Of --
+   -------------
+
+   function Name_Of (Server : Started) return String is
+      Named : Rose.Interfaces.Named.Client.Named_Client :=
+        Rose.Interfaces.Named.Client.From_Cap (Server.Served);
+   begin
+      return Named.Name;
+   exception
+      when others =>
+         return "(no name)";
+   end Name_Of;
+
    ----------------------
    -- Replacement_Test --
    ----------------------
@@ -108,10 +157,6 @@ package body Tests.Replacement is
          end if;
       end Check;
 
-      Served_1, Control_1, Saver_1 : Rose.Capabilities.Capability;
-      Served_2, Control_2, Saver_2 : Rose.Capabilities.Capability;
-      Null_Cap : constant Rose.Capabilities.Capability :=
-        Rose.Capabilities.Null_Capability;
    begin
       Ada.Text_IO.Put ("Replacement test");
 
@@ -120,94 +165,125 @@ package body Tests.Replacement is
          return True;
       end if;
 
-      Start ("fred", Null_Cap, Null_Cap, Served_1, Control_1, Saver_1);
-      if Served_1 = Rose.Capabilities.Null_Capability
-        or else Control_1 = Rose.Capabilities.Null_Capability
-        or else Saver_1 = Rose.Capabilities.Null_Capability
-      then
-         Ada.Text_IO.Put (": cannot start replaceable_test");
-         return False;
-      end if;
-
       declare
-         Named_1 : Rose.Interfaces.Named.Client.Named_Client :=
-           Rose.Interfaces.Named.Client.From_Cap (Served_1);
+         Old_Version : constant Started := Start ("fred");
       begin
+         if not Is_Started (Old_Version) then
+            Ada.Text_IO.Put (": cannot start replaceable_test");
+            return False;
+         end if;
+
          declare
-            Name : constant String := Named_1.Name;
+            Name : constant String := Name_Of (Old_Version);
          begin
             Check ("name " & Name, Name = "fred 0");
          end;
 
-         --  Reading the state twice gives the same state, and doesn't
-         --  change what the server serves.
+         --  A helper waits on the old version, which defers its call, so
+         --  that the old version owes a reply when it is replaced (#879).
 
          declare
-            First  : constant Ada.Streams.Stream_Element_Array :=
-              State_Of (Control_1);
-            Second : constant Ada.Streams.Stream_Element_Array :=
-              State_Of (Control_1);
+            Helper : constant Started :=
+              Start ("helper", Target => Old_Version.Held);
          begin
-            Check ("no state", First'Length > 8);
-            Check ("state changed",
-                   After_Identifiers (First) = After_Identifiers (Second));
-         end;
+            Check ("the helper did not start", Is_Started (Helper));
+            Check ("the helper's call was not deferred",
+                   Wait_For_Caller (Old_Version));
 
-         declare
-            Name : constant String := Named_1.Name;
-         begin
-            Check ("then " & Name, Name = "fred 1");
-         end;
+            --  Reading the state twice gives the same state, and doesn't
+            --  change what the server serves.
 
-         --  The caps are the one it holds, the cap set server's
-         --  Constructor, which works.
-
-         declare
-            Old : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
-              Rose.Interfaces.Replaceable.Client.From_Cap (Control_1);
-            Set : Rose.Interfaces.Releasable_Cap_Set
-              .Releasable_Cap_Set_Object'Class := Old.Caps;
-         begin
-            Check ("the caps are not one cap", Set.Length = 1);
-            if Set.Length = 1 then
-               declare
-                  Service : Rose.Interfaces.Constructor.Client
-                    .Constructor_Client :=
-                      Rose.Interfaces.Constructor.Client.From_Cap
-                        (Set.Get_Cap (1));
-                  Made    : Rose.Interfaces.Releasable_Cap_Set.Client
-                    .Releasable_Cap_Set_Client :=
-                      Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap
-                        (Service.Create);
-               begin
-                  Check ("the cap-set-service cap does not work",
-                         Made.Length = 0);
-                  Made.Release;
-               end;
-            end if;
-            Set.Release;
-         end;
-
-         --  A second one takes over from the first, and starts from its
-         --  name and count, not from the name that it is given.
-
-         Start ("anne", Control_1, Null_Cap, Served_2, Control_2, Saver_2);
-         Check ("the new version did not start",
-                Served_2 /= Rose.Capabilities.Null_Capability
-                and then Control_2 /= Rose.Capabilities.Null_Capability);
-
-         if Served_2 /= Rose.Capabilities.Null_Capability then
             declare
-               Named_2 : Rose.Interfaces.Named.Client.Named_Client :=
-                 Rose.Interfaces.Named.Client.From_Cap (Served_2);
-               Name    : constant String := Named_2.Name;
+               First  : constant Ada.Streams.Stream_Element_Array :=
+                 State_Of (Old_Version.Control);
+               Second : constant Ada.Streams.Stream_Element_Array :=
+                 State_Of (Old_Version.Control);
             begin
-               Check ("new " & Name, Name = "fred 2");
+               Check ("no state", First'Length > 8);
+               Check ("state changed",
+                      After_Identifiers (First) = After_Identifiers (Second));
             end;
-         end if;
+
+            declare
+               Name : constant String := Name_Of (Old_Version);
+            begin
+               Check ("then " & Name, Name = "fred 1");
+            end;
+
+            --  The caps are the one it holds, the cap set server's
+            --  Constructor, which works, and not the reply cap of the
+            --  deferred call. Releasing them leaves the call deferred.
+
+            declare
+               Old : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
+                 Rose.Interfaces.Replaceable.Client.From_Cap
+                   (Old_Version.Control);
+               Set : Rose.Interfaces.Releasable_Cap_Set
+                 .Releasable_Cap_Set_Object'Class := Old.Caps;
+            begin
+               Check ("the caps are not one cap", Set.Length = 1);
+               if Set.Length = 1 then
+                  declare
+                     Service : Rose.Interfaces.Constructor.Client
+                       .Constructor_Client :=
+                         Rose.Interfaces.Constructor.Client.From_Cap
+                           (Set.Get_Cap (1));
+                     Made    : Rose.Interfaces.Releasable_Cap_Set.Client
+                       .Releasable_Cap_Set_Client :=
+                         Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap
+                           (Service.Create);
+                  begin
+                     Check ("the cap-set-service cap does not work",
+                            Made.Length = 0);
+                     Made.Release;
+                  end;
+               end if;
+               Set.Release;
+            end;
+
+            Check ("releasing the caps ended the deferred call",
+                   Wait_For_Caller (Old_Version));
+
+            --  A second one takes over from the first, and starts from
+            --  its name and count, not from the name that it is given. It
+            --  answers the call that the first one deferred.
+
+            declare
+               New_Version : constant Started :=
+                 Start ("anne", Previous => Old_Version.Control);
+            begin
+               Check ("the new version did not start",
+                      Is_Started (New_Version));
+
+               if Is_Started (New_Version) then
+                  declare
+                     Name : constant String := Name_Of (New_Version);
+                  begin
+                     Check ("new " & Name, Name = "fred 2");
+                  end;
+
+                  declare
+                     Held : Rose.Interfaces.Held_Call.Client
+                       .Held_Call_Client :=
+                         Rose.Interfaces.Held_Call.Client.From_Cap
+                           (New_Version.Held);
+                  begin
+                     Check ("the new version has not the deferred call",
+                            Held.Waiting = 1);
+                     Held.Answer (7);
+                  end;
+
+                  declare
+                     Name : constant String := Name_Of (Helper);
+                  begin
+                     Check ("the helper " & Name, Name = "waited 7");
+                  end;
+               end if;
+            end;
+         end;
 
          declare
-            Name : constant String := Named_1.Name;
+            Name : constant String := Name_Of (Old_Version);
          begin
             Check ("old " & Name, Name = "fred 2");
          end;
@@ -220,34 +296,29 @@ package body Tests.Replacement is
 
          declare
             Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Saver_1);
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
             Saved    : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
-            Served_3, Control_3, Saver_3 : Rose.Capabilities.Capability;
+            Restored : constant Started :=
+              Start ("anne", Saved => Saved.Reader_Cap);
          begin
-            Start ("anne", Null_Cap, Saved.Reader_Cap,
-                   Served_3, Control_3, Saver_3);
             Saved.Release;
-            Check ("the restored one did not start",
-                   Served_3 /= Null_Cap and then Control_3 /= Null_Cap);
+            Check ("the restored one did not start", Is_Started (Restored));
 
-            if Served_3 /= Null_Cap then
+            if Is_Started (Restored) then
                declare
-                  Named_3 : Rose.Interfaces.Named.Client.Named_Client :=
-                    Rose.Interfaces.Named.Client.From_Cap (Served_3);
-                  Name    : constant String := Named_3.Name;
+                  Name : constant String := Name_Of (Restored);
                begin
                   Check ("restored " & Name, Name = "fred 3");
                end;
-            end if;
 
-            if Control_3 /= Null_Cap then
                declare
-                  Restored : Rose.Interfaces.Replaceable.Client
+                  Copy : Rose.Interfaces.Replaceable.Client
                     .Replaceable_Client :=
-                      Rose.Interfaces.Replaceable.Client.From_Cap (Control_3);
-                  Set      : Rose.Interfaces.Releasable_Cap_Set
-                    .Releasable_Cap_Set_Object'Class := Restored.Caps;
+                      Rose.Interfaces.Replaceable.Client.From_Cap
+                        (Restored.Control);
+                  Set  : Rose.Interfaces.Releasable_Cap_Set
+                    .Releasable_Cap_Set_Object'Class := Copy.Caps;
                begin
                   Check ("the restored one has no Cap_Set_Service",
                          Set.Length = 1);
@@ -257,7 +328,7 @@ package body Tests.Replacement is
          end;
 
          declare
-            Name : constant String := Named_1.Name;
+            Name : constant String := Name_Of (Old_Version);
          begin
             Check ("first after restore " & Name, Name = "fred 3");
          end;
@@ -268,49 +339,166 @@ package body Tests.Replacement is
 
          declare
             Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Saver_1);
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
             Saved    : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
-            Served_4, Control_4, Saver_4 : Rose.Capabilities.Capability;
          begin
-            Start ("both", Control_1, Saved.Reader_Cap,
-                   Served_4, Control_4, Saver_4);
             Check ("both a version and a state started",
-                   Served_4 = Null_Cap);
+                   not Is_Started
+                     (Start ("both",
+                             Previous => Old_Version.Control,
+                             Saved    => Saved.Reader_Cap)));
             Saved.Release;
          end;
 
          declare
             Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Saver_1);
+              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
             Saved    : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
             Skipped  : Ada.Streams.Stream_Element_Array (1 .. 4);
             Last     : Ada.Streams.Stream_Element_Offset;
-            Served_5, Control_5, Saver_5 : Rose.Capabilities.Capability;
          begin
             Saved.Read (Skipped, Last);
-            Start ("bad", Null_Cap, Saved.Reader_Cap,
-                   Served_5, Control_5, Saver_5);
-            Check ("a bad state started", Served_5 = Null_Cap);
+            Check ("a bad state started",
+                   not Is_Started (Start ("bad", Saved => Saved.Reader_Cap)));
             Saved.Release;
+         end;
+
+         --  Releasing a set that holds a reply cap fails the call, rather
+         --  than leaving its caller blocked for good, and frees the slot
+         --  where the server has the caller's buffer. The helper's calls
+         --  send a buffer, and there are more rounds than a server has
+         --  slots (8), so a slot that isn't freed stops the kernel. The
+         --  reply caps are given out once.
+
+         declare
+            Rounds : constant := 10;
+            Helper : constant Started :=
+              Start ("repeat", Target => Old_Version.Held);
+            Old    : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
+              Rose.Interfaces.Replaceable.Client.From_Cap
+                (Old_Version.Control);
+         begin
+            Check ("the second helper did not start", Is_Started (Helper));
+
+            for Round in 1 .. Rounds loop
+               if not Wait_For_Caller (Old_Version) then
+                  Check ("round" & Natural'Image (Round) & " not deferred",
+                         False);
+                  exit;
+               end if;
+
+               declare
+                  Replies : Rose.Interfaces.Releasable_Cap_Set
+                    .Releasable_Cap_Set_Object'Class := Old.Replies;
+               begin
+                  if Round = 1 then
+                     Check ("the replies are not one cap",
+                            Replies.Length = 1);
+
+                     declare
+                        Twice : Boolean;
+                     begin
+                        begin
+                           declare
+                              Second : Rose.Interfaces.Releasable_Cap_Set
+                                .Releasable_Cap_Set_Object'Class :=
+                                  Old.Replies;
+                           begin
+                              Second.Release;
+                           end;
+                           Twice := True;
+                        exception
+                           when others =>
+                              Twice := False;
+                        end;
+                        Check ("the replies were given out twice",
+                               not Twice);
+                     end;
+                  end if;
+
+                  Replies.Release;
+               end;
+            end loop;
+
+            if Wait_For_Caller (Old_Version) then
+               declare
+                  Held : Rose.Interfaces.Held_Call.Client.Held_Call_Client :=
+                    Rose.Interfaces.Held_Call.Client.From_Cap
+                      (Old_Version.Held);
+               begin
+                  Held.Answer (5);
+               end;
+            end if;
+
+            declare
+               Name : constant String := Name_Of (Helper);
+            begin
+               Check ("helper 2: " & Name,
+                      Name = "waited 5 after 10 errors");
+            end;
          end;
       end;
 
+      --  A version that refuses to take over leaves the old one to answer
+      --  the call that it deferred.
+
+      declare
+         Refused : constant Started := Start ("refuse");
+      begin
+         Check ("the refused version's old version did not start",
+                Is_Started (Refused));
+
+         if Is_Started (Refused) then
+            declare
+               Helper : constant Started :=
+                 Start ("helper", Target => Refused.Held);
+            begin
+               Check ("the third helper did not start", Is_Started (Helper));
+               Check ("the third helper's call was not deferred",
+                      Wait_For_Caller (Refused));
+
+               Check ("a version took over from refuse",
+                      not Is_Started
+                        (Start ("barry", Previous => Refused.Control)));
+
+               declare
+                  Held : Rose.Interfaces.Held_Call.Client.Held_Call_Client :=
+                    Rose.Interfaces.Held_Call.Client.From_Cap (Refused.Held);
+               begin
+                  Check ("the old version lost the deferred call",
+                         Held.Waiting = 1);
+                  Held.Answer (9);
+               end;
+
+               declare
+                  Name : constant String := Name_Of (Helper);
+               begin
+                  Check ("the third helper " & Name, Name = "waited 9");
+               end;
+            end;
+         end if;
+      end;
+
       return Passed;
+
+   exception
+      when others =>
+         Ada.Text_IO.Put (": raised");
+         return False;
    end Replacement_Test;
 
    -----------
    -- Start --
    -----------
 
-   procedure Start
+   function Start
      (Name     : String;
-      Previous : Rose.Capabilities.Capability;
-      Saved    : Rose.Capabilities.Capability;
-      Served   : out Rose.Capabilities.Capability;
-      Control  : out Rose.Capabilities.Capability;
-      Saver    : out Rose.Capabilities.Capability)
+      Previous : Rose.Capabilities.Capability := Null_Cap;
+      Saved    : Rose.Capabilities.Capability := Null_Cap;
+      Target   : Rose.Capabilities.Capability := Null_Cap)
+      return Started
    is
       use System.Storage_Elements;
       use type Rose.Words.Word_32;
@@ -323,20 +511,17 @@ package body Tests.Replacement is
         Storage_Offset ((Name'Length + 3) / 4 * 4);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
-      Served := Rose.Capabilities.Null_Capability;
-      Control := Rose.Capabilities.Null_Capability;
-      Saver := Rose.Capabilities.Null_Capability;
-
       if Endpoint = Rose.Capabilities.Null_Capability then
-         return;
+         return (others => <>);
       end if;
 
       --  The launch call: the create endpoint cap, the cap set server's
-      --  Constructor, the version to take over from and the saved state,
-      --  each if there is one, and the name as one buffer item, its
-      --  length little-endian and then its text, padded to four bytes. A
-      --  saved state without a version sends a null cap in the version's
-      --  place, as petal does.
+      --  Constructor, the target, which is null unless it is a helper,
+      --  the version to take over from and the saved state, each if there
+      --  is one, and the name as one buffer item, its length
+      --  little-endian and then its text, padded to four bytes. A saved
+      --  state without a version sends a null cap in the version's place,
+      --  as petal does.
 
       Name_Buffer (1 .. 4 + Padded) := (others => 0);
       Name_Buffer (1) := Storage_Element (Name'Length);
@@ -348,18 +533,17 @@ package body Tests.Replacement is
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Tests.Registry.Cap_Sets);
-      if Previous /= Rose.Capabilities.Null_Capability
-        or else Saved /= Rose.Capabilities.Null_Capability
-      then
+      Rose.System_Calls.Send_Cap (Params, Target);
+      if Previous /= Null_Cap or else Saved /= Null_Cap then
          Rose.System_Calls.Send_Cap (Params, Previous);
       end if;
-      if Saved /= Rose.Capabilities.Null_Capability then
+      if Saved /= Null_Cap then
          Rose.System_Calls.Send_Cap (Params, Saved);
       end if;
       Rose.System_Calls.Send_Buffer
         (Params, 4 + Padded, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 3);
+      Rose.System_Calls.Receive_Caps (Params, 4);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -367,12 +551,13 @@ package body Tests.Replacement is
         or else Params.Data (0) /= 0
         or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
       then
-         return;
+         return (others => <>);
       end if;
 
-      Served := Params.Caps (0);
-      Control := Params.Caps (1);
-      Saver := Params.Caps (2);
+      return (Served  => Params.Caps (0),
+              Control => Params.Caps (1),
+              Saver   => Params.Caps (2),
+              Held    => Params.Caps (3));
    end Start;
 
    --------------
@@ -400,5 +585,21 @@ package body Tests.Replacement is
       Reader.Release;
       return Data (1 .. Length);
    end State_Of;
+
+   ---------------------
+   -- Wait_For_Caller --
+   ---------------------
+
+   function Wait_For_Caller (Server : Started) return Boolean is
+      Held : Rose.Interfaces.Held_Call.Client.Held_Call_Client :=
+        Rose.Interfaces.Held_Call.Client.From_Cap (Server.Held);
+   begin
+      for Attempt in 1 .. 100_000 loop
+         if Held.Waiting > 0 then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Wait_For_Caller;
 
 end Tests.Replacement;
