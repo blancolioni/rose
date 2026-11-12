@@ -110,6 +110,11 @@ jobs:
       - name: Build
         run: ./clean-build.sh
 
+      # The book's bit layouts against the records as GNAT lays them out
+      # (#692). It compiles with the user RTS, so it runs after the build.
+      - name: Check the book's layouts
+        run: make -C doc/rose-book check-layouts
+
       - name: Boot test
         run: make test
 
