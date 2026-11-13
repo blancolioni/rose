@@ -742,8 +742,10 @@ package body Tests.Replacement is
             end;
 
             --  The caps are the one it holds, the cap set server's
-            --  Constructor, which works, and not the reply cap of the
-            --  deferred call. Releasing them leaves the call deferred.
+            --  Constructor, which works, and then its command's other cap
+            --  argument, Create_Endpoint, which a new version can take
+            --  (#901), and not the reply cap of the deferred call.
+            --  Releasing them leaves the call deferred.
 
             declare
                Old : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
@@ -752,8 +754,8 @@ package body Tests.Replacement is
                Set : Rose.Interfaces.Releasable_Cap_Set
                  .Releasable_Cap_Set_Object'Class := Old.Caps;
             begin
-               Check ("the caps are not one cap", Set.Length = 1);
-               if Set.Length = 1 then
+               Check ("the caps are not two caps", Set.Length = 2);
+               if Set.Length = 2 then
                   declare
                      Service : Rose.Interfaces.Constructor.Client
                        .Constructor_Client :=
@@ -851,8 +853,8 @@ package body Tests.Replacement is
                   Set  : Rose.Interfaces.Releasable_Cap_Set
                     .Releasable_Cap_Set_Object'Class := Copy.Caps;
                begin
-                  Check ("the restored one has no Cap_Set_Service",
-                         Set.Length = 1);
+                  Check ("the restored one doesn't have its two caps",
+                         Set.Length = 2);
                   Set.Release;
                end;
             end if;
