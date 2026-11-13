@@ -5,23 +5,26 @@ Website: [rose-os.org](https://rose-os.org)
 
 ## Requirements
 
-Rose requires gcc 15 or later, and is known to build on Fedora 43.  The
+Rose builds only with gcc 15, and is known to build on Fedora 43.  The
 run-time system is built from the GNAT sources, which `rts/kernel/copy-runtime.sh`
-and `rts/user/create-sources.sh` copy from the installed compiler.
+and `rts/user/create-sources.sh` copy from the installed compiler, and Rose's
+own versions of some of those units are based on gcc 15's.  Other versions of
+gcc ship different run-time units, so the build fails with them.  On a newer
+Fedora, build in a `fedora:43` container.
 `make check-env` checks that everything the build needs is installed, and
 `clean-build.sh` runs it first.
 
-The build scripts assume Fedora's file layout.  Install
-[Alire](https://alire.ada.dev) for the Ada toolchain (GNAT and gprbuild), and
-these packages:
+The build scripts assume Fedora's file layout.  Install these packages,
+which include Fedora's GNAT and gprbuild, and QEMU to boot the result:
 
 ```
-sudo dnf install make binutils python3 python3-pyyaml xorriso grub2-tools \
-    grub2-tools-extra grub2-pc-modules mtools qemu-img
+sudo dnf install git-core make gcc gcc-gnat gprbuild binutils findutils gawk \
+    sed python3 python3-pyyaml xorriso grub2-tools grub2-tools-extra \
+    grub2-pc-modules mtools qemu-img qemu-system-x86-core curl unzip
 ```
 
-To boot the result you'll want `qemu-system-x86`.  To test under Bochs as
-well, install bochs and run `sh bochs/run-bochs.sh`.
+Install [Alire](https://alire.ada.dev) as well, to build idle (see below).
+To test under Bochs too, install bochs and run `sh bochs/run-bochs.sh`.
 
 `clean-build.sh --book` also builds the book, which needs:
 
