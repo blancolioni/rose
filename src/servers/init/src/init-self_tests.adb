@@ -668,12 +668,17 @@ package body Init.Self_Tests is
 
                --  The file command's launch call, as src/drivers/file/
                --  rose-core-file.idl declares it: Create_Endpoint,
-               --  Delete_Cap and Cap_Set_Service, then Previous.
+               --  Delete_Cap and Cap_Set_Service, then Previous. The new
+               --  version takes the first three from the old one (#901),
+               --  so they are null, as the updater sends them (#830).
 
                Rose.System_Calls.Initialize_Send (Params, Endpoint);
-               Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
-               Rose.System_Calls.Send_Cap (Params, Delete_Cap);
-               Rose.System_Calls.Send_Cap (Params, Cap_Sets);
+               Rose.System_Calls.Send_Cap
+                 (Params, Rose.Capabilities.Null_Capability);
+               Rose.System_Calls.Send_Cap
+                 (Params, Rose.Capabilities.Null_Capability);
+               Rose.System_Calls.Send_Cap
+                 (Params, Rose.Capabilities.Null_Capability);
                Rose.System_Calls.Send_Cap (Params, Control);
                Rose.System_Calls.Receive_Words (Params, 1);
                Rose.System_Calls.Receive_Caps (Params, 2);

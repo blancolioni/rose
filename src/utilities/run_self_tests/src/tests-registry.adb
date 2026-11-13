@@ -244,12 +244,23 @@ package body Tests.Registry is
       Previous : Rose.Capabilities.Capability :=
         Rose.Capabilities.Null_Capability)
    is
+      use type Rose.Capabilities.Capability;
+      Fresh : constant Boolean :=
+        Previous = Rose.Capabilities.Null_Capability;
+
+      function Given
+        (Cap : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability
+      is (if Fresh then Cap else Rose.Capabilities.Null_Capability);
+      --  A new version takes its caps from the old one (#901), so a
+      --  handover passes Previous alone.
+
    begin
       Rose.Core.File_Client.Call
         (Endpoint        => Endpoint,
-         Create_Endpoint => Create_Endpoint,
-         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
-         Cap_Set_Service => Cap_Sets_Cap,
+         Create_Endpoint => Given (Create_Endpoint),
+         Delete_Cap      => Given (Rose.System_Calls.Delete_Cap_Capability),
+         Cap_Set_Service => Given (Cap_Sets_Cap),
          Served          => Served,
          Control         => Control,
          Previous        => Previous);

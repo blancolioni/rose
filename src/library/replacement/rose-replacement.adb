@@ -895,6 +895,12 @@ package body Rose.Replacement is
       if Previous /= Rose.Capabilities.Null_Capability
         and then Saved /= Rose.Capabilities.Null_Capability
       then
+
+         --  Arguments may have begun the handover, and holds the old
+         --  version's state and caps open until it is finished. This
+         --  version fails its launch, so it lets them go.
+
+         Abandon_Take_Over;
          raise Bad_Start with
            "Rose.Replacement: both a version to take over and a saved state";
       end if;
