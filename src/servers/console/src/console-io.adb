@@ -24,6 +24,9 @@ package body Console.IO is
    Serial : Boolean := False;
    --  Set by Use_Serial_Port
 
+   Mirror : Boolean := False;
+   --  Set by Mirror_Serial_Port
+
    Copy_Size : constant := 16 * 1024;
    --  More than a 128 by 48 screen shows
 
@@ -68,6 +71,15 @@ package body Console.IO is
       Update_Cursor;
    end Clear;
 
+   ------------------------
+   -- Mirror_Serial_Port --
+   ------------------------
+
+   procedure Mirror_Serial_Port is
+   begin
+      Mirror := True;
+   end Mirror_Serial_Port;
+
    --------------
    -- New_Line --
    --------------
@@ -77,6 +89,10 @@ package body Console.IO is
       if Serial then
          Put_Serial ((1 => Character'Val (10)));
          return;
+      end if;
+
+      if Mirror then
+         Console.Calls.Write_Mirror ((1 => Character'Val (10)));
       end if;
 
       Current_Line := Current_Line + 1;
@@ -103,6 +119,10 @@ package body Console.IO is
       if Serial then
          Put_Serial ((1 => Ch));
          return;
+      end if;
+
+      if Mirror then
+         Console.Calls.Write_Mirror ((1 => Ch));
       end if;
 
       Console_Memory (Offset) := Current_Colour + Character'Pos (Ch);
@@ -149,6 +169,10 @@ package body Console.IO is
       if Serial then
          Put_Serial (Text);
          return;
+      end if;
+
+      if Mirror then
+         Console.Calls.Write_Mirror (Text);
       end if;
 
       for I in Text'Range loop

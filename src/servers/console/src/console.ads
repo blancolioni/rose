@@ -11,5 +11,10 @@ package Console is
    Serial_Data_Cap     : constant Rose.Capabilities.Capability := 4;
    Serial_Status_Cap   : constant Rose.Capabilities.Capability := 5;
    Framebuffer_Tag_Cap : constant Rose.Capabilities.Capability := 6;
+   Command_Line_Cap    : constant Rose.Capabilities.Capability := 7;
+   Mirror_Data_Cap     : constant Rose.Capabilities.Capability := 8;
+   Mirror_Status_Cap   : constant Rose.Capabilities.Capability := 9;
+   --  The kernel's command line, which may ask for a copy of the console
+   --  on COM2 (serial-console, #904), and COM2's data and line status.
 
 end Console;

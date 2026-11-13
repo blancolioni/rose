@@ -2,3 +2,6 @@ create-endpoint
 device-page        184      # the VGA text page, 16#B8000#
 port-out-8         980 981  # CRT controller index and data
 port-in-8          981      # CRT controller data
+port-out-8         760      # COM2's data, for serial-console (#904)
+port-in-8          765      # COM2's line status
+boot-tag           1        # the kernel's command line

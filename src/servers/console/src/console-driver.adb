@@ -11,6 +11,9 @@ begin
       Console.IO.Use_Serial_Port;
    else
       Console.Calls.Invoke_Memory_Cap;
+      if Console.Calls.Has_Serial_Console then
+         Console.IO.Mirror_Serial_Port;
+      end if;
    end if;
 
    Console.IO.Clear;

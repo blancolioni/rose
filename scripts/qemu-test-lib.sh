@@ -5,8 +5,15 @@
 #   . "$HERE/qemu-test-lib.sh"
 #
 # It sets WORK, a new directory for the test's files, DISK, the test's
-# disk image, MONITOR, QEMU's monitor, and the first user's name and
-# password.  The tests need qemu-system-i386, qemu-img and python3.
+# disk image, MONITOR, QEMU's monitor, CONSOLE, the copy of the console
+# that the menu's serial-console entries write to COM2 (#904), and the
+# first user's name and password.  The tests need qemu-system-i386,
+# qemu-img and python3.
+#
+# The tests choose the menu's last entry, which is the serial-console one,
+# and read results from CONSOLE, where nothing scrolls away, rather than
+# from the screen. The kernel's log is in $WORK/serial, from COM1. Both
+# files go on from one boot to the next.
 #
 # WORK is made in ROSE_TEST_DIR, ~/scratch by default, and not in /tmp:
 # where /tmp is a small tmpfs, the disk images of a few tests, which a
@@ -17,6 +24,7 @@ mkdir -p "$ROSE_TEST_DIR" || exit 2
 WORK=$(mktemp -d "$ROSE_TEST_DIR/rose-test.XXXXXX") || exit 2
 DISK=$WORK/disk.img
 MONITOR=$WORK/monitor
+CONSOLE=$WORK/console
 first_user=fraser
 first_password=rose
 
@@ -31,6 +39,7 @@ fail () {
 start_qemu () {
     rm -f "$MONITOR"
     qemu-system-i386 -m 32 -display none -serial file:"$WORK/serial" \
+        -serial file:"$CONSOLE" \
         -monitor unix:"$MONITOR",server,nowait -pidfile "$WORK/pid" \
         -drive file="$DISK",index=0,if=ide,format=raw "$@" \
         > "$WORK/qemu.log" 2>&1 &
@@ -127,6 +136,33 @@ wait_for_serial () {
     return 1
 }
 
+console_mark () {
+    # console_mark: the number of lines in CONSOLE so far, for
+    # console_since and wait_for_console
+    if [ -f "$CONSOLE" ]; then
+        wc -l < "$CONSOLE"
+    else
+        echo 0
+    fi
+}
+
+console_since () {
+    # console_since MARK: what CONSOLE has after its first MARK lines
+    tail -n "+$(( $1 + 1 ))" "$CONSOLE" 2> /dev/null
+}
+
+wait_for_console () {
+    # wait_for_console TEXT SECONDS [MARK]: wait until TEXT is in CONSOLE,
+    # after its first MARK lines if MARK is given
+    waited=0
+    while [ $waited -lt "$2" ]; do
+        console_since "${3:-0}" | grep -q -- "$1" && return 0
+        sleep 5
+        waited=$((waited + 5))
+    done
+    return 1
+}
+
 answered=
 answer_install () {
     # answer_install SCREEN: answer the install's questions (#456), each
@@ -174,30 +210,29 @@ install_rose () {
     sleep 15
     stop_qemu
 
-    # Init's own tests run during the install, and report on the screen.
-    if grep -q -e ": FAIL" -e "test failed" "$WORK/install-screen.txt"
+    # Init's own tests run during the install, and report on the console.
+    if grep -q -e ": FAIL" -e "test failed" "$CONSOLE"
     then
-        grep -e ": FAIL" -e "test failed" "$WORK/install-screen.txt" \
+        grep -e ": FAIL" -e "test failed" "$CONSOLE" \
             | sort -u
         echo "FAIL: one of init's tests failed"
         exit 1
     fi
-    echo "init's derive, swap and hand over tests: $(sort -u "$WORK/install-screen.txt" \
+    echo "init's derive, swap and hand over tests: $(sort -u "$CONSOLE" \
         | grep -c ': ok') of their checks seen ok"
 
-    # The screen can scroll past init's tests between two looks at it, as
-    # it does on a slow machine, so the swap test (ADR 0032, #862) is
-    # checked in the serial log, where the kernel writes the swap.
+    # The kernel writes each swap of the swap test (ADR 0032, #862) to its
+    # own log.
     grep -a "takes over from" "$WORK/serial" \
         || { echo "FAIL: init's swap test did not swap its probes"; exit 1; }
 
     # The install's run of the self tests is the one that has the cap set
     # server, which petal doesn't give (#825).
-    if grep -q "self tests failed" "$WORK/install-screen.txt"; then
+    if grep -q "self tests failed" "$CONSOLE"; then
         echo "FAIL: the install's self tests failed"
         exit 1
     fi
-    cap_sets=$(grep "Cap set test" "$WORK/install-screen.txt" | tail -1)
+    cap_sets=$(grep "Cap set test" "$CONSOLE" | tail -1)
     echo "$cap_sets"
     case "$cap_sets" in
         *skipped*|*FAIL*|"")
@@ -209,10 +244,10 @@ install_rose () {
     # The test of Replaceable needs the cap set server too (#865). A
     # failure's message can wrap, so its line is kept whole, and only a
     # line that says PASS, and wasn't skipped, passes.
-    replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+    replacement=$(grep "Replacement test" "$CONSOLE" \
         | sort -u | grep -v "PASS" | tail -1)
     [ -n "$replacement" ] \
-        || replacement=$(grep "Replacement test" "$WORK/install-screen.txt" \
+        || replacement=$(grep "Replacement test" "$CONSOLE" \
                              | tail -1)
     echo "$replacement"
     case "$replacement" in
@@ -231,10 +266,10 @@ install_rose () {
     # The test of replacing a running server needs mem's Replacer, which
     # only the install's run has (#866). It is checked as the test of
     # Replaceable is.
-    replace=$(grep "Replace process test" "$WORK/install-screen.txt" \
+    replace=$(grep "Replace process test" "$CONSOLE" \
         | sort -u | grep -v "PASS" | tail -1)
     [ -n "$replace" ] \
-        || replace=$(grep "Replace process test" "$WORK/install-screen.txt" \
+        || replace=$(grep "Replace process test" "$CONSOLE" \
                          | tail -1)
     echo "$replace"
     case "$replace" in
@@ -251,11 +286,11 @@ install_rose () {
     esac
 
     # So is the test of replacing a file server with files open (#867).
-    replace_file=$(grep "Replace file test" "$WORK/install-screen.txt" \
+    replace_file=$(grep "Replace file test" "$CONSOLE" \
         | sort -u | grep -v "PASS" | tail -1)
     [ -n "$replace_file" ] \
         || replace_file=$(grep "Replace file test" \
-                              "$WORK/install-screen.txt" | tail -1)
+                              "$CONSOLE" | tail -1)
     echo "$replace_file"
     case "$replace_file" in
         *skipped*|"")
@@ -271,41 +306,20 @@ install_rose () {
     esac
 
     # Init replaces the file that hold_file holds, which the restore then
-    # checks (#867). Its line can scroll off the screen, as the swap
-    # test's can, so when it isn't seen, the kernel's swap of a file
-    # before the self tests start stands for it. A FAIL on the screen is
-    # caught above.
-    init_replace=$(grep "init: file replace test" "$WORK/install-screen.txt" \
-        | tail -1)
-    if [ -n "$init_replace" ]; then
-        echo "$init_replace"
-        case "$init_replace" in
-            *PASS*) ;;
-            *) echo "FAIL: init did not replace hold_file's file"; exit 1 ;;
-        esac
-    else
-        awk '/run_self_tests\[/ { exit }
-             /\/file\[.\]: takes over from / { print; found = 1; exit }
-             END { exit !found }' "$WORK/serial" \
-            || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
-    fi
+    # checks (#867).
+    grep "file replace test" "$CONSOLE" | tail -1
+    grep -q "init: file replace test: PASS" "$CONSOLE" \
+        || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
 }
 
 wait_for_install () {
     # wait_for_install SECONDS: wait until the install has finished, which
-    # is when the kernel restarts, and keep what init's tests print, which
-    # is gone from the screen by then
+    # is when the kernel restarts, answering its questions on the way.
+    # What init's tests print is in CONSOLE (#904).
     waited=0
-    : > "$WORK/install-screen.txt"
     answered=
     while [ $waited -lt "$1" ]; do
         screen > "$WORK/install-now.txt"
-        grep -e "derive test" -e "swap test" -e "hand over test" \
-            -e "Cap set test.*\(PASS\|FAIL\)" \
-            -e "Replacement test" -e "Replace process test" \
-            -e "Replace file test" -e "file replace test" \
-            -e "self tests failed" "$WORK/install-now.txt" \
-            >> "$WORK/install-screen.txt"
         answer_install "$WORK/install-now.txt"
         grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null \
             && return 0

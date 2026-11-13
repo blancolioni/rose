@@ -1,2 +1,5 @@
 create-endpoint
 create-signal               # for the surface to signal its events (#653)
+port-out-8         760      # COM2's data, for serial-console (#904)
+port-in-8          765      # COM2's line status
+boot-tag           1        # the kernel's command line
