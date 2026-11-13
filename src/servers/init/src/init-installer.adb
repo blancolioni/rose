@@ -498,4 +498,34 @@ package body Init.Installer is
 
    end Reserve_Storage;
 
+   -----------------------
+   -- Update_Executable --
+   -----------------------
+
+   function Update_Executable
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Name          : String;
+      Install_Caps  : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Update_Cap);
+      Rose.System_Calls.Send_Cap (Params, Binary_Stream);
+      for Cap of Install_Caps loop
+         Rose.System_Calls.Send_Cap (Params, Cap);
+      end loop;
+      Add_Text (Params, Name);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return 0;
+      else
+         return Params.Caps (0);
+      end if;
+   end Update_Executable;
+
 end Init.Installer;

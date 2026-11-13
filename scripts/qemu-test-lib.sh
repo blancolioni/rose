@@ -310,6 +310,11 @@ install_rose () {
     grep "file replace test" "$CONSOLE" | tail -1
     grep -q "init: file replace test: PASS" "$CONSOLE" \
         || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
+
+    # A retired version's launch caps launch the newest version (#902).
+    grep "exec forward test" "$CONSOLE" | tail -1
+    grep -q "init: exec forward test: PASS" "$CONSOLE" \
+        || { echo "FAIL: init's exec forward test did not pass"; exit 1; }
 }
 
 wait_for_install () {

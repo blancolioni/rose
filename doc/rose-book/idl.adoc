@@ -439,9 +439,14 @@ The old version answers the `Replaceable` interface through `Rose.Replacement` (
 . the server's named capabilities, each with its index in the set that `Caps` returns;
 . what the server writes, starting with its own format version.
 
-The new version's main calls `Rose.Replacement.Take_Over`.
-It reads the header, marks the identifiers in use with `Rose.Server.Read_Identifiers`, so that `New_Identifier` gives out none of them, and takes the named capabilities from the set.
-It then calls the server's `Read_State`, which attaches nothing: the command does that afterwards, with the identifiers that were read.
+The set also has the command's capability arguments, by their names in the IDL, which `Rose.Replacement.Start` was given at launch (#901).
+A name that the server gives one of its own capabilities isn't added twice.
+
+The new version's main names its role members and `in` interface arguments, and calls `Rose.Replacement.Arguments` with `Previous` before it uses any of them.
+Each capability that the caller left null is then the old version's of the same name, so the caller can launch the new version with `Previous` alone, as the updater does: it has none of a server's capabilities.
+`Arguments` reads the old version's state up to the server's part: the header, the identifiers, which it marks in use with `Rose.Server.Read_Identifiers` so that `New_Identifier` gives out none of them, and the named capabilities, from the set.
+The main then calls `Rose.Replacement.Start`, which calls the server's `Read_State` with the rest.
+`Read_State` attaches nothing: the command does that afterwards, with the identifiers that were read.
 Neither `State` nor `Caps` changes the old version.
 The test server `replaceable_test`, and the self test that takes over from it, show the whole pattern.
 
@@ -690,7 +695,7 @@ No aspect is required: anything a declaration must have is part of its syntax, a
 | `Authors` | Who wrote the command, printed by `--version` as "Written by ...". Without it, the package's `Authors` is used.
 | `Version`, `Copyright` | Override the package's version or copyright for this command. Without them, the package's values are used.
 | `Server` | A procedure that the generated main calls after it replies to the launch call, to serve. It never returns. For example, `+Server => User_Server.Start_Server+`.
-| `Replaceable` | A package of a server command whose new versions can take over from it (ADR 0032, #865). The command also needs `Server` and the `Cap_Set_Service` role. It is given the version that it replaces as an argument, `Previous`, the cap after its other caps, or no cap for a fresh start. The generated main reads that version's state with the package's `Read_State` before it calls the command (see <<replaceable-servers>>).
+| `Replaceable` | A package of a server command whose new versions can take over from it (ADR 0032, #865). The command also needs `Server` and the `Cap_Set_Service` role. It is given the version that it replaces as an argument, `Previous`, the cap after its other caps, or no cap for a fresh start. A cap argument left null in a handover is the old version's. The generated main reads that version's state with the package's `Read_State` before it calls the command (see <<replaceable-servers>>).
 |===
 
 ==== Arguments
