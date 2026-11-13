@@ -16,9 +16,9 @@ interface Exec : Launch is
    --  installed version's, and neither has install caps, nothing is
    --  installed, and the result is the installed version's Launch.
    --  Otherwise the new version is installed, and the old one is
-   --  retired: launching it fails from then on, but its pages stay,
-   --  because the processes running it map them. With no program called
-   --  Name, it is the same as Install.
+   --  retired: its pages stay, because the processes running it map
+   --  them, and its launch caps launch the new version from then on
+   --  (#902). With no program called Name, it is the same as Install.
 
    function Update
      (Executable   : interface Reader;

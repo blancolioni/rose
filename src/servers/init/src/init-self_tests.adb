@@ -16,6 +16,7 @@ with Rose.Objects;
 with Init.Boot_Steps;
 with Init.Calls;
 with Init.Grants;
+with Init.Installer;
 
 package body Init.Self_Tests is
 
@@ -279,6 +280,63 @@ package body Init.Self_Tests is
 
       return Passed;
    end Derive_Test;
+
+   -----------------------
+   -- Exec_Forward_Test --
+   -----------------------
+
+   function Exec_Forward_Test
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Old_Launch    : Rose.Capabilities.Capability;
+      Install_Cap   : Rose.Capabilities.Capability)
+      return Forward_Result
+   is
+      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
+      Launcher : Rose.Interfaces.Launch.Client.Launch_Client;
+      Bank     : Rose.Interfaces.Bank.Client.Bank_Client;
+      Bank_Cap : Rose.Capabilities.Capability;
+      Endpoint : Rose.Capabilities.Capability;
+   begin
+      if Update_Cap = Rose.Capabilities.Null_Capability then
+         return No_Update_Cap;
+      elsif Binary_Stream = Rose.Capabilities.Null_Capability
+        or else Old_Launch = Rose.Capabilities.Null_Capability
+      then
+         return Nothing_From_Restore;
+      end if;
+
+      --  An install cap makes the new version count as changed, though
+      --  its image is the same (ADR 0031, section 4).
+
+      if Init.Installer.Update_Executable
+        (Update_Cap, Binary_Stream, "replaceable_test", (1 => Install_Cap))
+        = Rose.Capabilities.Null_Capability
+      then
+         return Update_Failed;
+      end if;
+
+      --  The test bank is too small for a command: replaceable_test needs
+      --  a stack, a heap and its data.
+
+      Bank_Cap := Init.Grants.Bank (Pages => 1024, Regions => 16);
+      if Bank_Cap = Rose.Capabilities.Null_Capability then
+         return No_Test_Bank;
+      end if;
+      Rose.Interfaces.Bank.Client.Open (Bank, Bank_Cap);
+
+      Rose.Interfaces.Launch.Client.Open (Launcher, Old_Launch);
+      Endpoint :=
+        Rose.Interfaces.Launch.Client.Launch_Command
+          (Launcher, Bank_Cap, No_Caps);
+
+      --  The command waits for its launch call, which never comes:
+      --  destroying its bank ends it.
+
+      Rose.Interfaces.Bank.Client.Destroy (Bank);
+      return (if Endpoint = Rose.Capabilities.Null_Capability
+              then Launch_Failed else Passed);
+   end Exec_Forward_Test;
 
    --------------------
    -- Hand_Over_Test --

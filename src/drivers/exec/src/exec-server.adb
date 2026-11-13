@@ -111,8 +111,11 @@ package body Exec.Server is
    --  The Launch interface of program Id, whose object is made the first
    --  time; or a null cap if Id is 0.
 
-   procedure Check_Not_Retired (Id : Rose.Objects.Capability_Identifier);
-   --  Fail a launch of a program that Update has replaced (#829).
+   function Newest
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Objects.Capability_Identifier;
+   --  The newest version of program Id, which a launch through Id's caps
+   --  launches (#902). Fails the call if there is no program Id.
 
    procedure Send_Image
      (Params : in out Rose.Invocation.Invocation_Record;
@@ -146,18 +149,6 @@ package body Exec.Server is
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
-
-   -----------------------
-   -- Check_Not_Retired --
-   -----------------------
-
-   procedure Check_Not_Retired (Id : Rose.Objects.Capability_Identifier) is
-   begin
-      if Exec.Library.Is_Retired (Id) then
-         raise Constraint_Error
-           with "exec: a newer version replaced this program";
-      end if;
-   end Check_Not_Retired;
 
    -------------------
    -- Create_Server --
@@ -242,12 +233,13 @@ package body Exec.Server is
       return Process_Class
    is
       use Rose.System_Calls;
+      Id     : constant Rose.Objects.Capability_Identifier :=
+        Newest (Item.Id);
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Check_Not_Retired (Item.Id);
       Initialize_Send (Params, Create_Process_Cap);
-      Send_Image (Params, Item.Id, Bank);
-      Exec.Library.Send_Install_Caps (Item.Id, Params);
+      Send_Image (Params, Id, Bank);
+      Exec.Library.Send_Install_Caps (Id, Params);
 
       for Cap of Caps loop
          Send_Cap (Params, Cap);
@@ -311,24 +303,25 @@ package body Exec.Server is
       return Rose.Capabilities.Capability
    is
       use Rose.System_Calls;
+      Id     : constant Rose.Objects.Capability_Identifier :=
+        Newest (Item.Id);
       Params : aliased Rose.Invocation.Invocation_Record;
       Name   : String (1 .. 16);
       Last   : Natural;
    begin
-      Check_Not_Retired (Item.Id);
 
       --  A command has only the caps it is given (ADR 0002): no install
       --  caps, and no console.
 
-      Rose.Trace.Event ("launch command, program ", Natural (Item.Id));
+      Rose.Trace.Event ("launch command, program ", Natural (Id));
       Initialize_Send (Params, Launch_Command_Cap);
-      Send_Image (Params, Item.Id, Bank);
+      Send_Image (Params, Id, Bank);
 
       for Cap of Caps loop
          Send_Cap (Params, Cap);
       end loop;
 
-      Exec.Library.Get_Program_Name (Item.Id, Name, Last);
+      Exec.Library.Get_Program_Name (Id, Name, Last);
       Send_Text (Params, Name (1 .. Last));
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
@@ -398,10 +391,27 @@ package body Exec.Server is
       Text : String (1 .. 4096);
       Last : Natural;
    begin
-      Check_Not_Retired (Item.Id);
-      Exec.Library.Get_Metadata (Item.Id, Text, Last);
+      Exec.Library.Get_Metadata (Newest (Item.Id), Text, Last);
       return Text (1 .. Last);
    end Metadata;
+
+   ------------
+   -- Newest --
+   ------------
+
+   function Newest
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Result : constant Rose.Objects.Capability_Identifier :=
+        Exec.Library.Newest (Id);
+   begin
+      if Result = 0 then
+         raise Constraint_Error with "exec: no such program";
+      end if;
+      return Result;
+   end Newest;
 
    -------------------
    -- Not_A_Program --
