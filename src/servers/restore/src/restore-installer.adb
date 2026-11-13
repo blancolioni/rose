@@ -158,6 +158,15 @@ package body Restore.Installer is
    --  there is none, as for the clock.
 
    procedure Send_Cap_Sets (Constructor_Cap : Rose.Capabilities.Capability);
+
+   procedure Send_Forward_Test
+     (Directory  : Rose.Interfaces.Directory.Client.Directory_Client;
+      Exec_Index : Positive);
+   --  Send init replaceable_test's image again, from Directory, for its
+   --  test of exec's Update (#902). Init updates the program with it, and
+   --  then launches it through the first version's Launch interface,
+   --  which a retired version's launch caps do: they launch the newest
+   --  version.
    --  Give init the Constructor of the userland cap set server (#825).
    --  Nothing is sent if there is none, as for the clock.
 
@@ -626,6 +635,10 @@ package body Restore.Installer is
                         Rose.System_Calls.Send_Text (Reply, Name);
                         Rose.System_Calls.Send_Cap (Reply, Params.Caps (1));
                         Rose.System_Calls.Invoke_Capability (Reply);
+
+                        if Name = "replaceable_test" then
+                           Send_Forward_Test (Directory, Exec_Index);
+                        end if;
                   end case;
                end;
             end if;
@@ -733,6 +746,37 @@ package body Restore.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Console;
 
+   -----------------------
+   -- Send_Forward_Test --
+   -----------------------
+
+   procedure Send_Forward_Test
+     (Directory  : Rose.Interfaces.Directory.Client.Directory_Client;
+      Exec_Index : Positive)
+   is
+      use Rose.Interfaces.Directory.Client;
+      use Rose.Interfaces.Releasable_Reader.Client;
+      Binary_Reader : constant Releasable_Reader_Client :=
+        Rose.Interfaces.File.Client.Open_Reader
+          (Get_Ordinary_File (Directory, Exec_Index));
+      Params        : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+      Rose.System_Calls.Send_Cap
+        (Params,
+         Rose.Interfaces.Reader.Client.Get_Interface_Cap
+           (Conversions.To_Reader (Binary_Reader)));
+      Rose.System_Calls.Send_Word
+        (Params, Natural (Directory_Entry_Size (Directory, Exec_Index)));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(94));
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      --  Init has updated the program from the reader, and run its
+      --  test, by the time it replies.
+
+      Release (Binary_Reader);
+   end Send_Forward_Test;
+
    -----------------
    -- Send_Screen --
    -----------------
@@ -817,7 +861,7 @@ package body Restore.Installer is
       Exec_Index : Natural;
       Reader     : Releasable_Reader_Client;
    begin
-      if Action /= Save or else Name = "file" or else Name = "directory" then
+      if Action /= Save then
          return;
       end if;
 

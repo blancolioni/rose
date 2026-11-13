@@ -65,9 +65,9 @@ package Restore.Installer is
    --  the restored exec, with Exec.Update, and replace their entries in
    --  the restored command registry. The restored processes must be
    --  running. Launched programs are persistent, and are left as they
-   --  are. So are file and directory, whose launch caps every directory
-   --  process holds: retiring their old versions would stop those
-   --  directories creating anything, and their new code comes with
-   --  replacing them (ADR 0032).
+   --  are. File and directory are installed again too: every directory
+   --  process holds their launch caps, which launch the newest version
+   --  once the old one is retired (#902). Running files and directories
+   --  get their new code when they are replaced (ADR 0032).
 
 end Restore.Installer;

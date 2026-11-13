@@ -31,6 +31,9 @@ package body Exec.Library is
          Retired         : Boolean := False;
          --  A newer version replaced it (Update). Its pages are kept,
          --  because the processes still running it map them.
+         Successor       : Rose.Objects.Capability_Identifier := 0;
+         --  The version that replaced it, if it is retired. Its launch
+         --  caps launch the newest version (Newest, #902).
       end record;
 
    package Program_Vectors is
@@ -290,14 +293,27 @@ package body Exec.Library is
         (Installed_Programs.Last_Index);
    end Install;
 
-   ----------------
-   -- Is_Retired --
-   ----------------
+   ------------
+   -- Newest --
+   ------------
 
-   function Is_Retired
+   function Newest
      (Id : Rose.Objects.Capability_Identifier)
-      return Boolean
-   is (not Is_Installed (Id) or else Program (Id).Retired);
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Current : Rose.Objects.Capability_Identifier := Id;
+   begin
+      if not Is_Installed (Current) then
+         return 0;
+      end if;
+
+      while Program (Current).Successor /= 0 loop
+         Current := Program (Current).Successor;
+      end loop;
+
+      return Current;
+   end Newest;
 
    ------------
    -- Padded --
@@ -460,6 +476,9 @@ package body Exec.Library is
 
       if Old /= 0 then
          Installed_Programs (Old).Retired := True;
+         Installed_Programs (Old).Successor :=
+           Rose.Objects.Capability_Identifier
+             (Installed_Programs.Last_Index);
       end if;
 
       return Rose.Objects.Capability_Identifier

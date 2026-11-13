@@ -249,7 +249,15 @@ If any step before the menu fails, `restore-install` says why and exits, and hd0
 Each refusal leaves hd0 exactly as it was.
 The entry boots in text mode, so that a refusal is on the screen.
 
-Reinstalling the commands (#829) and replacing persistent servers (#830) will be further steps of the update, before `init` is told.
+Once the restored processes run, and before `init` takes its checkpoint, `restore-install` installs the commands again (#829):
+
+* It reaches the restored `exec` and command registry through restored-endpoint, by the interfaces they answer, `Exec` and `Map`. Nothing else on the update boot holds a capability to them.
+* For each program on the install media that the install saves as a command, it calls `Exec.Update` with the new image, and replaces the registry's entry with `Map.Add`. The next run of a command has the new code. A command that is running finishes with its old code.
+* `Exec.Update` keeps the installed version if the image is the same and neither version has install capabilities. Otherwise it installs the new version and retires the old one. A retired version's pages stay, because the processes running it map them.
+* A retired version's launch capabilities launch the newest version (#902). Some persistent processes keep a launch capability rather than finding the command each time: every directory holds `file`'s and `directory`'s. So `file` and `directory` are installed again too, and new files and subdirectories start with the new code.
+* Programs that the install launches, such as the drivers and the persistent servers, are left as they are.
+
+Replacing the persistent servers that can take over from themselves (ADR 0032), which gives running files and directories their new code, will be the update's last step (#830).
 
 [#restore-boot]
 == Restore Boot

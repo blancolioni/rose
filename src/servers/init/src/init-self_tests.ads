@@ -65,6 +65,24 @@ package Init.Self_Tests is
    --  probes. It reports each check on Standard_Output, and is True if
    --  they all passed.
 
+   type Forward_Result is
+     (Passed, No_Update_Cap, Nothing_From_Restore, Update_Failed,
+      No_Test_Bank, Launch_Failed);
+   --  The result of Exec_Forward_Test: Passed, or the step that failed.
+
+   function Exec_Forward_Test
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Old_Launch    : Rose.Capabilities.Capability;
+      Install_Cap   : Rose.Capabilities.Capability)
+      return Forward_Result;
+   --  Install replaceable_test again from Binary_Stream with Update_Cap,
+   --  exec's Update, giving it Install_Cap as an install cap, so that it
+   --  is a new version and the old one is retired (#902). Then launch it
+   --  as a command through Old_Launch, the first version's Launch
+   --  interface, against a test bank, which is then destroyed. Passed
+   --  if the launch through the retired version's cap works.
+
    function Hand_Over_Test
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;

@@ -31,11 +31,13 @@ package Exec.Library is
    --  Otherwise install it, retire the installed version, and return the
    --  new number with Changed True. 0 if there is no room for it.
 
-   function Is_Retired
+   function Newest
      (Id : Rose.Objects.Capability_Identifier)
-      return Boolean;
-   --  True if Update replaced program Id, or there is no program Id.
-   --  A retired program can't be launched, but its pages are kept.
+      return Rose.Objects.Capability_Identifier;
+   --  The newest version of program Id: Id itself, or, if Update retired
+   --  it, the version that replaced it, and so on (#902). A retired
+   --  version's pages are kept, and its launch caps launch the newest
+   --  version. 0 if there is no program Id.
 
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)

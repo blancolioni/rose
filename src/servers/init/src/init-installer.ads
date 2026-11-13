@@ -41,4 +41,14 @@ package Init.Installer is
    --  Is_Driver is True if the program is installed from the drivers
    --  directory, which allows it more caps (Grant_Caps).
 
+   function Update_Executable
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability;
+      Name          : String;
+      Install_Caps  : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability;
+   --  Install the image Binary_Stream as the new version of the program
+   --  Name, with Update_Cap, exec's Update, and Install_Caps as its
+   --  install caps. Its Launch interface, or null if it failed.
+
 end Init.Installer;

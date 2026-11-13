@@ -113,6 +113,15 @@ package body Init.Run is
       --  Its Create cap, for the set that init leaves for the restore
       --  test.
 
+      Exec_Update_Cap          : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  Exec's Update, for the test of a retired version's launch caps
+      --  (#902).
+      Forward_Launch_Cap       : Rose.Capabilities.Capability :=
+                                   Null_Capability;
+      --  For that test, the Launch interface of replaceable_test's first
+      --  version, from its install.
+
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
       --  the programs it would have installed are running already.
@@ -345,6 +354,8 @@ package body Init.Run is
                      Set_Output_Cap :=
                        Caps
                          (Rose.Interfaces.Exec.Set_Standard_Output_Index + 1);
+                     Exec_Update_Cap :=
+                       Caps (Rose.Interfaces.Exec.Update_Index + 1);
                   end if;
                end;
 
@@ -419,6 +430,46 @@ package body Init.Run is
                   Init.Calls.Send_String
                     (Console_Stream_Cap, "received input stream cap" & NL);
                end if;
+            elsif Params.Data (1) = 94 then
+
+               --  Replaceable_test's image again, for the test of exec's
+               --  Update: a retired version's launch caps launch the
+               --  newest version (#902). It runs now, because
+               --  restore-install releases the reader once this replies.
+
+               case Init.Self_Tests.Exec_Forward_Test
+                 (Update_Cap    => Exec_Update_Cap,
+                  Binary_Stream => Params.Caps (0),
+                  Old_Launch    => Forward_Launch_Cap,
+                  Install_Cap   => Console_Stream_Cap)
+               is
+                  when Init.Self_Tests.Passed =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: PASS" & NL);
+                  when Init.Self_Tests.No_Update_Cap =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: FAIL: no Update cap" & NL);
+                  when Init.Self_Tests.Nothing_From_Restore =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: FAIL: nothing from restore"
+                        & NL);
+                  when Init.Self_Tests.Update_Failed =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: FAIL: Update failed" & NL);
+                  when Init.Self_Tests.No_Test_Bank =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: FAIL: no test bank" & NL);
+                  when Init.Self_Tests.Launch_Failed =>
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec forward test: FAIL: the launch through"
+                        & " the old cap failed" & NL);
+               end case;
             elsif Params.Data (1) = 96 then
 
                --  The screen driver is running, and cap 0 is its surface.
@@ -556,6 +607,9 @@ package body Init.Run is
                   elsif Params.Data (1) = 1 then
                      Rose.System_Calls.Send_Cap (Reply, Add_Cap);
                      Rose.System_Calls.Send_Cap (Reply, Launch);
+                     if Name (1 .. Name_Last) = "replaceable_test" then
+                        Forward_Launch_Cap := Launch;
+                     end if;
                   else
                      Init.Calls.Send_String
                        (Console_Stream_Cap, "init: bad action");
