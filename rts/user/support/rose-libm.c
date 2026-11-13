@@ -47,16 +47,22 @@ reduce (long double x, int *quadrant)
 /* sin and cos of r, at most pi/4, from their Taylor series, to the
    terms in r**21 and r**22: the first term left out is less than 1e-24.
    These are not fsin and fcos because QEMU emulates those instructions
-   in double precision, which loses a third of a long double's bits. */
+   in double precision, which loses a third of a long double's bits.
 
-static const long double sin_terms[] = {
+   Each table is aligned to 256 bytes, so that no entry crosses a page.
+   QEMU 10.1 loads the first 8 bytes of a long double that crosses a page
+   from the physically next frame, not from the next page (#905). The
+   constants that GCC puts in .rodata.cst16 are aligned to 16, and never
+   cross one. */
+
+static const long double sin_terms[] __attribute__ ((aligned (256))) = {
   0.0L, -1.0L / 6.0L, 1.0L / 120.0L, -1.0L / 5040.0L, 1.0L / 362880.0L,
   -1.0L / 39916800.0L, 1.0L / 6227020800.0L, -1.0L / 1307674368000.0L,
   1.0L / 355687428096000.0L, -1.0L / 121645100408832000.0L,
   1.0L / 51090942171709440000.0L
 };
 
-static const long double cos_terms[] = {
+static const long double cos_terms[] __attribute__ ((aligned (256))) = {
   0.0L, -1.0L / 2.0L, 1.0L / 24.0L, -1.0L / 720.0L, 1.0L / 40320.0L,
   -1.0L / 3628800.0L, 1.0L / 479001600.0L, -1.0L / 87178291200.0L,
   1.0L / 20922789888000.0L, -1.0L / 6402373705728000.0L,
