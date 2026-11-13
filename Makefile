@@ -14,7 +14,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock caps screen surface-console
-UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests hold_derived hold_file swap_probe replaceable_test petal argv keytest kilo
+UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests hold_derived hold_file hold_home swap_probe replaceable_test petal argv keytest kilo
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
 # the GRUB menus' module2 lines come from.

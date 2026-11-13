@@ -1,12 +1,20 @@
-command Rose.Core.User : Create_Endpoint
+command Rose.Core.User : Create_Endpoint, Cap_Set_Service
   with Summary     => "Serve a user's User interface.",
        Description => """
           User serves the User interface of one user (ADR 0003): the
           user's name, the user's home directory, and a bank for each
           of the user's sessions. It returns the interface, and then
           keeps serving it.
+
+          A new version of the program can take over from a running one
+          (ADR 0032, #831). Its state is the user's name. The caps it
+          holds are its arguments, Home and Bank, and Cap_Set_Service,
+          the cap set server's Constructor, which the handover passes to
+          the new version (#901), so a new version is launched with
+          Previous alone, and an empty name.
           """,
        Server      => User_Server.Start_Server,
+       Replaceable => User_Server,
        Live
 is
    Name : String
@@ -17,4 +25,6 @@ is
      with Help => "the user's bank, which sessions are sub-banks of";
    User : out User
      with Help => "the user's User interface";
+   Control : out Replaceable
+     with Help => "its Replaceable interface, which auth keeps";
 end Rose.Core.User;

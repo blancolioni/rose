@@ -55,4 +55,7 @@ run_self_tests:
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
 	    ../../drivers/file/rose-core-file.idl $(INTERFACES)/rose-core.idl
+	$(IDLE) --target user --command-client -I $(INTERFACES) \
+	    -o build/generated \
+	    ../user/rose-core-user.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

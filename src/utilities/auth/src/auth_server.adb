@@ -3,12 +3,11 @@ with Ada.Containers.Indefinite_Ordered_Maps;
 
 with System.Storage_Elements;
 
+with Rose.Core.User_Client;
 with Rose.Crypto.PBKDF2_HMAC_SHA_256;
-with Rose.Invocation;
 with Rose.Random;
 with Rose.Server;
 with Rose.System_Calls;
-with Rose.Words;
 
 with Rose.Interfaces.Auth.Server;
 with Rose.Interfaces.Auth_Admin.Server;
@@ -46,6 +45,9 @@ package body Auth_Server is
          Salt       : Storage_Array (1 .. Salt_Length);
          Hash       : Storage_Array (1 .. Hash_Length);
          User       : Rose.Capabilities.Capability;
+         Control    : Rose.Capabilities.Capability;
+         --  The Replaceable interface of the user's server, which only
+         --  auth holds, for a new version of the user program (#831).
       end record;
 
    package User_Maps is
@@ -106,14 +108,16 @@ package body Auth_Server is
       Iterations : Positive;
       Hash       : out Storage_Array);
 
-   function Launch_User
-     (Name : String;
-      Home : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
-      return Rose.Capabilities.Capability;
+   procedure Launch_User
+     (Name    : String;
+      Home    : Rose.Capabilities.Capability;
+      Bank    : Rose.Capabilities.Capability;
+      User    : out Rose.Capabilities.Capability;
+      Control : out Rose.Capabilities.Capability);
    --  Launch the user program as a command with Name, Home and Bank (its
    --  declaration is src/utilities/user/rose-core-user.idl), against
-   --  Bank, and return the User interface from the reply, or null.
+   --  Bank, and return its User and Replaceable interfaces, or null caps
+   --  if the launch fails.
 
    ---------------
    -- Admin_Cap --
@@ -188,47 +192,38 @@ package body Auth_Server is
    -- Launch_User --
    -----------------
 
-   function Launch_User
-     (Name : String;
-      Home : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
-      return Rose.Capabilities.Capability
+   procedure Launch_User
+     (Name    : String;
+      Home    : Rose.Capabilities.Capability;
+      Bank    : Rose.Capabilities.Capability;
+      User    : out Rose.Capabilities.Capability;
+      Control : out Rose.Capabilities.Capability)
    is
-      use type Rose.Words.Word;
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
       Endpoint : constant Rose.Capabilities.Capability :=
                    Launcher.Launch_Command (Bank, No_Caps);
-      Params   : aliased Rose.Invocation.Invocation_Record;
    begin
+      User := Rose.Capabilities.Null_Capability;
+      Control := Rose.Capabilities.Null_Capability;
       if Endpoint = Rose.Capabilities.Null_Capability then
-         return Rose.Capabilities.Null_Capability;
+         return;
       end if;
 
-      --  The name is buffer item 1, in the same form as the items of
-      --  an invocation (Rose.Command_Line.Launch).
-
-      Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap
-        (Params, Rose.System_Calls.Create_Endpoint_Capability);
-      Rose.System_Calls.Send_Cap (Params, Home);
-      Rose.System_Calls.Send_Cap (Params, Bank);
-      Rose.System_Calls.Start_Items (Params);
-      Rose.System_Calls.Send_Text_Item (Params, Name);
-      Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
-        or else Params.Data (0) /= 0
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      return Params.Caps (0);
+      Rose.Core.User_Client.Call
+        (Endpoint        => Endpoint,
+         Create_Endpoint => Rose.System_Calls.Create_Endpoint_Capability,
+         Cap_Set_Service => Cap_Sets,
+         Name            => Name,
+         Home            => Home,
+         Bank            => Bank,
+         User            => User,
+         Control         => Control);
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         User := Rose.Capabilities.Null_Capability;
+         Control := Rose.Capabilities.Null_Capability;
    end Launch_User;
 
    -----------
@@ -285,6 +280,7 @@ package body Auth_Server is
       New_Item  : User_Record;
       Home      : Rose.Capabilities.Capability;
       User      : Rose.Capabilities.Capability;
+      Control   : Rose.Capabilities.Capability;
       User_Bank : Rose.Interfaces.Bank.Client.Bank_Client;
 
       function Give_Up return User_Class;
@@ -375,14 +371,17 @@ package body Auth_Server is
          return Give_Up;
       end if;
 
-      User := Launch_User
+      Launch_User
         (New_Item.Name (1 .. New_Item.Name_Last), Home,
-         User_Bank.Get_Interface_Cap);
-      if User = Rose.Capabilities.Null_Capability then
+         User_Bank.Get_Interface_Cap, User, Control);
+      if User = Rose.Capabilities.Null_Capability
+        or else Control = Rose.Capabilities.Null_Capability
+      then
          return Give_Up;
       end if;
 
       New_Item.User := User;
+      New_Item.Control := Control;
       Users.Insert (New_Item.Name (1 .. New_Item.Name_Last), New_Item);
 
       return Rose.Interfaces.User.Client.From_Cap (User);

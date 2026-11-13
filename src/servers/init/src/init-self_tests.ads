@@ -134,4 +134,22 @@ package Init.Self_Tests is
    --  file, and the first time it is restored, it checks the file and its
    --  streams. True if the replacement committed.
 
+   function Replace_Held_User
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
+      Replace_Process : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Launch the hold_home command, found through Find_Cap, with
+   --  Create_Endpoint, Standard_Output, Commands and Cap_Sets for its
+   --  roles. It launches a home directory and a user server that holds
+   --  it, and starts a session. Then replace the user server with a new
+   --  version, through Replace_Process, mem's Replacer (#831, ADR 0032).
+   --  Hold_home is persistent, so the checkpoint saves it and the new
+   --  version of the user server, and the first time it is restored, it
+   --  checks the user's name, home directory and sessions. True if the
+   --  replacement committed.
+
 end Init.Self_Tests;

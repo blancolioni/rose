@@ -15,6 +15,7 @@ with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Objects;
+with Rose.Interfaces.Process;
 with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
@@ -25,9 +26,12 @@ with Rose.Interfaces.Replacement.Client;
 with Rose.Interfaces.Replacer.Client;
 with Rose.Interfaces.Saveable.Client;
 with Rose.Interfaces.Transactional_Writable_File;
+with Rose.Interfaces.User.Client;
+with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Registry;
+with Tests.Users;
 
 package body Tests.Replacement is
 
@@ -666,6 +670,198 @@ package body Tests.Replacement is
          Ada.Text_IO.Put (": raised");
          return False;
    end Replace_Process_Test;
+
+   -----------------------
+   -- Replace_User_Test --
+   -----------------------
+
+   function Replace_User_Test return Boolean is
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+   begin
+      Ada.Text_IO.Put ("Replace user test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  The user, its home directory and its sessions are all in a bank
+      --  of the test's own, which it destroys at the end (#724), as auth
+      --  launches a user in the user's bank.
+
+      declare
+         No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Launcher  : Rose.Interfaces.Launch.Launch_Object'Class :=
+           Tests.Registry.Launcher ("user");
+         Home      : Rose.Interfaces.Writable_Directory.Client
+           .Writable_Directory_Client;
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
+         Served    : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+         User      : Rose.Interfaces.User.Client.User_Client;
+      begin
+         declare
+            Directories : Rose.Interfaces.Launch.Launch_Object'Class :=
+              Tests.Registry.Launcher ("directory");
+            Process     : Rose.Interfaces.Process.Process_Object'Class :=
+              Directories.Launch
+                (Test_Bank.Bank_Cap,
+                 (Tests.Registry.Launcher_Cap ("file"),
+                  Tests.Registry.Launcher_Cap ("directory"),
+                  Tests.Registry.Cap_Sets));
+         begin
+            if Process.Process_Cap /= Null_Cap then
+               Home.Open (Process.Published_Interface);
+            end if;
+         end;
+
+         if Endpoint /= Null_Cap
+           and then Home.Get_Interface_Cap /= Null_Cap
+         then
+            begin
+               Tests.Users.Start_User
+                 (Endpoint, "rhona", Home.Get_Interface_Cap,
+                  Test_Bank.Bank_Cap, Served, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Served = Null_Cap or else Control = Null_Cap then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": the user did not start");
+            return False;
+         end if;
+
+         User.Open (Served);
+
+         declare
+            Before      : Rose.Interfaces.Bank.Bank_Object'Class :=
+              User.New_Session;
+            --  A session that is open across the handover.
+            Replacement : Rose.Interfaces.Replacement
+              .Replacement_Object'Class :=
+                Replacer.Replace_Process (Control);
+            Committed   : Boolean := False;
+         begin
+            Check ("no replacement",
+                   Replacement.Replacement_Cap /= Null_Cap);
+
+            if Replacement.Replacement_Cap /= Null_Cap then
+               declare
+                  Ready       : Boolean := False;
+                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Replacement.Bank;
+                  New_Version : Rose.Capabilities.Capability;
+                  New_Served  : Rose.Capabilities.Capability;
+                  New_Control : Rose.Capabilities.Capability;
+               begin
+                  for Attempt in 1 .. 100_000 loop
+                     Ready := Replacement.Ready;
+                     exit when Ready;
+                  end loop;
+                  Check ("the old version is never ready", Ready);
+
+                  New_Version :=
+                    Launcher.Launch_Command (Sibling.Bank_Cap, No_Caps);
+                  Check ("the new version did not launch",
+                         New_Version /= Null_Cap);
+
+                  if Ready and then New_Version /= Null_Cap then
+                     Replacement.Allow (New_Version);
+                     begin
+                        Tests.Users.Start_User
+                          (New_Version, "", Null_Cap, Null_Cap,
+                           New_Served, New_Control, Previous => Control);
+                        Committed := Replacement.Commit;
+                     exception
+                        when Rose.Interfaces.Objects.Invocation_Error =>
+                           Check ("the new version refused", False);
+                     end;
+                  end if;
+               end;
+
+               Check ("the replacement did not commit", Committed);
+               Replacement.Release;
+            end if;
+
+            --  Until a replacement commits or is released, the old
+            --  version's calls are held, so nothing is asked of the user
+            --  unless it committed.
+
+            if Committed then
+               Check ("the name is not the old version's",
+                      User.Name = "rhona");
+
+               declare
+                  User_Home : Rose.Interfaces.Writable_Directory
+                    .Writable_Directory_Object'Class :=
+                      User.Home_Directory;
+                  Created   : Rose.Interfaces.Writable_File
+                    .Writable_File_Object'Class :=
+                      User_Home.Create_File ("after");
+               begin
+                  Check ("cannot create a file in the home directory",
+                         Created.Writable_File_Cap /= Null_Cap);
+                  Check ("the home directory is not the old version's",
+                         Home.Find_Entry ("after") = 1);
+               end;
+
+               --  The session from before the handover is still a bank
+               --  of the user's, and a new one is too.
+
+               declare
+                  After : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    User.New_Session;
+                  Inner : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Before.Create_Sub_Bank (0, 0);
+               begin
+                  Check ("no session after the handover",
+                         After.Bank_Cap /= Null_Cap);
+                  Check ("the session from before is gone",
+                         Inner.Bank_Cap /= Null_Cap);
+                  Inner.Destroy;
+                  After.Destroy;
+               end;
+
+               Before.Destroy;
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to the user failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_User_Test;
 
    ----------------------
    -- Replacement_Test --

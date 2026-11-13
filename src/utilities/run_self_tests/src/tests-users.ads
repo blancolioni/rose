@@ -2,6 +2,22 @@ with Rose.Capabilities;
 
 package Tests.Users is
 
+   procedure Start_User
+     (Endpoint : Rose.Capabilities.Capability;
+      Name     : String;
+      Home     : Rose.Capabilities.Capability;
+      Bank     : Rose.Capabilities.Capability;
+      User     : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability);
+   --  Make the launch call of the user command whose endpoint is Endpoint
+   --  (src/utilities/user/rose-core-user.idl), and return its User and
+   --  Replaceable interfaces. If Previous is a cap, the new version takes
+   --  over from it, and is given no other caps, and Name is ignored, since
+   --  it takes them from the old version (#901). Raises Invocation_Error
+   --  if the call fails.
+
    function Create_User
      (Name : String;
       Home : Rose.Capabilities.Capability;

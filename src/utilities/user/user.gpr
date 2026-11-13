@@ -11,7 +11,8 @@ project User is
       ("../../../rts/user/build/interfaces",
        "src",
        "build/generated",
-       "../../library/rose");
+       "../../library/rose",
+       "../../library/replacement");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("rose-core-user_main.adb");
