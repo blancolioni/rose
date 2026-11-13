@@ -68,6 +68,13 @@ grep "hold_file:" "$CONSOLE" | tail -1
 grep -q "hold_file: restored: the replaced file has its contents" "$CONSOLE" \
     || fail "hold_file did not find its replaced file intact after the restore"
 
+# Hold_home holds a user server that init replaced with a new version
+# during the install, with a session open, and checks it the first time
+# it is restored (#831).
+grep "hold_home:" "$CONSOLE" | tail -1
+grep -q "hold_home: restored: the replaced user has its name" "$CONSOLE" \
+    || fail "hold_home did not find its replaced user intact after the restore"
+
 # caps writes what it holds when it is restored. Init leaves it one set,
 # of two capabilities, for this check (#825); the install's self tests
 # release theirs.

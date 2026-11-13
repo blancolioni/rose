@@ -28,4 +28,13 @@ package Tests.Replacement is
    --
    --  Skipped without the Cap_Set_Service role, as when petal runs it.
 
+   function Replace_User_Test return Boolean;
+   --  Launch a user server, with a home directory, against a test bank,
+   --  and start a session. Replace the server with a new version, which
+   --  is given Previous alone (ADR 0032, #831), and check that the old
+   --  version's User cap reaches the new version, which has the user's
+   --  name, home directory and bank: a file can be created in the home
+   --  directory, and both the session from before and a new one work.
+   --  Skipped without a Replacer.
+
 end Tests.Replacement;

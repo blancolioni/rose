@@ -340,12 +340,16 @@ The directory holds the entry's writable interface, and hands out read-only ones
 
 === `user`
 
-Serves one user: the user's name, and the user's home directory (ADR 0003).
+Serves one user: the user's name, the user's home directory, and a bank for each session (ADR 0003, ADR 0014).
 
-Provides:: `User`, whose `Name` is the user's name, and whose `Home_Directory` is a `Writable_Directory`.
-Used by:: `auth`, which launches it for each user it creates; and the shell, which `init` gives the first user.
+Provides:: `User`, whose `Name` is the user's name, whose `Home_Directory` is a `Writable_Directory`, and whose `New_Session` returns a sub-bank of the user's bank; and `Replaceable` (ADR 0032), which only `auth` holds.
+Requests:: nothing: it is a command, `Rose.Core.User`, with the roles `Create_Endpoint` and `Cap_Set_Service`.
+Used by:: `auth`, which launches it for each user it creates, with the command's generated client; and the shell, which `init` gives the first user.
 
-`user` is installed with the commands, and launched once for each user, with the name and the home directory in its launch call.
+`user` is installed with the commands, and launched once for each user, with the name, the home directory and the user's bank in its launch call.
+
+A new version of `user` can take over from a running one (ADR 0032, #831).
+Its state is the user's name; the caps it holds are its arguments, which the handover passes on (#901), so the new version is launched with `Previous` alone.
 
 === `login`
 

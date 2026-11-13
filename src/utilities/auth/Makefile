@@ -6,7 +6,8 @@ all: auth
 
 # The spec of Rose.Core.Auth, its main and its metadata, the package
 # Rose.Core, and Auth with the interfaces it uses, are generated from IDL
-# (ADR 0002) for the user target.
+# (ADR 0002) for the user target, and the client of the user command,
+# which New_User launches (#831).
 
 auth:
 	mkdir -p build/obj
@@ -41,4 +42,7 @@ auth:
 	    $(INTERFACES)/writer.idl \
 	    $(INTERFACES)/resource.idl \
 	    $(INTERFACES)/seekable.idl
+	$(IDLE) --target user --command-client -I $(INTERFACES) \
+	    -o build/generated \
+	    ../user/rose-core-user.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

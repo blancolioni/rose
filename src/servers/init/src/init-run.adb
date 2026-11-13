@@ -816,6 +816,27 @@ package body Init.Run is
            (Console_Stream_Cap, "init: self tests failed" & NL);
       end if;
 
+      --  A persistent holder of a user server that init replaces, which
+      --  checks the user after a restore (#831). It comes after the self
+      --  tests, which come close to the kernel's 64 processes, since it
+      --  keeps four: itself, the home directory, its file and the user
+      --  server.
+
+      if Init.Self_Tests.Replace_Held_User
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Commands        => Commands_Cap,
+         Cap_Sets        => Cap_Sets_Cap,
+         Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: user replace test: PASS" & NL);
+      else
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: user replace test: FAIL" & NL);
+      end if;
+
       --  A cap set that the checkpoint keeps, so that the boot test can
       --  see that a set made before a checkpoint is there after a restore:
       --  the cap set server reports its sets when it is restored (#825).

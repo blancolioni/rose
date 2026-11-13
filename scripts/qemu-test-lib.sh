@@ -305,11 +305,37 @@ install_rose () {
             ;;
     esac
 
+    # So is the test of replacing a user server with a session open (#831).
+    replace_user=$(grep "Replace user test" "$CONSOLE" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replace_user" ] \
+        || replace_user=$(grep "Replace user test" \
+                              "$CONSOLE" | tail -1)
+    echo "$replace_user"
+    case "$replace_user" in
+        *skipped*|"")
+            echo "FAIL: the install's replace user test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replace user test did not pass"
+            exit 1
+            ;;
+    esac
+
     # Init replaces the file that hold_file holds, which the restore then
     # checks (#867).
     grep "file replace test" "$CONSOLE" | tail -1
     grep -q "init: file replace test: PASS" "$CONSOLE" \
         || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
+
+    # Init replaces the user server that hold_home holds, which the
+    # restore then checks (#831).
+    grep "user replace test" "$CONSOLE" | tail -1
+    grep -q "init: user replace test: PASS" "$CONSOLE" \
+        || { echo "FAIL: init did not replace hold_home's user"; exit 1; }
 
     # A retired version's launch caps launch the newest version (#902).
     grep "exec forward test" "$CONSOLE" | tail -1

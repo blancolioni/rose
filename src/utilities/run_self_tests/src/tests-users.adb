@@ -3,7 +3,7 @@ with Ada.Text_IO;
 
 with System.Storage_Elements;
 
-with Rose.Invocation;
+with Rose.Core.User_Client;
 with Rose.System_Calls;
 with Rose.Words;
 
@@ -27,10 +27,6 @@ package body Tests.Users is
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word;
 
-   Name_Buffer : Storage_Array (1 .. 4096)
-     with Alignment => 4096;
-   --  The buffer of the launch call, which holds the user's name.
-
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
 
@@ -45,52 +41,27 @@ package body Tests.Users is
         Rose.Capabilities.Null_Capability)
       return Rose.Capabilities.Capability
    is
+      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
       User_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
                       Tests.Registry.Launcher ("user");
-      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
-      Padded      : constant Storage_Count :=
-                      Storage_Count ((Name'Length + 3) / 4 * 4);
       User_Bank   : constant Rose.Capabilities.Capability :=
                       (if Bank = Rose.Capabilities.Null_Capability
                        then Rose.System_Calls.Own_Bank.Cap
                        else Bank);
       Endpoint    : constant Rose.Capabilities.Capability :=
                       User_Launch.Launch_Command (User_Bank, No_Caps);
-      Params      : aliased Rose.Invocation.Invocation_Record;
+      User        : Rose.Capabilities.Capability;
+      Control     : Rose.Capabilities.Capability;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
       end if;
 
-      --  The name is one buffer item: its length, little-endian, then
-      --  the text, padded to four bytes.
-
-      Name_Buffer (1 .. 4 + Padded) := (others => 0);
-      Name_Buffer (1) := Storage_Element (Name'Length);
-      for Index in Name'Range loop
-         Name_Buffer (4 + Storage_Offset (Index - Name'First + 1)) :=
-           Character'Pos (Name (Index));
-      end loop;
-
-      Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Home);
-      Rose.System_Calls.Send_Cap (Params, User_Bank);
-      Rose.System_Calls.Send_Buffer
-        (Params, 4 + Padded, Name_Buffer'Address, False);
-      Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
-        or else Params.Data (0) /= 0
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
+      Start_User (Endpoint, Name, Home, User_Bank, User, Control);
+      return User;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
          return Rose.Capabilities.Null_Capability;
-      end if;
-
-      return Params.Caps (0);
    end Create_User;
 
    ----------
@@ -211,20 +182,52 @@ package body Tests.Users is
       return Result;
    end Session_Test;
 
+   ----------------
+   -- Start_User --
+   ----------------
+
+   procedure Start_User
+     (Endpoint : Rose.Capabilities.Capability;
+      Name     : String;
+      Home     : Rose.Capabilities.Capability;
+      Bank     : Rose.Capabilities.Capability;
+      User     : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+   is
+      Fresh : constant Boolean :=
+        Previous = Rose.Capabilities.Null_Capability;
+
+      function Given
+        (Cap : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability
+      is (if Fresh then Cap else Rose.Capabilities.Null_Capability);
+      --  A new version takes its caps from the old one (#901), so a
+      --  handover passes Previous alone.
+
+   begin
+      Rose.Core.User_Client.Call
+        (Endpoint        => Endpoint,
+         Create_Endpoint => Given (Tests.Registry.Create_Endpoint),
+         Cap_Set_Service => Given (Tests.Registry.Cap_Sets),
+         Name            => (if Fresh then Name else ""),
+         Home            => Given (Home),
+         Bank            => Given (Bank),
+         User            => User,
+         Control         => Control,
+         Previous        => Previous);
+   end Start_User;
+
    ---------------
    -- User_Test --
    ---------------
 
    function User_Test return Boolean is
-      User_Name   : constant String := "test";
-      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
-      User_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
-        Tests.Registry.Launcher ("user");
-      Home        : Rose.Interfaces.Writable_Directory.Client
+      User_Name : constant String := "test";
+      Home      : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
-      Endpoint    : Rose.Capabilities.Capability;
-      Params      : aliased Rose.Invocation.Invocation_Record;
-      User        : Rose.Interfaces.User.Client.User_Client;
+      User      : Rose.Interfaces.User.Client.User_Client;
    begin
       Ada.Text_IO.Put ("User test");
 
@@ -234,45 +237,14 @@ package body Tests.Users is
             (Tests.Registry.Launcher_Cap ("file"),
              Tests.Registry.Launcher_Cap ("directory"))));
 
-      --  The user is launched as a command, and its launch call gives it
-      --  a create endpoint cap, its home directory and its name, as one
-      --  buffer item: the length, little-endian, then the text, padded
-      --  to four bytes.
+      --  The user is launched as a command, whose launch call gives it a
+      --  create endpoint cap, the cap set server, its home directory, its
+      --  bank, and its name.
 
-      Endpoint := User_Launch.Launch_Command
-                        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
-      if Endpoint = Rose.Capabilities.Null_Capability then
+      User.Open (Create_User (User_Name, Home.Get_Interface_Cap));
+      if User.User_Cap = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch a user");
       end if;
-
-      Name_Buffer (1 .. 8) :=
-        (Storage_Element (User_Name'Length), 0, 0, 0,
-         Character'Pos (User_Name (1)), Character'Pos (User_Name (2)),
-         Character'Pos (User_Name (3)), Character'Pos (User_Name (4)));
-
-      Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap
-        (Params,
-         Tests.Registry.Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Home.Get_Interface_Cap);
-      Rose.System_Calls.Send_Cap (Params, Rose.System_Calls.Own_Bank.Cap);
-      Rose.System_Calls.Send_Buffer (Params, 8, Name_Buffer'Address, False);
-      Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
-        or else Params.Data (0) /= 0
-      then
-         return Fail ("the launch call failed");
-      elsif not Params.Control.Flags (Rose.Invocation.Send_Caps)
-        or else Params.Caps (0) = Rose.Capabilities.Null_Capability
-      then
-         return Fail ("no user interface in the reply");
-      end if;
-
-      User.Open (Params.Caps (0));
 
       if User.Name /= User_Name then
          return Fail ("wrong name");

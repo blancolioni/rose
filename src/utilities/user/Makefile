@@ -6,7 +6,9 @@ all: user
 
 # The spec of Rose.Core.User, its main and its metadata, the package
 # Rose.Core, and User with the interfaces it uses, are generated from IDL
-# (ADR 0002) for the user target.
+# (ADR 0002) for the user target. It is a replaceable server (#831):
+# Rose.Replacement needs the packages of Replaceable, Releasable_Reader,
+# Releasable_Cap_Set and Constructor, with their parents.
 
 user:
 	mkdir -p build/obj
@@ -15,6 +17,11 @@ user:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-user.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/user.idl \
+	    $(INTERFACES)/replaceable.idl \
+	    $(INTERFACES)/saveable.idl \
+	    $(INTERFACES)/releasable_cap_set.idl \
+	    $(INTERFACES)/cap_set.idl \
+	    $(INTERFACES)/constructor.idl \
 	    $(INTERFACES)/named.idl \
 	    $(INTERFACES)/writable_directory.idl \
 	    $(INTERFACES)/directory.idl \
