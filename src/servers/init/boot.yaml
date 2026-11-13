@@ -105,6 +105,12 @@ stages:
         - {ports: [out, 8, 0x3F8, 0x3F8], owner: none}
         - {ports: [in, 8, 0x3FD, 0x3FD], owner: none}
         - {boot_tag: 8}
+        # The kernel's command line, and COM2: serial-console asks for a
+        # copy of the console on COM2, apart from the kernel's log on
+        # COM1, for the boot tests (#904).
+        - {boot_tag: 1}
+        - {ports: [out, 8, 0x2F8, 0x2F8], owner: none}
+        - {ports: [in, 8, 0x2FD, 0x2FD], owner: none}
       exports:
         console_interface: Writer.Writer_Interface
         console_stream: Writer.Write_Endpoint

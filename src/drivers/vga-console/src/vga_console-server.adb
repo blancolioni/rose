@@ -15,6 +15,7 @@ with Rose.Interfaces.Restorable.Server;
 with Rose.Interfaces.Terminal.Server;
 
 with Text_Console;
+with Text_Console.Serial;
 
 with VGA_Console.Line_Discipline;
 with VGA_Console.Screen;
@@ -305,6 +306,11 @@ package body VGA_Console.Server is
       pragma Unreferenced (Item);
    begin
       VGA_Console.Screen.Redraw;
+
+      --  This boot's command line says whether to copy to COM2.
+
+      Text_Console.Serial.Start
+        (Command_Line_Cap, Serial_Data_Cap, Serial_Status_Cap);
    end Restored;
 
    ------------

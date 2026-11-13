@@ -189,6 +189,13 @@ When it is told to send its output on, it first sends its copy, so the new conso
 If the copy overflowed, it starts with "[earlier boot output dropped]".
 Both learn that there is a framebuffer from the boot loader's framebuffer tag.
 
+[#serial-console]
+The last entry of each menu, on the install media and on the boot disk, is a text mode one with `serial-console` on the kernel's command line (#904).
+With it, every console also copies what it writes to the second serial port, COM2: the boot console, and then the persistent console, which reads the command line again whenever it is restored, so each boot's entry decides.
+Escape sequences are left out, so the copy is plain text, and the kernel's log stays on COM1, so the two never mix.
+The boot tests choose that entry, and read every result from QEMU's file for COM2 rather than from the screen, which scrolls past lines between two looks at it.
+Without the argument, nothing is copied: a serial port takes about 11 KB a second, which would slow every redraw.
+
 [#writing-the-boot-loader]
 === Writing the boot loader
 

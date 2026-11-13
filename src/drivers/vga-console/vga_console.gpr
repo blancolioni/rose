@@ -26,6 +26,8 @@ project vga_console is
        "text_console-cells.adb",
        "text_console-line_discipline.ads",
        "text_console-line_discipline.adb",
+       "text_console-serial.ads",
+       "text_console-serial.adb",
        "vga_console-screen.ads",
        "vga_console-screen.adb",
        "vga_console-server.ads",

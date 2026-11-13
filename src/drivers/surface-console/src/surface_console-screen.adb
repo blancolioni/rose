@@ -7,6 +7,7 @@ with Rose.Interfaces.Reader.Client;
 with Rose.Interfaces.Surface.Client;
 
 with Text_Console.Cells;
+with Text_Console.Serial;
 
 package body Surface_Console.Screen is
 
@@ -256,6 +257,7 @@ package body Surface_Console.Screen is
    procedure Put (Text : String) is
    begin
       Cells.Put (Text);
+      Text_Console.Serial.Put (Text);
    end Put;
 
    -----------------

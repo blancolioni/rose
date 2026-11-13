@@ -233,8 +233,13 @@ package body Init.Installer is
             elsif N = "bank" and then Count = 2 then
                Cap := Init.Grants.Bank (Values (1), Values (2));
             elsif N = "boot-tag" and then Count = 1
-              and then Values (1) = 8
+              and then Values (1) in 1 | 8
             then
+
+               --  The framebuffer (8), for the screen driver, and the
+               --  kernel's command line (1), which tells the consoles
+               --  whether to copy to COM2 (#904).
+
                Cap := Init.Grants.Boot_Tag (Values (1));
             elsif N = "port-out-8" and then Count in 1 .. 2 then
                Cap := Port (Init_Caps.Port_Out_Endpoint,

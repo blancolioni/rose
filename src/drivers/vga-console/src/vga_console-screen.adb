@@ -7,6 +7,7 @@ with Rose.Words;                        use Rose.Words;
 with Rose.Devices.Port_IO;
 
 with Text_Console.Cells;
+with Text_Console.Serial;
 
 package body VGA_Console.Screen is
 
@@ -125,6 +126,7 @@ package body VGA_Console.Screen is
       end if;
 
       Cells.Put (Text);
+      Text_Console.Serial.Put (Text);
    end Put;
 
 
