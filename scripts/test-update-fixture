@@ -17,9 +17,10 @@
 #      this boot set, writes the set to hd0, installs the commands again
 #      (#829), replaces each restored Replaceable server (#830), and
 #      restarts. Its console has to say that the commands were installed
-#      again, that each file was replaced, with none left unchanged, and
-#      that the update is complete, and the kernel's log has to show each
-#      file taking over;
+#      again, that each kind of replaceable server in the fixture (file,
+#      directory, user and auth) was replaced, with none left unchanged,
+#      and that the update is complete, and the kernel's log has to show
+#      a new version of each kind taking over (#922);
 #   2. boots the new set from hd0, its serial-console entry, which comes
 #      before "Previous". Login is still reading the name it was reading
 #      when the fixture was made, so an empty line brings its prompt
@@ -88,14 +89,19 @@ stop_qemu
 grep -e "restore:" -e "update complete" "$CONSOLE"
 grep -q "restore: installing the commands again" "$CONSOLE" \
     || { echo "FAIL: the update did not install the commands again"; exit 1; }
-grep -q "restore: replaced file" "$CONSOLE" \
-    || { echo "FAIL: the update replaced no file"; exit 1; }
 grep -q "is unchanged:" "$CONSOLE" \
     && { echo "FAIL: a replaceable server was not replaced"; exit 1; }
 grep -q "update complete" "$CONSOLE" \
     || { echo "FAIL: the update did not complete"; exit 1; }
-grep -a "/file\[.*takes over from" "$WORK/serial" \
-    || { echo "FAIL: no file took over in the kernel's log"; exit 1; }
+# The fixture has each kind of replaceable server: the files and
+# directories of the user's home, the first user's server and hold_home's,
+# and auth (#922).
+for server in file directory user auth; do
+    grep -q "restore: replaced $server" "$CONSOLE" \
+        || { echo "FAIL: the update replaced no $server"; exit 1; }
+    grep -a "/$server\[.*takes over from" "$WORK/serial" \
+        || { echo "FAIL: no $server took over in the kernel's log"; exit 1; }
+done
 
 echo "Booting the new set from hd0"
 start_qemu
