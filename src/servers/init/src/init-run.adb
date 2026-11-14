@@ -146,6 +146,9 @@ package body Init.Run is
       --  types (#456).
       Auth_Cap       : Rose.Capabilities.Capability;
       Auth_Admin_Cap : Rose.Capabilities.Capability;
+      Auth_Control   : Rose.Capabilities.Capability;
+      --  Auth's Replaceable interface, which init replaces it through
+      --  once the first user is made (#831), and then deletes.
       User_Cap       : Rose.Capabilities.Capability;
       Home_Cap   : Rose.Capabilities.Capability;
       --  The first user, and its home directory, created on first boot.
@@ -863,7 +866,8 @@ package body Init.Run is
          Commands        => Commands_Cap,
          Cap_Sets        => Cap_Sets_Cap,
          Auth            => Auth_Cap,
-         Admin           => Auth_Admin_Cap);
+         Admin           => Auth_Admin_Cap,
+         Control         => Auth_Control);
       if Auth_Cap = Null_Capability
         or else Auth_Admin_Cap = Null_Capability
       then
@@ -929,6 +933,36 @@ package body Init.Run is
       else
          Init.Calls.Send_String
            (Console_Stream_Cap, "init: login check failed" & NL);
+      end if;
+
+      --  Replace auth with a new version, as an update does (ADR 0031,
+      --  #831). The new version has the first user, and the caps that
+      --  init and login hold reach it, so the login is checked again
+      --  through the same Auth cap, and the restored system's login,
+      --  which the boot test makes, checks it after a restore.
+
+      if User_Cap /= Null_Capability then
+         if Init.Self_Tests.Replace_Auth
+             (Find_Cap        => Find_Cap,
+              Replace_Process => Init.Boot.Mem_Replace_Process_Cap,
+              Control         => Auth_Control)
+           and then Init.Users.Check_Login
+             (Auth_Cap, First_User (1 .. First_Last),
+              First_Password (1 .. Password_Last))
+           and then not Init.Users.Check_Login
+             (Auth_Cap, First_User (1 .. First_Last),
+              First_Password (1 .. Password_Last) & "x")
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: auth replace test: PASS" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: auth replace test: FAIL" & NL);
+         end if;
+      end if;
+      if Auth_Control /= Null_Capability then
+         Rose.System_Calls.Delete_Cap (Auth_Control);
+         Auth_Control := Null_Capability;
       end if;
 
       --  The first user may have every category of authority, under sudo

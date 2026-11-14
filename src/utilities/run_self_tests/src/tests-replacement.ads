@@ -2,6 +2,15 @@ package Tests.Replacement is
 
    function Replacement_Test return Boolean;
 
+   function Replace_Auth_Test return Boolean;
+   --  Launch auth against a test bank, make a user with it, and start a
+   --  session. Replace auth with a new version, which is given Previous
+   --  alone (ADR 0032, #831), and check that the user can log in through
+   --  the old version's Auth cap, with its password and not with another,
+   --  that the old Auth_Admin cap knows the name is taken, and that the
+   --  user and the session from before still work. Skipped without a
+   --  Replacer.
+
    function Replace_Directory_Test return Boolean;
    --  Launch a directory against a test bank, with a file and an empty
    --  subdirectory in it, and keep writable and read-only caps to them.

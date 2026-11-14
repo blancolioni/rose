@@ -345,6 +345,26 @@ install_rose () {
             ;;
     esac
 
+    # And of replacing auth with a user and a session (#831).
+    replace_auth=$(grep "Replace auth test" "$CONSOLE" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replace_auth" ] \
+        || replace_auth=$(grep "Replace auth test" \
+                              "$CONSOLE" | tail -1)
+    echo "$replace_auth"
+    case "$replace_auth" in
+        *skipped*|"")
+            echo "FAIL: the install's replace auth test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replace auth test did not pass"
+            exit 1
+            ;;
+    esac
+
     # Init replaces the file that hold_file holds, which the restore then
     # checks (#867).
     grep "file replace test" "$CONSOLE" | tail -1
@@ -356,6 +376,12 @@ install_rose () {
     grep "user replace test" "$CONSOLE" | tail -1
     grep -q "init: user replace test: PASS" "$CONSOLE" \
         || { echo "FAIL: init did not replace hold_home's user"; exit 1; }
+
+    # Init replaces auth once the first user is made, and checks the
+    # login again; the restored system's login checks it too (#831).
+    grep "auth replace test" "$CONSOLE" | tail -1
+    grep -q "init: auth replace test: PASS" "$CONSOLE" \
+        || { echo "FAIL: init did not replace auth"; exit 1; }
 
     # A retired version's launch caps launch the newest version (#902).
     grep "exec forward test" "$CONSOLE" | tail -1

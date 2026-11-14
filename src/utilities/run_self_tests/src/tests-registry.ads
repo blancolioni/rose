@@ -47,6 +47,10 @@ package Tests.Registry is
    function Replacer return Rose.Capabilities.Capability;
    --  Mem's Replacer, or the null cap.
 
+   function Commands return Rose.Capabilities.Capability;
+   --  The command registry's Commands interface, which Run_Self_Tests is
+   --  given for its Find_Command role.
+
    function Create_Endpoint return Rose.Capabilities.Capability;
    --  The create endpoint cap that Run_Self_Tests is given for its
    --  Create_Endpoint role.
