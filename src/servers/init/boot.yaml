@@ -293,6 +293,9 @@ stages:
         # Calls the restored exec and command registry on the update boot
         # (#829).
         - {cap: restored_endpoint, when: install}
+        # Replaces the restored Replaceable servers on the update boot
+        # (#830, ADR 0032 section 1).
+        - {cap: mem_replace_process, when: install}
 
   # After the restore server has restored a checkpoint or installed a new
   # system.

@@ -18,6 +18,7 @@ with Rose.Interfaces.Process;
 with Rose.Interfaces.Reader.Client;
 
 with Restore.Checkpoints;
+with Restore.Replacing;
 
 package body Restore.Installer is
 
@@ -838,6 +839,11 @@ package body Restore.Installer is
       Rose.Console_IO.Put_Line ("restore: installing the commands again");
       For_Each_Program
         (File_System, Source, Update_Executable'Access, Found);
+
+      --  Then the restored servers that can take over from themselves,
+      --  with the programs just installed (ADR 0031 section 5, #830).
+
+      Restore.Replacing.Replace_Servers;
    end Update;
 
    -----------------------
@@ -893,6 +899,8 @@ package body Restore.Installer is
                Rose.Console_IO.Put_Line
                  ("restore: cannot add " & Name & " to the registry");
             end if;
+            Restore.Replacing.Add_Program
+              (Name, Rose.Interfaces.Launch.Client.Get_Interface_Cap (Launch));
          end if;
       end;
 

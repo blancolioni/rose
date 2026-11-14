@@ -41,7 +41,13 @@ UPDATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-dependent.o \
 	$(BUILDDIR)/rose-interfaces-dependent-client.o \
 	$(BUILDDIR)/rose-interfaces-heap.o \
-	$(BUILDDIR)/rose-interfaces-heap-client.o
+	$(BUILDDIR)/rose-interfaces-heap-client.o \
+	$(BUILDDIR)/restore-replacing.o \
+	$(BUILDDIR)/rose-interfaces-replaceable.o \
+	$(BUILDDIR)/rose-interfaces-replacer.o \
+	$(BUILDDIR)/rose-interfaces-replacer-client.o \
+	$(BUILDDIR)/rose-interfaces-replacement.o \
+	$(BUILDDIR)/rose-interfaces-replacement-client.o
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-log_reader-client.o
