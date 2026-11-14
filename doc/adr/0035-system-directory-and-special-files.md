@@ -60,7 +60,8 @@ end Writable_Directory;
 ```
 
 - **A special file is a `Stream`.** That is what `/dev/null`, a console or a device needs, and it is what petal can bind to a reader, a writer or a redirection.
-- **Its rights are the installer's choice, not the directory's.** The read-only rule of ADR 0003, section 1, is about what a directory serves. A special file is a cap that the installer put there, so a read-only `system` still gives the `Stream` that the installer added. This is fine for `null`, where writing has no effect. A special file that shouldn't be written goes in as a `Stream` whose `Write` fails, or waits for the open question on read-only special files.
+- **A directory's rights are over the directory, not over its entries.** A `Directory` cap lets its holder list the directory and look names up. A `Writable_Directory` cap also lets them add, rename and delete entries. Neither type limits what can be done with an entry. A special file's cap carries the rights it was added with: `null` goes in as a `Stream`, so a read-only `system` gives a `Stream`. A special file that shouldn't be written goes in as a `Reader`, once special files can hold more than a `Stream`.
+- **The files a directory serves are a separate case.** ADR 0003, section 1, has a read-only `Directory` return read-only files and directories. That is the directory server's choice for what it serves, made because its children's write rights come from the same place as its own. It is not a rule that a directory's type bounds every entry.
 - **`Get_Special_File` fails** for an entry that isn't a special file, as `Get_Ordinary_File` does for one that isn't a file.
 - **Deleting a special file removes the entry**, and deletes the directory's copy of the cap. It doesn't end the server: the directory didn't launch it. `Delete_File` does this for a special file too.
 - **isofs serves no special files**, and its `Get_Special_File` always fails.
@@ -95,7 +96,7 @@ end Writable_Directory;
 - **Later devices have somewhere to live.** A serial port or a second console can be a special file in `system` without a new mechanism.
 - **`Directory` gains an operation**, which every directory server implements. Today there are two: the directory server and isofs.
 - **Login and petal gain a role.** Their callers pass one more cap, in declaration order.
-- **A special file's rights don't follow its directory's type.** This is the one place where a read-only `Directory` can give out a writable cap, and its documentation must say so.
+- **The rights of a directory and of its entries are separate.** This ADR states that explicitly. ADR 0003's read-only lookups stay as the rule for the files and directories a directory serves.
 
 ## Alternatives considered
 
@@ -106,7 +107,6 @@ end Writable_Directory;
 
 ## Open questions
 
-- **Read-only special files.** Should a special file in a read-only directory be narrowed to its `Reader`, with `Writable_Directory` giving the `Stream`? That would make a special file follow ADR 0012, but `echo hi > system/null` would then need a writable `system`.
 - **Who holds the writable `system`?** The installer could keep it, drop it after install, or give it to an administrator role (ADR 0021) so that devices can be added later.
 - **More named directories.** Should petal's table get other entries from the system as well, such as a shared `tmp`, or should those be up to the user's `.petalrc`?
 
