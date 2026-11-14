@@ -15,7 +15,9 @@
 --  4. The caller makes the new version's launch call, with the old
 --     version's Replaceable as its Previous argument. The new version
 --     takes over the old one's state, caps and deferred calls.
---  5. Commit, once that call has completed, makes the switch: the new
+--  5. Commit, once that call has completed and Ready is True again,
+--     makes the switch. (The old version has just answered the new
+--     version's calls, and may not be back at its receive: #926.) The new
 --     version takes the old one's identity and bank tree, the held calls
 --     reach it, and mem ends the old version. It is False, and nothing
 --     changed, if the switch couldn't be made: the new version lacks an

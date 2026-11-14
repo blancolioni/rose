@@ -160,6 +160,29 @@ package body Restore.Replacing is
           and then Params.Data (0) = Completed);
       --  The launch call in Params completed
 
+      function Wait_Until_Ready
+        (Replacement : Replacements.Replacement_Client)
+         return Boolean;
+      --  Ask Replacement until the old version is between calls, up to
+      --  a limit
+
+      ----------------------
+      -- Wait_Until_Ready --
+      ----------------------
+
+      function Wait_Until_Ready
+        (Replacement : Replacements.Replacement_Client)
+         return Boolean
+      is
+      begin
+         for Attempt in 1 .. 2_000 loop
+            if Replacements.Ready (Replacement) then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Wait_Until_Ready;
+
    begin
       Rose.Interfaces.Launch.Client.Open (Launcher, New_Launch);
       Rose.Interfaces.Launch.Client.Metadata (Launcher, Metadata_Text, Last);
@@ -179,7 +202,6 @@ package body Restore.Replacing is
          Replacement : constant Replacements.Replacement_Client :=
            Rose.Interfaces.Replacer.Client.Replace_Process
              (Replacer, Control);
-         Ready       : Boolean := False;
          Committed   : Boolean;
       begin
          if Rose.Interfaces.Replacer.Client.Has_Error then
@@ -195,12 +217,7 @@ package body Restore.Replacing is
 
          --  The old version has to be between calls (section 4).
 
-         for Attempt in 1 .. 2_000 loop
-            Ready := Replacements.Ready (Replacement);
-            exit when Ready;
-         end loop;
-
-         if not Ready then
+         if not Wait_Until_Ready (Replacement) then
             Replacements.Release (Replacement);
             return Not_Ready;
          end if;
@@ -239,6 +256,14 @@ package body Restore.Replacing is
          Rose.System_Calls.Receive_Words (Params, 1);
          Rose.System_Calls.Receive_Caps (Params, 4);
          Rose.System_Calls.Invoke_Capability (Params);
+
+         --  The old version has just answered the new version's calls,
+         --  and has to be between calls again (#926).
+
+         if Completes and then not Wait_Until_Ready (Replacement) then
+            Replacements.Release (Replacement);
+            return Not_Ready;
+         end if;
 
          Committed := Completes and then Replacements.Commit (Replacement);
          Replacements.Release (Replacement);
