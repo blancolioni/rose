@@ -14,7 +14,13 @@ package body Rose.Boot.Console is
 
    Checkpoint_Foreground        : constant := 16#0600#;
 
-   Serial_Port                  : constant := 16#03F8#;
+   COM1                         : constant := 16#03F8#;
+   COM2                         : constant := 16#02F8#;
+   Serial_Port                  : constant := COM1;
+   --  The kernel's log. COM2 has the console's copy, with serial-console
+   --  (#904). It's set up here too, because a 16550 starts with 5 data
+   --  bits, and the console only has its data and line status ports
+   --  (#917).
 
    Current_Colour               : constant Word_16 := 16#700#;
    Status_Chars                 : String (1 .. 80);
@@ -67,7 +73,9 @@ package body Rose.Boot.Console is
    procedure Put_String (Text   : String;
                          Update : Boolean);
 
-   procedure Enable_Serial_Port;
+   procedure Enable_Serial_Port (Base : Word_16);
+   --  Set the 16550 at Base to 115200 8N1, with its FIFO and no
+   --  interrupts
 
    -----------------------
    -- Checkpoint_Status --
@@ -156,15 +164,15 @@ package body Rose.Boot.Console is
    -- Enable_Serial_Port --
    ------------------------
 
-   procedure Enable_Serial_Port is
+   procedure Enable_Serial_Port (Base : Word_16) is
    begin
-      Rose.Arch.Outb (Serial_Port + 1, 16#00#);
-      Rose.Arch.Outb (Serial_Port + 3, 16#80#);
-      Rose.Arch.Outb (Serial_Port + 0, 16#01#);
-      Rose.Arch.Outb (Serial_Port + 1, 16#00#);
-      Rose.Arch.Outb (Serial_Port + 3, 16#03#);
-      Rose.Arch.Outb (Serial_Port + 2, 16#C7#);
-      Rose.Arch.Outb (Serial_Port + 1, 16#00#);
+      Rose.Arch.Outb (Base + 1, 16#00#);  --  no interrupts
+      Rose.Arch.Outb (Base + 3, 16#80#);  --  divisor latch on
+      Rose.Arch.Outb (Base + 0, 16#01#);  --  divisor 1: 115200
+      Rose.Arch.Outb (Base + 1, 16#00#);
+      Rose.Arch.Outb (Base + 3, 16#03#);  --  8N1, divisor latch off
+      Rose.Arch.Outb (Base + 2, 16#C7#);  --  FIFO on and cleared
+      Rose.Arch.Outb (Base + 1, 16#00#);
    end Enable_Serial_Port;
 
    ---------------------
@@ -219,7 +227,8 @@ package body Rose.Boot.Console is
 
       Status_Line ("starting ...", 0, 0, 0, 0, 0, 0, 0, 0);
 
-      Enable_Serial_Port;
+      Enable_Serial_Port (COM1);
+      Enable_Serial_Port (COM2);
 
    end Init_Boot_Console;
 
