@@ -6,8 +6,9 @@ all: auth
 
 # The spec of Rose.Core.Auth, its main and its metadata, the package
 # Rose.Core, and Auth with the interfaces it uses, are generated from IDL
-# (ADR 0002) for the user target, and the client of the user command,
-# which New_User launches (#831).
+# (ADR 0002) for the user target, with what Rose.Replacement needs, as auth
+# is a replaceable server (#831), and the clients of the user and
+# directory commands, which New_User launches (#831).
 
 auth:
 	mkdir -p build/obj
@@ -16,6 +17,10 @@ auth:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-auth.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/auth.idl \
+	    $(INTERFACES)/replaceable.idl \
+	    $(INTERFACES)/saveable.idl \
+	    $(INTERFACES)/releasable_cap_set.idl \
+	    $(INTERFACES)/cap_set.idl \
 	    $(INTERFACES)/auth_admin.idl \
 	    $(INTERFACES)/user.idl \
 	    $(INTERFACES)/named.idl \
@@ -44,5 +49,7 @@ auth:
 	    $(INTERFACES)/seekable.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
-	    ../user/rose-core-user.idl $(INTERFACES)/rose-core.idl
+	    ../user/rose-core-user.idl \
+	    ../../drivers/directory/rose-core-directory.idl \
+	    $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

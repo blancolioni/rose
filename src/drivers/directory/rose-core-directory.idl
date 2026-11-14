@@ -1,0 +1,34 @@
+command Rose.Core.Directory : Create_Endpoint, Delete_Cap, Cap_Set_Service
+  with Summary     => "Serve a directory.",
+       Description => """
+          Directory serves one directory (ADR 0003): its entries, each a
+          file or a directory of its own, launched when the entry is
+          created, in a bank of the entry's own, which deleting the entry
+          destroys. It is given the launch caps of the file and directory
+          commands, so that it can create only files and directories, and
+          the cap set server's Constructor, Cap_Set_Service, which it
+          gives each entry.
+
+          A new version of the program can take over from a running one
+          (ADR 0032, #831). Its state is the entries' names and kinds,
+          and the caps it holds for each entry: its writable interface,
+          its Replaceable interface, its bank, and its read-only
+          interface if one was given out. The launch caps and
+          Cap_Set_Service are its arguments, which the handover passes on
+          (#901), so a new version is launched with Previous alone. A
+          saved state has no caps, so a directory with entries can't be
+          restored from one.
+          """,
+       Server      => Directory_Server.Start_Server,
+       Replaceable => Directory_Server,
+       Live
+is
+   File_Launch : in Launch
+     with Help => "the launch interface of the file command";
+   Directory_Launch : in Launch
+     with Help => "the launch interface of the directory command";
+   Served : out Writable_Directory
+     with Help => "the directory";
+   Control : out Replaceable
+     with Help => "its Replaceable interface, which its parent keeps";
+end Rose.Core.Directory;

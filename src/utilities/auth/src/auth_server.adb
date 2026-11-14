@@ -1,13 +1,17 @@
 with Rose.System_Calls.Own_Bank;
 with Ada.Containers.Indefinite_Ordered_Maps;
+with Ada.Strings.Fixed;
 
 with System.Storage_Elements;
 
+with Rose.Core.Directory_Client;
 with Rose.Core.User_Client;
 with Rose.Crypto.PBKDF2_HMAC_SHA_256;
+with Rose.Objects;
 with Rose.Random;
 with Rose.Server;
 with Rose.System_Calls;
+with Rose.Words;
 
 with Rose.Interfaces.Auth.Server;
 with Rose.Interfaces.Auth_Admin.Server;
@@ -15,13 +19,13 @@ with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.User.Client;
 
 package body Auth_Server is
 
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
+   use type Rose.Words.Word_32;
 
    Max_Name_Length : constant := 64;
    Salt_Length     : constant := 16;
@@ -36,6 +40,26 @@ package body Auth_Server is
    --  A record keeps its algorithm, so that a stronger one, such as
    --  Argon2id, can be added later without losing the users.
 
+   Format : constant Rose.Words.Word_32 := 1;
+   --  The version of this server's part of the state (#831):
+   --
+   --    the Auth object's identifier, then the Auth_Admin object's
+   --    the number of users, then for each, in the order of their names:
+   --      the length of the name, then its characters
+   --      the hash's algorithm, a Hash_Algorithm, and its iterations
+   --      the salt, 16 bytes, and the hash, 32 bytes
+   --
+   --  and, for user I, counting from 1, the caps that it names:
+   --
+   --    User.I          the user's User interface
+   --    User.I.Control  the Replaceable interface of the user's server
+   --    Home.I.Control  the Replaceable interface of the home directory
+   --
+   --  Find_Command and Cap_Set_Service are its command's arguments, which
+   --  Rose.Replacement hands over (#901). The state has each password's
+   --  salted hash, as the process's memory does: only the holder of auth's
+   --  Replaceable or Saveable interface, which is init, can read it.
+
    type User_Record is
       record
          Name       : String (1 .. Max_Name_Length);
@@ -48,6 +72,9 @@ package body Auth_Server is
          Control    : Rose.Capabilities.Capability;
          --  The Replaceable interface of the user's server, which only
          --  auth holds, for a new version of the user program (#831).
+         Home       : Rose.Capabilities.Capability;
+         --  The Replaceable interface of the user's home directory, which
+         --  only auth holds, for a new version of the directory (#831).
       end record;
 
    package User_Maps is
@@ -90,7 +117,11 @@ package body Auth_Server is
       return User_Class;
 
    Users     : User_Maps.Map;
-   Context   : Rose.Server.Server_Context;
+   Context   : aliased Rose.Server.Server_Context;
+   Auth_Id   : Rose.Objects.Capability_Identifier := 0;
+   Admin_Id  : Rose.Objects.Capability_Identifier := 0;
+   --  The identifiers that the Auth and Auth_Admin objects had in the
+   --  version that this one took over from, or 0.
    Programs  : Rose.Interfaces.Commands.Client.Commands_Client;
    Cap_Sets  : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -101,6 +132,16 @@ package body Auth_Server is
    function No_User return User_Class
    is (Rose.Interfaces.User.Client.From_Cap
          (Rose.Capabilities.Null_Capability));
+
+   function Cap_Name
+     (Prefix : String;
+      Index  : Positive;
+      Suffix : String)
+      return String
+   is (Prefix & "."
+       & Ada.Strings.Fixed.Trim (Positive'Image (Index), Ada.Strings.Left)
+       & Suffix);
+   --  The name of a cap of user Index in the state.
 
    procedure Hash_Password
      (Password   : String;
@@ -159,15 +200,26 @@ package body Auth_Server is
    -- Create_Server --
    -------------------
 
+   --  A version that took over attaches each object with the identifier
+   --  it had, which the caps that clients hold name.
+
    procedure Create_Server
      (Commands        : Rose.Capabilities.Capability;
-      Cap_Set_Service : Rose.Capabilities.Capability)
+      Cap_Set_Service : Rose.Capabilities.Capability;
+      Control         : out Rose.Capabilities.Capability)
    is
    begin
       Rose.Interfaces.Commands.Client.Open (Programs, Commands);
       Cap_Sets := Cap_Set_Service;
-      Rose.Interfaces.Auth.Server.Publish (Context, The_Auth'Access);
-      Rose.Interfaces.Auth_Admin.Server.Attach (Context, The_Admin'Access);
+      Rose.Interfaces.Auth.Server.Attach
+        (Context, The_Auth'Access, Auth_Id);
+      Rose.Server.Publish_Interface
+        (Rose.Interfaces.Auth.Server.Interface_Cap (The_Auth'Access));
+      Rose.Interfaces.Auth_Admin.Server.Attach
+        (Context, The_Admin'Access, Admin_Id);
+      Rose.Replacement.Attach
+        (Context'Access, Write_State'Access, Cap_Set_Service);
+      Control := Rose.Replacement.Replaceable_Cap;
    end Create_Server;
 
    -------------------
@@ -281,6 +333,7 @@ package body Auth_Server is
       Home      : Rose.Capabilities.Capability;
       User      : Rose.Capabilities.Capability;
       Control   : Rose.Capabilities.Capability;
+      Home_Ctl  : Rose.Capabilities.Capability;
       User_Bank : Rose.Interfaces.Bank.Client.Bank_Client;
 
       function Give_Up return User_Class;
@@ -340,27 +393,37 @@ package body Auth_Server is
       end;
 
       --  The home directory, which can create files and directories
-      --  (ADR 0003). A program that can't be found raises.
+      --  (ADR 0003). It is a command, Rose.Core.Directory (#831). A
+      --  program that can't be found raises.
 
       begin
          declare
+            No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
             File_Launch      : Rose.Interfaces.Launch.Launch_Object'Class :=
               Programs.Find ("file");
             Directory_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
               Programs.Find ("directory");
-            Process          : Rose.Interfaces.Process.Process_Object'Class :=
-              Directory_Launch.Launch
-                (User_Bank.Get_Interface_Cap,
-                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap,
-                  Cap_Sets));
+            Endpoint         : constant Rose.Capabilities.Capability :=
+              Directory_Launch.Launch_Command
+                (User_Bank.Get_Interface_Cap, No_Caps);
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).
 
-            if Process.Process_Cap = Rose.Capabilities.Null_Capability then
+            if Endpoint = Rose.Capabilities.Null_Capability then
                return Give_Up;
             end if;
-            Home := Process.Published_Interface;
+
+            Rose.Core.Directory_Client.Call
+              (Endpoint         => Endpoint,
+               Create_Endpoint  =>
+                 Rose.System_Calls.Create_Endpoint_Capability,
+               Delete_Cap       => Rose.System_Calls.Delete_Cap_Capability,
+               Cap_Set_Service  => Cap_Sets,
+               File_Launch      => File_Launch.Launch_Cap,
+               Directory_Launch => Directory_Launch.Launch_Cap,
+               Served           => Home,
+               Control          => Home_Ctl);
          end;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
@@ -382,10 +445,71 @@ package body Auth_Server is
 
       New_Item.User := User;
       New_Item.Control := Control;
+      New_Item.Home := Home_Ctl;
       Users.Insert (New_Item.Name (1 .. New_Item.Name_Last), New_Item);
 
       return Rose.Interfaces.User.Client.From_Cap (User);
    end New_User;
+
+   ----------------
+   -- Read_State --
+   ----------------
+
+   procedure Read_State
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class;
+      Named  : Rose.Replacement.Named_Caps)
+   is
+      Version : Rose.Words.Word_32;
+      Count   : Natural;
+   begin
+      Rose.Words.Word_32'Read (Stream, Version);
+      if Version /= Format then
+         raise Rose.Replacement.Bad_State with "auth: unknown format";
+      end if;
+
+      Rose.Objects.Capability_Identifier'Read (Stream, Auth_Id);
+      Rose.Objects.Capability_Identifier'Read (Stream, Admin_Id);
+      Natural'Read (Stream, Count);
+
+      for Index in 1 .. Count loop
+         declare
+            Item   : User_Record;
+            Length : Natural;
+            Rounds : Natural;
+         begin
+            Natural'Read (Stream, Length);
+            if Length = 0 or else Length > Max_Name_Length then
+               raise Rose.Replacement.Bad_State with "auth: bad name";
+            end if;
+            for I in 1 .. Length loop
+               Character'Read (Stream, Item.Name (I));
+            end loop;
+            Item.Name_Last := Length;
+
+            Hash_Algorithm'Read (Stream, Item.Algorithm);
+            Natural'Read (Stream, Rounds);
+            if Rounds = 0 then
+               raise Rose.Replacement.Bad_State with "auth: bad iterations";
+            end if;
+            Item.Iterations := Rounds;
+            Storage_Array'Read (Stream, Item.Salt);
+            Storage_Array'Read (Stream, Item.Hash);
+
+            Item.User := Named.Cap (Cap_Name ("User", Index, ""));
+            Item.Control := Named.Cap (Cap_Name ("User", Index, ".Control"));
+            Item.Home := Named.Cap (Cap_Name ("Home", Index, ".Control"));
+            if Item.User = Rose.Capabilities.Null_Capability
+              or else Item.Control = Rose.Capabilities.Null_Capability
+              or else Item.Home = Rose.Capabilities.Null_Capability
+            then
+               raise Rose.Replacement.Bad_State
+                 with "auth: no caps for " & Item.Name (1 .. Length);
+            end if;
+
+            Users.Insert (Item.Name (1 .. Length), Item);
+         end;
+      end loop;
+   end Read_State;
 
    ------------------
    -- Start_Server --
@@ -395,5 +519,40 @@ package body Auth_Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   -----------------
+   -- Write_State --
+   -----------------
+
+   procedure Write_State
+     (Stream : not null access Ada.Streams.Root_Stream_Type'Class;
+      Named  : in out Rose.Replacement.Named_Caps)
+   is
+      Index : Positive := 1;
+   begin
+      Rose.Words.Word_32'Write (Stream, Format);
+      Rose.Objects.Capability_Identifier'Write
+        (Stream, Rose.Interfaces.Auth.Server.Identifier_Of (The_Auth'Access));
+      Rose.Objects.Capability_Identifier'Write
+        (Stream,
+         Rose.Interfaces.Auth_Admin.Server.Identifier_Of (The_Admin'Access));
+      Natural'Write (Stream, Natural (Users.Length));
+
+      for Item of Users loop
+         Natural'Write (Stream, Item.Name_Last);
+         for I in 1 .. Item.Name_Last loop
+            Character'Write (Stream, Item.Name (I));
+         end loop;
+         Hash_Algorithm'Write (Stream, Item.Algorithm);
+         Natural'Write (Stream, Item.Iterations);
+         Storage_Array'Write (Stream, Item.Salt);
+         Storage_Array'Write (Stream, Item.Hash);
+
+         Named.Add (Cap_Name ("User", Index, ""), Item.User);
+         Named.Add (Cap_Name ("User", Index, ".Control"), Item.Control);
+         Named.Add (Cap_Name ("Home", Index, ".Control"), Item.Home);
+         Index := Index + 1;
+      end loop;
+   end Write_State;
 
 end Auth_Server;

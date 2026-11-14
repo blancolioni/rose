@@ -3,19 +3,23 @@ with Ada.Text_IO;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
+with Rose.Core.Auth_Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
+with Rose.Interfaces.Auth.Client;
+with Rose.Interfaces.Auth_Admin.Client;
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Constructor.Client;
+with Rose.Interfaces.Directory;
+with Rose.Interfaces.File;
 with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
@@ -30,6 +34,7 @@ with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
+with Tests.Files;
 with Tests.Registry;
 with Tests.Users;
 
@@ -157,6 +162,468 @@ package body Tests.Replacement is
       when others =>
          return "(no name)";
    end Name_Of;
+
+   -----------------------
+   -- Replace_Auth_Test --
+   -----------------------
+
+   function Replace_Auth_Test return Boolean is
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      procedure Start_Auth
+        (Endpoint : Rose.Capabilities.Capability;
+         Auth     : out Rose.Capabilities.Capability;
+         Admin    : out Rose.Capabilities.Capability;
+         Control  : out Rose.Capabilities.Capability;
+         Previous : Rose.Capabilities.Capability := Null_Cap);
+      --  Make the launch call of the auth command whose endpoint is
+      --  Endpoint, with the test's caps for its roles, or none, taking
+      --  over from Previous, if it is a cap. Raises Invocation_Error if
+      --  the call fails.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      ----------------
+      -- Start_Auth --
+      ----------------
+
+      procedure Start_Auth
+        (Endpoint : Rose.Capabilities.Capability;
+         Auth     : out Rose.Capabilities.Capability;
+         Admin    : out Rose.Capabilities.Capability;
+         Control  : out Rose.Capabilities.Capability;
+         Previous : Rose.Capabilities.Capability := Null_Cap)
+      is
+         Fresh : constant Boolean := Previous = Null_Cap;
+
+         function Given
+           (Cap : Rose.Capabilities.Capability)
+            return Rose.Capabilities.Capability
+         is (if Fresh then Cap else Null_Cap);
+         --  A new version takes its caps from the old one (#901).
+
+      begin
+         Rose.Core.Auth_Client.Call
+           (Endpoint        => Endpoint,
+            Create_Endpoint => Given (Tests.Registry.Create_Endpoint),
+            Find_Command    => Given (Tests.Registry.Commands),
+            Cap_Set_Service => Given (Tests.Registry.Cap_Sets),
+            Auth            => Auth,
+            Admin           => Admin,
+            Control         => Control,
+            Previous        => Previous);
+      end Start_Auth;
+
+   begin
+      Ada.Text_IO.Put ("Replace auth test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  Auth, and the user's bank, home directory and user server, which
+      --  auth makes in its own bank, are in a bank of the test's own,
+      --  which it destroys at the end (#724). That is four processes at
+      --  once with the new version, as the install's self tests come
+      --  close to the kernel's 64 (#915).
+
+      declare
+         No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Launcher  : Rose.Interfaces.Launch.Launch_Object'Class :=
+           Tests.Registry.Launcher ("auth");
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
+         Auth_Cap  : Rose.Capabilities.Capability := Null_Cap;
+         Admin_Cap : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+      begin
+         if Endpoint /= Null_Cap then
+            begin
+               Start_Auth (Endpoint, Auth_Cap, Admin_Cap, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Auth_Cap = Null_Cap
+           or else Admin_Cap = Null_Cap
+           or else Control = Null_Cap
+         then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": auth did not start");
+            return False;
+         end if;
+
+         declare
+            Auth        : Rose.Interfaces.Auth.Client.Auth_Client :=
+              Rose.Interfaces.Auth.Client.From_Cap (Auth_Cap);
+            Admin       : Rose.Interfaces.Auth_Admin.Client
+              .Auth_Admin_Client :=
+                Rose.Interfaces.Auth_Admin.Client.From_Cap (Admin_Cap);
+            User        : Rose.Interfaces.User.User_Object'Class :=
+              Admin.New_User ("amy", "secret");
+            Session     : Rose.Interfaces.Bank.Bank_Object'Class :=
+              User.New_Session;
+            --  A user and a session from before the handover.
+            Replacement : Rose.Interfaces.Replacement
+              .Replacement_Object'Class :=
+                Replacer.Replace_Process (Control);
+            Committed   : Boolean := False;
+         begin
+            Check ("no user", User.User_Cap /= Null_Cap);
+            Check ("no replacement",
+                   Replacement.Replacement_Cap /= Null_Cap);
+
+            if Replacement.Replacement_Cap /= Null_Cap then
+               declare
+                  Ready       : Boolean := False;
+                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Replacement.Bank;
+                  New_Version : Rose.Capabilities.Capability;
+                  New_Auth    : Rose.Capabilities.Capability;
+                  New_Admin   : Rose.Capabilities.Capability;
+                  New_Control : Rose.Capabilities.Capability;
+               begin
+                  for Attempt in 1 .. 100_000 loop
+                     Ready := Replacement.Ready;
+                     exit when Ready;
+                  end loop;
+                  Check ("the old version is never ready", Ready);
+
+                  New_Version :=
+                    Launcher.Launch_Command (Sibling.Bank_Cap, No_Caps);
+                  Check ("the new version did not launch",
+                         New_Version /= Null_Cap);
+
+                  if Ready and then New_Version /= Null_Cap then
+                     Replacement.Allow (New_Version);
+                     begin
+                        Start_Auth
+                          (New_Version, New_Auth, New_Admin, New_Control,
+                           Previous => Control);
+                        Committed := Replacement.Commit;
+                     exception
+                        when Rose.Interfaces.Objects.Invocation_Error =>
+                           Check ("the new version refused", False);
+                     end;
+                  end if;
+               end;
+
+               Check ("the replacement did not commit", Committed);
+               Replacement.Release;
+            end if;
+
+            --  Until a replacement commits or is released, the old
+            --  version's calls are held, so nothing is asked of auth
+            --  unless it committed.
+
+            if Committed then
+
+               --  The new version has the user and the password's hash,
+               --  and gives the same user's server.
+
+               declare
+                  Again : Rose.Interfaces.User.User_Object'Class :=
+                    Auth.Login ("amy", "secret");
+                  Wrong : Rose.Interfaces.User.User_Object'Class :=
+                    Auth.Login ("amy", "wrong");
+               begin
+                  Check ("the user cannot log in",
+                         Again.User_Cap /= Null_Cap
+                         and then Again.Name = "amy");
+                  Check ("a wrong password logs in",
+                         Wrong.User_Cap = Null_Cap);
+               end;
+
+               --  The name is taken, which the new version knows without
+               --  launching anything.
+
+               declare
+                  Twice : Rose.Interfaces.User.User_Object'Class :=
+                    Admin.New_User ("amy", "other");
+               begin
+                  Check ("the user was made twice",
+                         Twice.User_Cap = Null_Cap);
+               end;
+
+               --  The user and the session from before still work.
+
+               declare
+                  Inner : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Session.Create_Sub_Bank (0, 0);
+               begin
+                  Check ("the user from before is wrong",
+                         User.Name = "amy");
+                  Check ("the session from before is gone",
+                         Inner.Bank_Cap /= Null_Cap);
+                  Inner.Destroy;
+               end;
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to auth failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_Auth_Test;
+
+   ----------------------------
+   -- Replace_Directory_Test --
+   ----------------------------
+
+   function Replace_Directory_Test return Boolean is
+      use type System.Storage_Elements.Storage_Count;
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      Hello : constant Ada.Streams.Stream_Element_Array (1 .. 5) :=
+        (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
+         Character'Pos ('l'), Character'Pos ('o'));
+
+   begin
+      Ada.Text_IO.Put ("Replace directory test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  The directory and its entries are in a bank of the test's own,
+      --  which it destroys at the end (#724).
+
+      declare
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Tests.Registry.Directory_Endpoint (Test_Bank.Bank_Cap);
+         Served    : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+         Top       : Rose.Interfaces.Writable_Directory.Client
+           .Writable_Directory_Client;
+      begin
+         if Endpoint /= Null_Cap then
+            begin
+               Tests.Registry.Start_Directory (Endpoint, Served, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Served = Null_Cap or else Control = Null_Cap then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": the directory did not start");
+            return False;
+         end if;
+
+         Top.Open (Served);
+
+         --  A file with contents, and an empty subdirectory. The test
+         --  keeps a writable and a read-only cap to each, which the
+         --  directory gave out before the handover. It uses few processes
+         --  at once, since the install's self tests come close to the
+         --  kernel's 64, and running out hangs the system (#915).
+
+         declare
+            File      : Rose.Interfaces.Writable_File
+              .Writable_File_Object'Class := Top.Create_File ("a");
+            Sub       : Rose.Interfaces.Writable_Directory
+              .Writable_Directory_Object'Class :=
+                Top.Create_Directory ("sub");
+            Read_File : Rose.Interfaces.File.File_Object'Class :=
+              Top.Get_Ordinary_File (1);
+            Read_Sub  : Rose.Interfaces.Directory.Directory_Object'Class :=
+              Top.Get_Directory (2);
+            Replacement : Rose.Interfaces.Replacement
+              .Replacement_Object'Class :=
+                Replacer.Replace_Process (Control);
+            Committed   : Boolean := False;
+         begin
+            Tests.Files.Append (File, Hello);
+            Check ("no subdirectory", Sub.Writable_Directory_Cap /= Null_Cap);
+            Check ("no replacement",
+                   Replacement.Replacement_Cap /= Null_Cap);
+
+            if Replacement.Replacement_Cap /= Null_Cap then
+               declare
+                  Ready       : Boolean := False;
+                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Replacement.Bank;
+                  New_Version : Rose.Capabilities.Capability;
+                  New_Served  : Rose.Capabilities.Capability;
+                  New_Control : Rose.Capabilities.Capability;
+               begin
+                  for Attempt in 1 .. 100_000 loop
+                     Ready := Replacement.Ready;
+                     exit when Ready;
+                  end loop;
+                  Check ("the old version is never ready", Ready);
+
+                  New_Version :=
+                    Tests.Registry.Directory_Endpoint (Sibling.Bank_Cap);
+                  Check ("the new version did not launch",
+                         New_Version /= Null_Cap);
+
+                  if Ready and then New_Version /= Null_Cap then
+                     Replacement.Allow (New_Version);
+                     begin
+                        Tests.Registry.Start_Directory
+                          (New_Version, New_Served, New_Control,
+                           Previous => Control);
+                        Committed := Replacement.Commit;
+                     exception
+                        when Rose.Interfaces.Objects.Invocation_Error =>
+                           Check ("the new version refused", False);
+                     end;
+                  end if;
+               end;
+
+               Check ("the replacement did not commit", Committed);
+               Replacement.Release;
+            end if;
+
+            --  Until a replacement commits or is released, the old
+            --  version's calls are held, so nothing is asked of the
+            --  directory unless it committed.
+
+            if Committed then
+
+               --  The new version has the entries, and its caps to them
+               --  work.
+
+               Check ("the entries are not the old version's",
+                      Top.Directory_Entry_Count = 2
+                      and then Top.Directory_Entry_Name (1) = "a"
+                      and then Top.Directory_Entry_Name (2) = "sub"
+                      and then Top.Find_Entry ("sub") = 2);
+               Check ("the file's size is wrong",
+                      Top.Directory_Entry_Size (1) = Hello'Length);
+               declare
+                  Again     : Rose.Interfaces.Writable_File
+                    .Writable_File_Object'Class := Top.Get_Writable_File (1);
+                  Sub_Again : Rose.Interfaces.Writable_Directory
+                    .Writable_Directory_Object'Class :=
+                      Top.Get_Writable_Directory (2);
+               begin
+                  Check ("the file through the directory is wrong",
+                         Again.Size = Hello'Length);
+                  Check ("the subdirectory through the directory is wrong",
+                         Sub_Again.Directory_Entry_Count = 0);
+               end;
+
+               --  The caps from before the handover work, and so do the
+               --  read-only interfaces that it hands out again.
+
+               Check ("the read-only file from before is wrong",
+                      Read_File.Size = Hello'Length);
+               Check ("the read-only directory from before is wrong",
+                      Read_Sub.Directory_Entry_Count = 0);
+               declare
+                  Read_Again : Rose.Interfaces.File.File_Object'Class :=
+                    Top.Get_Ordinary_File (1);
+               begin
+                  Check ("the read-only file is wrong",
+                         Read_Again.Size = Hello'Length);
+               end;
+
+               --  Deleting an entry that the old version created destroys
+               --  its bank, which the state handed over, and ends it. It
+               --  is deleted first, so that the file made next doesn't
+               --  need one more process.
+
+               Top.Delete_File ("a");
+               begin
+                  Ada.Text_IO.Put
+                    (System.Storage_Elements.Storage_Count'Image (File.Size));
+                  Check ("the deleted file still answers", False);
+               exception
+                  when Rose.Interfaces.Objects.Invocation_Error =>
+                     null;
+               end;
+
+               --  Entries can still be created, renamed and deleted.
+
+               declare
+                  Made : Rose.Interfaces.Writable_File
+                    .Writable_File_Object'Class := Top.Create_File ("b");
+               begin
+                  Check ("cannot create a file",
+                         Made.Writable_File_Cap /= Null_Cap
+                         and then Top.Directory_Entry_Count = 2);
+                  Top.Rename ("b", "c");
+                  Check ("the rename was lost", Top.Find_Entry ("c") = 2);
+                  Top.Delete_File ("c");
+               end;
+
+               Top.Delete_Directory ("sub");
+               Check ("the entries were not deleted",
+                      Top.Directory_Entry_Count = 0);
+               begin
+                  Ada.Text_IO.Put
+                    (Natural'Image (Read_Sub.Directory_Entry_Count));
+                  Check ("the deleted directory still answers", False);
+               exception
+                  when Rose.Interfaces.Objects.Invocation_Error =>
+                     null;
+               end;
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to the directory failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_Directory_Test;
 
    -----------------------
    -- Replace_File_Test --
@@ -725,20 +1192,7 @@ package body Tests.Replacement is
          Control   : Rose.Capabilities.Capability := Null_Cap;
          User      : Rose.Interfaces.User.Client.User_Client;
       begin
-         declare
-            Directories : Rose.Interfaces.Launch.Launch_Object'Class :=
-              Tests.Registry.Launcher ("directory");
-            Process     : Rose.Interfaces.Process.Process_Object'Class :=
-              Directories.Launch
-                (Test_Bank.Bank_Cap,
-                 (Tests.Registry.Launcher_Cap ("file"),
-                  Tests.Registry.Launcher_Cap ("directory"),
-                  Tests.Registry.Cap_Sets));
-         begin
-            if Process.Process_Cap /= Null_Cap then
-               Home.Open (Process.Published_Interface);
-            end if;
-         end;
+         Home.Open (Tests.Registry.Launch_Directory (Test_Bank.Bank_Cap));
 
          if Endpoint /= Null_Cap
            and then Home.Get_Interface_Cap /= Null_Cap

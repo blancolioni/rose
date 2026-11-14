@@ -9,9 +9,9 @@ with Rose.Capabilities;
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Launch;
+with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Process;
-with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
 with Tests.Files;
@@ -23,8 +23,6 @@ package body Tests.Processes is
    use System.Storage_Elements;
 
    package Files renames Rose.Interfaces.Writable_File.Client;
-   package Directories renames
-     Rose.Interfaces.Writable_Directory.Client;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -86,38 +84,34 @@ package body Tests.Processes is
    ----------------------
 
    function End_Process_Test return Boolean is
+      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
-        Tests.Registry.Launcher ("directory");
+        Tests.Registry.Launcher ("process_probe");
 
-      function Launch_Directory
+      function Launch_Probe
         return Rose.Interfaces.Process.Process_Object'Class
-      is (Launcher.Launch
-            (Rose.System_Calls.Own_Bank.Cap,
-             (Tests.Registry.Launcher_Cap ("file"),
-              Tests.Registry.Launcher_Cap ("directory"),
-              Tests.Registry.Cap_Sets)));
-      --  A directory, which is launched with Launch and so has a Process
-      --  cap, as a file did before it was a command (#867).
+      is (Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps));
+      --  A probe, which is launched with Launch and so has a Process cap,
+      --  as a command doesn't (#831).
 
-      First     : Rose.Interfaces.Process.Process_Object'Class :=
-        Launch_Directory;
-      Directory : Directories.Writable_Directory_Client;
+      First : Rose.Interfaces.Process.Process_Object'Class := Launch_Probe;
+      Probe : Rose.Interfaces.Named.Client.Named_Client;
    begin
       Ada.Text_IO.Put ("End process test");
 
-      Directory.Open (First.Published_Interface);
-      if Directory.Directory_Entry_Count /= 0 then
-         return Fail ("the directory doesn't work");
+      Probe.Open (First.Published_Interface);
+      if Probe.Name /= "probe" then
+         return Fail ("the probe doesn't work");
       end if;
 
-      --  The launcher ends the directory's process. The caps that are
-      --  held for it then fail (#320).
+      --  The launcher ends the probe's process. The caps that are held
+      --  for it then fail (#320).
 
       First.Destroy;
 
       begin
-         Ada.Text_IO.Put (Natural'Image (Directory.Directory_Entry_Count));
-         return Fail ("the directory answers after its process ended");
+         Ada.Text_IO.Put (" " & Probe.Name);
+         return Fail ("the probe answers after its process ended");
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
             null;
@@ -128,11 +122,11 @@ package body Tests.Processes is
       --  again must not reach it.
 
       declare
-         Second           : Rose.Interfaces.Process.Process_Object'Class :=
-           Launch_Directory;
-         Second_Directory : Directories.Writable_Directory_Client;
+         Second       : Rose.Interfaces.Process.Process_Object'Class :=
+           Launch_Probe;
+         Second_Probe : Rose.Interfaces.Named.Client.Named_Client;
       begin
-         Second_Directory.Open (Second.Published_Interface);
+         Second_Probe.Open (Second.Published_Interface);
 
          begin
             First.Destroy;
@@ -142,8 +136,8 @@ package body Tests.Processes is
          end;
 
          begin
-            if Second_Directory.Directory_Entry_Count /= 0 then
-               return Fail ("the second directory doesn't work");
+            if Second_Probe.Name /= "probe" then
+               return Fail ("the second probe doesn't work");
             end if;
          exception
             when Rose.Interfaces.Objects.Invocation_Error =>

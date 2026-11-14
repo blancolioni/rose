@@ -71,6 +71,11 @@ package body Restore.Installer.Default is
 
       Process ("file", "drivers", Save, Default_Flags);
       Process ("directory", "drivers", Save, Default_Flags);
+
+      --  Saved, not launched: run_self_tests' End_Process_Test launches
+      --  it with Launch, for its Process cap (#320, #831).
+
+      Process ("process_probe", "drivers", Save, Default_Flags);
       Process ("echo", "bin", Save, Default_Flags);
       Process ("list", "bin", Save, Default_Flags);
       Process ("cat", "bin", Save, Default_Flags);

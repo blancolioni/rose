@@ -6,11 +6,12 @@ command Rose.Core.Hold_Home
           checkpoint taken after it (#831, ADR 0032). Init launches it on
           a new install. It launches a home directory with a file in it,
           and a user server that holds the directory, starts a session,
-          and returns the user server's Replaceable interface. Init then
-          replaces the user server with a new version, and the checkpoint
-          saves the new version. The first time Hold_Home is restored, it
-          checks that the user still has its name and home directory, and
-          that the session from before and a new one work, and writes
+          and returns the Replaceable interfaces of the user server and
+          the directory. Init then replaces each with a new version, and
+          the checkpoint saves the new versions. The first time Hold_Home is restored, it
+          checks that the user still has its name and home directory,
+          that the directory still has its file, and that the session
+          from before and a new one work, and writes
           the result to standard output. It never completes.
           """,
        Server      => Home_Holder.Start_Server,
@@ -18,4 +19,6 @@ command Rose.Core.Hold_Home
 is
    User_Control : out Replaceable
      with Help => "the user server's Replaceable interface";
+   Home_Control : out Replaceable
+     with Help => "the home directory's Replaceable interface";
 end Rose.Core.Hold_Home;

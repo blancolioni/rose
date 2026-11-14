@@ -1,5 +1,7 @@
 with Ada.Text_IO;
+with System.Storage_Elements;
 
+with Rose.Core.Directory_Client;
 with Rose.Core.User_Client;
 with Rose.Server;
 with Rose.System_Calls;
@@ -10,7 +12,6 @@ with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.Restorable.Server;
 with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory;
@@ -20,6 +21,7 @@ with Rose.Interfaces.Writable_File;
 package body Home_Holder is
 
    use type Rose.Capabilities.Capability;
+   use type System.Storage_Elements.Storage_Count;
 
    type Holder_Object is
      limited new Rose.Interfaces.Restorable.Server.Restorable_Interface
@@ -57,7 +59,8 @@ package body Home_Holder is
    procedure Create_Server
      (Commands        : Rose.Capabilities.Capability;
       Cap_Set_Service : Rose.Capabilities.Capability;
-      User_Control    : out Rose.Capabilities.Capability)
+      User_Control    : out Rose.Capabilities.Capability;
+      Home_Control    : out Rose.Capabilities.Capability)
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Programs : Rose.Interfaces.Commands.Client.Commands_Client;
@@ -67,6 +70,7 @@ package body Home_Holder is
       Served   : Rose.Capabilities.Capability;
    begin
       User_Control := Rose.Capabilities.Null_Capability;
+      Home_Control := Rose.Capabilities.Null_Capability;
       Rose.Interfaces.Restorable.Server.Attach (Context, The_Holder'Access);
       Programs.Open (Commands);
       Own.Open (Rose.System_Calls.Own_Bank.Cap);
@@ -82,18 +86,24 @@ package body Home_Holder is
            Programs.Find ("directory");
          User_Launch      : Rose.Interfaces.Launch.Launch_Object'Class :=
            Programs.Find ("user");
-         Process          : Rose.Interfaces.Process.Process_Object'Class :=
-           Directory_Launch.Launch
-             (User_Bank.Bank_Cap,
-              (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap,
-               Cap_Set_Service));
-         Endpoint         : Rose.Capabilities.Capability;
+         Endpoint         : Rose.Capabilities.Capability :=
+           Directory_Launch.Launch_Command (User_Bank.Bank_Cap, No_Caps);
+         Served_Home      : Rose.Capabilities.Capability;
       begin
-         if Process.Process_Cap = Rose.Capabilities.Null_Capability then
+         if Endpoint = Rose.Capabilities.Null_Capability then
             raise Rose.Interfaces.Objects.Invocation_Error
               with "no home directory";
          end if;
-         Home.Open (Process.Published_Interface);
+         Rose.Core.Directory_Client.Call
+           (Endpoint         => Endpoint,
+            Create_Endpoint  => Rose.System_Calls.Create_Endpoint_Capability,
+            Delete_Cap       => Rose.System_Calls.Delete_Cap_Capability,
+            Cap_Set_Service  => Cap_Set_Service,
+            File_Launch      => File_Launch.Launch_Cap,
+            Directory_Launch => Directory_Launch.Launch_Cap,
+            Served           => Served_Home,
+            Control          => Home_Control);
+         Home.Open (Served_Home);
 
          declare
             Created : Rose.Interfaces.Writable_File
@@ -133,6 +143,7 @@ package body Home_Holder is
       when Rose.Interfaces.Objects.Invocation_Error =>
          Ada.Text_IO.Put_Line ("hold_home: FAIL: the user did not start");
          User_Control := Rose.Capabilities.Null_Capability;
+         Home_Control := Rose.Capabilities.Null_Capability;
    end Create_Server;
 
    --------------
@@ -151,7 +162,14 @@ package body Home_Holder is
          Name : constant String := User.Name;
          Home : Rose.Interfaces.Writable_Directory
            .Writable_Directory_Object'Class := User.Home_Directory;
-         Kept : constant Boolean := Home.Find_Entry (File_Name) = 1;
+         File : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+           Home.Get_Writable_File (1);
+         Kept : constant Boolean :=
+           Home.Find_Entry (File_Name) = 1
+           and then Home.Directory_Entry_Name (1) = File_Name
+           and then File.Size = 0;
+         --  The replaced directory has its entry, and its cap to the
+         --  entry's file still works.
          Next : Rose.Interfaces.Bank.Bank_Object'Class := User.New_Session;
          Old  : Rose.Interfaces.Bank.Bank_Object'Class :=
            Session.Create_Sub_Bank (0, 0);

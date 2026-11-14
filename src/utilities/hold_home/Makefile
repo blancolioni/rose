@@ -6,8 +6,8 @@ all: hold_home
 
 # The spec of Rose.Core.Hold_Home, its main and its metadata, the package
 # Rose.Core, and the interfaces it uses, are generated from IDL (ADR 0002)
-# for the user target, and the client of the user command, which it
-# launches (#831, idle#103).
+# for the user target, and the clients of the user and directory
+# commands, which it launches (#831, idle#103).
 
 hold_home:
 	mkdir -p build/obj
@@ -45,5 +45,7 @@ hold_home:
 	    $(INTERFACES)/stream.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
-	    ../user/rose-core-user.idl $(INTERFACES)/rose-core.idl
+	    ../user/rose-core-user.idl \
+	    ../../drivers/directory/rose-core-directory.idl \
+	    $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)
