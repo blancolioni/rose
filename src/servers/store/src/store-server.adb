@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Words;
 
 with Rose.Console_IO;
@@ -15,6 +17,9 @@ with Rose.Interfaces.Reader.Server;
 with Store.Devices;
 
 package body Store.Server is
+
+   procedure Map_Bss;
+   --  Touch each page of the bss, so that mem maps it now (#914)
 
    -------------------
    -- Create_Server --
@@ -90,6 +95,37 @@ package body Store.Server is
          Find_Region        => Store.Devices.Find_Region'Access);
    end Create_Server;
 
+   -------------
+   -- Map_Bss --
+   -------------
+
+   procedure Map_Bss is
+      use System.Storage_Elements;
+      Bss_Start : constant Storage_Element
+        with Import, Convention => C, External_Name => "__bss_start";
+      Bss_End   : constant Storage_Element
+        with Import, Convention => C, External_Name => "_end";
+      Page_Size : constant := 4096;
+      First     : constant Integer_Address := To_Integer (Bss_Start'Address);
+      Last      : constant Integer_Address := To_Integer (Bss_End'Address);
+      Address   : Integer_Address := First - First mod Page_Size;
+   begin
+      while Address < Last loop
+
+         --  A write, not a read: mem maps a page read-only until it is
+         --  written, so that it knows the page is dirty, and the first
+         --  write faults again.
+
+         declare
+            Byte : Storage_Element
+              with Import, Volatile, Address => To_Address (Address);
+         begin
+            Byte := Byte;
+         end;
+         Address := Address + Page_Size;
+      end loop;
+   end Map_Bss;
+
    ------------------
    -- Start_Server --
    ------------------
@@ -97,6 +133,16 @@ package body Store.Server is
    procedure Start_Server is
    begin
       Rose.Console_IO.Put_Line ("storage: starting server");
+
+      --  Mem waits in its calls to the store, and only mem serves the
+      --  store's page faults, so the store must not fault in one of those
+      --  calls (#914). Mem maps a page of the bss the first time it is
+      --  touched, and makes it writable the first time it is written, so
+      --  each is written now, while mem is free to serve the faults. The
+      --  endpoints are registered already, so init isn't kept waiting for
+      --  them.
+
+      Map_Bss;
       Rose.Server.Start_Server (Server_Context);
    end Start_Server;
 
