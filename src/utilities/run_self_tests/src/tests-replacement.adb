@@ -11,11 +11,12 @@ with Rose.Words;
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Constructor.Client;
+with Rose.Interfaces.Directory;
+with Rose.Interfaces.File;
 with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Named.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.Releasable_Cap_Set;
 with Rose.Interfaces.Releasable_Cap_Set.Client;
 with Rose.Interfaces.Releasable_Reader;
@@ -30,6 +31,7 @@ with Rose.Interfaces.User.Client;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
 
+with Tests.Files;
 with Tests.Registry;
 with Tests.Users;
 
@@ -157,6 +159,238 @@ package body Tests.Replacement is
       when others =>
          return "(no name)";
    end Name_Of;
+
+   ----------------------------
+   -- Replace_Directory_Test --
+   ----------------------------
+
+   function Replace_Directory_Test return Boolean is
+      use type System.Storage_Elements.Storage_Count;
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      Hello : constant Ada.Streams.Stream_Element_Array (1 .. 5) :=
+        (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
+         Character'Pos ('l'), Character'Pos ('o'));
+
+   begin
+      Ada.Text_IO.Put ("Replace directory test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  The directory and its entries are in a bank of the test's own,
+      --  which it destroys at the end (#724).
+
+      declare
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Tests.Registry.Directory_Endpoint (Test_Bank.Bank_Cap);
+         Served    : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+         Top       : Rose.Interfaces.Writable_Directory.Client
+           .Writable_Directory_Client;
+      begin
+         if Endpoint /= Null_Cap then
+            begin
+               Tests.Registry.Start_Directory (Endpoint, Served, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Served = Null_Cap or else Control = Null_Cap then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": the directory did not start");
+            return False;
+         end if;
+
+         Top.Open (Served);
+
+         --  A file with contents, and an empty subdirectory. The test
+         --  keeps a writable and a read-only cap to each, which the
+         --  directory gave out before the handover. It uses few processes
+         --  at once, since the install's self tests come close to the
+         --  kernel's 64, and running out hangs the system (#915).
+
+         declare
+            File      : Rose.Interfaces.Writable_File
+              .Writable_File_Object'Class := Top.Create_File ("a");
+            Sub       : Rose.Interfaces.Writable_Directory
+              .Writable_Directory_Object'Class :=
+                Top.Create_Directory ("sub");
+            Read_File : Rose.Interfaces.File.File_Object'Class :=
+              Top.Get_Ordinary_File (1);
+            Read_Sub  : Rose.Interfaces.Directory.Directory_Object'Class :=
+              Top.Get_Directory (2);
+            Replacement : Rose.Interfaces.Replacement
+              .Replacement_Object'Class :=
+                Replacer.Replace_Process (Control);
+            Committed   : Boolean := False;
+         begin
+            Tests.Files.Append (File, Hello);
+            Check ("no subdirectory", Sub.Writable_Directory_Cap /= Null_Cap);
+            Check ("no replacement",
+                   Replacement.Replacement_Cap /= Null_Cap);
+
+            if Replacement.Replacement_Cap /= Null_Cap then
+               declare
+                  Ready       : Boolean := False;
+                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Replacement.Bank;
+                  New_Version : Rose.Capabilities.Capability;
+                  New_Served  : Rose.Capabilities.Capability;
+                  New_Control : Rose.Capabilities.Capability;
+               begin
+                  for Attempt in 1 .. 100_000 loop
+                     Ready := Replacement.Ready;
+                     exit when Ready;
+                  end loop;
+                  Check ("the old version is never ready", Ready);
+
+                  New_Version :=
+                    Tests.Registry.Directory_Endpoint (Sibling.Bank_Cap);
+                  Check ("the new version did not launch",
+                         New_Version /= Null_Cap);
+
+                  if Ready and then New_Version /= Null_Cap then
+                     Replacement.Allow (New_Version);
+                     begin
+                        Tests.Registry.Start_Directory
+                          (New_Version, New_Served, New_Control,
+                           Previous => Control);
+                        Committed := Replacement.Commit;
+                     exception
+                        when Rose.Interfaces.Objects.Invocation_Error =>
+                           Check ("the new version refused", False);
+                     end;
+                  end if;
+               end;
+
+               Check ("the replacement did not commit", Committed);
+               Replacement.Release;
+            end if;
+
+            --  Until a replacement commits or is released, the old
+            --  version's calls are held, so nothing is asked of the
+            --  directory unless it committed.
+
+            if Committed then
+
+               --  The new version has the entries, and its caps to them
+               --  work.
+
+               Check ("the entries are not the old version's",
+                      Top.Directory_Entry_Count = 2
+                      and then Top.Directory_Entry_Name (1) = "a"
+                      and then Top.Directory_Entry_Name (2) = "sub"
+                      and then Top.Find_Entry ("sub") = 2);
+               Check ("the file's size is wrong",
+                      Top.Directory_Entry_Size (1) = Hello'Length);
+               declare
+                  Again     : Rose.Interfaces.Writable_File
+                    .Writable_File_Object'Class := Top.Get_Writable_File (1);
+                  Sub_Again : Rose.Interfaces.Writable_Directory
+                    .Writable_Directory_Object'Class :=
+                      Top.Get_Writable_Directory (2);
+               begin
+                  Check ("the file through the directory is wrong",
+                         Again.Size = Hello'Length);
+                  Check ("the subdirectory through the directory is wrong",
+                         Sub_Again.Directory_Entry_Count = 0);
+               end;
+
+               --  The caps from before the handover work, and so do the
+               --  read-only interfaces that it hands out again.
+
+               Check ("the read-only file from before is wrong",
+                      Read_File.Size = Hello'Length);
+               Check ("the read-only directory from before is wrong",
+                      Read_Sub.Directory_Entry_Count = 0);
+               declare
+                  Read_Again : Rose.Interfaces.File.File_Object'Class :=
+                    Top.Get_Ordinary_File (1);
+               begin
+                  Check ("the read-only file is wrong",
+                         Read_Again.Size = Hello'Length);
+               end;
+
+               --  Deleting an entry that the old version created destroys
+               --  its bank, which the state handed over, and ends it. It
+               --  is deleted first, so that the file made next doesn't
+               --  need one more process.
+
+               Top.Delete_File ("a");
+               begin
+                  Ada.Text_IO.Put
+                    (System.Storage_Elements.Storage_Count'Image (File.Size));
+                  Check ("the deleted file still answers", False);
+               exception
+                  when Rose.Interfaces.Objects.Invocation_Error =>
+                     null;
+               end;
+
+               --  Entries can still be created, renamed and deleted.
+
+               declare
+                  Made : Rose.Interfaces.Writable_File
+                    .Writable_File_Object'Class := Top.Create_File ("b");
+               begin
+                  Check ("cannot create a file",
+                         Made.Writable_File_Cap /= Null_Cap
+                         and then Top.Directory_Entry_Count = 2);
+                  Top.Rename ("b", "c");
+                  Check ("the rename was lost", Top.Find_Entry ("c") = 2);
+                  Top.Delete_File ("c");
+               end;
+
+               Top.Delete_Directory ("sub");
+               Check ("the entries were not deleted",
+                      Top.Directory_Entry_Count = 0);
+               begin
+                  Ada.Text_IO.Put
+                    (Natural'Image (Read_Sub.Directory_Entry_Count));
+                  Check ("the deleted directory still answers", False);
+               exception
+                  when Rose.Interfaces.Objects.Invocation_Error =>
+                     null;
+               end;
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to the directory failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_Directory_Test;
 
    -----------------------
    -- Replace_File_Test --
@@ -725,20 +959,7 @@ package body Tests.Replacement is
          Control   : Rose.Capabilities.Capability := Null_Cap;
          User      : Rose.Interfaces.User.Client.User_Client;
       begin
-         declare
-            Directories : Rose.Interfaces.Launch.Launch_Object'Class :=
-              Tests.Registry.Launcher ("directory");
-            Process     : Rose.Interfaces.Process.Process_Object'Class :=
-              Directories.Launch
-                (Test_Bank.Bank_Cap,
-                 (Tests.Registry.Launcher_Cap ("file"),
-                  Tests.Registry.Launcher_Cap ("directory"),
-                  Tests.Registry.Cap_Sets));
-         begin
-            if Process.Process_Cap /= Null_Cap then
-               Home.Open (Process.Published_Interface);
-            end if;
-         end;
+         Home.Open (Tests.Registry.Launch_Directory (Test_Bank.Bank_Cap));
 
          if Endpoint /= Null_Cap
            and then Home.Get_Interface_Cap /= Null_Cap

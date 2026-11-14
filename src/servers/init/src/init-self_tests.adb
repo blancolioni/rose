@@ -825,6 +825,10 @@ package body Init.Self_Tests is
         Init.Calls.Find_In_Map (Find_Cap, "hold_home");
       User_Cap   : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "user");
+      Home_Cap   : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "directory");
+      User_Ctl   : Rose.Capabilities.Capability;
+      Home_Ctl   : Rose.Capabilities.Capability;
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
@@ -832,6 +836,7 @@ package body Init.Self_Tests is
    begin
       if Holder_Cap = Rose.Capabilities.Null_Capability
         or else User_Cap = Rose.Capabilities.Null_Capability
+        or else Home_Cap = Rose.Capabilities.Null_Capability
         or else Cap_Sets = Rose.Capabilities.Null_Capability
       then
          return False;
@@ -848,7 +853,8 @@ package body Init.Self_Tests is
       --  Its roles' caps, as src/utilities/hold_home/
       --  rose-core-hold_home.idl declares them: Create_Endpoint,
       --  Standard_Output, Find_Command and Cap_Set_Service. It replies
-      --  with the user server's Replaceable, once it holds the user.
+      --  with the Replaceable interfaces of the user server and the home
+      --  directory, once it holds the user.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
@@ -856,7 +862,7 @@ package body Init.Self_Tests is
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Cap_Sets);
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 2);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -867,19 +873,32 @@ package body Init.Self_Tests is
          return False;
       end if;
 
+      User_Ctl := Params.Caps (0);
+      Home_Ctl := Params.Caps (1);
+
       --  The user command's launch call, as src/utilities/user/
       --  rose-core-user.idl declares it: Create_Endpoint,
       --  Cap_Set_Service, Home and Bank, then Previous, and its name,
       --  which a new version takes from the old one; and its results
-      --  User and Control.
+      --  User and Control. Then the directory command's, as src/drivers/
+      --  directory/rose-core-directory.idl declares it: Create_Endpoint,
+      --  Delete_Cap, Cap_Set_Service, File_Launch and Directory_Launch,
+      --  then Previous; and its results Served and Control.
 
       return Replace
-        (Replace_Process => Replace_Process,
-         Control         => Params.Caps (0),
-         Program         => User_Cap,
-         Null_Caps       => 4,
-         Empty_Strings   => 1,
-         Results         => 2);
+          (Replace_Process => Replace_Process,
+           Control         => User_Ctl,
+           Program         => User_Cap,
+           Null_Caps       => 4,
+           Empty_Strings   => 1,
+           Results         => 2)
+        and then Replace
+          (Replace_Process => Replace_Process,
+           Control         => Home_Ctl,
+           Program         => Home_Cap,
+           Null_Caps       => 5,
+           Empty_Strings   => 0,
+           Results         => 2);
    end Replace_Held_User;
 
    ---------

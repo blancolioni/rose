@@ -73,6 +73,7 @@ package Tests.Suite is
                    Tests.Replacement.Replacement_Test'Access,
                    Tests.Replacement.Replace_Process_Test'Access,
                    Tests.Replacement.Replace_File_Test'Access,
+                   Tests.Replacement.Replace_Directory_Test'Access,
                    Tests.Replacement.Replace_User_Test'Access,
                    Tests.Signed.Signed_Test'Access);
 

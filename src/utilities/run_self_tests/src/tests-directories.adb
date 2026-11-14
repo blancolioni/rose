@@ -6,12 +6,12 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
+with Rose.Interfaces.Bank;
+with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Directory;
 with Rose.Interfaces.File;
 with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.Transactional_Writable_File;
 with Rose.Interfaces.Writable_Directory.Client;
 with Rose.Interfaces.Writable_File.Client;
@@ -92,11 +92,7 @@ package body Tests.Directories is
       Ada.Text_IO.Put ("Directory test");
 
       Top.Open
-        (Tests.Registry.Launch
-           ("directory",
-            (Tests.Registry.Launcher_Cap ("file"),
-             Tests.Registry.Launcher_Cap ("directory"),
-             Tests.Registry.Cap_Sets)));
+        (Tests.Registry.Launch_Directory);
 
       if Top.Writable_Directory_Cap = Rose.Capabilities.Null_Capability then
          return Fail ("no directory server");
@@ -302,14 +298,13 @@ package body Tests.Directories is
    ------------------
 
    function Version_Test return Boolean is
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
-        Tests.Registry.Launcher ("directory");
-      Process  : Rose.Interfaces.Process.Process_Object'Class :=
-        Launcher.Launch
-          (Rose.System_Calls.Own_Bank.Cap,
-           (Tests.Registry.Launcher_Cap ("file"),
-            Tests.Registry.Launcher_Cap ("directory"),
-            Tests.Registry.Cap_Sets));
+      Own      : Rose.Interfaces.Bank.Client.Bank_Client :=
+        Rose.Interfaces.Bank.Client.From_Cap
+          (Rose.System_Calls.Own_Bank.Cap);
+      Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+        Own.Create_Sub_Bank (0, 0);
+      --  The directory is a command, which runs in a bank that the test
+      --  destroys to end it (#831).
       Top      : Rose.Interfaces.Writable_Directory.Client
         .Writable_Directory_Client;
 
@@ -348,7 +343,7 @@ package body Tests.Directories is
    begin
       Ada.Text_IO.Put ("Version test");
 
-      Top.Open (Process.Published_Interface);
+      Top.Open (Tests.Registry.Launch_Directory (Test_Bank.Bank_Cap));
       if Top.Writable_Directory_Cap = Rose.Capabilities.Null_Capability then
          return Fail ("no directory server");
       end if;
@@ -403,7 +398,7 @@ package body Tests.Directories is
 
       --  The directory ends with the test.
 
-      Process.Destroy;
+      Test_Bank.Destroy;
       return True;
    end Version_Test;
 

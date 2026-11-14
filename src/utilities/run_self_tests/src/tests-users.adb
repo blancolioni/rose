@@ -109,11 +109,7 @@ package body Tests.Users is
          Before_Regions, Regions, Region_Limit : Rose.Words.Word;
       begin
          Home.Open
-           (Tests.Registry.Launch
-              ("directory",
-               (Tests.Registry.Launcher_Cap ("file"),
-                Tests.Registry.Launcher_Cap ("directory"),
-                Tests.Registry.Cap_Sets)));
+           (Tests.Registry.Launch_Directory);
          User.Open
            (Create_User
               ("session", Home.Get_Interface_Cap, User_Bank.Bank_Cap));
@@ -232,10 +228,7 @@ package body Tests.Users is
       Ada.Text_IO.Put ("User test");
 
       Home.Open
-        (Tests.Registry.Launch
-           ("directory",
-            (Tests.Registry.Launcher_Cap ("file"),
-             Tests.Registry.Launcher_Cap ("directory"))));
+        (Tests.Registry.Launch_Directory);
 
       --  The user is launched as a command, whose launch call gives it a
       --  create endpoint cap, the cap set server, its home directory, its

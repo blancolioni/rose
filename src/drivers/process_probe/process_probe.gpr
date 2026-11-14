@@ -1,0 +1,46 @@
+with "../../../projects/checks.gpr";
+
+project Process_Probe is
+
+   --  Built with the userland run-time system (#490), which has Rose's
+   --  base, capability and system call packages, and the user-mode IDL
+   --  target, whose packages the Makefile generates in build/generated
+   --  (#528). The kernel target's packages, in kernelapi/generated, must
+   --  not be on the path: the two targets have units with the same names.
+
+   --  The RTS's own interface specs come first, so that the program
+   --  uses them and not the other copies on its path (#538).
+
+   for Source_Dirs use
+      ("../../../rts/user/build/interfaces",
+       "src",
+       "build/generated",
+       "../../library/rose");
+   for Object_Dir use "./build/obj";
+   for Exec_Dir use "./build/bin";
+   for Main use ("process_probe.adb");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "process_probe-pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Executable ("process_probe.adb") use "process_probe";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("ada") use ("-E");
+   end Binder;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../../rts/user/start/start.o");
+   end Linker;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end Process_Probe;

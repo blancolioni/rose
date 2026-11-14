@@ -15,15 +15,16 @@ project Directory is
       ("../../../rts/user/build/interfaces",
        "src",
        "build/generated",
-       "../../library/rose");
+       "../../library/rose",
+       "../../library/replacement");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
-   for Main use ("directory-driver.adb");
+   for Main use ("rose-core-directory_main.adb");
 
    package Builder is
       for Global_Configuration_Pragmas use "directory-pragmas.config";
       for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
-      for Executable ("directory-driver.adb") use "directory";
+      for Executable ("rose-core-directory_main.adb") use "directory";
    end Builder;
 
    package Compiler is
