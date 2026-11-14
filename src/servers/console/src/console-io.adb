@@ -139,6 +139,17 @@ package body Console.IO is
       New_Line;
    end Put_Line;
 
+   ---------------------
+   -- Put_Mirror_Only --
+   ---------------------
+
+   procedure Put_Mirror_Only (Text : String) is
+   begin
+      if Mirror then
+         Console.Calls.Write_Mirror (Text);
+      end if;
+   end Put_Mirror_Only;
+
    ----------------
    -- Put_Serial --
    ----------------

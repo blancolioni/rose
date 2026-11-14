@@ -17,8 +17,10 @@ SECTIONS
     }
 
     .bss : {
+        __bss_start = .;
         *(COMMON)
         *(.bss)
+        _end = .;
     }
 
     .note : {

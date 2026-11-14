@@ -67,7 +67,8 @@ package Restore.Installer is
    --  running. Launched programs are persistent, and are left as they
    --  are. File and directory are installed again too: every directory
    --  process holds their launch caps, which launch the newest version
-   --  once the old one is retired (#902). Running files and directories
-   --  get their new code when they are replaced (ADR 0032).
+   --  once the old one is retired (#902). Then each restored server that
+   --  implements Replaceable is replaced with the new version of its
+   --  program (Restore.Replacing, #830).
 
 end Restore.Installer;
