@@ -7,6 +7,9 @@ package Console.IO is
    --  characters for Replay, instead of writing to the VGA text page,
    --  which isn't on the screen when there is a framebuffer (#654).
 
+   procedure Put_Mirror_Only (Text : String);
+   --  Write Text to COM2 only, if Mirror_Serial_Port was called.
+
    procedure Mirror_Serial_Port;
    --  Write to the second serial port, COM2, as well as to the VGA text
    --  page, for serial-console (#904).

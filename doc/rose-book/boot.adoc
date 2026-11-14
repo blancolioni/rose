@@ -114,7 +114,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 20 | `partition` | Install media only: the boot partition | `Block_Device`, with 4096-byte blocks
 | 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
 | 16 | `log` | The kernel's start-log capability, delete | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag, and restored-endpoint, for calling the restored `exec` and command registry on the update boot (#829) | (see <<restore-server>>)
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag, restored-endpoint, for calling the restored `exec` and command registry on the update boot (#829), and mem's `Replacer`, for replacing the restored servers (#830) | (see <<restore-server>>)
 | 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
@@ -257,7 +257,15 @@ Once the restored processes run, and before `init` takes its checkpoint, `restor
 * A retired version's launch capabilities launch the newest version (#902). Some persistent processes keep a launch capability rather than finding the command each time: every directory holds `file`'s and `directory`'s. So `file` and `directory` are installed again too, and new files and subdirectories start with the new code.
 * Programs that the install launches, such as the drivers and the persistent servers, are left as they are.
 
-Replacing the persistent servers that can take over from themselves (ADR 0032), which gives running files and directories their new code, will be the update's last step (#830).
+The update's last step replaces the persistent servers that can take over from themselves (ADR 0032, #830), which gives running files and directories their new code:
+
+* `restore-install` holds mem's `Replacer`, and goes through the restored processes in the order they were restored. It replaces each one that answers `Replaceable`, if its program was just installed again.
+* Each replacement follows ADR 0032, section 1. Mem makes a `Replacement` for the old version, which holds its calls. Once the old version is between calls, the new version is launched as a command, against the sibling bank that the `Replacement` gives. Its launch call carries only `Previous`, the old version's `Replaceable`, at the place that the command's metadata gives (`previous cap N`). The new version takes its other capabilities from the old one (#901). If it takes over, `restore-install` commits the `Replacement`, and the old version ends.
+* A server whose new version doesn't take over keeps running the old version, as does one that mem won't replace or that never gets between calls. `restore-install` says which, and goes on to the next.
+* It writes a line for each server it replaces, and then how many were replaced and how many are unchanged.
+* The store writes to all of its pages before it serves (#914). Otherwise a page fault in the store during one of mem's calls to it would deadlock them, and the first `Replacement` makes such calls.
+
+`scripts/test-update-fixture` (`make test-update`) runs an update on the release series' fixture, the disk that `scripts/make-restore-fixture` makes (see <<restore-boot>>). It checks that every `file` was replaced, that hd0 then boots the new set with the fixture's files, and that `Previous` still restores the checkpoint.
 
 [#restore-boot]
 == Restore Boot

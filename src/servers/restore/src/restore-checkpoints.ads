@@ -29,6 +29,24 @@ package Restore.Checkpoints is
    --  waiting for a message, and running processes keep it busy with
    --  their page faults.
 
+   function Restored_Process_Count return Natural;
+   --  The number of processes that Restore brought back.
+
+   procedure Get_Restored_Name
+     (Index : Positive;
+      Name  : out String;
+      Last  : out Natural);
+   --  The name of restored process Index, from the checkpoint, in
+   --  Name (Name'First .. Last).
+
+   function Find_Endpoint
+     (Index        : Positive;
+      Interface_Id : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability;
+   --  A cap to the interface endpoint Interface_Id, with identifier 0, of
+   --  restored process Index, or null if it has none. Only
+   --  restore-install can do this, for the update boot (#829, #830).
+
    function Find_Server
      (Interface_Id : Rose.Objects.Endpoint_Id)
       return Rose.Capabilities.Capability;

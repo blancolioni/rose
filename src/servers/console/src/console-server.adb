@@ -106,6 +106,14 @@ package body Console.Server is
          Console.IO.Put (S);
       elsif Has_Target then
          Rose.Interfaces.Writer.Client.Write (Target_Console, Buffer);
+      else
+
+         --  After a restore the boot console stops writing to the screen,
+         --  which the restored console redraws, but its copy on COM2 goes
+         --  on: on the update boot, restore-install still writes to it
+         --  (#830).
+
+         Console.IO.Put_Mirror_Only (S);
       end if;
    end Handle_Write;
 

@@ -72,11 +72,30 @@ choose_last_entry () {
     monitor "sendkey ret"
 }
 
+choose_entry_from_bottom () {
+    # choose_entry_from_bottom N: choose the entry N above the last of the
+    # GRUB menu, as choose_last_entry does, but then with N presses of Up.
+    i=0
+    while [ $i -lt 24 ]; do
+        monitor "sendkey end"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    i=0
+    while [ $i -lt "$1" ]; do
+        monitor "sendkey up"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    monitor "sendkey ret"
+}
+
 choose_entry () {
     # choose_entry N: choose entry N of the GRUB menu, counting from 0,
     # as choose_last_entry does, but with Home and then N presses of Down.
     # On the install media with a disk that has Rose, entry 0 boots the
-    # disk, and entry 2 installs, erasing it (#836).
+    # disk, entry 1 updates it (#830), and entry 2 installs, erasing it
+    # (#836).
     i=0
     while [ $i -lt 24 ]; do
         monitor "sendkey home"

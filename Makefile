@@ -74,6 +74,14 @@ test:
 test-restore:
 	sh ./scripts/test-restore-fixture
 
+# The update test (#830): this build's install media has to update the
+# same fixture, keeping its checkpoint and replacing its replaceable
+# servers, and then hd0 has to boot the new set and Previous.  It needs
+# images/rose.iso, so run "make" first, and passes with a message while
+# there is no fixture.  It takes about fifteen minutes.  CI runs it.
+test-update:
+	sh ./scripts/test-update-fixture
+
 # The fixture for test-restore: install images/rose.iso, edit a file, and
 # keep the disk, compressed, in images/fixtures.  At a release, upload it
 # to the release (scripts/make-restore-fixture).
