@@ -1,0 +1,139 @@
+#!/bin/sh
+# The update test (#830, ADR 0031 section 6): this build's install media
+# has to update a disk that the release series' first release installed,
+# keeping its checkpoint, and replace its replaceable servers.
+#
+#   scripts/test-update-fixture [FIXTURE [ISO]]
+#
+# FIXTURE is a disk that make-restore-fixture wrote, and ISO this build's
+# install image, images/rose.iso by default. Without FIXTURE, the test
+# uses the fixture of this build's release series X.Y, as
+# test-restore-fixture does, and passes with a note if there is none yet.
+#
+# The test:
+#
+#   1. boots the install media with a copy of the fixture as hd0, and
+#      chooses "Update Rose on hd0", which restores hd0's checkpoint with
+#      this boot set, writes the set to hd0, installs the commands again
+#      (#829), replaces each restored Replaceable server (#830), and
+#      restarts. Its console has to say that the commands were installed
+#      again, that each file was replaced, with none left unchanged, and
+#      that the update is complete, and the kernel's log has to show each
+#      file taking over;
+#   2. boots the new set from hd0, its serial-console entry, which comes
+#      before "Previous". Login is still reading the name it was reading
+#      when the fixture was made, so an empty line brings its prompt
+#      back. Then it logs in, and reads the file that
+#      make-restore-fixture left, notes, which a replaced file serves;
+#   3. boots "Previous", the set that hd0 had before, which has to
+#      restore the checkpoint that step 2 left, with petal on the screen;
+#   4. runs check-log.py on the disk, which has to find the log
+#      consistent.
+#
+# A fixture made from this build is enough to test the update while
+# 0.X.0 isn't released: the update replaces every replaceable server,
+# whether or not its program changed. Checking that a server reports the
+# new version needs a fixture from an earlier release.
+#
+# It takes about fifteen minutes, and needs qemu-system-i386, qemu-img and
+# python3. It exits with 0 if everything passed, and keeps the disk image
+# and QEMU's files if anything failed.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+ISO=${2:-$HERE/../images/rose.iso}
+
+if [ $# -ge 1 ]; then
+    FIXTURE=$1
+else
+    VERSION=$(sed -n \
+        's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
+        "$HERE/../src/base/rose-version.ads")
+    SERIES=$(echo "$VERSION" | sed -n 's/^\([0-9]*\.[0-9]*\)\..*/\1/p')
+    [ -n "$SERIES" ] || {
+        echo "no release series in the version, $VERSION"
+        exit 2
+    }
+    NAME=rose-$SERIES.0-hd0.qcow2
+    FIXTURE=$HERE/../images/fixtures/$NAME
+    if [ ! -f "$FIXTURE" ]; then
+        URL=https://github.com/blancolioni/rose/releases/download/v$SERIES.0/$NAME
+        mkdir -p "$(dirname "$FIXTURE")" || exit 2
+        if curl -fsL -o "$FIXTURE.part" "$URL"; then
+            mv -f "$FIXTURE.part" "$FIXTURE"
+        else
+            rm -f "$FIXTURE.part"
+            echo "No $SERIES.0 fixture yet ($URL); nothing to update"
+            exit 0
+        fi
+    fi
+fi
+
+[ -f "$FIXTURE" ] || { echo "no fixture: $FIXTURE"; exit 2; }
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+qemu-img convert -O raw "$FIXTURE" "$DISK" || fail "could not copy the fixture"
+
+echo "Updating $(basename "$FIXTURE") from the install media"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+# The menu's first entry boots hd0, and the second updates it.
+choose_entry 1
+wait_for_serial "kernel: restarting" 900 || fail "the update did not finish"
+stop_qemu
+
+grep -e "restore:" -e "update complete" "$CONSOLE"
+grep -q "restore: installing the commands again" "$CONSOLE" \
+    || { echo "FAIL: the update did not install the commands again"; exit 1; }
+grep -q "restore: replaced file" "$CONSOLE" \
+    || { echo "FAIL: the update replaced no file"; exit 1; }
+grep -q "is unchanged:" "$CONSOLE" \
+    && { echo "FAIL: a replaceable server was not replaced"; exit 1; }
+grep -q "update complete" "$CONSOLE" \
+    || { echo "FAIL: the update did not complete"; exit 1; }
+grep -a "/file\[.*takes over from" "$WORK/serial" \
+    || { echo "FAIL: no file took over in the kernel's log"; exit 1; }
+
+echo "Booting the new set from hd0"
+start_qemu
+# "Previous" is the last entry now, and the new set's serial-console
+# entry is the one before it.
+choose_entry_from_bottom 1
+wait_for "caps: restored" 200 || fail "the new set did not restore the checkpoint"
+# Login is still reading the name it was reading when the fixture was
+# made, and what the update wrote to the console has scrolled its prompt
+# away: an empty name brings the prompt back.
+type_text "
+"
+log_in
+mark=$(console_mark)
+type_text "cat notes
+"
+wait_for_console "hello from kilo" 30 "$mark" \
+    || fail "the file that the fixture's user left is gone"
+echo "notes is still there"
+echo "Waiting for a checkpoint, then stopping the machine"
+sleep 45
+stop_qemu
+
+echo "Booting Previous, the set hd0 had before the update"
+start_qemu
+choose_last_entry
+# Previous shows the old set's own menu.
+choose_last_entry
+# The checkpoint is the new set's, with petal at its prompt after cat.
+wait_for "hello from kilo" 200 || fail "Previous did not restore the checkpoint"
+stop_qemu
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" || {
+    cat "$WORK/check-log.txt"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "PASS"

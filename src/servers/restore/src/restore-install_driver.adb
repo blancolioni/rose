@@ -139,6 +139,7 @@ begin
    Restore.Start.Next (Keyboard_Data_Cap);
    Restore.Start.Next (Command_Line_Cap);
    Restore.Start.Next (Restored_Endpoint_Cap);
+   Restore.Start.Next (Replacer_Cap);
    Restore.Start.Delete_Cap_Set;
 
    Erasing := Restore.Command_Line.Has_Argument ("erase-hd0");

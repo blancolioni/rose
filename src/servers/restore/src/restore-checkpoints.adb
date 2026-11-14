@@ -65,8 +65,10 @@ package body Restore.Checkpoints is
          Oid     : Rose.Words.Word_64 := 0;
          Process : Rose.Capabilities.Capability := 0;
          Mem_Pid : Rose.Words.Word_32 := 0;
+         Name    : String (1 .. 16) := (others => ' ');
       end record;
-   --  Process is the restored process's Kernel_Process interface.
+   --  Process is the restored process's Kernel_Process interface, and
+   --  Name its name in the checkpoint.
 
    Restored       : array (1 .. Max_Processes) of Restored_Process;
    Restored_Count : Natural := 0;
@@ -328,6 +330,42 @@ package body Restore.Checkpoints is
    end Fail;
 
    -------------------
+   -- Find_Endpoint --
+   -------------------
+
+   function Find_Endpoint
+     (Index        : Positive;
+      Interface_Id : Rose.Objects.Endpoint_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Objects.Endpoint_Id;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Restored_Endpoint_Cap = Rose.Capabilities.Null_Capability
+        or else Index > Restored_Count
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Restored_Endpoint_Cap);
+      Rose.Invocation.Send_Object_Id
+        (Params, Rose.Objects.Object_Id (Restored (Index).Oid));
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word (Interface_Id mod 2 ** 32));
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word (Interface_Id / 2 ** 32));
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+      if not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return Params.Caps (0);
+      end if;
+      return Rose.Capabilities.Null_Capability;
+   end Find_Endpoint;
+
+   -------------------
    -- Find_Restored --
    -------------------
 
@@ -349,36 +387,43 @@ package body Restore.Checkpoints is
      (Interface_Id : Rose.Objects.Endpoint_Id)
       return Rose.Capabilities.Capability
    is
-      use type Rose.Objects.Endpoint_Id;
    begin
-      if Restored_Endpoint_Cap = Rose.Capabilities.Null_Capability then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      for P of Restored (1 .. Restored_Count) loop
+      for Index in 1 .. Restored_Count loop
          declare
-            Params : aliased Rose.Invocation.Invocation_Record;
+            Cap : constant Rose.Capabilities.Capability :=
+              Find_Endpoint (Index, Interface_Id);
          begin
-            Rose.System_Calls.Initialize_Send (Params, Restored_Endpoint_Cap);
-            Rose.Invocation.Send_Object_Id
-              (Params, Rose.Objects.Object_Id (P.Oid));
-            Rose.System_Calls.Send_Word
-              (Params, Rose.Words.Word (Interface_Id mod 2 ** 32));
-            Rose.System_Calls.Send_Word
-              (Params, Rose.Words.Word (Interface_Id / 2 ** 32));
-            Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(0));
-            Rose.System_Calls.Receive_Caps (Params, 1);
-            Rose.System_Calls.Invoke_Capability (Params);
-            if not Params.Control.Flags (Rose.Invocation.Error)
-              and then Params.Control.Flags (Rose.Invocation.Send_Caps)
-            then
-               return Params.Caps (0);
+            if Cap /= Rose.Capabilities.Null_Capability then
+               return Cap;
             end if;
          end;
       end loop;
 
       return Rose.Capabilities.Null_Capability;
    end Find_Server;
+
+   -----------------------
+   -- Get_Restored_Name --
+   -----------------------
+
+   procedure Get_Restored_Name
+     (Index : Positive;
+      Name  : out String;
+      Last  : out Natural)
+   is
+   begin
+      Last := Name'First - 1;
+      if Index > Restored_Count then
+         return;
+      end if;
+
+      for Ch of Restored (Index).Name loop
+         exit when Ch = ' ' or else Ch = Character'Val (0)
+           or else Last = Name'Last;
+         Last := Last + 1;
+         Name (Last) := Ch;
+      end loop;
+   end Get_Restored_Name;
 
    ----------
    -- Read --
@@ -640,7 +685,8 @@ package body Restore.Checkpoints is
                Restored (Restored_Count) :=
                  (Oid     => Process_Item.Oid,
                   Process => Params.Caps (0),
-                  Mem_Pid => 0);
+                  Mem_Pid => 0,
+                  Name    => Process_Item.Name);
 
                Index := Index + 1 + Cap_Pages;
             end;
@@ -795,6 +841,12 @@ package body Restore.Checkpoints is
 
       Success := True;
    end Restore;
+
+   ----------------------------
+   -- Restored_Process_Count --
+   ----------------------------
+
+   function Restored_Process_Count return Natural is (Restored_Count);
 
    ----------------------
    -- Resume_Processes --

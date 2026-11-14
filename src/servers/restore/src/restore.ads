@@ -60,5 +60,9 @@ package Restore is
                              Rose.Capabilities.Null_Capability;
    --  Makes an endpoint cap to a restored process, so that the update
    --  boot can call the restored exec and command registry (#829).
+   Replacer_Cap          : Rose.Capabilities.Capability :=
+                             Rose.Capabilities.Null_Capability;
+   --  Mem's Replacer, with which the update boot replaces the restored
+   --  Replaceable servers (#830).
 
 end Restore;
