@@ -152,4 +152,16 @@ package Init.Self_Tests is
    --  restored, it checks the user's name, home directory and sessions.
    --  True if both replacements committed.
 
+   function Replace_Auth
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Replace_Process : Rose.Capabilities.Capability;
+      Control         : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Replace auth, whose Replaceable interface is Control, with a new
+   --  version of the auth command, found through Find_Cap, through
+   --  Replace_Process, mem's Replacer (#831, ADR 0032). The new version
+   --  takes the users from the old one, and its caps, so that the Auth
+   --  and Auth_Admin caps that init and login hold reach it. True if the
+   --  replacement committed.
+
 end Init.Self_Tests;

@@ -3,11 +3,14 @@ with Ada.Text_IO;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
+with Rose.Core.Auth_Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
+with Rose.Interfaces.Auth.Client;
+with Rose.Interfaces.Auth_Admin.Client;
 with Rose.Interfaces.Bank;
 with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Constructor.Client;
@@ -159,6 +162,236 @@ package body Tests.Replacement is
       when others =>
          return "(no name)";
    end Name_Of;
+
+   -----------------------
+   -- Replace_Auth_Test --
+   -----------------------
+
+   function Replace_Auth_Test return Boolean is
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      procedure Start_Auth
+        (Endpoint : Rose.Capabilities.Capability;
+         Auth     : out Rose.Capabilities.Capability;
+         Admin    : out Rose.Capabilities.Capability;
+         Control  : out Rose.Capabilities.Capability;
+         Previous : Rose.Capabilities.Capability := Null_Cap);
+      --  Make the launch call of the auth command whose endpoint is
+      --  Endpoint, with the test's caps for its roles, or none, taking
+      --  over from Previous, if it is a cap. Raises Invocation_Error if
+      --  the call fails.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+      ----------------
+      -- Start_Auth --
+      ----------------
+
+      procedure Start_Auth
+        (Endpoint : Rose.Capabilities.Capability;
+         Auth     : out Rose.Capabilities.Capability;
+         Admin    : out Rose.Capabilities.Capability;
+         Control  : out Rose.Capabilities.Capability;
+         Previous : Rose.Capabilities.Capability := Null_Cap)
+      is
+         Fresh : constant Boolean := Previous = Null_Cap;
+
+         function Given
+           (Cap : Rose.Capabilities.Capability)
+            return Rose.Capabilities.Capability
+         is (if Fresh then Cap else Null_Cap);
+         --  A new version takes its caps from the old one (#901).
+
+      begin
+         Rose.Core.Auth_Client.Call
+           (Endpoint        => Endpoint,
+            Create_Endpoint => Given (Tests.Registry.Create_Endpoint),
+            Find_Command    => Given (Tests.Registry.Commands),
+            Cap_Set_Service => Given (Tests.Registry.Cap_Sets),
+            Auth            => Auth,
+            Admin           => Admin,
+            Control         => Control,
+            Previous        => Previous);
+      end Start_Auth;
+
+   begin
+      Ada.Text_IO.Put ("Replace auth test");
+
+      if Tests.Registry.Replacer = Null_Cap
+        or else Tests.Registry.Cap_Sets = Null_Cap
+      then
+         Ada.Text_IO.Put (" (skipped: no Replacer)");
+         return True;
+      end if;
+
+      --  Auth, and the user's bank, home directory and user server, which
+      --  auth makes in its own bank, are in a bank of the test's own,
+      --  which it destroys at the end (#724). That is four processes at
+      --  once with the new version, as the install's self tests come
+      --  close to the kernel's 64 (#915).
+
+      declare
+         No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
+         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+           Own.Create_Sub_Bank (0, 0);
+         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
+           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Launcher  : Rose.Interfaces.Launch.Launch_Object'Class :=
+           Tests.Registry.Launcher ("auth");
+         Endpoint  : constant Rose.Capabilities.Capability :=
+           Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
+         Auth_Cap  : Rose.Capabilities.Capability := Null_Cap;
+         Admin_Cap : Rose.Capabilities.Capability := Null_Cap;
+         Control   : Rose.Capabilities.Capability := Null_Cap;
+      begin
+         if Endpoint /= Null_Cap then
+            begin
+               Start_Auth (Endpoint, Auth_Cap, Admin_Cap, Control);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end if;
+
+         if Auth_Cap = Null_Cap
+           or else Admin_Cap = Null_Cap
+           or else Control = Null_Cap
+         then
+            Test_Bank.Destroy;
+            Ada.Text_IO.Put (": auth did not start");
+            return False;
+         end if;
+
+         declare
+            Auth        : Rose.Interfaces.Auth.Client.Auth_Client :=
+              Rose.Interfaces.Auth.Client.From_Cap (Auth_Cap);
+            Admin       : Rose.Interfaces.Auth_Admin.Client
+              .Auth_Admin_Client :=
+                Rose.Interfaces.Auth_Admin.Client.From_Cap (Admin_Cap);
+            User        : Rose.Interfaces.User.User_Object'Class :=
+              Admin.New_User ("amy", "secret");
+            Session     : Rose.Interfaces.Bank.Bank_Object'Class :=
+              User.New_Session;
+            --  A user and a session from before the handover.
+            Replacement : Rose.Interfaces.Replacement
+              .Replacement_Object'Class :=
+                Replacer.Replace_Process (Control);
+            Committed   : Boolean := False;
+         begin
+            Check ("no user", User.User_Cap /= Null_Cap);
+            Check ("no replacement",
+                   Replacement.Replacement_Cap /= Null_Cap);
+
+            if Replacement.Replacement_Cap /= Null_Cap then
+               declare
+                  Ready       : Boolean := False;
+                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Replacement.Bank;
+                  New_Version : Rose.Capabilities.Capability;
+                  New_Auth    : Rose.Capabilities.Capability;
+                  New_Admin   : Rose.Capabilities.Capability;
+                  New_Control : Rose.Capabilities.Capability;
+               begin
+                  for Attempt in 1 .. 100_000 loop
+                     Ready := Replacement.Ready;
+                     exit when Ready;
+                  end loop;
+                  Check ("the old version is never ready", Ready);
+
+                  New_Version :=
+                    Launcher.Launch_Command (Sibling.Bank_Cap, No_Caps);
+                  Check ("the new version did not launch",
+                         New_Version /= Null_Cap);
+
+                  if Ready and then New_Version /= Null_Cap then
+                     Replacement.Allow (New_Version);
+                     begin
+                        Start_Auth
+                          (New_Version, New_Auth, New_Admin, New_Control,
+                           Previous => Control);
+                        Committed := Replacement.Commit;
+                     exception
+                        when Rose.Interfaces.Objects.Invocation_Error =>
+                           Check ("the new version refused", False);
+                     end;
+                  end if;
+               end;
+
+               Check ("the replacement did not commit", Committed);
+               Replacement.Release;
+            end if;
+
+            --  Until a replacement commits or is released, the old
+            --  version's calls are held, so nothing is asked of auth
+            --  unless it committed.
+
+            if Committed then
+
+               --  The new version has the user and the password's hash,
+               --  and gives the same user's server.
+
+               declare
+                  Again : Rose.Interfaces.User.User_Object'Class :=
+                    Auth.Login ("amy", "secret");
+                  Wrong : Rose.Interfaces.User.User_Object'Class :=
+                    Auth.Login ("amy", "wrong");
+               begin
+                  Check ("the user cannot log in",
+                         Again.User_Cap /= Null_Cap
+                         and then Again.Name = "amy");
+                  Check ("a wrong password logs in",
+                         Wrong.User_Cap = Null_Cap);
+               end;
+
+               --  The name is taken, which the new version knows without
+               --  launching anything.
+
+               declare
+                  Twice : Rose.Interfaces.User.User_Object'Class :=
+                    Admin.New_User ("amy", "other");
+               begin
+                  Check ("the user was made twice",
+                         Twice.User_Cap = Null_Cap);
+               end;
+
+               --  The user and the session from before still work.
+
+               declare
+                  Inner : Rose.Interfaces.Bank.Bank_Object'Class :=
+                    Session.Create_Sub_Bank (0, 0);
+               begin
+                  Check ("the user from before is wrong",
+                         User.Name = "amy");
+                  Check ("the session from before is gone",
+                         Inner.Bank_Cap /= Null_Cap);
+                  Inner.Destroy;
+               end;
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Check ("a call to auth failed", False);
+         end;
+
+         Test_Bank.Destroy;
+      end;
+
+      return Passed;
+   end Replace_Auth_Test;
 
    ----------------------------
    -- Replace_Directory_Test --

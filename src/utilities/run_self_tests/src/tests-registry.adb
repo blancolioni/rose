@@ -50,6 +50,15 @@ package body Tests.Registry is
       return Clock_Interface_Cap;
    end Clock;
 
+   --------------
+   -- Commands --
+   --------------
+
+   function Commands return Rose.Capabilities.Capability is
+   begin
+      return Registry.Get_Interface_Cap;
+   end Commands;
+
    ---------------------
    -- Create_Endpoint --
    ---------------------

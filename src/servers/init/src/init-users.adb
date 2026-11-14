@@ -341,7 +341,8 @@ package body Init.Users is
       Commands        : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
       Auth            : out Rose.Capabilities.Capability;
-      Admin           : out Rose.Capabilities.Capability)
+      Admin           : out Rose.Capabilities.Capability;
+      Control         : out Rose.Capabilities.Capability)
    is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
@@ -353,6 +354,7 @@ package body Init.Users is
    begin
       Auth := Rose.Capabilities.Null_Capability;
       Admin := Rose.Capabilities.Null_Capability;
+      Control := Rose.Capabilities.Null_Capability;
 
       if Launch_Cap = Rose.Capabilities.Null_Capability then
          return;
@@ -368,14 +370,14 @@ package body Init.Users is
 
       --  Its roles' caps, as src/utilities/auth/rose-core-auth.idl
       --  declares them: Create_Endpoint, Find_Command, then
-      --  Cap_Set_Service.
+      --  Cap_Set_Service; and its results Auth, Admin and Control.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Send_Cap (Params, Commands);
       Rose.System_Calls.Send_Cap (Params, Cap_Sets);
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 2);
+      Rose.System_Calls.Receive_Caps (Params, 3);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -388,6 +390,7 @@ package body Init.Users is
 
       Auth := Params.Caps (0);
       Admin := Params.Caps (1);
+      Control := Params.Caps (2);
    end Start_Auth;
 
    -----------------
