@@ -3,6 +3,7 @@ with Ada.Containers.Indefinite_Ordered_Maps;
 
 with System.Storage_Elements;
 
+with Rose.Core.Directory_Client;
 with Rose.Core.User_Client;
 with Rose.Crypto.PBKDF2_HMAC_SHA_256;
 with Rose.Random;
@@ -15,7 +16,6 @@ with Rose.Interfaces.Bank.Client;
 with Rose.Interfaces.Commands.Client;
 with Rose.Interfaces.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
 with Rose.Interfaces.User.Client;
 
 package body Auth_Server is
@@ -48,6 +48,9 @@ package body Auth_Server is
          Control    : Rose.Capabilities.Capability;
          --  The Replaceable interface of the user's server, which only
          --  auth holds, for a new version of the user program (#831).
+         Home       : Rose.Capabilities.Capability;
+         --  The Replaceable interface of the user's home directory, which
+         --  only auth holds, for a new version of the directory (#831).
       end record;
 
    package User_Maps is
@@ -281,6 +284,7 @@ package body Auth_Server is
       Home      : Rose.Capabilities.Capability;
       User      : Rose.Capabilities.Capability;
       Control   : Rose.Capabilities.Capability;
+      Home_Ctl  : Rose.Capabilities.Capability;
       User_Bank : Rose.Interfaces.Bank.Client.Bank_Client;
 
       function Give_Up return User_Class;
@@ -340,27 +344,37 @@ package body Auth_Server is
       end;
 
       --  The home directory, which can create files and directories
-      --  (ADR 0003). A program that can't be found raises.
+      --  (ADR 0003). It is a command, Rose.Core.Directory (#831). A
+      --  program that can't be found raises.
 
       begin
          declare
+            No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
             File_Launch      : Rose.Interfaces.Launch.Launch_Object'Class :=
               Programs.Find ("file");
             Directory_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
               Programs.Find ("directory");
-            Process          : Rose.Interfaces.Process.Process_Object'Class :=
-              Directory_Launch.Launch
-                (User_Bank.Get_Interface_Cap,
-                 (File_Launch.Launch_Cap, Directory_Launch.Launch_Cap,
-                  Cap_Sets));
+            Endpoint         : constant Rose.Capabilities.Capability :=
+              Directory_Launch.Launch_Command
+                (User_Bank.Get_Interface_Cap, No_Caps);
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).
 
-            if Process.Process_Cap = Rose.Capabilities.Null_Capability then
+            if Endpoint = Rose.Capabilities.Null_Capability then
                return Give_Up;
             end if;
-            Home := Process.Published_Interface;
+
+            Rose.Core.Directory_Client.Call
+              (Endpoint         => Endpoint,
+               Create_Endpoint  =>
+                 Rose.System_Calls.Create_Endpoint_Capability,
+               Delete_Cap       => Rose.System_Calls.Delete_Cap_Capability,
+               Cap_Set_Service  => Cap_Sets,
+               File_Launch      => File_Launch.Launch_Cap,
+               Directory_Launch => Directory_Launch.Launch_Cap,
+               Served           => Home,
+               Control          => Home_Ctl);
          end;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
@@ -382,6 +396,7 @@ package body Auth_Server is
 
       New_Item.User := User;
       New_Item.Control := Control;
+      New_Item.Home := Home_Ctl;
       Users.Insert (New_Item.Name (1 .. New_Item.Name_Last), New_Item);
 
       return Rose.Interfaces.User.Client.From_Cap (User);

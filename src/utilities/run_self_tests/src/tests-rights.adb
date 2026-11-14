@@ -131,17 +131,9 @@ package body Tests.Rights is
 
       declare
          Alice_Home : constant Rose.Capabilities.Capability :=
-                        Tests.Registry.Launch
-                          ("directory",
-                           (Tests.Registry.Launcher_Cap ("file"),
-                            Tests.Registry.Launcher_Cap ("directory"),
-                            Tests.Registry.Cap_Sets));
+                        Tests.Registry.Launch_Directory;
          Bob_Home   : constant Rose.Capabilities.Capability :=
-                        Tests.Registry.Launch
-                          ("directory",
-                           (Tests.Registry.Launcher_Cap ("file"),
-                            Tests.Registry.Launcher_Cap ("directory"),
-                            Tests.Registry.Cap_Sets));
+                        Tests.Registry.Launch_Directory;
       begin
          if Alice_Home = Rose.Capabilities.Null_Capability
            or else Bob_Home = Rose.Capabilities.Null_Capability

@@ -69,6 +69,36 @@ package Tests.Registry is
    --  Launch the program Name with Caps, and return the interface that
    --  it publishes, or the null cap if the launch failed.
 
+   --  A directory is a command, Rose.Core.Directory (#831).
+
+   function Directory_Endpoint
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability;
+   --  Launch the directory command against Bank, or Run_Self_Tests' own
+   --  bank if it is null, and return its command endpoint, or the null
+   --  cap if the launch failed.
+
+   procedure Start_Directory
+     (Endpoint : Rose.Capabilities.Capability;
+      Served   : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability);
+   --  Make the launch call of the directory command whose endpoint is
+   --  Endpoint, with the file and directory launch caps and the cap set
+   --  server, taking over from Previous if it is a cap, and return its
+   --  Writable_Directory and its Replaceable interface. Raises
+   --  Invocation_Error if the call fails.
+
+   function Launch_Directory
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability;
+   --  Launch a new directory against Bank, as Directory_Endpoint does,
+   --  and return its Writable_Directory, or the null cap if the launch
+   --  failed.
+
    --  The file server is a command, Rose.Core.File (#867).
 
    function File_Endpoint

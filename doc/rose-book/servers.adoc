@@ -329,14 +329,19 @@ See <<Files and Directories>> for how files, versions and commits work.
 
 Serves one directory: each directory is a process of its own, as each file is.
 
-Provides:: `Writable_Directory` (ADR 0003).
-Requests:: `create-endpoint`.
-Used by:: `init`, for the first user's home directory, and the shell, as its current directory.
+Provides:: `Writable_Directory` (ADR 0003), and `Replaceable` (ADR 0032), which only whoever launched it holds: `auth` for a home directory, and the parent for a subdirectory.
+Requests:: nothing: it is a command, `Rose.Core.Directory`, with the roles `Create_Endpoint`, `Delete_Cap` and `Cap_Set_Service`, and the arguments `File_Launch` and `Directory_Launch` (#831).
+Used by:: `auth`, for each user's home directory, and other directories, for their subdirectories, each with the command's generated client; and the shell, as its current directory.
 
-Each entry of a directory is a `file` or `directory` process, launched when the entry is created, and ended when the entry is deleted.
-A file runs in a bank of its own, below the directory's, which deleting the entry destroys, so that a new version of the file that replaced it ends too.
-A directory is launched with the `file` and `directory` launch caps and the cap set server's `Constructor`, which it gives each file and subdirectory (#867).
+Each entry of a directory is a `file` or `directory` command, launched when the entry is created, and ended when the entry is deleted.
+Each entry runs in a bank of its own, below the directory's, which deleting the entry destroys, so that a new version that replaced it ends too.
+A directory is given the `file` and `directory` launch caps and the cap set server's `Constructor`, which it gives each file and subdirectory (#867).
 The directory holds the entry's writable interface, and hands out read-only ones (see <<Files and Directories>>).
+
+A new version of `directory` can take over from a running one (ADR 0032, #831).
+Its state is the entries' names and kinds, and the caps it holds for each: its writable interface, its `Replaceable`, its bank, and its read-only interface if one was given out.
+The launch caps and `Constructor` are its arguments, which the handover passes on (#901), so the new version is launched with `Previous` alone.
+A saved state carries no caps, so only a directory without entries can be restored from one.
 
 === `user`
 

@@ -325,14 +325,34 @@ install_rose () {
             ;;
     esac
 
+    # And of replacing a directory with entries (#831).
+    replace_dir=$(grep "Replace directory test" "$CONSOLE" \
+        | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$replace_dir" ] \
+        || replace_dir=$(grep "Replace directory test" \
+                             "$CONSOLE" | tail -1)
+    echo "$replace_dir"
+    case "$replace_dir" in
+        *skipped*|"")
+            echo "FAIL: the install's replace directory test did not pass"
+            exit 1
+            ;;
+        *PASS*)
+            ;;
+        *)
+            echo "FAIL: the install's replace directory test did not pass"
+            exit 1
+            ;;
+    esac
+
     # Init replaces the file that hold_file holds, which the restore then
     # checks (#867).
     grep "file replace test" "$CONSOLE" | tail -1
     grep -q "init: file replace test: PASS" "$CONSOLE" \
         || { echo "FAIL: init did not replace hold_file's file"; exit 1; }
 
-    # Init replaces the user server that hold_home holds, which the
-    # restore then checks (#831).
+    # Init replaces the user server and the home directory that
+    # hold_home holds, which the restore then checks (#831).
     grep "user replace test" "$CONSOLE" | tail -1
     grep -q "init: user replace test: PASS" "$CONSOLE" \
         || { echo "FAIL: init did not replace hold_home's user"; exit 1; }

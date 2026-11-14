@@ -2,6 +2,7 @@
 with Rose.System_Calls.Own_Bank;
 with Rose.System_Calls;
 
+with Rose.Core.Directory_Client;
 with Rose.Core.File_Client;
 
 with Rose.Interfaces.Commands.Client;
@@ -58,6 +59,30 @@ package body Tests.Registry is
       return Rose.System_Calls.Create_Endpoint_Capability;
    end Create_Endpoint;
 
+   ------------------------
+   -- Directory_Endpoint --
+   ------------------------
+
+   function Directory_Endpoint
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
+      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+        Launcher ("directory");
+   begin
+      return Program.Launch_Command
+        ((if Bank = Rose.Capabilities.Null_Capability
+          then Rose.System_Calls.Own_Bank.Cap
+          else Bank),
+         No_Caps);
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Directory_Endpoint;
+
    -------------------
    -- File_Endpoint --
    -------------------
@@ -107,6 +132,31 @@ package body Tests.Registry is
 
       return Process.Published_Interface;
    end Launch;
+
+   ----------------------
+   -- Launch_Directory --
+   ----------------------
+
+   function Launch_Directory
+     (Bank : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      Endpoint : constant Rose.Capabilities.Capability :=
+        Directory_Endpoint (Bank);
+      Served   : Rose.Capabilities.Capability;
+      Control  : Rose.Capabilities.Capability;
+   begin
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      Start_Directory (Endpoint, Served, Control);
+      return Served;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Launch_Directory;
 
    -----------------
    -- Launch_File --
@@ -232,6 +282,44 @@ package body Tests.Registry is
    begin
       Screen_Surface_Cap := Screen;
    end Set_Screen;
+
+   ---------------------
+   -- Start_Directory --
+   ---------------------
+
+   procedure Start_Directory
+     (Endpoint : Rose.Capabilities.Capability;
+      Served   : out Rose.Capabilities.Capability;
+      Control  : out Rose.Capabilities.Capability;
+      Previous : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability)
+   is
+      use type Rose.Capabilities.Capability;
+      Fresh : constant Boolean :=
+        Previous = Rose.Capabilities.Null_Capability;
+
+      function Given
+        (Cap : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability
+      is (if Fresh then Cap else Rose.Capabilities.Null_Capability);
+      --  A new version takes its caps from the old one (#901).
+
+   begin
+      Rose.Core.Directory_Client.Call
+        (Endpoint         => Endpoint,
+         Create_Endpoint  => Given (Create_Endpoint),
+         Delete_Cap       => Given (Rose.System_Calls.Delete_Cap_Capability),
+         Cap_Set_Service  => Given (Cap_Sets_Cap),
+         File_Launch      =>
+           (if Fresh then Launcher_Cap ("file")
+            else Rose.Capabilities.Null_Capability),
+         Directory_Launch =>
+           (if Fresh then Launcher_Cap ("directory")
+            else Rose.Capabilities.Null_Capability),
+         Served           => Served,
+         Control          => Control,
+         Previous         => Previous);
+   end Start_Directory;
 
    ----------------
    -- Start_File --
