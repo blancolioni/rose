@@ -5,6 +5,9 @@
 # s-trasym.adb is in src/adainclude, unchanged from GCC's git
 # (releases/gcc-15): the installed GCC has the Linux body, which reads the
 # executable's DWARF line tables, and Rose uses GCC's target-independent body.
+#
+# s-powllf.ads is in src/adainclude, GCC's with its tables aligned so that
+# no Long_Long_Float in them crosses a page, which QEMU loads wrongly (#905).
 
 a-assert.adb
 a-assert.ads
@@ -419,7 +422,6 @@ s-valrea.ads
 s-valrea.adb
 s-powflt.ads
 s-powlfl.ads
-s-powllf.ads
 s-flocon.ads
 
 # Ada.Text_IO.Float_IO and Ada.Float_Text_IO, Long_Float_Text_IO and
