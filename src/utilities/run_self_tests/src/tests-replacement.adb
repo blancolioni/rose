@@ -88,6 +88,21 @@ package body Tests.Replacement is
        and then Server.Saver /= Rose.Capabilities.Null_Capability
        and then Server.Held /= Rose.Capabilities.Null_Capability);
 
+   function Wait_Until_Ready
+     (Replacement : in out Rose.Interfaces.Replacement
+        .Replacement_Object'Class)
+      return Boolean;
+   --  Ask Replacement until the old version is between calls.
+
+   function Commit_When_Ready
+     (Replacement : in out Rose.Interfaces.Replacement
+        .Replacement_Object'Class)
+      return Boolean;
+   --  Commit Replacement once the old version is between calls again.
+   --  It has just answered the new version's calls, through Previous,
+   --  and may not be back at its receive yet (#926). False if it never
+   --  is, or if Commit is.
+
    function Name_Of (Server : Started) return String;
    --  What Server's Named interface says.
 
@@ -148,6 +163,19 @@ package body Tests.Replacement is
       end if;
       return State (Start .. State'Last);
    end After_Identifiers;
+
+   -----------------------
+   -- Commit_When_Ready --
+   -----------------------
+
+   function Commit_When_Ready
+     (Replacement : in out Rose.Interfaces.Replacement
+        .Replacement_Object'Class)
+      return Boolean
+   is
+   begin
+      return Wait_Until_Ready (Replacement) and then Replacement.Commit;
+   end Commit_When_Ready;
 
    -------------
    -- Name_Of --
@@ -324,7 +352,7 @@ package body Tests.Replacement is
                         Start_Auth
                           (New_Version, New_Auth, New_Admin, New_Control,
                            Previous => Control);
-                        Committed := Replacement.Commit;
+                        Committed := Commit_When_Ready (Replacement);
                      exception
                         when Rose.Interfaces.Objects.Invocation_Error =>
                            Check ("the new version refused", False);
@@ -517,7 +545,7 @@ package body Tests.Replacement is
                         Tests.Registry.Start_Directory
                           (New_Version, New_Served, New_Control,
                            Previous => Control);
-                        Committed := Replacement.Commit;
+                        Committed := Commit_When_Ready (Replacement);
                      exception
                         when Rose.Interfaces.Objects.Invocation_Error =>
                            Check ("the new version refused", False);
@@ -800,7 +828,8 @@ package body Tests.Replacement is
                            Tests.Registry.Start_File
                              (New_Version, New_Served, New_Control,
                               Previous => Control);
-                           Committed := Replacement.Commit;
+                           Committed :=
+                             Commit_When_Ready (Replacement);
                         exception
                            when Rose.Interfaces.Objects.Invocation_Error =>
                               Check ("the new version refused", False);
@@ -862,12 +891,6 @@ package body Tests.Replacement is
 
       procedure Check (Name : String; Ok : Boolean);
 
-      function Wait_Until_Ready
-        (Replacement : in out Rose.Interfaces.Replacement
-           .Replacement_Object'Class)
-         return Boolean;
-      --  Ask Replacement until the old version is between calls.
-
       -----------
       -- Check --
       -----------
@@ -879,24 +902,6 @@ package body Tests.Replacement is
             Passed := False;
          end if;
       end Check;
-
-      ----------------------
-      -- Wait_Until_Ready --
-      ----------------------
-
-      function Wait_Until_Ready
-        (Replacement : in out Rose.Interfaces.Replacement
-           .Replacement_Object'Class)
-         return Boolean
-      is
-      begin
-         for Attempt in 1 .. 100_000 loop
-            if Replacement.Ready then
-               return True;
-            end if;
-         end loop;
-         return False;
-      end Wait_Until_Ready;
 
    begin
       Ada.Text_IO.Put ("Replace process test");
@@ -986,7 +991,7 @@ package body Tests.Replacement is
                                Is_Started (New_Version));
                         Committed :=
                           Is_Started (New_Version)
-                          and then Replacement.Commit;
+                          and then Commit_When_Ready (Replacement);
                         Check ("the replacement did not commit", Committed);
 
                         --  Until a replacement commits or is released,
@@ -1096,7 +1101,7 @@ package body Tests.Replacement is
                                          Replacement =>
                                            Replacement.Replacement_Cap)));
                         Check ("a refused replacement committed",
-                               not Replacement.Commit);
+                               not Commit_When_Ready (Replacement));
                      end;
                      Replacement.Release;
                   end if;
@@ -1253,7 +1258,7 @@ package body Tests.Replacement is
                         Tests.Users.Start_User
                           (New_Version, "", Null_Cap, Null_Cap,
                            New_Served, New_Control, Previous => Control);
-                        Committed := Replacement.Commit;
+                        Committed := Commit_When_Ready (Replacement);
                      exception
                         when Rose.Interfaces.Objects.Invocation_Error =>
                            Check ("the new version refused", False);
@@ -1802,5 +1807,23 @@ package body Tests.Replacement is
       end loop;
       return False;
    end Wait_For_Caller;
+
+   ----------------------
+   -- Wait_Until_Ready --
+   ----------------------
+
+   function Wait_Until_Ready
+     (Replacement : in out Rose.Interfaces.Replacement
+        .Replacement_Object'Class)
+      return Boolean
+   is
+   begin
+      for Attempt in 1 .. 100_000 loop
+         if Replacement.Ready then
+            return True;
+         end if;
+      end loop;
+      return False;
+   end Wait_Until_Ready;
 
 end Tests.Replacement;

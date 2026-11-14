@@ -653,6 +653,24 @@ package body Init.Self_Tests is
       Replacement : Replacements.Replacement_Client;
       Ready       : Boolean := False;
       Committed   : Boolean := False;
+
+      function Wait_Until_Ready return Boolean;
+      --  Ask Replacement until the old version is between calls
+
+      ----------------------
+      -- Wait_Until_Ready --
+      ----------------------
+
+      function Wait_Until_Ready return Boolean is
+      begin
+         for Attempt in 1 .. 100_000 loop
+            if Replacements.Ready (Replacement) then
+               return True;
+            end if;
+         end loop;
+         return False;
+      end Wait_Until_Ready;
+
    begin
       if Replace_Process = Rose.Capabilities.Null_Capability
         or else Control = Rose.Capabilities.Null_Capability
@@ -673,10 +691,7 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      for Attempt in 1 .. 100_000 loop
-         Ready := Replacements.Ready (Replacement);
-         exit when Ready;
-      end loop;
+      Ready := Wait_Until_Ready;
 
       if Ready then
          declare
@@ -713,10 +728,14 @@ package body Init.Self_Tests is
          Rose.System_Calls.Receive_Caps (Params, Results);
          Rose.System_Calls.Invoke_Capability (Params);
 
+         --  The old version has just answered the new version's
+         --  calls, and has to be between calls again (#926).
+
          Committed :=
            not Params.Control.Flags (Rose.Invocation.Error)
            and then Params.Control.Flags (Rose.Invocation.Send_Words)
            and then Params.Data (0) = Completed
+           and then Wait_Until_Ready
            and then Replacements.Commit (Replacement);
       end if;
 
