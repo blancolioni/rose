@@ -1,6 +1,8 @@
 .set END_OF_INT, 0x20
 .set INT_CTL_MASTER, 0x20
 .set INT_CTL_SLAVE, 0xA0
+.set OCW3_READ_IRR, 0x0A
+.set OCW3_READ_ISR, 0x0B
 
 .set DIVIDE_VECTOR,              0x00
 .set DEBUG_VECTOR,               0x01
@@ -101,9 +103,9 @@ kernel_stack_top:
 	restore_kernel_state
 .endm
 
-.macro hwint_master irq
-.global hwint\irq
-hwint\irq :
+.macro hwint_master irq, label
+.global \label
+\label :
     save_process_context 0
     push    $(\irq + 32)
     call    handle_interrupt
@@ -114,25 +116,25 @@ hwint\irq :
     jmp continue
     .endm
 
-hwint_master 0
+hwint_master 0, hwint0
 
-hwint_master 1
+hwint_master 1, hwint1
 
-hwint_master 2
+hwint_master 2, hwint2
 
-hwint_master 3
+hwint_master 3, hwint3
 
-hwint_master 4
+hwint_master 4, hwint4
 
-hwint_master 5
+hwint_master 5, hwint5
 
-hwint_master 6
+hwint_master 6, hwint6
 
-hwint_master 7
+hwint_master 7, hwint7_dispatch
 
-.macro hwint_slave irq
-.global hwint\irq
-hwint\irq :
+.macro hwint_slave irq, label
+.global \label
+\label :
     save_process_context 0
     push    $(\irq + 32)
     call    handle_interrupt
@@ -144,21 +146,60 @@ hwint\irq :
     jmp continue
     .endm
 
-hwint_slave 8
+hwint_slave 8, hwint8
 
-hwint_slave 9
+hwint_slave 9, hwint9
 
-hwint_slave 10
+hwint_slave 10, hwint10
 
-hwint_slave 11
+hwint_slave 11, hwint11
 
-hwint_slave 12
+hwint_slave 12, hwint12
 
-hwint_slave 13
+hwint_slave 13, hwint13
 
-hwint_slave 14
+hwint_slave 14, hwint14
 
-hwint_slave 15
+hwint_slave 15, hwint15_dispatch
+
+# A spurious IRQ 7 or 15: the PIC raised the vector, but the line dropped
+# before the CPU acknowledged it, so its in-service bit is clear (#918).
+# It goes no further, and the PIC that raised it gets no EOI, which would
+# end whatever interrupt it really has in service. For IRQ 15, the master
+# did see IRQ 2, so it gets one. A real IRQ 7 or 15 goes to its stub.
+
+.global hwint7
+hwint7:
+    push    %eax
+    movb    $(OCW3_READ_ISR), %al
+    outb    $(INT_CTL_MASTER)
+    inb     $(INT_CTL_MASTER)
+    movb    %al, %ah
+    movb    $(OCW3_READ_IRR), %al       # put the read register back
+    outb    $(INT_CTL_MASTER)
+    testb   $0x80, %ah
+    pop     %eax                        # pop leaves the flags alone
+    jnz     hwint7_dispatch
+    iret
+
+.global hwint15
+hwint15:
+    push    %eax
+    movb    $(OCW3_READ_ISR), %al
+    outb    $(INT_CTL_SLAVE)
+    inb     $(INT_CTL_SLAVE)
+    movb    %al, %ah
+    movb    $(OCW3_READ_IRR), %al
+    outb    $(INT_CTL_SLAVE)
+    testb   $0x80, %ah
+    jnz     1f
+    movb    $(END_OF_INT), %al
+    outb    $(INT_CTL_MASTER)
+    pop     %eax
+    iret
+1:
+    pop     %eax
+    jmp     hwint15_dispatch
 
 .data
 .global exception_code, excep
