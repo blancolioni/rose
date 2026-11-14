@@ -374,8 +374,8 @@ Used by:: `init`, which launches it on a first boot, after it creates the first 
 
 Keeps the users, and a salted hash of each one's password (#455).
 
-Provides:: `Auth`, whose `Login` returns a user's `User` interface for the right password; and `Auth_Admin`, whose `New_User` creates a user, with a home directory, and fails if the name is taken.
-Requests:: `Create_Endpoint` and `Find_Command`, as roles of its command declaration.
+Provides:: `Auth`, whose `Login` returns a user's `User` interface for the right password; `Auth_Admin`, whose `New_User` creates a user, with a home directory, and fails if the name is taken; and `Replaceable` (ADR 0032).
+Requests:: `Create_Endpoint`, `Find_Command` and `Cap_Set_Service`, as roles of its command declaration.
 Used by:: `init`, which launches it on a first boot and creates the first user, whose name and password the person installing types (#456), through `Auth_Admin`.
 
 * *Passwords are hashed with PBKDF2-HMAC-SHA-256,* from `Rose.Crypto`, with a 16-byte salt from `Rose.Random` and 100,000 iterations: a login takes about a second in QEMU.
@@ -383,6 +383,10 @@ Used by:: `init`, which launches it on a first boot and creates the first user, 
 * *`Login` takes as long for a name that doesn't exist,* and compares hashes in constant time, so that neither the time nor the comparison tells which names exist or how much of a password was right.
 * *The users are a list in the process's memory,* so they persist with it.
 * *Only `init` holds `Auth_Admin`* until the installer asks for the first user (#456).
+* *A new version can take over from a running one* (ADR 0032, #831).
+  Its state is the users' names and password hashes, and the caps auth holds for each user: the `User` interface, and the `Replaceable` interfaces of the user's server and home directory, which only auth holds.
+  `Find_Command` and `Cap_Set_Service` are its arguments, which the handover passes on (#901).
+  Init replaces it on the install, once the first user is made.
 
 === `rights`
 

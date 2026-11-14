@@ -16,6 +16,8 @@ run_self_tests:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-run_self_tests.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands.idl \
+	    $(INTERFACES)/auth.idl \
+	    $(INTERFACES)/auth_admin.idl \
 	    $(INTERFACES)/clock.idl \
 	    $(INTERFACES)/rights.idl \
 	    $(INTERFACES)/rights_admin.idl \
@@ -59,5 +61,6 @@ run_self_tests:
 	    $(INTERFACES)/rose-core.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
-	    ../user/rose-core-user.idl $(INTERFACES)/rose-core.idl
+	    ../user/rose-core-user.idl ../auth/rose-core-auth.idl \
+	    $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

@@ -9,12 +9,25 @@ command Rose.Core.Auth : Create_Endpoint, Find_Command, Cap_Set_Service
           home directory the cap set server's Constructor, its
           Cap_Set_Service, which the directory gives each of its files
           (#867).
+
+          A new version of the program can take over from a running one
+          (ADR 0032, #831). Its state is the users: each one's name and
+          password hash, and the caps it holds for each, the user's User
+          interface and the Replaceable interfaces of the user's server
+          and home directory, which only auth holds. Find_Command and
+          Cap_Set_Service are its arguments, which the handover passes on
+          (#901), so a new version is launched with Previous alone. A
+          saved state has no caps, so auth with users can't be restored
+          from one.
           """,
        Server      => Auth_Server.Start_Server,
+       Replaceable => Auth_Server,
        Live
 is
    Auth : out Auth
      with Help => "the Auth interface, for logging in";
    Admin : out Auth_Admin
      with Help => "the Auth_Admin interface, for creating users";
+   Control : out Replaceable
+     with Help => "its Replaceable interface";
 end Rose.Core.Auth;

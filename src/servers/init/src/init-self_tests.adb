@@ -724,6 +724,28 @@ package body Init.Self_Tests is
       return Committed;
    end Replace;
 
+   ------------------
+   -- Replace_Auth --
+   ------------------
+
+   --  The auth command's launch call, as src/utilities/auth/
+   --  rose-core-auth.idl declares it: Create_Endpoint, Find_Command and
+   --  Cap_Set_Service, then Previous; and its results Auth, Admin and
+   --  Control.
+
+   function Replace_Auth
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Replace_Process : Rose.Capabilities.Capability;
+      Control         : Rose.Capabilities.Capability)
+      return Boolean
+   is (Replace
+         (Replace_Process => Replace_Process,
+          Control         => Control,
+          Program         => Init.Calls.Find_In_Map (Find_Cap, "auth"),
+          Null_Caps       => 3,
+          Empty_Strings   => 0,
+          Results         => 3));
+
    -----------------------
    -- Replace_Held_File --
    -----------------------
