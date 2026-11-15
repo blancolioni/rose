@@ -1,14 +1,14 @@
 with System.Storage_Elements;
 
-with Rose.Interfaces.File_System.Client;
-with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Files.File_System.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
 
-private with Rose.Interfaces.Directory.Client;
+private with Rose.Interfaces.Files.Directory.Client;
 
 package Rose.Directories is
 
    procedure Open_Root_File_System
-     (Client : Rose.Interfaces.File_System.Client.File_System_Client);
+     (Client : Rose.Interfaces.Files.File_System.Client.File_System_Client);
 
    procedure Set_Directory (Directory : String);
 
@@ -21,7 +21,7 @@ package Rose.Directories is
    function Size (Name : String) return File_Size;
 
    procedure Open
-     (File : out Rose.Interfaces.Releasable_Reader.Client
+     (File : out Rose.Interfaces.Streams.Releasable_Reader.Client
         .Releasable_Reader_Client;
       Name : String);
    --  A new reader of the file Name, at its start (ADR 0009). Release it
@@ -74,12 +74,13 @@ package Rose.Directories is
 
    procedure Open
      (File            : out
-        Rose.Interfaces.Releasable_Reader.Client.Releasable_Reader_Client;
+        Rose.Interfaces.Streams.Releasable_Reader.Client
+          .Releasable_Reader_Client;
       Directory_Entry : Directory_Entry_Type);
 
 private
 
-   use Rose.Interfaces.Directory.Client;
+   use Rose.Interfaces.Files.Directory.Client;
 
    subtype Entry_Name_Type is String (1 .. 400);
 

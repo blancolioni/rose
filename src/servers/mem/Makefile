@@ -20,30 +20,30 @@ OBJECTS= \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-heap-server.o \
-	$(BUILDDIR)/rose-interfaces-memory.o \
-	$(BUILDDIR)/rose-interfaces-memory-server.o \
-	$(BUILDDIR)/rose-interfaces-memory_restore.o \
-	$(BUILDDIR)/rose-interfaces-memory_restore-server.o \
-	$(BUILDDIR)/rose-interfaces-process.o \
-	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
-	$(BUILDDIR)/rose-interfaces-process-server.o \
-	$(BUILDDIR)/rose-interfaces-receiver-server.o \
-	$(BUILDDIR)/rose-interfaces-replacement.o \
-	$(BUILDDIR)/rose-interfaces-replacement-server.o \
-	$(BUILDDIR)/rose-interfaces-replacer.o \
-	$(BUILDDIR)/rose-interfaces-replacer-server.o \
-	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-bank.o \
-	$(BUILDDIR)/rose-interfaces-bank-client.o \
-	$(BUILDDIR)/rose-interfaces-dependent.o \
-	$(BUILDDIR)/rose-interfaces-dependent-client.o \
-	$(BUILDDIR)/rose-interfaces-process_banks.o \
-	$(BUILDDIR)/rose-interfaces-process_banks-client.o \
-	$(BUILDDIR)/rose-interfaces-reader.o \
-	$(BUILDDIR)/rose-interfaces-reader-client.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-heap-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-memory.o \
+	$(BUILDDIR)/rose-interfaces-processes-memory-server.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-process.o \
+	$(BUILDDIR)/rose-interfaces-processes-kernel_process-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process-server.o \
+	$(BUILDDIR)/rose-interfaces-caps-receiver-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacement.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacement-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacer.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacer-server.o \
+	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-process_banks.o \
+	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-reader-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-trace.o \

@@ -1,7 +1,7 @@
 with System.Storage_Elements;
 
 with Rose.Capabilities.Standard;
-with Rose.Interfaces.Cap_Set;
+with Rose.Interfaces.Caps.Cap_Set;
 with Rose.Invocation;
 with Rose.System_Calls.Client;
 with Rose.Words;
@@ -59,9 +59,9 @@ package body Rose.Standard_Streams is
          Rose.System_Calls.Initialize_Send
            (Params, Rose.Capabilities.Standard.Argument_Cap_Set);
          Rose.System_Calls.Receive_Caps
-           (Params, Rose.Interfaces.Cap_Set.Subprogram_Count);
+           (Params, Rose.Interfaces.Caps.Cap_Set.Subprogram_Count);
          Rose.System_Calls.Invoke_Capability (Params);
-         Get_Cap := Params.Caps (Rose.Interfaces.Cap_Set.Get_Cap_Index);
+         Get_Cap := Params.Caps (Rose.Interfaces.Caps.Cap_Set.Get_Cap_Index);
       end;
 
       --  The cap set holds the input stream's interface, from which the

@@ -6,13 +6,13 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
-with Rose.Interfaces.Bank;
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Launch;
-with Rose.Interfaces.Named.Client;
+with Rose.Interfaces.Storage.Bank;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Processes.Launch;
+with Rose.Interfaces.Common.Named.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Files;
 with Tests.Registry;
@@ -22,7 +22,7 @@ package body Tests.Processes is
    use Ada.Streams;
    use System.Storage_Elements;
 
-   package Files renames Rose.Interfaces.Writable_File.Client;
+   package Files renames Rose.Interfaces.Files.Writable_File.Client;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -47,9 +47,9 @@ package body Tests.Processes is
       end if;
 
       declare
-         Own_Bank : Rose.Interfaces.Bank.Client.Bank_Client :=
-                      Rose.Interfaces.Bank.Client.From_Cap (Own);
-         Sub_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Own_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                      Rose.Interfaces.Storage.Bank.Client.From_Cap (Own);
+         Sub_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
                       Own_Bank.Create_Sub_Bank (0, 0);
          File     : Files.Writable_File_Client;
       begin
@@ -85,17 +85,18 @@ package body Tests.Processes is
 
    function End_Process_Test return Boolean is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("process_probe");
 
       function Launch_Probe
-        return Rose.Interfaces.Process.Process_Object'Class
+        return Rose.Interfaces.Processes.Process.Process_Object'Class
       is (Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps));
       --  A probe, which is launched with Launch and so has a Process cap,
       --  as a command doesn't (#831).
 
-      First : Rose.Interfaces.Process.Process_Object'Class := Launch_Probe;
-      Probe : Rose.Interfaces.Named.Client.Named_Client;
+      First : Rose.Interfaces.Processes.Process
+        .Process_Object'Class := Launch_Probe;
+      Probe : Rose.Interfaces.Common.Named.Client.Named_Client;
    begin
       Ada.Text_IO.Put ("End process test");
 
@@ -122,9 +123,10 @@ package body Tests.Processes is
       --  again must not reach it.
 
       declare
-         Second       : Rose.Interfaces.Process.Process_Object'Class :=
+         Second       : Rose.Interfaces.Processes.Process
+           .Process_Object'Class :=
            Launch_Probe;
-         Second_Probe : Rose.Interfaces.Named.Client.Named_Client;
+         Second_Probe : Rose.Interfaces.Common.Named.Client.Named_Client;
       begin
          Second_Probe.Open (Second.Published_Interface);
 

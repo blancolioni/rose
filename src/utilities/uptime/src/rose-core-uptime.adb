@@ -3,7 +3,7 @@ with Ada.Text_IO;
 with Rose.Clock.Calendar;
 
 procedure Rose.Core.Uptime
-  (Clock_Service : in out Rose.Interfaces.Clock.Clock_Object'Class;
+  (Clock_Service : in out Rose.Interfaces.Time.Clock.Clock_Object'Class;
    Seconds       : Boolean := False)
 is
    use Rose.Clock.Calendar;

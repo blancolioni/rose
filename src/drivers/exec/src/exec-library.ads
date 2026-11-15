@@ -1,7 +1,7 @@
 with Rose.Invocation;
 with Rose.Objects;
 
-with Rose.Interfaces.Reader;
+with Rose.Interfaces.Streams.Reader;
 
 package Exec.Library is
 
@@ -12,7 +12,7 @@ package Exec.Library is
    --  Keep the images in Region, the cap of a Region interface.
 
    function Install
-     (ELF_Image  : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image  : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name       : String;
       Caps       : Rose.Capabilities.Capability_Array)
      return Rose.Objects.Capability_Identifier;
@@ -20,7 +20,7 @@ package Exec.Library is
    --  there is no room for it.
 
    function Update
-     (ELF_Image  : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image  : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name       : String;
       Caps       : Rose.Capabilities.Capability_Array;
       Changed    : out Boolean)

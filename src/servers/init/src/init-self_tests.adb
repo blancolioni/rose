@@ -3,14 +3,14 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Init_Capabilities;
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Constructor.Client;
-with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Named.Client;
-with Rose.Interfaces.Process_Banks.Client;
-with Rose.Interfaces.Releasable_Cap_Set.Client;
-with Rose.Interfaces.Replacement.Client;
-with Rose.Interfaces.Replacer.Client;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Caps.Constructor.Client;
+with Rose.Interfaces.Processes.Launch.Client;
+with Rose.Interfaces.Common.Named.Client;
+with Rose.Interfaces.Storage.Process_Banks.Client;
+with Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
+with Rose.Interfaces.Processes.Replacement.Client;
+with Rose.Interfaces.Processes.Replacer.Client;
 with Rose.Objects;
 
 with Init.Boot_Steps;
@@ -262,14 +262,16 @@ package body Init.Self_Tests is
 
       if Cap_Sets /= Rose.Capabilities.Null_Capability then
          declare
-            package Sets renames Rose.Interfaces.Releasable_Cap_Set.Client;
-            Service : Rose.Interfaces.Constructor.Client.Constructor_Client;
+            package Sets renames Rose.Interfaces.Caps.Releasable_Cap_Set
+              .Client;
+            Service : Rose.Interfaces.Caps.Constructor.Client
+              .Constructor_Client;
             Set     : Sets.Releasable_Cap_Set_Client;
             Taken   : Rose.Capabilities.Capability;
          begin
-            Rose.Interfaces.Constructor.Client.Open (Service, Cap_Sets);
+            Rose.Interfaces.Caps.Constructor.Client.Open (Service, Cap_Sets);
             Sets.Open
-              (Set, Rose.Interfaces.Constructor.Client.Create (Service));
+              (Set, Rose.Interfaces.Caps.Constructor.Client.Create (Service));
 
             First := Derive (Derive_Cap, Find_Cap);
             Child := Derive (Derive_Cap, First);
@@ -309,8 +311,8 @@ package body Init.Self_Tests is
       return Forward_Result
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Client.Launch_Client;
-      Bank     : Rose.Interfaces.Bank.Client.Bank_Client;
+      Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      Bank     : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Bank_Cap : Rose.Capabilities.Capability;
       Endpoint : Rose.Capabilities.Capability;
    begin
@@ -339,17 +341,17 @@ package body Init.Self_Tests is
       if Bank_Cap = Rose.Capabilities.Null_Capability then
          return No_Test_Bank;
       end if;
-      Rose.Interfaces.Bank.Client.Open (Bank, Bank_Cap);
+      Rose.Interfaces.Storage.Bank.Client.Open (Bank, Bank_Cap);
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Old_Launch);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Old_Launch);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Bank_Cap, No_Caps);
 
       --  The command waits for its launch call, which never comes:
       --  destroying its bank ends it.
 
-      Rose.Interfaces.Bank.Client.Destroy (Bank);
+      Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
       return (if Endpoint = Rose.Capabilities.Null_Capability
               then Launch_Failed else Passed);
    end Exec_Forward_Test;
@@ -367,9 +369,9 @@ package body Init.Self_Tests is
    is
       use type Rose.Words.Word;
       use type Rose.Words.Word_64;
-      package Bank_Client renames Rose.Interfaces.Bank.Client;
-      package Named renames Rose.Interfaces.Named.Client;
-      package PB renames Rose.Interfaces.Process_Banks.Client;
+      package Bank_Client renames Rose.Interfaces.Storage.Bank.Client;
+      package Named renames Rose.Interfaces.Common.Named.Client;
+      package PB renames Rose.Interfaces.Storage.Process_Banks.Client;
 
       Old_Process : constant Rose.Objects.Object_Id := 16#7FFF_FFF0#;
       New_Process : constant Rose.Objects.Object_Id := 16#7FFF_FFF1#;
@@ -593,13 +595,13 @@ package body Init.Self_Tests is
    is
       use type Rose.Words.Word;
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint : Rose.Capabilities.Capability;
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Bank, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
@@ -643,13 +645,14 @@ package body Init.Self_Tests is
       return Boolean
    is
       use type Rose.Words.Word;
-      package Replacements renames Rose.Interfaces.Replacement.Client;
+      package Replacements renames Rose.Interfaces.Processes.Replacement
+        .Client;
       No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher    : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher    : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint    : Rose.Capabilities.Capability :=
         Rose.Capabilities.Null_Capability;
       Params      : aliased Rose.Invocation.Invocation_Record;
-      Replacer    : Rose.Interfaces.Replacer.Client.Replacer_Client;
+      Replacer    : Rose.Interfaces.Processes.Replacer.Client.Replacer_Client;
       Replacement : Replacements.Replacement_Client;
       Ready       : Boolean := False;
       Committed   : Boolean := False;
@@ -682,9 +685,11 @@ package body Init.Self_Tests is
       --  Only the new version's calls reach the old version until
       --  Commit.
 
-      Rose.Interfaces.Replacer.Client.Open (Replacer, Replace_Process);
+      Rose.Interfaces.Processes.Replacer.Client
+        .Open (Replacer, Replace_Process);
       Replacement :=
-        Rose.Interfaces.Replacer.Client.Replace_Process (Replacer, Control);
+        Rose.Interfaces.Processes.Replacer.Client
+          .Replace_Process (Replacer, Control);
       if Replacements.Get_Interface_Cap (Replacement)
         = Rose.Capabilities.Null_Capability
       then
@@ -695,14 +700,16 @@ package body Init.Self_Tests is
 
       if Ready then
          declare
-            Sibling : constant Rose.Interfaces.Bank.Client.Bank_Client :=
+            Sibling : constant Rose.Interfaces.Storage.Bank.Client
+              .Bank_Client :=
               Replacements.Bank (Replacement);
          begin
-            Rose.Interfaces.Launch.Client.Open (Launcher, Program);
+            Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Program);
             Endpoint :=
-              Rose.Interfaces.Launch.Client.Launch_Command
+              Rose.Interfaces.Processes.Launch.Client.Launch_Command
                 (Launcher,
-                 Rose.Interfaces.Bank.Client.Get_Interface_Cap (Sibling),
+                 Rose.Interfaces.Storage.Bank.Client
+                   .Get_Interface_Cap (Sibling),
                  No_Caps);
          end;
       end if;
@@ -785,7 +792,7 @@ package body Init.Self_Tests is
       File_Cap   : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "file");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
       Control    : Rose.Capabilities.Capability;
@@ -806,9 +813,9 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Holder_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Holder_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
@@ -871,7 +878,7 @@ package body Init.Self_Tests is
       User_Ctl   : Rose.Capabilities.Capability;
       Home_Ctl   : Rose.Capabilities.Capability;
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -883,9 +890,9 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Holder_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Holder_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
@@ -962,7 +969,7 @@ package body Init.Self_Tests is
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "run_self_tests");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -970,9 +977,9 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
@@ -1016,7 +1023,7 @@ package body Init.Self_Tests is
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "hold_derived");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
       Spare      : Rose.Capabilities.Capability;
@@ -1042,9 +1049,9 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
@@ -1086,7 +1093,7 @@ package body Init.Self_Tests is
       return Boolean
    is
       use type Rose.Words.Word;
-      package Named renames Rose.Interfaces.Named.Client;
+      package Named renames Rose.Interfaces.Common.Named.Client;
       package Init_Caps renames Rose.Init_Capabilities;
 
       Calling : constant Rose.Words.Word := 2;
@@ -1096,7 +1103,7 @@ package body Init.Self_Tests is
                      Init.Calls.Find_In_Map (Find_Cap, "swap_probe");
       Bank_Cap   : constant Rose.Capabilities.Capability :=
                      Init.Grants.Bank (Probe_Page_Limit, Probe_Region_Limit);
-      Bank       : Rose.Interfaces.Bank.Client.Bank_Client;
+      Bank       : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
 
       Passed     : Boolean := True;
       Probe_1    : Rose.Capabilities.Capability;
@@ -1171,7 +1178,7 @@ package body Init.Self_Tests is
          return False;
       end if;
 
-      Rose.Interfaces.Bank.Client.Open (Bank, Bank_Cap);
+      Rose.Interfaces.Storage.Bank.Client.Open (Bank, Bank_Cap);
 
       Probe_1 := Launch_Probe (Launch_Cap, Bank_Cap, Create_Endpoint, 1,
                                Rose.Capabilities.Null_Capability);
@@ -1182,7 +1189,7 @@ package body Init.Self_Tests is
         or else Probe_2 = Rose.Capabilities.Null_Capability
       then
          Check ("launch probes 1 and 2", False);
-         Rose.Interfaces.Bank.Client.Destroy (Bank);
+         Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
          return False;
       end if;
 
@@ -1241,7 +1248,7 @@ package body Init.Self_Tests is
       --  Ending the bank ends the three probes, including probe 1's
       --  process, which is retired.
 
-      Rose.Interfaces.Bank.Client.Destroy (Bank);
+      Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
       return Passed;
    end Swap_Test;
 

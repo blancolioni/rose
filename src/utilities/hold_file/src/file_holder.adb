@@ -7,37 +7,40 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 
-with Rose.Interfaces.Commands.Client;
-with Rose.Interfaces.Launch;
+with Rose.Interfaces.Commands.Lookup.Client;
+with Rose.Interfaces.Processes.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Releasable_Writer;
-with Rose.Interfaces.Releasable_Writer.Client;
-with Rose.Interfaces.Restorable.Server;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Streams.Releasable_Reader;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
+with Rose.Interfaces.Streams.Releasable_Writer;
+with Rose.Interfaces.Streams.Releasable_Writer.Client;
+with Rose.Interfaces.Processes.Restorable.Server;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 package body File_Holder is
 
    use Ada.Streams;
    use System.Storage_Elements;
    type Holder_Object is
-     limited new Rose.Interfaces.Restorable.Server.Restorable_Interface
+     limited new Rose.Interfaces.Processes.Restorable.Server
+       .Restorable_Interface
    with null record;
 
    overriding function Restorable_Cap
      (Item : in out Holder_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    overriding procedure Restored (Item : in out Holder_Object);
 
    Context    : Rose.Server.Server_Context;
    The_Holder : aliased Holder_Object;
 
-   File   : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
-   Writer : Rose.Interfaces.Releasable_Writer.Client.Releasable_Writer_Client;
-   Reader : Rose.Interfaces.Releasable_Reader.Client.Releasable_Reader_Client;
+   File   : Rose.Interfaces.Files.Writable_File.Client.Writable_File_Client;
+   Writer : Rose.Interfaces.Streams.Releasable_Writer.Client
+     .Releasable_Writer_Client;
+   Reader : Rose.Interfaces.Streams.Releasable_Reader.Client
+     .Releasable_Reader_Client;
    --  The file, and the streams that are open across the handover and
    --  the restore.
 
@@ -75,16 +78,17 @@ package body File_Holder is
       Control         : out Rose.Capabilities.Capability)
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Programs : Rose.Interfaces.Commands.Client.Commands_Client;
+      Programs : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
       Endpoint : Rose.Capabilities.Capability;
       Served   : Rose.Capabilities.Capability;
    begin
       Control := Rose.Capabilities.Null_Capability;
-      Rose.Interfaces.Restorable.Server.Attach (Context, The_Holder'Access);
+      Rose.Interfaces.Processes.Restorable.Server
+        .Attach (Context, The_Holder'Access);
       Programs.Open (Commands);
 
       declare
-         Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+         Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
            Programs.Find ("file");
       begin
          Endpoint :=
@@ -99,7 +103,7 @@ package body File_Holder is
          File.Open (Served);
 
          declare
-            First : Rose.Interfaces.Releasable_Writer
+            First : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class := File.Rewrite;
          begin
             First.Write (Bytes ("hello"));
@@ -107,9 +111,9 @@ package body File_Holder is
          end;
 
          declare
-            Appender : Rose.Interfaces.Releasable_Writer
+            Appender : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class := File.Append;
-            Opened   : Rose.Interfaces.Releasable_Reader
+            Opened   : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := File.Open_Reader;
             Start    : Stream_Element_Array (1 .. 2);
             Last     : Stream_Element_Offset;

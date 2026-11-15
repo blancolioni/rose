@@ -2,7 +2,7 @@ with Ada.Strings.Unbounded;
 
 with Rose.Interfaces.Held_Call.Client;
 with Rose.Interfaces.Held_Call.Server;
-with Rose.Interfaces.Named.Server;
+with Rose.Interfaces.Common.Named.Server;
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Server;
@@ -28,12 +28,12 @@ package body Replaceable_Test_Server is
    --  time it fails, until it is answered.
 
    type Named_Server is
-     new Rose.Interfaces.Named.Server.Named_Interface with null record;
+     new Rose.Interfaces.Common.Named.Server.Named_Interface with null record;
 
    overriding function Named_Cap
      (Item : in out Named_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Named.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Item));
 
    overriding function Name (Item : in out Named_Server) return String;
 
@@ -119,14 +119,14 @@ package body Replaceable_Test_Server is
       end if;
       Target_Cap := Target;
 
-      Rose.Interfaces.Named.Server.Attach
+      Rose.Interfaces.Common.Named.Server.Attach
         (Context, The_Named'Access, Named_Id);
       Rose.Interfaces.Held_Call.Server.Attach
         (Context, The_Held'Access, Held_Id);
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Service_Cap);
 
-      Served := Rose.Interfaces.Named.Server.Cap_Of (The_Named);
+      Served := Rose.Interfaces.Common.Named.Server.Cap_Of (The_Named);
       Control := Rose.Replacement.Replaceable_Cap;
       Saver := Rose.Replacement.Saveable_Cap;
       Held := Rose.Interfaces.Held_Call.Server.Cap_Of (The_Held);
@@ -316,7 +316,7 @@ package body Replaceable_Test_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream,
-         Rose.Interfaces.Named.Server.Identifier_Of (The_Named'Access));
+         Rose.Interfaces.Common.Named.Server.Identifier_Of (The_Named'Access));
       Rose.Objects.Capability_Identifier'Write
         (Stream,
          Rose.Interfaces.Held_Call.Server.Identifier_Of (The_Held'Access));

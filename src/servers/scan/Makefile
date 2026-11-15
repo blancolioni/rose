@@ -4,25 +4,25 @@ include $(ROOT)/mk/common.mk
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/scan.reloc.o
 READER_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-reader.o \
-	$(BUILDDIR)/rose-interfaces-reader-client.o
+	$(BUILDDIR)/rose-interfaces-streams-reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-reader-client.o
 DIRECTORY_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-directory.o \
-	$(BUILDDIR)/rose-interfaces-directory-client.o
+	$(BUILDDIR)/rose-interfaces-files-directory.o \
+	$(BUILDDIR)/rose-interfaces-files-directory-client.o
 FILE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-file.o \
-	$(BUILDDIR)/rose-interfaces-file-client.o \
-	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
-	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader-client.o
+	$(BUILDDIR)/rose-interfaces-files-file.o \
+	$(BUILDDIR)/rose-interfaces-files-file-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-releasable_reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-releasable_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader-client.o
 FILE_SYSTEM_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-file_system.o \
-	$(BUILDDIR)/rose-interfaces-file_system-client.o
+	$(BUILDDIR)/rose-interfaces-files-file_system.o \
+	$(BUILDDIR)/rose-interfaces-files-file_system-client.o
 BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client-table.o
+	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client-table.o
 
 OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
@@ -35,8 +35,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-gpt.o \
 	$(BUILDDIR)/rose-devices-gpt_format.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \

@@ -1,4 +1,4 @@
-command Rose.Core.Rename : Standard_Error
+command Rose.Core.Rename : Streams.Standard_Error
   with Summary     => "Rename an entry in a directory.",
        Description => """
           Rename gives the entry FROM in DIRECTORY, which is home if it is
@@ -13,6 +13,6 @@ is
      with Help => "the entry's name";
    To : String
      with Help => "its new name";
-   Directory : in Writable_Directory
+   Directory : in Files.Writable_Directory
      with Help => "the directory that holds it";
 end Rose.Core.Rename;

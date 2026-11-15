@@ -12,16 +12,16 @@ OBJECTS= \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-cap.o \
-	$(BUILDDIR)/rose-interfaces-cap-client.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
-	$(BUILDDIR)/rose-interfaces-timer.o \
-	$(BUILDDIR)/rose-interfaces-timer-client.o \
-	$(BUILDDIR)/rose-interfaces-checkpointer.o \
-	$(BUILDDIR)/rose-interfaces-checkpointer-server.o \
-	$(BUILDDIR)/rose-interfaces-timeout.o \
-	$(BUILDDIR)/rose-interfaces-timeout-server.o \
+	$(BUILDDIR)/rose-interfaces-caps-cap.o \
+	$(BUILDDIR)/rose-interfaces-caps-cap-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-time-timer.o \
+	$(BUILDDIR)/rose-interfaces-time-timer-client.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-checkpointer.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-checkpointer-server.o \
+	$(BUILDDIR)/rose-interfaces-time-timeout.o \
+	$(BUILDDIR)/rose-interfaces-time-timeout-server.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-server.o \

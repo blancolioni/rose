@@ -1,0 +1,5 @@
+interface Time.Timeout is
+
+   procedure On_Timeout;
+   
+end Time.Timeout;

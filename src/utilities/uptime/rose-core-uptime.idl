@@ -1,4 +1,4 @@
-command Rose.Core.Uptime : Standard_Output, Clock_Service
+command Rose.Core.Uptime : Streams.Standard_Output, Time.Clock_Service
   with Summary     => "Write how long the system has run.",
        Description => """
           Uptime writes how long the system has run, from the clock's

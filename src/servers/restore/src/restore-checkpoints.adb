@@ -6,15 +6,15 @@ with Rose.Invocation;
 with Rose.Limits;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Log_Reader.Client;
-with Rose.Interfaces.Memory_Restore.Client;
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Storage_Checkpoint.Client;
+with Rose.Interfaces.Checkpoints.Log_Reader.Client;
+with Rose.Interfaces.Checkpoints.Memory_Restore.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Checkpoints.Storage_Checkpoint.Client;
 
 package body Restore.Checkpoints is
 
    use System.Storage_Elements;
-   use Rose.Interfaces.Log_Reader.Client;
+   use Rose.Interfaces.Checkpoints.Log_Reader.Client;
    use type Rose.Words.Word_32;
    use type Rose.Words.Word_64;
    use type Rose.Capabilities.Capability;
@@ -491,8 +491,8 @@ package body Restore.Checkpoints is
       Checkpoint : Rose.Words.Word_64;
       Success    : out Boolean)
    is
-      use Rose.Interfaces.Memory_Restore.Client;
-      use Rose.Interfaces.Storage_Checkpoint.Client;
+      use Rose.Interfaces.Checkpoints.Memory_Restore.Client;
+      use Rose.Interfaces.Checkpoints.Storage_Checkpoint.Client;
       Reader          : Log_Reader_Client;
       Store           : Storage_Checkpoint_Client;
       Mem             : Memory_Restore_Client;
@@ -721,7 +721,7 @@ package body Restore.Checkpoints is
                   if Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0
                   then
                      declare
-                        Region : constant Rose.Interfaces.Region.Client
+                        Region : constant Rose.Interfaces.Storage.Region.Client
                           .Region_Client :=
                             Find_Region
                               (Store,
@@ -736,7 +736,8 @@ package body Restore.Checkpoints is
                            Limit         => Segment.Limit,
                            Flags         => Segment.Flags,
                            Region        =>
-                             Rose.Interfaces.Region.Client.Get_Interface_Cap
+                             Rose.Interfaces.Storage.Region.Client
+                               .Get_Interface_Cap
                                (Region),
                            Region_Offset =>
                              Rose.Words.Word (Segment.Region_Offset));

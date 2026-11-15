@@ -15,7 +15,9 @@ An IDL file declares one interface: its methods, their parameters, and any types
 The IDL compiler turns each interface into Ada packages that a client uses to call the interface and a server uses to implement it.
 
 * Interface files live in `interfaces/`, one interface per file.
-* The file name is the interface name in lower case, with the extension `.idl`: `Block_Device` is declared in `block_device.idl`.
+* Each interface is in a group, and is named with it: `Storage.Block_Array` (ADR 0034).
+  A reference to an interface always gives its group, even from inside the same group.
+* The file name is the interface's name in lower case, with the `.` replaced by `-`, as GNAT names child units, and the extension `.idl`: `Storage.Block_Array` is declared in `storage-block_array.idl`.
   The compiler relies on this to find parent interfaces.
 * The compiler is run once per file, as `idl <file> <endpoint-table>`.
   The build in `src/library/kernelapi/generated` runs it over a fixed list of interfaces and writes the generated packages there.
@@ -24,9 +26,9 @@ The syntax is a small subset of Ada, so an IDL file reads like an Ada package sp
 
 [source,ada]
 ----
-interface Block_Device is
+interface Storage.Block_Array is
 
-   Max_Block_Size : constant := 4096;
+   Max_Block_Size : constant := 65536;
 
    type Block_Size_Type is range 0 .. Max_Block_Size;
    type Block_Address_Type is new Word_64;
@@ -40,8 +42,34 @@ interface Block_Device is
       Count   : Natural;
       Blocks  : out Storage_Array);
 
-end Block_Device;
+end Storage.Block_Array;
 ----
+
+=== Groups
+
+The groups are one level below `Rose.Interfaces`, and each is an empty package, such as `Rose.Interfaces.Storage`, which the compiler generates with its interfaces.
+ADR 0034 says which interface is in which group, and why:
+
+[cols="1,4",options="header"]
+|===
+| Group | Interfaces and roles
+
+| `Caps` | `Cap`, `Cap_Set`, `Releasable_Cap_Set`, `Constructor`, `Receiver`; the roles `Create_Endpoint`, `Create_Signal`, `Delete_Cap`, `Rescind_Cap` and `Cap_Set_Service`
+| `Common` | `Named`, `Resource`, `Transactional`: the mix-ins that interfaces of several groups descend from
+| `Streams` | `Reader`, `Writer`, `Stream`, `Releasable_Reader`, `Releasable_Writer`, `Seekable`, `Seekable_Reader`, `Output_Redirect`; the roles `Standard_Input`, `Standard_Output`, `Standard_Error` and `Standard_IO`
+| `Processes` | `Process`, `Kernel_Process`, `Segment`, `Heap`, `Server`, `Launch`, `Exec`, `Executable`, `Memory`, `Signalled`, `Restorable`, `Replaceable`, `Saveable`, `Replacement`, `Replacer`; the role `Replace_Process`
+| `Storage` | `Store`, `Bank`, `Region`, `Dependent`, `Process_Banks`, `Block_Array`, `Partitions`, `Partition_Setup`; the role `Storage_Service`
+| `Checkpoints` | `Checkpointer`, `Kernel_Log`, `Log_Reader`, `Memory_Restore`, `Storage_Checkpoint`, `State`
+| `Devices` | `ATA`, `Interrupt_Handler`, `Event_Listener`, `Event_Source`
+| `Time` | `Clock`, `Clock_Admin`, `Timer`, `Timeout`; the roles `Clock_Service`, `Clock_Admin_Service` and `Timer_Service`
+| `Files` | `File`, `Writable_File`, `Transactional_Writable_File`, `Directory`, `Writable_Directory`, `File_System`
+| `Users` | `Auth`, `Auth_Admin`, `User`, `Rights`, `Rights_Admin`; the roles `Rights_Service` and `Rights_Admin_Service`
+| `Commands` | `Lookup`, `Map`, `Command_Endpoint`; the role `Find_Command`
+| `Screens` | `Terminal`, `Surface`; the roles `Console` and `Screen_Service`
+|===
+
+From 0.4.0, an interface can't move to another group within a release series, since its endpoint ids hash its full name.
+A new interface goes in an existing group, or in a new one.
 
 == Lexical elements
 
@@ -106,7 +134,7 @@ end File;
 
 * An interface inherits every method of every parent, recursively.
   `File` has `Read` from `Reader`, `Write` from `Writer` and `Seek` from `Seekable`.
-* Each parent is found by parsing `<parent>.idl`, in the same directory as the first file the compiler was given.
+* Each parent is found by parsing its file, such as `common-named.idl` for `Common.Named`, in the same directory as the first file the compiler was given.
   The rewritten compiler will search a list of directories instead (see <<search-paths>>).
 * An interface may have no declarations of its own, as `File` does.
 
@@ -130,7 +158,7 @@ An interface can declare types for its methods to use.
 * *Enumerations:* `type File_Kind is (Directory, Ordinary_File, Special_File);`.
 * *Records:* `+type T is record ... end record;+`.
   These are parsed but no interface uses them.
-* *Interface types:* `interface X` as a parameter or result type means a value of interface `X`, such as `function Get_Device return interface Block_Device;`.
+* *Interface types:* `interface X` as a parameter or result type means a value of interface `X`, such as `function Get_Device return interface Storage.Block_Array;`.
 
 === Constants
 
@@ -171,8 +199,7 @@ The grammar also allows a list of constraints after an interface name, but no in
 | `String` | `String` | The shared buffer
 | `Storage_Array`, `Stream_Element_Array` | `System.Storage_Elements.Storage_Array` | The shared buffer
 | `Page` | `Storage_Array (1 .. 4096)`, page aligned | The shared buffer
-| `Rose_Interface` | `Rose.Interfaces.Rose_Interface` | One capability
-| `interface X` | `Rose.Interfaces.X.Client.X_Client` | One capability, the interface capability (see <<kernel-target>>)
+| `interface G.X` | `Rose.Interfaces.G.X.Client.X_Client` | One capability, the interface capability (see <<kernel-target>>)
 |===
 
 Types derived from these, such as `type Block_Address_Type is new Word_64`, are passed in the same way.
@@ -195,13 +222,13 @@ An id is derived from its declaration, so the same source always gives the same 
 * The *canonical form* of a declaration is written in lower case, with single spaces:
 +
 ----
-interface rose.interfaces.directory
-rose.interfaces.directory.find_entry(in string) return natural
-rose.interfaces.cap.destroy
+interface rose.interfaces.files.directory
+rose.interfaces.files.directory.find_entry(in string) return natural
+rose.interfaces.caps.cap.destroy
 ----
 * A subprogram is named in the interface that declares it, so an inherited subprogram has its parent's id.
 * Each parameter contributes its mode and type, but not its name, so renaming a parameter keeps the id.
-* Predefined types use their IDL names (`word`, `capability`, `string`), a type declared in an interface is qualified by it (`rose.interfaces.block_device.block_address_type`), and an interface type is written `interface rose.interfaces.<name>`.
+* Predefined types use their IDL names (`word`, `capability`, `string`), a type declared in an interface is qualified by it (`rose.interfaces.storage.block_array.block_address_type`), and an interface type is written `interface rose.interfaces.<name>`.
 * The id is the first eight bytes, big-endian, of the SHA-256 of the canonical form.
   A hash of zero, which is not a valid id, becomes 1.
 
@@ -211,7 +238,7 @@ A saved process that holds an old id is no longer valid, so Rose starts from a f
 `idle --list-endpoints` writes each id with its canonical form, which helps when reading kernel traces:
 
 ----
-16#ECDE_34C4_3D46_477B#  rose.interfaces.directory.find_entry(in string) return natural
+16#ECDE_34C4_3D46_477B#  rose.interfaces.files.directory.find_entry(in string) return natural
 ----
 
 === Pinned ids
@@ -239,22 +266,22 @@ The build runs it before generating any code.
 This is one of the two targets that the compiler generates, and the only one that programs built with the kernel run-time system can use.
 The other is the <<user-mode-target,user-mode target>>, for programs built with the userland run-time system.
 Its output uses the subset of Ada available to kernel-level code: no tagged types, no interfaces and no `Ada.Streams`.
-For an interface `X` declared in `x.idl`, it writes three packages:
+For an interface `G.X`, in the group `G`, declared in `g-x.idl`, it writes the group's package, `Rose.Interfaces.G`, which declares nothing, and three packages:
 
 [cols="2,2,4",options="header"]
 |===
 | Package | File | Contents
 
-| `Rose.Interfaces.X`
-| `rose-interfaces-x.ads`
+| `Rose.Interfaces.G.X`
+| `rose-interfaces-g-x.ads`
 | The interface's types and constants, `X_Interface`, and a `<Method>_Endpoint` constant for each method, including inherited ones.
 
-| `Rose.Interfaces.X.Client`
-| `rose-interfaces-x-client.ad[sb]`
+| `Rose.Interfaces.G.X.Client`
+| `rose-interfaces-g-x-client.ad[sb]`
 | The private record type `X_Client` and one subprogram per method, for calling the interface.
 
-| `Rose.Interfaces.X.Server`
-| `rose-interfaces-x-server.ad[sb]`
+| `Rose.Interfaces.G.X.Server`
+| `rose-interfaces-g-x-server.ad[sb]`
 | One handler access type per method, and procedures to register handlers with a `Rose.Server` context.
 |===
 
@@ -345,7 +372,7 @@ The caps, isofs, mem and store servers use instanced interfaces in the same way.
 
 The instance table holds up to 1024 (endpoint, identifier) pairs for each interface (`Rose.Server.Max_Endpoint_Instances`).
 
-The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Block_Device` server package.
+The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Storage.Block_Array` server package.
 
 [#user-mode-target]
 === User-mode target (in progress)
@@ -365,16 +392,16 @@ A program built with the userland run-time system (`rts/user`) can use either:
 * *Userland run-time system, kernel target:* the installed drivers `exec`, `command`, `keyboard`, `directory` and `file` (#490), petal, the `user` and `auth` servers, and the commands other than `cat` and `echo`.
 * *Userland run-time system, user-mode target:* `vga-console`, `cat` and `echo`.
 
-The userland run-time system itself will use the user-mode `Rose.Interfaces.Process` and `Rose.Interfaces.Cap_Set`, once idle#41 generates them.
+The userland run-time system itself will use the user-mode `Rose.Interfaces.Processes.Process` and `Rose.Interfaces.Caps.Cap_Set`, once idle#41 generates them.
 Until then it uses the kernel target's, which is enough until a user-mode program needs the user-mode version of one of them, since it uses only their constants.
-Each user-mode `Rose.Interfaces.X` declares everything the kernel target's does, so the programs built with the run-time system can move to the user-mode target one at a time.
+Each user-mode `Rose.Interfaces.G.X` declares everything the kernel target's does, so the programs built with the run-time system can move to the user-mode target one at a time.
 
 Handwritten libraries are either for one target, because they use its generated clients or servers (`Rose.Console_IO`, `Rose.Directories` and `Rose.Devices.GPT` use the kernel target's), or neutral, because they use none (`Rose.Server`, `Rose.System_Calls`, `Rose.Command_Line.Launch`).
 
 ==== Principles
 
 * *One package hierarchy.*
-  Both targets generate `Rose.Interfaces.X`, `Rose.Interfaces.X.Client` and `Rose.Interfaces.X.Server`, each into its own directory, and a program's project chooses one.
+  Both targets generate `Rose.Interfaces.G.X`, `Rose.Interfaces.G.X.Client` and `Rose.Interfaces.G.X.Server`, each into its own directory, and a program's project chooses one.
   A program that tried to use both would have two units with the same name, so the barrier between the targets is checked when the program is built.
 * *One wire format.*
   A program of one target calls servers of the other all the time: a command calls the store, timer and exec servers, for example.
@@ -390,26 +417,26 @@ Handwritten libraries are either for one target, because they use its generated 
 
 ==== Generated packages
 
-For an interface `X`, the user-mode target writes the same three packages as the kernel target:
+For an interface `G.X`, the user-mode target writes the same three packages as the kernel target, and the group's package:
 
 [cols="2,5",options="header"]
 |===
 | Package | Contents
 
-| `Rose.Interfaces.X`
+| `Rose.Interfaces.G.X`
 | The endpoint ids, constants and types, as in the kernel target, and `type X_Object is limited interface`, with one abstract primitive for each subprogram, and the abstract function `X_Cap`, which returns the object's capability for `X`.
 IDL parents become interface parents, so `File_Object` is also a `Reader_Object` and a `Seekable_Object`, and has their `Reader_Cap` and `Seekable_Cap`.
 Every primitive takes `Item : in out X_Object`, functions too, so that a client can get its capabilities on its first call.
 The package names other interfaces, and its own client, through `limited with` clauses, so interface packages can name each other.
 
-| `Rose.Interfaces.X.Client`
+| `Rose.Interfaces.G.X.Client`
 | `X_Client`, which implements `X_Object` by invoking a capability.
 `Open` records the interface capability, and the client gets the capabilities of the subprograms on its first call.
 `From_Cap` returns a client opened from a capability, which an interface result is built from.
 `X_Cap` is the interface capability; for each ancestor `A`, `A_Cap` asks the server for the ancestor's interface capability the first time, as the kernel target's conversions do, and keeps it.
 `Close` is as in the kernel target, and a call that fails raises `Invocation_Error`.
 
-| `Rose.Interfaces.X.Server`
+| `Rose.Interfaces.G.X.Server`
 | `type X_Interface is limited interface and X_Object`, for implementations in the program itself.
 `Attach (Context, Object)` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
 `Publish` attaches the object and publishes its interface capability as the server's public interface.
@@ -467,7 +494,7 @@ A subprogram cannot have the name of a cap function of its interface, which idle
 Opening a client is not an invocation.
 A server that receives one of its caller's objects as an argument gets a client of it, and could not invoke it before it replies, since the caller is waiting for the reply.
 
-`X.Server.X_Interface` has the same name as the endpoint id constant `X_Interface` in `Rose.Interfaces.X`, which it hides in the server package.
+`X.Server.X_Interface` has the same name as the endpoint id constant `X_Interface` in `Rose.Interfaces.G.X`, which it hides in the server package.
 The generated server body therefore names the endpoint ids by their package; a program does not need to.
 `Rose.Interfaces.Objects` declares `Invocation_Error`, and `Not_Served`, which `Cap_Of` raises for an object that has no capability for an interface, because it was never attached to it.
 
@@ -478,8 +505,8 @@ For example, `vga-console` serves the console's screen both as a stream to write
 [source,ada]
 ----
 type Console is limited new
-  Rose.Interfaces.Writer.Server.Writer_Interface
-  and Rose.Interfaces.Restorable.Server.Restorable_Interface
+  Rose.Interfaces.Streams.Writer.Server.Writer_Interface
+  and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
 with record
    ...
 end record;
@@ -488,14 +515,14 @@ overriding procedure Write (Item : in out Console; Buffer : Storage_Array);
 overriding procedure Restored (Item : in out Console);
 
 overriding function Writer_Cap (Item : in out Console) return Capability
-is (Rose.Interfaces.Writer.Server.Cap_Of (Item));
+is (Rose.Interfaces.Streams.Writer.Server.Cap_Of (Item));
 overriding function Restorable_Cap (Item : in out Console) return Capability
-is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
 Screen : aliased Console;
 ...
-Rose.Interfaces.Writer.Server.Publish (Context, Screen'Access);
-Rose.Interfaces.Restorable.Server.Attach (Context, Screen'Access);
+Rose.Interfaces.Streams.Writer.Server.Publish (Context, Screen'Access);
+Rose.Interfaces.Processes.Restorable.Server.Attach (Context, Screen'Access);
 ----
 
 ==== Types
@@ -569,10 +596,10 @@ For `Rose.Core.Copy`, the spec is:
 [source,ada]
 ----
 procedure Rose.Core.Copy
-  (Logging : in out Rose.Interfaces.Writer.Writer_Object'Class;
-   Source  : in out Rose.Interfaces.File.File_Object'Class;
-   Target  : in out Rose.Interfaces.File.File_Object'Class;
-   Root    : in out Rose.Interfaces.Directory.Directory_Object'Class;
+  (Logging : in out Rose.Interfaces.Streams.Writer.Writer_Object'Class;
+   Source  : in out Rose.Interfaces.Files.File.File_Object'Class;
+   Target  : in out Rose.Interfaces.Files.File.File_Object'Class;
+   Root    : in out Rose.Interfaces.Files.Directory.Directory_Object'Class;
    Count   : out Natural;
    Verbose : in out Boolean;
    Report  : out Rose.Command_Line.Text;
@@ -1067,6 +1094,6 @@ package_name ::= Name { '.' Name }
 
 These are differences between this chapter and the current compiler, or problems in it.
 
-* The ATA server does not use the generated `Block_Device` server package; it builds its capabilities by hand with endpoint ids from `Rose.Devices.Block`.
+* The ATA server does not use the generated `Storage.Block_Array` server package; it builds its capabilities by hand with endpoint ids from `Rose.Devices.Block`.
 * `data_source.idl`, `named.idl` and `rose_interface.idl` are not compiled by the build, and `idle --check` warns about them.
   `Named` is still used through `Kernel_Process`, which inherits it.

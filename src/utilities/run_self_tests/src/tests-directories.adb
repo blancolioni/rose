@@ -6,15 +6,15 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
-with Rose.Interfaces.Bank;
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Directory;
-with Rose.Interfaces.File;
-with Rose.Interfaces.Releasable_Reader;
+with Rose.Interfaces.Storage.Bank;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Files.Directory;
+with Rose.Interfaces.Files.File;
+with Rose.Interfaces.Streams.Releasable_Reader;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Transactional_Writable_File;
-with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Files.Transactional_Writable_File;
+with Rose.Interfaces.Files.Writable_Directory.Client;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Files;
 with Tests.Registry;
@@ -24,17 +24,17 @@ package body Tests.Directories is
    use Ada.Streams;
    use type System.Storage_Elements.Storage_Count;
    use type Rose.Capabilities.Capability;
-   use type Rose.Interfaces.Directory.File_Kind;
+   use type Rose.Interfaces.Files.Directory.File_Kind;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
    subtype Version_Class is
-     Rose.Interfaces.Transactional_Writable_File
+     Rose.Interfaces.Files.Transactional_Writable_File
        .Transactional_Writable_File_Object'Class;
    subtype Writable_File_Class is
-     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+     Rose.Interfaces.Files.Writable_File.Writable_File_Object'Class;
 
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
@@ -44,12 +44,12 @@ package body Tests.Directories is
    --------------------
 
    function Directory_Test return Boolean is
-      Top    : Rose.Interfaces.Writable_Directory.Client
+      Top    : Rose.Interfaces.Files.Writable_Directory.Client
         .Writable_Directory_Client;
       Buffer    : Stream_Element_Array (1 .. 16);
       Last      : Stream_Element_Offset;
       Notes_Cap : Rose.Capabilities.Capability;
-      Held      : Rose.Interfaces.Writable_File.Client
+      Held      : Rose.Interfaces.Files.Writable_File.Client
         .Writable_File_Client;
 
       function Delete_Refused
@@ -101,7 +101,8 @@ package body Tests.Directories is
       --  A file, written through its writable interface.
 
       declare
-         Notes : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+         Notes : Rose.Interfaces.Files.Writable_File
+           .Writable_File_Object'Class :=
            Top.Create_File ("notes");
       begin
          if Notes.Writable_File_Cap = Rose.Capabilities.Null_Capability then
@@ -115,7 +116,7 @@ package body Tests.Directories is
         or else Top.Find_Entry ("notes") /= 1
         or else Top.Find_Entry ("other") /= 0
         or else Top.Directory_Entry_Kind (1)
-          /= Rose.Interfaces.Directory.Ordinary_File
+          /= Rose.Interfaces.Files.Directory.Ordinary_File
         or else Top.Directory_Entry_Size (1) /= Hello'Length
       then
          return Fail ("wrong entry for the file");
@@ -128,9 +129,9 @@ package body Tests.Directories is
       --  Read back through a reader of the read-only file (ADR 0009).
 
       declare
-         Read_Only : Rose.Interfaces.File.File_Object'Class :=
+         Read_Only : Rose.Interfaces.Files.File.File_Object'Class :=
            Top.Get_Ordinary_File (1);
-         Reader    : Rose.Interfaces.Releasable_Reader
+         Reader    : Rose.Interfaces.Streams.Releasable_Reader
            .Releasable_Reader_Object'Class :=
            Read_Only.Open_Reader;
       begin
@@ -145,10 +146,11 @@ package body Tests.Directories is
       --  directory.
 
       declare
-         Sub   : Rose.Interfaces.Writable_Directory
+         Sub   : Rose.Interfaces.Files.Writable_Directory
            .Writable_Directory_Object'Class :=
              Top.Create_Directory ("sub");
-         Inner : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+         Inner : Rose.Interfaces.Files.Writable_File
+           .Writable_File_Object'Class :=
            Sub.Create_File ("inner");
       begin
          if Inner.Writable_File_Cap = Rose.Capabilities.Null_Capability then
@@ -157,7 +159,8 @@ package body Tests.Directories is
       end;
 
       declare
-         Sub_Listing : Rose.Interfaces.Directory.Directory_Object'Class :=
+         Sub_Listing : Rose.Interfaces.Files.Directory
+           .Directory_Object'Class :=
            Top.Get_Directory (2);
       begin
          if Sub_Listing.Directory_Entry_Count /= 1
@@ -168,7 +171,7 @@ package body Tests.Directories is
       end;
 
       if Top.Directory_Entry_Kind (2)
-        /= Rose.Interfaces.Directory.Directory
+        /= Rose.Interfaces.Files.Directory.Directory
       then
          return Fail ("the subdirectory is not a directory");
       end if;
@@ -263,7 +266,7 @@ package body Tests.Directories is
 
       begin
          declare
-            Sub : Rose.Interfaces.Writable_Directory
+            Sub : Rose.Interfaces.Files.Writable_Directory
               .Writable_Directory_Object'Class :=
                 Top.Get_Writable_Directory (Top.Find_Entry ("sub"));
          begin
@@ -298,14 +301,14 @@ package body Tests.Directories is
    ------------------
 
    function Version_Test return Boolean is
-      Own      : Rose.Interfaces.Bank.Client.Bank_Client :=
-        Rose.Interfaces.Bank.Client.From_Cap
+      Own      : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+        Rose.Interfaces.Storage.Bank.Client.From_Cap
           (Rose.System_Calls.Own_Bank.Cap);
-      Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+      Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
         Own.Create_Sub_Bank (0, 0);
       --  The directory is a command, which runs in a bank that the test
       --  destroys to end it (#831).
-      Top      : Rose.Interfaces.Writable_Directory.Client
+      Top      : Rose.Interfaces.Files.Writable_Directory.Client
         .Writable_Directory_Client;
 
       function Holds
@@ -326,9 +329,9 @@ package body Tests.Directories is
          end if;
 
          declare
-            File   : Rose.Interfaces.File.File_Object'Class :=
+            File   : Rose.Interfaces.Files.File.File_Object'Class :=
               Top.Get_Ordinary_File (Index);
-            Reader : Rose.Interfaces.Releasable_Reader
+            Reader : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class :=
               File.Open_Reader;
             Buffer : Stream_Element_Array (1 .. 16);

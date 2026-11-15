@@ -201,12 +201,19 @@ iso: bootdisk
 finished: iso exports
 
 # The generated interface packages that the kernel uses, for their
-# endpoint ids. Only these are linked into the kernel's sources.
+# endpoint ids, and their groups' packages (ADR 0034). Only these are
+# linked into the kernel's sources.
 
-KERNEL_INTERFACES=kernel_log memory process restorable signalled
+KERNEL_INTERFACES=checkpoints checkpoints-kernel_log processes \
+    processes-memory processes-process processes-restorable \
+    processes-signalled
+
+# Links left from an earlier list, such as before the interfaces were
+# grouped, would name files that no longer exist, so they go first.
 
 kernel:
 	mkdir -p build/$(ARCH)/kernel/interfaces
+	rm -f build/$(ARCH)/kernel/interfaces/*.ads
 	for name in $(KERNEL_INTERFACES); do \
 	  ln -sf $(CURDIR)/src/library/kernelapi/generated/rose-interfaces-$$name.ads build/$(ARCH)/kernel/interfaces/; \
 	done

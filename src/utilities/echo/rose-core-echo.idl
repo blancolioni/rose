@@ -1,4 +1,4 @@
-command Rose.Core.Echo : Standard_Output
+command Rose.Core.Echo : Streams.Standard_Output
   with Summary     => "Write the arguments to standard output.",
        Description => """
           Echo writes its arguments to standard output, separated by

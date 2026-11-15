@@ -14,10 +14,10 @@ screen:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/region.idl $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/restorable.idl $(INTERFACES)/bank.idl \
-	    $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/process.idl $(INTERFACES)/heap.idl \
-	    $(INTERFACES)/event_listener.idl $(INTERFACES)/event_source.idl
+	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/storage-region.idl $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/processes-restorable.idl $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/processes-process.idl $(INTERFACES)/processes-heap.idl \
+	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl
 	gprbuild $(GPRBUILD_CARGS)

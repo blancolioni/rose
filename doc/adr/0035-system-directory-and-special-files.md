@@ -15,7 +15,7 @@ On Unix, `cat /dev/null` reads nothing and `echo hi > /dev/null` throws the outp
 
 ### What exists today
 
-- `interfaces/directory.idl`: `File_Kind`, `Get_Ordinary_File`, `Get_Directory`.
+- `interfaces/files-directory.idl`: `File_Kind`, `Get_Ordinary_File`, `Get_Directory`.
 - `interfaces/writable_directory.idl`: `Create_File`, `Create_Directory`, `Rename`, `Delete_File` and `Delete_Directory`.
 - `Petal.Session.Home_Name` is `"home"`. A path's first component names an entry in the table, and the rest of the path is looked up in that directory.
 - Login launches petal with its roles' caps and its `User` argument, in the order of petal's command declaration.

@@ -5,13 +5,13 @@ with Rose.Words;
 
 with Rose.System_Calls.Client;
 
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Directory.Server;
-with Rose.Interfaces.File;
-with Rose.Interfaces.File.Server;
-with Rose.Interfaces.File_System.Server;
-with Rose.Interfaces.Seekable_Reader;
-with Rose.Interfaces.Seekable_Reader.Server;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Files.Directory.Server;
+with Rose.Interfaces.Files.File;
+with Rose.Interfaces.Files.File.Server;
+with Rose.Interfaces.Files.File_System.Server;
+with Rose.Interfaces.Streams.Seekable_Reader;
+with Rose.Interfaces.Streams.Seekable_Reader.Server;
 with Rose.System_Calls.Server;
 
 with Rose.Server;
@@ -23,7 +23,7 @@ with IsoFS.Directories;
 package body IsoFS.Server is
 
    Context : Rose.Server.Server_Context;
-   Device  : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+   Device  : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
 
    function Root_Directory
      (Id : Rose.Objects.Capability_Identifier)
@@ -42,7 +42,7 @@ package body IsoFS.Server is
    function Directory_Entry_Kind
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
-      return Rose.Interfaces.Directory.File_Kind;
+      return Rose.Interfaces.Files.Directory.File_Kind;
 
    function Directory_Entry_Size
      (Id    : in     Rose.Objects.Capability_Identifier;
@@ -147,13 +147,13 @@ package body IsoFS.Server is
    function Directory_Entry_Kind
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
-      return Rose.Interfaces.Directory.File_Kind
+      return Rose.Interfaces.Files.Directory.File_Kind
    is
       use IsoFS.Directories;
       Directory : constant Directory_Type := Check_Directory (Id);
    begin
       if Directory = No_Directory then
-         return Rose.Interfaces.Directory.Special_File;
+         return Rose.Interfaces.Files.Directory.Special_File;
       else
          return Get_Entry_Kind (Directory, Index);
       end if;
@@ -275,7 +275,7 @@ package body IsoFS.Server is
       end if;
       return Rose.System_Calls.Server.Create_Endpoint
         (Create_Cap  => Create_Endpoint_Cap,
-         Endpoint_Id => Rose.Interfaces.File.File_Interface,
+         Endpoint_Id => Rose.Interfaces.Files.File.File_Interface,
          Identifier  => Rose.Objects.Capability_Identifier (File));
    end Get_Ordinary_File;
 
@@ -287,7 +287,8 @@ package body IsoFS.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is (Open_Reader_Through
-         (Id, Rose.Interfaces.Seekable_Reader.Releasable_Reader_Interface));
+         (Id, Rose.Interfaces.Streams.Seekable_Reader
+           .Releasable_Reader_Interface));
 
    -------------------------
    -- Open_Reader_Through --
@@ -321,7 +322,7 @@ package body IsoFS.Server is
       return Rose.Capabilities.Capability
    is (Open_Reader_Through
          (Id,
-          Rose.Interfaces.Seekable_Reader
+          Rose.Interfaces.Streams.Seekable_Reader
           .Seekable_Reader_Interface));
 
    -----------------
@@ -414,14 +415,14 @@ package body IsoFS.Server is
       Rose.Console_IO.Open (Console_Cap);
       Rose.Console_IO.Put_Line ("isofs: starting server");
 
-      Rose.Interfaces.Block_Device.Client.Open
+      Rose.Interfaces.Storage.Block_Array.Client.Open
         (Device, Device_Cap);
 
-      Rose.Interfaces.File_System.Server.Create_Server
+      Rose.Interfaces.Files.File_System.Server.Create_Server
         (Server_Context => Context,
          Root_Directory => Root_Directory'Access);
 
-      Rose.Interfaces.Directory.Server.Attach_Interface
+      Rose.Interfaces.Files.Directory.Server.Attach_Interface
         (Server_Context        => Context,
          Directory_Entry_Count => Directory_Entry_Count'Access,
          Directory_Entry_Name  => Directory_Entry_Name'Access,
@@ -432,14 +433,14 @@ package body IsoFS.Server is
          Get_Directory         => Get_Directory'Access,
          Instanced             => True);
 
-      Rose.Interfaces.File.Server.Attach_Interface
+      Rose.Interfaces.Files.File.Server.Attach_Interface
         (Server_Context       => Context,
          Size                 => File_Size'Access,
          Open_Reader          => Open_Reader'Access,
          Open_Seekable_Reader => Open_Seekable_Reader'Access,
          Instanced            => True);
 
-      Rose.Interfaces.Seekable_Reader.Server.Attach_Interface
+      Rose.Interfaces.Streams.Seekable_Reader.Server.Attach_Interface
         (Server_Context => Context,
          Read           => Reader_Read'Access,
          Release        => Reader_Release'Access,

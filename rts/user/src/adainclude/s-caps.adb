@@ -1,6 +1,6 @@
 with System.Standard_Caps;
 
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Process;
 with Rose.Invocation;
 with Rose.Standard_Streams;
 with Rose.System_Calls;
@@ -25,7 +25,7 @@ package body System.Caps is
          Exit_Process_Cap :=
            Rose.System_Calls.Get_Interface_Cap
              (System.Standard_Caps.Process_Interface_Cap,
-              Rose.Interfaces.Process.Exit_Process_Index);
+              Rose.Interfaces.Processes.Process.Exit_Process_Index);
       end if;
 
       Rose.System_Calls.Initialize_Send

@@ -6,15 +6,16 @@ with Petal.Session;
 with Petal.Version;
 
 procedure Rose.Core.Petal
-  (Find_Command   : in out Rose.Interfaces.Commands.Commands_Object'Class;
-   Console        : in out Rose.Interfaces.Terminal.Terminal_Object'Class;
-   Clock_Service  : in out Rose.Interfaces.Clock.Clock_Object'Class;
-   Rights_Service : in out Rose.Interfaces.Rights.Rights_Object'Class;
-   User           : in out Rose.Interfaces.User.User_Object'Class)
+  (Find_Command   : in out Rose.Interfaces.Commands.Lookup.Lookup_Object'Class;
+   Console        : in out Rose.Interfaces.Screens.Terminal
+     .Terminal_Object'Class;
+   Clock_Service  : in out Rose.Interfaces.Time.Clock.Clock_Object'Class;
+   Rights_Service : in out Rose.Interfaces.Users.Rights.Rights_Object'Class;
+   User           : in out Rose.Interfaces.Users.User.User_Object'Class)
 is
 begin
    Standard.Petal.Command_Launch.Set_Registry
-     (Commands => Find_Command.Commands_Cap,
+     (Commands => Find_Command.Lookup_Cap,
       Terminal => Console.Terminal_Cap,
       Clock    => Clock_Service.Clock_Cap,
       Rights   => Rights_Service.Rights_Cap);

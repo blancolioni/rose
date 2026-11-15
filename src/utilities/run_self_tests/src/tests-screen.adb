@@ -8,8 +8,8 @@ with Rose.Capabilities;
 with Rose.Shared_Regions;
 with Rose.Words;
 
-with Rose.Interfaces.Region;
-with Rose.Interfaces.Surface.Client;
+with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Screens.Surface.Client;
 
 with Tests.Registry;
 
@@ -46,8 +46,8 @@ package body Tests.Screen is
       end if;
 
       declare
-         Surface : Rose.Interfaces.Surface.Client.Surface_Client :=
-                     Rose.Interfaces.Surface.Client.From_Cap
+         Surface : Rose.Interfaces.Screens.Surface.Client.Surface_Client :=
+                     Rose.Interfaces.Screens.Surface.Client.From_Cap
                        (Tests.Registry.Screen);
          Width, Height : Word;
       begin
@@ -72,7 +72,7 @@ package body Tests.Screen is
          --  the console's.
 
          declare
-            Region  : Rose.Interfaces.Region.Region_Object'Class :=
+            Region  : Rose.Interfaces.Storage.Region.Region_Object'Class :=
                         Surface.Get_Buffer;
             Address : constant System.Address :=
                         Rose.Shared_Regions.Map (Region);

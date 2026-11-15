@@ -1,6 +1,6 @@
 with Ada.Streams;
 
-with Rose.Interfaces.Writable_File;
+with Rose.Interfaces.Files.Writable_File;
 
 package Tests.Files is
 
@@ -28,13 +28,15 @@ package Tests.Files is
    --  an unmapped entry named (#713).
 
    procedure Append
-     (File : in out Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+     (File : in out Rose.Interfaces.Files.Writable_File
+       .Writable_File_Object'Class;
       Data : Ada.Streams.Stream_Element_Array);
    --  Write Data at the end of File, through a writer that is released
    --  once it has written.
 
    procedure Rewrite
-     (File : in out Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+     (File : in out Rose.Interfaces.Files.Writable_File
+       .Writable_File_Object'Class;
       Data : Ada.Streams.Stream_Element_Array);
    --  Replace the contents of File with Data, as Append does.
 

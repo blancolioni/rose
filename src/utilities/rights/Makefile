@@ -14,29 +14,29 @@ rights:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-rights.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/rights.idl \
-	    $(INTERFACES)/rights_admin.idl \
-	    $(INTERFACES)/clock_admin.idl \
-	    $(INTERFACES)/clock.idl \
-	    $(INTERFACES)/restorable.idl \
-	    $(INTERFACES)/user.idl \
-	    $(INTERFACES)/named.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/writable_directory.idl \
-	    $(INTERFACES)/directory.idl \
-	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/transactional_writable_file.idl \
-	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/releasable_writer.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/bank.idl \
-	    $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/region.idl \
-	    $(INTERFACES)/seekable.idl
+	    $(INTERFACES)/users-rights.idl \
+	    $(INTERFACES)/users-rights_admin.idl \
+	    $(INTERFACES)/time-clock_admin.idl \
+	    $(INTERFACES)/time-clock.idl \
+	    $(INTERFACES)/processes-restorable.idl \
+	    $(INTERFACES)/users-user.idl \
+	    $(INTERFACES)/common-named.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/files-writable_file.idl \
+	    $(INTERFACES)/files-transactional_writable_file.idl \
+	    $(INTERFACES)/common-transactional.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-releasable_writer.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)
 
 # The policy is plain Ada, so it is tested on the host.

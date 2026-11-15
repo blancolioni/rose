@@ -16,16 +16,16 @@ OBJECTS= \
 	$(BUILDDIR)/rose-containers.o \
 	$(BUILDDIR)/rose-containers-bounded_hashed_maps.o \
 	$(BUILDDIR)/rose-containers-queues.o \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o \
-	$(BUILDDIR)/rose-interfaces-directory-server.o \
-	$(BUILDDIR)/rose-interfaces-file_system-server.o \
-	$(BUILDDIR)/rose-interfaces-file.o \
-	$(BUILDDIR)/rose-interfaces-file-server.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader-server.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
+	$(BUILDDIR)/rose-interfaces-files-directory-server.o \
+	$(BUILDDIR)/rose-interfaces-files-file_system-server.o \
+	$(BUILDDIR)/rose-interfaces-files-file.o \
+	$(BUILDDIR)/rose-interfaces-files-file-server.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader-server.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

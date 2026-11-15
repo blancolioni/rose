@@ -1,0 +1,8 @@
+interface Time.Timer is
+
+   function Set_Timer
+     (Milliseconds : Word;
+      Cap          : Capability)
+     return interface Caps.Cap;
+       
+end Time.Timer;

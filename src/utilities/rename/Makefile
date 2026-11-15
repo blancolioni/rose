@@ -14,17 +14,17 @@ rename:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-rename.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/writable_directory.idl \
-	    $(INTERFACES)/directory.idl \
-	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/transactional_writable_file.idl \
-	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/releasable_writer.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/seekable.idl
+	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/files-writable_file.idl \
+	    $(INTERFACES)/files-transactional_writable_file.idl \
+	    $(INTERFACES)/common-transactional.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-releasable_writer.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

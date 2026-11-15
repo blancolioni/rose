@@ -12,8 +12,8 @@ clock:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/clock.idl $(INTERFACES)/clock_admin.idl \
-	    $(INTERFACES)/restorable.idl
+	    $(INTERFACES)/time-clock.idl $(INTERFACES)/time-clock_admin.idl \
+	    $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)
 
 # The calendar arithmetic is plain Ada, so it is tested on the host.

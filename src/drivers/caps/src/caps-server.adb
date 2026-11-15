@@ -7,9 +7,9 @@ with Rose.Server;
 with Rose.Standard_Streams;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Constructor.Server;
-with Rose.Interfaces.Releasable_Cap_Set.Server;
-with Rose.Interfaces.Restorable.Server;
+with Rose.Interfaces.Caps.Constructor.Server;
+with Rose.Interfaces.Caps.Releasable_Cap_Set.Server;
+with Rose.Interfaces.Processes.Restorable.Server;
 
 package body Caps.Server is
 
@@ -48,7 +48,7 @@ package body Caps.Server is
    type Set_Access is access all Set_Object;
 
    type Set_Object is
-     new Rose.Interfaces.Releasable_Cap_Set.Server
+     new Rose.Interfaces.Caps.Releasable_Cap_Set.Server
        .Releasable_Cap_Set_Interface with
       record
          Active : Boolean := False;
@@ -59,19 +59,19 @@ package body Caps.Server is
    overriding function Releasable_Cap_Set_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Cap_Set.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of (Item));
 
    overriding function Cap_Set_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Cap_Set.Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Cap_Set.Cap_Set_Interface));
+   is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of
+         (Item, Rose.Interfaces.Caps.Releasable_Cap_Set.Cap_Set_Interface));
 
    overriding function Resource_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Cap_Set.Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Cap_Set.Resource_Interface));
+   is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of
+         (Item, Rose.Interfaces.Caps.Releasable_Cap_Set.Resource_Interface));
 
    overriding procedure Append
      (Item : in out Set_Object;
@@ -92,19 +92,19 @@ package body Caps.Server is
    --  One object makes the sets, and takes the restore notice.
 
    type Constructor_Object is
-     new Rose.Interfaces.Constructor.Server.Constructor_Interface
-     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     new Rose.Interfaces.Caps.Constructor.Server.Constructor_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding function Constructor_Cap
      (Item : in out Constructor_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Constructor.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Caps.Constructor.Server.Cap_Of (Item));
 
    overriding function Restorable_Cap
      (Item : in out Constructor_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    overriding function Create
      (Item : in out Constructor_Object)
@@ -179,10 +179,11 @@ package body Caps.Server is
 
       Set.Active := True;
       Set.Caps.Clear;
-      Rose.Interfaces.Releasable_Cap_Set.Server.Attach (Context, Set);
+      Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Attach (Context, Set);
       Used := Used + Set_Overhead;
       Set_Count := Set_Count + 1;
-      return Rose.Interfaces.Releasable_Cap_Set.Server.Interface_Cap (Set);
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Server
+        .Interface_Cap (Set);
    end Create;
 
    -------------
@@ -277,9 +278,9 @@ package body Caps.Server is
    procedure Start_Server is
    begin
       Open_Console;
-      Rose.Interfaces.Constructor.Server.Publish
+      Rose.Interfaces.Caps.Constructor.Server.Publish
         (Context, The_Constructor'Access);
-      Rose.Interfaces.Restorable.Server.Attach
+      Rose.Interfaces.Processes.Restorable.Server.Attach
         (Context, The_Constructor'Access);
       Rose.Server.Start_Server (Context);
    end Start_Server;

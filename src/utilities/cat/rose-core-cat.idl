@@ -1,6 +1,6 @@
-command Rose.Core.Cat : Standard_Output
+command Rose.Core.Cat : Streams.Standard_Output
   with Summary => "Write the contents of a file to standard output."
 is
-   File : in Reader := Standard_Input
+   File : in Streams.Reader := Streams.Standard_Input
      with Help => "the file to write (default: standard input)";
 end Rose.Core.Cat;

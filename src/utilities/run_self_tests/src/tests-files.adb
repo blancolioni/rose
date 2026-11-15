@@ -9,13 +9,13 @@ with Rose.Streams;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.File.Client;
+with Rose.Interfaces.Files.File.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Releasable_Writer.Client;
-with Rose.Interfaces.Seekable_Reader.Client;
-with Rose.Interfaces.Transactional_Writable_File;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
+with Rose.Interfaces.Streams.Releasable_Writer.Client;
+with Rose.Interfaces.Streams.Seekable_Reader.Client;
+with Rose.Interfaces.Files.Transactional_Writable_File;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Registry;
 
@@ -25,10 +25,10 @@ package body Tests.Files is
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
 
-   package Readers renames Rose.Interfaces.Releasable_Reader.Client;
+   package Readers renames Rose.Interfaces.Streams.Releasable_Reader.Client;
    package Seekable_Readers renames
-     Rose.Interfaces.Seekable_Reader.Client;
-   package Writers renames Rose.Interfaces.Releasable_Writer.Client;
+     Rose.Interfaces.Streams.Seekable_Reader.Client;
+   package Writers renames Rose.Interfaces.Streams.Releasable_Writer.Client;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
@@ -42,9 +42,9 @@ package body Tests.Files is
    --  until the kernel asks mem for them (#713).
 
    subtype Writable_File_Class is
-     Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+     Rose.Interfaces.Files.Writable_File.Writable_File_Object'Class;
    subtype Version_Class is
-     Rose.Interfaces.Transactional_Writable_File
+     Rose.Interfaces.Files.Transactional_Writable_File
        .Transactional_Writable_File_Object'Class;
 
    function Refused
@@ -53,13 +53,13 @@ package body Tests.Files is
    --  True if File refuses to make a version.
 
    function Reader_Cap
-     (File : in out Rose.Interfaces.File.File_Object'Class)
+     (File : in out Rose.Interfaces.Files.File.File_Object'Class)
       return Rose.Capabilities.Capability;
    --  A new reader of File. The test holds its readers as clients, so
    --  that closing one deletes the test's caps for it too.
 
    function Seekable_Reader_Cap
-     (File : in out Rose.Interfaces.File.File_Object'Class)
+     (File : in out Rose.Interfaces.Files.File.File_Object'Class)
       return Rose.Capabilities.Capability;
    --  A new seekable reader of File.
 
@@ -91,7 +91,8 @@ package body Tests.Files is
    ---------------------
 
    function Cap_Stream_Test return Boolean is
-      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      File    : Rose.Interfaces.Files.Writable_File.Client
+        .Writable_File_Client;
       Writer  : aliased Writers.Releasable_Writer_Client;
       Reader  : aliased Readers.Releasable_Reader_Client;
       Long    : constant String (1 .. Page_Bytes + 904) := (others => 'x');
@@ -157,8 +158,9 @@ package body Tests.Files is
    ---------------
 
    function File_Test return Boolean is
-      File      : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
-      Read_Only : Rose.Interfaces.File.Client.File_Client;
+      File      : Rose.Interfaces.Files.Writable_File.Client
+        .Writable_File_Client;
+      Read_Only : Rose.Interfaces.Files.File.Client.File_Client;
       First     : Readers.Releasable_Reader_Client;
       Second    : Readers.Releasable_Reader_Client;
       Seekable  : Seekable_Readers.Seekable_Reader_Client;
@@ -423,10 +425,10 @@ package body Tests.Files is
    ----------------
 
    function Reader_Cap
-     (File : in out Rose.Interfaces.File.File_Object'Class)
+     (File : in out Rose.Interfaces.Files.File.File_Object'Class)
       return Rose.Capabilities.Capability
    is
-      Reader : Rose.Interfaces.Releasable_Reader
+      Reader : Rose.Interfaces.Streams.Releasable_Reader
         .Releasable_Reader_Object'Class :=
         File.Open_Reader;
    begin
@@ -473,10 +475,10 @@ package body Tests.Files is
    -------------------------
 
    function Seekable_Reader_Cap
-     (File : in out Rose.Interfaces.File.File_Object'Class)
+     (File : in out Rose.Interfaces.Files.File.File_Object'Class)
       return Rose.Capabilities.Capability
    is
-      Reader : Rose.Interfaces.Seekable_Reader
+      Reader : Rose.Interfaces.Streams.Seekable_Reader
         .Seekable_Reader_Object'Class :=
           File.Open_Seekable_Reader;
    begin
@@ -488,7 +490,8 @@ package body Tests.Files is
    ---------------------------
 
    function Untouched_Buffer_Test return Boolean is
-      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      File    : Rose.Interfaces.Files.Writable_File.Client
+        .Writable_File_Client;
       Reader  : Readers.Releasable_Reader_Client;
       Buffer  : Stream_Element_Array (1 .. 256);
       Last    : Stream_Element_Offset;
@@ -581,7 +584,7 @@ package body Tests.Files is
    begin
       if Empty then
          declare
-            Writer : Rose.Interfaces.Releasable_Writer
+            Writer : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class :=
                 File.Rewrite;
          begin
@@ -589,7 +592,7 @@ package body Tests.Files is
          end;
       else
          declare
-            Writer : Rose.Interfaces.Releasable_Writer
+            Writer : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class :=
                 File.Append;
          begin
@@ -603,7 +606,8 @@ package body Tests.Files is
    -----------------
 
    function Writer_Test return Boolean is
-      File    : Rose.Interfaces.Writable_File.Client.Writable_File_Client;
+      File    : Rose.Interfaces.Files.Writable_File.Client
+        .Writable_File_Client;
       First   : Writers.Releasable_Writer_Client;
       Second  : Writers.Releasable_Writer_Client;
       Third   : Writers.Releasable_Writer_Client;

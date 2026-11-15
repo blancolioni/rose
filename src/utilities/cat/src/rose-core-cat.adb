@@ -3,7 +3,7 @@ with Ada.Streams;
 with Ada.Text_IO;
 
 procedure Rose.Core.Cat
-  (File : in out Rose.Interfaces.Reader.Reader_Object'Class)
+  (File : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class)
 is
    use Ada.Streams;
    Buffer : Stream_Element_Array (1 .. 4096);

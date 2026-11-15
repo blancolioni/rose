@@ -16,7 +16,8 @@ package body Rose.Devices.Checkpoints is
      with Size => 8 * 4096;
 
 --     Current_Page_Last    : Storage_Offset;
-   Current_Page_Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+   Current_Page_Address : Rose.Interfaces.Storage.Block_Array
+     .Block_Address_Type;
    Current_Page         : Checkpoint_Page :=
                             Checkpoint_Page'
                               (Begin_Magic => Checkpoint_Begin_Magic,
@@ -28,14 +29,14 @@ package body Rose.Devices.Checkpoints is
    -------------------------
 
    procedure Finish_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
       Page : Storage_Array (1 .. 4096);
       pragma Import (Ada, Page);
       for Page'Address use Current_Page'Address;
    begin
       Rose.Console_IO.Put_Line ("committing system image");
-      Rose.Interfaces.Block_Device.Client.Write_Blocks
+      Rose.Interfaces.Storage.Block_Array.Client.Write_Blocks
         (Item   => Device,
          Start  => Current_Page_Address,
          Count  => 1,
@@ -47,7 +48,7 @@ package body Rose.Devices.Checkpoints is
    ------------------------
 
    procedure Start_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
       pragma Unreferenced (Device);
    begin
@@ -61,7 +62,7 @@ package body Rose.Devices.Checkpoints is
    end Start_System_Image;
 
    procedure Write_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Image  : System.Storage_Elements.Storage_Array)
    is null;
 

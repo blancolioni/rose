@@ -1,3 +1,0 @@
-interface Stream : Reader, Writer is
-
-end Stream;

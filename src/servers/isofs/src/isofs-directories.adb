@@ -9,7 +9,7 @@ with Rose.Containers.Queues;
 
 package body IsoFS.Directories is
 
-   use Rose.Interfaces.Block_Device;
+   use Rose.Interfaces.Storage.Block_Array;
    use Rose.Words;
 
    Max_Directory_Entries : constant := 512;
@@ -19,7 +19,8 @@ package body IsoFS.Directories is
    Max_Files       : constant := 64;
    Max_Readers     : constant := 20;
 
-   Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+   Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+     .Block_Array_Client;
 
    subtype ISO_Sector is
      System.Storage_Elements.Storage_Array
@@ -56,7 +57,7 @@ package body IsoFS.Directories is
    Next_Tick    : Word_32 := 0;
 
    procedure Read_Sector
-     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+     (Address : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       Sector  : out ISO_Sector);
 
    type Directory_Date_Time is array (1 .. 7) of Word_8;
@@ -179,7 +180,7 @@ package body IsoFS.Directories is
    --  The slot of Reader, or 0 if there is no such reader.
 
    procedure Read_Root_Directory
-     (Device : Client.Block_Device_Client);
+     (Device : Client.Block_Array_Client);
 
    function New_Cap
      (Directory : Directory_Type;
@@ -252,7 +253,7 @@ package body IsoFS.Directories is
       Sector    : Block_Address_Type;
       Dir_Entry : Directory_Entry)
    is
-      use Rose.Interfaces.Directory;
+      use Rose.Interfaces.Files.Directory;
 
       Caps : Directory_Caps_Record renames
                Directory_Caps (Directory);
@@ -485,11 +486,11 @@ package body IsoFS.Directories is
    function Get_Entry_Kind
      (Directory : Directory_Type;
       Index     : Positive)
-      return Rose.Interfaces.Directory.File_Kind
+      return Rose.Interfaces.Files.Directory.File_Kind
    is
       Count : Natural := 0;
-      Kind  : Rose.Interfaces.Directory.File_Kind :=
-                Rose.Interfaces.Directory.Ordinary_File;
+      Kind  : Rose.Interfaces.Files.Directory.File_Kind :=
+                Rose.Interfaces.Files.Directory.Ordinary_File;
 
       procedure Process
         (Rec        : Directory_Entry;
@@ -508,9 +509,9 @@ package body IsoFS.Directories is
          Count := Count + 1;
          if Count = Index then
             if (Rec.File_Flags and 2) = 2 then
-               Kind := Rose.Interfaces.Directory.Directory;
+               Kind := Rose.Interfaces.Files.Directory.Directory;
             else
-               Kind := Rose.Interfaces.Directory.Ordinary_File;
+               Kind := Rose.Interfaces.Files.Directory.Ordinary_File;
             end if;
          end if;
       end Process;
@@ -817,7 +818,7 @@ package body IsoFS.Directories is
    ------------------------
 
    function Get_Root_Directory
-     (Device : Client.Block_Device_Client)
+     (Device : Client.Block_Array_Client)
       return Directory_Type
    is
    begin
@@ -919,10 +920,10 @@ package body IsoFS.Directories is
    -------------------------
 
    procedure Read_Root_Directory
-     (Device : Client.Block_Device_Client)
+     (Device : Client.Block_Array_Client)
    is
       use System.Storage_Elements;
-      use Rose.Interfaces.Block_Device.Client;
+      use Rose.Interfaces.Storage.Block_Array.Client;
 
       Volume_Index : Block_Address_Type := ISO_First_Volume_Sector;
       Sector_Count : Block_Address_Type;
@@ -972,7 +973,7 @@ package body IsoFS.Directories is
    -----------------
 
    procedure Read_Sector
-     (Address : Rose.Interfaces.Block_Device.Block_Address_Type;
+     (Address : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       Sector  : out ISO_Sector)
    is
       use Sector_Cache_Queues;
@@ -997,7 +998,7 @@ package body IsoFS.Directories is
             end;
          end if;
 
-         Rose.Interfaces.Block_Device.Client.Read_Blocks
+         Rose.Interfaces.Storage.Block_Array.Client.Read_Blocks
            (Block_Device, Address, 1, Sector);
 
          Item := (Next_Tick, Sector);

@@ -1,11 +1,11 @@
 with Ada.Streams;
 
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Writer.Client;
+with Rose.Interfaces.Streams.Writer.Client;
 
 package body Exec.Output is
 
-   Output : Rose.Interfaces.Writer.Client.Writer_Client;
+   Output : Rose.Interfaces.Streams.Writer.Client.Writer_Client;
 
    --------------
    -- Put_Line --
@@ -28,7 +28,7 @@ package body Exec.Output is
 
    procedure Set (Writer : Rose.Capabilities.Capability) is
    begin
-      Rose.Interfaces.Writer.Client.Open (Output, Writer);
+      Rose.Interfaces.Streams.Writer.Client.Open (Output, Writer);
    end Set;
 
 end Exec.Output;

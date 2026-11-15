@@ -5,7 +5,7 @@ with Rose.Interfaces.Objects;
 
 procedure Rose.Core.Set_Date
   (Clock_Admin_Service : in out
-     Rose.Interfaces.Clock_Admin.Clock_Admin_Object'Class;
+     Rose.Interfaces.Time.Clock_Admin.Clock_Admin_Object'Class;
    Time                : String)
 is
    use Rose.Clock.Calendar;

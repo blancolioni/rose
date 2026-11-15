@@ -1,4 +1,4 @@
-command Rose.Core.Editors.Kilo : Console
+command Rose.Core.Editors.Kilo : Screens.Console
   with Summary     => "Edit a text file.",
        Description => """
           Kilo is a full-screen editor for FILE, a file in the current
@@ -11,6 +11,6 @@ command Rose.Core.Editors.Kilo : Console
           and Tab can be typed.
           """
 is
-   File : in Transactional_Writable_File
+   File : in Files.Transactional_Writable_File
      with Help => "the file to edit";
 end Rose.Core.Editors.Kilo;

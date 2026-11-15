@@ -4,61 +4,61 @@ include $(ROOT)/mk/common.mk
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/restore.reloc.o
 READER_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-reader.o \
-	$(BUILDDIR)/rose-interfaces-reader-client.o
+	$(BUILDDIR)/rose-interfaces-streams-reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-reader-client.o
 DIRECTORY_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-directory.o \
-	$(BUILDDIR)/rose-interfaces-directory-client.o
+	$(BUILDDIR)/rose-interfaces-files-directory.o \
+	$(BUILDDIR)/rose-interfaces-files-directory-client.o
 FILE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-file.o \
-	$(BUILDDIR)/rose-interfaces-file-client.o \
-	$(BUILDDIR)/rose-interfaces-releasable_reader.o \
-	$(BUILDDIR)/rose-interfaces-releasable_reader-client.o \
-	$(BUILDDIR)/rose-interfaces-releasable_reader-client-conversions.o \
-	$(BUILDDIR)/rose-interfaces-resource.o \
-	$(BUILDDIR)/rose-interfaces-resource-client.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader.o \
-	$(BUILDDIR)/rose-interfaces-seekable_reader-client.o
+	$(BUILDDIR)/rose-interfaces-files-file.o \
+	$(BUILDDIR)/rose-interfaces-files-file-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-releasable_reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-releasable_reader-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-releasable_reader-client-conversions.o \
+	$(BUILDDIR)/rose-interfaces-common-resource.o \
+	$(BUILDDIR)/rose-interfaces-common-resource-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader.o \
+	$(BUILDDIR)/rose-interfaces-streams-seekable_reader-client.o
 FILE_SYSTEM_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-file_system.o \
-	$(BUILDDIR)/rose-interfaces-file_system-client.o
+	$(BUILDDIR)/rose-interfaces-files-file_system.o \
+	$(BUILDDIR)/rose-interfaces-files-file_system-client.o
 BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o
+	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o
 UPDATE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-exec.o \
-	$(BUILDDIR)/rose-interfaces-exec-client.o \
-	$(BUILDDIR)/rose-interfaces-launch.o \
-	$(BUILDDIR)/rose-interfaces-launch-client.o \
-	$(BUILDDIR)/rose-interfaces-process.o \
-	$(BUILDDIR)/rose-interfaces-process-client.o \
-	$(BUILDDIR)/rose-interfaces-map.o \
-	$(BUILDDIR)/rose-interfaces-map-client.o \
-	$(BUILDDIR)/rose-interfaces-commands.o \
-	$(BUILDDIR)/rose-interfaces-commands-client.o \
-	$(BUILDDIR)/rose-interfaces-bank.o \
-	$(BUILDDIR)/rose-interfaces-bank-client.o \
-	$(BUILDDIR)/rose-interfaces-dependent.o \
-	$(BUILDDIR)/rose-interfaces-dependent-client.o \
-	$(BUILDDIR)/rose-interfaces-heap.o \
-	$(BUILDDIR)/rose-interfaces-heap-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-exec.o \
+	$(BUILDDIR)/rose-interfaces-processes-exec-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-launch.o \
+	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process.o \
+	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
+	$(BUILDDIR)/rose-interfaces-commands-map.o \
+	$(BUILDDIR)/rose-interfaces-commands-map-client.o \
+	$(BUILDDIR)/rose-interfaces-commands-lookup.o \
+	$(BUILDDIR)/rose-interfaces-commands-lookup-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-heap.o \
+	$(BUILDDIR)/rose-interfaces-processes-heap-client.o \
 	$(BUILDDIR)/restore-replacing.o \
-	$(BUILDDIR)/rose-interfaces-replaceable.o \
-	$(BUILDDIR)/rose-interfaces-replacer.o \
-	$(BUILDDIR)/rose-interfaces-replacer-client.o \
-	$(BUILDDIR)/rose-interfaces-replacement.o \
-	$(BUILDDIR)/rose-interfaces-replacement-client.o
+	$(BUILDDIR)/rose-interfaces-processes-replaceable.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacer.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacer-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacement.o \
+	$(BUILDDIR)/rose-interfaces-processes-replacement-client.o
 LOG_READER_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-log_reader.o \
-	$(BUILDDIR)/rose-interfaces-log_reader-client.o
+	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader-client.o
 RESTORE_OBJECTS= \
 	$(BUILDDIR)/restore-checkpoints.o \
-	$(BUILDDIR)/rose-interfaces-memory_restore.o \
-	$(BUILDDIR)/rose-interfaces-memory_restore-client.o \
-	$(BUILDDIR)/rose-interfaces-region.o \
-	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-storage_checkpoint.o \
-	$(BUILDDIR)/rose-interfaces-storage_checkpoint-client.o
+	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region.o \
+	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-storage_checkpoint.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-storage_checkpoint-client.o
 
 COMMON_OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
@@ -71,8 +71,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
@@ -99,7 +99,7 @@ INSTALL_OBJECTS= \
 	$(BUILDDIR)/restore-boot_sets.o \
 	$(BUILDDIR)/rose-devices.o \
 	$(BUILDDIR)/rose-devices-port_io.o \
-	$(BUILDDIR)/rose-interfaces-timeout.o \
+	$(BUILDDIR)/rose-interfaces-time-timeout.o \
 	$(BUILDDIR)/restore-boot_disk.o \
 	$(BUILDDIR)/restore-installer.o \
 	$(BUILDDIR)/restore-installer-default.o \

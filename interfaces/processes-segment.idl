@@ -1,0 +1,35 @@
+interface Processes.Segment is
+
+   Segment_Readable    : constant := 1;
+   Segment_Writable    : constant := 2;
+   Segment_Executable  : constant := 4;
+   Segment_Resizable   : constant := 8;
+   Segment_Initialized : constant := 16;
+   Segment_Private     : constant := 32;
+   --  The region belongs to the segment's process, and is released when
+   --  the process is gone.
+   Segment_Shared      : constant := 64;
+   --  The segment maps the region's pages themselves, not copies of
+   --  them: every process that maps a page of the region shared sees the
+   --  same page, and its writes (ADR 0025). A shared segment can't
+   --  overlap another segment of the process.
+
+   procedure Add_Segment
+     (Virtual_Base  : Word;
+      Virtual_Bound : Word;
+      Region        : interface Storage.Region;
+      Region_Offset : Word;
+      Flags         : Word);
+
+   procedure Add_Nonpersistent_Segment
+     (Virtual_Base  : Word;
+      Virtual_Bound : Word;
+      Flags         : Word);
+
+   procedure Remove_Segment
+     (Virtual_Base : Word);
+   --  Unmap the segment that starts at Virtual_Base. A page of a shared
+   --  segment that nothing else maps is written back to its region, if
+   --  it has been changed.
+
+end Processes.Segment;

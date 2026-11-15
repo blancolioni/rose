@@ -85,7 +85,7 @@ Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 Manages persistent storage, divided into regions of pages.
 
-Provides:: `Storage`, whose `Add_Backing_Store` adds a block device, and whose `Get_Root_Bank` returns the bank that every other is below; a `Bank` for each bank, whose `Reserve_Storage` returns a new region (ADR 0014); a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
+Provides:: `Store`, whose `Add_Backing_Store` adds a block array, and whose `Get_Root_Bank` returns the bank that every other is below; a `Bank` for each bank, whose `Reserve_Storage` returns a new region (ADR 0014); a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
 Launched with:: Delete, the console and trace.
 Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
 
@@ -254,7 +254,7 @@ The boot modules have their own cap set server, `bootcaps`, which ends after boo
 
 Provides:: `Constructor`, whose `Create` makes a new, empty set; `Releasable_Cap_Set` for each set, with `Append`, `Get_Cap` and `Length` from `Cap_Set` and `Release` from `Resource`; and `Restorable`.
 Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`, and the persistent console's `Writer`, which the installer gives after them.
-Used by:: `init`, which gets `Constructor` from the installer, and leaves one set, of the registry's `Commands` interface and the clock, for the boot test to find after a restore; and `run_self_tests`, through its `Cap_Set_Service` role.
+Used by:: `init`, which gets `Constructor` from the installer, and leaves one set, of the registry's `Lookup` interface and the clock, for the boot test to find after a restore; and `run_self_tests`, through its `Cap_Set_Service` role.
 
 * *It is installed and restored,* so its sets, which are in its memory, and their capabilities, which are in its capability table, survive a restore.
   When it is restored it writes `caps: restored sets N; caps M` on the console, and the boot test compares the counts with the ones the install left.

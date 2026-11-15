@@ -6,8 +6,8 @@ with Rose.Capabilities;
 with Rose.Shared_Regions;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Region;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Storage.Region;
 
 with Tests.Registry;
 
@@ -51,10 +51,10 @@ package body Tests.Shared_Regions is
       end if;
 
       declare
-         Bank   : Rose.Interfaces.Bank.Client.Bank_Client :=
-                    Rose.Interfaces.Bank.Client.From_Cap
+         Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                    Rose.Interfaces.Storage.Bank.Client.From_Cap
                       (Tests.Registry.Bank);
-         Region : Rose.Interfaces.Region.Region_Object'Class :=
+         Region : Rose.Interfaces.Storage.Region.Region_Object'Class :=
                     Bank.Reserve_Storage (Pages * Page_Size);
          First_Address  : constant System.Address :=
                             Rose.Shared_Regions.Map (Region);

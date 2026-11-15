@@ -3,12 +3,12 @@ with System.Storage_Elements;
 
 with Ada_Text_IO;
 
-with Rose.Interfaces.Commands.Client;
-with Rose.Interfaces.Launch.Client;
+with Rose.Interfaces.Commands.Lookup.Client;
+with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Rights.Client;
-with Rose.Interfaces.Terminal.Client;
-with Rose.Interfaces.User.Client;
+with Rose.Interfaces.Users.Rights.Client;
+with Rose.Interfaces.Screens.Terminal.Client;
+with Rose.Interfaces.Users.User.Client;
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Standard_Streams;
@@ -34,14 +34,14 @@ package body Petal.Command_Launch is
    --  The command registry's Commands interface, which petal also gives
    --  to a command that has the Find_Command role.
 
-   Registry : Rose.Interfaces.Commands.Client.Commands_Client;
+   Registry : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
    --  The same Commands interface, opened, to find commands.
 
    Terminal_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  The console's Terminal, for the Console role (#454).
 
-   Console : Rose.Interfaces.Terminal.Client.Terminal_Client;
+   Console : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
    --  The same Terminal, opened, if there is one.
 
    Clock_Cap : Rose.Capabilities.Capability :=
@@ -53,7 +53,7 @@ package body Petal.Command_Launch is
    --  The rights broker's Rights interface, which grants the authority of
    --  a categorised role (ADR 0021).
 
-   Rights : Rose.Interfaces.Rights.Client.Rights_Client;
+   Rights : Rose.Interfaces.Users.Rights.Client.Rights_Client;
    --  The same Rights interface, opened, if there is one.
 
    Max_Words : constant := 64;
@@ -109,7 +109,7 @@ package body Petal.Command_Launch is
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
        and then Value (Item, Argument.Interface_Name)
-                  = "Writable_Directory");
+                  = "Files.Writable_Directory");
    --  True if Argument is an in Writable_Directory, which gets petal's
    --  own writable cap (ADR 0012, section 4).
 
@@ -121,7 +121,7 @@ package body Petal.Command_Launch is
        or else (Argument.Of_Type = Interface_Type
                 and then Argument.Mode = In_Mode
                 and then Value (Item, Argument.Interface_Name)
-                           = "Directory"));
+                           = "Files.Directory"));
    --  True if Argument is an in Directory or an in Writable_Directory. It
    --  names a directory in petal's table, and is bound to the current
    --  directory if it is not given (ADR 0003, section 6; #342).
@@ -132,7 +132,7 @@ package body Petal.Command_Launch is
       return Boolean
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
-       and then Value (Item, Argument.Interface_Name) = "File");
+       and then Value (Item, Argument.Interface_Name) = "Files.File");
    --  True if Argument is an in File, which names a file in the current
    --  directory (#344). It must be given, unless it has a default.
 
@@ -143,7 +143,8 @@ package body Petal.Command_Launch is
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
        and then Argument.Has_Default
-       and then Value (Item, Argument.Default) = "Standard_Input");
+       and then Value (Item, Argument.Default)
+                  = "Streams.Standard_Input");
    --  True if Argument is an in Reader whose default is standard input
    --  (#395; idle#52). It names a file in the current directory, which
    --  petal opens a reader on, or if it is not given, it is petal's own
@@ -156,7 +157,8 @@ package body Petal.Command_Launch is
       return Boolean
    is (Argument.Of_Type = Interface_Type
        and then Argument.Mode = In_Mode
-       and then Value (Item, Argument.Interface_Name) = "Writable_File");
+       and then Value (Item, Argument.Interface_Name)
+                  = "Files.Writable_File");
    --  True if Argument is an in Writable_File, which names a file in the
    --  current directory. The command gets the file itself, which must
    --  exist (ADR 0026).
@@ -169,7 +171,7 @@ package body Petal.Command_Launch is
        and then Argument.Mode = In_Mode
        and then Argument.Transactional
        and then Value (Item, Argument.Interface_Name)
-                  = "Transactional_Writable_File");
+                  = "Files.Transactional_Writable_File");
    --  True if Argument is an in Transactional_Writable_File, which names
    --  a file in the current directory. The command gets a version of it,
    --  or of a new file if there is none, and commits it (ADR 0026).
@@ -177,7 +179,8 @@ package body Petal.Command_Launch is
    procedure Launch
      (Command_Name : String;
       Item         : Signature;
-      Client       : in out Rose.Interfaces.Launch.Client.Launch_Client;
+      Client       : in out Rose.Interfaces.Processes.Launch.Client
+        .Launch_Client;
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
@@ -230,7 +233,8 @@ package body Petal.Command_Launch is
    procedure Launch
      (Command_Name : String;
       Item         : Signature;
-      Client       : in out Rose.Interfaces.Launch.Client.Launch_Client;
+      Client       : in out Rose.Interfaces.Processes.Launch.Client
+        .Launch_Client;
       Line         : String;
       Words        : Word_Array;
       Count        : Natural;
@@ -363,14 +367,14 @@ package body Petal.Command_Launch is
       --------------------
 
       procedure Release_Grants is
-         User : Rose.Interfaces.User.Client.User_Client;
+         User : Rose.Interfaces.Users.User.Client.User_Client;
          --  A client of the session's User cap, which is not closed: the
          --  cap is the session's.
       begin
          if Grant_Count = 0 then
             return;
          end if;
-         Rose.Interfaces.User.Client.Open (User, Petal.Session.User_Cap);
+         Rose.Interfaces.Users.User.Client.Open (User, Petal.Session.User_Cap);
          for I in 1 .. Grant_Count loop
             if Petal.Session.User_Cap /= Rose.Capabilities.Null_Capability
             then
@@ -397,7 +401,7 @@ package body Petal.Command_Launch is
          Category : constant String := Value (Item, Role.Category);
          Named    : constant Boolean :=
            Petal.Privileges.Covered (Sudo, Category);
-         User     : Rose.Interfaces.User.Client.User_Client;
+         User     : Rose.Interfaces.Users.User.Client.User_Client;
          --  A client of the session's User cap, which is not closed.
          Grant    : Rose.Words.Word;
       begin
@@ -409,7 +413,7 @@ package body Petal.Command_Launch is
             return;
          end if;
 
-         Rose.Interfaces.User.Client.Open (User, Petal.Session.User_Cap);
+         Rose.Interfaces.Users.User.Client.Open (User, Petal.Session.User_Cap);
          begin
             Rights.Request
               (User, Value (Item, Role.Name),
@@ -1321,7 +1325,7 @@ package body Petal.Command_Launch is
       declare
          Name       : constant String := Lower (Word_Text (1));
          Params     : aliased Rose.Invocation.Invocation_Record;
-         Client     : Rose.Interfaces.Launch.Client.Launch_Client;
+         Client     : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
          Launch_Cap : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
          Last       : Natural;
@@ -1333,7 +1337,7 @@ package body Petal.Command_Launch is
 
          begin
             declare
-               Found : Rose.Interfaces.Launch.Launch_Object'Class :=
+               Found : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                  Registry.Find (Name);
             begin
                Launch_Cap := Found.Launch_Cap;
@@ -1349,7 +1353,7 @@ package body Petal.Command_Launch is
             return;
          end if;
 
-         Rose.Interfaces.Launch.Client.Open (Client, Launch_Cap);
+         Rose.Interfaces.Processes.Launch.Client.Open (Client, Launch_Cap);
 
          --  The metadata is read here, not through the client's Metadata,
          --  which reads a string into a text of at most Rose.Texts
@@ -1396,11 +1400,11 @@ package body Petal.Command_Launch is
             Petal.Session.Release_Files;
          end if;
 
-         Rose.Interfaces.Launch.Client.Close (Client);
+         Rose.Interfaces.Processes.Launch.Client.Close (Client);
       exception
          when Invocation_Error =>
             Error (Name & ": the command's launcher failed");
-            Rose.Interfaces.Launch.Client.Close (Client);
+            Rose.Interfaces.Processes.Launch.Client.Close (Client);
       end;
    end Run_Command;
 
@@ -1416,15 +1420,15 @@ package body Petal.Command_Launch is
    is
    begin
       Commands_Cap := Commands;
-      Rose.Interfaces.Commands.Client.Open (Registry, Commands_Cap);
+      Rose.Interfaces.Commands.Lookup.Client.Open (Registry, Commands_Cap);
       Terminal_Cap := Terminal;
       if Terminal_Cap /= Rose.Capabilities.Null_Capability then
-         Rose.Interfaces.Terminal.Client.Open (Console, Terminal_Cap);
+         Rose.Interfaces.Screens.Terminal.Client.Open (Console, Terminal_Cap);
       end if;
       Clock_Cap := Clock;
       Rights_Cap := Rights;
       if Rights_Cap /= Rose.Capabilities.Null_Capability then
-         Rose.Interfaces.Rights.Client.Open
+         Rose.Interfaces.Users.Rights.Client.Open
            (Command_Launch.Rights, Rights_Cap);
       end if;
    end Set_Registry;

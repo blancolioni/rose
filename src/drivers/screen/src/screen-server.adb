@@ -11,14 +11,14 @@ with Rose.Shared_Regions;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Event_Listener.Server;
-with Rose.Interfaces.Event_Source.Client;
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Restorable.Server;
-with Rose.Interfaces.Reader.Client;
-with Rose.Interfaces.Reader.Server;
-with Rose.Interfaces.Surface.Server;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Devices.Event_Listener.Server;
+with Rose.Interfaces.Devices.Event_Source.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Processes.Restorable.Server;
+with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Streams.Reader.Server;
+with Rose.Interfaces.Screens.Surface.Server;
 
 with Screen.Events;
 with Screen.Framebuffer;
@@ -34,8 +34,8 @@ package body Screen.Server is
    --  framebuffer is mapped again and drawn from the buffer.
 
    type Screen_Surface is limited new
-     Rose.Interfaces.Surface.Server.Surface_Interface
-     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     Rose.Interfaces.Screens.Surface.Server.Surface_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding procedure Get_Size
@@ -45,7 +45,7 @@ package body Screen.Server is
 
    overriding function Get_Buffer
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Region.Region_Object'Class;
+      return Rose.Interfaces.Storage.Region.Region_Object'Class;
 
    overriding procedure Damage
      (Item   : in out Screen_Surface;
@@ -56,7 +56,7 @@ package body Screen.Server is
 
    overriding function Events
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Reader.Reader_Object'Class;
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class;
 
    overriding procedure Get_Pointer
      (Item    : in out Screen_Surface;
@@ -71,7 +71,7 @@ package body Screen.Server is
 
    overriding procedure Set_Cursor
      (Item  : in out Screen_Surface;
-      Shape : Rose.Interfaces.Surface.Cursor_Shape);
+      Shape : Rose.Interfaces.Screens.Surface.Cursor_Shape);
 
    overriding procedure Release (Item : in out Screen_Surface);
 
@@ -94,8 +94,8 @@ package body Screen.Server is
    --  with #588.
 
    type Event_Stream is limited new
-     Rose.Interfaces.Reader.Server.Reader_Interface
-     and Rose.Interfaces.Event_Listener.Server.Event_Listener_Interface
+     Rose.Interfaces.Streams.Reader.Server.Reader_Interface
+     and Rose.Interfaces.Devices.Event_Listener.Server.Event_Listener_Interface
      with null record;
 
    overriding procedure On_Event
@@ -174,7 +174,7 @@ package body Screen.Server is
    overriding function Event_Listener_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Event_Listener.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of (Item));
 
    ------------------
    -- Event_Queued --
@@ -184,7 +184,7 @@ package body Screen.Server is
       use type Rose.Capabilities.Capability;
    begin
       Rose.Server.Unblock_Endpoint
-        (Server_Context, Rose.Interfaces.Reader.Read_Endpoint);
+        (Server_Context, Rose.Interfaces.Streams.Reader.Read_Endpoint);
 
       --  Invoking a signal cap never waits, so this can't deadlock with a
       --  holder that is calling the screen (ADR 0022, as amended).
@@ -205,12 +205,12 @@ package body Screen.Server is
 
    overriding function Events
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Reader.Reader_Object'Class
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class
    is
       pragma Unreferenced (Item);
    begin
-      return Rose.Interfaces.Reader.Client.From_Cap
-        (Rose.Interfaces.Reader.Server.Cap_Of (The_Events));
+      return Rose.Interfaces.Streams.Reader.Client.From_Cap
+        (Rose.Interfaces.Streams.Reader.Server.Cap_Of (The_Events));
    end Events;
 
    ----------------
@@ -219,11 +219,11 @@ package body Screen.Server is
 
    overriding function Get_Buffer
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Region.Region_Object'Class
+      return Rose.Interfaces.Storage.Region.Region_Object'Class
    is
       pragma Unreferenced (Item);
    begin
-      return Rose.Interfaces.Region.Client.From_Cap (Buffer_Cap);
+      return Rose.Interfaces.Storage.Region.Client.From_Cap (Buffer_Cap);
    end Get_Buffer;
 
    -----------------
@@ -356,8 +356,8 @@ package body Screen.Server is
    overriding function Resource_Cap
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Surface.Server.Cap_Of
-         (Item, Rose.Interfaces.Surface.Resource_Interface));
+   is (Rose.Interfaces.Screens.Surface.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Surface.Resource_Interface));
 
    --------------------
    -- Restorable_Cap --
@@ -366,7 +366,7 @@ package body Screen.Server is
    overriding function Restorable_Cap
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
@@ -390,7 +390,7 @@ package body Screen.Server is
 
    overriding procedure Set_Cursor
      (Item  : in out Screen_Surface;
-      Shape : Rose.Interfaces.Surface.Cursor_Shape)
+      Shape : Rose.Interfaces.Screens.Surface.Cursor_Shape)
    is
       pragma Unreferenced (Item, Shape);
    begin
@@ -414,9 +414,9 @@ package body Screen.Server is
 
       if Have_Framebuffer then
          declare
-            Bank   : Rose.Interfaces.Bank.Client.Bank_Client :=
-                       Rose.Interfaces.Bank.Client.From_Cap (Bank_Cap);
-            Region : Rose.Interfaces.Region.Region_Object'Class :=
+            Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                       Rose.Interfaces.Storage.Bank.Client.From_Cap (Bank_Cap);
+            Region : Rose.Interfaces.Storage.Region.Region_Object'Class :=
                        Bank.Reserve_Storage
                          (Word_64 (Screen.Framebuffer.Width)
                           * Word_64 (Screen.Framebuffer.Height) * 4);
@@ -427,23 +427,25 @@ package body Screen.Server is
          Redraw;
       end if;
 
-      Rose.Interfaces.Surface.Server.Publish
+      Rose.Interfaces.Screens.Surface.Server.Publish
         (Server_Context, The_Surface'Access);
-      Rose.Interfaces.Restorable.Server.Attach
+      Rose.Interfaces.Processes.Restorable.Server.Attach
         (Server_Context, The_Surface'Access);
-      Rose.Interfaces.Reader.Server.Attach
+      Rose.Interfaces.Streams.Reader.Server.Attach
         (Server_Context, The_Events'Access);
-      Rose.Interfaces.Event_Listener.Server.Attach
+      Rose.Interfaces.Devices.Event_Listener.Server.Attach
         (Server_Context, The_Events'Access);
 
       --  The screen holds the keyboard, and the console on the surface
       --  takes its keys from the surface's events (ADR 0022, #653).
 
       declare
-         Keyboard : Rose.Interfaces.Event_Source.Client.Event_Source_Client;
+         Keyboard : Rose.Interfaces.Devices.Event_Source.Client
+           .Event_Source_Client;
       begin
-         Rose.Interfaces.Event_Source.Client.Open (Keyboard, Keyboard_Cap);
-         Rose.Interfaces.Event_Source.Client.Add_Listener
+         Rose.Interfaces.Devices.Event_Source.Client
+           .Open (Keyboard, Keyboard_Cap);
+         Rose.Interfaces.Devices.Event_Source.Client.Add_Listener
            (Keyboard, The_Events);
       end;
 
@@ -457,7 +459,7 @@ package body Screen.Server is
    overriding function Reader_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Reader.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Streams.Reader.Server.Cap_Of (Item));
 
    -----------------
    -- Surface_Cap --
@@ -466,6 +468,6 @@ package body Screen.Server is
    overriding function Surface_Cap
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Surface.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Screens.Surface.Server.Cap_Of (Item));
 
 end Screen.Server;

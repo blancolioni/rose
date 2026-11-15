@@ -1,5 +1,0 @@
-interface Server is
-
-   function Published_Interface return Capability;
-     
-end Server;

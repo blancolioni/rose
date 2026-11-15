@@ -1,0 +1,2 @@
+role Streams.Standard_IO : Streams.Standard_Input, Streams.Standard_Output, Streams.Standard_Error is
+end Streams.Standard_IO;

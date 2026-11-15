@@ -2,9 +2,11 @@ with Directory_Server;
 
 procedure Rose.Core.Directory
   (Cap_Set_Service  : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
-   File_Launch      : in out Rose.Interfaces.Launch.Launch_Object'Class;
-   Directory_Launch : in out Rose.Interfaces.Launch.Launch_Object'Class;
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+   File_Launch      : in out Rose.Interfaces.Processes.Launch
+     .Launch_Object'Class;
+   Directory_Launch : in out Rose.Interfaces.Processes.Launch
+     .Launch_Object'Class;
    Served           : out Rose.Capabilities.Capability;
    Control          : out Rose.Capabilities.Capability)
 is

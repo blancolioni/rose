@@ -4,19 +4,19 @@ with Rose.Objects;
 with Rose.Server;
 with Rose.Words;
 
-with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Releasable_Writer;
-with Rose.Interfaces.Releasable_Writer.Client;
-with Rose.Interfaces.Releasable_Writer.Server;
-with Rose.Interfaces.Seekable_Reader;
-with Rose.Interfaces.Seekable_Reader.Client;
-with Rose.Interfaces.Seekable_Reader.Server;
-with Rose.Interfaces.Transactional_Writable_File;
-with Rose.Interfaces.Transactional_Writable_File.Client;
-with Rose.Interfaces.Transactional_Writable_File.Server;
-with Rose.Interfaces.Writable_File;
-with Rose.Interfaces.Writable_File.Server;
+with Rose.Interfaces.Streams.Releasable_Reader;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
+with Rose.Interfaces.Streams.Releasable_Writer;
+with Rose.Interfaces.Streams.Releasable_Writer.Client;
+with Rose.Interfaces.Streams.Releasable_Writer.Server;
+with Rose.Interfaces.Streams.Seekable_Reader;
+with Rose.Interfaces.Streams.Seekable_Reader.Client;
+with Rose.Interfaces.Streams.Seekable_Reader.Server;
+with Rose.Interfaces.Files.Transactional_Writable_File;
+with Rose.Interfaces.Files.Transactional_Writable_File.Client;
+with Rose.Interfaces.Files.Transactional_Writable_File.Server;
+with Rose.Interfaces.Files.Writable_File;
+with Rose.Interfaces.Files.Writable_File.Server;
 
 package body File_Server is
 
@@ -25,17 +25,19 @@ package body File_Server is
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word_32;
 
-   package Reader_Server renames Rose.Interfaces.Seekable_Reader.Server;
-   package Writer_Server renames Rose.Interfaces.Releasable_Writer.Server;
-   package File_Interfaces renames Rose.Interfaces.Writable_File.Server;
+   package Reader_Server renames Rose.Interfaces.Streams.Seekable_Reader
+     .Server;
+   package Writer_Server renames Rose.Interfaces.Streams.Releasable_Writer
+     .Server;
+   package File_Interfaces renames Rose.Interfaces.Files.Writable_File.Server;
    package Version_Server renames
-     Rose.Interfaces.Transactional_Writable_File.Server;
-   package Versions renames Rose.Interfaces.Transactional_Writable_File;
+     Rose.Interfaces.Files.Transactional_Writable_File.Server;
+   package Versions renames Rose.Interfaces.Files.Transactional_Writable_File;
 
    subtype Version_Class is
      Versions.Transactional_Writable_File_Object'Class;
    subtype Writer_Class is
-     Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class;
+     Rose.Interfaces.Streams.Releasable_Writer.Releasable_Writer_Object'Class;
 
    Format : constant Rose.Words.Word_32 := 1;
    --  The version of this server's part of the state (#867):
@@ -77,11 +79,13 @@ package body File_Server is
 
    function Open_Reader
      (Buffer : Buffer_Index)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class;
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class;
 
    function Open_Seekable_Reader
      (Buffer : Buffer_Index)
-      return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class;
+      return Rose.Interfaces.Streams.Seekable_Reader
+        .Seekable_Reader_Object'Class;
 
    function Open_Writer
      (Buffer : Buffer_Index;
@@ -107,7 +111,7 @@ package body File_Server is
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
    is (File_Interfaces.Cap_Of
-         (Item, Rose.Interfaces.Writable_File.File_Interface));
+         (Item, Rose.Interfaces.Files.Writable_File.File_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out File_Object)
@@ -121,12 +125,14 @@ package body File_Server is
 
    overriding function Open_Reader
      (Item : in out File_Object)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class
    is (Open_Reader (File_Buffer));
 
    overriding function Open_Seekable_Reader
      (Item : in out File_Object)
-      return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Seekable_Reader
+        .Seekable_Reader_Object'Class
    is (Open_Seekable_Reader (File_Buffer));
 
    overriding function Append
@@ -186,12 +192,14 @@ package body File_Server is
 
    overriding function Open_Reader
      (Item : in out Version_Object)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class
    is (Open_Reader (Version_Buffer));
 
    overriding function Open_Seekable_Reader
      (Item : in out Version_Object)
-      return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Seekable_Reader
+        .Seekable_Reader_Object'Class
    is (Open_Seekable_Reader (Version_Buffer));
 
    overriding function Append
@@ -247,25 +255,26 @@ package body File_Server is
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Seekable_Reader.Reader_Interface));
+         (Item, Rose.Interfaces.Streams.Seekable_Reader.Reader_Interface));
 
    overriding function Resource_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Seekable_Reader.Resource_Interface));
+         (Item, Rose.Interfaces.Streams.Seekable_Reader.Resource_Interface));
 
    overriding function Releasable_Reader_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Seekable_Reader.Releasable_Reader_Interface));
+         (Item, Rose.Interfaces.Streams.Seekable_Reader
+           .Releasable_Reader_Interface));
 
    overriding function Seekable_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Seekable_Reader.Seekable_Interface));
+         (Item, Rose.Interfaces.Streams.Seekable_Reader.Seekable_Interface));
 
    overriding function Seekable_Reader_Cap
      (Item : in out Reader_Object)
@@ -315,13 +324,13 @@ package body File_Server is
      (Item : in out Writer_Object)
       return Rose.Capabilities.Capability
    is (Writer_Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Writer.Writer_Interface));
+         (Item, Rose.Interfaces.Streams.Releasable_Writer.Writer_Interface));
 
    overriding function Resource_Cap
      (Item : in out Writer_Object)
       return Rose.Capabilities.Capability
    is (Writer_Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Writer.Resource_Interface));
+         (Item, Rose.Interfaces.Streams.Releasable_Writer.Resource_Interface));
 
    overriding function Releasable_Writer_Cap
      (Item : in out Writer_Object)
@@ -549,11 +558,12 @@ package body File_Server is
 
    function Open_Reader
      (Buffer : Buffer_Index)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class
    is
       Reader : constant Reader_Access := Open (Buffer);
    begin
-      return Rose.Interfaces.Releasable_Reader.Client.From_Cap
+      return Rose.Interfaces.Streams.Releasable_Reader.Client.From_Cap
         (Reader.Releasable_Reader_Cap);
    end Open_Reader;
 
@@ -563,11 +573,12 @@ package body File_Server is
 
    function Open_Seekable_Reader
      (Buffer : Buffer_Index)
-      return Rose.Interfaces.Seekable_Reader.Seekable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Seekable_Reader
+        .Seekable_Reader_Object'Class
    is
       Reader : constant Reader_Access := Open (Buffer);
    begin
-      return Rose.Interfaces.Seekable_Reader.Client.From_Cap
+      return Rose.Interfaces.Streams.Seekable_Reader.Client.From_Cap
         (Reader.Seekable_Reader_Cap);
    end Open_Seekable_Reader;
 
@@ -610,7 +621,7 @@ package body File_Server is
       Writer.Buffer := Buffer;
       Writer.Ended := False;
       Writer_Server.Attach (Context, Writer);
-      return Rose.Interfaces.Releasable_Writer.Client.From_Cap
+      return Rose.Interfaces.Streams.Releasable_Writer.Client.From_Cap
         (Writer.Releasable_Writer_Cap);
    end Open_Writer;
 

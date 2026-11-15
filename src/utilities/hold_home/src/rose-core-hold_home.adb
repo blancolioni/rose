@@ -1,9 +1,10 @@
 with Home_Holder;
 
 procedure Rose.Core.Hold_Home
-  (Find_Command    : in out Rose.Interfaces.Commands.Commands_Object'Class;
+  (Find_Command    : in out Rose.Interfaces.Commands.Lookup
+    .Lookup_Object'Class;
    Cap_Set_Service : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
    User_Control    : out Rose.Capabilities.Capability;
    Home_Control    : out Rose.Capabilities.Capability)
 is
@@ -13,7 +14,7 @@ begin
    --  then it runs Home_Holder.Start_Server, which never returns.
 
    Home_Holder.Create_Server
-     (Commands        => Find_Command.Commands_Cap,
+     (Commands        => Find_Command.Lookup_Cap,
       Cap_Set_Service => Cap_Set_Service.Constructor_Cap,
       User_Control    => User_Control,
       Home_Control    => Home_Control);

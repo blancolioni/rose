@@ -1,5 +1,5 @@
 command Rose.Core.Hold_Home
-  : Create_Endpoint, Standard_Output, Find_Command, Cap_Set_Service
+  : Caps.Create_Endpoint, Streams.Standard_Output, Commands.Find_Command, Caps.Cap_Set_Service
   with Summary     => "Hold a replaced user server across a restore.",
        Description => """
           Hold_Home is a test of replacing a user's servers, and of the
@@ -17,8 +17,8 @@ command Rose.Core.Hold_Home
        Server      => Home_Holder.Start_Server,
        Live
 is
-   User_Control : out Replaceable
+   User_Control : out Processes.Replaceable
      with Help => "the user server's Replaceable interface";
-   Home_Control : out Replaceable
+   Home_Control : out Processes.Replaceable
      with Help => "the home directory's Replaceable interface";
 end Rose.Core.Hold_Home;

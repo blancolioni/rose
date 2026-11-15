@@ -1,28 +1,42 @@
 ROOT=../../../..
 include $(ROOT)/mk/common.mk
 
-IDL=cap block_device file_system directory file \
-    transactional transactional_writable_file \
-    writable_directory writable_file user \
-    resource releasable_reader releasable_writer seekable_reader \
-    reader writer stream seekable storage storage_checkpoint \
-    dependent bank process_banks state \
-    ata partitions partition_setup keyboard_handler interrupt_handler \
-    launch exec region executable memory memory_restore process segment \
-    server \
-    timeout timer constructor cap_set releasable_cap_set terminal event_source event_listener \
-    commands map heap receiver named kernel_process kernel_log log_reader \
-    command_endpoint restorable signalled output_redirect auth auth_admin checkpointer \
-    clock clock_admin rights rights_admin display surface replacer replacement saveable replaceable
+IDL=caps-cap storage-block_array files-file_system files-directory \
+    files-file common-transactional files-transactional_writable_file \
+    files-writable_directory files-writable_file users-user \
+    common-resource streams-releasable_reader \
+    streams-releasable_writer streams-seekable_reader streams-reader \
+    streams-writer streams-stream streams-seekable storage-store \
+    checkpoints-storage_checkpoint storage-dependent storage-bank \
+    storage-process_banks checkpoints-state devices-ata \
+    storage-partitions storage-partition_setup \
+    devices-interrupt_handler processes-launch processes-exec \
+    storage-region processes-executable processes-memory \
+    checkpoints-memory_restore processes-process processes-segment \
+    processes-server time-timeout time-timer caps-constructor \
+    caps-cap_set caps-releasable_cap_set screens-terminal \
+    devices-event_source devices-event_listener commands-lookup \
+    commands-map processes-heap caps-receiver common-named \
+    processes-kernel_process checkpoints-kernel_log \
+    checkpoints-log_reader commands-command_endpoint \
+    processes-restorable processes-signalled streams-output_redirect \
+    users-auth users-auth_admin checkpoints-checkpointer time-clock \
+    time-clock_admin users-rights users-rights_admin screens-surface \
+    processes-replacer processes-replacement processes-saveable \
+    processes-replaceable
 
 # Declarations for commands (ADR 0002): the roles they inherit, and the
 # package of the core commands. They are checked with the interfaces, but
 # nothing is generated for them here; each command generates its own units.
 
-COMMANDS=rose-core standard_input standard_output standard_error standard_io \
-    create_endpoint delete_cap rescind_cap find_command console timer_service clock_service \
-    clock_admin_service rights_service rights_admin_service storage_service create_signal \
-    screen_service cap_set_service replace_process
+COMMANDS=rose-core streams-standard_input streams-standard_output \
+    streams-standard_error streams-standard_io caps-create_endpoint \
+    caps-delete_cap caps-rescind_cap commands-find_command \
+    screens-console time-timer_service time-clock_service \
+    time-clock_admin_service users-rights_service \
+    users-rights_admin_service storage-storage_service \
+    caps-create_signal screens-screen_service caps-cap_set_service \
+    processes-replace_process
 
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)
 COMMAND_SOURCES=$(COMMANDS:%=../../../../interfaces/%.idl)

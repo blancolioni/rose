@@ -1,9 +1,9 @@
-with Rose.Interfaces.Writer.Client;
+with Rose.Interfaces.Streams.Writer.Client;
 with Rose.System_Calls;
 
 package body Rose.Console_IO is
 
-   Client : Rose.Interfaces.Writer.Client.Writer_Client;
+   Client : Rose.Interfaces.Streams.Writer.Client.Writer_Client;
 
    Text_Buffer   : String (1 .. 4096)
      with Alignment => 4096;
@@ -41,7 +41,7 @@ package body Rose.Console_IO is
      (Console_Cap : Rose.Capabilities.Capability)
    is
    begin
-      Rose.Interfaces.Writer.Client.Open (Client, Console_Cap);
+      Rose.Interfaces.Streams.Writer.Client.Open (Client, Console_Cap);
       Buffer_Length := 0;
    end Open;
 
@@ -277,7 +277,7 @@ package body Rose.Console_IO is
             Buffer_Size  => 4096);
       end if;
 
-      Rose.Interfaces.Writer.Client.Write
+      Rose.Interfaces.Streams.Writer.Client.Write
         (Item   => Client,
          Buffer => Storage_Buffer);
       Buffer_Length := 0;

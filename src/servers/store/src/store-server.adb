@@ -6,13 +6,13 @@ with Rose.Console_IO;
 with Rose.Trace;
 with Rose.System_Calls.Client;
 
-with Rose.Interfaces.Storage.Server;
-with Rose.Interfaces.Bank.Server;
-with Rose.Interfaces.Dependent.Server;
-with Rose.Interfaces.Process_Banks.Server;
-with Rose.Interfaces.Region.Server;
-with Rose.Interfaces.Storage_Checkpoint.Server;
-with Rose.Interfaces.Reader.Server;
+with Rose.Interfaces.Storage.Store.Server;
+with Rose.Interfaces.Storage.Bank.Server;
+with Rose.Interfaces.Storage.Dependent.Server;
+with Rose.Interfaces.Storage.Process_Banks.Server;
+with Rose.Interfaces.Storage.Region.Server;
+with Rose.Interfaces.Checkpoints.Storage_Checkpoint.Server;
+with Rose.Interfaces.Streams.Reader.Server;
 
 with Store.Devices;
 
@@ -45,11 +45,11 @@ package body Store.Server is
 
       Rose.Console_IO.Open (Console_Cap);
 
-      Rose.Interfaces.Storage.Server.Create_Server
+      Rose.Interfaces.Storage.Store.Server.Create_Server
         (Server_Context    => Server_Context,
          Add_Backing_Store => Store.Devices.Add_Backing_Store'Access,
          Get_Root_Bank     => Store.Devices.Get_Root_Bank'Access);
-      Rose.Interfaces.Bank.Server.Attach_Interface
+      Rose.Interfaces.Storage.Bank.Server.Attach_Interface
         (Server_Context,
          Store.Devices.Reserve_From_Bank'Access,
          Store.Devices.Create_Sub_Bank'Access,
@@ -58,7 +58,7 @@ package body Store.Server is
          Store.Devices.Destroy_Bank'Access,
          Store.Devices.Bank_Index'Access,
          Instanced => True);
-      Rose.Interfaces.Process_Banks.Server.Attach_Interface
+      Rose.Interfaces.Storage.Process_Banks.Server.Attach_Interface
         (Server_Context,
          Create_Process_Bank => Store.Devices.Create_Process_Bank'Access,
          Process_Bank        => Store.Devices.Process_Bank'Access,
@@ -67,12 +67,12 @@ package body Store.Server is
          Take_Ended          => Store.Devices.Take_Ended'Access,
          Hand_Over           => Store.Devices.Hand_Over'Access,
          Parent_Bank         => Store.Devices.Parent_Bank'Access);
-      Rose.Interfaces.Dependent.Server.Attach_Interface
+      Rose.Interfaces.Storage.Dependent.Server.Attach_Interface
         (Server_Context,
          Release   => Store.Devices.Release_Dependent'Access,
          Destroyed => Store.Devices.Dependent_Destroyed'Access,
          Instanced => True);
-      Rose.Interfaces.Region.Server.Attach_Interface
+      Rose.Interfaces.Storage.Region.Server.Attach_Interface
         (Server_Context,
          Store.Devices.Get_Range'Access,
          Store.Devices.Get'Access,
@@ -82,12 +82,12 @@ package body Store.Server is
          Store.Devices.Release'Access,
          Instanced => True);
 
-      Rose.Interfaces.Reader.Server.Attach_Interface
+      Rose.Interfaces.Streams.Reader.Server.Attach_Interface
         (Server_Context => Server_Context,
          Read           => Store.Devices.Read'Access,
          Instanced      => True);
 
-      Rose.Interfaces.Storage_Checkpoint.Server.Attach_Interface
+      Rose.Interfaces.Checkpoints.Storage_Checkpoint.Server.Attach_Interface
         (Server_Context     => Server_Context,
          Checkpoint         => Store.Devices.Checkpoint'Access,
          Restore_Region     => Store.Devices.Restore_Region'Access,

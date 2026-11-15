@@ -1,0 +1,19 @@
+--  A file that can be written. It is not a stream: writers are opened
+--  from it, as readers are from a file (ADR 0009, section 4).
+
+interface Files.Writable_File : Files.File
+  with Versioned
+is
+
+   function Append return interface Streams.Releasable_Writer;
+   --  A writer that adds to the end of the file.
+
+   function Rewrite return interface Streams.Releasable_Writer;
+   --  Empty the file, then a writer that adds to its end. A reader past
+   --  the new end moves back to it.
+
+   function New_Version return interface Files.Transactional_Writable_File;
+   --  A version of the file, which starts as a copy of it (ADR 0026). It
+   --  fails if the file already has a version, or if this is a version.
+
+end Files.Writable_File;

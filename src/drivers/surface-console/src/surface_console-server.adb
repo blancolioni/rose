@@ -8,7 +8,7 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Terminal.Server;
+with Rose.Interfaces.Screens.Terminal.Server;
 
 with Text_Console;
 
@@ -31,7 +31,7 @@ package body Surface_Console.Server is
    Event_Bytes : constant := 16;
 
    type Console is limited new
-     Rose.Interfaces.Terminal.Server.Terminal_Interface
+     Rose.Interfaces.Screens.Terminal.Server.Terminal_Interface
      with null record;
 
    overriding procedure Read
@@ -345,7 +345,7 @@ package body Surface_Console.Server is
 
       Surface_Console.Screen.Open;
 
-      Rose.Interfaces.Terminal.Server.Publish
+      Rose.Interfaces.Screens.Terminal.Server.Publish
         (Server_Context, The_Console'Access);
 
       Rose.Server.Set_Signal_Handler
@@ -363,8 +363,8 @@ package body Surface_Console.Server is
    overriding function Stream_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Stream_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Stream_Interface));
 
    -----------------------
    -- Reader_Cap --
@@ -373,8 +373,8 @@ package body Surface_Console.Server is
    overriding function Reader_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Reader_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Reader_Interface));
 
    -----------------------
    -- Writer_Cap --
@@ -383,8 +383,8 @@ package body Surface_Console.Server is
    overriding function Writer_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Writer_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Writer_Interface));
 
    ------------------
    -- Terminal_Cap --
@@ -393,7 +393,7 @@ package body Surface_Console.Server is
    overriding function Terminal_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of (Item));
 
    ---------------------
    -- Unblock_Readers --
@@ -407,12 +407,13 @@ package body Surface_Console.Server is
 
       if Surface_Console.Line_Discipline.Ready then
          Rose.Server.Unblock_Endpoint
-           (Server_Context, Rose.Interfaces.Terminal.Read_Endpoint);
+           (Server_Context, Rose.Interfaces.Screens.Terminal.Read_Endpoint);
       end if;
 
       if Surface_Console.Line_Discipline.Key_Ready then
          Rose.Server.Unblock_Endpoint
-           (Server_Context, Rose.Interfaces.Terminal.Read_Key_Endpoint);
+           (Server_Context, Rose.Interfaces.Screens.Terminal
+             .Read_Key_Endpoint);
       end if;
    end Unblock_Readers;
 

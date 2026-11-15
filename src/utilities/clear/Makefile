@@ -15,8 +15,8 @@ clear:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-clear.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/terminal.idl \
-	    $(INTERFACES)/stream.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl
+	    $(INTERFACES)/screens-terminal.idl \
+	    $(INTERFACES)/streams-stream.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl
 	gprbuild $(GPRBUILD_CARGS)

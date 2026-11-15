@@ -11,10 +11,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-interfaces-cap-server.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
-	$(BUILDDIR)/rose-interfaces-timeout-server.o \
-	$(BUILDDIR)/rose-interfaces-timer-server.o \
+	$(BUILDDIR)/rose-interfaces-caps-cap-server.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-time-timeout-server.o \
+	$(BUILDDIR)/rose-interfaces-time-timer-server.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
