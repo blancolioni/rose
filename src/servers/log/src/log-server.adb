@@ -8,6 +8,7 @@ with Rose.Words;
 with Rose.Interfaces.Storage.Block_Array.Client;
 with Rose.Interfaces.Checkpoints.Kernel_Log.Server;
 with Rose.Interfaces.Checkpoints.Log_Reader.Server;
+with Rose.Interfaces.Checkpoints.Page_Log.Server;
 with Rose.Interfaces.Checkpoints.State.Server;
 
 with Rose.Server;
@@ -96,6 +97,29 @@ package body Log.Server is
    procedure Append
      (Id   : Rose.Objects.Capability_Identifier;
       Data : System.Storage_Elements.Storage_Array);
+
+   function Append_Data
+     (Data : System.Storage_Elements.Storage_Array)
+      return Log_Location_Id;
+   --  Append Data to the open entry, and return the location it was
+   --  written to, or 0 if the entry has failed.
+
+   procedure Open_Entry;
+   --  Open the next entry, at Next_Log_Location.  An entry is open from
+   --  one commit to the next (ADR 0028, section 4), so that the memory
+   --  server can append pages between checkpoints.
+
+   function Append_Page
+     (Id   : Rose.Objects.Capability_Identifier;
+      Page : System.Storage_Elements.Storage_Array)
+      return Rose.Words.Word;
+   --  Page_Log.Append_Page.
+
+   procedure Read_Log_Page
+     (Id       : Rose.Objects.Capability_Identifier;
+      Log_Page : Rose.Words.Word;
+      Page     : out System.Storage_Elements.Storage_Array);
+   --  Page_Log.Read_Page.
 
    procedure Add_Log_Device
      (Id     : Rose.Objects.Capability_Identifier;
@@ -281,6 +305,7 @@ package body Log.Server is
                end if;
 
                Active := True;
+               Open_Entry;
 
             end;
 
@@ -313,13 +338,29 @@ package body Log.Server is
    is
       pragma Unreferenced (Id);
    begin
+      --  A failed entry has said so already, and is left out when the
+      --  checkpoint commits.
+      if Append_Data (Data) = 0 then
+         null;
+      end if;
+   end Append;
+
+   -----------------
+   -- Append_Data --
+   -----------------
+
+   function Append_Data
+     (Data : System.Storage_Elements.Storage_Array)
+      return Log_Location_Id
+   is
+   begin
       if not Writing then
-         Rose.Console_IO.Put_Line ("log: append: not currently logging");
-         return;
+         Rose.Console_IO.Put_Line ("log: append: no entry is open");
+         return 0;
       end if;
 
       if Entry_Failed then
-         return;
+         return 0;
       end if;
 
       if Data'Length /= Log_Page_Size then
@@ -329,12 +370,12 @@ package body Log.Server is
          Rose.Console_IO.Put (Natural (Log_Page_Size));
          Rose.Console_IO.New_Line;
          Fail_Entry ("log: append: bad page");
-         return;
+         return 0;
       end if;
 
       if not Has_Room (Current_Log_Header.Log_Last + 1) then
          Fail_Entry ("log: log is full");
-         return;
+         return 0;
       end if;
 
       Current_Log_Header.Log_Last :=
@@ -343,7 +384,7 @@ package body Log.Server is
       if Page_Buffer_Last = Log_Page_Buffer_Count then
          Flush;
          if Entry_Failed then
-            return;
+            return 0;
          end if;
          Page_Buffer_Loc := Current_Log_Header.Log_Last;
       end if;
@@ -351,7 +392,24 @@ package body Log.Server is
       Page_Buffer_Last := Page_Buffer_Last + 1;
       Page_Buffer (Page_Buffer_Last) := Data;
 
-   end Append;
+      return Current_Log_Header.Log_Last;
+   end Append_Data;
+
+   -----------------
+   -- Append_Page --
+   -----------------
+
+   function Append_Page
+     (Id   : Rose.Objects.Capability_Identifier;
+      Page : System.Storage_Elements.Storage_Array)
+      return Rose.Words.Word
+   is
+      pragma Unreferenced (Id);
+   begin
+      --  A log page fits in a word: a partition of 2 ** 32 pages would be
+      --  16 TiB.
+      return Rose.Words.Word (Append_Data (Page));
+   end Append_Page;
 
    ------------
    -- Commit --
@@ -408,6 +466,12 @@ package body Log.Server is
          Notify_Store_Committed;
       end if;
 
+      --  The next entry opens now, not when the next checkpoint starts,
+      --  so that the memory server can append to it in between. After a
+      --  failed entry, it starts where that one did.
+
+      Open_Entry;
+
    end Commit;
 
    ------------
@@ -425,28 +489,12 @@ package body Log.Server is
          return;
       end if;
 
-      if Writing then
-         Rose.Console_IO.Put_Line ("log: create: already writing");
-         return;
-      end if;
+      --  The kernel calls this when a checkpoint starts. The entry that
+      --  the checkpoint completes has been open since the last commit
+      --  (ADR 0028, section 4), and may already hold pages.
 
-      Writing := True;
-      Entry_Failed := False;
-      --  The startup scan reads into Current_Log_Header, so after a
-      --  restart it holds whatever page followed the last entry.  Set
-      --  each field, rather than assigning a whole header: that would
-      --  need a page-sized temporary on the stack.
-      Current_Log_Header.Magic := Log.Header.Entry_Magic;
-      Current_Log_Header.Version := Log_Version;
-      Current_Log_Header.Flags := Log.Header.Is_Active_Entry;
-      Current_Log_Header.Generation := Header.Generation;
-      Current_Log_Header.Log_First := Next_Log_Location + 1;
-      Current_Log_Header.Log_Last := Next_Log_Location;
-      Page_Buffer_Last := 0;
-      Page_Buffer_Loc := Current_Log_Header.Log_First;
-
-      if not Has_Room (Next_Log_Location) then
-         Fail_Entry ("log: log is full");
+      if not Writing then
+         Open_Entry;
       end if;
 
    end Create;
@@ -502,6 +550,11 @@ package body Log.Server is
          Next_Entry     => Next_Entry'Access,
          Page_Count     => Page_Count'Access,
          Read_Page      => Read_Page'Access);
+
+      Rose.Interfaces.Checkpoints.Page_Log.Server.Attach_Interface
+        (Server_Context => Log_Server,
+         Append_Page    => Append_Page'Access,
+         Read_Page      => Read_Log_Page'Access);
 
       for Page of Page_Buffer loop
          for Element of Page loop
@@ -690,6 +743,32 @@ package body Log.Server is
       end if;
    end Notify_Store_Committed;
 
+   ----------------
+   -- Open_Entry --
+   ----------------
+
+   procedure Open_Entry is
+   begin
+      Writing := True;
+      Entry_Failed := False;
+      --  The startup scan reads into Current_Log_Header, so after a
+      --  restart it holds whatever page followed the last entry.  Set
+      --  each field, rather than assigning a whole header: that would
+      --  need a page-sized temporary on the stack.
+      Current_Log_Header.Magic := Log.Header.Entry_Magic;
+      Current_Log_Header.Version := Log_Version;
+      Current_Log_Header.Flags := Log.Header.Is_Active_Entry;
+      Current_Log_Header.Generation := Header.Generation;
+      Current_Log_Header.Log_First := Next_Log_Location + 1;
+      Current_Log_Header.Log_Last := Next_Log_Location;
+      Page_Buffer_Last := 0;
+      Page_Buffer_Loc := Current_Log_Header.Log_First;
+
+      if not Has_Room (Next_Log_Location) then
+         Fail_Entry ("log: log is full");
+      end if;
+   end Open_Entry;
+
    -------------
    -- Operate --
    -------------
@@ -789,6 +868,49 @@ package body Log.Server is
       Operate (Location, Addr, Read, 1, Success);
    end Read;
 
+   -------------------
+   -- Read_Log_Page --
+   -------------------
+
+   procedure Read_Log_Page
+     (Id       : Rose.Objects.Capability_Identifier;
+      Log_Page : Rose.Words.Word;
+      Page     : out System.Storage_Elements.Storage_Array)
+   is
+      pragma Unreferenced (Id);
+      Location : constant Log_Location_Id := Log_Location_Id (Log_Page);
+      Success  : Boolean := False;
+   begin
+      if Page'Length /= Log_Page_Size then
+         Rose.Console_IO.Put_Line ("log: read page: buffer is not one page");
+      elsif not Active
+        or else Location = 0
+        or else Location
+          > (if Writing and then not Entry_Failed
+             then Current_Log_Header.Log_Last
+             else Next_Log_Location - 1)
+      then
+         Rose.Console_IO.Put ("log: read page: no log page ");
+         Rose.Console_IO.Put (Log_Page);
+         Rose.Console_IO.New_Line;
+      elsif Writing
+        and then Location >= Page_Buffer_Loc
+        and then Location
+          < Page_Buffer_Loc + Log_Location_Id (Page_Buffer_Last)
+      then
+         --  A page of the open entry that is still in the buffer.
+         Page :=
+           Page_Buffer (Page_Buffer_Index (Location - Page_Buffer_Loc + 1));
+         Success := True;
+      else
+         Read (Location, Page'Address, Success);
+      end if;
+
+      if not Success then
+         Page := (others => 0);
+      end if;
+   end Read_Log_Page;
+
    ---------------
    -- Read_Page --
    ---------------
@@ -852,6 +974,15 @@ package body Log.Server is
             Last_Committed := 0;
             Cached_Location := 0;
          end;
+
+         --  An open entry is dropped, with anything appended to it, and
+         --  the first entry of the new log opens.
+
+         Writing := False;
+         Page_Buffer_Last := 0;
+         if Active then
+            Open_Entry;
+         end if;
       end if;
    end Reset;
 

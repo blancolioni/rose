@@ -252,6 +252,42 @@ package body Restore.Checkpoints is
       Layout : Entries.Entry_Layout;
       Status : Entries.Layout_Status;
       Index  : Positive;
+
+      function Add_Sections (First : Positive; Last : Natural) return Boolean;
+      --  Add the pages of the batches from page First to page Last, and
+      --  skip the index sections there.
+
+      ------------------
+      -- Add_Sections --
+      ------------------
+
+      function Add_Sections (First : Positive; Last : Natural) return Boolean
+      is
+         Section : Positive := First;
+      begin
+         while Section <= Last loop
+            declare
+               Kind  : Entries.Section_Kind;
+               Size  : Natural;
+               Added : Boolean;
+            begin
+               Entries.Section_Size
+                 (Reader, Location, Section, Last, Kind, Size, Status);
+               if Status /= Entries.Found then
+                  return False;
+               end if;
+               if Kind = Entries.Memory_Batch then
+                  Add_Batch_Pages (Reader, Location, Section, Added);
+                  if not Added then
+                     return False;
+                  end if;
+               end if;
+               Section := Section + Size;
+            end;
+         end loop;
+         return True;
+      end Add_Sections;
+
    begin
       Success := False;
 
@@ -275,31 +311,16 @@ package body Restore.Checkpoints is
            (Mem_Process.Mem_Pid, Mem_Process.Oid);
       end loop;
 
-      --  Each batch, in order, so that a page's last copy wins. Index
-      --  sections are skipped: a restore reads pages from the batches.
+      --  Each batch, in order, so that a page's last copy wins: those
+      --  paged out before the kernel's tables, then the checkpoint's own
+      --  after the storage server's. Index sections are skipped: a
+      --  restore reads pages from the batches.
 
-      Index := Layout.Batch_First;
-      while Index < Layout.Mem_First loop
-         declare
-            Kind  : Entries.Section_Kind;
-            Size  : Natural;
-            Added : Boolean;
-         begin
-            Entries.Section_Size
-              (Reader, Location, Index, Layout.Mem_First - 1, Kind, Size,
-               Status);
-            if Status /= Entries.Found then
-               return;
-            end if;
-            if Kind = Entries.Memory_Batch then
-               Add_Batch_Pages (Reader, Location, Index, Added);
-               if not Added then
-                  return;
-               end if;
-            end if;
-            Index := Index + Size;
-         end;
-      end loop;
+      if not Add_Sections (1, Layout.Kernel_First - 1)
+        or else not Add_Sections (Layout.Batch_First, Layout.Mem_First - 1)
+      then
+         return;
+      end if;
 
       --  The pages of shared segments, after the memory server's tables:
       --  their header pages, then the pages they list as saved.
@@ -503,6 +524,9 @@ package body Restore.Checkpoints is
       Status          : Entries.Layout_Status;
       Kernel_Pages    : Natural;
       Store_Pages     : Natural;
+      Base            : Natural;
+      --  The page before the kernel's tables: batches paged out between
+      --  checkpoints come first (ADR 0028).
       Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array;
       Interrupt_Count : Natural;
       Process_Count   : Natural;
@@ -531,10 +555,11 @@ package body Restore.Checkpoints is
       end if;
       Kernel_Pages := Layout.Kernel_Pages;
       Store_Pages := Layout.Store_Pages;
+      Base := Layout.Kernel_First - 1;
 
       --  The kernel's header page lists the processes and interrupts.
 
-      if not Read (Reader, Checkpoint, 1) then
+      if not Read (Reader, Checkpoint, Base + 1) then
          Fail ("cannot read the kernel's tables");
          return;
       end if;
@@ -547,7 +572,7 @@ package body Restore.Checkpoints is
 
       --  The regions first: the memory server's segments use them.
 
-      if not Read (Reader, Checkpoint, Kernel_Pages + 1) then
+      if not Read (Reader, Checkpoint, Base + Kernel_Pages + 1) then
          Fail ("cannot read the storage tables");
          return;
       end if;
@@ -560,7 +585,7 @@ package body Restore.Checkpoints is
             if (I - 1) mod Rose.Checkpoints.Regions_Per_Page = 0
               and then not Read
                 (Reader, Checkpoint,
-                 Kernel_Pages + 2
+                 Base + Kernel_Pages + 2
                  + (I - 1) / Rose.Checkpoints.Regions_Per_Page)
             then
                Fail ("cannot read the storage tables");
@@ -592,7 +617,7 @@ package body Restore.Checkpoints is
       --  and which of their pages are fresh (#305).
 
       for I in 1 .. Store_Pages loop
-         if not Read (Reader, Checkpoint, Kernel_Pages + I) then
+         if not Read (Reader, Checkpoint, Base + Kernel_Pages + I) then
             Fail ("cannot read the storage tables");
             return;
          end if;
@@ -613,7 +638,7 @@ package body Restore.Checkpoints is
             end if;
 
             for I in 1 .. Record_Pages loop
-               if not Read (Reader, Checkpoint, 1 + I) then
+               if not Read (Reader, Checkpoint, Base + 1 + I) then
                   Fail ("cannot read the derivation records");
                   return;
                end if;
@@ -642,7 +667,7 @@ package body Restore.Checkpoints is
       --  has their pages.
 
       declare
-         Index : Positive := 2 + Record_Pages;
+         Index : Positive := Base + 2 + Record_Pages;
       begin
          for P in 1 .. Process_Count loop
             if not Read (Reader, Checkpoint, Index) then

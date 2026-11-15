@@ -10,6 +10,9 @@ package Rose.Checkpoints is
 
    --  A checkpoint log entry holds, in this order:
    --
+   --  * any number of batches of the memory server's pages, which it
+   --    paged out between checkpoints, while the entry was open (ADR
+   --    0028, section 4);
    --  * the kernel's tables;
    --  * the storage server's tables;
    --  * one or more batches of the memory server's pages: header pages,
@@ -479,9 +482,12 @@ package Rose.Checkpoints is
    --  A batch of the memory server's pages is one or more header pages
    --  that list the pages, followed by those pages in the order they are
    --  listed. The last header page has Is_Last_Header_Page set. An entry
-   --  has one batch or more, before its index sections and the memory
-   --  server's tables. The memory server writes them, and the restore
-   --  server reads them.
+   --  has one batch or more after the storage server's tables, before
+   --  its index sections and the memory server's tables, and may have
+   --  more before the kernel's tables, which the memory server paged out
+   --  between checkpoints. The memory server writes them, and the
+   --  restore server reads them, in order, so that a page's last copy
+   --  wins.
    --
    --  If the memory server's table header has Mem_Has_Shared_Pages, the
    --  pages of shared segments come after its tables (ADR 0025): one or

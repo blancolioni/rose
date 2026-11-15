@@ -12,6 +12,7 @@
 16#12EA_6B64_56BB_DB12#  interface rose.interfaces.caps.releasable_cap_set
 16#D4F1_EB79_920F_D13A#  interface rose.interfaces.checkpoints.checkpointer
 16#B051_3B6A_5195_22BC#  rose.interfaces.checkpoints.checkpointer.take_checkpoint return natural
+16#9EB8_EAB4_7629_0DE8#  rose.interfaces.checkpoints.checkpointer.request_checkpoint
 16#7C0E_EB81_87DB_3B52#  interface rose.interfaces.checkpoints.kernel_log
 16#00FB_1B80_BC4B_2E82#  rose.interfaces.checkpoints.kernel_log.create
 16#ED3F_DBA7_775D_A025#  rose.interfaces.checkpoints.kernel_log.append(in storage_array)
@@ -29,6 +30,9 @@
 16#8E28_AB14_5B8F_BEA6#  rose.interfaces.checkpoints.memory_restore.restore_zero_segment(in natural; in word; in word; in word; in word)
 16#C2A2_3D85_B6DA_35E6#  rose.interfaces.checkpoints.memory_restore.restore_page(in natural; in word; in storage_array)
 16#6FD8_89CB_06E8_0BD6#  rose.interfaces.checkpoints.memory_restore.restore_shared_page(in object_id; in storage_array)
+16#E8C9_E2E2_F9E2_FD43#  interface rose.interfaces.checkpoints.page_log
+16#0806_2377_8396_167A#  rose.interfaces.checkpoints.page_log.append_page(in storage_array) return word
+16#CAA4_CCB5_AA3C_3D72#  rose.interfaces.checkpoints.page_log.read_page(in word; out storage_array)
 16#0785_107B_F439_F895#  interface rose.interfaces.checkpoints.state
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset
 16#417B_75A1_17EC_9F59#  interface rose.interfaces.checkpoints.storage_checkpoint
@@ -113,6 +117,7 @@
 16#7087_4386_A2D5_6A89#  rose.interfaces.processes.memory.checkpoint(in capability)
 16#1F7B_E47C_2FED_3DA2#  rose.interfaces.processes.memory.set_process_banks(in interface rose.interfaces.storage.process_banks)
 16#AC92_8D24_2B6B_0251#  rose.interfaces.processes.memory.processes_ended
+16#B560_3ACC_A08B_D37F#  rose.interfaces.processes.memory.set_page_log(in interface rose.interfaces.checkpoints.page_log)
 16#C353_4F25_4299_7779#  interface rose.interfaces.processes.process
 16#D79B_C2CA_81C9_6FBC#  rose.interfaces.processes.process.heap_interface return interface rose.interfaces.processes.heap
 16#D969_D83E_E234_B149#  rose.interfaces.processes.process.bank return interface rose.interfaces.storage.bank

@@ -6,18 +6,23 @@ package Restore.Entries is
 
    --  Where the parts of a checkpoint log entry are (Rose.Checkpoints).
    --  Pages are numbered from 1, as Log_Reader.Read_Page numbers them.
-   --  The memory server's tables come after its pages and index pages
-   --  (ADR 0028), so finding them means skipping those by the counts in
-   --  their header pages.
+   --  Batches of the memory server's pages paged out between checkpoints
+   --  come before the kernel's tables, and the memory server's tables
+   --  come after its pages and index pages (ADR 0028), so finding the
+   --  tables means skipping those by the counts in their header pages.
 
    type Entry_Layout is
       record
          Page_Count   : Natural := 0;
          --  The entry's pages, not counting its header.
+         Kernel_First : Positive := 1;
+         --  The first page of the kernel's tables.  The pages before it
+         --  are batches that the memory server paged out between
+         --  checkpoints.
          Kernel_Pages : Natural := 0;
          Store_Pages  : Natural := 0;
-         --  The kernel's tables start at page 1, and the storage
-         --  server's follow them.
+         --  The storage server's tables follow the kernel's.  Kernel_Pages
+         --  is 0 if the kernel's tables weren't found.
          Batch_First  : Positive := 1;
          --  The first page after the storage server's tables, which
          --  starts the first batch of the memory server's pages.
@@ -50,7 +55,9 @@ package Restore.Entries is
       Status   : out Layout_Status);
    --  Find the parts of the entry at Location.  Only the tables' header
    --  pages and the header pages of the batches and index sections are
-   --  read, and only their magic numbers and counts are checked.
+   --  read, and only their magic numbers and counts are checked.  Once
+   --  the kernel's tables are found, Kernel_First and Kernel_Pages are
+   --  set, whatever Status is.
 
    type Section_Kind is (Memory_Batch, Index_Section);
 

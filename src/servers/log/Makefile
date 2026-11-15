@@ -17,6 +17,10 @@ LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader-server.o
 
+PAGE_LOG_OBJECTS= \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log-server.o
+
 STATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-checkpoints-state.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-state-server.o
@@ -41,6 +45,7 @@ OBJECTS= \
 	$(BLOCK_DEVICE_OBJECTS) \
 	$(KERNEL_LOG_OBJECTS) \
 	$(LOG_READER_OBJECTS) \
+	$(PAGE_LOG_OBJECTS) \
 	$(STATE_OBJECTS)
 
 all: log $(RELOC)
