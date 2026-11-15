@@ -91,10 +91,10 @@ The hash table and its buckets go, but the cache and the four bitmaps of the fre
 
 1. The changed pages of the tree, then the root.
 2. The changed pages of this generation's free map copy.
-3. When #505 has added `Block_Device.Flush`, a flush of each backing store.
+3. A flush of each backing store (`Block_Array.Flush`, #505).
 4. The store's table, appended to the log.
 
-The table names the root, so steps 1 and 2 must be on the medium before the entry is committed. Each write returns when it has completed. Until #505, the drive's write cache is the only gap, as it is for the log.
+The table names the root, so steps 1 and 2 must be on the medium before the entry is committed. Each write returns when it has completed, but a drive can still hold it in its write cache, which the flush empties. The log flushes its own devices around each entry's header in the same way (#505).
 
 ### 9. Releasing a region
 
