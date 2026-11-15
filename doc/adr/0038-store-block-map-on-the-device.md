@@ -1,8 +1,8 @@
 # 38. The store's block map on the device, as a copy-on-write tree
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-15
-- **Related:** #504 (this decision), #305 (blocks on first write, PR #501), #505 (flushing the disk's write cache), #935 (a stable storage format for 0.4.0), [ADR 0008](0008-install-boot-and-pager-path.md) (every hard-disk boot is a restore), [ADR 0014](0014-banks.md) (banks), [ADR 0025](0025-shared-regions.md) (shared pages written back), [ADR 0028](0028-paging-to-the-log.md) (paging to the log)
+- **Related:** #504 (this decision, implemented in PRs #956, #957 and #958), #305 (blocks on first write, PR #501), #505 (flushing the disk's write cache), #935 (a stable storage format for 0.4.0), [ADR 0008](0008-install-boot-and-pager-path.md) (every hard-disk boot is a restore), [ADR 0014](0014-banks.md) (banks), [ADR 0025](0025-shared-regions.md) (shared pages written back), [ADR 0028](0028-paging-to-the-log.md) (paging to the log)
 
 ## Context
 
