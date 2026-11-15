@@ -167,7 +167,7 @@ class Generator:
         if isinstance(value, int):
             return str(value)
         if "." in value:
-            package = value.split(".")[0]
+            package = value.rsplit(".", 1)[0]
             self.withs.add("Rose.Interfaces." + package)
         else:
             self.withs.add("Rose.Interfaces")
@@ -501,6 +501,20 @@ class Writer:
     def fits(self, text):
         return self.level + len(text) <= LINE_LENGTH
 
+    def split_line(self, text):
+        """TEXT as a line, or if it is too long, broken before the last
+        dot that leaves a first part that fits, as for the long names of
+        grouped interfaces (ADR 0034)."""
+        cut = text.rfind(".")
+        while cut > 0 and not self.fits(text[:cut]):
+            cut = text.rfind(".", 0, cut)
+        if self.fits(text) or cut <= len(text) - len(text.lstrip()):
+            self.line(text)
+            return
+        lead = len(text) - len(text.lstrip())
+        self.line(text[:cut])
+        self.split_line(" " * (lead + 2) + text[cut:])
+
     def call(self, name, args, tail):
         """A continuation line calling NAME with ARGS, or if that is too
         long, NAME and then the arguments, as many to a line as fit."""
@@ -517,9 +531,9 @@ class Writer:
             elif self.fits(current + " " + text):
                 current += " " + text
             else:
-                self.line(current)
+                self.split_line(current)
                 current = "     " + text
-        self.line(current)
+        self.split_line(current)
 
     def aligned(self, pairs, separator):
         """NAME SEPARATOR VALUE lines, with the separators lined up."""

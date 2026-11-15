@@ -4,7 +4,7 @@ with Rose.Limits;
 with Rose.Objects;
 
 with Rose.Console_IO;
-with Rose.Interfaces.Segment;
+with Rose.Interfaces.Processes.Segment;
 with Rose.Trace;
 
 with Elf.Format;
@@ -12,9 +12,9 @@ with Elf.Segments;
 
 package body Elf.Loader is
 
-   use Rose.Interfaces.Region.Client;
-   use Rose.Interfaces.Process.Client;
-   use Rose.Interfaces.Bank.Client;
+   use Rose.Interfaces.Storage.Region.Client;
+   use Rose.Interfaces.Processes.Process.Client;
+   use Rose.Interfaces.Storage.Bank.Client;
 
    Stack_Bound : constant := 16#E000_0000#;
    Stack_Size  : constant := 16#0004_0000#;
@@ -71,9 +71,9 @@ package body Elf.Loader is
    --------------------
 
    procedure Load_Elf_Image
-     (Process : Rose.Interfaces.Process.Client.Process_Client;
-      Bank   : Rose.Interfaces.Bank.Client.Bank_Client;
-      Image   : Rose.Interfaces.Region.Client.Region_Client;
+     (Process : Rose.Interfaces.Processes.Process.Client.Process_Client;
+      Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+      Image   : Rose.Interfaces.Storage.Region.Client.Region_Client;
       Start   : out Rose.Words.Word;
       Success : out Boolean)
    is
@@ -122,7 +122,7 @@ package body Elf.Loader is
 
       declare
          use type Rose.Words.Word;
-         Region : Rose.Interfaces.Region.Client.Region_Client :=
+         Region : Rose.Interfaces.Storage.Region.Client.Region_Client :=
            Reserve_Storage
              (Bank, Rose.Words.Word_64 (Stack_Size));
       begin
@@ -133,16 +133,16 @@ package body Elf.Loader is
             Region        => Region,
             Region_Offset => 0,
             Flags         =>
-              Rose.Interfaces.Segment.Segment_Readable
-            + Rose.Interfaces.Segment.Segment_Writable
-            + Rose.Interfaces.Segment.Segment_Private);
+              Rose.Interfaces.Processes.Segment.Segment_Readable
+            + Rose.Interfaces.Processes.Segment.Segment_Writable
+            + Rose.Interfaces.Processes.Segment.Segment_Private);
          Close (Region);
          Rose.Trace.Event ("stack added");
       end;
 
       declare
          use type Rose.Words.Word;
-         Region : Rose.Interfaces.Region.Client.Region_Client :=
+         Region : Rose.Interfaces.Storage.Region.Client.Region_Client :=
            Reserve_Storage
              (Bank, Rose.Words.Word_64 (Heap_Size));
       begin
@@ -153,10 +153,10 @@ package body Elf.Loader is
             Region        => Region,
             Region_Offset => 0,
             Flags         =>
-              Rose.Interfaces.Segment.Segment_Readable
-            + Rose.Interfaces.Segment.Segment_Writable
-            + Rose.Interfaces.Segment.Segment_Resizable
-            + Rose.Interfaces.Segment.Segment_Private);
+              Rose.Interfaces.Processes.Segment.Segment_Readable
+            + Rose.Interfaces.Processes.Segment.Segment_Writable
+            + Rose.Interfaces.Processes.Segment.Segment_Resizable
+            + Rose.Interfaces.Processes.Segment.Segment_Private);
          Close (Region);
          Rose.Trace.Event ("heap added");
       end;
@@ -194,11 +194,12 @@ package body Elf.Loader is
          when PT_LOAD =>
             Flags :=
               (if Readable
-               then Rose.Interfaces.Segment.Segment_Readable else 0)
+               then Rose.Interfaces.Processes.Segment.Segment_Readable else 0)
               + (if Writable
-                 then Rose.Interfaces.Segment.Segment_Writable else 0)
+                 then Rose.Interfaces.Processes.Segment
+                   .Segment_Writable else 0)
               + (if Executable
-                 then Rose.Interfaces.Segment.Segment_Executable
+                 then Rose.Interfaces.Processes.Segment.Segment_Executable
                  else 0);
 
             if not Writable then
@@ -256,7 +257,8 @@ package body Elf.Loader is
                Region_Offset => Region_Offset,
                Flags        =>
                  Flags
-               + (if Writable then Rose.Interfaces.Segment.Segment_Private
+               + (if Writable then Rose.Interfaces.Processes.Segment
+                 .Segment_Private
                   else 0));
 
             if Writable then

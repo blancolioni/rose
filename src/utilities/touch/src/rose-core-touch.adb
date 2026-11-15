@@ -1,15 +1,15 @@
 with Rose.Command_Line;
 
-with Rose.Interfaces.Directory;
+with Rose.Interfaces.Files.Directory;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Writable_File;
+with Rose.Interfaces.Files.Writable_File;
 
 procedure Rose.Core.Touch
   (Name      : String;
    Directory : in out
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class)
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class)
 is
-   use type Rose.Interfaces.Directory.File_Kind;
+   use type Rose.Interfaces.Files.Directory.File_Kind;
 
    Index : constant Natural := Directory.Find_Entry (Name);
 
@@ -35,14 +35,15 @@ begin
 
    if Index > 0
      and then Directory.Directory_Entry_Kind (Index)
-                = Rose.Interfaces.Directory.Directory
+                = Rose.Interfaces.Files.Directory.Directory
    then
       Fail (": it is a directory");
    end if;
 
    begin
       declare
-         File : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+         File : Rose.Interfaces.Files.Writable_File
+           .Writable_File_Object'Class :=
            Directory.Create_File (Name);
          pragma Unreferenced (File);
       begin

@@ -1,6 +1,6 @@
 with Rose.Capabilities;
 
-with Rose.Interfaces.User;
+with Rose.Interfaces.Users.User;
 
 package Petal.Session is
 
@@ -13,7 +13,8 @@ package Petal.Session is
    --  root, and a path from it. A directory doesn't know its parent, so
    --  petal keeps the directories on the path. It starts as home.
 
-   procedure Start (User : in out Rose.Interfaces.User.User_Object'Class);
+   procedure Start (User : in out Rose.Interfaces.Users.User
+     .User_Object'Class);
    --  Start the session of User, with User's home directory as home. A
    --  user with no home directory has no current directory.
 

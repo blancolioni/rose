@@ -5,7 +5,7 @@ with Rose.System_Calls.Server;
 with Rose.Words;
 
 with Rose.Devices.Port_IO;
-with Rose.Interfaces.Timeout;
+with Rose.Interfaces.Time.Timeout;
 
 package body Restore.Ask is
 
@@ -191,7 +191,7 @@ package body Restore.Ask is
       if Receive_Timeout_Cap = Rose.Capabilities.Null_Capability then
          Rose.System_Calls.Server.Create_Endpoint
            (Create_Cap   => Create_Endpoint_Cap,
-            Endpoint_Id  => Rose.Interfaces.Timeout.On_Timeout_Endpoint,
+            Endpoint_Id  => Rose.Interfaces.Time.Timeout.On_Timeout_Endpoint,
             Identifier   => Rose.Objects.Capability_Identifier'(0),
             Entry_Cap    => Receive_Timeout_Cap,
             Endpoint_Cap => Send_Timeout_Cap);

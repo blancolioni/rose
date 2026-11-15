@@ -3,9 +3,9 @@ with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Interfaces.Cap.Server;
-with Rose.Interfaces.Timeout.Server;
-with Rose.Interfaces.Timer.Server;
+with Rose.Interfaces.Caps.Cap.Server;
+with Rose.Interfaces.Time.Timeout.Server;
+with Rose.Interfaces.Time.Timer.Server;
 
 with Rose.Server;
 with Rose.System_Calls.Client;
@@ -93,13 +93,13 @@ package body Timer.Server is
       Timeout_Cap :=
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Endpoint_Cap,
-           Rose.Interfaces.Timeout.On_Timeout_Endpoint);
+           Rose.Interfaces.Time.Timeout.On_Timeout_Endpoint);
 
-      Rose.Interfaces.Timer.Server.Create_Server
+      Rose.Interfaces.Time.Timer.Server.Create_Server
         (Server, Set_Timer'Access);
-      Rose.Interfaces.Timeout.Server.Attach_Interface
+      Rose.Interfaces.Time.Timeout.Server.Attach_Interface
         (Server, On_Timeout'Access, Instanced => True);
-      Rose.Interfaces.Cap.Server.Attach_Interface
+      Rose.Interfaces.Caps.Cap.Server.Attach_Interface
         (Server, Destroy_Timer'Access, Get_Timer_Object_Id'Access,
          Instanced => True);
    end Create_Server;
@@ -215,7 +215,8 @@ package body Timer.Server is
                        Control_Cap =>
                          Rose.System_Calls.Server.Create_Endpoint
                            (Create_Cap  => Create_Endpoint_Cap,
-                            Endpoint_Id => Rose.Interfaces.Cap.Cap_Interface,
+                            Endpoint_Id => Rose.Interfaces.Caps.Cap
+                              .Cap_Interface,
                             Identifier  => New_Id));
       Index     : Timer_Count := Queue_Front;
       Reset     : constant Boolean :=

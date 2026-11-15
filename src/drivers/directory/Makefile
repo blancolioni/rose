@@ -21,33 +21,33 @@ directory:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/replaceable.idl \
-	    $(INTERFACES)/saveable.idl \
-	    $(INTERFACES)/releasable_cap_set.idl \
-	    $(INTERFACES)/cap_set.idl \
-	    $(INTERFACES)/constructor.idl \
-	    $(INTERFACES)/writable_directory.idl \
-	    $(INTERFACES)/directory.idl \
-	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/transactional_writable_file.idl \
-	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/releasable_writer.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/seekable.idl \
-	    $(INTERFACES)/launch.idl \
-	    $(INTERFACES)/process.idl \
-	    $(INTERFACES)/bank.idl \
-	    $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/segment.idl \
-	    $(INTERFACES)/server.idl \
-	    $(INTERFACES)/cap.idl \
-	    $(INTERFACES)/heap.idl \
-	    $(INTERFACES)/region.idl
+	    $(INTERFACES)/processes-replaceable.idl \
+	    $(INTERFACES)/processes-saveable.idl \
+	    $(INTERFACES)/caps-releasable_cap_set.idl \
+	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-constructor.idl \
+	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/files-writable_file.idl \
+	    $(INTERFACES)/files-transactional_writable_file.idl \
+	    $(INTERFACES)/common-transactional.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-releasable_writer.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/streams-seekable.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/processes-segment.idl \
+	    $(INTERFACES)/processes-server.idl \
+	    $(INTERFACES)/caps-cap.idl \
+	    $(INTERFACES)/processes-heap.idl \
+	    $(INTERFACES)/storage-region.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
 	    ../file/rose-core-file.idl rose-core-directory.idl \

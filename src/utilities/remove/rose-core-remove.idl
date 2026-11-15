@@ -1,4 +1,4 @@
-command Rose.Core.Remove : Standard_Error
+command Rose.Core.Remove : Streams.Standard_Error
   with Summary     => "Remove a file from a directory.",
        Description => """
           Remove removes the file NAME from DIRECTORY, which is home if it
@@ -11,6 +11,6 @@ command Rose.Core.Remove : Standard_Error
 is
    Name : String
      with Help => "the file to remove";
-   Directory : in Writable_Directory
+   Directory : in Files.Writable_Directory
      with Help => "the directory that holds it";
 end Rose.Core.Remove;

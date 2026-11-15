@@ -24,7 +24,7 @@ with Rose.Kernel.Capabilities.Physical_Memory;
 with Rose.Init_Capabilities;
 
 with Rose.Formats.ELF;
-with Rose.Interfaces.Memory;
+with Rose.Interfaces.Processes.Memory;
 
 with Rose.Boot.Console;
 with Rose.Arch.Interrupts;
@@ -614,7 +614,7 @@ package body Rose.Kernel.Processes.Init is
          if Have_Process_Handlers then
             Launch_Params.Cap := Mem_Launch_Cap;
             Launch_Params.Endpoint :=
-              Rose.Interfaces.Memory.Register_Process_Endpoint;
+              Rose.Interfaces.Processes.Memory.Register_Process_Endpoint;
             Launch_Params.Control.Last_Sent_Word := 7;
             Launch_Params.Control.Flags (Rose.Invocation.Send_Words) := True;
 

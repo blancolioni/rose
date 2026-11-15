@@ -5,13 +5,13 @@ with Rose.System_Calls;
 with Rose.Core.Directory_Client;
 with Rose.Core.File_Client;
 
-with Rose.Interfaces.Commands.Client;
+with Rose.Interfaces.Commands.Lookup.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Process;
 
 package body Tests.Registry is
 
-   Registry : Rose.Interfaces.Commands.Client.Commands_Client;
+   Registry : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
    Clock_Interface_Cap : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
    Bank_Interface_Cap  : Rose.Capabilities.Capability :=
@@ -79,7 +79,7 @@ package body Tests.Registry is
    is
       use type Rose.Capabilities.Capability;
       No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
-      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher ("directory");
    begin
       return Program.Launch_Command
@@ -103,7 +103,7 @@ package body Tests.Registry is
    is
       use type Rose.Capabilities.Capability;
       No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
-      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher ("file");
    begin
       return Program.Launch_Command
@@ -125,9 +125,9 @@ package body Tests.Registry is
       Caps : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
-      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher (Name);
-      Process : Rose.Interfaces.Process.Process_Object'Class :=
+      Process : Rose.Interfaces.Processes.Process.Process_Object'Class :=
         Program.Launch (Rose.System_Calls.Own_Bank.Cap, Caps);
       use type Rose.Capabilities.Capability;
    begin
@@ -198,7 +198,7 @@ package body Tests.Registry is
 
    function Launcher
      (Name : String)
-      return Rose.Interfaces.Launch.Launch_Object'Class
+      return Rose.Interfaces.Processes.Launch.Launch_Object'Class
    is
    begin
       return Registry.Find (Name);
@@ -212,7 +212,7 @@ package body Tests.Registry is
      (Name : String)
       return Rose.Capabilities.Capability
    is
-      Program : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher (Name);
    begin
       return Program.Launch_Cap;
@@ -268,10 +268,10 @@ package body Tests.Registry is
    ------------------
 
    procedure Set_Commands
-     (Commands : in out Rose.Interfaces.Commands.Commands_Object'Class)
+     (Commands : in out Rose.Interfaces.Commands.Lookup.Lookup_Object'Class)
    is
    begin
-      Registry.Open (Commands.Commands_Cap);
+      Registry.Open (Commands.Lookup_Cap);
    end Set_Commands;
 
    ------------------

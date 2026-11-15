@@ -12,7 +12,7 @@ caps:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/constructor.idl $(INTERFACES)/cap_set.idl \
-	    $(INTERFACES)/resource.idl $(INTERFACES)/releasable_cap_set.idl \
-	    $(INTERFACES)/restorable.idl
+	    $(INTERFACES)/caps-constructor.idl $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/common-resource.idl $(INTERFACES)/caps-releasable_cap_set.idl \
+	    $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)

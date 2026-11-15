@@ -20,20 +20,20 @@ file:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-file.idl \
 	    $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/replaceable.idl \
-	    $(INTERFACES)/saveable.idl \
-	    $(INTERFACES)/releasable_cap_set.idl \
-	    $(INTERFACES)/cap_set.idl \
-	    $(INTERFACES)/constructor.idl \
-	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/transactional_writable_file.idl \
-	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/releasable_writer.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/seekable.idl
+	    $(INTERFACES)/processes-replaceable.idl \
+	    $(INTERFACES)/processes-saveable.idl \
+	    $(INTERFACES)/caps-releasable_cap_set.idl \
+	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-constructor.idl \
+	    $(INTERFACES)/files-writable_file.idl \
+	    $(INTERFACES)/files-transactional_writable_file.idl \
+	    $(INTERFACES)/common-transactional.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-releasable_writer.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

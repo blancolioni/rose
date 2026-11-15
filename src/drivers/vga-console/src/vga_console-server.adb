@@ -9,10 +9,10 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Event_Listener.Server;
-with Rose.Interfaces.Event_Source.Client;
-with Rose.Interfaces.Restorable.Server;
-with Rose.Interfaces.Terminal.Server;
+with Rose.Interfaces.Devices.Event_Listener.Server;
+with Rose.Interfaces.Devices.Event_Source.Client;
+with Rose.Interfaces.Processes.Restorable.Server;
+with Rose.Interfaces.Screens.Terminal.Server;
 
 with Text_Console;
 with Text_Console.Serial;
@@ -28,9 +28,9 @@ package body VGA_Console.Server is
    --  restore notification (ADR 0004).
 
    type Console is limited new
-     Rose.Interfaces.Terminal.Server.Terminal_Interface
-     and Rose.Interfaces.Event_Listener.Server.Event_Listener_Interface
-     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     Rose.Interfaces.Screens.Terminal.Server.Terminal_Interface
+     and Rose.Interfaces.Devices.Event_Listener.Server.Event_Listener_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding procedure Read
@@ -221,7 +221,7 @@ package body VGA_Console.Server is
    overriding function Event_Listener_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Event_Listener.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of (Item));
 
    --------------
    -- On_Event --
@@ -296,7 +296,7 @@ package body VGA_Console.Server is
    overriding function Restorable_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
@@ -350,24 +350,26 @@ package body VGA_Console.Server is
    ------------------
 
    procedure Start_Server is
-      Keyboard : Rose.Interfaces.Event_Source.Client.Event_Source_Client;
+      Keyboard : Rose.Interfaces.Devices.Event_Source.Client
+        .Event_Source_Client;
    begin
       Rose.System_Calls.Use_Buffer
         (Console_Buffer'Address, Console_Buffer'Last);
 
       VGA_Console.Screen.Map;
 
-      Rose.Interfaces.Terminal.Server.Publish
+      Rose.Interfaces.Screens.Terminal.Server.Publish
         (Server_Context, The_Console'Access);
-      Rose.Interfaces.Event_Listener.Server.Attach
+      Rose.Interfaces.Devices.Event_Listener.Server.Attach
         (Server_Context, The_Console'Access);
-      Rose.Interfaces.Restorable.Server.Attach
+      Rose.Interfaces.Processes.Restorable.Server.Attach
         (Server_Context, The_Console'Access);
 
       --  The console reads the keyboard itself (#454).
 
-      Rose.Interfaces.Event_Source.Client.Open (Keyboard, Event_Source_Cap);
-      Rose.Interfaces.Event_Source.Client.Add_Listener
+      Rose.Interfaces.Devices.Event_Source.Client
+        .Open (Keyboard, Event_Source_Cap);
+      Rose.Interfaces.Devices.Event_Source.Client.Add_Listener
         (Keyboard, The_Console);
 
       Rose.Server.Start_Server (Server_Context);
@@ -380,8 +382,8 @@ package body VGA_Console.Server is
    overriding function Stream_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Stream_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Stream_Interface));
 
    -----------------------
    -- Reader_Cap --
@@ -390,8 +392,8 @@ package body VGA_Console.Server is
    overriding function Reader_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Reader_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Reader_Interface));
 
    -----------------------
    -- Writer_Cap --
@@ -400,8 +402,8 @@ package body VGA_Console.Server is
    overriding function Writer_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Terminal.Writer_Interface));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
+         (Item, Rose.Interfaces.Screens.Terminal.Writer_Interface));
 
    ------------------
    -- Terminal_Cap --
@@ -410,7 +412,7 @@ package body VGA_Console.Server is
    overriding function Terminal_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Terminal.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of (Item));
 
    ---------------------
    -- Unblock_Readers --
@@ -424,12 +426,13 @@ package body VGA_Console.Server is
 
       if VGA_Console.Line_Discipline.Ready then
          Rose.Server.Unblock_Endpoint
-           (Server_Context, Rose.Interfaces.Terminal.Read_Endpoint);
+           (Server_Context, Rose.Interfaces.Screens.Terminal.Read_Endpoint);
       end if;
 
       if VGA_Console.Line_Discipline.Key_Ready then
          Rose.Server.Unblock_Endpoint
-           (Server_Context, Rose.Interfaces.Terminal.Read_Key_Endpoint);
+           (Server_Context, Rose.Interfaces.Screens.Terminal
+             .Read_Key_Endpoint);
       end if;
    end Unblock_Readers;
 

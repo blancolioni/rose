@@ -1,3 +1,0 @@
-interface Writer is
-   procedure Write (Buffer : Stream_Element_Array);
-end Writer;

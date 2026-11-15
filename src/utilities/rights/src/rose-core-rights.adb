@@ -2,7 +2,7 @@ with Rights_Server;
 
 procedure Rose.Core.Rights
   (Clock_Admin_Service : in out
-     Rose.Interfaces.Clock_Admin.Clock_Admin_Object'Class;
+     Rose.Interfaces.Time.Clock_Admin.Clock_Admin_Object'Class;
    Rights              : out Rose.Capabilities.Capability;
    Admin               : out Rose.Capabilities.Capability)
 is

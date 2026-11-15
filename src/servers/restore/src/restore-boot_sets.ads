@@ -6,7 +6,7 @@
 --  are written in place: each file is contiguous, and starts on a block
 --  of the partition, so neither the FAT nor a directory changes.
 
-with Rose.Interfaces.Block_Device;
+with Rose.Interfaces.Storage.Block_Array;
 
 package Restore.Boot_Sets is
 
@@ -34,8 +34,8 @@ private
    type Slot_Name is (Slot_A, Slot_B);
 
    type File_Extent is record
-      First : Rose.Interfaces.Block_Device.Block_Address_Type := 0;
-      Count : Rose.Interfaces.Block_Device.Block_Address_Type := 0;
+      First : Rose.Interfaces.Storage.Block_Array.Block_Address_Type := 0;
+      Count : Rose.Interfaces.Storage.Block_Array.Block_Address_Type := 0;
    end record;
    --  A file's blocks on the boot partition
 

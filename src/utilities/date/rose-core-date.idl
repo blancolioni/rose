@@ -1,4 +1,4 @@
-command Rose.Core.Date : Standard_Output, Standard_Error, Clock_Service
+command Rose.Core.Date : Streams.Standard_Output, Streams.Standard_Error, Time.Clock_Service
   with Summary     => "Write the date and time.",
        Description => """
           Date writes the current date and time, in UTC, from the system's

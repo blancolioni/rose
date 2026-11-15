@@ -1,4 +1,4 @@
-command Rose.Core.Replaceable_Test : Create_Endpoint, Cap_Set_Service
+command Rose.Core.Replaceable_Test : Caps.Create_Endpoint, Caps.Cap_Set_Service
   with Summary     => "Serve a name that a new version can take over.",
        Description => """
           Replaceable_Test is the test server of the Replaceable
@@ -29,11 +29,11 @@ is
      with Help => "the name it serves, unless it takes over another";
    Target : in Held_Call
      with Help => "the server whose Wait a helper calls, or none";
-   Served : out Named
+   Served : out Common.Named
      with Help => "its Named interface";
-   Control : out Replaceable
+   Control : out Processes.Replaceable
      with Help => "its Replaceable interface";
-   Saver : out Saveable
+   Saver : out Processes.Saveable
      with Help => "its Saveable interface";
    Held : out Held_Call
      with Help => "its Held_Call interface";

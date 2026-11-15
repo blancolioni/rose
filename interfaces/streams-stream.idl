@@ -1,0 +1,3 @@
+interface Streams.Stream : Streams.Reader, Streams.Writer is
+
+end Streams.Stream;

@@ -13,13 +13,13 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Auth.Server;
-with Rose.Interfaces.Auth_Admin.Server;
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Commands.Client;
-with Rose.Interfaces.Launch;
+with Rose.Interfaces.Users.Auth.Server;
+with Rose.Interfaces.Users.Auth_Admin.Server;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Commands.Lookup.Client;
+with Rose.Interfaces.Processes.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.User.Client;
+with Rose.Interfaces.Users.User.Client;
 
 package body Auth_Server is
 
@@ -83,14 +83,14 @@ package body Auth_Server is
         Element_Type => User_Record);
    --  The users, by name (#490).
 
-   subtype User_Class is Rose.Interfaces.User.User_Object'Class;
+   subtype User_Class is Rose.Interfaces.Users.User.User_Object'Class;
 
    --  One object serves Auth, and another Auth_Admin. A login or a new
    --  user that fails gives a User with the null cap, which init and
    --  login check for.
 
    type Auth_Object is
-     new Rose.Interfaces.Auth.Server.Auth_Interface with null record;
+     new Rose.Interfaces.Users.Auth.Server.Auth_Interface with null record;
 
    overriding function Auth_Cap
      (Item : in out Auth_Object)
@@ -103,7 +103,7 @@ package body Auth_Server is
       return User_Class;
 
    type Admin_Object is
-     new Rose.Interfaces.Auth_Admin.Server.Auth_Admin_Interface
+     new Rose.Interfaces.Users.Auth_Admin.Server.Auth_Admin_Interface
      with null record;
 
    overriding function Auth_Admin_Cap
@@ -122,7 +122,7 @@ package body Auth_Server is
    Admin_Id  : Rose.Objects.Capability_Identifier := 0;
    --  The identifiers that the Auth and Auth_Admin objects had in the
    --  version that this one took over from, or 0.
-   Programs  : Rose.Interfaces.Commands.Client.Commands_Client;
+   Programs  : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
    Cap_Sets  : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    --  The cap set server's Constructor, for the home directories.
@@ -130,7 +130,7 @@ package body Auth_Server is
    The_Admin : aliased Admin_Object;
 
    function No_User return User_Class
-   is (Rose.Interfaces.User.Client.From_Cap
+   is (Rose.Interfaces.Users.User.Client.From_Cap
          (Rose.Capabilities.Null_Capability));
 
    function Cap_Name
@@ -166,7 +166,7 @@ package body Auth_Server is
 
    function Admin_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Auth_Admin.Server.Cap_Of (The_Admin);
+      return Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of (The_Admin);
    end Admin_Cap;
 
    --------------------
@@ -176,7 +176,7 @@ package body Auth_Server is
    overriding function Auth_Admin_Cap
      (Item : in out Admin_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Auth_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of (Item));
 
    --------------
    -- Auth_Cap --
@@ -184,7 +184,7 @@ package body Auth_Server is
 
    function Auth_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Auth.Server.Cap_Of (The_Auth);
+      return Rose.Interfaces.Users.Auth.Server.Cap_Of (The_Auth);
    end Auth_Cap;
 
    --------------
@@ -194,7 +194,7 @@ package body Auth_Server is
    overriding function Auth_Cap
      (Item : in out Auth_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Auth.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Auth.Server.Cap_Of (Item));
 
    -------------------
    -- Create_Server --
@@ -209,13 +209,13 @@ package body Auth_Server is
       Control         : out Rose.Capabilities.Capability)
    is
    begin
-      Rose.Interfaces.Commands.Client.Open (Programs, Commands);
+      Rose.Interfaces.Commands.Lookup.Client.Open (Programs, Commands);
       Cap_Sets := Cap_Set_Service;
-      Rose.Interfaces.Auth.Server.Attach
+      Rose.Interfaces.Users.Auth.Server.Attach
         (Context, The_Auth'Access, Auth_Id);
       Rose.Server.Publish_Interface
-        (Rose.Interfaces.Auth.Server.Interface_Cap (The_Auth'Access));
-      Rose.Interfaces.Auth_Admin.Server.Attach
+        (Rose.Interfaces.Users.Auth.Server.Interface_Cap (The_Auth'Access));
+      Rose.Interfaces.Users.Auth_Admin.Server.Attach
         (Context, The_Admin'Access, Admin_Id);
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Cap_Set_Service);
@@ -252,7 +252,7 @@ package body Auth_Server is
       Control : out Rose.Capabilities.Capability)
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
       Endpoint : constant Rose.Capabilities.Capability :=
                    Launcher.Launch_Command (Bank, No_Caps);
@@ -311,7 +311,7 @@ package body Auth_Server is
          end case;
 
          if Rose.Crypto.Equal (Hash, Item.Hash) then
-            return Rose.Interfaces.User.Client.From_Cap (Item.User);
+            return Rose.Interfaces.Users.User.Client.From_Cap (Item.User);
          else
             return No_User;
          end if;
@@ -334,7 +334,7 @@ package body Auth_Server is
       User      : Rose.Capabilities.Capability;
       Control   : Rose.Capabilities.Capability;
       Home_Ctl  : Rose.Capabilities.Capability;
-      User_Bank : Rose.Interfaces.Bank.Client.Bank_Client;
+      User_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
 
       function Give_Up return User_Class;
       --  Destroy the user's bank, which ends whatever was launched
@@ -380,10 +380,10 @@ package body Auth_Server is
       --  auth's own bank, which is in the system bank.
 
       declare
-         Own : Rose.Interfaces.Bank.Client.Bank_Client :=
-                 Rose.Interfaces.Bank.Client.From_Cap
+         Own : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                 Rose.Interfaces.Storage.Bank.Client.From_Cap
                    (Rose.System_Calls.Own_Bank.Cap);
-         Sub : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Sub : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
                  Own.Create_Sub_Bank (0, 0);
       begin
          User_Bank.Open (Sub.Bank_Cap);
@@ -399,9 +399,11 @@ package body Auth_Server is
       begin
          declare
             No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
-            File_Launch      : Rose.Interfaces.Launch.Launch_Object'Class :=
+            File_Launch      : Rose.Interfaces.Processes.Launch
+              .Launch_Object'Class :=
               Programs.Find ("file");
-            Directory_Launch : Rose.Interfaces.Launch.Launch_Object'Class :=
+            Directory_Launch : Rose.Interfaces.Processes.Launch
+              .Launch_Object'Class :=
               Programs.Find ("directory");
             Endpoint         : constant Rose.Capabilities.Capability :=
               Directory_Launch.Launch_Command
@@ -448,7 +450,7 @@ package body Auth_Server is
       New_Item.Home := Home_Ctl;
       Users.Insert (New_Item.Name (1 .. New_Item.Name_Last), New_Item);
 
-      return Rose.Interfaces.User.Client.From_Cap (User);
+      return Rose.Interfaces.Users.User.Client.From_Cap (User);
    end New_User;
 
    ----------------
@@ -532,10 +534,12 @@ package body Auth_Server is
    begin
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
-        (Stream, Rose.Interfaces.Auth.Server.Identifier_Of (The_Auth'Access));
+        (Stream, Rose.Interfaces.Users.Auth.Server
+          .Identifier_Of (The_Auth'Access));
       Rose.Objects.Capability_Identifier'Write
         (Stream,
-         Rose.Interfaces.Auth_Admin.Server.Identifier_Of (The_Admin'Access));
+         Rose.Interfaces.Users.Auth_Admin.Server
+           .Identifier_Of (The_Admin'Access));
       Natural'Write (Stream, Natural (Users.Length));
 
       for Item of Users loop

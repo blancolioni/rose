@@ -6,14 +6,14 @@ with Rose.System_Calls;
 with Rose.Version;
 with Rose.Words;
 
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
 
 package body Restore.Boot_Sets is
 
    use System.Storage_Elements;
-   use Rose.Interfaces.Block_Device;
-   use Rose.Interfaces.Block_Device.Client;
+   use Rose.Interfaces.Storage.Block_Array;
+   use Rose.Interfaces.Storage.Block_Array.Client;
 
    Block_Bytes : constant := 4096;
    --  The block size of the boot partition's partition server
@@ -46,7 +46,7 @@ package body Restore.Boot_Sets is
    subtype Short_Name is String (1 .. 11);
    --  A directory entry's name, in FAT's 8.3 form
 
-   Device        : Block_Device_Client;
+   Device        : Block_Array_Client;
    Device_Blocks : Block_Address_Type := 0;
 
    Failed : Boolean := False;
@@ -434,7 +434,7 @@ package body Restore.Boot_Sets is
          Failed := True;
       else
          Read_Blocks (Device, Address, 1, Cache);
-         if Rose.Interfaces.Block_Device.Client.Has_Error then
+         if Rose.Interfaces.Storage.Block_Array.Client.Has_Error then
             Failed := True;
          end if;
       end if;
@@ -490,7 +490,7 @@ package body Restore.Boot_Sets is
       Ready     : out Boolean)
    is
       use type Rose.Directories.File_Size;
-      use Rose.Interfaces.Releasable_Reader.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
       Reader  : Releasable_Reader_Client;
       Filled  : Storage_Count := 0;
       Version : String renames
@@ -514,7 +514,8 @@ package body Restore.Boot_Sets is
             Count : Storage_Count;
          begin
             Read (Reader, Buffer (Filled + 1 .. Buffer'Last), Count);
-            exit when Rose.Interfaces.Releasable_Reader.Client.Has_Error
+            exit when Rose.Interfaces.Streams.Releasable_Reader.Client
+              .Has_Error
               or else Count = 0;
             Filled := Filled + Count;
             exit when Filled = Buffer'Last;
@@ -713,7 +714,7 @@ package body Restore.Boot_Sets is
    is
    begin
       Write_Blocks (Device, Address, 1, Buffer);
-      Done := not Rose.Interfaces.Block_Device.Client.Has_Error;
+      Done := not Rose.Interfaces.Storage.Block_Array.Client.Has_Error;
       if Cache_Valid and then Cached = Address then
          Cache_Valid := False;
       end if;
@@ -729,7 +730,7 @@ package body Restore.Boot_Sets is
       Done   : out Boolean)
    is
       use type Rose.Directories.File_Size;
-      use Rose.Interfaces.Releasable_Reader.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
       Reader  : Releasable_Reader_Client;
       Filled  : Storage_Count := 0;
       Written : Block_Address_Type := 0;
@@ -756,7 +757,8 @@ package body Restore.Boot_Sets is
             Count : Storage_Count;
          begin
             Read (Reader, Buffer (Filled + 1 .. Buffer'Last), Count);
-            exit when Rose.Interfaces.Releasable_Reader.Client.Has_Error
+            exit when Rose.Interfaces.Streams.Releasable_Reader.Client
+              .Has_Error
               or else Count = 0;
             Filled := Filled + Count;
          end;

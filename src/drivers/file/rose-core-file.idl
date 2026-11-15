@@ -1,4 +1,4 @@
-command Rose.Core.File : Create_Endpoint, Delete_Cap, Cap_Set_Service
+command Rose.Core.File : Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Cap_Set_Service
   with Summary     => "Serve a file.",
        Description => """
           File serves one file (ADR 0003): its contents, the readers and
@@ -19,8 +19,8 @@ command Rose.Core.File : Create_Endpoint, Delete_Cap, Cap_Set_Service
        Replaceable => File_Server,
        Live
 is
-   Served : out Writable_File
+   Served : out Files.Writable_File
      with Help => "the file";
-   Control : out Replaceable
+   Control : out Processes.Replaceable
      with Help => "its Replaceable interface, which its directory keeps";
 end Rose.Core.File;

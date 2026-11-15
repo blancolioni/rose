@@ -1,0 +1,6 @@
+interface Caps.Cap is
+
+   procedure Destroy;
+   function Get_Object_Id return Object_Id;
+
+end Caps.Cap;

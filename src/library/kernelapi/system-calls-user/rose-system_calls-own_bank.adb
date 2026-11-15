@@ -1,7 +1,7 @@
 with Rose.Capabilities.Standard;
 with Rose.Invocation;
 
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Process;
 
 package body Rose.System_Calls.Own_Bank is
 
@@ -32,7 +32,7 @@ package body Rose.System_Calls.Own_Bank is
       Endpoint :=
         Get_Interface_Cap
           (Rose.Capabilities.Standard.Process_Interface_Cap,
-           Rose.Interfaces.Process.Bank_Index);
+           Rose.Interfaces.Processes.Process.Bank_Index);
 
       if Endpoint /= Rose.Capabilities.Null_Capability then
          Initialize_Send (Params, Endpoint);

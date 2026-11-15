@@ -7,14 +7,14 @@ with Rose.Invocation;
 with Rose.Trace;
 with Rose.System_Calls.Server;
 
-with Rose.Interfaces.Bank;
-with Rose.Interfaces.Bank.Server;
-with Rose.Interfaces.Dependent;
-with Rose.Interfaces.Dependent.Server;
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Region;
-with Rose.Interfaces.Region.Server;
-with Rose.Interfaces.Reader;
+with Rose.Interfaces.Storage.Bank;
+with Rose.Interfaces.Storage.Bank.Server;
+with Rose.Interfaces.Storage.Dependent;
+with Rose.Interfaces.Storage.Dependent.Server;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Storage.Region.Server;
+with Rose.Interfaces.Streams.Reader;
 
 package body Store.Devices is
 
@@ -85,8 +85,8 @@ package body Store.Devices is
    type Backing_Store_Record is
       record
          Allocated       : Boolean := False;
-         Client          : Rose.Interfaces.Block_Device.Client
-           .Block_Device_Client;
+         Client          : Rose.Interfaces.Storage.Block_Array.Client
+           .Block_Array_Client;
          Base            : Rose.Objects.Object_Id := 0;
          Bound           : Rose.Objects.Object_Id := 0;
          Device_Bound    : Rose.Objects.Object_Id := 0;
@@ -304,7 +304,7 @@ package body Store.Devices is
      (Entry_Index : Positive;
       Page        : Rose.Objects.Object_Id;
       Store       : out Positive)
-      return Rose.Interfaces.Block_Device.Block_Address_Type;
+      return Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
    --  The page of the device that holds Page, which is in the block of
    --  an entry of the map, and the backing store that the device is.
 
@@ -358,7 +358,8 @@ package body Store.Devices is
    Allocator : Space_Allocators.Store;
 
    procedure New_Store
-     (Client     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Client     : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client;
       Page_Count : Rose.Words.Word;
       Base       : out Rose.Objects.Object_Id;
       Bound      : out Rose.Objects.Object_Id);
@@ -372,8 +373,9 @@ package body Store.Devices is
       Device : in Rose.Capabilities.Capability)
    is
       use type Rose.Objects.Capability_Identifier;
-      use Rose.Interfaces.Block_Device, Rose.Interfaces.Block_Device.Client;
-      Client : Block_Device_Client;
+      use Rose.Interfaces.Storage.Block_Array, Rose.Interfaces.Storage
+        .Block_Array.Client;
+      Client : Block_Array_Client;
       Block_Count : Block_Address_Type;
       Block_Size  : Block_Size_Type;
    begin
@@ -463,7 +465,7 @@ package body Store.Devices is
                Access_Cap =>
                  Rose.System_Calls.Server.Create_Endpoint
                    (Create_Endpoint_Cap,
-                    Rose.Interfaces.Dependent.Dependent_Interface,
+                    Rose.Interfaces.Storage.Dependent.Dependent_Interface,
                     Rose.Objects.Capability_Identifier (Index)),
                Destroyed  => False);
             return Dependents (Index).Access_Cap;
@@ -695,7 +697,7 @@ package body Store.Devices is
             Access_Cap =>
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
-                 Rose.Interfaces.Bank.Bank_Interface,
+                 Rose.Interfaces.Storage.Bank.Bank_Interface,
                  Rose.Objects.Capability_Identifier (Root_Bank)),
             others     => <>);
       end if;
@@ -725,7 +727,7 @@ package body Store.Devices is
                Access_Cap   =>
                  Rose.System_Calls.Server.Create_Endpoint
                    (Create_Endpoint_Cap,
-                    Rose.Interfaces.Bank.Bank_Interface,
+                    Rose.Interfaces.Storage.Bank.Bank_Interface,
                     Rose.Objects.Capability_Identifier (Index)),
                Page_Limit   => Page_Limit,
                Region_Limit => Region_Limit,
@@ -842,7 +844,7 @@ package body Store.Devices is
                         Access_Cap =>
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
-                             Rose.Interfaces.Region.Region_Interface,
+                             Rose.Interfaces.Storage.Region.Region_Interface,
                              Capability_Identifier (Index)));
 
             Charge (Child.Bank, 0, 1);
@@ -983,7 +985,7 @@ package body Store.Devices is
             Rose.System_Calls.Send_Cap (Params, Banks (Index).Access_Cap);
             Rose.System_Calls.Invoke_Capability (Params);
 
-            Rose.Interfaces.Bank.Server.Remove_Instance
+            Rose.Interfaces.Storage.Bank.Server.Remove_Instance
               (Rose.Objects.Capability_Identifier (Index));
             Banks (Index) := (others => <>);
          end if;
@@ -998,7 +1000,7 @@ package body Store.Devices is
      (Entry_Index : Positive;
       Page        : Rose.Objects.Object_Id;
       Store       : out Positive)
-      return Rose.Interfaces.Block_Device.Block_Address_Type
+      return Rose.Interfaces.Storage.Block_Array.Block_Address_Type
    is
       Block : constant Natural := Natural (Map (Entry_Index).Block);
    begin
@@ -1007,7 +1009,7 @@ package body Store.Devices is
          Store := Store + 1;
       end loop;
 
-      return Rose.Interfaces.Block_Device.Block_Address_Type
+      return Rose.Interfaces.Storage.Block_Array.Block_Address_Type
         ((Block - Backing_Stores (Store).Allocator_Base)
          * Minimum_Block_Pages
          + Natural (Page mod Minimum_Block_Pages));
@@ -1160,7 +1162,7 @@ package body Store.Devices is
    begin
       Delete_Cap (Item.Signal);
       Delete_Cap (Item.Access_Cap);
-      Rose.Interfaces.Dependent.Server.Remove_Instance
+      Rose.Interfaces.Storage.Dependent.Server.Remove_Instance
         (Rose.Objects.Capability_Identifier (Index));
       Item := (others => <>);
    end Free_Dependent;
@@ -1194,7 +1196,7 @@ package body Store.Devices is
          Entry_Index : constant Natural := Find_Entry (Page);
          Start       : constant Natural := Rose.Trace.Ticks;
          Store       : Positive;
-         Address     : Rose.Interfaces.Block_Device.Block_Address_Type;
+         Address     : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       begin
          if Entry_Index = 0 or else Is_Fresh (Page) then
             Data := (others => 0);
@@ -1204,7 +1206,7 @@ package body Store.Devices is
 
          Address := Device_Page (Entry_Index, Page, Store);
 
-         Rose.Interfaces.Block_Device.Client.Read_Blocks
+         Rose.Interfaces.Storage.Block_Array.Client.Read_Blocks
            (Item   => Backing_Stores (Store).Client,
             Start  => Address,
             Count  => 1,
@@ -1539,7 +1541,8 @@ package body Store.Devices is
    ---------------
 
    procedure New_Store
-     (Client     : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Client     : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client;
       Page_Count : Rose.Words.Word;
       Base       : out Rose.Objects.Object_Id;
       Bound      : out Rose.Objects.Object_Id)
@@ -1713,7 +1716,7 @@ package body Store.Devices is
          Entry_Index : Natural := Find_Entry (Page);
          Start       : constant Natural := Rose.Trace.Ticks;
          Store       : Positive;
-         Address     : Rose.Interfaces.Block_Device.Block_Address_Type;
+         Address     : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       begin
          if Entry_Index = 0 then
 
@@ -1731,7 +1734,7 @@ package body Store.Devices is
 
          Address := Device_Page (Entry_Index, Page, Store);
 
-         Rose.Interfaces.Block_Device.Client.Write_Blocks
+         Rose.Interfaces.Storage.Block_Array.Client.Write_Blocks
            (Item   => Backing_Stores (Store).Client,
             Start  => Address,
             Count  => 1,
@@ -1836,7 +1839,7 @@ package body Store.Devices is
          if Stream_Rec.Cap = 0 then
             Stream_Rec.Cap :=
               Rose.System_Calls.Server.Create_Endpoint
-                (1, Rose.Interfaces.Reader.Reader_Interface,
+                (1, Rose.Interfaces.Streams.Reader.Reader_Interface,
                  Stream_Id);
          end if;
 
@@ -1903,7 +1906,7 @@ package body Store.Devices is
 
          Uncharge (Region.Bank, Freed * Minimum_Block_Pages, 1);
 
-         Rose.Interfaces.Region.Server.Remove_Instance (Id);
+         Rose.Interfaces.Storage.Region.Server.Remove_Instance (Id);
          Region := (others => <>);
       end;
    end Release;
@@ -2000,7 +2003,7 @@ package body Store.Devices is
          Cap      : constant Rose.Capabilities.Capability :=
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
-                 Rose.Interfaces.Region.Region_Interface,
+                 Rose.Interfaces.Storage.Region.Region_Interface,
                  Capability_Identifier (Region_Index));
 
       begin
@@ -2079,7 +2082,7 @@ package body Store.Devices is
                   Access_Cap   =>
                     Rose.System_Calls.Server.Create_Endpoint
                       (Create_Endpoint_Cap,
-                       Rose.Interfaces.Bank.Bank_Interface,
+                       Rose.Interfaces.Storage.Bank.Bank_Interface,
                        Rose.Objects.Capability_Identifier (Index)),
                   Page_Limit   => Saved.Page_Limit,
                   Region_Limit => Rose.Words.Word (Saved.Region_Limit),
@@ -2181,7 +2184,7 @@ package body Store.Devices is
            Access_Cap     =>
              Rose.System_Calls.Server.Create_Endpoint
                (Create_Endpoint_Cap,
-                Rose.Interfaces.Region.Region_Interface,
+                Rose.Interfaces.Storage.Region.Region_Interface,
                 Capability_Identifier (Index)),
            Root           => (if Root in Regions'Range then Root else Index),
            Mapped_Blocks  => 0,

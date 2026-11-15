@@ -1,13 +1,12 @@
 = Interfaces
 
 Every interface between Rose processes is declared in IDL (see <<idl>>), one interface to a file in `interfaces/`.
-The file name is the interface name in lower case: `Cap_Set` is declared in `cap_set.idl`.
+Each interface is in a group (ADR 0034), and the file name is its full name in lower case, with `-` for the dot: `Caps.Cap_Set` is declared in `caps-cap_set.idl`, and generated as `Rose.Interfaces.Caps.Cap_Set`.
+The tables below give each interface without its group; <<idl>> lists the groups.
 
-The build compiles 45 interfaces into Ada packages in `src/library/kernelapi/generated`, listed in that directory's `Makefile`.
+The build compiles 69 interfaces into Ada packages in `src/library/kernelapi/generated`, listed in that directory's `Makefile`.
 `interfaces/` also holds the declarations that commands use: the package `Rose.Core` (see <<packages>>) and the standard stream roles `Standard_Input`, `Standard_Output`, `Standard_Error` and `Standard_IO` (see <<roles>>).
 The build checks them with the interfaces, but generates nothing for them there; each command generates its own units.
-`Data_Source` and `Rose_Interface` are declared but not compiled, and nothing uses them.
-
 Each subprogram and each interface has an endpoint id derived from its declaration, so there is no table of ids to keep (see <<endpoint-ids>>).
 
 In the tables below, _Parents_ are the interfaces an interface inherits, and _Implemented by_ names the server or driver that serves it, from `src/servers` or `src/drivers`.
@@ -68,7 +67,7 @@ Its `Append` raises when the set can't take every capability it is given, and th
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint`, `Set_Process_Banks`, `Processes_Ended` | `mem`
 | `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
-| `Storage` | | `Add_Backing_Store`, `Get_Root_Bank` | `store`
+| `Store` | | `Add_Backing_Store`, `Get_Root_Bank` | `store`
 | `Bank` | | `Reserve_Storage`, `Create_Sub_Bank`, `Add_Dependent`, `Get_Usage`, `Destroy`, `Index` | `store`
 | `Process_Banks` | | `Create_Process_Bank`, `Process_Bank`, `End_Process`, `Set_Ended`, `Take_Ended` | `store`, for `mem` only
 | `Dependent` | `Resource` | `Destroyed` | `store`
@@ -95,7 +94,7 @@ A segment maps a range of virtual addresses onto a region of storage, with flags
 A private segment's region belongs to its process, and is released when the process is gone.
 A nonpersistent segment has no region behind it.
 
-`Storage` reserves regions of persistent storage, backed by block devices, and a `Region` reads and writes its pages.
+`Store` reserves regions of persistent storage, backed by block arrays, and a `Region` reads and writes its pages.
 `Region.Release` frees a region that is no longer needed, with its storage if it has its own; neither the region nor its subregions can be used afterwards.
 
 == Launching Programs
@@ -210,17 +209,16 @@ end Writable_Directory;
 [cols="2,2,4,2",options="header"]
 |===
 | Interface | Parents | Operations | Implemented by
-| `Block_Device` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
+| `Block_Array` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
 | `ATA` | | `Get_Device` | `ata`
 | `Partitions` | `Resource` | `Partition_Count`, `Get_Partition` | `scan`
 | `Interrupt_Handler` | | `Handle_Interrupt` | `keyboard`
-| `Keyboard_Handler` | | `Handle_Key` |
 | `Event_Source` | | `Add_Listener` | `keyboard`
 | `Event_Listener` | | `On_Event` | `vga-console`
 |===
 
-A block device has blocks of up to `Max_Block_Size` (4096) bytes, addressed by a 64-bit block number.
-The `partition` server serves each partition of a device as a block device of its own.
+A block array (`Storage.Block_Array`) has blocks of up to `Max_Block_Size` (65536) bytes, addressed by a 64-bit block number.
+The `partition` server serves each partition of a device as a block array of its own.
 
 == Time and Logging
 
@@ -254,7 +252,7 @@ An entry is named by its location in the log, which never changes; `First_Entry`
 |===
 
 `Storage_Checkpoint` and `Memory_Restore` are the storage and memory servers' parts in checkpoints and restores.
-They are kept out of `Storage` and `Memory`, so that only the checkpoint and restore servers, which `init` gives them to, can use them:
+They are kept out of `Store` and `Memory`, so that only the checkpoint and restore servers, which `init` gives them to, can use them:
 
 * `Storage_Checkpoint.Checkpoint` appends the storage server's region table to the checkpoint log, and `Restore_Region` recreates a region from it, with the index, pages and backing store space it had.
 * `Memory_Restore` recreates the memory server's processes, with the ids they had, their segments, and the saved contents of their pages; a restored page is dirty, so the next checkpoint saves it again.
@@ -265,7 +263,8 @@ In the same way, the kernel sends `Signalled.Signal` to a process that has signa
 
 == Unused Interfaces
 
-`Data_Source` (`Add_Sink`, `Remove_Sink`) and `Rose_Interface` (`Destroy`) are declared but not compiled, and nothing uses them.
+`Data_Source`, `Keyboard_Handler`, `Rose_Interface` and `Display` were declared, but nothing implemented them, so they were removed before 0.4.0 froze the interfaces (ADR 0034).
+An interface goes into a release only once something implements it; `Display` comes back, in `Screens`, with the display server.
 
 [NOTE]
 ====

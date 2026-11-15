@@ -2,7 +2,7 @@ with Rose.Arch.Interrupt_Table;
 with Rose.Boot.Console;
 with Rose.Checkpoints;
 with Rose.Interface_Level;
-with Rose.Interfaces.Restorable;
+with Rose.Interfaces.Processes.Restorable;
 with Rose.Limits;
 
 with Rose.Kernel.Cap_Tables;
@@ -866,7 +866,8 @@ package body Rose.Kernel.Processes.Snapshot is
 
             P.Flags (Restore_Notice) :=
               Find_Endpoint
-                (Pid, Rose.Interfaces.Restorable.Restored_Endpoint) /= 0;
+                (Pid, Rose.Interfaces.Processes.Restorable
+                  .Restored_Endpoint) /= 0;
 
             if Waiting then
 

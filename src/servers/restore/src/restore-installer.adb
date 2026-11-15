@@ -8,14 +8,14 @@ with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Directory.Client;
-with Rose.Interfaces.Exec.Client;
-with Rose.Interfaces.File.Client;
-with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Map.Client;
-with Rose.Interfaces.Releasable_Reader.Client.Conversions;
-with Rose.Interfaces.Process;
-with Rose.Interfaces.Reader.Client;
+with Rose.Interfaces.Files.Directory.Client;
+with Rose.Interfaces.Processes.Exec.Client;
+with Rose.Interfaces.Files.File.Client;
+with Rose.Interfaces.Processes.Launch.Client;
+with Rose.Interfaces.Commands.Map.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client.Conversions;
+with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Streams.Reader.Client;
 
 with Restore.Checkpoints;
 with Restore.Replacing;
@@ -78,7 +78,7 @@ package body Restore.Installer is
    --    (Cap_File_Entry : Rose.Directories.Directory_Entry_Type);
 
    procedure Install_Executable
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Root_Path : String;
       Category  : String;
       Name      : String;
@@ -88,7 +88,8 @@ package body Restore.Installer is
    --  path is only for messages.
 
    type Program_Handler is access
-     procedure (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     procedure (Directory : Rose.Interfaces.Files.Directory.Client
+       .Directory_Client;
                 Root_Path : String;
                 Category  : String;
                 Name      : String;
@@ -96,7 +97,8 @@ package body Restore.Installer is
                 Flags     : Install_Flag_Array);
 
    procedure For_Each_Program
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator;
       Handle      : Program_Handler;
       Found       : out Boolean);
@@ -104,12 +106,12 @@ package body Restore.Installer is
    --  directory in /rose/install. Found is False if there is no
    --  /rose/install.
 
-   Exec_Client : Rose.Interfaces.Exec.Client.Exec_Client;
-   Map_Client  : Rose.Interfaces.Map.Client.Map_Client;
+   Exec_Client : Rose.Interfaces.Processes.Exec.Client.Exec_Client;
+   Map_Client  : Rose.Interfaces.Commands.Map.Client.Map_Client;
    --  The restored exec and command registry, for Update.
 
    procedure Update_Executable
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Root_Path : String;
       Category  : String;
       Name      : String;
@@ -119,15 +121,15 @@ package body Restore.Installer is
    --  saved program, and add it to the restored registry.
 
    procedure Open_Directory
-     (Parent    : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Parent    : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Name      : String;
-      Directory : out Rose.Interfaces.Directory.Client.Directory_Client;
+      Directory : out Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Found     : out Boolean);
    --  Directory is the directory Name in Parent. Found is False if
    --  Parent has no directory called Name.
 
    function Find_File
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Name      : String)
       return Natural;
    --  The index of the ordinary file Name in Directory, or 0 if there
@@ -161,7 +163,7 @@ package body Restore.Installer is
    procedure Send_Cap_Sets (Constructor_Cap : Rose.Capabilities.Capability);
 
    procedure Send_Forward_Test
-     (Directory  : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory  : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Exec_Index : Positive);
    --  Send init replaceable_test's image again, from Directory, for its
    --  test of exec's Update (#902). Init updates the program with it, and
@@ -192,17 +194,17 @@ package body Restore.Installer is
    ---------------
 
    function Find_File
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Name      : String)
       return Natural
    is
-      use Rose.Interfaces.Directory.Client;
-      use type Rose.Interfaces.Directory.File_Kind;
+      use Rose.Interfaces.Files.Directory.Client;
+      use type Rose.Interfaces.Files.Directory.File_Kind;
       Index : constant Natural := Find_Entry (Directory, Name);
    begin
       if Index /= 0
         and then Directory_Entry_Kind (Directory, Index)
-        = Rose.Interfaces.Directory.Ordinary_File
+        = Rose.Interfaces.Files.Directory.Ordinary_File
       then
          return Index;
       else
@@ -215,12 +217,13 @@ package body Restore.Installer is
    ----------------------
 
    procedure For_Each_Program
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator;
       Handle      : Program_Handler;
       Found       : out Boolean)
    is
-      use Rose.Interfaces.Directory.Client;
+      use Rose.Interfaces.Files.Directory.Client;
       Install_Path       : constant String := "/rose/install";
       Install_Directory  : Directory_Client;
       Category_Directory : Directory_Client;
@@ -294,7 +297,8 @@ package body Restore.Installer is
          Rose_Directory : Directory_Client;
       begin
          Open_Directory
-           (Rose.Interfaces.File_System.Client.Root_Directory (File_System),
+           (Rose.Interfaces.Files.File_System.Client
+             .Root_Directory (File_System),
             "rose", Rose_Directory, Found);
          if Found then
             Open_Directory
@@ -383,7 +387,7 @@ package body Restore.Installer is
    is
       use Rose.Capabilities;
       Caps          : Array_Of_Capabilities
-        (1 .. Rose.Interfaces.Process.Subprogram_Count);
+        (1 .. Rose.Interfaces.Processes.Process.Subprogram_Count);
       Public_Cap    : Rose.Capabilities.Capability;
       Interface_Cap : Rose.Capabilities.Capability :=
                         Rose.Capabilities.Null_Capability;
@@ -392,7 +396,7 @@ package body Restore.Installer is
       Open_Interface (Process_Cap, Caps);
 
       Public_Cap :=
-        Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
+        Caps (Rose.Interfaces.Processes.Process.Published_Interface_Index + 1);
 
       if Public_Cap /= Null_Capability then
          Get_Interface (Public_Cap, Caps);
@@ -407,7 +411,8 @@ package body Restore.Installer is
    -------------
 
    procedure Install
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator)
    is
       Found : Boolean;
@@ -438,15 +443,15 @@ package body Restore.Installer is
    ------------------------
 
    procedure Install_Executable
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Root_Path : String;
       Category  : String;
       Name      : String;
       Action    : Install_Action;
       Flags     : Install_Flag_Array)
    is
-      use Rose.Interfaces.Directory.Client;
-      use Rose.Interfaces.Releasable_Reader.Client;
+      use Rose.Interfaces.Files.Directory.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
       Caps_Reader    : Releasable_Reader_Client;
       Binary_Reader  : Releasable_Reader_Client;
       --  Released once exec has read them, which frees their slots in
@@ -502,10 +507,10 @@ package body Restore.Installer is
       end if;
 
       Caps_Reader :=
-        Rose.Interfaces.File.Client.Open_Reader
+        Rose.Interfaces.Files.File.Client.Open_Reader
           (Get_Ordinary_File (Directory, Caps_Index));
       Binary_Reader :=
-        Rose.Interfaces.File.Client.Open_Reader
+        Rose.Interfaces.Files.File.Client.Open_Reader
           (Get_Ordinary_File (Directory, Exec_Index));
 
       Rose.Console_IO.Put ("restore: installing: ");
@@ -528,11 +533,11 @@ package body Restore.Installer is
          Rose.System_Calls.Initialize_Send (Params, Init_Cap);
          Rose.System_Calls.Send_Cap
            (Params,
-            Rose.Interfaces.Reader.Client.Get_Interface_Cap
+            Rose.Interfaces.Streams.Reader.Client.Get_Interface_Cap
               (Conversions.To_Reader (Caps_Reader)));
          Rose.System_Calls.Send_Cap
            (Params,
-            Rose.Interfaces.Reader.Client.Get_Interface_Cap
+            Rose.Interfaces.Streams.Reader.Client.Get_Interface_Cap
               (Conversions.To_Reader (Binary_Reader)));
          Rose.System_Calls.Send_Word
            (Params,
@@ -655,18 +660,18 @@ package body Restore.Installer is
    --------------------
 
    procedure Open_Directory
-     (Parent    : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Parent    : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Name      : String;
-      Directory : out Rose.Interfaces.Directory.Client.Directory_Client;
+      Directory : out Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Found     : out Boolean)
    is
-      use Rose.Interfaces.Directory.Client;
-      use type Rose.Interfaces.Directory.File_Kind;
+      use Rose.Interfaces.Files.Directory.Client;
+      use type Rose.Interfaces.Files.Directory.File_Kind;
       Index : constant Natural := Find_Entry (Parent, Name);
    begin
       Found := Index /= 0
         and then Directory_Entry_Kind (Parent, Index)
-        = Rose.Interfaces.Directory.Directory;
+        = Rose.Interfaces.Files.Directory.Directory;
       if Found then
          Directory := Get_Directory (Parent, Index);
       end if;
@@ -752,20 +757,20 @@ package body Restore.Installer is
    -----------------------
 
    procedure Send_Forward_Test
-     (Directory  : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory  : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Exec_Index : Positive)
    is
-      use Rose.Interfaces.Directory.Client;
-      use Rose.Interfaces.Releasable_Reader.Client;
+      use Rose.Interfaces.Files.Directory.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
       Binary_Reader : constant Releasable_Reader_Client :=
-        Rose.Interfaces.File.Client.Open_Reader
+        Rose.Interfaces.Files.File.Client.Open_Reader
           (Get_Ordinary_File (Directory, Exec_Index));
       Params        : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send (Params, Init_Cap);
       Rose.System_Calls.Send_Cap
         (Params,
-         Rose.Interfaces.Reader.Client.Get_Interface_Cap
+         Rose.Interfaces.Streams.Reader.Client.Get_Interface_Cap
            (Conversions.To_Reader (Binary_Reader)));
       Rose.System_Calls.Send_Word
         (Params, Natural (Directory_Entry_Size (Directory, Exec_Index)));
@@ -803,16 +808,17 @@ package body Restore.Installer is
    ------------
 
    procedure Update
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator)
    is
       use Rose.Capabilities;
       Exec_Cap : constant Capability :=
                    Restore.Checkpoints.Find_Server
-                     (Rose.Interfaces.Exec.Exec_Interface);
+                     (Rose.Interfaces.Processes.Exec.Exec_Interface);
       Map_Cap  : constant Capability :=
                    Restore.Checkpoints.Find_Server
-                     (Rose.Interfaces.Map.Map_Interface);
+                     (Rose.Interfaces.Commands.Map.Map_Interface);
       Found    : Boolean;
    begin
       if Exec_Cap = Null_Capability or else Map_Cap = Null_Capability then
@@ -822,12 +828,12 @@ package body Restore.Installer is
          return;
       end if;
 
-      Rose.Interfaces.Exec.Client.Open (Exec_Client, Exec_Cap);
-      Rose.Interfaces.Map.Client.Open (Map_Client, Map_Cap);
+      Rose.Interfaces.Processes.Exec.Client.Open (Exec_Client, Exec_Cap);
+      Rose.Interfaces.Commands.Map.Client.Open (Map_Client, Map_Cap);
 
       --  An exec installed before Exec.Update has no cap for it.
 
-      if Rose.Interfaces.Exec.Client.Get_Update_Cap (Exec_Client)
+      if Rose.Interfaces.Processes.Exec.Client.Get_Update_Cap (Exec_Client)
         = Null_Capability
       then
          Rose.Console_IO.Put_Line
@@ -851,7 +857,7 @@ package body Restore.Installer is
    -----------------------
 
    procedure Update_Executable
-     (Directory : Rose.Interfaces.Directory.Client.Directory_Client;
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Root_Path : String;
       Category  : String;
       Name      : String;
@@ -859,8 +865,8 @@ package body Restore.Installer is
       Flags     : Install_Flag_Array)
    is
       pragma Unreferenced (Root_Path, Category, Flags);
-      use Rose.Interfaces.Directory.Client;
-      use Rose.Interfaces.Releasable_Reader.Client;
+      use Rose.Interfaces.Files.Directory.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
       use type Rose.Capabilities.Capability;
       No_Caps    : constant Rose.Capabilities.Capability_Array (1 .. 0) :=
                      (others => <>);
@@ -878,29 +884,32 @@ package body Restore.Installer is
       end if;
 
       Reader :=
-        Rose.Interfaces.File.Client.Open_Reader
+        Rose.Interfaces.Files.File.Client.Open_Reader
           (Get_Ordinary_File (Directory, Exec_Index));
 
       declare
-         Launch : constant Rose.Interfaces.Launch.Client.Launch_Client :=
-                    Rose.Interfaces.Exec.Client.Update
+         Launch : constant Rose.Interfaces.Processes.Launch.Client
+           .Launch_Client :=
+                    Rose.Interfaces.Processes.Exec.Client.Update
                       (Exec_Client, Conversions.To_Reader (Reader), Name,
                        No_Caps);
       begin
-         if Rose.Interfaces.Exec.Client.Has_Error
-           or else Rose.Interfaces.Launch.Client.Get_Interface_Cap (Launch)
+         if Rose.Interfaces.Processes.Exec.Client.Has_Error
+           or else Rose.Interfaces.Processes.Launch.Client
+             .Get_Interface_Cap (Launch)
            = Rose.Capabilities.Null_Capability
          then
             Rose.Console_IO.Put_Line
               ("restore: cannot install " & Name & " again");
          else
-            Rose.Interfaces.Map.Client.Add (Map_Client, Name, Launch);
-            if Rose.Interfaces.Map.Client.Has_Error then
+            Rose.Interfaces.Commands.Map.Client.Add (Map_Client, Name, Launch);
+            if Rose.Interfaces.Commands.Map.Client.Has_Error then
                Rose.Console_IO.Put_Line
                  ("restore: cannot add " & Name & " to the registry");
             end if;
             Restore.Replacing.Add_Program
-              (Name, Rose.Interfaces.Launch.Client.Get_Interface_Cap (Launch));
+              (Name, Rose.Interfaces.Processes.Launch.Client
+                .Get_Interface_Cap (Launch));
          end if;
       end;
 

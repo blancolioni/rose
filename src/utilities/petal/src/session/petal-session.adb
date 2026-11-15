@@ -5,28 +5,31 @@ with Ada_Text_IO;
 
 with Rose.System_Calls;
 
-with Rose.Interfaces.Directory;
-with Rose.Interfaces.File.Client;
+with Rose.Interfaces.Files.Directory;
+with Rose.Interfaces.Files.File.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Releasable_Writer.Client;
-with Rose.Interfaces.Transactional_Writable_File.Client;
-with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
+with Rose.Interfaces.Streams.Releasable_Writer.Client;
+with Rose.Interfaces.Files.Transactional_Writable_File.Client;
+with Rose.Interfaces.Files.Writable_Directory.Client;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Petal.Read;
 
 package body Petal.Session is
 
    use type Rose.Capabilities.Capability;
-   use type Rose.Interfaces.Directory.File_Kind;
+   use type Rose.Interfaces.Files.Directory.File_Kind;
 
-   package Directory_Clients renames Rose.Interfaces.Writable_Directory.Client;
-   package File_Clients renames Rose.Interfaces.Writable_File.Client;
-   package Reader_Clients renames Rose.Interfaces.Releasable_Reader.Client;
-   package Writer_Clients renames Rose.Interfaces.Releasable_Writer.Client;
+   package Directory_Clients renames Rose.Interfaces.Files.Writable_Directory
+     .Client;
+   package File_Clients renames Rose.Interfaces.Files.Writable_File.Client;
+   package Reader_Clients renames Rose.Interfaces.Streams.Releasable_Reader
+     .Client;
+   package Writer_Clients renames Rose.Interfaces.Streams.Releasable_Writer
+     .Client;
    package Version_Clients renames
-     Rose.Interfaces.Transactional_Writable_File.Client;
+     Rose.Interfaces.Files.Transactional_Writable_File.Client;
 
    Invocation_Error : exception
      renames Rose.Interfaces.Objects.Invocation_Error;
@@ -326,12 +329,12 @@ package body Petal.Session is
                if Index = 0 then
                   Error ("no directory named '" & Name & "'");
                elsif Parent.Directory_Entry_Kind (Index)
-                 /= Rose.Interfaces.Directory.Directory
+                 /= Rose.Interfaces.Files.Directory.Directory
                then
                   Error ("'" & Name & "' is not a directory");
                else
                   declare
-                     Directory : Rose.Interfaces.Writable_Directory
+                     Directory : Rose.Interfaces.Files.Writable_Directory
                        .Writable_Directory_Object'Class :=
                          Parent.Get_Writable_Directory (Index);
                   begin
@@ -591,7 +594,7 @@ package body Petal.Session is
          Result := No_Such_File;
          return;
       elsif Directory.Directory_Entry_Kind (Index)
-        /= Rose.Interfaces.Directory.Ordinary_File
+        /= Rose.Interfaces.Files.Directory.Ordinary_File
       then
          Result := Not_A_File;
          return;
@@ -602,14 +605,15 @@ package body Petal.Session is
 
       if Writable then
          declare
-            Item : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+            Item : Rose.Interfaces.Files.Writable_File
+              .Writable_File_Object'Class :=
               Directory.Get_Writable_File (Index);
          begin
             File := Item.Writable_File_Cap;
          end;
       else
          declare
-            Item : Rose.Interfaces.File.File_Object'Class :=
+            Item : Rose.Interfaces.Files.File.File_Object'Class :=
               Directory.Get_Ordinary_File (Index);
          begin
             File := Item.File_Cap;
@@ -645,7 +649,7 @@ package body Petal.Session is
       Index := Directory.Find_Entry (Name);
       if Index /= 0
         and then Directory.Directory_Entry_Kind (Index)
-          /= Rose.Interfaces.Directory.Ordinary_File
+          /= Rose.Interfaces.Files.Directory.Ordinary_File
       then
          Result := Not_A_Version_File;
          return;
@@ -657,7 +661,8 @@ package body Petal.Session is
          --  buffer, where it may already be.
 
          function Target_File
-           return Rose.Interfaces.Writable_File.Writable_File_Object'Class;
+           return Rose.Interfaces.Files.Writable_File
+             .Writable_File_Object'Class;
          --  The file Name, made first if there is no entry Name (ADR 0027).
 
          -----------------
@@ -665,7 +670,8 @@ package body Petal.Session is
          -----------------
 
          function Target_File
-           return Rose.Interfaces.Writable_File.Writable_File_Object'Class
+           return Rose.Interfaces.Files.Writable_File
+             .Writable_File_Object'Class
          is
          begin
             if Index = 0 then
@@ -675,7 +681,8 @@ package body Petal.Session is
             end if;
          end Target_File;
 
-         Target : Rose.Interfaces.Writable_File.Writable_File_Object'Class :=
+         Target : Rose.Interfaces.Files.Writable_File
+           .Writable_File_Object'Class :=
            Target_File;
       begin
          if Target.Writable_File_Cap = Rose.Capabilities.Null_Capability then
@@ -687,7 +694,7 @@ package body Petal.Session is
          --  version, so its client of the file is closed.
 
          declare
-            New_Version : Rose.Interfaces.Transactional_Writable_File
+            New_Version : Rose.Interfaces.Files.Transactional_Writable_File
               .Transactional_Writable_File_Object'Class :=
                 Target.New_Version;
          begin
@@ -772,21 +779,21 @@ package body Petal.Session is
       --  closed, which deletes its caps.
 
       declare
-         File : Rose.Interfaces.File.Client.File_Client;
+         File : Rose.Interfaces.Files.File.Client.File_Client;
       begin
-         Rose.Interfaces.File.Client.Open (File, File_Cap);
+         Rose.Interfaces.Files.File.Client.Open (File, File_Cap);
          declare
-            New_Reader : Rose.Interfaces.Releasable_Reader
+            New_Reader : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := File.Open_Reader;
          begin
             Reader_Count := Reader_Count + 1;
             Reader_Clients.Open
               (Readers (Reader_Count), New_Reader.Releasable_Reader_Cap);
          end;
-         Rose.Interfaces.File.Client.Close (File);
+         Rose.Interfaces.Files.File.Client.Close (File);
       exception
          when Invocation_Error =>
-            Rose.Interfaces.File.Client.Close (File);
+            Rose.Interfaces.Files.File.Client.Close (File);
             Result := No_Such_File;
             return;
       end;
@@ -819,7 +826,7 @@ package body Petal.Session is
 
       declare
          function New_Writer
-           return Rose.Interfaces.Releasable_Writer
+           return Rose.Interfaces.Streams.Releasable_Writer
              .Releasable_Writer_Object'Class;
          --  Rewrite, which empties the version, or Append.
 
@@ -828,7 +835,7 @@ package body Petal.Session is
          ----------------
 
          function New_Writer
-           return Rose.Interfaces.Releasable_Writer
+           return Rose.Interfaces.Streams.Releasable_Writer
              .Releasable_Writer_Object'Class
          is
          begin
@@ -841,7 +848,7 @@ package body Petal.Session is
 
       begin
          declare
-            Writer : Rose.Interfaces.Releasable_Writer
+            Writer : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class := New_Writer;
          begin
             Writer_Clients.Open (Output_Writer, Writer.Releasable_Writer_Cap);
@@ -947,13 +954,13 @@ package body Petal.Session is
       --  the reader releases it.
 
       declare
-         File   : Rose.Interfaces.File.File_Object'Class :=
+         File   : Rose.Interfaces.Files.File.File_Object'Class :=
            Home.Get_Ordinary_File (Index);
-         Reader : Rose.Interfaces.Releasable_Reader
+         Reader : Rose.Interfaces.Streams.Releasable_Reader
            .Releasable_Reader_Object'Class := File.Open_Reader;
       begin
-         Rose.Interfaces.File.Client.Close
-           (Rose.Interfaces.File.Client.File_Client (File));
+         Rose.Interfaces.Files.File.Client.Close
+           (Rose.Interfaces.Files.File.Client.File_Client (File));
 
          loop
             Reader.Read (Buffer, Last);
@@ -988,12 +995,13 @@ package body Petal.Session is
    -- Start --
    -----------
 
-   procedure Start (User : in out Rose.Interfaces.User.User_Object'Class) is
+   procedure Start (User : in out Rose.Interfaces.Users.User
+     .User_Object'Class) is
    begin
       Session_User := User.User_Cap;
 
       declare
-         Home : Rose.Interfaces.Writable_Directory
+         Home : Rose.Interfaces.Files.Writable_Directory
            .Writable_Directory_Object'Class := User.Home_Directory;
       begin
          if Home.Writable_Directory_Cap /= Rose.Capabilities.Null_Capability

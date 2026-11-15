@@ -1,7 +1,7 @@
 with System.Machine_Code;
 with System.Storage_Elements;
 
-with Rose.Interfaces.Block_Device.Client.Table;
+with Rose.Interfaces.Storage.Block_Array.Client.Table;
 with Rose.Devices.GPT_Format;
 with Rose.Devices.Partitions;
 
@@ -11,7 +11,7 @@ package body Rose.Devices.GPT is
 
    package Format renames Rose.Devices.GPT_Format;
 
-   use Rose.Interfaces.Block_Device;
+   use Rose.Interfaces.Storage.Block_Array;
    use System.Storage_Elements;
    use Rose.Words;
 
@@ -38,7 +38,7 @@ package body Rose.Devices.GPT is
       end record;
 
    package Cached_Table is
-     new Rose.Interfaces.Block_Device.Client.Table (8, GPT_Record);
+     new Rose.Interfaces.Storage.Block_Array.Client.Table (8, GPT_Record);
 
    GPT_Data          : GPT_Record;
 
@@ -73,7 +73,7 @@ package body Rose.Devices.GPT is
    is (Natural (Word_64'Min (Value, Word_64 (Natural'Last))));
 
    procedure Check_Cached
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client);
 
    procedure New_GUID (Low, High : out Word_64);
    --  A random (version 4) GUID.
@@ -82,7 +82,8 @@ package body Rose.Devices.GPT is
    --  A pseudo-random word, seeded from the CPU's time stamp counter.
 
    procedure Read_Copy
-     (Device      : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device      : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client;
       Header_LBA  : Block_Address_Type;
       Found_Magic : out Boolean;
       Valid       : out Boolean);
@@ -93,24 +94,25 @@ package body Rose.Devices.GPT is
    --  must be valid.
 
    procedure Save_Changes
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client);
 
    procedure Write_All
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client);
    --  Write the protective MBR, both copies of the entries, and the
    --  backup header and then the primary one.
 
    procedure Write_Entries
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Start  : Block_Address_Type);
 
    procedure Write_Header
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Header : Format.Header);
    --  Write Header to its Current_LBA.
 
    procedure Write_Protective_MBR
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client);
    --  Write the protective MBR that a GPT disk has in block 0: a single
    --  partition of type EE covering the disk, so that tools which only
    --  know MBRs leave it alone.  GRUB looks for it too (#322).  The
@@ -121,7 +123,7 @@ package body Rose.Devices.GPT is
    -------------------
 
    procedure Add_Partition
-     (Block_Device        : Client.Block_Device_Client;
+     (Block_Device        : Client.Block_Array_Client;
       First_Block         : Block_Address_Type;
       Last_Block          : Block_Address_Type;
       Partition_Type_Low  : Word_64;
@@ -188,7 +190,7 @@ package body Rose.Devices.GPT is
    ------------------
 
    procedure Check_Cached
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
       Primary_Magic, Primary_Valid : Boolean;
       Backup_Magic, Backup_Valid   : Boolean;
@@ -244,7 +246,7 @@ package body Rose.Devices.GPT is
    -----------
 
    procedure Flush
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
    begin
       Check_Cached (Device);
@@ -260,12 +262,12 @@ package body Rose.Devices.GPT is
 
    procedure Get_Partition_Details
      (Block_Device        :
-      Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+      Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Partition_Index     : Positive;
       First_Block         : out
-        Rose.Interfaces.Block_Device.Block_Address_Type;
+        Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       Last_Block          : out
-        Rose.Interfaces.Block_Device.Block_Address_Type;
+        Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
       Partition_Type_Low  : out Word_64;
       Partition_Type_High : out Word_64;
       Partition_Flags     : out Word_64;
@@ -312,7 +314,8 @@ package body Rose.Devices.GPT is
    --------------------
 
    procedure Initialize_GPT
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
    is
    begin
       Check_Cached (Block_Device);
@@ -338,8 +341,9 @@ package body Rose.Devices.GPT is
    -----------------------
 
    function Last_Usable_Block
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
-      return Rose.Interfaces.Block_Device.Block_Address_Type
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
+      return Rose.Interfaces.Storage.Block_Array.Block_Address_Type
    is
    begin
       Check_Cached (Block_Device);
@@ -374,7 +378,8 @@ package body Rose.Devices.GPT is
    ---------------------
 
    function Partition_Count
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
       return Natural
    is
    begin
@@ -413,7 +418,8 @@ package body Rose.Devices.GPT is
    ---------------
 
    procedure Read_Copy
-     (Device      : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device      : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client;
       Header_LBA  : Block_Address_Type;
       Found_Magic : out Boolean;
       Valid       : out Boolean)
@@ -502,7 +508,8 @@ package body Rose.Devices.GPT is
    ----------------------------
 
    procedure Report_Partition_Table
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
    is
    begin
 
@@ -582,7 +589,7 @@ package body Rose.Devices.GPT is
    ------------------
 
    procedure Save_Changes
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
    begin
       Cached_Table.Update (Device, GPT_Data);
@@ -593,7 +600,8 @@ package body Rose.Devices.GPT is
    -----------
 
    function State
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
       return GPT_State
    is
    begin
@@ -606,7 +614,7 @@ package body Rose.Devices.GPT is
    ---------------
 
    procedure Write_All
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
    is
       Block_Size : constant Natural := Natural (GPT_Data.Block_Size);
       Block_Count : constant Word_64 := Word_64 (GPT_Data.Block_Count);
@@ -658,7 +666,7 @@ package body Rose.Devices.GPT is
    -------------------
 
    procedure Write_Entries
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Start  : Block_Address_Type)
    is
       Chunk   : Storage_Array (0 .. Chunk_Bytes - 1) := (others => 0);
@@ -680,7 +688,7 @@ package body Rose.Devices.GPT is
    ------------------
 
    procedure Write_Header
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Header : Format.Header)
    is
       Block : Storage_Array (0 .. Storage_Count (GPT_Data.Block_Size) - 1) :=
@@ -696,7 +704,8 @@ package body Rose.Devices.GPT is
    --------------------------
 
    procedure Write_Protective_MBR
-     (Block_Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Block_Device : Rose.Interfaces.Storage.Block_Array.Client
+       .Block_Array_Client)
    is
       Block_Size  : Block_Size_Type;
       Block_Count : Block_Address_Type;

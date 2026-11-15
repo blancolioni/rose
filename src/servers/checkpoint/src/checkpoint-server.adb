@@ -8,19 +8,19 @@ with Rose.Words;
 with Rose.Console_IO;
 with Rose.System_Calls.Client;
 
-with Rose.Interfaces.Checkpointer.Server;
-with Rose.Interfaces.Timeout.Server;
+with Rose.Interfaces.Checkpoints.Checkpointer.Server;
+with Rose.Interfaces.Time.Timeout.Server;
 
-with Rose.Interfaces.Cap.Client;
-with Rose.Interfaces.Timer.Client;
+with Rose.Interfaces.Caps.Cap.Client;
+with Rose.Interfaces.Time.Timer.Client;
 
 package body Checkpoint.Server is
 
    use type System.Storage_Elements.Storage_Offset;
 
-   Timer : Rose.Interfaces.Timer.Client.Timer_Client;
+   Timer : Rose.Interfaces.Time.Timer.Client.Timer_Client;
 
-   Timeout_Cap           : Rose.Interfaces.Cap.Client.Cap_Client;
+   Timeout_Cap           : Rose.Interfaces.Caps.Cap.Client.Cap_Client;
    Enter_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Leave_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
@@ -146,22 +146,23 @@ package body Checkpoint.Server is
 
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
-      Rose.Interfaces.Timer.Client.Open_Cap_Set
+      Rose.Interfaces.Time.Timer.Client.Open_Cap_Set
         (Client    => Timer,
          Set_Timer => Timer_Cap);
 
-      Rose.Interfaces.Timeout.Server.Create_Server
+      Rose.Interfaces.Time.Timeout.Server.Create_Server
         (Server_Context => Server_Context,
          On_Timeout     => On_Timeout'Access);
-      Rose.Interfaces.Checkpointer.Server.Attach_Interface
+      Rose.Interfaces.Checkpoints.Checkpointer.Server.Attach_Interface
         (Server_Context  => Server_Context,
          Take_Checkpoint => Take_Checkpoint'Access);
 
       Timeout_Cap :=
-        Rose.Interfaces.Timer.Client.Set_Timer
+        Rose.Interfaces.Time.Timer.Client.Set_Timer
           (Item         => Timer,
            Milliseconds => 30_000,
-           Cap          => Rose.Interfaces.Timeout.Server.Get_On_Timeout_Cap);
+           Cap          => Rose.Interfaces.Time.Timeout.Server
+             .Get_On_Timeout_Cap);
 
    end Create_Server;
 
@@ -225,16 +226,17 @@ package body Checkpoint.Server is
       pragma Unreferenced (Id);
       Taken : Boolean with Unreferenced;
    begin
-      Rose.Interfaces.Cap.Client.Destroy (Timeout_Cap);
-      Rose.Interfaces.Cap.Client.Close (Timeout_Cap);
+      Rose.Interfaces.Caps.Cap.Client.Destroy (Timeout_Cap);
+      Rose.Interfaces.Caps.Cap.Client.Close (Timeout_Cap);
 
       Taken := Checkpoint;
 
       Timeout_Cap :=
-        Rose.Interfaces.Timer.Client.Set_Timer
+        Rose.Interfaces.Time.Timer.Client.Set_Timer
           (Item         => Timer,
            Milliseconds => 30_000,
-           Cap          => Rose.Interfaces.Timeout.Server.Get_On_Timeout_Cap);
+           Cap          => Rose.Interfaces.Time.Timeout.Server
+             .Get_On_Timeout_Cap);
    end On_Timeout;
 
    ------------------

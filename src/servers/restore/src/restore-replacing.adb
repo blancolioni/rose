@@ -3,11 +3,11 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Replaceable;
-with Rose.Interfaces.Replacement.Client;
-with Rose.Interfaces.Replacer.Client;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Processes.Launch.Client;
+with Rose.Interfaces.Processes.Replaceable;
+with Rose.Interfaces.Processes.Replacement.Client;
+with Rose.Interfaces.Processes.Replacer.Client;
 
 with Restore.Checkpoints;
 
@@ -144,10 +144,11 @@ package body Restore.Replacing is
       New_Launch : Rose.Capabilities.Capability)
       return Outcome
    is
-      package Replacements renames Rose.Interfaces.Replacement.Client;
+      package Replacements renames Rose.Interfaces.Processes.Replacement
+        .Client;
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Client.Launch_Client;
-      Replacer : Rose.Interfaces.Replacer.Client.Replacer_Client;
+      Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      Replacer : Rose.Interfaces.Processes.Replacer.Client.Replacer_Client;
       Last     : Natural;
       Index    : Natural;
       Found    : Boolean;
@@ -184,15 +185,17 @@ package body Restore.Replacing is
       end Wait_Until_Ready;
 
    begin
-      Rose.Interfaces.Launch.Client.Open (Launcher, New_Launch);
-      Rose.Interfaces.Launch.Client.Metadata (Launcher, Metadata_Text, Last);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, New_Launch);
+      Rose.Interfaces.Processes.Launch.Client
+        .Metadata (Launcher, Metadata_Text, Last);
       Find_Previous (Metadata_Text (1 .. Last), Index, Found);
       if not Found then
          return No_Metadata;
       end if;
 
-      Rose.Interfaces.Replacer.Client.Open (Replacer, Replacer_Cap);
-      if Rose.Interfaces.Replacer.Client.Get_Replace_Process_Cap (Replacer)
+      Rose.Interfaces.Processes.Replacer.Client.Open (Replacer, Replacer_Cap);
+      if Rose.Interfaces.Processes.Replacer.Client
+        .Get_Replace_Process_Cap (Replacer)
         = Rose.Capabilities.Null_Capability
       then
          return No_Replacer;
@@ -200,14 +203,14 @@ package body Restore.Replacing is
 
       declare
          Replacement : constant Replacements.Replacement_Client :=
-           Rose.Interfaces.Replacer.Client.Replace_Process
+           Rose.Interfaces.Processes.Replacer.Client.Replace_Process
              (Replacer, Control);
          Committed   : Boolean;
       begin
-         if Rose.Interfaces.Replacer.Client.Has_Error then
+         if Rose.Interfaces.Processes.Replacer.Client.Has_Error then
             Last_Error :=
               Rose.Invocation.Invocation_Error'Pos
-                (Rose.Interfaces.Replacer.Client.Get_Last_Error);
+                (Rose.Interfaces.Processes.Replacer.Client.Get_Last_Error);
             return No_Replacement;
          elsif Replacements.Get_Interface_Cap (Replacement)
            = Rose.Capabilities.Null_Capability
@@ -226,13 +229,15 @@ package body Restore.Replacing is
          --  a sibling of the old version's (section 6).
 
          declare
-            Sibling : constant Rose.Interfaces.Bank.Client.Bank_Client :=
+            Sibling : constant Rose.Interfaces.Storage.Bank.Client
+              .Bank_Client :=
               Replacements.Bank (Replacement);
          begin
             Endpoint :=
-              Rose.Interfaces.Launch.Client.Launch_Command
+              Rose.Interfaces.Processes.Launch.Client.Launch_Command
                 (Launcher,
-                 Rose.Interfaces.Bank.Client.Get_Interface_Cap (Sibling),
+                 Rose.Interfaces.Storage.Bank.Client
+                   .Get_Interface_Cap (Sibling),
                  No_Caps);
          end;
 
@@ -293,7 +298,8 @@ package body Restore.Replacing is
          declare
             Control : constant Rose.Capabilities.Capability :=
               Restore.Checkpoints.Find_Endpoint
-                (Index, Rose.Interfaces.Replaceable.Replaceable_Interface);
+                (Index, Rose.Interfaces.Processes.Replaceable
+                  .Replaceable_Interface);
             New_Launch : Rose.Capabilities.Capability;
          begin
             if Control /= Rose.Capabilities.Null_Capability then

@@ -6,7 +6,7 @@ with Rose.Checkpoints;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Interfaces.Region.Client;
+with Rose.Interfaces.Storage.Region.Client;
 
 package Mem.Processes is
 
@@ -167,7 +167,7 @@ package Mem.Processes is
      (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
-      Region        : Rose.Interfaces.Region.Client.Region_Client;
+      Region        : Rose.Interfaces.Storage.Region.Client.Region_Client;
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;

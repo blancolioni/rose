@@ -1,4 +1,4 @@
-command Rose.Core.Make_Directory : Standard_Error
+command Rose.Core.Make_Directory : Streams.Standard_Error
   with Summary     => "Create a directory.",
        Description => """
           Make_Directory creates an empty directory called
@@ -11,6 +11,6 @@ command Rose.Core.Make_Directory : Standard_Error
 is
    Directory_Name : String
      with Help => "the name of the new directory";
-   Directory : in Writable_Directory
+   Directory : in Files.Writable_Directory
      with Help => "the directory to create it in";
 end Rose.Core.Make_Directory;

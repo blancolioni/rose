@@ -1,0 +1,2 @@
+role Users.Rights_Admin_Service : Users.Rights_Admin
+  with Category => "rights";

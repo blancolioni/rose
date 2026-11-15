@@ -4,7 +4,7 @@ with Rose.Keys;
 with Rose.Words;
 
 procedure Rose.Core.Keytest
-  (Console : in out Rose.Interfaces.Terminal.Terminal_Object'Class)
+  (Console : in out Rose.Interfaces.Screens.Terminal.Terminal_Object'Class)
 is
    use Rose.Words;
 

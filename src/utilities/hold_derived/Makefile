@@ -14,19 +14,19 @@ hold_derived:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-hold_derived.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/commands.idl \
-	    $(INTERFACES)/launch.idl \
-	    $(INTERFACES)/process.idl \
-	    $(INTERFACES)/bank.idl \
-	    $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/region.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/segment.idl \
-	    $(INTERFACES)/server.idl \
-	    $(INTERFACES)/heap.idl \
-	    $(INTERFACES)/cap.idl \
-	    $(INTERFACES)/restorable.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/stream.idl
+	    $(INTERFACES)/commands-lookup.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/processes-segment.idl \
+	    $(INTERFACES)/processes-server.idl \
+	    $(INTERFACES)/processes-heap.idl \
+	    $(INTERFACES)/caps-cap.idl \
+	    $(INTERFACES)/processes-restorable.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/streams-stream.idl
 	gprbuild $(GPRBUILD_CARGS)

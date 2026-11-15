@@ -4,22 +4,24 @@ with System.Storage_Elements;
 with Rose.Command_Line;
 
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Releasable_Writer;
+with Rose.Interfaces.Streams.Releasable_Reader;
+with Rose.Interfaces.Streams.Releasable_Writer;
 
 procedure Rose.Core.Copy
-  (Source : in out Rose.Interfaces.File.File_Object'Class;
-   Target : in out Rose.Interfaces.Transactional_Writable_File
+  (Source : in out Rose.Interfaces.Files.File.File_Object'Class;
+   Target : in out Rose.Interfaces.Files.Transactional_Writable_File
                      .Transactional_Writable_File_Object'Class)
 is
    use System.Storage_Elements;
    use type Ada.Streams.Stream_Element_Offset;
    Buffer : Ada.Streams.Stream_Element_Array (1 .. 4096);
    Last   : Ada.Streams.Stream_Element_Offset;
-   Reader : Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class :=
+   Reader : Rose.Interfaces.Streams.Releasable_Reader
+     .Releasable_Reader_Object'Class :=
      Source.Open_Reader;
    --  A reader of its own, from the start of the file (ADR 0009).
-   Writer : Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class :=
+   Writer : Rose.Interfaces.Streams.Releasable_Writer
+     .Releasable_Writer_Object'Class :=
      Target.Rewrite;
    --  The copy replaces the target's contents (ADR 0009, section 4).
 begin

@@ -1,4 +1,4 @@
-command Rose.Core.User : Create_Endpoint, Cap_Set_Service
+command Rose.Core.User : Caps.Create_Endpoint, Caps.Cap_Set_Service
   with Summary     => "Serve a user's User interface.",
        Description => """
           User serves the User interface of one user (ADR 0003): the
@@ -19,12 +19,12 @@ command Rose.Core.User : Create_Endpoint, Cap_Set_Service
 is
    Name : String
      with Help => "the user's name";
-   Home : in Writable_Directory
+   Home : in Files.Writable_Directory
      with Help => "the user's home directory";
-   Bank : in Bank
+   Bank : in Storage.Bank
      with Help => "the user's bank, which sessions are sub-banks of";
-   User : out User
+   User : out Users.User
      with Help => "the user's User interface";
-   Control : out Replaceable
+   Control : out Processes.Replaceable
      with Help => "its Replaceable interface, which auth keeps";
 end Rose.Core.User;

@@ -1,0 +1,5 @@
+interface Devices.ATA is
+
+   function Get_Device return interface Storage.Block_Array;
+
+end Devices.ATA;

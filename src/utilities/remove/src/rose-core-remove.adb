@@ -1,14 +1,14 @@
 with Rose.Command_Line;
 
-with Rose.Interfaces.Directory;
+with Rose.Interfaces.Files.Directory;
 with Rose.Interfaces.Objects;
 
 procedure Rose.Core.Remove
   (Name      : String;
    Directory : in out
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class)
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class)
 is
-   use type Rose.Interfaces.Directory.File_Kind;
+   use type Rose.Interfaces.Files.Directory.File_Kind;
 
    Index : constant Natural := Directory.Find_Entry (Name);
 
@@ -35,7 +35,7 @@ begin
    if Index = 0 then
       Fail (": there is no such entry");
    elsif Directory.Directory_Entry_Kind (Index)
-     /= Rose.Interfaces.Directory.Ordinary_File
+     /= Rose.Interfaces.Files.Directory.Ordinary_File
    then
       Fail (": it is not a file");
    end if;

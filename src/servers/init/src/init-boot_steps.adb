@@ -4,10 +4,10 @@ with Rose.Words;
 
 with Rose.Devices.Partitions;
 
-with Rose.Interfaces.Block_Device;
-with Rose.Interfaces.Partition_Setup.Client;
-with Rose.Interfaces.Partitions.Client;
-with Rose.Interfaces.Resource.Client;
+with Rose.Interfaces.Storage.Block_Array;
+with Rose.Interfaces.Storage.Partition_Setup.Client;
+with Rose.Interfaces.Storage.Partitions.Client;
+with Rose.Interfaces.Common.Resource.Client;
 
 with Init.Boot;
 with Init.Calls;
@@ -99,13 +99,13 @@ package body Init.Boot_Steps is
 
    procedure End_Boot_Cap_Sets is
       use type Rose.Capabilities.Capability;
-      Bootcaps : Rose.Interfaces.Resource.Client.Resource_Client;
+      Bootcaps : Rose.Interfaces.Common.Resource.Client.Resource_Client;
    begin
       if Init.Boot.Bootcaps_Release_Cap /= Rose.Capabilities.Null_Capability
       then
-         Rose.Interfaces.Resource.Client.Open_Cap_Set
+         Rose.Interfaces.Common.Resource.Client.Open_Cap_Set
            (Bootcaps, Init.Boot.Bootcaps_Release_Cap);
-         Rose.Interfaces.Resource.Client.Release (Bootcaps);
+         Rose.Interfaces.Common.Resource.Client.Release (Bootcaps);
       end if;
 
       Rose.System_Calls.Delete_Cap (Init.Boot.Bootcaps_Release_Cap);
@@ -135,24 +135,25 @@ package body Init.Boot_Steps is
                          (Init.Boot.Console_Interface_Cap,
                           Init.Boot.Hd0_Cap,
                           Rose.Init_Capabilities.Delete_Cap));
-      Setup       : Rose.Interfaces.Partition_Setup.Client
+      Setup       : Rose.Interfaces.Storage.Partition_Setup.Client
                       .Partition_Setup_Client;
    begin
       --  The server refuses every block request until it has its range,
       --  and nothing has the block device interface before this returns.
 
-      Rose.Interfaces.Partition_Setup.Client.Open
+      Rose.Interfaces.Storage.Partition_Setup.Client.Open
         (Setup,
          Copy
            (Copy_Id_Cap,
-            Rose.Interfaces.Partition_Setup.Partition_Setup_Interface));
-      Rose.Interfaces.Partition_Setup.Client.Set_Range
+            Rose.Interfaces.Storage.Partition_Setup
+              .Partition_Setup_Interface));
+      Rose.Interfaces.Storage.Partition_Setup.Client.Set_Range
         (Setup, Start, Bound, Block_Size);
-      Rose.Interfaces.Partition_Setup.Client.Close (Setup);
+      Rose.Interfaces.Storage.Partition_Setup.Client.Close (Setup);
 
       return Copy
         (Copy_Id_Cap,
-         Rose.Interfaces.Block_Device.Block_Device_Interface);
+         Rose.Interfaces.Storage.Block_Array.Block_Array_Interface);
    end Launch_Partition_Server;
 
    ---------------------
@@ -160,7 +161,7 @@ package body Init.Boot_Steps is
    ---------------------
 
    procedure Load_Partitions is
-      use Rose.Interfaces.Partitions;
+      use Rose.Interfaces.Storage.Partitions;
       Parts : Client.Partitions_Client;
 
       procedure Load_Partition (Index : Positive);

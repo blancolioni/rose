@@ -1,7 +1,0 @@
-interface Heap is
-
-   function Current_Bound return Word;
-   procedure Request_New_Bound
-     (New_Bound : Word);
-
-end Heap;

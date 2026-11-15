@@ -1,7 +1,0 @@
-interface Kernel_Process : Named, Cap is
-
-   procedure Resume;
-   procedure Fault;
-   procedure Notify (Flags : Word_32);
-   
-end Kernel_Process;

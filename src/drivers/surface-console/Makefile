@@ -15,10 +15,10 @@ surface_console:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/reader.idl $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/stream.idl $(INTERFACES)/terminal.idl \
-	    $(INTERFACES)/surface.idl $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/region.idl $(INTERFACES)/process.idl \
-	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/heap.idl
+	    $(INTERFACES)/streams-reader.idl $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
+	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/storage-region.idl $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/processes-heap.idl
 	gprbuild $(GPRBUILD_CARGS)

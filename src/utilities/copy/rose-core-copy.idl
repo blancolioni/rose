@@ -1,4 +1,4 @@
-command Rose.Core.Copy : Standard_Error
+command Rose.Core.Copy : Streams.Standard_Error
   with Summary     => "Copy a file.",
        Description => """
           Copy writes the contents of SOURCE to TARGET, a file in the
@@ -8,8 +8,8 @@ command Rose.Core.Copy : Standard_Error
           empty if it was made.
           """
 is
-   Source : in File
+   Source : in Files.File
      with Help => "the file to copy";
-   Target : in Transactional_Writable_File
+   Target : in Files.Transactional_Writable_File
      with Help => "the file to write";
 end Rose.Core.Copy;

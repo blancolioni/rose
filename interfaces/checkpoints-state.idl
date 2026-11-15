@@ -1,0 +1,5 @@
+interface Checkpoints.State is
+
+   procedure Reset;
+     
+end Checkpoints.State;

@@ -1,5 +1,5 @@
 with Rose.Clock_Source;
-with Rose.Interfaces.Clock.Client;
+with Rose.Interfaces.Time.Clock.Client;
 with Rose.Interfaces.Objects;
 
 package body Rose.Clock is
@@ -7,7 +7,7 @@ package body Rose.Clock is
    --  The user-mode IDL target's client (#554): a reading that fails
    --  raises Invocation_Error, which is reported as Program_Error.
 
-   Source : Rose.Interfaces.Clock.Client.Clock_Client;
+   Source : Rose.Interfaces.Time.Clock.Client.Clock_Client;
    Opened : Boolean := False;
 
    function Read_Realtime return Rose.Words.Word_64;

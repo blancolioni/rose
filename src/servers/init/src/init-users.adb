@@ -3,16 +3,16 @@ with System.Storage_Elements;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Auth.Client;
-with Rose.Interfaces.Auth_Admin.Client;
-with Rose.Interfaces.Launch.Client;
-with Rose.Interfaces.Rights.Client;
-with Rose.Interfaces.Releasable_Writer.Client;
-with Rose.Interfaces.Rights_Admin.Client;
-with Rose.Interfaces.Terminal.Client;
-with Rose.Interfaces.User.Client;
-with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Users.Auth.Client;
+with Rose.Interfaces.Users.Auth_Admin.Client;
+with Rose.Interfaces.Processes.Launch.Client;
+with Rose.Interfaces.Users.Rights.Client;
+with Rose.Interfaces.Streams.Releasable_Writer.Client;
+with Rose.Interfaces.Users.Rights_Admin.Client;
+with Rose.Interfaces.Screens.Terminal.Client;
+with Rose.Interfaces.Users.User.Client;
+with Rose.Interfaces.Files.Writable_Directory.Client;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Init.Calls;
 
@@ -28,7 +28,7 @@ package body Init.Users is
    NL : constant String := (1 => Character'Val (10));
 
    procedure Read_Line
-     (Console : Rose.Interfaces.Terminal.Client.Terminal_Client;
+     (Console : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
       Line    : out String;
       Last    : out Natural);
    --  The next line typed on Console, without its line break. With line
@@ -36,7 +36,8 @@ package body Init.Users is
    --  than Line is cut short, and an end of file is an empty line.
 
    procedure Forget
-     (Console : in out Rose.Interfaces.Terminal.Client.Terminal_Client);
+     (Console : in out Rose.Interfaces.Screens.Terminal.Client
+       .Terminal_Client);
    --  Delete the caps that opening Console got for its subprograms, but
    --  not its interface cap, which is init's console, and which login is
    --  given later: the client's Close would delete that too. The
@@ -54,14 +55,14 @@ package body Init.Users is
       return Boolean
    is
       use type Rose.Words.Word;
-      Client : Rose.Interfaces.Rights_Admin.Client.Rights_Admin_Client;
+      Client : Rose.Interfaces.Users.Rights_Admin.Client.Rights_Admin_Client;
    begin
       if Admin = Rose.Capabilities.Null_Capability then
          return False;
       end if;
 
-      Rose.Interfaces.Rights_Admin.Client.Open (Client, Admin);
-      return Rose.Interfaces.Rights_Admin.Client.Allow
+      Rose.Interfaces.Users.Rights_Admin.Client.Open (Client, Admin);
+      return Rose.Interfaces.Users.Rights_Admin.Client.Allow
         (Client, User, Category, Mode) = 1;
    end Allow;
 
@@ -77,7 +78,7 @@ package body Init.Users is
       Password      : out String;
       Password_Last : out Natural)
    is
-      Terminal : Rose.Interfaces.Terminal.Client.Terminal_Client;
+      Terminal : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
 
       function Valid_Name return Boolean
       is (Name_Last >= Name'First
@@ -98,7 +99,7 @@ package body Init.Users is
          return;
       end if;
 
-      Rose.Interfaces.Terminal.Client.Open (Terminal, Console);
+      Rose.Interfaces.Screens.Terminal.Client.Open (Terminal, Console);
 
       Init.Calls.Send_String
         (Output, NL & "Create the first user." & NL);
@@ -121,13 +122,13 @@ package body Init.Users is
             --  The line break that ends a password isn't echoed either, so
             --  it is written after each.
 
-            Rose.Interfaces.Terminal.Client.Disable_Echo (Terminal);
+            Rose.Interfaces.Screens.Terminal.Client.Disable_Echo (Terminal);
             Init.Calls.Send_String (Output, "Password: ");
             Read_Line (Terminal, Password, Password_Last);
             Init.Calls.Send_String (Output, NL & "Password again: ");
             Read_Line (Terminal, Again, Again_Last);
             Init.Calls.Send_String (Output, NL);
-            Rose.Interfaces.Terminal.Client.Enable_Echo (Terminal);
+            Rose.Interfaces.Screens.Terminal.Client.Enable_Echo (Terminal);
 
             exit when Password_Last >= Password'First
               and then Password (Password'First .. Password_Last)
@@ -155,11 +156,11 @@ package body Init.Users is
       Password : String)
       return Boolean
    is
-      Client : Rose.Interfaces.Auth.Client.Auth_Client;
+      Client : Rose.Interfaces.Users.Auth.Client.Auth_Client;
    begin
-      Rose.Interfaces.Auth.Client.Open (Client, Auth);
-      return Rose.Interfaces.User.Client.Get_Interface_Cap
-        (Rose.Interfaces.Auth.Client.Login (Client, Name, Password))
+      Rose.Interfaces.Users.Auth.Client.Open (Client, Auth);
+      return Rose.Interfaces.Users.User.Client.Get_Interface_Cap
+        (Rose.Interfaces.Users.Auth.Client.Login (Client, Name, Password))
         /= Rose.Capabilities.Null_Capability;
    end Check_Login;
 
@@ -173,8 +174,8 @@ package body Init.Users is
       Role   : String)
       return Boolean
    is
-      Rights_Client : Rose.Interfaces.Rights.Client.Rights_Client;
-      User_Client   : Rose.Interfaces.User.Client.User_Client;
+      Rights_Client : Rose.Interfaces.Users.Rights.Client.Rights_Client;
+      User_Client   : Rose.Interfaces.Users.User.Client.User_Client;
       Grant         : Rose.Words.Word;
       Granted       : Rose.Capabilities.Capability;
       Refused       : Boolean;
@@ -185,29 +186,29 @@ package body Init.Users is
          return False;
       end if;
 
-      Rose.Interfaces.Rights.Client.Open (Rights_Client, Rights);
-      Rose.Interfaces.User.Client.Open (User_Client, User);
+      Rose.Interfaces.Users.Rights.Client.Open (Rights_Client, Rights);
+      Rose.Interfaces.Users.User.Client.Open (User_Client, User);
 
       --  An ordinary request has to be refused. If it isn't, end the
       --  grant, and fail.
 
-      Rose.Interfaces.Rights.Client.Request
+      Rose.Interfaces.Users.Rights.Client.Request
         (Rights_Client, User_Client, Role, 0, Grant, Granted);
       Refused := Granted = Rose.Capabilities.Null_Capability;
       if not Refused then
-         Rose.Interfaces.Rights.Client.Finish
+         Rose.Interfaces.Users.Rights.Client.Finish
            (Rights_Client, User_Client, Grant);
          Rose.System_Calls.Delete_Cap (Granted);
       end if;
 
       --  A request under sudo has to be granted.
 
-      Rose.Interfaces.Rights.Client.Request
+      Rose.Interfaces.Users.Rights.Client.Request
         (Rights_Client, User_Client, Role, 1, Grant, Granted);
       if Granted = Rose.Capabilities.Null_Capability then
          return False;
       end if;
-      Rose.Interfaces.Rights.Client.Finish
+      Rose.Interfaces.Users.Rights.Client.Finish
         (Rights_Client, User_Client, Grant);
       Rose.System_Calls.Delete_Cap (Granted);
 
@@ -225,12 +226,12 @@ package body Init.Users is
       User     : out Rose.Capabilities.Capability;
       Home     : out Rose.Capabilities.Capability)
    is
-      use Rose.Interfaces.Writable_Directory.Client;
-      package Files renames Rose.Interfaces.Writable_File.Client;
-      package Writers renames Rose.Interfaces.Releasable_Writer.Client;
+      use Rose.Interfaces.Files.Writable_Directory.Client;
+      package Files renames Rose.Interfaces.Files.Writable_File.Client;
+      package Writers renames Rose.Interfaces.Streams.Releasable_Writer.Client;
 
-      Admin_Client : Rose.Interfaces.Auth_Admin.Client.Auth_Admin_Client;
-      User_Client  : Rose.Interfaces.User.Client.User_Client;
+      Admin_Client : Rose.Interfaces.Users.Auth_Admin.Client.Auth_Admin_Client;
+      User_Client  : Rose.Interfaces.Users.User.Client.User_Client;
       Directory    : Writable_Directory_Client;
       Rc_File      : Files.Writable_File_Client;
       Rc_Writer    : Writers.Releasable_Writer_Client;
@@ -243,17 +244,18 @@ package body Init.Users is
          return;
       end if;
 
-      Rose.Interfaces.Auth_Admin.Client.Open (Admin_Client, Admin);
+      Rose.Interfaces.Users.Auth_Admin.Client.Open (Admin_Client, Admin);
       User_Client :=
-        Rose.Interfaces.Auth_Admin.Client.New_User
+        Rose.Interfaces.Users.Auth_Admin.Client.New_User
           (Admin_Client, Name, Password);
-      if Rose.Interfaces.User.Client.Get_Interface_Cap (User_Client)
+      if Rose.Interfaces.Users.User.Client.Get_Interface_Cap (User_Client)
         = Rose.Capabilities.Null_Capability
       then
          return;
       end if;
 
-      Directory := Rose.Interfaces.User.Client.Home_Directory (User_Client);
+      Directory := Rose.Interfaces.Users.User.Client
+        .Home_Directory (User_Client);
       if Get_Interface_Cap (Directory) = Rose.Capabilities.Null_Capability
       then
          return;
@@ -275,7 +277,8 @@ package body Init.Users is
       Writers.Release (Rc_Writer);
       Writers.Close (Rc_Writer);
 
-      User := Rose.Interfaces.User.Client.Get_Interface_Cap (User_Client);
+      User := Rose.Interfaces.Users.User.Client
+        .Get_Interface_Cap (User_Client);
       Home := Get_Interface_Cap (Directory);
    end Create_First_User;
 
@@ -284,9 +287,9 @@ package body Init.Users is
    ------------
 
    procedure Forget
-     (Console : in out Rose.Interfaces.Terminal.Client.Terminal_Client)
+     (Console : in out Rose.Interfaces.Screens.Terminal.Client.Terminal_Client)
    is
-      use Rose.Interfaces.Terminal.Client;
+      use Rose.Interfaces.Screens.Terminal.Client;
       Caps : constant Rose.Capabilities.Capability_Array :=
         (Get_Read_Cap (Console), Get_Write_Cap (Console),
          Get_Get_Size_Cap (Console), Get_Move_Cursor_Cap (Console),
@@ -309,7 +312,7 @@ package body Init.Users is
    ---------------
 
    procedure Read_Line
-     (Console : Rose.Interfaces.Terminal.Client.Terminal_Client;
+     (Console : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
       Line    : out String;
       Last    : out Natural)
    is
@@ -318,7 +321,7 @@ package body Init.Users is
    begin
       Last := Line'First - 1;
       loop
-         Rose.Interfaces.Terminal.Client.Read (Console, Buffer, Count);
+         Rose.Interfaces.Screens.Terminal.Client.Read (Console, Buffer, Count);
          exit when Count < Buffer'First;
          for Byte of Buffer (Buffer'First .. Count) loop
             if Byte = 10 then
@@ -348,7 +351,7 @@ package body Init.Users is
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "auth");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -360,9 +363,9 @@ package body Init.Users is
          return;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
@@ -414,7 +417,7 @@ package body Init.Users is
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "login");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -422,9 +425,9 @@ package body Init.Users is
          return False;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
@@ -467,7 +470,7 @@ package body Init.Users is
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "rights");
       No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher   : Rose.Interfaces.Launch.Client.Launch_Client;
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -480,9 +483,9 @@ package body Init.Users is
          return;
       end if;
 
-      Rose.Interfaces.Launch.Client.Open (Launcher, Launch_Cap);
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
-        Rose.Interfaces.Launch.Client.Launch_Command
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
           (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
@@ -521,11 +524,11 @@ package body Init.Users is
       Output  : Rose.Capabilities.Capability;
       Message : String)
    is
-      Terminal : Rose.Interfaces.Terminal.Client.Terminal_Client;
+      Terminal : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
       Line     : String (1 .. 80);
       Last     : Natural;
    begin
-      Rose.Interfaces.Terminal.Client.Open (Terminal, Console);
+      Rose.Interfaces.Screens.Terminal.Client.Open (Terminal, Console);
       Init.Calls.Send_String (Output, Message);
       Read_Line (Terminal, Line, Last);
       Forget (Terminal);

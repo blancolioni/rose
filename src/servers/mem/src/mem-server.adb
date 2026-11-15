@@ -10,16 +10,16 @@ with Rose.Words;
 with Rose.Console_IO;
 with Rose.Trace;
 
-with Rose.Interfaces.Heap.Server;
-with Rose.Interfaces.Memory.Server;
-with Rose.Interfaces.Memory_Restore.Server;
-with Rose.Interfaces.Process.Server;
-with Rose.Interfaces.Receiver.Server;
-with Rose.Interfaces.Replacement.Server;
-with Rose.Interfaces.Replacer.Server;
-with Rose.Interfaces.Segment;
+with Rose.Interfaces.Processes.Heap.Server;
+with Rose.Interfaces.Processes.Memory.Server;
+with Rose.Interfaces.Checkpoints.Memory_Restore.Server;
+with Rose.Interfaces.Processes.Process.Server;
+with Rose.Interfaces.Caps.Receiver.Server;
+with Rose.Interfaces.Processes.Replacement.Server;
+with Rose.Interfaces.Processes.Replacer.Server;
+with Rose.Interfaces.Processes.Segment;
 
-with Rose.Interfaces.Region.Client;
+with Rose.Interfaces.Storage.Region.Client;
 
 with Rose.Server;
 with Rose.System_Calls;
@@ -214,7 +214,7 @@ package body Mem.Server is
       Object   : Rose.Objects.Object_Id;
       Virtual  : Rose.Words.Word;
       Physical : Rose.Words.Word;
-      Action   : Rose.Interfaces.Memory.Page_Access_Type);
+      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type);
 
    procedure Destroy (Id : Rose.Objects.Capability_Identifier);
 
@@ -254,7 +254,7 @@ package body Mem.Server is
       Virtual_Bound : Rose.Words.Word;
       Flags         : Rose.Words.Word)
    is
-      use Rose.Interfaces.Segment;
+      use Rose.Interfaces.Processes.Segment;
       use type Rose.Words.Word;
 
       Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
@@ -285,8 +285,8 @@ package body Mem.Server is
       Offset        : Rose.Words.Word;
       Flags         : Rose.Words.Word)
    is
-      use Rose.Interfaces.Segment;
-      use Rose.Interfaces.Region.Client;
+      use Rose.Interfaces.Processes.Segment;
+      use Rose.Interfaces.Storage.Region.Client;
       use type Rose.Words.Word;
 
       Client : Region_Client;
@@ -476,7 +476,7 @@ package body Mem.Server is
 
       Mem.Calls.Load_Memory_Map;
 
-      Rose.Interfaces.Memory.Server.Create_Server
+      Rose.Interfaces.Processes.Memory.Server.Create_Server
         (Server_Context => Server,
          New_Process    => New_Process'Access,
          Register_Process => Register_Process'Access,
@@ -486,7 +486,7 @@ package body Mem.Server is
          Set_Process_Banks => Set_Process_Banks'Access,
          Processes_Ended => Processes_Ended'Access);
 
-      Rose.Interfaces.Process.Server.Attach_Interface
+      Rose.Interfaces.Processes.Process.Server.Attach_Interface
         (Server_Context => Server,
          Destroy => Destroy'Access,
          Add_Segment    => Add_Segment'Access,
@@ -500,13 +500,13 @@ package body Mem.Server is
          Publish_Interface => Publish_Interface'Access,
          Instanced      => True);
 
-      Rose.Interfaces.Heap.Server.Attach_Interface
+      Rose.Interfaces.Processes.Heap.Server.Attach_Interface
         (Server_Context    => Server,
          Current_Bound     => Current_Bound'Access,
          Request_New_Bound => Request_New_Bound'Access,
          Instanced         => True);
 
-      Rose.Interfaces.Receiver.Server.Attach_Interface
+      Rose.Interfaces.Caps.Receiver.Server.Attach_Interface
         (Server_Context => Server,
          Send_Cap       => Send_Cap'Access,
          Instanced      => True);
@@ -514,7 +514,7 @@ package body Mem.Server is
       --  Attached last, so that the endpoints of the interfaces above
       --  are where they were.
 
-      Rose.Interfaces.Memory_Restore.Server.Attach_Interface
+      Rose.Interfaces.Checkpoints.Memory_Restore.Server.Attach_Interface
         (Server_Context       => Server,
          Restore_Process      => Mem.Processes.Restore_Process'Access,
          Restore_Segment      => Mem.Processes.Restore_Segment'Access,
@@ -524,11 +524,11 @@ package body Mem.Server is
 
       --  Attached after Memory_Restore, for the same reason (#866).
 
-      Rose.Interfaces.Replacer.Server.Attach_Interface
+      Rose.Interfaces.Processes.Replacer.Server.Attach_Interface
         (Server_Context  => Server,
          Replace_Process => Replace_Process'Access);
 
-      Rose.Interfaces.Replacement.Server.Attach_Interface
+      Rose.Interfaces.Processes.Replacement.Server.Attach_Interface
         (Server_Context => Server,
          Release        => Release_Replacement'Access,
          Ready          => Replacement_Ready'Access,
@@ -758,11 +758,11 @@ package body Mem.Server is
       Object   : Rose.Objects.Object_Id;
       Virtual  : Rose.Words.Word;
       Physical : Rose.Words.Word;
-      Action   : Rose.Interfaces.Memory.Page_Access_Type)
+      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type)
    is
       pragma Unreferenced (Id);
       use Rose.Addresses;
-      use all type Rose.Interfaces.Memory.Page_Access_Type;
+      use all type Rose.Interfaces.Processes.Memory.Page_Access_Type;
       Valid,
       Readable,
       Writable,
@@ -1015,7 +1015,8 @@ package body Mem.Server is
 
       Mem.Processes.Set_Published_Interface_Cap (Pid, Interface_Cap);
       Rose.Server.Unblock_Endpoint
-        (Server, Rose.Interfaces.Process.Published_Interface_Endpoint);
+        (Server, Rose.Interfaces.Processes.Process
+          .Published_Interface_Endpoint);
    end Publish_Interface;
 
    -------------------------
@@ -1165,9 +1166,9 @@ package body Mem.Server is
 
    procedure Remove_Instances (Id : Rose.Objects.Capability_Identifier) is
    begin
-      Rose.Interfaces.Process.Server.Remove_Instance (Id);
-      Rose.Interfaces.Heap.Server.Remove_Instance (Id);
-      Rose.Interfaces.Receiver.Server.Remove_Instance (Id);
+      Rose.Interfaces.Processes.Process.Server.Remove_Instance (Id);
+      Rose.Interfaces.Processes.Heap.Server.Remove_Instance (Id);
+      Rose.Interfaces.Caps.Receiver.Server.Remove_Instance (Id);
    end Remove_Instances;
 
    --------------------
@@ -1231,7 +1232,7 @@ package body Mem.Server is
            Rose.System_Calls.Server.Create_Endpoint
              (Create_Cap  => Create_Endpoint_Cap,
               Endpoint_Id =>
-                Rose.Interfaces.Replacement.Replacement_Interface,
+                Rose.Interfaces.Processes.Replacement.Replacement_Interface,
               Identifier  => Last_Replacement_Id),
          Old_Cap         => Old,
          Old_Pid         => Pid,
@@ -1311,7 +1312,7 @@ package body Mem.Server is
       --  Processes_Ended, without waiting.
 
       Mem.Processes.Set_Ended
-        (Rose.Interfaces.Memory.Server.Get_Processes_Ended_Cap);
+        (Rose.Interfaces.Processes.Memory.Server.Get_Processes_Ended_Cap);
    end Set_Process_Banks;
 
    -----------------------

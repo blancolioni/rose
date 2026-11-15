@@ -1,0 +1,6 @@
+interface Devices.Event_Source is
+
+   procedure Add_Listener
+      (Listener : interface Devices.Event_Listener);
+
+end Devices.Event_Source;

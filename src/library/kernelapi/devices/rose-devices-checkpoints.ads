@@ -1,6 +1,6 @@
 with System.Storage_Elements;
 
-with Rose.Interfaces.Block_Device.Client;
+with Rose.Interfaces.Storage.Block_Array.Client;
 
 package Rose.Devices.Checkpoints is
 
@@ -12,14 +12,14 @@ package Rose.Devices.Checkpoints is
    --  interface.
 
    procedure Start_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client);
 
    procedure Write_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Image  : System.Storage_Elements.Storage_Array);
 
    procedure Finish_System_Image
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client);
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client);
 
 
 end Rose.Devices.Checkpoints;

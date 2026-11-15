@@ -1,6 +1,6 @@
 with System;
 
-with Rose.Interfaces.Region;
+with Rose.Interfaces.Storage.Region;
 
 package Rose.Shared_Regions is
 
@@ -14,7 +14,7 @@ package Rose.Shared_Regions is
    Mapping_Error : exception;
 
    function Map
-     (Region   : in out Rose.Interfaces.Region.Region_Object'Class;
+     (Region   : in out Rose.Interfaces.Storage.Region.Region_Object'Class;
       Writable : Boolean := True)
       return System.Address;
    --  Map all of Region, and return the address of its first page. Raise

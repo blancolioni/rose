@@ -1,5 +1,5 @@
 command Rose.Core.Rights
-  : Create_Endpoint, Standard_Output, Clock_Admin_Service
+  : Caps.Create_Endpoint, Streams.Standard_Output, Time.Clock_Admin_Service
   with Summary     => "Serve the rights broker.",
        Description => """
           Rights is the rights broker (ADR 0021). It holds the caps that
@@ -12,8 +12,8 @@ command Rose.Core.Rights
        Server      => Rights_Server.Start_Server,
        Live
 is
-   Rights : out Rights
+   Rights : out Users.Rights
      with Help => "the Rights interface, for asking for authority";
-   Admin : out Rights_Admin
+   Admin : out Users.Rights_Admin
      with Help => "the Rights_Admin interface, for setting the policy";
 end Rose.Core.Rights;

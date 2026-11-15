@@ -2,7 +2,7 @@ with Swap_Probe_Server;
 
 procedure Rose.Core.Swap_Probe
   (Number : Natural;
-   Target : in out Rose.Interfaces.Named.Named_Object'Class;
+   Target : in out Rose.Interfaces.Common.Named.Named_Object'Class;
    Probe  : out Rose.Capabilities.Capability)
 is
 begin

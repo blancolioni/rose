@@ -5,10 +5,10 @@ with System.Storage_Elements;
 with Rose.Capabilities.Standard;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Region;
-with Rose.Interfaces.Segment;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Processes.Segment;
 
 with Tests.Registry;
 
@@ -49,7 +49,7 @@ package body Tests.Shared_Segments is
    -------------------------
 
    function Shared_Segment_Test return Boolean is
-      use Rose.Interfaces.Segment;
+      use Rose.Interfaces.Processes.Segment;
       use System.Storage_Elements;
 
       Second_Page : constant := Page_Size / 4 + 1;
@@ -70,13 +70,13 @@ package body Tests.Shared_Segments is
       end if;
 
       declare
-         Bank   : Rose.Interfaces.Bank.Client.Bank_Client :=
-                    Rose.Interfaces.Bank.Client.From_Cap
+         Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                    Rose.Interfaces.Storage.Bank.Client.From_Cap
                       (Tests.Registry.Bank);
-         Region : Rose.Interfaces.Region.Region_Object'Class :=
+         Region : Rose.Interfaces.Storage.Region.Region_Object'Class :=
                     Bank.Reserve_Storage (Pages * Page_Size);
-         Self   : Rose.Interfaces.Process.Client.Process_Client :=
-                    Rose.Interfaces.Process.Client.From_Cap
+         Self   : Rose.Interfaces.Processes.Process.Client.Process_Client :=
+                    Rose.Interfaces.Processes.Process.Client.From_Cap
                       (Rose.Capabilities.Standard.Process_Interface_Cap);
          First  : Word_Array
            with Import, Address => Address_Of (First_Shared);

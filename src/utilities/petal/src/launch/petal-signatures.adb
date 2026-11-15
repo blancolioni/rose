@@ -162,18 +162,31 @@ package body Petal.Signatures is
                end if;
             elsif Key = "category" then
                --  "category <role> <category>": for the role of that name.
+               --  The role is named with its group, Time.Clock_Service,
+               --  and its member by the last part, Clock_Service (Rose
+               --  ADR 0034).
 
                for I in Field.First .. Field.Last loop
                   if Result.Text (I) = ' ' then
-                     for Role of
-                       Result.Role_Caps (1 .. Result.Role_Cap_Count)
-                     loop
-                        if Result.Text (Role.Name.First .. Role.Name.Last)
-                          = Result.Text (Field.First .. I - 1)
-                        then
-                           Role.Category := (I + 1, Field.Last);
-                        end if;
-                     end loop;
+                     declare
+                        Start : Positive := Field.First;
+                     begin
+                        for J in Field.First .. I - 1 loop
+                           if Result.Text (J) = '.' then
+                              Start := J + 1;
+                           end if;
+                        end loop;
+
+                        for Role of
+                          Result.Role_Caps (1 .. Result.Role_Cap_Count)
+                        loop
+                           if Result.Text (Role.Name.First .. Role.Name.Last)
+                             = Result.Text (Start .. I - 1)
+                           then
+                              Role.Category := (I + 1, Field.Last);
+                           end if;
+                        end loop;
+                     end;
                      exit;
                   end if;
                end loop;

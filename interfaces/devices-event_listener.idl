@@ -1,0 +1,5 @@
+interface Devices.Event_Listener is
+
+   procedure On_Event (Code : Word);
+   
+end Devices.Event_Listener;

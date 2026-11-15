@@ -4,9 +4,9 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Event_Listener.Client;
-with Rose.Interfaces.Event_Source.Server;
-with Rose.Interfaces.Interrupt_Handler.Server;
+with Rose.Interfaces.Devices.Event_Listener.Client;
+with Rose.Interfaces.Devices.Event_Source.Server;
+with Rose.Interfaces.Devices.Interrupt_Handler.Server;
 
 with Rose.Devices.Port_IO;
 
@@ -20,7 +20,7 @@ package body Keyboard.Server is
    --  a listener, and another takes the keyboard's interrupt.
 
    type Source_Object is
-     new Rose.Interfaces.Event_Source.Server.Event_Source_Interface
+     new Rose.Interfaces.Devices.Event_Source.Server.Event_Source_Interface
      with null record;
 
    overriding function Event_Source_Cap
@@ -30,10 +30,11 @@ package body Keyboard.Server is
    overriding procedure Add_Listener
      (Item     : in out Source_Object;
       Listener : in out
-        Rose.Interfaces.Event_Listener.Event_Listener_Object'Class);
+        Rose.Interfaces.Devices.Event_Listener.Event_Listener_Object'Class);
 
    type Interrupt_Object is
-     new Rose.Interfaces.Interrupt_Handler.Server.Interrupt_Handler_Interface
+     new Rose.Interfaces.Devices.Interrupt_Handler.Server
+       .Interrupt_Handler_Interface
      with null record;
 
    overriding function Interrupt_Handler_Cap
@@ -49,7 +50,7 @@ package body Keyboard.Server is
    The_Interrupt : aliased Interrupt_Object;
 
    Have_Listener : Boolean := False;
-   Listener      : Rose.Interfaces.Event_Listener.Client
+   Listener      : Rose.Interfaces.Devices.Event_Listener.Client
      .Event_Listener_Client;
    --  The first listener, which gets every key. A user-target client
    --  first invokes its cap on its first call, at the first key, so
@@ -67,12 +68,12 @@ package body Keyboard.Server is
    overriding procedure Add_Listener
      (Item     : in out Source_Object;
       Listener : in out
-        Rose.Interfaces.Event_Listener.Event_Listener_Object'Class)
+        Rose.Interfaces.Devices.Event_Listener.Event_Listener_Object'Class)
    is
       pragma Unreferenced (Item);
    begin
       if not Have_Listener then
-         Rose.Interfaces.Event_Listener.Client.Open
+         Rose.Interfaces.Devices.Event_Listener.Client.Open
            (Server.Listener, Listener.Event_Listener_Cap);
          Have_Listener := True;
       end if;
@@ -84,10 +85,10 @@ package body Keyboard.Server is
 
    procedure Create_Server is
    begin
-      Rose.Interfaces.Interrupt_Handler.Server.Attach
+      Rose.Interfaces.Devices.Interrupt_Handler.Server.Attach
         (Context, The_Interrupt'Access);
       Register_IRQ;
-      Rose.Interfaces.Event_Source.Server.Publish
+      Rose.Interfaces.Devices.Event_Source.Server.Publish
         (Context, The_Source'Access);
    end Create_Server;
 
@@ -98,7 +99,7 @@ package body Keyboard.Server is
    overriding function Event_Source_Cap
      (Item : in out Source_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Event_Source.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Source.Server.Cap_Of (Item));
 
    ----------------------
    -- Handle_Interrupt --
@@ -151,7 +152,7 @@ package body Keyboard.Server is
    overriding function Interrupt_Handler_Cap
      (Item : in out Interrupt_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Interrupt_Handler.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Interrupt_Handler.Server.Cap_Of (Item));
 
    ------------------
    -- Register_IRQ --
@@ -168,7 +169,8 @@ package body Keyboard.Server is
       Rose.System_Calls.Send_Cap
         (Params,
          Rose.Server.Create_Endpoint
-           (Rose.Interfaces.Interrupt_Handler.Handle_Interrupt_Endpoint));
+           (Rose.Interfaces.Devices.Interrupt_Handler
+             .Handle_Interrupt_Endpoint));
       Rose.System_Calls.Invoke_Capability (Params);
    end Register_IRQ;
 

@@ -1,0 +1,13 @@
+interface Storage.Store is
+
+   --  Storage is reserved from a bank (ADR 0014, #449): the root bank,
+   --  or a bank below it.
+
+   procedure Add_Backing_Store
+     (Store  : interface Storage.Block_Array);
+
+   function Get_Root_Bank
+     return interface Storage.Bank;
+   --  The bank that every other is a sub-bank of.
+     
+end Storage.Store;

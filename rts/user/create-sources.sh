@@ -25,16 +25,22 @@ DIRS="$DIRS build/gnat-src"
 # directories, so that they use these specs and not other copies.
 
 IDLE=${IDLE:-idle}
-INTERFACES="process heap cap_set segment server cap region reader writer bank dependent resource
-signalled"
+INTERFACES="processes-process processes-heap caps-cap_set processes-segment
+    processes-server caps-cap storage-region streams-reader
+    streams-writer storage-bank storage-dependent common-resource
+    processes-signalled"
 mkdir -p build/idl build/interfaces
+rm -f build/interfaces/*.ads
 IDL_FILES=""
 for name in $INTERFACES
 do
     IDL_FILES="$IDL_FILES ../../interfaces/$name.idl"
 done
 $IDLE --target user -I ../../interfaces -o build/idl $IDL_FILES || exit 1
-for name in $INTERFACES
+# The interfaces' groups (ADR 0034), whose empty packages idle writes
+# with them, are copied too.
+IDL_GROUPS="caps common processes storage streams"
+for name in $IDL_GROUPS $INTERFACES
 do
     cp build/idl/rose-interfaces-$name.ads build/interfaces/ || exit 1
 done

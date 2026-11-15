@@ -5,9 +5,9 @@ with Rose.Init_Capabilities;
 with Rose.Limits;
 with Rose.Words;
 
-with Rose.Interfaces.Exec;
-with Rose.Interfaces.Map;
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Exec;
+with Rose.Interfaces.Commands.Map;
+with Rose.Interfaces.Processes.Process;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -178,7 +178,7 @@ package body Init.Run is
          return Rose.Capabilities.Capability
       is
          Caps          : Init.Calls.Array_Of_Capabilities
-           (1 .. Rose.Interfaces.Process.Subprogram_Count);
+           (1 .. Rose.Interfaces.Processes.Process.Subprogram_Count);
          Public_Cap    : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := Null_Capability;
       begin
@@ -186,7 +186,8 @@ package body Init.Run is
          Init.Calls.Open_Interface (Process_Cap, Caps);
 
          Public_Cap :=
-           Caps (Rose.Interfaces.Process.Published_Interface_Index + 1);
+           Caps (Rose.Interfaces.Processes.Process
+             .Published_Interface_Index + 1);
 
          if Public_Cap /= Null_Capability then
             for I in 1 .. 4 loop
@@ -340,7 +341,7 @@ package body Init.Run is
                                   Binary_Stream   => Params.Caps (1),
                                   Binary_Length   => Params.Data (0));
                   Caps     : Init.Calls.Array_Of_Capabilities
-                    (1 .. Rose.Interfaces.Exec.Subprogram_Count);
+                    (1 .. Rose.Interfaces.Processes.Exec.Subprogram_Count);
                   Public_Cap : constant Rose.Capabilities.Capability :=
                                  Get_Public_Interface_From_Process (Exec_Cap);
                begin
@@ -353,12 +354,13 @@ package body Init.Run is
                   else
                      Init.Calls.Open_Interface (Public_Cap, Caps);
                      Install_Cap :=
-                       Caps (Rose.Interfaces.Exec.Install_Index + 1);
+                       Caps (Rose.Interfaces.Processes.Exec.Install_Index + 1);
                      Set_Output_Cap :=
                        Caps
-                         (Rose.Interfaces.Exec.Set_Standard_Output_Index + 1);
+                         (Rose.Interfaces.Processes.Exec
+                           .Set_Standard_Output_Index + 1);
                      Exec_Update_Cap :=
-                       Caps (Rose.Interfaces.Exec.Update_Index + 1);
+                       Caps (Rose.Interfaces.Processes.Exec.Update_Index + 1);
                   end if;
                end;
 
@@ -376,7 +378,7 @@ package body Init.Run is
                                      Binary_Stream   => Params.Caps (1),
                                      Binary_Length   => Params.Data (0));
                   Caps     : Init.Calls.Array_Of_Capabilities
-                    (1 .. Rose.Interfaces.Map.Subprogram_Count);
+                    (1 .. Rose.Interfaces.Commands.Map.Subprogram_Count);
                   Public_Cap : constant Rose.Capabilities.Capability :=
                                   Get_Public_Interface_From_Process
                                     (Command_Cap);
@@ -385,8 +387,10 @@ package body Init.Run is
                   Add_Cap := Null_Capability;
                   for I in 1 .. 4 loop
                      Init.Calls.Open_Interface (Public_Cap, Caps);
-                     Find_Cap := Caps (Rose.Interfaces.Map.Find_Index + 1);
-                     Add_Cap := Caps (Rose.Interfaces.Map.Add_Index + 1);
+                     Find_Cap := Caps (Rose.Interfaces.Commands.Map
+                       .Find_Index + 1);
+                     Add_Cap := Caps (Rose.Interfaces.Commands.Map
+                       .Add_Index + 1);
                      exit when Add_Cap /= Null_Capability;
                      Wait (500);
                   end loop;
@@ -408,7 +412,8 @@ package body Init.Run is
 
                   declare
                      Get_Commands : constant Rose.Capabilities.Capability :=
-                       Caps (Rose.Interfaces.Map.Get_Commands_Index + 1);
+                       Caps (Rose.Interfaces.Commands.Map
+                         .Get_Commands_Index + 1);
                   begin
                      if Get_Commands /= Null_Capability then
                         Commands_Cap :=

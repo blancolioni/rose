@@ -1,6 +1,6 @@
 with Rose.Capabilities.Standard;
-with Rose.Interfaces.Heap;
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Heap;
+with Rose.Interfaces.Processes.Process;
 with Rose.Invocation;
 with Rose.Limits;
 with Rose.System_Calls;
@@ -344,7 +344,7 @@ package body Rose.CRTL is
       Params    : aliased Rose.Invocation.Invocation_Record;
       Heap_Cap  : Rose.Capabilities.Capability;
       Heap_Caps : Rose.Capabilities.Capability_Array
-                    (1 .. Rose.Interfaces.Heap.Subprogram_Count);
+                    (1 .. Rose.Interfaces.Processes.Heap.Subprogram_Count);
    begin
       Heap_Started := True;
 
@@ -352,7 +352,7 @@ package body Rose.CRTL is
         (Params,
          Rose.System_Calls.Get_Interface_Cap
            (Rose.Capabilities.Standard.Process_Interface_Cap,
-            Rose.Interfaces.Process.Heap_Interface_Index));
+            Rose.Interfaces.Processes.Process.Heap_Interface_Index));
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
       if Params.Control.Flags (Rose.Invocation.Error) then
@@ -365,9 +365,9 @@ package body Rose.CRTL is
          return;
       end if;
       Current_Bound_Cap :=
-        Heap_Caps (Rose.Interfaces.Heap.Current_Bound_Index + 1);
+        Heap_Caps (Rose.Interfaces.Processes.Heap.Current_Bound_Index + 1);
       Request_Bound_Cap :=
-        Heap_Caps (Rose.Interfaces.Heap.Request_New_Bound_Index + 1);
+        Heap_Caps (Rose.Interfaces.Processes.Heap.Request_New_Bound_Index + 1);
 
       Heap_Base := Current_Bound;
       Heap_Top := Heap_Base;

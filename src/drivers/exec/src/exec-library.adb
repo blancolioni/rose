@@ -4,7 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Limits;
 
-with Rose.Interfaces.Region.Client;
+with Rose.Interfaces.Storage.Region.Client;
 
 with Exec.Output;
 
@@ -56,7 +56,7 @@ package body Exec.Library is
    is (Installed_Programs.Reference (Positive (Id)));
    --  Program Id, which Is_Installed.
 
-   Region         : Rose.Interfaces.Region.Client.Region_Client;
+   Region         : Rose.Interfaces.Storage.Region.Client.Region_Client;
    --  Where the images are kept.
    Page_Base,
    Page_Bound         : Rose.Objects.Object_Id := 0;
@@ -80,7 +80,7 @@ package body Exec.Library is
    --  Name as a program record holds it: cut, or padded with spaces.
 
    procedure Write_Image
-     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array;
       Old       : Natural;
@@ -259,7 +259,7 @@ package body Exec.Library is
    begin
       if Item.Image = Rose.Capabilities.Null_Capability then
          declare
-            Image : Rose.Interfaces.Region.Region_Object'Class :=
+            Image : Rose.Interfaces.Storage.Region.Region_Object'Class :=
               Region.Create_Subregion (Item.ELF_Base, Item.ELF_Bound, 5);
          begin
             Item.Image := Image.Region_Cap;
@@ -273,7 +273,7 @@ package body Exec.Library is
    -------------
 
    function Install
-     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array)
       return Rose.Objects.Capability_Identifier
@@ -403,7 +403,7 @@ package body Exec.Library is
 
    procedure Set_Region (Region : Rose.Capabilities.Capability) is
    begin
-      Rose.Interfaces.Region.Client.Open (Exec.Library.Region, Region);
+      Rose.Interfaces.Storage.Region.Client.Open (Exec.Library.Region, Region);
       Exec.Library.Region.Get_Range (Page_Base, Page_Bound);
       Next_Page := Page_Base;
    end Set_Region;
@@ -432,7 +432,7 @@ package body Exec.Library is
    ------------
 
    function Update
-     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array;
       Changed   : out Boolean)
@@ -490,7 +490,7 @@ package body Exec.Library is
    -----------------
 
    procedure Write_Image
-     (ELF_Image : in out Rose.Interfaces.Reader.Reader_Object'Class;
+     (ELF_Image : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name      : String;
       Caps      : Rose.Capabilities.Capability_Array;
       Old       : Natural;

@@ -4,8 +4,8 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Clock_Admin.Server;
-with Rose.Interfaces.Restorable.Server;
+with Rose.Interfaces.Time.Clock_Admin.Server;
+with Rose.Interfaces.Processes.Restorable.Server;
 
 with Clock.Calendar;
 with Clock.RTC;
@@ -19,8 +19,8 @@ package body Clock.Server is
    --  so that a checkpoint holds it with the process's memory.
 
    type Clock_Object is
-     new Rose.Interfaces.Clock_Admin.Server.Clock_Admin_Interface
-     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     new Rose.Interfaces.Time.Clock_Admin.Server.Clock_Admin_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding function Clock_Cap
@@ -109,7 +109,7 @@ package body Clock.Server is
    overriding function Clock_Admin_Cap
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Clock_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Time.Clock_Admin.Server.Cap_Of (Item));
 
    ---------------
    -- Clock_Cap --
@@ -118,8 +118,8 @@ package body Clock.Server is
    overriding function Clock_Cap
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Clock_Admin.Server.Cap_Of
-         (Item, Rose.Interfaces.Clock_Admin.Clock_Interface));
+   is (Rose.Interfaces.Time.Clock_Admin.Server.Cap_Of
+         (Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
 
    ------------
    -- Divide --
@@ -259,7 +259,7 @@ package body Clock.Server is
    overriding function Restorable_Cap
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
@@ -340,8 +340,10 @@ package body Clock.Server is
 
    procedure Start_Server is
    begin
-      Rose.Interfaces.Clock_Admin.Server.Publish (Context, The_Clock'Access);
-      Rose.Interfaces.Restorable.Server.Attach (Context, The_Clock'Access);
+      Rose.Interfaces.Time.Clock_Admin.Server
+        .Publish (Context, The_Clock'Access);
+      Rose.Interfaces.Processes.Restorable.Server
+        .Attach (Context, The_Clock'Access);
 
       --  Callers wait for the server while it finds the edge of the RTC's
       --  second, which takes up to a second.

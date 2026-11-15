@@ -1,5 +1,5 @@
 with Rose.Boot.Console;
-with Rose.Interfaces.Kernel_Log;
+with Rose.Interfaces.Checkpoints.Kernel_Log;
 with Rose.Invocation;
 
 with Rose.Kernel.Processes.Snapshot;
@@ -43,7 +43,8 @@ package body Rose.Kernel.Checkpoint is
       Rose.Boot.Console.Put_Line ("Checkpoint mode ready");
 
       if Log_Started then
-         Notify_Log (Log_Create, Rose.Interfaces.Kernel_Log.Create_Endpoint);
+         Notify_Log (Log_Create, Rose.Interfaces.Checkpoints.Kernel_Log
+           .Create_Endpoint);
       end if;
    end Enter_Checkpoint;
 
@@ -55,7 +56,8 @@ package body Rose.Kernel.Checkpoint is
    begin
       Rose.Boot.Console.Put_Line ("Leaving checkpoint");
       if Log_Started then
-         Notify_Log (Log_Commit, Rose.Interfaces.Kernel_Log.Commit_Endpoint);
+         Notify_Log (Log_Commit, Rose.Interfaces.Checkpoints.Kernel_Log
+           .Commit_Endpoint);
       end if;
       Rose.Kernel.Processes.Leave_Checkpoint;
       Rose.Boot.Console.Checkpoint_Status (False);

@@ -9,30 +9,30 @@ with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
-with Rose.Interfaces.Auth.Client;
-with Rose.Interfaces.Auth_Admin.Client;
-with Rose.Interfaces.Bank;
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Constructor.Client;
-with Rose.Interfaces.Directory;
-with Rose.Interfaces.File;
+with Rose.Interfaces.Users.Auth.Client;
+with Rose.Interfaces.Users.Auth_Admin.Client;
+with Rose.Interfaces.Storage.Bank;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Caps.Constructor.Client;
+with Rose.Interfaces.Files.Directory;
+with Rose.Interfaces.Files.File;
 with Rose.Interfaces.Held_Call.Client;
-with Rose.Interfaces.Launch;
-with Rose.Interfaces.Named.Client;
+with Rose.Interfaces.Processes.Launch;
+with Rose.Interfaces.Common.Named.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Cap_Set;
-with Rose.Interfaces.Releasable_Cap_Set.Client;
-with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Releasable_Writer;
-with Rose.Interfaces.Replaceable.Client;
-with Rose.Interfaces.Replacement;
-with Rose.Interfaces.Replacement.Client;
-with Rose.Interfaces.Replacer.Client;
-with Rose.Interfaces.Saveable.Client;
-with Rose.Interfaces.Transactional_Writable_File;
-with Rose.Interfaces.User.Client;
-with Rose.Interfaces.Writable_Directory.Client;
-with Rose.Interfaces.Writable_File.Client;
+with Rose.Interfaces.Caps.Releasable_Cap_Set;
+with Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
+with Rose.Interfaces.Streams.Releasable_Reader;
+with Rose.Interfaces.Streams.Releasable_Writer;
+with Rose.Interfaces.Processes.Replaceable.Client;
+with Rose.Interfaces.Processes.Replacement;
+with Rose.Interfaces.Processes.Replacement.Client;
+with Rose.Interfaces.Processes.Replacer.Client;
+with Rose.Interfaces.Processes.Saveable.Client;
+with Rose.Interfaces.Files.Transactional_Writable_File;
+with Rose.Interfaces.Users.User.Client;
+with Rose.Interfaces.Files.Writable_Directory.Client;
+with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Files;
 with Tests.Registry;
@@ -89,13 +89,13 @@ package body Tests.Replacement is
        and then Server.Held /= Rose.Capabilities.Null_Capability);
 
    function Wait_Until_Ready
-     (Replacement : in out Rose.Interfaces.Replacement
+     (Replacement : in out Rose.Interfaces.Processes.Replacement
         .Replacement_Object'Class)
       return Boolean;
    --  Ask Replacement until the old version is between calls.
 
    function Commit_When_Ready
-     (Replacement : in out Rose.Interfaces.Replacement
+     (Replacement : in out Rose.Interfaces.Processes.Replacement
         .Replacement_Object'Class)
       return Boolean;
    --  Commit Replacement once the old version is between calls again.
@@ -169,7 +169,7 @@ package body Tests.Replacement is
    -----------------------
 
    function Commit_When_Ready
-     (Replacement : in out Rose.Interfaces.Replacement
+     (Replacement : in out Rose.Interfaces.Processes.Replacement
         .Replacement_Object'Class)
       return Boolean
    is
@@ -182,8 +182,8 @@ package body Tests.Replacement is
    -------------
 
    function Name_Of (Server : Started) return String is
-      Named : Rose.Interfaces.Named.Client.Named_Client :=
-        Rose.Interfaces.Named.Client.From_Cap (Server.Served);
+      Named : Rose.Interfaces.Common.Named.Client.Named_Client :=
+        Rose.Interfaces.Common.Named.Client.From_Cap (Server.Served);
    begin
       return Named.Name;
    exception
@@ -272,14 +272,16 @@ package body Tests.Replacement is
 
       declare
          No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
-         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+         Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
-         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
            Own.Create_Sub_Bank (0, 0);
-         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
-           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
-         Launcher  : Rose.Interfaces.Launch.Launch_Object'Class :=
+         Replacer  : Rose.Interfaces.Processes.Replacer.Client
+           .Replacer_Client :=
+           Rose.Interfaces.Processes.Replacer.Client.From_Cap (Tests.Registry
+             .Replacer);
+         Launcher  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
            Tests.Registry.Launcher ("auth");
          Endpoint  : constant Rose.Capabilities.Capability :=
            Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
@@ -306,17 +308,17 @@ package body Tests.Replacement is
          end if;
 
          declare
-            Auth        : Rose.Interfaces.Auth.Client.Auth_Client :=
-              Rose.Interfaces.Auth.Client.From_Cap (Auth_Cap);
-            Admin       : Rose.Interfaces.Auth_Admin.Client
+            Auth        : Rose.Interfaces.Users.Auth.Client.Auth_Client :=
+              Rose.Interfaces.Users.Auth.Client.From_Cap (Auth_Cap);
+            Admin       : Rose.Interfaces.Users.Auth_Admin.Client
               .Auth_Admin_Client :=
-                Rose.Interfaces.Auth_Admin.Client.From_Cap (Admin_Cap);
-            User        : Rose.Interfaces.User.User_Object'Class :=
+                Rose.Interfaces.Users.Auth_Admin.Client.From_Cap (Admin_Cap);
+            User        : Rose.Interfaces.Users.User.User_Object'Class :=
               Admin.New_User ("amy", "secret");
-            Session     : Rose.Interfaces.Bank.Bank_Object'Class :=
+            Session     : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
               User.New_Session;
             --  A user and a session from before the handover.
-            Replacement : Rose.Interfaces.Replacement
+            Replacement : Rose.Interfaces.Processes.Replacement
               .Replacement_Object'Class :=
                 Replacer.Replace_Process (Control);
             Committed   : Boolean := False;
@@ -328,7 +330,8 @@ package body Tests.Replacement is
             if Replacement.Replacement_Cap /= Null_Cap then
                declare
                   Ready       : Boolean := False;
-                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  Sibling     : Rose.Interfaces.Storage.Bank
+                    .Bank_Object'Class :=
                     Replacement.Bank;
                   New_Version : Rose.Capabilities.Capability;
                   New_Auth    : Rose.Capabilities.Capability;
@@ -374,9 +377,9 @@ package body Tests.Replacement is
                --  and gives the same user's server.
 
                declare
-                  Again : Rose.Interfaces.User.User_Object'Class :=
+                  Again : Rose.Interfaces.Users.User.User_Object'Class :=
                     Auth.Login ("amy", "secret");
-                  Wrong : Rose.Interfaces.User.User_Object'Class :=
+                  Wrong : Rose.Interfaces.Users.User.User_Object'Class :=
                     Auth.Login ("amy", "wrong");
                begin
                   Check ("the user cannot log in",
@@ -390,7 +393,7 @@ package body Tests.Replacement is
                --  launching anything.
 
                declare
-                  Twice : Rose.Interfaces.User.User_Object'Class :=
+                  Twice : Rose.Interfaces.Users.User.User_Object'Class :=
                     Admin.New_User ("amy", "other");
                begin
                   Check ("the user was made twice",
@@ -400,7 +403,7 @@ package body Tests.Replacement is
                --  The user and the session from before still work.
 
                declare
-                  Inner : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  Inner : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
                     Session.Create_Sub_Bank (0, 0);
                begin
                   Check ("the user from before is wrong",
@@ -462,18 +465,20 @@ package body Tests.Replacement is
       --  which it destroys at the end (#724).
 
       declare
-         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+         Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
-         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
            Own.Create_Sub_Bank (0, 0);
-         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
-           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Replacer  : Rose.Interfaces.Processes.Replacer.Client
+           .Replacer_Client :=
+           Rose.Interfaces.Processes.Replacer.Client.From_Cap (Tests.Registry
+             .Replacer);
          Endpoint  : constant Rose.Capabilities.Capability :=
            Tests.Registry.Directory_Endpoint (Test_Bank.Bank_Cap);
          Served    : Rose.Capabilities.Capability := Null_Cap;
          Control   : Rose.Capabilities.Capability := Null_Cap;
-         Top       : Rose.Interfaces.Writable_Directory.Client
+         Top       : Rose.Interfaces.Files.Writable_Directory.Client
            .Writable_Directory_Client;
       begin
          if Endpoint /= Null_Cap then
@@ -500,16 +505,17 @@ package body Tests.Replacement is
          --  kernel's 64, and running out hangs the system (#915).
 
          declare
-            File      : Rose.Interfaces.Writable_File
+            File      : Rose.Interfaces.Files.Writable_File
               .Writable_File_Object'Class := Top.Create_File ("a");
-            Sub       : Rose.Interfaces.Writable_Directory
+            Sub       : Rose.Interfaces.Files.Writable_Directory
               .Writable_Directory_Object'Class :=
                 Top.Create_Directory ("sub");
-            Read_File : Rose.Interfaces.File.File_Object'Class :=
+            Read_File : Rose.Interfaces.Files.File.File_Object'Class :=
               Top.Get_Ordinary_File (1);
-            Read_Sub  : Rose.Interfaces.Directory.Directory_Object'Class :=
+            Read_Sub  : Rose.Interfaces.Files.Directory
+              .Directory_Object'Class :=
               Top.Get_Directory (2);
-            Replacement : Rose.Interfaces.Replacement
+            Replacement : Rose.Interfaces.Processes.Replacement
               .Replacement_Object'Class :=
                 Replacer.Replace_Process (Control);
             Committed   : Boolean := False;
@@ -522,7 +528,8 @@ package body Tests.Replacement is
             if Replacement.Replacement_Cap /= Null_Cap then
                declare
                   Ready       : Boolean := False;
-                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  Sibling     : Rose.Interfaces.Storage.Bank
+                    .Bank_Object'Class :=
                     Replacement.Bank;
                   New_Version : Rose.Capabilities.Capability;
                   New_Served  : Rose.Capabilities.Capability;
@@ -574,9 +581,9 @@ package body Tests.Replacement is
                Check ("the file's size is wrong",
                       Top.Directory_Entry_Size (1) = Hello'Length);
                declare
-                  Again     : Rose.Interfaces.Writable_File
+                  Again     : Rose.Interfaces.Files.Writable_File
                     .Writable_File_Object'Class := Top.Get_Writable_File (1);
-                  Sub_Again : Rose.Interfaces.Writable_Directory
+                  Sub_Again : Rose.Interfaces.Files.Writable_Directory
                     .Writable_Directory_Object'Class :=
                       Top.Get_Writable_Directory (2);
                begin
@@ -594,7 +601,7 @@ package body Tests.Replacement is
                Check ("the read-only directory from before is wrong",
                       Read_Sub.Directory_Entry_Count = 0);
                declare
-                  Read_Again : Rose.Interfaces.File.File_Object'Class :=
+                  Read_Again : Rose.Interfaces.Files.File.File_Object'Class :=
                     Top.Get_Ordinary_File (1);
                begin
                   Check ("the read-only file is wrong",
@@ -619,7 +626,7 @@ package body Tests.Replacement is
                --  Entries can still be created, renamed and deleted.
 
                declare
-                  Made : Rose.Interfaces.Writable_File
+                  Made : Rose.Interfaces.Files.Writable_File
                     .Writable_File_Object'Class := Top.Create_File ("b");
                begin
                   Check ("cannot create a file",
@@ -668,7 +675,7 @@ package body Tests.Replacement is
       function Bytes (Text : String) return Stream_Element_Array;
 
       function Read_All
-        (Reader : in out Rose.Interfaces.Releasable_Reader
+        (Reader : in out Rose.Interfaces.Streams.Releasable_Reader
            .Releasable_Reader_Object'Class)
          return String;
       --  What Reader reads until it reaches the end.
@@ -704,7 +711,7 @@ package body Tests.Replacement is
       --------------
 
       function Read_All
-        (Reader : in out Rose.Interfaces.Releasable_Reader
+        (Reader : in out Rose.Interfaces.Streams.Releasable_Reader
            .Releasable_Reader_Object'Class)
          return String
       is
@@ -739,18 +746,20 @@ package body Tests.Replacement is
       --  test's own, which it destroys at the end (#724).
 
       declare
-         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+         Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
-         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
            Own.Create_Sub_Bank (0, 0);
-         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
-           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Replacer  : Rose.Interfaces.Processes.Replacer.Client
+           .Replacer_Client :=
+           Rose.Interfaces.Processes.Replacer.Client.From_Cap (Tests.Registry
+             .Replacer);
          Endpoint  : constant Rose.Capabilities.Capability :=
            Tests.Registry.File_Endpoint (Test_Bank.Bank_Cap);
          Served    : Rose.Capabilities.Capability := Null_Cap;
          Control   : Rose.Capabilities.Capability := Null_Cap;
-         File      : Rose.Interfaces.Writable_File.Client
+         File      : Rose.Interfaces.Files.Writable_File.Client
            .Writable_File_Client;
       begin
          if Endpoint /= Null_Cap then
@@ -771,11 +780,11 @@ package body Tests.Replacement is
          File.Open (Served);
 
          declare
-            First   : Rose.Interfaces.Releasable_Writer
+            First   : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class := File.Rewrite;
-            Writer  : Rose.Interfaces.Releasable_Writer
+            Writer  : Rose.Interfaces.Streams.Releasable_Writer
               .Releasable_Writer_Object'Class := File.Append;
-            Reader  : Rose.Interfaces.Releasable_Reader
+            Reader  : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := File.Open_Reader;
             Start   : Stream_Element_Array (1 .. 2);
             Last    : Stream_Element_Offset;
@@ -789,12 +798,13 @@ package body Tests.Replacement is
             --  the handover too.
 
             declare
-               Version        : Rose.Interfaces.Transactional_Writable_File
+               Version        : Rose.Interfaces.Files
+                 .Transactional_Writable_File
                  .Transactional_Writable_File_Object'Class :=
                    File.New_Version;
-               Version_Writer : Rose.Interfaces.Releasable_Writer
+               Version_Writer : Rose.Interfaces.Streams.Releasable_Writer
                  .Releasable_Writer_Object'Class := Version.Append;
-               Replacement    : Rose.Interfaces.Replacement
+               Replacement    : Rose.Interfaces.Processes.Replacement
                  .Replacement_Object'Class :=
                    Replacer.Replace_Process (Control);
                Committed      : Boolean := False;
@@ -805,7 +815,8 @@ package body Tests.Replacement is
                if Replacement.Replacement_Cap /= Null_Cap then
                   declare
                      Ready       : Boolean := False;
-                     Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                     Sibling     : Rose.Interfaces.Storage.Bank
+                       .Bank_Object'Class :=
                        Replacement.Bank;
                      New_Version : Rose.Capabilities.Capability;
                      New_Served  : Rose.Capabilities.Capability;
@@ -857,7 +868,7 @@ package body Tests.Replacement is
                          File.Size = 6);
 
                   declare
-                     Again : Rose.Interfaces.Releasable_Reader
+                     Again : Rose.Interfaces.Streams.Releasable_Reader
                        .Releasable_Reader_Object'Class := File.Open_Reader;
                   begin
                      Check ("the file is not the version's",
@@ -918,15 +929,17 @@ package body Tests.Replacement is
       --  leaves no servers behind (#724).
 
       declare
-         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+         Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
-         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
            Own.Create_Sub_Bank (0, 0);
          In_Bank   : constant Rose.Capabilities.Capability :=
            Test_Bank.Bank_Cap;
-         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
-           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
+         Replacer  : Rose.Interfaces.Processes.Replacer.Client
+           .Replacer_Client :=
+           Rose.Interfaces.Processes.Replacer.Client.From_Cap (Tests.Registry
+             .Replacer);
       begin
          Check ("no test bank", In_Bank /= Null_Cap);
 
@@ -950,7 +963,7 @@ package body Tests.Replacement is
                   Deferred    : constant Started :=
                     Start ("helper", Target => Old_Version.Held,
                            Bank => In_Bank);
-                  Replacement : Rose.Interfaces.Replacement
+                  Replacement : Rose.Interfaces.Processes.Replacement
                     .Replacement_Object'Class :=
                       Replacer.Replace_Process (Old_Version.Control);
                begin
@@ -974,7 +987,8 @@ package body Tests.Replacement is
                         --  Wait, which has room for one deferred call.
                         Ready   : constant Boolean :=
                           Wait_Until_Ready (Replacement);
-                        Sibling : Rose.Interfaces.Bank.Bank_Object'Class :=
+                        Sibling : Rose.Interfaces.Storage.Bank
+                          .Bank_Object'Class :=
                           Replacement.Bank;
                         New_Version : constant Started :=
                           Start ("ignored",
@@ -1076,7 +1090,7 @@ package body Tests.Replacement is
                            Bank => In_Bank);
                   Waited      : constant Boolean :=
                     Wait_For_Caller (Old_Version);
-                  Replacement : Rose.Interfaces.Replacement
+                  Replacement : Rose.Interfaces.Processes.Replacement
                     .Replacement_Object'Class :=
                       Replacer.Replace_Process (Old_Version.Control);
                begin
@@ -1089,7 +1103,8 @@ package body Tests.Replacement is
                      declare
                         Ready   : constant Boolean :=
                           Wait_Until_Ready (Replacement);
-                        Sibling : Rose.Interfaces.Bank.Bank_Object'Class :=
+                        Sibling : Rose.Interfaces.Storage.Bank
+                          .Bank_Object'Class :=
                           Replacement.Bank;
                      begin
                         Check ("the refused one is never ready", Ready);
@@ -1180,22 +1195,24 @@ package body Tests.Replacement is
 
       declare
          No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
-         Own       : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+         Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
-         Test_Bank : Rose.Interfaces.Bank.Bank_Object'Class :=
+         Test_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
            Own.Create_Sub_Bank (0, 0);
-         Replacer  : Rose.Interfaces.Replacer.Client.Replacer_Client :=
-           Rose.Interfaces.Replacer.Client.From_Cap (Tests.Registry.Replacer);
-         Launcher  : Rose.Interfaces.Launch.Launch_Object'Class :=
+         Replacer  : Rose.Interfaces.Processes.Replacer.Client
+           .Replacer_Client :=
+           Rose.Interfaces.Processes.Replacer.Client.From_Cap (Tests.Registry
+             .Replacer);
+         Launcher  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
            Tests.Registry.Launcher ("user");
-         Home      : Rose.Interfaces.Writable_Directory.Client
+         Home      : Rose.Interfaces.Files.Writable_Directory.Client
            .Writable_Directory_Client;
          Endpoint  : constant Rose.Capabilities.Capability :=
            Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
          Served    : Rose.Capabilities.Capability := Null_Cap;
          Control   : Rose.Capabilities.Capability := Null_Cap;
-         User      : Rose.Interfaces.User.Client.User_Client;
+         User      : Rose.Interfaces.Users.User.Client.User_Client;
       begin
          Home.Open (Tests.Registry.Launch_Directory (Test_Bank.Bank_Cap));
 
@@ -1221,10 +1238,10 @@ package body Tests.Replacement is
          User.Open (Served);
 
          declare
-            Before      : Rose.Interfaces.Bank.Bank_Object'Class :=
+            Before      : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
               User.New_Session;
             --  A session that is open across the handover.
-            Replacement : Rose.Interfaces.Replacement
+            Replacement : Rose.Interfaces.Processes.Replacement
               .Replacement_Object'Class :=
                 Replacer.Replace_Process (Control);
             Committed   : Boolean := False;
@@ -1235,7 +1252,8 @@ package body Tests.Replacement is
             if Replacement.Replacement_Cap /= Null_Cap then
                declare
                   Ready       : Boolean := False;
-                  Sibling     : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  Sibling     : Rose.Interfaces.Storage.Bank
+                    .Bank_Object'Class :=
                     Replacement.Bank;
                   New_Version : Rose.Capabilities.Capability;
                   New_Served  : Rose.Capabilities.Capability;
@@ -1279,10 +1297,10 @@ package body Tests.Replacement is
                       User.Name = "rhona");
 
                declare
-                  User_Home : Rose.Interfaces.Writable_Directory
+                  User_Home : Rose.Interfaces.Files.Writable_Directory
                     .Writable_Directory_Object'Class :=
                       User.Home_Directory;
-                  Created   : Rose.Interfaces.Writable_File
+                  Created   : Rose.Interfaces.Files.Writable_File
                     .Writable_File_Object'Class :=
                       User_Home.Create_File ("after");
                begin
@@ -1296,9 +1314,9 @@ package body Tests.Replacement is
                --  of the user's, and a new one is too.
 
                declare
-                  After : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  After : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
                     User.New_Session;
-                  Inner : Rose.Interfaces.Bank.Bank_Object'Class :=
+                  Inner : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
                     Before.Create_Sub_Bank (0, 0);
                begin
                   Check ("no session after the handover",
@@ -1343,7 +1361,7 @@ package body Tests.Replacement is
          end if;
       end Check;
 
-      function New_Bank return Rose.Interfaces.Bank.Bank_Object'Class;
+      function New_Bank return Rose.Interfaces.Storage.Bank.Bank_Object'Class;
       --  A new sub-bank of run_self_tests' own bank. Each part of the test
       --  launches in one, and destroys it when the part is done, which
       --  ends every process launched in it, so that only a few
@@ -1353,9 +1371,10 @@ package body Tests.Replacement is
       -- New_Bank --
       --------------
 
-      function New_Bank return Rose.Interfaces.Bank.Bank_Object'Class is
-         Own : Rose.Interfaces.Bank.Client.Bank_Client :=
-           Rose.Interfaces.Bank.Client.From_Cap
+      function New_Bank return Rose.Interfaces.Storage.Bank
+        .Bank_Object'Class is
+         Own : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
       begin
          return Own.Create_Sub_Bank (0, 0);
@@ -1370,7 +1389,8 @@ package body Tests.Replacement is
       end if;
 
       declare
-         Fred_Bank   : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+         Fred_Bank   : Rose.Interfaces.Storage.Bank
+           .Bank_Object'Class := New_Bank;
          Old_Version : constant Started :=
            Start ("fred", Bank => Fred_Bank.Bank_Cap);
       begin
@@ -1390,7 +1410,8 @@ package body Tests.Replacement is
          --  that the old version owes a reply when it is replaced (#879).
 
          declare
-            Helper_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Helper_Bank : Rose.Interfaces.Storage.Bank
+              .Bank_Object'Class := New_Bank;
             Helper      : constant Started :=
               Start ("helper",
                      Target => Old_Version.Held,
@@ -1427,22 +1448,24 @@ package body Tests.Replacement is
             --  Releasing them leaves the call deferred.
 
             declare
-               Old : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
-                 Rose.Interfaces.Replaceable.Client.From_Cap
+               Old : Rose.Interfaces.Processes.Replaceable.Client
+                 .Replaceable_Client :=
+                 Rose.Interfaces.Processes.Replaceable.Client.From_Cap
                    (Old_Version.Control);
-               Set : Rose.Interfaces.Releasable_Cap_Set
+               Set : Rose.Interfaces.Caps.Releasable_Cap_Set
                  .Releasable_Cap_Set_Object'Class := Old.Caps;
             begin
                Check ("the caps are not two caps", Set.Length = 2);
                if Set.Length = 2 then
                   declare
-                     Service : Rose.Interfaces.Constructor.Client
+                     Service : Rose.Interfaces.Caps.Constructor.Client
                        .Constructor_Client :=
-                         Rose.Interfaces.Constructor.Client.From_Cap
+                         Rose.Interfaces.Caps.Constructor.Client.From_Cap
                            (Set.Get_Cap (1));
-                     Made    : Rose.Interfaces.Releasable_Cap_Set.Client
+                     Made    : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
                        .Releasable_Cap_Set_Client :=
-                         Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap
+                         Rose.Interfaces.Caps.Releasable_Cap_Set.Client
+                           .From_Cap
                            (Service.Create);
                   begin
                      Check ("the cap-set-service cap does not work",
@@ -1511,11 +1534,14 @@ package body Tests.Replacement is
          --  as it was (ADR 0032, section 10, #881).
 
          declare
-            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
-            Saved    : Rose.Interfaces.Releasable_Reader
+            Saveable : Rose.Interfaces.Processes.Saveable.Client
+              .Saveable_Client :=
+              Rose.Interfaces.Processes.Saveable.Client.From_Cap (Old_Version
+                .Saver);
+            Saved    : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
-            Restore_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Restore_Bank : Rose.Interfaces.Storage.Bank
+              .Bank_Object'Class := New_Bank;
             Restored     : constant Started :=
               Start ("anne",
                      Saved => Saved.Reader_Cap,
@@ -1532,11 +1558,11 @@ package body Tests.Replacement is
                end;
 
                declare
-                  Copy : Rose.Interfaces.Replaceable.Client
+                  Copy : Rose.Interfaces.Processes.Replaceable.Client
                     .Replaceable_Client :=
-                      Rose.Interfaces.Replaceable.Client.From_Cap
+                      Rose.Interfaces.Processes.Replaceable.Client.From_Cap
                         (Restored.Control);
-                  Set  : Rose.Interfaces.Releasable_Cap_Set
+                  Set  : Rose.Interfaces.Caps.Releasable_Cap_Set
                     .Releasable_Cap_Set_Object'Class := Copy.Caps;
                begin
                   Check ("the restored one doesn't have its two caps",
@@ -1559,11 +1585,14 @@ package body Tests.Replacement is
          --  without its first word.
 
          declare
-            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
-            Saved     : Rose.Interfaces.Releasable_Reader
+            Saveable : Rose.Interfaces.Processes.Saveable.Client
+              .Saveable_Client :=
+              Rose.Interfaces.Processes.Saveable.Client.From_Cap (Old_Version
+                .Saver);
+            Saved     : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
-            Both_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Both_Bank : Rose.Interfaces.Storage.Bank
+              .Bank_Object'Class := New_Bank;
          begin
             Check ("both a version and a state started",
                    not Is_Started
@@ -1576,13 +1605,16 @@ package body Tests.Replacement is
          end;
 
          declare
-            Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
-              Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
-            Saved    : Rose.Interfaces.Releasable_Reader
+            Saveable : Rose.Interfaces.Processes.Saveable.Client
+              .Saveable_Client :=
+              Rose.Interfaces.Processes.Saveable.Client.From_Cap (Old_Version
+                .Saver);
+            Saved    : Rose.Interfaces.Streams.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
             Skipped  : Ada.Streams.Stream_Element_Array (1 .. 4);
             Last     : Ada.Streams.Stream_Element_Offset;
-            Bad_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Bad_Bank : Rose.Interfaces.Storage.Bank
+              .Bank_Object'Class := New_Bank;
          begin
             Saved.Read (Skipped, Last);
             Check ("a bad state started",
@@ -1603,13 +1635,15 @@ package body Tests.Replacement is
 
          declare
             Rounds      : constant := 10;
-            Repeat_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Repeat_Bank : Rose.Interfaces.Storage.Bank
+              .Bank_Object'Class := New_Bank;
             Helper      : constant Started :=
               Start ("repeat",
                      Target => Old_Version.Held,
                      Bank   => Repeat_Bank.Bank_Cap);
-            Old    : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
-              Rose.Interfaces.Replaceable.Client.From_Cap
+            Old    : Rose.Interfaces.Processes.Replaceable.Client
+              .Replaceable_Client :=
+              Rose.Interfaces.Processes.Replaceable.Client.From_Cap
                 (Old_Version.Control);
          begin
             Check ("the second helper did not start", Is_Started (Helper));
@@ -1622,7 +1656,7 @@ package body Tests.Replacement is
                end if;
 
                declare
-                  Replies : Rose.Interfaces.Releasable_Cap_Set
+                  Replies : Rose.Interfaces.Caps.Releasable_Cap_Set
                     .Releasable_Cap_Set_Object'Class := Old.Replies;
                begin
                   if Round = 1 then
@@ -1634,7 +1668,7 @@ package body Tests.Replacement is
                      begin
                         begin
                            declare
-                              Second : Rose.Interfaces.Releasable_Cap_Set
+                              Second : Rose.Interfaces.Caps.Releasable_Cap_Set
                                 .Releasable_Cap_Set_Object'Class :=
                                   Old.Replies;
                            begin
@@ -1681,7 +1715,8 @@ package body Tests.Replacement is
       --  the call that it deferred.
 
       declare
-         Refuse_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+         Refuse_Bank : Rose.Interfaces.Storage.Bank
+           .Bank_Object'Class := New_Bank;
          Refused     : constant Started :=
            Start ("refuse", Bank => Refuse_Bank.Bank_Cap);
       begin
@@ -1749,7 +1784,7 @@ package body Tests.Replacement is
       use System.Storage_Elements;
       use type Rose.Words.Word_32;
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("replaceable_test");
       Endpoint : constant Rose.Capabilities.Capability :=
         Launcher.Launch_Command
@@ -1766,8 +1801,10 @@ package body Tests.Replacement is
 
       if Replacement /= Null_Cap then
          declare
-            R : Rose.Interfaces.Replacement.Client.Replacement_Client :=
-              Rose.Interfaces.Replacement.Client.From_Cap (Replacement);
+            R : Rose.Interfaces.Processes.Replacement.Client
+              .Replacement_Client :=
+              Rose.Interfaces.Processes.Replacement.Client
+                .From_Cap (Replacement);
          begin
             R.Allow (Endpoint);
          end;
@@ -1827,9 +1864,10 @@ package body Tests.Replacement is
       return Ada.Streams.Stream_Element_Array
    is
       use Ada.Streams;
-      Old    : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
-        Rose.Interfaces.Replaceable.Client.From_Cap (Control);
-      Reader : Rose.Interfaces.Releasable_Reader
+      Old    : Rose.Interfaces.Processes.Replaceable.Client
+        .Replaceable_Client :=
+        Rose.Interfaces.Processes.Replaceable.Client.From_Cap (Control);
+      Reader : Rose.Interfaces.Streams.Releasable_Reader
         .Releasable_Reader_Object'Class := Old.State;
       Data   : Stream_Element_Array (1 .. 4096);
       Length : Stream_Element_Offset := 0;
@@ -1869,7 +1907,7 @@ package body Tests.Replacement is
    ----------------------
 
    function Wait_Until_Ready
-     (Replacement : in out Rose.Interfaces.Replacement
+     (Replacement : in out Rose.Interfaces.Processes.Replacement
         .Replacement_Object'Class)
       return Boolean
    is

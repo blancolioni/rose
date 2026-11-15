@@ -1,15 +1,15 @@
 with Rose.Words;
 
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Bank.Client;
+with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Bank.Client;
 
 package Elf.Loader is
 
    procedure Load_Elf_Image
-     (Process : Rose.Interfaces.Process.Client.Process_Client;
-      Bank    : Rose.Interfaces.Bank.Client.Bank_Client;
-      Image   : Rose.Interfaces.Region.Client.Region_Client;
+     (Process : Rose.Interfaces.Processes.Process.Client.Process_Client;
+      Bank    : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+      Image   : Rose.Interfaces.Storage.Region.Client.Region_Client;
       Start   : out Rose.Words.Word;
       Success : out Boolean);
 

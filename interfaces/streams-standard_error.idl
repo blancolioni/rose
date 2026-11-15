@@ -1,0 +1,1 @@
+role Streams.Standard_Error : Streams.Writer;

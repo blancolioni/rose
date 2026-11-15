@@ -1,4 +1,4 @@
-command Rose.Core.Touch : Standard_Error
+command Rose.Core.Touch : Streams.Standard_Error
   with Summary     => "Create an empty file.",
        Description => """
           Touch creates an empty file called NAME in DIRECTORY, which is
@@ -10,6 +10,6 @@ command Rose.Core.Touch : Standard_Error
 is
    Name : String
      with Help => "the name of the new file";
-   Directory : in Writable_Directory
+   Directory : in Files.Writable_Directory
      with Help => "the directory to create it in";
 end Rose.Core.Touch;

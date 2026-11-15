@@ -3,13 +3,13 @@ with Ada.Text_IO;
 with Rose.Server;
 with Rose.Words;
 
-with Rose.Interfaces.Clock_Admin.Client;
-with Rose.Interfaces.Clock_Admin.Server;
+with Rose.Interfaces.Time.Clock_Admin.Client;
+with Rose.Interfaces.Time.Clock_Admin.Server;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Restorable.Server;
-with Rose.Interfaces.Rights.Server;
-with Rose.Interfaces.Rights_Admin.Server;
-with Rose.Interfaces.User;
+with Rose.Interfaces.Processes.Restorable.Server;
+with Rose.Interfaces.Users.Rights.Server;
+with Rose.Interfaces.Users.Rights_Admin.Server;
+with Rose.Interfaces.Users.User;
 
 with Rights_Policy;
 
@@ -17,7 +17,7 @@ package body Rights_Server is
 
    use type Rose.Words.Word;
 
-   package Clock_Admin_Server renames Rose.Interfaces.Clock_Admin.Server;
+   package Clock_Admin_Server renames Rose.Interfaces.Time.Clock_Admin.Server;
 
    --  The roles that the broker holds are the ones that it declares
    --  (rose-core-rights.idl), each with the proxy that a grant of it is,
@@ -35,8 +35,8 @@ package body Rights_Server is
    --  object, and Rights_Admin through another.
 
    type Broker_Object is
-     new Rose.Interfaces.Rights.Server.Rights_Interface
-     and Rose.Interfaces.Restorable.Server.Restorable_Interface
+     new Rose.Interfaces.Users.Rights.Server.Rights_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding function Rights_Cap
@@ -49,7 +49,7 @@ package body Rights_Server is
 
    overriding procedure Request
      (Item      : in out Broker_Object;
-      User      : in out Rose.Interfaces.User.User_Object'Class;
+      User      : in out Rose.Interfaces.Users.User.User_Object'Class;
       Role_Name : String;
       Elevate   : Rose.Words.Word;
       Grant     : out Rose.Words.Word;
@@ -57,13 +57,13 @@ package body Rights_Server is
 
    overriding procedure Finish
      (Item  : in out Broker_Object;
-      User  : in out Rose.Interfaces.User.User_Object'Class;
+      User  : in out Rose.Interfaces.Users.User.User_Object'Class;
       Grant : Rose.Words.Word);
 
    overriding procedure Restored (Item : in out Broker_Object);
 
    type Admin_Object is
-     new Rose.Interfaces.Rights_Admin.Server.Rights_Admin_Interface
+     new Rose.Interfaces.Users.Rights_Admin.Server.Rights_Admin_Interface
      with null record;
 
    overriding function Rights_Admin_Cap
@@ -132,13 +132,13 @@ package body Rights_Server is
    Context    : Rose.Server.Server_Context;
    The_Broker : aliased Broker_Object;
    The_Admin  : aliased Admin_Object;
-   Real_Clock : Rose.Interfaces.Clock_Admin.Client.Clock_Admin_Client;
+   Real_Clock : Rose.Interfaces.Time.Clock_Admin.Client.Clock_Admin_Client;
 
    function Find_Grant (Number : Rose.Words.Word) return Natural;
    --  The index in Grants of the live grant Number, or 0.
 
    procedure Get_User_Name
-     (User : in out Rose.Interfaces.User.User_Object'Class;
+     (User : in out Rose.Interfaces.Users.User.User_Object'Class;
       Name : out String;
       Last : out Natural);
    --  The name of User, or Last = 0 if it can't be asked.
@@ -151,7 +151,7 @@ package body Rights_Server is
 
    function Admin_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Rights_Admin.Server.Cap_Of (The_Admin);
+      return Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of (The_Admin);
    end Admin_Cap;
 
    -----------
@@ -226,7 +226,7 @@ package body Rights_Server is
      (Item : in out Grant_Object)
       return Rose.Capabilities.Capability
    is (Clock_Admin_Server.Cap_Of
-         (Item, Rose.Interfaces.Clock_Admin.Clock_Interface));
+         (Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
 
    -------------------
    -- Create_Server --
@@ -234,10 +234,12 @@ package body Rights_Server is
 
    procedure Create_Server (Clock_Admin : Rose.Capabilities.Capability) is
    begin
-      Rose.Interfaces.Clock_Admin.Client.Open (Real_Clock, Clock_Admin);
-      Rose.Interfaces.Rights.Server.Publish (Context, The_Broker'Access);
-      Rose.Interfaces.Rights_Admin.Server.Attach (Context, The_Admin'Access);
-      Rose.Interfaces.Restorable.Server.Attach (Context, The_Broker'Access);
+      Rose.Interfaces.Time.Clock_Admin.Client.Open (Real_Clock, Clock_Admin);
+      Rose.Interfaces.Users.Rights.Server.Publish (Context, The_Broker'Access);
+      Rose.Interfaces.Users.Rights_Admin.Server
+        .Attach (Context, The_Admin'Access);
+      Rose.Interfaces.Processes.Restorable.Server
+        .Attach (Context, The_Broker'Access);
    end Create_Server;
 
    ----------------
@@ -263,7 +265,7 @@ package body Rights_Server is
 
    overriding procedure Finish
      (Item  : in out Broker_Object;
-      User  : in out Rose.Interfaces.User.User_Object'Class;
+      User  : in out Rose.Interfaces.Users.User.User_Object'Class;
       Grant : Rose.Words.Word)
    is
       pragma Unreferenced (Item);
@@ -292,7 +294,7 @@ package body Rights_Server is
    -------------------
 
    procedure Get_User_Name
-     (User : in out Rose.Interfaces.User.User_Object'Class;
+     (User : in out Rose.Interfaces.Users.User.User_Object'Class;
       Name : out String;
       Last : out Natural)
    is
@@ -360,7 +362,7 @@ package body Rights_Server is
 
    overriding procedure Request
      (Item      : in out Broker_Object;
-      User      : in out Rose.Interfaces.User.User_Object'Class;
+      User      : in out Rose.Interfaces.Users.User.User_Object'Class;
       Role_Name : String;
       Elevate   : Rose.Words.Word;
       Grant     : out Rose.Words.Word;
@@ -463,7 +465,7 @@ package body Rights_Server is
    overriding function Restorable_Cap
      (Item : in out Broker_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    --------------
    -- Restored --
@@ -499,7 +501,7 @@ package body Rights_Server is
    overriding function Rights_Admin_Cap
      (Item : in out Admin_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Rights_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of (Item));
 
    ----------------
    -- Rights_Cap --
@@ -507,7 +509,7 @@ package body Rights_Server is
 
    function Rights_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Rights.Server.Cap_Of (The_Broker);
+      return Rose.Interfaces.Users.Rights.Server.Cap_Of (The_Broker);
    end Rights_Cap;
 
    ----------------
@@ -517,7 +519,7 @@ package body Rights_Server is
    overriding function Rights_Cap
      (Item : in out Broker_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Rights.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Rights.Server.Cap_Of (Item));
 
    ------------------
    -- Set_Realtime --

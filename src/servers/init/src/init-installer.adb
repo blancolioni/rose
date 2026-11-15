@@ -4,8 +4,8 @@ with Rose.Init_Capabilities;
 with Rose.Limits;
 with Rose.Objects;
 
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Reader.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Streams.Reader.Client;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -27,14 +27,14 @@ package body Init.Installer is
    function Reserve_Storage
      (Storage_Cap : Rose.Capabilities.Capability;
       Size        : Rose.Words.Word_64)
-      return Rose.Interfaces.Region.Client.Region_Client;
+      return Rose.Interfaces.Storage.Region.Client.Region_Client;
 
    procedure Copy_Stream
-     (From : Rose.Interfaces.Reader.Client.Reader_Client;
-      To   : Rose.Interfaces.Region.Client.Region_Client);
+     (From : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
+      To   : Rose.Interfaces.Storage.Region.Client.Region_Client);
 
    procedure Grant_Caps
-     (From      : Rose.Interfaces.Reader.Client.Reader_Client;
+     (From      : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
       To        : in out Rose.Invocation.Invocation_Record;
       Is_Driver : Boolean);
    --  From is the program's cap requests: one to a line, each a name and
@@ -74,12 +74,12 @@ package body Init.Installer is
    -----------------
 
    procedure Copy_Stream
-     (From : Rose.Interfaces.Reader.Client.Reader_Client;
-      To   : Rose.Interfaces.Region.Client.Region_Client)
+     (From : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
+      To   : Rose.Interfaces.Storage.Region.Client.Region_Client)
    is
       use System.Storage_Elements;
-      use Rose.Interfaces.Reader.Client;
-      use Rose.Interfaces.Region.Client;
+      use Rose.Interfaces.Streams.Reader.Client;
+      use Rose.Interfaces.Storage.Region.Client;
       use type Rose.Objects.Object_Id;
       Last   : Storage_Count;
       Page_Base : Rose.Objects.Object_Id;
@@ -104,11 +104,11 @@ package body Init.Installer is
    ----------------
 
    procedure Grant_Caps
-     (From      : Rose.Interfaces.Reader.Client.Reader_Client;
+     (From      : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
       To        : in out Rose.Invocation.Invocation_Record;
       Is_Driver : Boolean)
    is
-      use Rose.Interfaces.Reader.Client;
+      use Rose.Interfaces.Streams.Reader.Client;
       use System.Storage_Elements;
       use type Rose.Capabilities.Capability;
       use type Rose.Words.Word;
@@ -314,8 +314,8 @@ package body Init.Installer is
       Binary_Length   : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
-      use Rose.Interfaces.Region.Client;
-      use Rose.Interfaces.Reader.Client;
+      use Rose.Interfaces.Storage.Region.Client;
+      use Rose.Interfaces.Streams.Reader.Client;
       Region      : constant Region_Client :=
                       Reserve_Storage
                         (Reserve_Cap,
@@ -377,8 +377,8 @@ package body Init.Installer is
       return Rose.Capabilities.Capability
    is
       --  use Rose.Words;
-      use Rose.Interfaces.Region.Client;
-      use Rose.Interfaces.Reader.Client;
+      use Rose.Interfaces.Storage.Region.Client;
+      use Rose.Interfaces.Streams.Reader.Client;
       Region : constant Region_Client :=
                      Reserve_Storage
                        (Reserve_Cap,
@@ -444,7 +444,7 @@ package body Init.Installer is
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Binary_Length);
-      use Rose.Interfaces.Reader.Client;
+      use Rose.Interfaces.Streams.Reader.Client;
       Client : Reader_Client;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -479,7 +479,7 @@ package body Init.Installer is
    function Reserve_Storage
      (Storage_Cap : Rose.Capabilities.Capability;
       Size        : Rose.Words.Word_64)
-      return Rose.Interfaces.Region.Client.Region_Client
+      return Rose.Interfaces.Storage.Region.Client.Region_Client
    is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
@@ -489,9 +489,9 @@ package body Init.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
 
 
-      return Result : Rose.Interfaces.Region.Client.Region_Client do
+      return Result : Rose.Interfaces.Storage.Region.Client.Region_Client do
          if Params.Control.Flags (Rose.Invocation.Send_Caps) then
-            Rose.Interfaces.Region.Client.Open
+            Rose.Interfaces.Storage.Region.Client.Open
               (Result, Params.Caps (0));
          end if;
       end return;

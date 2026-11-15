@@ -1,4 +1,4 @@
-command Rose.Core.Clear : Console
+command Rose.Core.Clear : Screens.Console
   with Summary     => "Clear the screen.",
        Description => """
           Clear clears the console, and moves the cursor to its top

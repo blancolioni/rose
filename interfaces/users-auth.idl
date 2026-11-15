@@ -1,0 +1,11 @@
+interface Users.Auth is
+
+   --  Logging in (#455). Login returns the User interface of the user
+   --  called Name, if Password is theirs, and fails otherwise.
+
+   function Login
+     (Name     : String;
+      Password : String)
+     return interface Users.User;
+
+end Users.Auth;

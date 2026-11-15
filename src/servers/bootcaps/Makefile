@@ -11,11 +11,11 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-interfaces-constructor-server.o \
-	$(BUILDDIR)/rose-interfaces-cap-server.o \
-	$(BUILDDIR)/rose-interfaces-cap_set-server.o \
-	$(BUILDDIR)/rose-interfaces-resource.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-caps-constructor-server.o \
+	$(BUILDDIR)/rose-interfaces-caps-cap-server.o \
+	$(BUILDDIR)/rose-interfaces-caps-cap_set-server.o \
+	$(BUILDDIR)/rose-interfaces-common-resource.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

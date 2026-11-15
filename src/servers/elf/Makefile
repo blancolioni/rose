@@ -15,23 +15,23 @@ OBJECTS= \
 	$(BUILDDIR)/rose-console_io.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-command_endpoint.o \
-	$(BUILDDIR)/rose-interfaces-executable.o \
-	$(BUILDDIR)/rose-interfaces-executable-server.o \
-	$(BUILDDIR)/rose-interfaces-heap-client.o \
-	$(BUILDDIR)/rose-interfaces-kernel_process-client.o \
-	$(BUILDDIR)/rose-interfaces-memory-client.o \
-	$(BUILDDIR)/rose-interfaces-process_banks.o \
-	$(BUILDDIR)/rose-interfaces-process_banks-client.o \
-	$(BUILDDIR)/rose-interfaces-process-client.o \
-	$(BUILDDIR)/rose-interfaces-bank.o \
-	$(BUILDDIR)/rose-interfaces-bank-client.o \
-	$(BUILDDIR)/rose-interfaces-dependent.o \
-	$(BUILDDIR)/rose-interfaces-dependent-client.o \
-	$(BUILDDIR)/rose-interfaces-region.o \
-	$(BUILDDIR)/rose-interfaces-region-client.o \
-	$(BUILDDIR)/rose-interfaces-reader-client.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-commands-command_endpoint.o \
+	$(BUILDDIR)/rose-interfaces-processes-executable.o \
+	$(BUILDDIR)/rose-interfaces-processes-executable-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-heap-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-kernel_process-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-memory-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-process_banks.o \
+	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank.o \
+	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent.o \
+	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region.o \
+	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-reader-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-trace.o \
 	$(BUILDDIR)/rose-system_calls.o \

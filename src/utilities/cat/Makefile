@@ -14,5 +14,5 @@ cat:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-cat.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/reader.idl
+	    $(INTERFACES)/streams-reader.idl
 	gprbuild $(GPRBUILD_CARGS)

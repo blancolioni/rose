@@ -3,8 +3,8 @@ with Ada.Text_IO;
 with Rose.Capabilities;
 with Rose.Invocation;
 
-with Rose.Interfaces.Constructor.Client;
-with Rose.Interfaces.Releasable_Cap_Set.Client;
+with Rose.Interfaces.Caps.Constructor.Client;
+with Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
 
 with Tests.Registry;
 
@@ -27,7 +27,7 @@ package body Tests.Cap_Sets is
       procedure Check (Name : String; Ok : Boolean);
 
       procedure Fill
-        (Set    : in out Rose.Interfaces.Releasable_Cap_Set.Client
+        (Set    : in out Rose.Interfaces.Caps.Releasable_Cap_Set.Client
                     .Releasable_Cap_Set_Client;
          Cap    : Rose.Capabilities.Capability;
          Filled : out Natural;
@@ -54,7 +54,7 @@ package body Tests.Cap_Sets is
       ----------
 
       procedure Fill
-        (Set    : in out Rose.Interfaces.Releasable_Cap_Set.Client
+        (Set    : in out Rose.Interfaces.Caps.Releasable_Cap_Set.Client
                     .Releasable_Cap_Set_Client;
          Cap    : Rose.Capabilities.Capability;
          Filled : out Natural;
@@ -95,9 +95,10 @@ package body Tests.Cap_Sets is
       end if;
 
       declare
-         use Rose.Interfaces.Releasable_Cap_Set.Client;
-         Constructor : Rose.Interfaces.Constructor.Client.Constructor_Client
-           := Rose.Interfaces.Constructor.Client.From_Cap
+         use Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
+         Constructor : Rose.Interfaces.Caps.Constructor.Client
+           .Constructor_Client
+           := Rose.Interfaces.Caps.Constructor.Client.From_Cap
                 (Tests.Registry.Cap_Sets);
          Set         : Releasable_Cap_Set_Client :=
                          From_Cap (Constructor.Create);

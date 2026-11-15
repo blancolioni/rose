@@ -5,10 +5,10 @@ with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Kernel_Log.Server;
-with Rose.Interfaces.Log_Reader.Server;
-with Rose.Interfaces.State.Server;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Checkpoints.Kernel_Log.Server;
+with Rose.Interfaces.Checkpoints.Log_Reader.Server;
+with Rose.Interfaces.Checkpoints.State.Server;
 
 with Rose.Server;
 with Rose.System_Calls.Client;
@@ -19,9 +19,9 @@ package body Log.Server is
 
    use type System.Storage_Elements.Storage_Count;
 
-   use Rose.Interfaces.Block_Device;
-   subtype Block_Device_Client is
-     Rose.Interfaces.Block_Device.Client.Block_Device_Client;
+   use Rose.Interfaces.Storage.Block_Array;
+   subtype Block_Array_Client is
+     Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
 
    Max_Log_Devices : constant := 4;
 
@@ -34,7 +34,7 @@ package body Log.Server is
          Block_Count    : Block_Address_Type;
          Block_Size     : Block_Size_Type;
          Multiplier     : Positive;
-         Client         : Block_Device_Client;
+         Client         : Block_Array_Client;
          First_Location : Log_Location_Id;
          Last_Location  : Log_Location_Id;
       end record;
@@ -180,15 +180,15 @@ package body Log.Server is
          Last_Log_Device := Last_Log_Device + 1;
 
          declare
-            Client      : Block_Device_Client;
+            Client      : Block_Array_Client;
             Block_Count : Block_Address_Type;
             Block_Size  : Block_Size_Type;
             First_Location : Log_Location_Id := 0;
             Last_Location  : Log_Location_Id := 0;
             Page_Count     : Log_Location_Id := 0;
          begin
-            Rose.Interfaces.Block_Device.Client.Open (Client, Device);
-            Rose.Interfaces.Block_Device.Client.Get_Parameters
+            Rose.Interfaces.Storage.Block_Array.Client.Open (Client, Device);
+            Rose.Interfaces.Storage.Block_Array.Client.Get_Parameters
               (Item        => Client,
                Block_Count => Block_Count,
                Block_Size  => Block_Size);
@@ -282,7 +282,7 @@ package body Log.Server is
             end;
 
             declare
-               use Rose.Interfaces.Kernel_Log.Server;
+               use Rose.Interfaces.Checkpoints.Kernel_Log.Server;
                Params : aliased Rose.Invocation.Invocation_Record;
             begin
                Rose.System_Calls.Initialize_Send
@@ -470,7 +470,7 @@ package body Log.Server is
 
       Rose.Console_IO.Put_Line ("log: starting");
 
-      Rose.Interfaces.Kernel_Log.Server.Create_Server
+      Rose.Interfaces.Checkpoints.Kernel_Log.Server.Create_Server
         (Server_Context => Log_Server,
          Create         => Create'Access,
          Append         => Append'Access,
@@ -478,11 +478,11 @@ package body Log.Server is
          Add_Log_Device => Add_Log_Device'Access,
          Instanced      => False);
 
-      Rose.Interfaces.State.Server.Attach_Interface
+      Rose.Interfaces.Checkpoints.State.Server.Attach_Interface
         (Server_Context => Log_Server,
          Reset          => Reset'Access);
 
-      Rose.Interfaces.Log_Reader.Server.Attach_Interface
+      Rose.Interfaces.Checkpoints.Log_Reader.Server.Attach_Interface
         (Server_Context => Log_Server,
          First_Entry    => First_Entry'Access,
          Last_Entry     => Last_Entry'Access,
@@ -702,7 +702,7 @@ package body Log.Server is
       begin
          case Operation is
             when Read =>
-               Rose.Interfaces.Block_Device.Client.Read_Blocks
+               Rose.Interfaces.Storage.Block_Array.Client.Read_Blocks
                  (Item   => Device.Client,
                   Start  => Start,
                   Count  => Count,
@@ -716,7 +716,7 @@ package body Log.Server is
                --  Rose.Console_IO.Put (Natural (Data_Last));
                --  Rose.Console_IO.New_Line;
 
-               Rose.Interfaces.Block_Device.Client.Write_Blocks
+               Rose.Interfaces.Storage.Block_Array.Client.Write_Blocks
                  (Item   => Device.Client,
                   Start  => Start,
                   Count  => Count,

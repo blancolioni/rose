@@ -2,9 +2,9 @@ with Rose.Drawing.Text;
 with Rose.Shared_Regions;
 with Rose.Words;
 
-with Rose.Interfaces.Region;
-with Rose.Interfaces.Reader.Client;
-with Rose.Interfaces.Surface.Client;
+with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Screens.Surface.Client;
 
 with Text_Console.Cells;
 with Text_Console.Serial;
@@ -19,8 +19,8 @@ package body Surface_Console.Screen is
    Background : constant Pixel := 0;
    --  The VGA console's light grey on black, and white for bold.
 
-   Surface : Rose.Interfaces.Surface.Client.Surface_Client;
-   Events  : Rose.Interfaces.Reader.Client.Reader_Client;
+   Surface : Rose.Interfaces.Screens.Surface.Client.Surface_Client;
+   Events  : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
    Target  : Bitmap;
    Width   : Word := 0;
    Height  : Word := 0;
@@ -211,11 +211,11 @@ package body Surface_Console.Screen is
 
    procedure Open is
    begin
-      Rose.Interfaces.Surface.Client.Open (Surface, Surface_Cap);
+      Rose.Interfaces.Screens.Surface.Client.Open (Surface, Surface_Cap);
       Surface.Get_Size (Width, Height);
 
       declare
-         Buffer : Rose.Interfaces.Region.Region_Object'Class :=
+         Buffer : Rose.Interfaces.Storage.Region.Region_Object'Class :=
                     Surface.Get_Buffer;
       begin
          Target :=
@@ -225,10 +225,10 @@ package body Surface_Console.Screen is
       end;
 
       declare
-         Stream : Rose.Interfaces.Reader.Reader_Object'Class :=
+         Stream : Rose.Interfaces.Streams.Reader.Reader_Object'Class :=
                     Surface.Events;
       begin
-         Rose.Interfaces.Reader.Client.Open
+         Rose.Interfaces.Streams.Reader.Client.Open
            (Events, Stream.Reader_Cap);
       end;
 
@@ -269,7 +269,7 @@ package body Surface_Console.Screen is
       Last   : out Ada.Streams.Stream_Element_Offset)
    is
    begin
-      Rose.Interfaces.Reader.Client.Read (Events, Buffer, Last);
+      Rose.Interfaces.Streams.Reader.Client.Read (Events, Buffer, Last);
    end Read_Events;
 
    ----------

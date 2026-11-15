@@ -1,0 +1,30 @@
+interface Files.Writable_Directory : Files.Directory
+  with Versioned
+is
+
+   function Get_Writable_File
+     (Index : Positive) return interface Files.Writable_File;
+   function Get_Writable_Directory
+     (Index : Positive) return interface Files.Writable_Directory;
+
+   function Create_File (Name : String) return interface Files.Writable_File;
+   function Create_Directory
+     (Name : String) return interface Files.Writable_Directory;
+
+   procedure Rename
+     (From : String;
+      To   : String);
+   --  Give the entry From the name To. Only the entry changes: the file
+   --  or directory is the same, so caps to it keep working. It fails if
+   --  From is not an entry, or if To is already one, or is empty or too
+   --  long.
+
+   procedure Delete_File (Name : String);
+   --  Remove the file Name, and end its process. It fails if Name is not
+   --  a file.
+
+   procedure Delete_Directory (Name : String);
+   --  Remove the directory Name, and end its process. It fails if Name is
+   --  not a directory, or if the directory has entries.
+
+end Files.Writable_Directory;

@@ -1,0 +1,4 @@
+--  A releasable reader that can also seek (ADR 0009).
+
+interface Streams.Seekable_Reader : Streams.Releasable_Reader, Streams.Seekable is
+end Streams.Seekable_Reader;

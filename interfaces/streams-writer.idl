@@ -1,0 +1,3 @@
+interface Streams.Writer is
+   procedure Write (Buffer : Stream_Element_Array);
+end Streams.Writer;

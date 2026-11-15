@@ -23,15 +23,17 @@ project Clock is
        "rose-devices.ads",
        "rose-devices-port_io.ads",
        "rose-devices-port_io.adb",
-       "rose-interfaces-clock.ads",
-       "rose-interfaces-clock-server.ads",
-       "rose-interfaces-clock-server.adb",
-       "rose-interfaces-clock_admin.ads",
-       "rose-interfaces-clock_admin-server.ads",
-       "rose-interfaces-clock_admin-server.adb",
-       "rose-interfaces-restorable.ads",
-       "rose-interfaces-restorable-server.ads",
-       "rose-interfaces-restorable-server.adb");
+       "rose-interfaces-time.ads",
+       "rose-interfaces-time-clock.ads",
+       "rose-interfaces-time-clock-server.ads",
+       "rose-interfaces-time-clock-server.adb",
+       "rose-interfaces-time-clock_admin.ads",
+       "rose-interfaces-time-clock_admin-server.ads",
+       "rose-interfaces-time-clock_admin-server.adb",
+       "rose-interfaces-processes.ads",
+       "rose-interfaces-processes-restorable.ads",
+       "rose-interfaces-processes-restorable-server.ads",
+       "rose-interfaces-processes-restorable-server.adb");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("clock-driver.adb");

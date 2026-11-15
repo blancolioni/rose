@@ -14,15 +14,15 @@ exec:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/exec.idl \
-	    $(INTERFACES)/launch.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/region.idl \
-	    $(INTERFACES)/process.idl \
-	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/segment.idl \
-	    $(INTERFACES)/server.idl \
-	    $(INTERFACES)/cap.idl \
-	    $(INTERFACES)/heap.idl
+	    $(INTERFACES)/processes-exec.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/processes-segment.idl \
+	    $(INTERFACES)/processes-server.idl \
+	    $(INTERFACES)/caps-cap.idl \
+	    $(INTERFACES)/processes-heap.idl
 	gprbuild $(GPRBUILD_CARGS)
