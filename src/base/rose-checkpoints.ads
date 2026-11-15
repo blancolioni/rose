@@ -8,8 +8,20 @@ package Rose.Checkpoints is
 
    use type System.Storage_Elements.Storage_Offset;
 
-   --  A checkpoint log entry holds the kernel's tables, then the storage
-   --  server's region table, then the memory server's tables and pages.
+   --  A checkpoint log entry holds, in this order:
+   --
+   --  * the kernel's tables;
+   --  * the storage server's tables;
+   --  * one or more batches of the memory server's pages: header pages,
+   --    then the pages that they list;
+   --  * any number of index sections (ADR 0028): an index header page,
+   --    then the index pages that it lists;
+   --  * the memory server's tables;
+   --  * if the memory server's table header has Mem_Has_Shared_Pages, the
+   --    pages of shared segments (ADR 0025).
+   --
+   --  A reader finds each part by the magic number of its first page, and
+   --  skips the pages that a header page counts.
 
    --  The kernel's part: a header page, then for each persistent process
    --  a process record page followed by its capability pages.  The
@@ -375,15 +387,22 @@ package Rose.Checkpoints is
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
-   --  The memory server's part of a checkpoint log entry starts with its
-   --  tables: a header page, then a record page for each of its active
-   --  processes, which are the persistent ones.  A record names the
-   --  process by its object id and by the memory server's own process
-   --  id, which the caps the memory server gave the process use as
-   --  their identifier, and which the header pages below use for pages.
+   --  The memory server's tables come after its pages and index pages: a
+   --  header page, then a record page for each of its active processes,
+   --  which are the persistent ones.  A record names the process by its
+   --  object id and by the memory server's own process id, which the caps
+   --  the memory server gave the process use as their identifier, and
+   --  which the header pages below use for pages.
+   --
+   --  Version 2 put the tables after the pages, and added the header's
+   --  Flags and each process's Index_Directory (ADR 0028).
 
    Mem_Table_Magic   : constant := 16#4D45_4D54_4142_4C31#;
-   Mem_Table_Version : constant := 1;
+   Mem_Table_Version : constant := 2;
+
+   Mem_Has_Shared_Pages : constant := 16#0001#;
+   --  A flag of Mem_Table_Header: the pages of shared segments follow the
+   --  tables.
 
    type Mem_Table_Header is
       record
@@ -392,8 +411,9 @@ package Rose.Checkpoints is
          Page_Count    : Rose.Words.Word_32 := 0;
          --  All of the memory server's table pages, including this one.
          Process_Count : Rose.Words.Word_32 := 0;
+         Flags         : Rose.Words.Word_32 := 0;
          Reserved      : System.Storage_Elements.Storage_Array
-                           (1 .. Rose.Limits.Page_Size - 20) :=
+                           (1 .. Rose.Limits.Page_Size - 24) :=
                              (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
@@ -436,41 +456,43 @@ package Rose.Checkpoints is
    Mem_Process_Record_Bytes : constant := 32 + Max_Saved_Segments * 40;
 
    --  State is the memory server's process state: 1 for active, 2 for
-   --  faulted.
+   --  faulted.  Index_Directory is the log page of the process's index
+   --  directory, or 0 if the log has none of its pages (ADR 0028,
+   --  section 2).
 
    type Mem_Process_Record is
       record
-         Magic         : Rose.Words.Word_64 := Mem_Process_Magic;
-         Oid           : Rose.Words.Word_64 := 0;
-         Mem_Pid       : Rose.Words.Word_32 := 0;
-         State         : Rose.Words.Word_32 := 0;
-         Segment_Count : Rose.Words.Word_32 := 0;
-         Unused        : Rose.Words.Word_32 := 0;
-         Segments      : Saved_Segment_Array;
-         Reserved      : System.Storage_Elements.Storage_Array
-                           (1 .. Rose.Limits.Page_Size
-                                - Mem_Process_Record_Bytes) :=
-                             (others => 0);
+         Magic           : Rose.Words.Word_64 := Mem_Process_Magic;
+         Oid             : Rose.Words.Word_64 := 0;
+         Mem_Pid         : Rose.Words.Word_32 := 0;
+         State           : Rose.Words.Word_32 := 0;
+         Segment_Count   : Rose.Words.Word_32 := 0;
+         Index_Directory : Rose.Words.Word_32 := 0;
+         Segments        : Saved_Segment_Array;
+         Reserved        : System.Storage_Elements.Storage_Array
+                             (1 .. Rose.Limits.Page_Size
+                                  - Mem_Process_Record_Bytes) :=
+                               (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
-   --  After the tables come one or more header pages that list the
-   --  pages the memory server saved, followed by those pages in the
-   --  order they are listed. The last header page has
-   --  Is_Last_Header_Page set. The memory server writes this, and the
-   --  restore server reads it.
+   --  A batch of the memory server's pages is one or more header pages
+   --  that list the pages, followed by those pages in the order they are
+   --  listed. The last header page has Is_Last_Header_Page set. An entry
+   --  has one batch or more, before its index sections and the memory
+   --  server's tables. The memory server writes them, and the restore
+   --  server reads them.
    --
-   --  If the last header page also has Has_Shared_Pages, the pages of
-   --  shared segments come next (ADR 0025): one or more shared header
-   --  pages, the last with Is_Last_Header_Page, then the pages that they
-   --  list as saved, in that order.
+   --  If the memory server's table header has Mem_Has_Shared_Pages, the
+   --  pages of shared segments come after its tables (ADR 0025): one or
+   --  more shared header pages, the last with Is_Last_Header_Page, then
+   --  the pages that they list as saved, in that order.
 
    Header_Page_Magic : constant := 16#7E6A_F178_79CB_E048#;
 
    type Header_Page_Flags is new Rose.Words.Word_32;
 
    Is_Last_Header_Page : constant Header_Page_Flags := 16#0001#;
-   Has_Shared_Pages    : constant Header_Page_Flags := 16#0002#;
 
    type Page_Reference is
       record
@@ -491,6 +513,61 @@ package Rose.Checkpoints is
          Flags : Header_Page_Flags := 0;
          Count : Rose.Words.Word_32 := 0;
          Pages : Page_Reference_Array;
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   --  The index from each page of a process to the log page that holds
+   --  its latest copy (ADR 0028, section 2). A process's index directory
+   --  is an index page whose entries are the log pages of its index
+   --  leaves, and an index leaf is an index page whose entries are the
+   --  log pages of 1,024 pages of the process's address space, 4 MiB in
+   --  all. An entry of 0 means that the log has no such page: log page 0
+   --  is the log's header, so it never holds a page of an entry. A log
+   --  page is numbered from 0 within the log partition.
+   --
+   --  Index pages are never changed in place. An index section is one or
+   --  more index header pages, the last with Is_Last_Header_Page, then
+   --  the index pages that they list, in that order. A reference names
+   --  the process by the memory server's id, and the page by the entry
+   --  of the process's directory that names it, or Directory_Slot for the
+   --  directory itself.
+
+   Index_Entries_Per_Page : constant := 1024;
+
+   type Index_Entry_Array is
+     array (0 .. Index_Entries_Per_Page - 1) of Rose.Words.Word_32
+     with Pack, Size => Index_Entries_Per_Page * 32;
+
+   type Index_Page is
+      record
+         Entries : Index_Entry_Array;
+      end record
+     with Pack, Size => Rose.Limits.Page_Size * 8;
+
+   Index_Header_Magic : constant := 16#494E_4445_5848_4431#;
+
+   Directory_Slot : constant := 16#FFFF#;
+
+   type Index_Reference is
+      record
+         Process : Rose.Words.Word_16 := 0;
+         Slot    : Rose.Words.Word_16 := 0;
+      end record
+     with Pack, Size => 32;
+
+   Max_Index_References : constant := (Rose.Limits.Page_Size - 16) / 4;
+
+   type Index_Reference_Array is
+     array (Rose.Words.Word_32 range 1 .. Max_Index_References)
+     of Index_Reference
+     with Pack, Size => Max_Index_References * 32;
+
+   type Index_Header_Page is
+      record
+         Magic : Rose.Words.Word_64 := Index_Header_Magic;
+         Flags : Header_Page_Flags := 0;
+         Count : Rose.Words.Word_32 := 0;
+         Pages : Index_Reference_Array;
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 

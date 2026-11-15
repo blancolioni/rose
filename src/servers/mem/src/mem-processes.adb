@@ -1480,6 +1480,8 @@ package body Mem.Processes is
       Item.Mem_Pid := Word_32 (Process);
       Item.State := Process_State'Pos (P.State);
       Item.Segment_Count := Word_32 (P.Num_Segments);
+      Item.Index_Directory := 0;
+      --  The memory server writes no index yet (ADR 0028, #949).
 
       for I in 1 .. P.Num_Segments loop
          declare
