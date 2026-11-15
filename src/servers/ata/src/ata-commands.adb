@@ -72,16 +72,50 @@ package body ATA.Commands is
    -----------
 
    procedure Flush
-     (Drive : ATA.Drives.ATA_Drive)
+     (Drive   : ATA.Drives.ATA_Drive;
+      Success : out Boolean)
    is
-      Command : constant ATA_Command :=
-                  (Command => ATA_Flush,
-                   Master  => ATA.Drives.Is_Master (Drive),
-                   others  => <>);
+      Command : ATA_Command;
    begin
-      if not Send_Command (Drive, Command) then
-         Rose.Console_IO.Put_Line ("cannot flush drive");
+      Success := False;
+
+      if ATA.Drives.Is_Dead (Drive) then
+         ATA.Drives.Log (Drive, "drive is dead");
+         return;
       end if;
+
+      if ATA.Drives.Is_Atapi (Drive) then
+         Success := True;
+         return;
+      end if;
+
+      --  FLUSH CACHE has no data.  The drive interrupts when the cache is
+      --  on the medium, or when it fails.
+
+      Initialize_Command
+        (Command, ATA_Flush_Cache, ATA.Drives.Is_Master (Drive));
+
+      if not Send_Command (Drive, Command) then
+         ATA.Drives.Log (Drive, "sending flush command failed");
+         return;
+      end if;
+
+      if not ATA.Drives.Wait_For_Interrupt (Drive) then
+         ATA.Drives.Log (Drive, "flush: no interrupt");
+         return;
+      end if;
+
+      if not Poll_Status_Bits (Drive, Busy => False) then
+         ATA.Drives.Log (Drive, "flush: drive still busy");
+         return;
+      end if;
+
+      if not Check_Drive_OK (Drive) then
+         ATA.Drives.Log (Drive, "error detected after flush");
+         return;
+      end if;
+
+      Success := True;
    end Flush;
 
    ------------------------

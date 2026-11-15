@@ -71,6 +71,10 @@ package body Partition.Server is
       Count  : in     Natural;
       Blocks : in     System.Storage_Elements.Storage_Array);
 
+   procedure Flush
+     (Id : in Rose.Objects.Capability_Identifier);
+   --  Flush the device that the partition is on (#505).
+
    -------------------
    -- Create_Server --
    -------------------
@@ -116,10 +120,23 @@ package body Partition.Server is
         (Server_Context => Partition_Server,
          Get_Parameters => Get_Parameters'Access,
          Read_Blocks    => Read_Blocks'Access,
-         Write_Blocks   => Write_Blocks'Access);
+         Write_Blocks   => Write_Blocks'Access,
+         Flush          => Flush'Access);
       Rose.Interfaces.Storage.Partition_Setup.Server.Attach_Interface
         (Partition_Server, Set_Range'Access);
    end Create_Server;
+
+   -----------
+   -- Flush --
+   -----------
+
+   procedure Flush
+     (Id : in Rose.Objects.Capability_Identifier)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Client.Flush (Device_Client);
+   end Flush;
 
    --------------------
    -- Get_Parameters --

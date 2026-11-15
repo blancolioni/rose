@@ -163,6 +163,16 @@ package body ATA.Drives is
 
       end if;
 
+      --  An ATAPI drive is read-only, so its Flush has nothing to do, but
+      --  it is still a Block_Array.
+
+      Drive.Flush_Cap :=
+        Rose.System_Calls.Server.Create_Endpoint
+          (Create_Cap  => Create_Endpoint_Cap,
+           Endpoint_Id => Rose.Devices.Block.Flush_Endpoint,
+           Identifier  =>
+             Rose.Objects.Capability_Identifier (Drive.Index));
+
       Drive.Interrupt_Cap :=
         Rose.System_Calls.Server.Create_Receive_Cap
           (Create_Cap   => Create_Endpoint_Cap,
