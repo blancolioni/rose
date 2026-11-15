@@ -2,7 +2,7 @@ package Ada.Command_Line is
 
    pragma Preelaborate;
 
-   --  Rose has no argv, so this is not GNAT's package (#498, ADR 0023).
+   --  Rose has no argv, so this is not GNAT's package (#498, ADR 0037).
    --  The arguments are those of the command's argument list, the one
    --  String_List in its signature, if it has one. The shell binds named
    --  arguments and options by the signature, so they are not among them.

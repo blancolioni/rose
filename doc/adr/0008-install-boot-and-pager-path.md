@@ -1,6 +1,6 @@
 # 8. An install boot, and a hard-disk boot with only the pager path
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-27
 - **Related:** #321 (partition layout), #322 (booting from hd0), #327 and #348 (fresh pages after a restore), #305 (allocating storage on first write), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (persistent console)
 

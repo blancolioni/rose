@@ -1,6 +1,6 @@
 # 25. Mapping a region shared
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-03
 - **Related:** #593 (this decision), [ADR 0022](0022-display-server.md) (the display server, which needs it), [ADR 0014](0014-banks.md) (banks), #200 (the read-only page cache), #356 (consolidation)
 - **Amended by:** #593's implementation, which needed two small kernel changes (Context), lists the shared pages written back to their regions in each checkpoint (sections 4 and 5), and fails the faulting process when the shared table is full (section 6)

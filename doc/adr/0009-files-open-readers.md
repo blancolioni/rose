@@ -1,6 +1,6 @@
 # 9. Files open readers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** [ADR 0010](0010-resources.md) (resources), #389 (implementation), #390 (writers), #331 (`cat`), #344 (petal binds `in File`), #347 (`Truncate`), #141 (shell-owned commit), #215 (seeks capped at the size), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), #726 (`Stream_Writer` renamed `Writer`), #338 (redirection), #735 (an editor)
 - **Amended by:**

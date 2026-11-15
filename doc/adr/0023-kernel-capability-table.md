@@ -1,6 +1,6 @@
 # 23. The kernel capability table
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-02
 - **Related:** [ADR 0001](0001-capability-revocation.md) (revocation), #286 (the table, in SPARK), #116 (per-grant revocation), #277 (proving Rose with gnatprove), #281 (`Rose.Invocation` and `Rose.Capabilities.Layout`, proved)
 

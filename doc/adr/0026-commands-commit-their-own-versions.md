@@ -1,6 +1,6 @@
 # 26. Commands commit their own versions
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Related:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (argument modes, writable interfaces and transactions, which this amends), [ADR 0027](0027-new-files-in-a-transaction.md) (new files in a transaction), [ADR 0010](0010-resources.md) (resources), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #735 (an editor, ported from kilo), #752 (read-only and writable files), #634 (directory versions), #338 and #340 (redirection)
 - **Amended by:** #338, where petal commits a redirection, which is its own and not the command's (section 3).

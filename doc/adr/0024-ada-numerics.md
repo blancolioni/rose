@@ -1,6 +1,6 @@
 # 24. Ada.Numerics in the userland run-time system
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-03
 - **Related:** #496 (this decision), #664 (real and complex arrays), #670 (floating-point Image and Value), [ADR 0016](0016-random-numbers.md) (the kernel's random source), [ADR 0020](0020-clock.md) (the clock)
 

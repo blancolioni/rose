@@ -1,6 +1,6 @@
 # 22. A display server on the framebuffer
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-31
 - **Related:** #578 (this decision), project 54 (the implementation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (the persistent console), [ADR 0006](0006-signals.md) (signals), [ADR 0013](0013-typed-streams.md) (typed streams), [ADR 0014](0014-banks.md) (banks)
 - **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2); #654, where the early messages are replayed on the screen when the console starts (section 1)
