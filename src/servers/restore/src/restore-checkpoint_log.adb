@@ -8,6 +8,8 @@ with Rose.System_Calls;
 
 with Rose.Interfaces.Checkpoints.Log_Reader.Client;
 
+with Restore.Entries;
+
 package body Restore.Checkpoint_Log is
 
    use Rose.Interfaces.Checkpoints.Log_Reader.Client;
@@ -123,6 +125,12 @@ package body Restore.Checkpoint_Log is
      (Location : Rose.Words.Word_64;
       Message  : String);
 
+   procedure Report_Layout
+     (Location : Rose.Words.Word_64;
+      Status   : Restore.Entries.Layout_Status);
+   --  Report that Restore.Entries found the entry at Location
+   --  inconsistent, as Status says.
+
    procedure Refuse_Version
      (Location : Rose.Words.Word_64;
       Tables   : String;
@@ -150,112 +158,150 @@ package body Restore.Checkpoint_Log is
       return Boolean
    is
       use type Rose.Checkpoints.Header_Page_Flags;
+      use type Restore.Entries.Layout_Status;
+      use type Restore.Entries.Section_Kind;
       Pages        : constant Natural := Page_Count (Reader, Location);
       Kernel_Pages : Natural;
       Store_Pages  : Natural;
       Mem_Pages    : Natural;
-      Table_Pages  : Natural;
+      Layout       : Restore.Entries.Entry_Layout;
+      Status       : Restore.Entries.Layout_Status;
+      Index        : Positive;
       Header_Pages : Natural := 0;
-      Listed       : Natural := 0;
-      Has_Shared   : Boolean := False;
       Saved        : Natural := 0;
    begin
       if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
         or else not Check_Store_Tables
           (Reader, Location, Pages, Kernel_Pages + 1, Store_Pages)
-        or else not Check_Mem_Tables
-          (Reader, Location, Pages, Kernel_Pages + Store_Pages + 1,
-           Mem_Pages)
       then
          return False;
       end if;
 
-      Table_Pages := Kernel_Pages + Store_Pages + Mem_Pages;
+      --  The memory server's tables come after its pages (ADR 0028), so
+      --  finding them means skipping the batches and index sections.
 
-      loop
-         if Table_Pages + Header_Pages = Pages then
-            Report_Bad_Entry (Location, "header pages run past the entry");
-            return False;
-         end if;
+      Restore.Entries.Find_Layout (Reader, Location, Layout, Status);
 
-         Read_Page (Reader, Location, Table_Pages + Header_Pages + 1, Page);
+      if Status not in Restore.Entries.Found | Restore.Entries.Other_Version
+      then
+         Report_Layout (Location, Status);
+         return False;
+      end if;
 
-         if Has_Error
-           or else Header.Magic /= Rose.Checkpoints.Header_Page_Magic
-         then
-            Report_Bad_Entry (Location, "expected a checkpoint header page");
-            return False;
-         end if;
+      --  Tables of another version are refused here.
 
-         for I in 1 .. Header.Count loop
-            if not Is_Mem_Process
-              (Rose.Words.Word_32 (Header.Pages (I).Process))
-            then
-               Report_Bad_Entry
-                 (Location, "a page belongs to an unknown process");
+      if not Check_Mem_Tables
+        (Reader, Location, Pages, Layout.Mem_First, Mem_Pages)
+      then
+         return False;
+      end if;
+
+      if Status /= Restore.Entries.Found then
+         Report_Layout (Location, Status);
+         return False;
+      end if;
+
+      --  Every page that a batch lists belongs to a process in the memory
+      --  server's tables. Find_Layout has already checked that the
+      --  batches and index sections fill the pages up to those tables.
+
+      Index := Layout.Batch_First;
+      while Index < Layout.Mem_First loop
+         declare
+            Kind : Restore.Entries.Section_Kind;
+            Size : Natural;
+            Next : Positive := Index;
+         begin
+            Restore.Entries.Section_Size
+              (Reader, Location, Index, Layout.Mem_First - 1, Kind, Size,
+               Status);
+            if Status /= Restore.Entries.Found then
+               Report_Layout (Location, Status);
                return False;
             end if;
+
+            if Kind = Restore.Entries.Memory_Batch then
+               loop
+                  Read_Page (Reader, Location, Next, Page);
+                  if Has_Error then
+                     Report_Bad_Entry
+                       (Location, "expected a checkpoint header page");
+                     return False;
+                  end if;
+
+                  for I in 1 .. Header.Count loop
+                     if not Is_Mem_Process
+                       (Rose.Words.Word_32 (Header.Pages (I).Process))
+                     then
+                        Report_Bad_Entry
+                          (Location, "a page belongs to an unknown process");
+                        return False;
+                     end if;
+                  end loop;
+
+                  Next := Next + 1;
+                  exit when
+                    (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page)
+                    /= 0;
+               end loop;
+            end if;
+
+            Index := Index + Size;
+         end;
+      end loop;
+
+      --  Then the shared header pages, after the memory server's tables,
+      --  and then the pages that they list as saved (ADR 0025).
+
+      if not Layout.Has_Shared then
+         if Layout.Mem_First + Mem_Pages - 1 /= Pages then
+            Report_Bad_Entry
+              (Location, "page count does not match its headers");
+            return False;
+         end if;
+         return True;
+      end if;
+
+      loop
+         if Layout.Shared_First + Header_Pages > Pages then
+            Report_Bad_Entry
+              (Location, "shared header pages run past the entry");
+            return False;
+         end if;
+
+         Read_Page
+           (Reader, Location, Layout.Shared_First + Header_Pages, Page);
+
+         if Has_Error
+           or else Shared_Header.Magic
+             /= Rose.Checkpoints.Shared_Header_Magic
+           or else Shared_Header.Count
+             > Rose.Checkpoints.Max_Shared_References
+         then
+            Report_Bad_Entry (Location, "expected a shared header page");
+            return False;
+         end if;
+
+         for I in 1 .. Shared_Header.Count loop
+            case Shared_Header.Pages (I).Flags is
+               when Rose.Checkpoints.Shared_Page_Saved =>
+                  Saved := Saved + 1;
+               when Rose.Checkpoints.Shared_Page_Released =>
+                  null;
+               when others =>
+                  Report_Bad_Entry
+                    (Location, "a shared page is neither saved nor "
+                     & "released");
+                  return False;
+            end case;
          end loop;
 
          Header_Pages := Header_Pages + 1;
-         Listed := Listed + Natural (Header.Count);
-
-         if (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page) /= 0 then
-            Has_Shared :=
-              (Header.Flags and Rose.Checkpoints.Has_Shared_Pages) /= 0;
-            exit;
-         end if;
+         exit when (Shared_Header.Flags
+                    and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
       end loop;
 
-      --  Then the shared header pages, after the pages listed so far, and
-      --  then the pages that they list (ADR 0025). Saved counts what they
-      --  list, which comes after all of them.
-
-      if Has_Shared then
-         loop
-            if Table_Pages + Header_Pages + Listed = Pages then
-               Report_Bad_Entry
-                 (Location, "shared header pages run past the entry");
-               return False;
-            end if;
-
-            Read_Page
-              (Reader, Location, Table_Pages + Header_Pages + Listed + 1,
-               Page);
-
-            if Has_Error
-              or else Shared_Header.Magic
-                /= Rose.Checkpoints.Shared_Header_Magic
-              or else Shared_Header.Count
-                > Rose.Checkpoints.Max_Shared_References
-            then
-               Report_Bad_Entry (Location, "expected a shared header page");
-               return False;
-            end if;
-
-            for I in 1 .. Shared_Header.Count loop
-               case Shared_Header.Pages (I).Flags is
-                  when Rose.Checkpoints.Shared_Page_Saved =>
-                     Saved := Saved + 1;
-                  when Rose.Checkpoints.Shared_Page_Released =>
-                     null;
-                  when others =>
-                     Report_Bad_Entry
-                       (Location, "a shared page is neither saved nor "
-                        & "released");
-                     return False;
-               end case;
-            end loop;
-
-            Header_Pages := Header_Pages + 1;
-
-            exit when (Shared_Header.Flags
-                       and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
-         end loop;
-         Listed := Listed + Saved;
-      end if;
-
-      if Table_Pages + Header_Pages + Listed /= Pages then
+      if Layout.Shared_First + Header_Pages + Saved - 1 /= Pages then
          Report_Bad_Entry (Location, "page count does not match its headers");
          return False;
       end if;
@@ -792,5 +838,38 @@ package body Restore.Checkpoint_Log is
       Rose.Console_IO.Put (": ");
       Rose.Console_IO.Put_Line (Message);
    end Report_Bad_Entry;
+
+   -------------------
+   -- Report_Layout --
+   -------------------
+
+   procedure Report_Layout
+     (Location : Rose.Words.Word_64;
+      Status   : Restore.Entries.Layout_Status)
+   is
+      use Restore.Entries;
+   begin
+      case Status is
+         when Found =>
+            null;
+         when Other_Version =>
+            Report_Bad_Entry
+              (Location, "memory tables of another version");
+         when No_Kernel_Tables =>
+            Report_Bad_Entry (Location, "expected the kernel's tables");
+         when No_Store_Tables =>
+            Report_Bad_Entry (Location, "expected the storage tables");
+         when No_Memory_Tables =>
+            Report_Bad_Entry
+              (Location, "expected the memory server's tables");
+         when No_Batch =>
+            Report_Bad_Entry (Location, "no batch of memory pages");
+         when Bad_Section =>
+            Report_Bad_Entry
+              (Location, "expected a checkpoint or index header page");
+         when Runs_Past_Entry =>
+            Report_Bad_Entry (Location, "header pages run past the entry");
+      end case;
+   end Report_Layout;
 
 end Restore.Checkpoint_Log;

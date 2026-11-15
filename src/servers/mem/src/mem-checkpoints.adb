@@ -32,8 +32,10 @@ package body Mem.Checkpoints is
      with Import, Address => Checkpoint_Header'Address;
 
    procedure Write_Tables
-     (Append : not null access procedure (Buffer : System.Address));
-   --  Append the memory server's table pages.
+     (Append     : not null access procedure (Buffer : System.Address);
+      Has_Shared : Boolean);
+   --  Append the memory server's table pages.  Has_Shared says that the
+   --  pages of shared segments follow them.
 
    procedure Write_Shared_Pages
      (Append : not null access procedure (Buffer : System.Address));
@@ -116,18 +118,21 @@ package body Mem.Checkpoints is
 
    begin
 
-      Write_Tables (Append);
+      --  The batch of changed pages comes first, then the tables, which
+      --  name the processes that the batch's header pages refer to by
+      --  the memory server's ids (ADR 0028, section 4).
 
       Reset_Header;
 
       Mem.Page_Table.Iterate_Dirty_Pages (Update_Header'Access);
 
       Checkpoint_Header.Flags :=
-        Checkpoint_Header.Flags or Is_Last_Header_Page
-        or (if Has_Shared then Has_Shared_Pages else 0);
+        Checkpoint_Header.Flags or Is_Last_Header_Page;
       Append (Checkpoint_Header'Address);
       Mem.Page_Table.Iterate_Dirty_Pages (Write_Page'Access);
       Mem.Page_Table.Clear_Dirty_Pages;
+
+      Write_Tables (Append, Has_Shared);
 
       if Has_Shared then
          Write_Shared_Pages (Append);
@@ -245,7 +250,8 @@ package body Mem.Checkpoints is
    ------------------
 
    procedure Write_Tables
-     (Append : not null access procedure (Buffer : System.Address))
+     (Append     : not null access procedure (Buffer : System.Address);
+      Has_Shared : Boolean)
    is
       Count : Natural := 0;
 
@@ -281,6 +287,7 @@ package body Mem.Checkpoints is
       Table_Header.Version := Mem_Table_Version;
       Table_Header.Page_Count := Rose.Words.Word_32 (Count + 1);
       Table_Header.Process_Count := Rose.Words.Word_32 (Count);
+      Table_Header.Flags := (if Has_Shared then Mem_Has_Shared_Pages else 0);
       Append (Checkpoint_Header'Address);
 
       Mem.Processes.Iterate_Saved_Processes (Write_Process'Access);
