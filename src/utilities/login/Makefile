@@ -15,35 +15,35 @@ login:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-login.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/auth.idl \
-	    $(INTERFACES)/user.idl \
-	    $(INTERFACES)/named.idl \
-	    $(INTERFACES)/terminal.idl \
-	    $(INTERFACES)/stream.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/timer.idl \
-	    $(INTERFACES)/clock.idl \
-	    $(INTERFACES)/rights.idl \
-	    $(INTERFACES)/cap.idl \
-	    $(INTERFACES)/timeout.idl \
-	    $(INTERFACES)/commands.idl \
-	    $(INTERFACES)/launch.idl \
-	    $(INTERFACES)/writable_directory.idl \
-	    $(INTERFACES)/directory.idl \
-	    $(INTERFACES)/writable_file.idl \
-	    $(INTERFACES)/transactional_writable_file.idl \
-	    $(INTERFACES)/transactional.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/releasable_writer.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/seekable.idl \
-	    $(INTERFACES)/process.idl \
-	    $(INTERFACES)/bank.idl $(INTERFACES)/dependent.idl \
-	    $(INTERFACES)/segment.idl \
-	    $(INTERFACES)/server.idl \
-	    $(INTERFACES)/heap.idl \
-	    $(INTERFACES)/region.idl
+	    $(INTERFACES)/users-auth.idl \
+	    $(INTERFACES)/users-user.idl \
+	    $(INTERFACES)/common-named.idl \
+	    $(INTERFACES)/screens-terminal.idl \
+	    $(INTERFACES)/streams-stream.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/time-timer.idl \
+	    $(INTERFACES)/time-clock.idl \
+	    $(INTERFACES)/users-rights.idl \
+	    $(INTERFACES)/caps-cap.idl \
+	    $(INTERFACES)/time-timeout.idl \
+	    $(INTERFACES)/commands-lookup.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/files-writable_file.idl \
+	    $(INTERFACES)/files-transactional_writable_file.idl \
+	    $(INTERFACES)/common-transactional.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-releasable_writer.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/streams-seekable.idl \
+	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/processes-segment.idl \
+	    $(INTERFACES)/processes-server.idl \
+	    $(INTERFACES)/processes-heap.idl \
+	    $(INTERFACES)/storage-region.idl
 	gprbuild $(GPRBUILD_CARGS)

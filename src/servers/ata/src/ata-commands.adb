@@ -1,5 +1,5 @@
 with Rose.Devices.Port_IO;
-with Rose.Interfaces.Block_Device;
+with Rose.Interfaces.Storage.Block_Array;
 with Rose.Console_IO;
 
 package body ATA.Commands is
@@ -249,7 +249,7 @@ package body ATA.Commands is
 
       for I in 1 .. Count loop
          declare
-            use Rose.Interfaces.Block_Device;
+            use Rose.Interfaces.Storage.Block_Array;
             Next : constant Block_Address_Type :=
                      Address + Block_Address_Type (I - 1);
          begin
@@ -313,7 +313,7 @@ package body ATA.Commands is
       Success : out Boolean)
    is
       pragma Unreferenced (Count);
-      use Rose.Interfaces.Block_Device;
+      use Rose.Interfaces.Storage.Block_Array;
       use Rose.Words;
       use ATA.Drives;
       use System.Storage_Elements;
@@ -654,7 +654,7 @@ package body ATA.Commands is
 
       for I in 1 .. Count loop
          declare
-            use Rose.Interfaces.Block_Device;
+            use Rose.Interfaces.Storage.Block_Array;
             Next : constant Block_Address_Type :=
                      Address + Block_Address_Type (I - 1);
          begin

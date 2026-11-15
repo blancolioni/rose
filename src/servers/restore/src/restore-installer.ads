@@ -1,4 +1,4 @@
-with Rose.Interfaces.File_System.Client;
+with Rose.Interfaces.Files.File_System.Client;
 
 package Restore.Installer is
 
@@ -52,13 +52,15 @@ package Restore.Installer is
                              Flags : Install_Flag_Array));
 
    procedure Install
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator);
    --  Install the programs Source gives from /rose/install in
    --  File_System.
 
    procedure Update
-     (File_System : Rose.Interfaces.File_System.Client.File_System_Client;
+     (File_System : Rose.Interfaces.Files.File_System.Client
+       .File_System_Client;
       Source      : Step_Iterator);
    --  The update boot (ADR 0031, section 4; #829): install the saved
    --  programs Source gives from /rose/install in File_System again, in

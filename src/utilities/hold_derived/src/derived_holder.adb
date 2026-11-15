@@ -4,20 +4,21 @@ with Rose.Invocation;
 with Rose.Server;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Restorable.Server;
+with Rose.Interfaces.Processes.Restorable.Server;
 
 package body Derived_Holder is
 
    use type Rose.Capabilities.Capability;
 
    type Holder_Object is
-     limited new Rose.Interfaces.Restorable.Server.Restorable_Interface
+     limited new Rose.Interfaces.Processes.Restorable.Server
+       .Restorable_Interface
    with null record;
 
    overriding function Restorable_Cap
      (Item : in out Holder_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
 
    overriding procedure Restored (Item : in out Holder_Object);
 
@@ -49,7 +50,8 @@ package body Derived_Holder is
    begin
       Parent_Cap := Parent;
       Child_Cap := Child;
-      Rose.Interfaces.Restorable.Server.Attach (Context, The_Holder'Access);
+      Rose.Interfaces.Processes.Restorable.Server
+        .Attach (Context, The_Holder'Access);
 
       if Works (Parent_Cap) and then Works (Child_Cap) then
          Ada.Text_IO.Put_Line

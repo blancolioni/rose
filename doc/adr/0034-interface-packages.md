@@ -1,6 +1,6 @@
 # 34. Interface packages
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-12
 - **Related:** #888 (this decision), #841 (`Block_Device` renamed), #162 (system caps as roles), #736 (endpoint ids), #827 (endpoint ids append-only), [ADR 0002](0002-typed-commands-and-directory-caps.md) (roles), [ADR 0031](0031-updating-an-installation.md) (the interfaces freeze with 0.4.0)
 

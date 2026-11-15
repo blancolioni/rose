@@ -1,4 +1,4 @@
-command Rose.Core.Directory : Create_Endpoint, Delete_Cap, Cap_Set_Service
+command Rose.Core.Directory : Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Cap_Set_Service
   with Summary     => "Serve a directory.",
        Description => """
           Directory serves one directory (ADR 0003): its entries, each a
@@ -23,12 +23,12 @@ command Rose.Core.Directory : Create_Endpoint, Delete_Cap, Cap_Set_Service
        Replaceable => Directory_Server,
        Live
 is
-   File_Launch : in Launch
+   File_Launch : in Processes.Launch
      with Help => "the launch interface of the file command";
-   Directory_Launch : in Launch
+   Directory_Launch : in Processes.Launch
      with Help => "the launch interface of the directory command";
-   Served : out Writable_Directory
+   Served : out Files.Writable_Directory
      with Help => "the directory";
-   Control : out Replaceable
+   Control : out Processes.Replaceable
      with Help => "its Replaceable interface, which its parent keeps";
 end Rose.Core.Directory;

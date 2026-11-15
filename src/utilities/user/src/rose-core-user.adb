@@ -4,11 +4,11 @@ with User_Server;
 
 procedure Rose.Core.User
   (Cap_Set_Service : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
    Name            : String;
    Home            : in out
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
-   Bank            : in out Rose.Interfaces.Bank.Bank_Object'Class;
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
+   Bank            : in out Rose.Interfaces.Storage.Bank.Bank_Object'Class;
    User            : out Rose.Capabilities.Capability;
    Control         : out Rose.Capabilities.Capability)
 is

@@ -2,9 +2,9 @@ with Rose.Objects;
 with Rose.Server;
 with Rose.Words;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.User.Server;
-with Rose.Interfaces.Writable_Directory.Client;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Users.User.Server;
+with Rose.Interfaces.Files.Writable_Directory.Client;
 
 package body User_Server is
 
@@ -24,7 +24,7 @@ package body User_Server is
    --  package's, so that a checkpoint holds it with the process's memory.
 
    type User_Object is
-     new Rose.Interfaces.User.Server.User_Interface with null record;
+     new Rose.Interfaces.Users.User.Server.User_Interface with null record;
 
    overriding function User_Cap
      (Item : in out User_Object)
@@ -37,13 +37,13 @@ package body User_Server is
    overriding function Name (Item : in out User_Object) return String;
 
    subtype Writable_Directory_Class is
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class;
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
 
    overriding function Home_Directory
      (Item : in out User_Object)
       return Writable_Directory_Class;
 
-   subtype Bank_Class is Rose.Interfaces.Bank.Bank_Object'Class;
+   subtype Bank_Class is Rose.Interfaces.Storage.Bank.Bank_Object'Class;
 
    overriding function New_Session
      (Item : in out User_Object)
@@ -82,7 +82,7 @@ package body User_Server is
 
       Home_Cap := Home;
       Bank_Cap := Bank;
-      Rose.Interfaces.User.Server.Attach
+      Rose.Interfaces.Users.User.Server.Attach
         (Context, The_User'Access, User_Id);
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Cap_Set_Service);
@@ -99,7 +99,8 @@ package body User_Server is
    is
       pragma Unreferenced (Item);
    begin
-      return Rose.Interfaces.Writable_Directory.Client.From_Cap (Home_Cap);
+      return Rose.Interfaces.Files.Writable_Directory.Client
+        .From_Cap (Home_Cap);
    end Home_Directory;
 
    -------------------
@@ -108,7 +109,7 @@ package body User_Server is
 
    function Interface_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.User.Server.Cap_Of (The_User);
+      return Rose.Interfaces.Users.User.Server.Cap_Of (The_User);
    end Interface_Cap;
 
    ----------
@@ -128,8 +129,8 @@ package body User_Server is
    overriding function Named_Cap
      (Item : in out User_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.User.Server.Cap_Of
-         (Item, Rose.Interfaces.User.Named_Interface));
+   is (Rose.Interfaces.Users.User.Server.Cap_Of
+         (Item, Rose.Interfaces.Users.User.Named_Interface));
 
    -----------------
    -- New_Session --
@@ -140,8 +141,8 @@ package body User_Server is
       return Bank_Class
    is
       pragma Unreferenced (Item);
-      User_Bank : Rose.Interfaces.Bank.Client.Bank_Client :=
-                    Rose.Interfaces.Bank.Client.From_Cap (Bank_Cap);
+      User_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                    Rose.Interfaces.Storage.Bank.Client.From_Cap (Bank_Cap);
    begin
       return User_Bank.Create_Sub_Bank (0, 0);
    end New_Session;
@@ -198,7 +199,7 @@ package body User_Server is
    overriding function User_Cap
      (Item : in out User_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.User.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.User.Server.Cap_Of (Item));
 
    -----------------
    -- Write_State --
@@ -212,7 +213,8 @@ package body User_Server is
    begin
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
-        (Stream, Rose.Interfaces.User.Server.Identifier_Of (The_User'Access));
+        (Stream, Rose.Interfaces.Users.User.Server
+          .Identifier_Of (The_User'Access));
       Natural'Write (Stream, Name_Last);
       for I in 1 .. Name_Last loop
          Character'Write (Stream, User_Name (I));

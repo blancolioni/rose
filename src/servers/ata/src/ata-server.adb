@@ -13,8 +13,8 @@ with Rose.Devices.Port_IO;
 with Rose.Console_IO;
 
 with Rose.Devices.Block;
-with Rose.Interfaces.Block_Device;
-with Rose.Interfaces.Ata;
+with Rose.Interfaces.Storage.Block_Array;
+with Rose.Interfaces.Devices.Ata;
 
 with ATA.Commands;
 with ATA.Drives;
@@ -267,18 +267,18 @@ package body ATA.Server is
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Get_Parameters_Endpoint);
+         Rose.Interfaces.Storage.Block_Array.Get_Parameters_Endpoint);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Ata.Get_Device_Endpoint);
+         Rose.Interfaces.Devices.Ata.Get_Device_Endpoint);
 
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Read_Blocks_Endpoint);
+         Rose.Interfaces.Storage.Block_Array.Read_Blocks_Endpoint);
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Block_Device.Write_Blocks_Endpoint);
+         Rose.Interfaces.Storage.Block_Array.Write_Blocks_Endpoint);
 
       loop
          Send_Reply := True;
@@ -338,7 +338,7 @@ package body ATA.Server is
                   Rose.System_Calls.Send_Cap (Reply, Write_Block_Cap);
                end;
 
-            when Rose.Interfaces.Block_Device.Get_Parameters_Endpoint =>
+            when Rose.Interfaces.Storage.Block_Array.Get_Parameters_Endpoint =>
                declare
                   Block_Size    : Rose.Devices.Block.Block_Size_Type;
                   Block_Count   : Rose.Devices.Block.Block_Address_Type;
@@ -352,9 +352,9 @@ package body ATA.Server is
 
                end;
 
-            when Rose.Interfaces.Block_Device.Read_Blocks_Endpoint =>
+            when Rose.Interfaces.Storage.Block_Array.Read_Blocks_Endpoint =>
                declare
-                  use Rose.Interfaces.Block_Device;
+                  use Rose.Interfaces.Storage.Block_Array;
                   use System.Storage_Elements;
                   Buffer : Storage_Array (1 .. Params.Buffer_Length);
                   pragma Import (Ada, Buffer);
@@ -395,9 +395,9 @@ package body ATA.Server is
                   end loop;
                end;
 
-            when Rose.Interfaces.Block_Device.Write_Blocks_Endpoint =>
+            when Rose.Interfaces.Storage.Block_Array.Write_Blocks_Endpoint =>
                declare
-                  use Rose.Interfaces.Block_Device;
+                  use Rose.Interfaces.Storage.Block_Array;
                   use System.Storage_Elements;
                   Buffer        : Storage_Array (1 .. Params.Buffer_Length);
                   pragma Import (Ada, Buffer);
@@ -438,7 +438,7 @@ package body ATA.Server is
                   end loop;
                end;
 
-            when Rose.Interfaces.Ata.Get_Device_Endpoint =>
+            when Rose.Interfaces.Devices.Ata.Get_Device_Endpoint =>
                declare
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
                   Read_Block_Cap     : Rose.Capabilities.Capability;

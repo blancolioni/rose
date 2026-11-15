@@ -3,7 +3,7 @@ with Ada.Text_IO;
 with Rose.Clock.Calendar;
 
 procedure Rose.Core.Date
-  (Clock_Service : in out Rose.Interfaces.Clock.Clock_Object'Class;
+  (Clock_Service : in out Rose.Interfaces.Time.Clock.Clock_Object'Class;
    ISO_8601      : Boolean := False)
 is
    use Rose.Clock.Calendar;

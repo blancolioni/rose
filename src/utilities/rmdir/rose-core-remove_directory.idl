@@ -1,4 +1,4 @@
-command Rose.Core.Remove_Directory : Standard_Error
+command Rose.Core.Remove_Directory : Streams.Standard_Error
   with Summary     => "Remove an empty directory.",
        Description => """
           Remove_Directory removes the directory DIRECTORY_NAME from
@@ -12,6 +12,6 @@ command Rose.Core.Remove_Directory : Standard_Error
 is
    Directory_Name : String
      with Help => "the directory to remove";
-   Directory : in Writable_Directory
+   Directory : in Files.Writable_Directory
      with Help => "the directory that holds it";
 end Rose.Core.Remove_Directory;

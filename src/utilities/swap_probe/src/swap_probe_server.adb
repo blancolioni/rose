@@ -1,5 +1,5 @@
-with Rose.Interfaces.Named.Client;
-with Rose.Interfaces.Named.Server;
+with Rose.Interfaces.Common.Named.Client;
+with Rose.Interfaces.Common.Named.Server;
 with Rose.Server;
 
 package body Swap_Probe_Server is
@@ -9,13 +9,13 @@ package body Swap_Probe_Server is
    Max_Answer : constant := 16;
 
    type Probe_Object is
-     limited new Rose.Interfaces.Named.Server.Named_Interface
+     limited new Rose.Interfaces.Common.Named.Server.Named_Interface
    with null record;
 
    overriding function Named_Cap
      (Item : in out Probe_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Named.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Item));
 
    overriding function Name (Item : in out Probe_Object) return String;
 
@@ -42,7 +42,7 @@ package body Swap_Probe_Server is
    begin
       Target_Cap := Target;
       Set_Answer (Image (Image'First + 1 .. Image'Last));
-      Rose.Interfaces.Named.Server.Attach (Context, The_Probe'Access);
+      Rose.Interfaces.Common.Named.Server.Attach (Context, The_Probe'Access);
    end Create_Server;
 
    -------------------
@@ -51,7 +51,8 @@ package body Swap_Probe_Server is
 
    function Interface_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Named.Server.Interface_Cap (The_Probe'Access);
+      return Rose.Interfaces.Common.Named.Server
+        .Interface_Cap (The_Probe'Access);
    end Interface_Cap;
 
    ----------
@@ -83,10 +84,10 @@ package body Swap_Probe_Server is
    begin
       if Target_Cap /= Rose.Capabilities.Null_Capability then
          declare
-            Target : Rose.Interfaces.Named.Client.Named_Client;
+            Target : Rose.Interfaces.Common.Named.Client.Named_Client;
          begin
-            Rose.Interfaces.Named.Client.Open (Target, Target_Cap);
-            Set_Answer (Rose.Interfaces.Named.Client.Name (Target));
+            Rose.Interfaces.Common.Named.Client.Open (Target, Target_Cap);
+            Set_Answer (Rose.Interfaces.Common.Named.Client.Name (Target));
          exception
             when others =>
                Set_Answer ("failed");

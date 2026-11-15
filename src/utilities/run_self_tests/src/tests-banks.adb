@@ -4,8 +4,8 @@ with Rose.Capabilities;
 with Rose.Server;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Dependent;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Storage.Dependent;
 
 with Tests.Registry;
 
@@ -24,9 +24,9 @@ package body Tests.Banks is
    --------------------
 
    function Dependent_Test return Boolean is
-      subtype Bank_Class is Rose.Interfaces.Bank.Bank_Object'Class;
+      subtype Bank_Class is Rose.Interfaces.Storage.Bank.Bank_Object'Class;
       subtype Dependent_Class is
-        Rose.Interfaces.Dependent.Dependent_Object'Class;
+        Rose.Interfaces.Storage.Dependent.Dependent_Object'Class;
       Context : Rose.Server.Server_Context;
       Passed  : Boolean := True;
       Refused : Boolean := False;
@@ -67,8 +67,8 @@ package body Tests.Banks is
         (Context, Dependent_Bit, On_Dependent_Bit'Access);
 
       declare
-         Test_Bank : Rose.Interfaces.Bank.Client.Bank_Client :=
-                       Rose.Interfaces.Bank.Client.From_Cap
+         Test_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                       Rose.Interfaces.Storage.Bank.Client.From_Cap
                          (Tests.Registry.Bank);
          Doomed    : Bank_Class := Test_Bank.Create_Sub_Bank (0, 0);
          Kept      : Bank_Class := Test_Bank.Create_Sub_Bank (0, 0);

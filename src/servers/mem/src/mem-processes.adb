@@ -4,11 +4,11 @@ with Rose.Trace;
 with Rose.System_Calls.Server;
 with Rose.Limits;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Heap;
-with Rose.Interfaces.Process;
-with Rose.Interfaces.Process_Banks.Client;
-with Rose.Interfaces.Kernel_Process.Client;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Processes.Heap;
+with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Storage.Process_Banks.Client;
+with Rose.Interfaces.Processes.Kernel_Process.Client;
 
 with Mem.Calls;
 
@@ -43,7 +43,7 @@ package body Mem.Processes is
          Base          : Rose.Addresses.Virtual_Page_Address := 0;
          Bound         : Rose.Addresses.Virtual_Page_Address := 0;
          Limit         : Rose.Addresses.Virtual_Page_Address := 0;
-         Region        : Rose.Interfaces.Region.Client.Region_Client;
+         Region        : Rose.Interfaces.Storage.Region.Client.Region_Client;
          Region_Base   : Rose.Objects.Object_Id := 0;
          Region_Bound  : Rose.Objects.Object_Id := 0;
          Region_Offset : Rose.Objects.Object_Id := 0;
@@ -56,7 +56,7 @@ package body Mem.Processes is
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
 
    subtype Kernel_Process_Client is
-     Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
+     Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
 
    type Fault_Count is
       record
@@ -93,7 +93,8 @@ package body Mem.Processes is
 
    Process_Table : Memory_Process_Table;
 
-   Process_Banks : Rose.Interfaces.Process_Banks.Client.Process_Banks_Client;
+   Process_Banks : Rose.Interfaces.Storage.Process_Banks.Client
+     .Process_Banks_Client;
    Have_Banks    : Boolean := False;
    --  The storage server's record of each process's own bank (#750), from
    --  Set_Process_Banks.
@@ -190,7 +191,7 @@ package body Mem.Processes is
      (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
-      Region        : Rose.Interfaces.Region.Client.Region_Client;
+      Region        : Rose.Interfaces.Storage.Region.Client.Region_Client;
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
@@ -220,7 +221,7 @@ package body Mem.Processes is
          return;
       end if;
 
-      Rose.Interfaces.Region.Client.Get_Range
+      Rose.Interfaces.Storage.Region.Client.Get_Range
         (Region, Region_Base, Region_Bound);
 
       --  Without its range, the segment would be read from page 0 of the
@@ -228,7 +229,7 @@ package body Mem.Processes is
       --  code (#261). Leave the segment out, so that a fault in it is
       --  reported as an invalid page reference.
 
-      if Rose.Interfaces.Region.Client.Has_Error
+      if Rose.Interfaces.Storage.Region.Client.Has_Error
         or else not Region_Base'Valid
         or else not Region_Bound'Valid
       then
@@ -322,12 +323,13 @@ package body Mem.Processes is
       use type Rose.Capabilities.Capability;
    begin
       if Segment.Private_Region then
-         Rose.Interfaces.Region.Client.Release (Segment.Region);
+         Rose.Interfaces.Storage.Region.Client.Release (Segment.Region);
       end if;
-      if Rose.Interfaces.Region.Client.Get_Interface_Cap (Segment.Region)
+      if Rose.Interfaces.Storage.Region.Client.Get_Interface_Cap (Segment
+        .Region)
         /= 0
       then
-         Rose.Interfaces.Region.Client.Close (Segment.Region);
+         Rose.Interfaces.Storage.Region.Client.Close (Segment.Region);
       end if;
    end Close_Segment;
 
@@ -353,7 +355,7 @@ package body Mem.Processes is
    procedure End_Bank (Process : Rose.Objects.Object_Id) is
    begin
       if Have_Banks then
-         Rose.Interfaces.Process_Banks.Client.End_Process
+         Rose.Interfaces.Storage.Process_Banks.Client.End_Process
            (Process_Banks, Process);
       end if;
    end End_Bank;
@@ -366,7 +368,7 @@ package body Mem.Processes is
      (Process : Process_Id;
       Message : String)
    is
-      use Rose.Interfaces.Kernel_Process.Client;
+      use Rose.Interfaces.Processes.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
    begin
       Rose.Console_IO.Put_Line (Message);
@@ -437,8 +439,8 @@ package body Mem.Processes is
       begin
          if P.Bank_Cap = 0 and then Have_Banks then
             P.Bank_Cap :=
-              Rose.Interfaces.Bank.Client.Get_Interface_Cap
-                (Rose.Interfaces.Process_Banks.Client.Process_Bank
+              Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+                (Rose.Interfaces.Storage.Process_Banks.Client.Process_Bank
                    (Process_Banks, P.Oid));
          end if;
          return P.Bank_Cap;
@@ -606,7 +608,7 @@ package body Mem.Processes is
    procedure Hand_Over_Banks (Old_Oid, New_Oid : Rose.Objects.Object_Id) is
    begin
       if Have_Banks then
-         Rose.Interfaces.Process_Banks.Client.Hand_Over
+         Rose.Interfaces.Storage.Process_Banks.Client.Hand_Over
            (Process_Banks, Old_Oid, New_Oid);
       end if;
    end Hand_Over_Banks;
@@ -649,7 +651,7 @@ package body Mem.Processes is
                              + Segment.Region_Offset;
                begin
                   Store_Reads := Store_Reads + 1;
-                  Rose.Interfaces.Region.Client.Get
+                  Rose.Interfaces.Storage.Region.Client.Get
                     (Item => Segment.Region,
                      Page => Page,
                      Data => Buffer);
@@ -730,7 +732,7 @@ package body Mem.Processes is
    ------------------
 
    procedure Kill_Process (Process : Process_Id) is
-      use Rose.Interfaces.Kernel_Process.Client;
+      use Rose.Interfaces.Processes.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
 
       procedure Delete (Cap : Rose.Capabilities.Capability);
@@ -819,7 +821,7 @@ package body Mem.Processes is
       Pid    : constant Process_Id :=
                  Register_Process (Process_Cap, Boot_Module => False);
       Cap    : Rose.Capabilities.Capability;
-      Launch : Rose.Interfaces.Bank.Client.Bank_Client;
+      Launch : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
    begin
       if Pid = 0 then
          Rose.System_Calls.Delete_Cap (Bank_Cap);
@@ -831,14 +833,14 @@ package body Mem.Processes is
       --  so mem need not keep the cap across a restore.
 
       if Have_Banks and then Bank_Cap /= 0 then
-         Rose.Interfaces.Bank.Client.Open (Launch, Bank_Cap);
+         Rose.Interfaces.Storage.Bank.Client.Open (Launch, Bank_Cap);
          Process_Table (Pid).Bank_Cap :=
-           Rose.Interfaces.Bank.Client.Get_Interface_Cap
-             (Rose.Interfaces.Process_Banks.Client.Create_Process_Bank
+           Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+             (Rose.Interfaces.Storage.Process_Banks.Client.Create_Process_Bank
                 (Process_Banks,
-                 Parent  => Rose.Interfaces.Bank.Client.Index (Launch),
+                 Parent  => Rose.Interfaces.Storage.Bank.Client.Index (Launch),
                  Process => Process_Table (Pid).Oid));
-         Rose.Interfaces.Bank.Client.Close (Launch);
+         Rose.Interfaces.Storage.Bank.Client.Close (Launch);
       else
          Rose.System_Calls.Delete_Cap (Bank_Cap);
       end if;
@@ -847,7 +849,7 @@ package body Mem.Processes is
         Rose.System_Calls.Server.Create_Endpoint
           (Create_Cap   => Create_Endpoint_Cap,
            Endpoint_Id  =>
-             Rose.Interfaces.Process.Process_Interface,
+             Rose.Interfaces.Processes.Process.Process_Interface,
            Identifier   => Process_Identifier (Pid));
       Process_Table (Pid).Interface_Cap := Cap;
       return Cap;
@@ -921,8 +923,8 @@ package body Mem.Processes is
       if not Have_Banks or else Process not in Real_Process_Id then
          return 0;
       end if;
-      return Rose.Interfaces.Bank.Client.Get_Interface_Cap
-        (Rose.Interfaces.Process_Banks.Client.Parent_Bank
+      return Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+        (Rose.Interfaces.Storage.Process_Banks.Client.Parent_Bank
            (Process_Banks, Process_Table (Process).Oid));
    end Parent_Bank;
 
@@ -1010,7 +1012,8 @@ package body Mem.Processes is
                    (if Boot_Module then Next_Boot_Pid
                     else Next_Launched_Pid);
       Start  : constant Process_Id := Next_Pid;
-      Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
+      Client : Rose.Interfaces.Processes.Kernel_Process.Client
+        .Kernel_Process_Client;
    begin
       while Process_Table (Next_Pid).State /= Available loop
          if Next_Pid = Last then
@@ -1030,27 +1033,30 @@ package body Mem.Processes is
          Next_Launched_Pid := Next_Pid;
       end if;
 
-      Rose.Interfaces.Kernel_Process.Client.Open (Client, Process_Cap);
+      Rose.Interfaces.Processes.Kernel_Process.Client
+        .Open (Client, Process_Cap);
 
       declare
          Oid : constant Rose.Objects.Object_Id :=
-                 Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client);
+                 Rose.Interfaces.Processes.Kernel_Process.Client
+                   .Get_Object_Id (Client);
       begin
          if Find_Process (Identifier_Of (Oid)) /= 0 then
             Rose.Console_IO.Put_Line ("mem: process identifier in use");
-            Rose.Interfaces.Kernel_Process.Client.Close (Client);
+            Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
             return 0;
          end if;
       end;
 
       declare
          Oid : constant Rose.Objects.Object_Id :=
-                 Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client);
+                 Rose.Interfaces.Processes.Kernel_Process.Client
+                   .Get_Object_Id (Client);
          Heap_Cap : constant Rose.Capabilities.Capability :=
                       Rose.System_Calls.Server.Create_Endpoint
                         (Create_Cap   => Create_Endpoint_Cap,
                          Endpoint_Id  =>
-                           Rose.Interfaces.Heap.Heap_Interface,
+                           Rose.Interfaces.Processes.Heap.Heap_Interface,
                          Identifier   => Identifier_Of (Oid));
       begin
          Process_Table (Next_Pid) :=
@@ -1280,7 +1286,8 @@ package body Mem.Processes is
    is
       pragma Unreferenced (Id);
       Pid    : constant Process_Id := Process_Id (Mem_Pid);
-      Client : Rose.Interfaces.Kernel_Process.Client.Kernel_Process_Client;
+      Client : Rose.Interfaces.Processes.Kernel_Process.Client
+        .Kernel_Process_Client;
    begin
       if Pid not in Real_Process_Id
         or else Process_Table (Pid).State /= Available
@@ -1289,7 +1296,7 @@ package body Mem.Processes is
          return;
       end if;
 
-      Rose.Interfaces.Kernel_Process.Client.Open (Client, Process);
+      Rose.Interfaces.Processes.Kernel_Process.Client.Open (Client, Process);
 
       --  The heap and process caps the process holds carry its identifier,
       --  which comes from its object id, so they are made again in the
@@ -1299,26 +1306,30 @@ package body Mem.Processes is
         Memory_Process_Record'
           (State         => Active,
            Oid           =>
-             Rose.Interfaces.Kernel_Process.Client.Get_Object_Id (Client),
+             Rose.Interfaces.Processes.Kernel_Process.Client
+               .Get_Object_Id (Client),
            Segments      => <>,
            Num_Segments  => 0,
            Heap          =>
              Rose.System_Calls.Server.Create_Endpoint
                (Create_Cap   => Create_Endpoint_Cap,
-                Endpoint_Id  => Rose.Interfaces.Heap.Heap_Interface,
+                Endpoint_Id  => Rose.Interfaces.Processes.Heap.Heap_Interface,
                 Identifier   =>
                   Identifier_Of
-                    (Rose.Interfaces.Kernel_Process.Client.Get_Object_Id
+                    (Rose.Interfaces.Processes.Kernel_Process.Client
+                      .Get_Object_Id
                        (Client))),
            Server        => 0,
            Process       => Client,
            Interface_Cap =>
              Rose.System_Calls.Server.Create_Endpoint
                (Create_Cap   => Create_Endpoint_Cap,
-                Endpoint_Id  => Rose.Interfaces.Process.Process_Interface,
+                Endpoint_Id  => Rose.Interfaces.Processes.Process
+                  .Process_Interface,
                 Identifier   =>
                   Identifier_Of
-                    (Rose.Interfaces.Kernel_Process.Client.Get_Object_Id
+                    (Rose.Interfaces.Processes.Kernel_Process.Client
+                      .Get_Object_Id
                        (Client))),
            Bank_Cap      => 0,
            Faults        => <>);
@@ -1349,8 +1360,9 @@ package body Mem.Processes is
             P       : Memory_Process_Record renames Process_Table (Pid);
             Segment : Segment_Record renames P.Segments (P.Num_Segments);
          begin
-            Rose.Interfaces.Region.Client.Open (Segment.Region, Region);
-            Rose.Interfaces.Region.Client.Get_Range
+            Rose.Interfaces.Storage.Region.Client.Open (Segment
+              .Region, Region);
+            Rose.Interfaces.Storage.Region.Client.Get_Range
               (Segment.Region, Segment.Region_Base, Segment.Region_Bound);
             Segment.Region_Offset := Rose.Objects.Object_Id (Region_Offset);
          end;
@@ -1449,7 +1461,7 @@ package body Mem.Processes is
    is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
-      Rose.Interfaces.Kernel_Process.Client.Resume (P.Process);
+      Rose.Interfaces.Processes.Kernel_Process.Client.Resume (P.Process);
    end Resume_Process;
 
    ------------------
@@ -1507,7 +1519,7 @@ package body Mem.Processes is
    procedure Set_Ended (Ended_Cap : Rose.Capabilities.Capability) is
    begin
       if Have_Banks then
-         Rose.Interfaces.Process_Banks.Client.Set_Ended
+         Rose.Interfaces.Storage.Process_Banks.Client.Set_Ended
            (Process_Banks, Ended_Cap);
       end if;
    end Set_Ended;
@@ -1518,7 +1530,8 @@ package body Mem.Processes is
 
    procedure Set_Process_Banks (Banks_Cap : Rose.Capabilities.Capability) is
    begin
-      Rose.Interfaces.Process_Banks.Client.Open (Process_Banks, Banks_Cap);
+      Rose.Interfaces.Storage.Process_Banks.Client
+        .Open (Process_Banks, Banks_Cap);
       Have_Banks := True;
    end Set_Process_Banks;
 
@@ -1607,7 +1620,8 @@ package body Mem.Processes is
       if not Have_Banks then
          return 0;
       end if;
-      return Rose.Interfaces.Process_Banks.Client.Take_Ended (Process_Banks);
+      return Rose.Interfaces.Storage.Process_Banks.Client
+        .Take_Ended (Process_Banks);
    end Take_Ended;
 
    -------------------------
@@ -1684,7 +1698,8 @@ package body Mem.Processes is
          procedure Put (Address : System.Address) is
             Data : Page_Buffer with Import, Address => Address;
          begin
-            Rose.Interfaces.Region.Client.Put (Segment.Region, Page, Data);
+            Rose.Interfaces.Storage.Region.Client.Put (Segment
+              .Region, Page, Data);
          end Put;
 
       begin

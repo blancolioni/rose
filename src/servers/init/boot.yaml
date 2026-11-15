@@ -112,9 +112,9 @@ stages:
         - {ports: [out, 8, 0x2F8, 0x2F8], owner: none}
         - {ports: [in, 8, 0x2FD, 0x2FD], owner: none}
       exports:
-        console_interface: Writer.Writer_Interface
-        console_stream: Writer.Write_Endpoint
-        console_redirect: Output_Redirect.Redirect_Endpoint
+        console_interface: Streams.Writer.Writer_Interface
+        console_stream: Streams.Writer.Write_Endpoint
+        console_redirect: Streams.Output_Redirect.Redirect_Endpoint
 
     # Where Init.Calls.Send_String reports, as when the installer refuses
     # a cap request.
@@ -129,8 +129,8 @@ stages:
       cap_set: none
       caps: [console_interface, exit]
       exports:
-        cap_set: Constructor.Create_Endpoint
-        bootcaps_release: Resource.Release_Endpoint
+        cap_set: Caps.Constructor.Create_Endpoint
+        bootcaps_release: Common.Resource.Release_Endpoint
 
     - launch: mem
       oid: 4
@@ -139,21 +139,21 @@ stages:
              trace, hold_calls, release_calls, swap_processes,
              process_state]
       exports:
-        mem: Memory.Memory_Interface
-        memory_checkpoint: Memory.Checkpoint_Endpoint
-        mem_set_process_banks: Memory.Set_Process_Banks_Endpoint
-        memory_restore: Memory_Restore.Memory_Restore_Interface
-        mem_replace_process: Replacer.Replacer_Interface
+        mem: Processes.Memory.Memory_Interface
+        memory_checkpoint: Processes.Memory.Checkpoint_Endpoint
+        mem_set_process_banks: Processes.Memory.Set_Process_Banks_Endpoint
+        memory_restore: Checkpoints.Memory_Restore.Memory_Restore_Interface
+        mem_replace_process: Processes.Replacer.Replacer_Interface
 
     - launch: timer
       oid: 13
       priority: device_driver
       caps: [console_interface, set_timeout, get_ticks_64, delete]
       exports:
-        timer: Timer.Set_Timer_Endpoint
-        timer_interface: Timer.Timer_Interface
+        timer: Time.Timer.Set_Timer_Endpoint
+        timer_interface: Time.Timer.Timer_Interface
 
-    - endpoint: Timeout.On_Timeout_Endpoint
+    - endpoint: Time.Timeout.On_Timeout_Endpoint
       receiver: receive_timeout
       sender: send_timeout
 
@@ -195,14 +195,14 @@ stages:
       priority: device_driver
       caps: [delete, console_interface, trace]
       exports:
-        storage: Storage.Storage_Interface
-        add_storage: Storage.Add_Backing_Store_Endpoint
+        storage: Storage.Store.Store_Interface
+        add_storage: Storage.Store.Add_Backing_Store_Endpoint
         # For the checkpoint server, to add the region table to each
         # checkpoint.
-        store_checkpoint: Storage_Checkpoint.Checkpoint_Endpoint
-        store_restore: Storage_Checkpoint.Storage_Checkpoint_Interface
+        store_checkpoint: Checkpoints.Storage_Checkpoint.Checkpoint_Endpoint
+        store_restore: Checkpoints.Storage_Checkpoint.Storage_Checkpoint_Interface
         # For mem: which bank is each process's own (ADR 0015, #750).
-        process_banks: Process_Banks.Process_Banks_Interface
+        process_banks: Storage.Process_Banks.Process_Banks_Interface
 
     # Mem is launched before the store, so it is given the store's
     # Process_Banks once the store is running, on every boot (#750).
@@ -214,24 +214,24 @@ stages:
       caps: [delete, rescind, console_interface, mem, create_process,
              trace]
       exports:
-        launch_elf: Executable.Launch_Endpoint
-        launch_command_elf: Executable.Launch_Command_Endpoint
+        launch_elf: Processes.Executable.Launch_Endpoint
+        launch_command_elf: Processes.Executable.Launch_Command_Endpoint
 
     - launch: scan
       oid: 10
       priority: file_system
       caps: [console_interface, hd0, exit, delete]
       exports:
-        release_partitions: Partitions.Release_Endpoint
-        partition_count: Partitions.Partition_Count_Endpoint
-        get_partition: Partitions.Get_Partition_Endpoint
+        release_partitions: Storage.Partitions.Release_Endpoint
+        partition_count: Storage.Partitions.Partition_Count_Endpoint
+        get_partition: Storage.Partitions.Get_Partition_Endpoint
 
     # Partition servers for the swap and log partitions, and on the
     # install media, for block 0 and the two boot partitions (#322).
     - call: Load_Partitions
       sets: [swap, log, mbr, bios_boot, boot_partition]
 
-    - endpoint: Exec.Install_Endpoint
+    - endpoint: Processes.Exec.Install_Endpoint
       receiver: install_receiver
       sender: install_endpoint
 
@@ -243,17 +243,17 @@ stages:
       priority: file_system
       caps: [console_interface, hd1, delete]
       exports:
-        install_media_fs: File_System.Root_Directory_Endpoint
+        install_media_fs: Files.File_System.Root_Directory_Endpoint
 
     - launch: log
       oid: 16
       priority: log
       caps: [console_interface, start_log, delete]
       exports:
-        add_log_device: Kernel_Log.Add_Log_Device_Endpoint
-        append_to_log: Kernel_Log.Append_Endpoint
-        log_reader: Log_Reader.Log_Reader_Interface
-        log_reset: State.Reset_Endpoint
+        add_log_device: Checkpoints.Kernel_Log.Add_Log_Device_Endpoint
+        append_to_log: Checkpoints.Kernel_Log.Append_Endpoint
+        log_reader: Checkpoints.Log_Reader.Log_Reader_Interface
+        log_reset: Checkpoints.State.Reset_Endpoint
 
     # In the order Restore.Start takes them.  Only restore-install has
     # the last nine: five to install from the install media, start a new
@@ -307,4 +307,4 @@ stages:
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
              delete, memory_checkpoint, append_to_log, store_checkpoint]
       exports:
-        checkpointer: Checkpointer.Take_Checkpoint_Endpoint
+        checkpointer: Checkpoints.Checkpointer.Take_Checkpoint_Endpoint

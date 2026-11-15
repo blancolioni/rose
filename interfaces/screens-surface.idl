@@ -1,0 +1,81 @@
+interface Screens.Surface : Common.Resource is
+
+   --  A window's pixels, and its input (ADR 0022). A client draws only
+   --  into its own surface, and sees only the input sent to it. The
+   --  display server's root surface has this interface too, so that one
+   --  server can run on a surface of another. Release destroys the
+   --  surface, and the window with it.
+
+   type Cursor_Shape is (Arrow, Text, Crosshair, Busy);
+
+   procedure Get_Size
+     (Width  : out Word;
+      Height : out Word);
+   --  The surface's size in pixels. It changes only when a Size event
+   --  has been sent, and the old buffer is no longer the surface's then.
+
+   function Get_Buffer return interface Storage.Region;
+   --  The pixels, one 32-bit word each, XRGB (the top byte is unused),
+   --  row by row from the top left, with no padding between rows: Width
+   --  by Height words. The client and the server share it: each maps it
+   --  as a shared segment, with Rose.Shared_Regions.Map (ADR 0025), and
+   --  uses it only through that mapping. Ask again after a Size event.
+
+   procedure Damage
+     (X      : Word;
+      Y      : Word;
+      Width  : Word;
+      Height : Word);
+   --  The client has changed this region of the buffer, and the server is
+   --  to draw it. A region outside the surface is cut to the surface.
+
+   procedure Notify (Signal : Capability);
+   --  Signal is a signal cap (ADR 0006), which the surface invokes, never
+   --  waiting, whenever it queues an event. From then on, a Read of
+   --  Events never waits: it returns the whole events that are ready, or
+   --  nothing. A holder that is a server, and can't wait in a Read, reads
+   --  after each signal until a Read returns nothing (ADR 0022, as
+   --  amended by #653). A later Notify replaces the signal cap.
+
+   function Events return interface Streams.Reader;
+   --  The surface's input, as a stream of fixed-size events, in the
+   --  order they happened. Each event is four words, written as a
+   --  stream's bytes in the machine's byte order:
+   --
+   --     Kind 1, Key:      Kind, Code, State, 0
+   --        Code is the key, a Unicode code point or a named key,
+   --        and State the modifiers that were held, as
+   --        Terminal.Read_Key gives them (Rose.Keys, #734).
+   --     Kind 2, Pointer:  Kind, X, Y, Buttons
+   --        X and Y are as Get_Pointer gives them: in the surface's
+   --        pixels, as Integer_32 words. Buttons is the mask that
+   --        Get_Pointer gives.
+   --     Kind 3, Focus:    Kind, Focused, 0, 0
+   --        Focused is 1 when the surface has the keyboard, and 0 when
+   --        it has lost it.
+   --     Kind 4, Size:     Kind, Width, Height, 0
+   --
+   --  A Read returns the whole events that are ready, and waits only if
+   --  there are none and Notify hasn't been called. This is a byte stream until typed streams exist
+   --  (ADR 0013, #140), when it becomes a stream of an event type with
+   --  the same fields.
+
+   procedure Get_Pointer
+     (Over    : out Boolean;
+      X       : out Integer_32;
+      Y       : out Integer_32;
+      Buttons : out Word);
+   --  The pointer's position now, in the surface's pixels from its top
+   --  left, and the buttons that are down: a mask with bit 0 the first
+   --  button, bit 1 the second, and so on. Over is True if the pointer is
+   --  over the surface, or if the surface has a grab (a button went down
+   --  on it and is still down). During a grab, X and Y can be negative, or
+   --  past the surface's size, when the pointer has left the surface. If
+   --  Over is False, X, Y and Buttons are zero: a surface can't learn
+   --  where the pointer is when it is somewhere else.
+
+   procedure Set_Cursor (Shape : Cursor_Shape);
+   --  The cursor to show while the pointer is over this surface. A
+   --  surface chooses among the shapes, and can't supply an image.
+
+end Screens.Surface;

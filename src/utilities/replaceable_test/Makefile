@@ -18,14 +18,14 @@ replaceable_test:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-replaceable_test.idl held_call.idl \
 	    $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/named.idl \
-	    $(INTERFACES)/replaceable.idl \
-	    $(INTERFACES)/saveable.idl \
-	    $(INTERFACES)/writer.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/releasable_cap_set.idl \
-	    $(INTERFACES)/cap_set.idl \
-	    $(INTERFACES)/constructor.idl
+	    $(INTERFACES)/common-named.idl \
+	    $(INTERFACES)/processes-replaceable.idl \
+	    $(INTERFACES)/processes-saveable.idl \
+	    $(INTERFACES)/streams-writer.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/caps-releasable_cap_set.idl \
+	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-constructor.idl
 	gprbuild $(GPRBUILD_CARGS)

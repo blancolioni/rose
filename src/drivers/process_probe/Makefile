@@ -13,5 +13,5 @@ process_probe:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/named.idl
+	    $(INTERFACES)/common-named.idl
 	gprbuild $(GPRBUILD_CARGS)

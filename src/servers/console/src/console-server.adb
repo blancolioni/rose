@@ -7,9 +7,9 @@ with Rose.Objects;
 with Rose.Server;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Output_Redirect;
-with Rose.Interfaces.Writer.Client;
-with Rose.Interfaces.Writer.Server;
+with Rose.Interfaces.Streams.Output_Redirect;
+with Rose.Interfaces.Streams.Writer.Client;
+with Rose.Interfaces.Streams.Writer.Server;
 
 with Console.IO;
 
@@ -38,7 +38,7 @@ package body Console.Server is
 
    Redirected     : Boolean := False;
    Has_Target     : Boolean := False;
-   Target_Console : Rose.Interfaces.Writer.Client.Writer_Client;
+   Target_Console : Rose.Interfaces.Streams.Writer.Client.Writer_Client;
 
    procedure Write_Target (Text : System.Storage_Elements.Storage_Array);
    --  Write Text to Target_Console
@@ -54,12 +54,12 @@ package body Console.Server is
       Rose.System_Calls.Use_Buffer
         (Console_Buffer'Address, Console_Buffer_Size);
 
-      Rose.Interfaces.Writer.Server.Create_Server
+      Rose.Interfaces.Streams.Writer.Server.Create_Server
         (Server_Context => Server_Context,
          Write          => Handle_Write'Access);
       Rose.Server.Register_Handler
         (Server_Context,
-         Rose.Interfaces.Output_Redirect.Redirect_Endpoint,
+         Rose.Interfaces.Streams.Output_Redirect.Redirect_Endpoint,
          Handle_Redirect'Access);
    end Create_Console_Server;
 
@@ -79,7 +79,7 @@ package body Console.Server is
       Redirected := True;
       Has_Target := Target /= Rose.Capabilities.Null_Capability;
       if Has_Target then
-         Rose.Interfaces.Writer.Client.Open (Target_Console, Target);
+         Rose.Interfaces.Streams.Writer.Client.Open (Target_Console, Target);
 
          --  With a framebuffer, nothing written so far was on the screen,
          --  so it goes to the new console first (#654).
@@ -105,7 +105,7 @@ package body Console.Server is
       if not Redirected then
          Console.IO.Put (S);
       elsif Has_Target then
-         Rose.Interfaces.Writer.Client.Write (Target_Console, Buffer);
+         Rose.Interfaces.Streams.Writer.Client.Write (Target_Console, Buffer);
       else
 
          --  After a restore the boot console stops writing to the screen,
@@ -132,7 +132,7 @@ package body Console.Server is
 
    procedure Write_Target (Text : System.Storage_Elements.Storage_Array) is
    begin
-      Rose.Interfaces.Writer.Client.Write (Target_Console, Text);
+      Rose.Interfaces.Streams.Writer.Client.Write (Target_Console, Text);
    end Write_Target;
 
 end Console.Server;

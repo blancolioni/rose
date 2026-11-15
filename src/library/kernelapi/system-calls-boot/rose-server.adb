@@ -1,5 +1,5 @@
 with Rose.Capabilities.Standard;
-with Rose.Interfaces.Process;
+with Rose.Interfaces.Processes.Process;
 with Rose.System_Calls.Server;
 
 package body Rose.Server is
@@ -107,7 +107,8 @@ package body Rose.Server is
          Publish_Cap : constant Rose.Capabilities.Capability :=
                          Rose.System_Calls.Get_Interface_Cap
                            (Rose.Capabilities.Standard.Process_Interface_Cap,
-                            Rose.Interfaces.Process.Publish_Interface_Index);
+                            Rose.Interfaces.Processes.Process
+                              .Publish_Interface_Index);
       begin
          Rose.System_Calls.Initialize_Send (Params, Publish_Cap);
          Rose.System_Calls.Send_Cap (Params, Interface_Cap);

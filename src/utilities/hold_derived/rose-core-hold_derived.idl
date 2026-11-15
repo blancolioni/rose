@@ -1,5 +1,5 @@
 command Rose.Core.Hold_Derived
-  : Create_Endpoint, Standard_Output, Rescind_Cap
+  : Caps.Create_Endpoint, Streams.Standard_Output, Caps.Rescind_Cap
   with Summary     => "Hold two derived capabilities across a restore.",
        Description => """
           Hold_Derived is a test of revocation across a restore (#691,
@@ -15,8 +15,8 @@ command Rose.Core.Hold_Derived
        Server      => Derived_Holder.Start_Server,
        Live
 is
-   Parent : in Commands
+   Parent : in Commands.Lookup
      with Help => "a capability derived from the registry's";
-   Child : in Commands
+   Child : in Commands.Lookup
      with Help => "a capability derived from Parent";
 end Rose.Core.Hold_Derived;

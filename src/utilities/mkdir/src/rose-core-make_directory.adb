@@ -5,7 +5,7 @@ with Rose.Interfaces.Objects;
 procedure Rose.Core.Make_Directory
   (Directory_Name : String;
    Directory      : in out
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class)
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class)
 is
    procedure Fail (Reason : String)
      with No_Return;
@@ -34,7 +34,7 @@ begin
 
    begin
       declare
-         Created : Rose.Interfaces.Writable_Directory
+         Created : Rose.Interfaces.Files.Writable_Directory
            .Writable_Directory_Object'Class :=
              Directory.Create_Directory (Directory_Name);
          pragma Unreferenced (Created);

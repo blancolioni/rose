@@ -6,20 +6,20 @@ RELOC=$(BUILDDIR)/log.reloc.o
 LIBROSE_OBJECTS=
 
 BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o
+	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o
 
 KERNEL_LOG_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-kernel_log.o \
-	$(BUILDDIR)/rose-interfaces-kernel_log-server.o
+	$(BUILDDIR)/rose-interfaces-checkpoints-kernel_log.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-kernel_log-server.o
 
 LOG_READER_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-log_reader.o \
-	$(BUILDDIR)/rose-interfaces-log_reader-server.o
+	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader-server.o
 
 STATE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-state.o \
-	$(BUILDDIR)/rose-interfaces-state-server.o
+	$(BUILDDIR)/rose-interfaces-checkpoints-state.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-state-server.o
 
 OBJECTS= \
 	$(BUILDDIR)/log.o \
@@ -28,8 +28,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

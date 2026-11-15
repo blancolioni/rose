@@ -1,0 +1,15 @@
+interface Commands.Map : Commands.Lookup is
+
+   procedure Add
+     (Name : String;
+      Cap  : interface Processes.Launch);
+
+   procedure Remove
+     (Name : String);
+
+   --  A cap for the registry's Commands interface alone, which finds
+   --  commands but cannot add or remove them (#460).
+
+   function Get_Commands return interface Commands.Lookup;
+
+end Commands.Map;

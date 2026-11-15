@@ -14,5 +14,5 @@ uptime:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-uptime.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/clock.idl
+	    $(INTERFACES)/time-clock.idl
 	gprbuild

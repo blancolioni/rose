@@ -1,0 +1,5 @@
+interface Common.Named is
+
+   function Name return String;
+   
+end Common.Named;

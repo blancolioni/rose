@@ -1,0 +1,7 @@
+interface Processes.Kernel_Process : Common.Named, Caps.Cap is
+
+   procedure Resume;
+   procedure Fault;
+   procedure Notify (Flags : Word_32);
+   
+end Processes.Kernel_Process;

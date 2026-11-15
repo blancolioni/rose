@@ -1,0 +1,5 @@
+interface Caps.Constructor is
+
+   function Create return Capability;
+
+end Caps.Constructor;

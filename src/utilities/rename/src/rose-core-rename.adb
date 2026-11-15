@@ -6,7 +6,7 @@ procedure Rose.Core.Rename
   (From      : String;
    To        : String;
    Directory : in out
-     Rose.Interfaces.Writable_Directory.Writable_Directory_Object'Class)
+     Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class)
 is
 
    procedure Fail (Reason : String)

@@ -22,7 +22,7 @@ with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.File_System.Client;
+with Rose.Interfaces.Files.File_System.Client;
 
 with Rose.Console_IO;
 with Rose.Directories;
@@ -42,7 +42,7 @@ procedure Restore.Install_Driver is
    Erasing    : Boolean;
    Updating   : Boolean;
 
-   Install_Media : Rose.Interfaces.File_System.Client.File_System_Client;
+   Install_Media : Rose.Interfaces.Files.File_System.Client.File_System_Client;
 
    procedure Open_Install_Media;
    --  Open the install media's file system, for Rose.Directories
@@ -72,7 +72,7 @@ procedure Restore.Install_Driver is
    ------------------------
 
    procedure Open_Install_Media is
-      use Rose.Interfaces.File_System.Client;
+      use Rose.Interfaces.Files.File_System.Client;
    begin
       Open_Cap_Set (Install_Media, Install_Media_Cap);
       Rose.Directories.Open_Root_File_System (Install_Media);
@@ -195,7 +195,7 @@ begin
       Rose.Console_IO.Put_Line ("restore: creating system image");
 
       declare
-         use Rose.Interfaces.File_System.Client;
+         use Rose.Interfaces.Files.File_System.Client;
          File_System : File_System_Client;
       begin
          Open_Cap_Set (File_System, Install_Media_Cap);

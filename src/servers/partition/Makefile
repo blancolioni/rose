@@ -4,13 +4,13 @@ include $(ROOT)/mk/common.mk
 BUILDDIR=./build/obj
 RELOC=$(BUILDDIR)/partition.reloc.o
 BLOCK_DEVICE_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-block_device.o \
-	$(BUILDDIR)/rose-interfaces-block_device-client.o \
-	$(BUILDDIR)/rose-interfaces-block_device-server.o
+	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-block_array-server.o
 
 PARTITION_SETUP_OBJECTS= \
-	$(BUILDDIR)/rose-interfaces-partition_setup.o \
-	$(BUILDDIR)/rose-interfaces-partition_setup-server.o
+	$(BUILDDIR)/rose-interfaces-storage-partition_setup.o \
+	$(BUILDDIR)/rose-interfaces-storage-partition_setup-server.o
 
 OBJECTS= \
 	$(BUILDDIR)/partition.o \
@@ -19,8 +19,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

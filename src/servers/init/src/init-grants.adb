@@ -4,8 +4,8 @@ with Rose.Init_Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Bank.Client;
-with Rose.Interfaces.Storage.Client;
+with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Storage.Store.Client;
 
 with Init.Calls;
 
@@ -37,7 +37,7 @@ package body Init.Grants is
 
    Last_Owner : Owner_Id := 1000;
 
-   System_Bank_Client : Rose.Interfaces.Bank.Client.Bank_Client;
+   System_Bank_Client : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
    Have_System_Bank   : Boolean := False;
    --  The system bank, once System_Bank has made it
 
@@ -70,7 +70,7 @@ package body Init.Grants is
       Regions : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
-      use Rose.Interfaces.Bank.Client;
+      use Rose.Interfaces.Storage.Bank.Client;
    begin
       if not Have_System_Bank
         or else Pages = 0
@@ -302,10 +302,10 @@ package body Init.Grants is
       Bank    : out Rose.Capabilities.Capability;
       Reserve : out Rose.Capabilities.Capability)
    is
-      use Rose.Interfaces.Bank.Client;
-      use Rose.Interfaces.Storage.Client;
+      use Rose.Interfaces.Storage.Bank.Client;
+      use Rose.Interfaces.Storage.Store.Client;
       use type Rose.Capabilities.Capability;
-      Store : Storage_Client;
+      Store : Store_Client;
    begin
       Bank := Rose.Capabilities.Null_Capability;
       Reserve := Rose.Capabilities.Null_Capability;

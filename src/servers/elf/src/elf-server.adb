@@ -10,23 +10,23 @@ with Rose.Console_IO;
 with Rose.Trace;
 with Rose.System_Calls.Client;
 
-with Rose.Interfaces.Command_Endpoint;
-with Rose.Interfaces.Executable.Server;
+with Rose.Interfaces.Commands.Command_Endpoint;
+with Rose.Interfaces.Processes.Executable.Server;
 
-with Rose.Interfaces.Kernel_Process.Client;
-with Rose.Interfaces.Memory.Client;
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Region.Client;
-with Rose.Interfaces.Bank.Client;
+with Rose.Interfaces.Processes.Kernel_Process.Client;
+with Rose.Interfaces.Processes.Memory.Client;
+with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Bank.Client;
 
 with Elf.Loader;
 
 package body Elf.Server is
 
    Server_Context : Rose.Server.Server_Context;
-   Memory_Client  : Rose.Interfaces.Memory.Client.Memory_Client;
+   Memory_Client  : Rose.Interfaces.Processes.Memory.Client.Memory_Client;
 
-   Last_Process   : Rose.Interfaces.Process.Client.Process_Client;
+   Last_Process   : Rose.Interfaces.Processes.Process.Client.Process_Client;
    Last_Command   : Rose.Capabilities.Capability := 0;
    Have_Last      : Boolean := False;
    --  What the last launch returned: the new process's Process interface,
@@ -165,11 +165,11 @@ package body Elf.Server is
 
       Rose.Console_IO.Open (Console_Cap);
 
-      Rose.Interfaces.Executable.Server.Create_Server
+      Rose.Interfaces.Processes.Executable.Server.Create_Server
         (Server_Context => Server_Context,
          Launch         => Launch'Access,
          Launch_Command => Launch_Command'Access);
-      Rose.Interfaces.Memory.Client.Open (Memory_Client, Memory_Cap);
+      Rose.Interfaces.Processes.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
 
    ----------------
@@ -272,7 +272,7 @@ package body Elf.Server is
       Command : Boolean)
       return Rose.Capabilities.Capability
    is
-      use Rose.Interfaces.Process.Client;
+      use Rose.Interfaces.Processes.Process.Client;
       use type Rose.Capabilities.Capability;
 
       Kernel_Process : Rose.Capabilities.Capability;
@@ -280,12 +280,12 @@ package body Elf.Server is
       Initial_Cap    : Rose.Capabilities.Capability;
       Endpoint_Cap   : Rose.Capabilities.Capability;
       Command_Cap    : Rose.Capabilities.Capability := 0;
-      Kernel_Client  : Rose.Interfaces.Kernel_Process
+      Kernel_Client  : Rose.Interfaces.Processes.Kernel_Process
         .Client.Kernel_Process_Client;
-      Process_Client : Rose.Interfaces.Process.Client.Process_Client;
-      Region         : Rose.Interfaces.Region.Client.Region_Client;
-      Bank_Store     : Rose.Interfaces.Bank.Client.Bank_Client;
-      Process_Bank   : Rose.Interfaces.Bank.Client.Bank_Client;
+      Process_Client : Rose.Interfaces.Processes.Process.Client.Process_Client;
+      Region         : Rose.Interfaces.Storage.Region.Client.Region_Client;
+      Bank_Store     : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+      Process_Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       --  The process's own bank (ADR 0015, #750), which mem makes as a
       --  sub-bank of Bank_Store, the bank it is launched against.
       Start          : Rose.Words.Word;
@@ -300,10 +300,10 @@ package body Elf.Server is
 
       procedure Clean_Up is
       begin
-         Rose.Interfaces.Region.Client.Close (Region);
-         Rose.Interfaces.Bank.Client.Close (Bank_Store);
-         Rose.Interfaces.Bank.Client.Close (Process_Bank);
-         Rose.Interfaces.Kernel_Process.Client.Close (Kernel_Client);
+         Rose.Interfaces.Storage.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Bank.Client.Close (Bank_Store);
+         Rose.Interfaces.Storage.Bank.Client.Close (Process_Bank);
+         Rose.Interfaces.Processes.Kernel_Process.Client.Close (Kernel_Client);
          Delete_Cap (Start_Cap);
          Delete_Cap (Initial_Cap);
          Delete_Cap (Endpoint_Cap);
@@ -314,15 +314,15 @@ package body Elf.Server is
 
    begin
       if Have_Last then
-         Rose.Interfaces.Process.Client.Close (Last_Process);
+         Rose.Interfaces.Processes.Process.Client.Close (Last_Process);
          Have_Last := False;
       end if;
       Delete_Cap (Last_Command);
       Last_Command := 0;
 
       Rose.Trace.Event ("load " & Name);
-      Rose.Interfaces.Region.Client.Open (Region, Image);
-      Rose.Interfaces.Bank.Client.Open (Bank_Store, Bank);
+      Rose.Interfaces.Storage.Region.Client.Open (Region, Image);
+      Rose.Interfaces.Storage.Bank.Client.Open (Bank_Store, Bank);
       Rose.Trace.Event ("regions opened");
 
       Create_Process
@@ -333,23 +333,24 @@ package body Elf.Server is
 
       if Kernel_Process = 0 then
          Rose.Console_IO.Put_Line ("elf: cannot create process " & Name);
-         Rose.Interfaces.Region.Client.Close (Region);
-         Rose.Interfaces.Bank.Client.Close (Bank_Store);
+         Rose.Interfaces.Storage.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Bank.Client.Close (Bank_Store);
          for Cap of Caps loop
             Delete_Cap (Cap);
          end loop;
          return 0;
       end if;
 
-      Rose.Interfaces.Kernel_Process.Client.Open
+      Rose.Interfaces.Processes.Kernel_Process.Client.Open
         (Kernel_Client, Kernel_Process);
       Rose.Trace.Event ("process created");
       Process_Client :=
-        Rose.Interfaces.Memory.Client.New_Process
+        Rose.Interfaces.Processes.Memory.Client.New_Process
           (Item    => Memory_Client,
            Process => Kernel_Client,
            Bank    => Bank_Store);
-      Process_Bank := Rose.Interfaces.Process.Client.Bank (Process_Client);
+      Process_Bank := Rose.Interfaces.Processes.Process.Client
+        .Bank (Process_Client);
       Rose.Trace.Event ("mem process");
 
       declare
@@ -372,7 +373,8 @@ package body Elf.Server is
          begin
             Rose.System_Calls.Initialize_Send (Params, Endpoint_Cap);
             Rose.System_Calls.Send_Endpoint
-              (Params, Rose.Interfaces.Command_Endpoint.Launch_Endpoint);
+              (Params, Rose.Interfaces.Commands.Command_Endpoint
+                .Launch_Endpoint);
             Rose.System_Calls.Receive_Caps (Params, 1);
             Rose.System_Calls.Invoke_Capability (Params);
             if not Params.Control.Flags (Rose.Invocation.Error) then
@@ -384,7 +386,7 @@ package body Elf.Server is
          if Command_Cap = 0 then
             Rose.Console_IO.Put_Line
               ("elf: failed to create command endpoint");
-            Rose.Interfaces.Process.Client.Close (Process_Client);
+            Rose.Interfaces.Processes.Process.Client.Close (Process_Client);
             Clean_Up;
             return 0;
          end if;
@@ -405,7 +407,8 @@ package body Elf.Server is
       --  Without a bank of its own, as before mem has the store's
       --  Process_Banks, the process is charged to the launch's bank.
 
-      if Rose.Interfaces.Bank.Client.Get_Interface_Cap (Process_Bank) /= 0
+      if Rose.Interfaces.Storage.Bank.Client
+        .Get_Interface_Cap (Process_Bank) /= 0
       then
          Elf.Loader.Load_Elf_Image
            (Process_Client, Process_Bank, Region, Start, Success);
@@ -425,11 +428,11 @@ package body Elf.Server is
       Rose.Trace.Event ("cleaned up");
 
       if not Success then
-         Rose.Interfaces.Process.Client.Close (Process_Client);
+         Rose.Interfaces.Processes.Process.Client.Close (Process_Client);
          Delete_Cap (Command_Cap);
          return 0;
       elsif Command then
-         Rose.Interfaces.Process.Client.Close (Process_Client);
+         Rose.Interfaces.Processes.Process.Client.Close (Process_Client);
          Last_Command := Command_Cap;
          return Command_Cap;
       else

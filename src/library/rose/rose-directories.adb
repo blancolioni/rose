@@ -1,5 +1,5 @@
 with Rose.Console_IO;
-with Rose.Interfaces.File.Client;
+with Rose.Interfaces.Files.File.Client;
 
 package body Rose.Directories is
 
@@ -247,7 +247,7 @@ package body Rose.Directories is
                   case Directory_Entry_Kind
                     (Directory_Entry.Containing_Directory, Next_Index)
                   is
-                     when Rose.Interfaces.Directory.Ordinary_File =>
+                     when Rose.Interfaces.Files.Directory.Ordinary_File =>
                         Directory_Entry.Entry_Index := Next_Index;
                         Directory_Entry.Valid := True;
                         Directory_Entry.Kind := Ordinary_File;
@@ -255,7 +255,7 @@ package body Rose.Directories is
                           Name (Start .. I - 1);
                         Directory_Entry.Simple_Name_Last := I - Start;
                         At_File := True;
-                     when Rose.Interfaces.Directory.Directory =>
+                     when Rose.Interfaces.Files.Directory.Directory =>
                         Directory_Entry.Containing_Directory :=
                           Get_Directory
                             (Directory_Entry.Containing_Directory,
@@ -264,7 +264,7 @@ package body Rose.Directories is
                         Directory_Entry.Entry_Index := 0;
                         Directory_Entry.Kind := Directory;
                         Directory_Entry.Valid := True;
-                     when Rose.Interfaces.Directory.Special_File =>
+                     when Rose.Interfaces.Files.Directory.Special_File =>
                         Directory_Entry.Valid := False;
                         return;
                   end case;
@@ -283,7 +283,7 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File : out Rose.Interfaces.Releasable_Reader.Client
+     (File : out Rose.Interfaces.Streams.Releasable_Reader.Client
         .Releasable_Reader_Client;
       Name : String)
    is
@@ -298,13 +298,13 @@ package body Rose.Directories is
    ----------
 
    procedure Open
-     (File            : out Rose.Interfaces.Releasable_Reader.Client
+     (File            : out Rose.Interfaces.Streams.Releasable_Reader.Client
       .Releasable_Reader_Client;
       Directory_Entry : Directory_Entry_Type)
    is
    begin
       File :=
-        Rose.Interfaces.File.Client.Open_Reader
+        Rose.Interfaces.Files.File.Client.Open_Reader
           (Get_Ordinary_File (Directory_Entry.Containing_Directory,
                               Directory_Entry.Entry_Index));
    end Open;
@@ -314,10 +314,10 @@ package body Rose.Directories is
    ---------------------------
 
    procedure Open_Root_File_System
-     (Client : Rose.Interfaces.File_System.Client.File_System_Client)
+     (Client : Rose.Interfaces.Files.File_System.Client.File_System_Client)
    is
       Top : constant Directory_Client :=
-              Rose.Interfaces.File_System.Client.Root_Directory (Client);
+              Rose.Interfaces.Files.File_System.Client.Root_Directory (Client);
    begin
       Root := Directory_Entry_Type'
         (Containing_Directory => Top,
@@ -374,7 +374,7 @@ package body Rose.Directories is
             declare
                Kind : constant File_Kind :=
                         File_Kind'Val
-                          (Rose.Interfaces.Directory.File_Kind'Pos
+                          (Rose.Interfaces.Files.Directory.File_Kind'Pos
                              (Directory_Entry_Kind (Dir, Index)));
             begin
                if Search.Filter (Kind) then

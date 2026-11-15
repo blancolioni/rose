@@ -1,12 +1,12 @@
 with Rose.Capabilities;
 
-with Rose.Interfaces.Commands;
-with Rose.Interfaces.Launch;
+with Rose.Interfaces.Commands.Lookup;
+with Rose.Interfaces.Processes.Launch;
 
 package Tests.Registry is
 
    procedure Set_Commands
-     (Commands : in out Rose.Interfaces.Commands.Commands_Object'Class);
+     (Commands : in out Rose.Interfaces.Commands.Lookup.Lookup_Object'Class);
    --  Find programs through Commands, the command registry's Commands
    --  interface, which Run_Self_Tests is given for its Find_Command role
    --  (#460).
@@ -57,7 +57,7 @@ package Tests.Registry is
 
    function Launcher
      (Name : String)
-      return Rose.Interfaces.Launch.Launch_Object'Class;
+      return Rose.Interfaces.Processes.Launch.Launch_Object'Class;
    --  The Launch interface of the program Name, from the command
    --  registry.
 

@@ -1,4 +1,4 @@
-command Rose.Core.Auth : Create_Endpoint, Find_Command, Cap_Set_Service
+command Rose.Core.Auth : Caps.Create_Endpoint, Commands.Find_Command, Caps.Cap_Set_Service
   with Summary     => "Serve logging in and creating users.",
        Description => """
           Auth keeps the users' names and a salted hash of each password
@@ -24,10 +24,10 @@ command Rose.Core.Auth : Create_Endpoint, Find_Command, Cap_Set_Service
        Replaceable => Auth_Server,
        Live
 is
-   Auth : out Auth
+   Auth : out Users.Auth
      with Help => "the Auth interface, for logging in";
-   Admin : out Auth_Admin
+   Admin : out Users.Auth_Admin
      with Help => "the Auth_Admin interface, for creating users";
-   Control : out Replaceable
+   Control : out Processes.Replaceable
      with Help => "its Replaceable interface";
 end Rose.Core.Auth;

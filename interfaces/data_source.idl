@@ -1,8 +1,0 @@
-interface Data_Source is
-
-   procedure Add_Sink
-     (Sink : interface Writer);
-   
-   procedure Remove_Sink;
-   
-end Data_Source;

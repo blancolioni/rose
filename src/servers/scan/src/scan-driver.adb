@@ -1,4 +1,5 @@
-with Rose.Interfaces.Block_Device.Client;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Devices.Block;
 with Rose.Devices.GPT;
 with Rose.Devices.Partitions;
 
@@ -10,16 +11,19 @@ with Rose.Invocation;
 with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
-with Rose.Interfaces.Partitions;
+with Rose.Interfaces.Storage.Partitions;
 
 procedure Scan.Driver is
 
-   use Rose.Interfaces.Block_Device;
-   use Rose.Interfaces.Block_Device.Client;
+   use Rose.Interfaces.Storage.Block_Array;
+   use type Rose.Devices.Block.Device_Size_Type;
 
-   Device : Block_Device_Client;
-   Block_Size   : Rose.Interfaces.Block_Device.Block_Size_Type;
-   Block_Count  : Rose.Interfaces.Block_Device.Block_Address_Type;
+   subtype Device_Size_Type is Rose.Devices.Block.Device_Size_Type;
+   use Rose.Interfaces.Storage.Block_Array.Client;
+
+   Device : Block_Array_Client;
+   Block_Size   : Rose.Interfaces.Storage.Block_Array.Block_Size_Type;
+   Block_Count  : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
 
    function Get_Cap (Index : Positive) return Rose.Capabilities.Capability
    is (Rose.System_Calls.Client.Get_Capability
@@ -41,7 +45,7 @@ begin
 
    Rose.Console_IO.Open (Console_Cap);
 
-   Rose.Interfaces.Block_Device.Client.Open
+   Rose.Interfaces.Storage.Block_Array.Client.Open
      (Client         => Device,
       Interface_Cap  => Block_Device_Cap);
 
@@ -84,8 +88,8 @@ begin
 --
 --           for I in 1 .. Rose.Devices.GPT.Partition_Count (Device) loop
 --              declare
---      First_Block         : Rose.Interfaces.Block_Device.Block_Address_Type;
---      Last_Block          : Rose.Interfaces.Block_Device.Block_Address_Type;
+--  First_Block : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
+--  Last_Block : Rose.Interfaces.Storage.Block_Array.Block_Address_Type;
 --                 Partition_Type_Low  : Rose.Words.Word_64;
 --                 Partition_Type_High : Rose.Words.Word_64;
 --                 Partition_Flags     : Rose.Words.Word_64;
@@ -196,13 +200,13 @@ begin
    begin
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Partitions.Release_Endpoint);
+         Rose.Interfaces.Storage.Partitions.Release_Endpoint);
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Partitions.Partition_Count_Endpoint);
+         Rose.Interfaces.Storage.Partitions.Partition_Count_Endpoint);
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
-         Rose.Interfaces.Partitions.Get_Partition_Endpoint);
+         Rose.Interfaces.Storage.Partitions.Get_Partition_Endpoint);
 
       loop
          Params :=
@@ -224,7 +228,7 @@ begin
          Rose.System_Calls.Initialize_Reply (Reply, Params.Reply_Cap);
 
          case Params.Endpoint is
-            when Rose.Interfaces.Partitions.Release_Endpoint =>
+            when Rose.Interfaces.Storage.Partitions.Release_Endpoint =>
 
                --  Init has read the table, and nothing else can reach
                --  scan, so it replies and exits (#463).
@@ -233,12 +237,12 @@ begin
                Rose.System_Calls.Initialize_Send (Reply, Exit_Cap);
                Rose.System_Calls.Invoke_Capability (Reply);
 
-            when Rose.Interfaces.Partitions.Partition_Count_Endpoint =>
+            when Rose.Interfaces.Storage.Partitions.Partition_Count_Endpoint =>
                Rose.System_Calls.Send_Word
                  (Reply,
                   Rose.Words.Word_32 (Partition_Count));
 
-            when Rose.Interfaces.Partitions.Get_Partition_Endpoint =>
+            when Rose.Interfaces.Storage.Partitions.Get_Partition_Endpoint =>
                declare
                   Index : constant Natural :=
                             Natural (Params.Data (0));

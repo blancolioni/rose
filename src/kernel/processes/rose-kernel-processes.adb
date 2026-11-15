@@ -1,10 +1,10 @@
 with System.Storage_Elements;
 
 with Rose.Boot.Console;
-with Rose.Interfaces.Memory;
-with Rose.Interfaces.Process;
-with Rose.Interfaces.Restorable;
-with Rose.Interfaces.Signalled;
+with Rose.Interfaces.Processes.Memory;
+with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Restorable;
+with Rose.Interfaces.Processes.Signalled;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Cap_Tables;
@@ -1259,7 +1259,8 @@ package body Rose.Kernel.Processes is
          Signal_Endpoint : constant Rose.Objects.Endpoint_Index :=
                              Find_Endpoint
                                (Process,
-                                Rose.Interfaces.Signalled.Signal_Endpoint);
+                                Rose.Interfaces.Processes.Signalled
+                                  .Signal_Endpoint);
       begin
          return Signal_Endpoint /= 0
            and then (Endpoint = 0 or else Endpoint = Signal_Endpoint);
@@ -1300,7 +1301,8 @@ package body Rose.Kernel.Processes is
                   or else Endpoint =
                     Find_Endpoint
                       (Process,
-                       Rose.Interfaces.Restorable.Restored_Endpoint));
+                       Rose.Interfaces.Processes.Restorable
+                         .Restored_Endpoint));
    end Has_Restore_Notice;
 
    ---------------------------
@@ -1887,7 +1889,8 @@ package body Rose.Kernel.Processes is
       Signal_Endpoint : constant Rose.Objects.Endpoint_Index :=
                           Find_Endpoint
                             (Process,
-                             Rose.Interfaces.Signalled.Signal_Endpoint);
+                             Rose.Interfaces.Processes.Signalled
+                               .Signal_Endpoint);
    begin
       P.Signals := P.Signals or 2 ** Bit;
 
@@ -2420,7 +2423,8 @@ package body Rose.Kernel.Processes is
                                others => False);
 
       Params.Cap := Mem_Page_Fault_Cap;
-      Params.Endpoint := Rose.Interfaces.Process.Exit_Process_Endpoint;
+      Params.Endpoint := Rose.Interfaces.Processes.Process
+        .Exit_Process_Endpoint;
       Params.Identifier := Rose.Objects.Process_Identifier (Proc.Oid);
 
       Send_Word (Params, 0);
@@ -2450,7 +2454,7 @@ package body Rose.Kernel.Processes is
 
       Params.Cap := Mem_Page_Fault_Cap;
       Params.Endpoint :=
-        Rose.Interfaces.Memory.Take_Physical_Memory_Endpoint;
+        Rose.Interfaces.Processes.Memory.Take_Physical_Memory_Endpoint;
       Params.Identifier := 0;
 
       Send_Word (Params, Rose.Words.Word (Amount));
@@ -2496,7 +2500,7 @@ package body Rose.Kernel.Processes is
                                others => False);
 
       Params.Cap := Mem_Page_Fault_Cap;
-      Params.Endpoint := Rose.Interfaces.Memory.Page_Fault_Endpoint;
+      Params.Endpoint := Rose.Interfaces.Processes.Memory.Page_Fault_Endpoint;
       Params.Identifier := 0;
 
       Send_Object_Id (Params, To_Object_Id (Pid));
@@ -2703,7 +2707,7 @@ package body Rose.Kernel.Processes is
          Sender_Cap      => 0,
          Endpoint        =>
            Find_Endpoint
-             (Process, Rose.Interfaces.Restorable.Restored_Endpoint),
+             (Process, Rose.Interfaces.Processes.Restorable.Restored_Endpoint),
          Identifier      => 0,
          Params          => Params);
    end Send_Restore_Notice;
@@ -2741,7 +2745,7 @@ package body Rose.Kernel.Processes is
          Sender_Cap      => 0,
          Endpoint        =>
            Find_Endpoint
-             (Process, Rose.Interfaces.Signalled.Signal_Endpoint),
+             (Process, Rose.Interfaces.Processes.Signalled.Signal_Endpoint),
          Identifier      => 0,
          Params          => Params);
    end Send_Signals;

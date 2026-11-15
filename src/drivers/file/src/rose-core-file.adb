@@ -2,7 +2,7 @@ with File_Server;
 
 procedure Rose.Core.File
   (Cap_Set_Service : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
    Served          : out Rose.Capabilities.Capability;
    Control         : out Rose.Capabilities.Capability)
 is

@@ -1,4 +1,4 @@
-command Rose.Core.Argv : Standard_Output
+command Rose.Core.Argv : Streams.Standard_Output
   with Summary     => "Write the command name and arguments that Ada.Command_Line reports.",
        Description => """
           Argv writes the name of the command and each of its arguments, as

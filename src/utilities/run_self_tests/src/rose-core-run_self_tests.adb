@@ -6,14 +6,17 @@ with Tests.Registry;
 with Tests.Suite;
 
 procedure Rose.Core.Run_Self_Tests
-  (Find_Command    : in out Rose.Interfaces.Commands.Commands_Object'Class;
-   Clock_Service   : in out Rose.Interfaces.Clock.Clock_Object'Class;
-   Storage_Service : in out Rose.Interfaces.Bank.Bank_Object'Class;
-   Screen_Service  : in out Rose.Interfaces.Surface.Surface_Object'Class;
-   Create_Signal   : in out Rose.Interfaces.Cap.Cap_Object'Class;
+  (Find_Command    : in out Rose.Interfaces.Commands.Lookup
+    .Lookup_Object'Class;
+   Clock_Service   : in out Rose.Interfaces.Time.Clock.Clock_Object'Class;
+   Storage_Service : in out Rose.Interfaces.Storage.Bank.Bank_Object'Class;
+   Screen_Service  : in out Rose.Interfaces.Screens.Surface
+     .Surface_Object'Class;
+   Create_Signal   : in out Rose.Interfaces.Caps.Cap.Cap_Object'Class;
    Cap_Set_Service : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
-   Replace_Process : in out Rose.Interfaces.Replacer.Replacer_Object'Class)
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+   Replace_Process : in out Rose.Interfaces.Processes.Replacer
+     .Replacer_Object'Class)
 is
    Self_Tests_Failed : exception;
    --  Raised when a test fails, so that the command fails, and its

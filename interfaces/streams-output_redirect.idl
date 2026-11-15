@@ -1,0 +1,8 @@
+interface Streams.Output_Redirect is
+
+   --  Send everything written from now on to Target instead, or discard
+   --  it if Target is null.
+
+   procedure Redirect (Target : interface Streams.Writer);
+
+end Streams.Output_Redirect;

@@ -1,5 +1,0 @@
-interface File_System is
-
-   function Root_Directory return interface Directory;
-   
-end File_System;

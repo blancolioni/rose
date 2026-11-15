@@ -1,4 +1,4 @@
-command Rose.Core.Set_Date : Standard_Error, Clock_Admin_Service
+command Rose.Core.Set_Date : Streams.Standard_Error, Time.Clock_Admin_Service
   with Summary     => "Set the date and time.",
        Description => """
           Set_Date sets the system's clock (ADR 0020) to TIME, in UTC, in

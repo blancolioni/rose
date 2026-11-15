@@ -43,15 +43,15 @@ with Ada.Containers.Vectors;
 with Ada.Strings.Unbounded;
 
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Releasable_Reader;
-with Rose.Interfaces.Releasable_Writer;
+with Rose.Interfaces.Streams.Releasable_Reader;
+with Rose.Interfaces.Streams.Releasable_Writer;
 with Rose.Keys;
 with Rose.Words;
 
 procedure Rose.Core.Editors.Kilo
-  (Console : in out Rose.Interfaces.Terminal.Terminal_Object'Class;
+  (Console : in out Rose.Interfaces.Screens.Terminal.Terminal_Object'Class;
    File    : in out
-     Rose.Interfaces.Transactional_Writable_File
+     Rose.Interfaces.Files.Transactional_Writable_File
        .Transactional_Writable_File_Object'Class)
 is
    use Ada.Strings.Unbounded;
@@ -60,9 +60,9 @@ is
    subtype Key_Code is Rose.Keys.Key_Code;
 
    subtype Reader_Class is
-     Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class;
+     Rose.Interfaces.Streams.Releasable_Reader.Releasable_Reader_Object'Class;
    subtype Writer_Class is
-     Rose.Interfaces.Releasable_Writer.Releasable_Writer_Object'Class;
+     Rose.Interfaces.Streams.Releasable_Writer.Releasable_Writer_Object'Class;
 
    package Row_Vectors is
      new Ada.Containers.Vectors (Natural, Unbounded_String);

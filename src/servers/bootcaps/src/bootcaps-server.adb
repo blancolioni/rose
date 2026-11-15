@@ -2,10 +2,10 @@ with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.Objects;
 
-with Rose.Interfaces.Constructor.Server;
-with Rose.Interfaces.Cap_Set.Server;
-with Rose.Interfaces.Cap.Server;
-with Rose.Interfaces.Resource;
+with Rose.Interfaces.Caps.Constructor.Server;
+with Rose.Interfaces.Caps.Cap_Set.Server;
+with Rose.Interfaces.Caps.Cap.Server;
+with Rose.Interfaces.Common.Resource;
 
 with Rose.Server;
 with Rose.System_Calls.Server;
@@ -131,7 +131,8 @@ package body Bootcaps.Server is
                     Last   => 0);
                return Rose.System_Calls.Server.Create_Endpoint
                  (Create_Cap  => Create_Endpoint_Cap,
-                  Endpoint_Id => Rose.Interfaces.Cap_Set.Cap_Set_Interface,
+                  Endpoint_Id => Rose.Interfaces.Caps.Cap_Set
+                    .Cap_Set_Interface,
                   Identifier  => Cap_Set_Id);
             end;
          end if;
@@ -153,22 +154,22 @@ package body Bootcaps.Server is
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => Create_Endpoint_Cap);
 
-      Rose.Interfaces.Constructor.Server.Create_Server
+      Rose.Interfaces.Caps.Constructor.Server.Create_Server
         (Server, Create'Access);
 
       Rose.Server.Register_Handler
         (Server,
-         Rose.Interfaces.Resource.Release_Endpoint,
+         Rose.Interfaces.Common.Resource.Release_Endpoint,
          Handle_Release'Access);
 
-      Rose.Interfaces.Cap_Set.Server.Attach_Interface
+      Rose.Interfaces.Caps.Cap_Set.Server.Attach_Interface
         (Server_Context => Server,
          Append         => Append'Access,
          Get_Cap        => Get_Cap'Access,
          Length         => Length'Access,
          Instanced      => True);
 
-      Rose.Interfaces.Cap.Server.Attach_Interface
+      Rose.Interfaces.Caps.Cap.Server.Attach_Interface
         (Server_Context => Server,
          Destroy        => Destroy'Access,
          Get_Object_Id  => Get_Cap_Set_Object_Id'Access,

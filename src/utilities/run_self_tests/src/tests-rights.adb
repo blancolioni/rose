@@ -7,12 +7,12 @@ with Rose.Standard_Streams;
 with Rose.System_Calls;
 with Rose.Words;
 
-with Rose.Interfaces.Clock.Client;
-with Rose.Interfaces.Launch;
+with Rose.Interfaces.Time.Clock.Client;
+with Rose.Interfaces.Processes.Launch;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Rights.Client;
-with Rose.Interfaces.Rights_Admin.Client;
-with Rose.Interfaces.User.Client;
+with Rose.Interfaces.Users.Rights.Client;
+with Rose.Interfaces.Users.Rights_Admin.Client;
+with Rose.Interfaces.Users.User.Client;
 
 with Tests.Registry;
 with Tests.Users;
@@ -48,22 +48,22 @@ package body Tests.Rights is
    -----------------
 
    function Rights_Test return Boolean is
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Tests.Registry.Launcher ("rights");
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Endpoint : Rose.Capabilities.Capability;
       Params   : aliased Rose.Invocation.Invocation_Record;
 
-      Rights   : Rose.Interfaces.Rights.Client.Rights_Client;
-      Admin    : Rose.Interfaces.Rights_Admin.Client.Rights_Admin_Client;
-      Alice    : Rose.Interfaces.User.Client.User_Client;
-      Bob      : Rose.Interfaces.User.Client.User_Client;
+      Rights   : Rose.Interfaces.Users.Rights.Client.Rights_Client;
+      Admin    : Rose.Interfaces.Users.Rights_Admin.Client.Rights_Admin_Client;
+      Alice    : Rose.Interfaces.Users.User.Client.User_Client;
+      Bob      : Rose.Interfaces.Users.User.Client.User_Client;
 
       Grant    : Rose.Words.Word;
       Cap      : Rose.Capabilities.Capability;
 
       function Ask
-        (User : in out Rose.Interfaces.User.User_Object'Class;
+        (User : in out Rose.Interfaces.Users.User.User_Object'Class;
          Sudo : Rose.Words.Word;
          Name : String := Role)
          return Boolean;
@@ -75,7 +75,7 @@ package body Tests.Rights is
       ---------
 
       function Ask
-        (User : in out Rose.Interfaces.User.User_Object'Class;
+        (User : in out Rose.Interfaces.Users.User.User_Object'Class;
          Sudo : Rose.Words.Word;
          Name : String := Role)
          return Boolean
@@ -173,7 +173,7 @@ package body Tests.Rights is
       --  The grant works: it is the clock, through the broker.
 
       declare
-         Clock        : Rose.Interfaces.Clock.Client.Clock_Client;
+         Clock        : Rose.Interfaces.Time.Clock.Client.Clock_Client;
          Before       : Rose.Words.Word_64;
          After        : Rose.Words.Word_64;
          Alices_Grant : constant Rose.Words.Word := Grant;

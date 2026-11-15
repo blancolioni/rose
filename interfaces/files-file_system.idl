@@ -1,0 +1,5 @@
+interface Files.File_System is
+
+   function Root_Directory return interface Files.Directory;
+   
+end Files.File_System;

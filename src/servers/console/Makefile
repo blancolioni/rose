@@ -15,10 +15,10 @@ OBJECTS= \
 	$(BUILDDIR)/rose-build.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-interfaces.o \
-	$(BUILDDIR)/rose-interfaces-output_redirect.o \
-	$(BUILDDIR)/rose-interfaces-writer.o \
-	$(BUILDDIR)/rose-interfaces-writer-client.o \
-	$(BUILDDIR)/rose-interfaces-writer-server.o \
+	$(BUILDDIR)/rose-interfaces-streams-output_redirect.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-writer-server.o \
 	$(BUILDDIR)/rose-invocation.o \
 	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \

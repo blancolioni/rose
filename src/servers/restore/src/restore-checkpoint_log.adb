@@ -6,11 +6,11 @@ with Rose.Interface_Level;
 with Rose.Limits;
 with Rose.System_Calls;
 
-with Rose.Interfaces.Log_Reader.Client;
+with Rose.Interfaces.Checkpoints.Log_Reader.Client;
 
 package body Restore.Checkpoint_Log is
 
-   use Rose.Interfaces.Log_Reader.Client;
+   use Rose.Interfaces.Checkpoints.Log_Reader.Client;
    use type Rose.Words.Word_32;
    use type Rose.Words.Word_64;
 

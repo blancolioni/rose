@@ -8,15 +8,15 @@ with Rose.Build;
 with Rose.Version;
 with Rose.Words;
 
-with Rose.Interfaces.Auth.Client;
-with Rose.Interfaces.Bank;
-with Rose.Interfaces.Cap;
-with Rose.Interfaces.Commands.Client;
-with Rose.Interfaces.Launch;
-with Rose.Interfaces.Terminal.Client;
-with Rose.Interfaces.Timeout;
-with Rose.Interfaces.Timer.Client;
-with Rose.Interfaces.User;
+with Rose.Interfaces.Users.Auth.Client;
+with Rose.Interfaces.Storage.Bank;
+with Rose.Interfaces.Caps.Cap;
+with Rose.Interfaces.Commands.Lookup.Client;
+with Rose.Interfaces.Processes.Launch;
+with Rose.Interfaces.Screens.Terminal.Client;
+with Rose.Interfaces.Time.Timeout;
+with Rose.Interfaces.Time.Timer.Client;
+with Rose.Interfaces.Users.User;
 
 package body Login_Loop is
 
@@ -28,10 +28,10 @@ package body Login_Loop is
    Failure_Delay : constant Rose.Words.Word := 3_000;
    --  Milliseconds to wait after a wrong name or password.
 
-   Console  : Rose.Interfaces.Terminal.Client.Terminal_Client;
-   Commands : Rose.Interfaces.Commands.Client.Commands_Client;
-   Timer    : Rose.Interfaces.Timer.Client.Timer_Client;
-   Auth     : Rose.Interfaces.Auth.Client.Auth_Client;
+   Console  : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
+   Commands : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
+   Timer    : Rose.Interfaces.Time.Timer.Client.Timer_Client;
+   Auth     : Rose.Interfaces.Users.Auth.Client.Auth_Client;
 
    Clock_Interface_Cap : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
@@ -61,7 +61,7 @@ package body Login_Loop is
    --  Write Text to the console.
 
    procedure Run_Petal
-     (User : in out Rose.Interfaces.User.User_Object'Class);
+     (User : in out Rose.Interfaces.Users.User.User_Object'Class);
    --  Run petal for User, and return when it logs out.
 
    procedure Wait (Milliseconds : Rose.Words.Word);
@@ -163,7 +163,7 @@ package body Login_Loop is
                Put ((1 => LF));
 
                declare
-                  User : Rose.Interfaces.User.User_Object'Class :=
+                  User : Rose.Interfaces.Users.User.User_Object'Class :=
                            Auth.Login
                              (Name (Name'First .. Name_Last),
                               Password (Password'First .. Password_Last));
@@ -208,7 +208,7 @@ package body Login_Loop is
    ---------------
 
    procedure Run_Petal
-     (User : in out Rose.Interfaces.User.User_Object'Class)
+     (User : in out Rose.Interfaces.Users.User.User_Object'Class)
    is
       No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
 
@@ -216,8 +216,9 @@ package body Login_Loop is
       --  the user's. Petal is launched against it, and so its jobs are
       --  in it too.
 
-      Session  : Rose.Interfaces.Bank.Bank_Object'Class := User.New_Session;
-      Launcher : Rose.Interfaces.Launch.Launch_Object'Class :=
+      Session  : Rose.Interfaces.Storage.Bank.Bank_Object'Class := User
+        .New_Session;
+      Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Commands.Find ("petal");
       Endpoint : constant Rose.Capabilities.Capability :=
                    Launcher.Launch_Command (Session.Bank_Cap, No_Caps);
@@ -245,7 +246,7 @@ package body Login_Loop is
         (Params, Rose.System_Calls.Delete_Cap_Capability);
       Rose.System_Calls.Send_Cap
         (Params, Rose.System_Calls.Rescind_Cap_Capability);
-      Rose.System_Calls.Send_Cap (Params, Commands.Commands_Cap);
+      Rose.System_Calls.Send_Cap (Params, Commands.Lookup_Cap);
       Rose.System_Calls.Send_Cap (Params, Console.Terminal_Cap);
       Rose.System_Calls.Send_Cap (Params, Clock_Interface_Cap);
       Rose.System_Calls.Send_Cap (Params, Rights_Interface_Cap);
@@ -276,10 +277,12 @@ package body Login_Loop is
    begin
       Clock_Interface_Cap := Clock;
       Rights_Interface_Cap := Rights;
-      Rose.Interfaces.Terminal.Client.Open (Login_Loop.Console, Console);
-      Rose.Interfaces.Commands.Client.Open (Login_Loop.Commands, Commands);
-      Rose.Interfaces.Timer.Client.Open (Login_Loop.Timer, Timer);
-      Rose.Interfaces.Auth.Client.Open (Login_Loop.Auth, Auth);
+      Rose.Interfaces.Screens.Terminal.Client.Open (Login_Loop
+        .Console, Console);
+      Rose.Interfaces.Commands.Lookup.Client.Open (Login_Loop
+        .Commands, Commands);
+      Rose.Interfaces.Time.Timer.Client.Open (Login_Loop.Timer, Timer);
+      Rose.Interfaces.Users.Auth.Client.Open (Login_Loop.Auth, Auth);
    end Set_Caps;
 
    ----------
@@ -296,14 +299,14 @@ package body Login_Loop is
          Timeout_Send_Cap :=
            Rose.System_Calls.Server.Create_Endpoint
              (Rose.System_Calls.Create_Endpoint_Capability,
-              Rose.Interfaces.Timeout.On_Timeout_Endpoint);
+              Rose.Interfaces.Time.Timeout.On_Timeout_Endpoint);
       end if;
 
       --  The timer calls the endpoint when the time is up, without
       --  waiting, so login is already receiving on it by then.
 
       declare
-         Handle : Rose.Interfaces.Cap.Cap_Object'Class :=
+         Handle : Rose.Interfaces.Caps.Cap.Cap_Object'Class :=
                     Timer.Set_Timer (Milliseconds, Timeout_Send_Cap)
            with Unreferenced;
       begin

@@ -2,7 +2,7 @@ with Replaceable_Test_Server;
 
 procedure Rose.Core.Replaceable_Test
   (Cap_Set_Service : in out
-     Rose.Interfaces.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
    Name            : String;
    Target          : in out Rose.Interfaces.Held_Call.Held_Call_Object'Class;
    Served          : out Rose.Capabilities.Capability;

@@ -1,0 +1,29 @@
+--  A numbered array of blocks of one size (ADR 0034, #841). ata serves
+--  one for each disk and the partition server one for each partition,
+--  but anything can serve one, such as a RAM disk or an image in a file.
+--  Rose's own block arrays have 512- or 2048-byte blocks. The range of
+--  Block_Size_Type allows blocks of up to 64 KiB, so that a 0.4.0 client
+--  accepts a larger block that a later 0.4.x serves.
+
+interface Storage.Block_Array is
+
+   Max_Block_Size : constant := 65536;
+
+   type Block_Size_Type is range 0 .. Max_Block_Size;
+   type Block_Address_Type is new Word_64;
+
+   procedure Get_Parameters
+     (Block_Count : out Block_Address_Type;
+      Block_Size  : out Block_Size_Type);
+      
+   procedure Read_Blocks
+     (Start   : Block_Address_Type;
+      Count   : Natural;
+      Blocks  : out Storage_Array);
+
+   procedure Write_Blocks
+     (Start   : Block_Address_Type;
+      Count   : Natural;
+      Blocks  : Storage_Array);
+
+end Storage.Block_Array;

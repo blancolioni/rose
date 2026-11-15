@@ -3,14 +3,14 @@ with System.Storage_Elements;
 with Rose.Console_IO;
 with Rose.Directories;
 
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Releasable_Reader.Client;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
 
 package body Restore.Boot_Disk is
 
    use System.Storage_Elements;
-   use Rose.Interfaces.Block_Device;
-   use Rose.Interfaces.Block_Device.Client;
+   use Rose.Interfaces.Storage.Block_Array;
+   use Rose.Interfaces.Storage.Block_Array.Client;
 
    Boot_Directory : constant String := "/rose/install/boot/";
 
@@ -52,7 +52,7 @@ package body Restore.Boot_Disk is
       use type Rose.Capabilities.Capability;
       use type Rose.Directories.File_Size;
       Path        : constant String := Boot_Directory & Name;
-      Client      : Block_Device_Client;
+      Client      : Block_Array_Client;
       Block_Count : Block_Address_Type;
       Block_Size  : Block_Size_Type;
    begin
@@ -82,7 +82,7 @@ package body Restore.Boot_Disk is
       end if;
 
       declare
-         use Rose.Interfaces.Releasable_Reader.Client;
+         use Rose.Interfaces.Streams.Releasable_Reader.Client;
          Reader  : Releasable_Reader_Client;
          Block   : Storage_Array renames
                      Buffer (1 .. Storage_Offset (Block_Size));
@@ -97,7 +97,8 @@ package body Restore.Boot_Disk is
                --  Read gives the number of bytes it read
             begin
                Read (Reader, Block (Filled + 1 .. Block'Last), Count);
-               exit when Rose.Interfaces.Releasable_Reader.Client.Has_Error
+               exit when Rose.Interfaces.Streams.Releasable_Reader.Client
+                 .Has_Error
                  or else Count = 0;
                Filled := Filled + Count;
             end;
@@ -129,7 +130,7 @@ package body Restore.Boot_Disk is
    procedure Write_MBR is
       use type Rose.Capabilities.Capability;
       Path   : constant String := Boot_Directory & "boot.img";
-      Client : Block_Device_Client;
+      Client : Block_Array_Client;
       Block  : Storage_Array renames Buffer (1 .. 512);
    begin
       if MBR_Cap = Rose.Capabilities.Null_Capability
@@ -143,7 +144,7 @@ package body Restore.Boot_Disk is
       Read_Blocks (Client, 0, 1, Block);
 
       declare
-         use Rose.Interfaces.Releasable_Reader.Client;
+         use Rose.Interfaces.Streams.Releasable_Reader.Client;
          Reader : Releasable_Reader_Client;
          Code   : Storage_Array (1 .. 512);
          Last   : Storage_Count := 0;
@@ -154,7 +155,8 @@ package body Restore.Boot_Disk is
                Count : Storage_Count;
             begin
                Read (Reader, Code (Last + 1 .. Code'Last), Count);
-               exit when Rose.Interfaces.Releasable_Reader.Client.Has_Error
+               exit when Rose.Interfaces.Streams.Releasable_Reader.Client
+                 .Has_Error
                  or else Count = 0;
                Last := Last + Count;
             end;

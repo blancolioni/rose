@@ -15,11 +15,11 @@ list:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-list.idl $(INTERFACES)/rose-core.idl \
-	    $(INTERFACES)/directory.idl \
-	    $(INTERFACES)/file.idl \
-	    $(INTERFACES)/releasable_reader.idl \
-	    $(INTERFACES)/seekable_reader.idl \
-	    $(INTERFACES)/reader.idl \
-	    $(INTERFACES)/resource.idl \
-	    $(INTERFACES)/seekable.idl
+	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-releasable_reader.idl \
+	    $(INTERFACES)/streams-seekable_reader.idl \
+	    $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/common-resource.idl \
+	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)

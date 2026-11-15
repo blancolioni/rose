@@ -1,13 +1,13 @@
 with Ada.Unchecked_Deallocation;
 
-with Rose.Interfaces.Constructor.Client;
-with Rose.Interfaces.Releasable_Cap_Set.Client;
-with Rose.Interfaces.Releasable_Reader.Client;
-with Rose.Interfaces.Releasable_Reader.Server;
-with Rose.Interfaces.Reader.Client;
-with Rose.Interfaces.Replaceable.Client;
-with Rose.Interfaces.Replaceable.Server;
-with Rose.Interfaces.Writer.Client;
+with Rose.Interfaces.Caps.Constructor.Client;
+with Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Client;
+with Rose.Interfaces.Streams.Releasable_Reader.Server;
+with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Processes.Replaceable.Client;
+with Rose.Interfaces.Processes.Replaceable.Server;
+with Rose.Interfaces.Streams.Writer.Client;
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Streams;
@@ -80,7 +80,7 @@ package body Rose.Replacement is
    --  The reader of one State: a snapshot, which Release frees.
 
    type State_Reader is
-     new Rose.Interfaces.Releasable_Reader.Server
+     new Rose.Interfaces.Streams.Releasable_Reader.Server
        .Releasable_Reader_Interface with
       record
          Data       : Element_Array_Access;
@@ -94,19 +94,19 @@ package body Rose.Replacement is
    overriding function Reader_Cap
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Reader.Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Reader.Reader_Interface));
+   is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
+         (Item, Rose.Interfaces.Streams.Releasable_Reader.Reader_Interface));
 
    overriding function Resource_Cap
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Reader.Server.Cap_Of
-         (Item, Rose.Interfaces.Releasable_Reader.Resource_Interface));
+   is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
+         (Item, Rose.Interfaces.Streams.Releasable_Reader.Resource_Interface));
 
    overriding function Releasable_Reader_Cap
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Releasable_Reader.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of (Item));
 
    overriding procedure Read
      (Item   : in out State_Reader;
@@ -118,38 +118,39 @@ package body Rose.Replacement is
    --  The Replaceable interface.
 
    type Replaceable_Server is
-     new Rose.Interfaces.Replaceable.Server.Replaceable_Interface
+     new Rose.Interfaces.Processes.Replaceable.Server.Replaceable_Interface
      with null record;
 
    overriding function Replaceable_Cap
      (Item : in out Replaceable_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Replaceable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Replaceable.Server.Cap_Of (Item));
 
    overriding function Saveable_Cap
      (Item : in out Replaceable_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Replaceable.Server.Cap_Of
-         (Item, Rose.Interfaces.Replaceable.Saveable_Interface));
+   is (Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
+         (Item, Rose.Interfaces.Processes.Replaceable.Saveable_Interface));
 
    overriding function State
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class;
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class;
 
    overriding function Caps
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Cap_Set.Releasable_Cap_Set_Object'
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Releasable_Cap_Set_Object'
         Class;
 
    overriding function Replies
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Cap_Set.Releasable_Cap_Set_Object'
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Releasable_Cap_Set_Object'
         Class;
 
    The_Server     : aliased Replaceable_Server;
    Server_Context : access Rose.Server.Server_Context;
    Writer         : Write_State_Procedure;
-   Constructor    : Rose.Interfaces.Constructor.Client.Constructor_Client;
+   Constructor    : Rose.Interfaces.Caps.Constructor.Client.Constructor_Client;
    Attached       : Boolean := False;
 
    Reader_Ids : Identifier_Vectors.Vector;
@@ -187,11 +188,11 @@ package body Rose.Replacement is
    Pending          : Boolean := False;
    Pending_Previous : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
-   Pending_Reader   : aliased Rose.Interfaces.Releasable_Reader.Client
+   Pending_Reader   : aliased Rose.Interfaces.Streams.Releasable_Reader.Client
      .Releasable_Reader_Client;
    Pending_Input    : aliased Rose.Streams.Reader_Stream
      (Pending_Reader'Access);
-   Pending_Set      : aliased Rose.Interfaces.Releasable_Cap_Set.Client
+   Pending_Set      : aliased Rose.Interfaces.Caps.Releasable_Cap_Set.Client
      .Releasable_Cap_Set_Client;
    Pending_Named    : Named_Caps;
    Pending_Calls    : Call_Vectors.Vector;
@@ -207,7 +208,7 @@ package body Rose.Replacement is
 
    procedure Read_Prefix
      (Input : not null access Root_Stream_Type'Class;
-      Set   : access Rose.Interfaces.Releasable_Cap_Set
+      Set   : access Rose.Interfaces.Caps.Releasable_Cap_Set
                 .Releasable_Cap_Set_Object'Class;
       Named   : in out Named_Caps;
       Calls   : out Call_Vectors.Vector;
@@ -260,7 +261,7 @@ package body Rose.Replacement is
    --  version's calls again, with its reply cap.
 
    function Taken
-     (Set   : in out Rose.Interfaces.Releasable_Cap_Set
+     (Set   : in out Rose.Interfaces.Caps.Releasable_Cap_Set
         .Releasable_Cap_Set_Object'Class;
       Index : Positive)
       return Rose.Capabilities.Capability;
@@ -368,9 +369,9 @@ package body Rose.Replacement is
       Server_Context := Context;
       Writer := Write_State;
       Constructor.Open (Cap_Set_Service);
-      Rose.Interfaces.Replaceable.Server.Attach
+      Rose.Interfaces.Processes.Replaceable.Server.Attach
         (Context.all, The_Server'Access);
-      Rose.Interfaces.Releasable_Reader.Server.Attach
+      Rose.Interfaces.Streams.Releasable_Reader.Server.Attach
         (Context.all, Endpoint_Reader'Access);
       Rose.Server.Set_Receive_Hook (Context.all, Before_Call'Access);
       Attached := True;
@@ -411,13 +412,14 @@ package body Rose.Replacement is
    ---------------------
 
    procedure Begin_Take_Over (Previous : Rose.Capabilities.Capability) is
-      Old     : Rose.Interfaces.Replaceable.Client.Replaceable_Client;
+      Old     : Rose.Interfaces.Processes.Replaceable.Client
+        .Replaceable_Client;
       Movable : Boolean;
    begin
       Old.Open (Previous);
 
       declare
-         Reader : Rose.Interfaces.Releasable_Reader
+         Reader : Rose.Interfaces.Streams.Releasable_Reader
            .Releasable_Reader_Object'Class := Old.State;
       begin
          Pending_Reader.Open (Reader.Releasable_Reader_Cap);
@@ -427,7 +429,7 @@ package body Rose.Replacement is
       Pending_Previous := Previous;
 
       declare
-         Set : Rose.Interfaces.Releasable_Cap_Set
+         Set : Rose.Interfaces.Caps.Releasable_Cap_Set
            .Releasable_Cap_Set_Object'Class := Old.Caps;
       begin
          Pending_Set.Open (Set.Releasable_Cap_Set_Cap);
@@ -449,7 +451,7 @@ package body Rose.Replacement is
 
       if not Pending_Calls.Is_Empty then
          declare
-            Replies : Rose.Interfaces.Releasable_Cap_Set
+            Replies : Rose.Interfaces.Caps.Releasable_Cap_Set
               .Releasable_Cap_Set_Object'Class := Old.Replies;
          begin
             Replies_Set := Replies.Releasable_Cap_Set_Cap;
@@ -514,16 +516,16 @@ package body Rose.Replacement is
 
    overriding function Caps
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Cap_Set.Releasable_Cap_Set_Object'
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Releasable_Cap_Set_Object'
         Class
    is
       pragma Unreferenced (Item);
       Discard : aliased Discard_Stream;
       Named   : Named_Caps;
       Set_Cap : constant Rose.Capabilities.Capability := Constructor.Create;
-      Set     : Rose.Interfaces.Releasable_Cap_Set.Client
+      Set     : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
         .Releasable_Cap_Set_Client :=
-          Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
+          Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
       Next    : Positive := 1;
    begin
       Writer (Discard'Access, Named);
@@ -547,7 +549,7 @@ package body Rose.Replacement is
          end;
       end loop;
 
-      return Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
    end Caps;
 
    --------------------
@@ -589,9 +591,9 @@ package body Rose.Replacement is
    procedure Forget_Replies is
    begin
       declare
-         Set : Rose.Interfaces.Releasable_Cap_Set.Client
+         Set : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
            .Releasable_Cap_Set_Client :=
-             Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap
+             Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap
                (Replies_Set);
       begin
          Set.Release;
@@ -615,7 +617,8 @@ package body Rose.Replacement is
    is
    begin
       return Identifier =
-        Rose.Interfaces.Replaceable.Server.Identifier_Of (The_Server'Access)
+        Rose.Interfaces.Processes.Replaceable.Server
+          .Identifier_Of (The_Server'Access)
         or else Reader_Ids.Contains (Identifier);
    end Is_Handover_Call;
 
@@ -672,7 +675,7 @@ package body Rose.Replacement is
 
    procedure Read_Prefix
      (Input : not null access Root_Stream_Type'Class;
-      Set   : access Rose.Interfaces.Releasable_Cap_Set
+      Set   : access Rose.Interfaces.Caps.Releasable_Cap_Set
                 .Releasable_Cap_Set_Object'Class;
       Named   : in out Named_Caps;
       Calls   : out Call_Vectors.Vector;
@@ -757,7 +760,7 @@ package body Rose.Replacement is
       if not Attached then
          return Rose.Capabilities.Null_Capability;
       end if;
-      return Rose.Interfaces.Replaceable.Server.Cap_Of (The_Server);
+      return Rose.Interfaces.Processes.Replaceable.Server.Cap_Of (The_Server);
    end Replaceable_Cap;
 
    -------------
@@ -766,7 +769,7 @@ package body Rose.Replacement is
 
    overriding function Replies
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Cap_Set.Releasable_Cap_Set_Object'
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Releasable_Cap_Set_Object'
         Class
    is
       pragma Unreferenced (Item);
@@ -782,9 +785,9 @@ package body Rose.Replacement is
       Set_Cap := Constructor.Create;
 
       declare
-         Set : Rose.Interfaces.Releasable_Cap_Set.Client
+         Set : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
            .Releasable_Cap_Set_Client :=
-             Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
+             Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
       begin
          --  Sending a reply cap moves it (#864): its slot here is left
          --  empty, and kept, until Take_Back deletes it.
@@ -814,7 +817,7 @@ package body Rose.Replacement is
       Replies_Set := Set_Cap;
       Replies_Given := True;
 
-      return Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
+      return Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
    end Replies;
 
    -------------
@@ -835,8 +838,9 @@ package body Rose.Replacement is
       --  ignored: their replies can only move in a handover.
 
       declare
-         Reader : aliased Rose.Interfaces.Reader.Client.Reader_Client :=
-           Rose.Interfaces.Reader.Client.From_Cap (Saved);
+         Reader : aliased Rose.Interfaces.Streams.Reader.Client
+           .Reader_Client :=
+           Rose.Interfaces.Streams.Reader.Client.From_Cap (Saved);
          Input  : aliased Rose.Streams.Reader_Stream (Reader'Access);
          Unused  : Named_Caps;
          Calls   : Call_Vectors.Vector;
@@ -854,8 +858,8 @@ package body Rose.Replacement is
    procedure Save (To : Rose.Capabilities.Capability) is
       Snapshot : aliased Buffer_Stream;
       Named    : Named_Caps;
-      Writer   : aliased Rose.Interfaces.Writer.Client.Writer_Client :=
-        Rose.Interfaces.Writer.Client.From_Cap (To);
+      Writer   : aliased Rose.Interfaces.Streams.Writer.Client.Writer_Client :=
+        Rose.Interfaces.Streams.Writer.Client.From_Cap (To);
       Output   : aliased Rose.Streams.Writer_Stream (Writer'Access);
    begin
       if not Attached then
@@ -877,8 +881,8 @@ package body Rose.Replacement is
       if not Attached then
          return Rose.Capabilities.Null_Capability;
       end if;
-      return Rose.Interfaces.Replaceable.Server.Cap_Of
-        (The_Server, Rose.Interfaces.Replaceable.Saveable_Interface);
+      return Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
+        (The_Server, Rose.Interfaces.Processes.Replaceable.Saveable_Interface);
    end Saveable_Cap;
 
    -----------
@@ -920,7 +924,8 @@ package body Rose.Replacement is
 
    overriding function State
      (Item : in out Replaceable_Server)
-      return Rose.Interfaces.Releasable_Reader.Releasable_Reader_Object'Class
+      return Rose.Interfaces.Streams.Releasable_Reader
+        .Releasable_Reader_Object'Class
    is
       pragma Unreferenced (Item);
       Snapshot : aliased Buffer_Stream;
@@ -935,13 +940,14 @@ package body Rose.Replacement is
       --  not in the state, and two snapshots of the same state are the
       --  same.
 
-      Rose.Interfaces.Releasable_Reader.Server.Attach
+      Rose.Interfaces.Streams.Releasable_Reader.Server.Attach
         (Server_Context.all, Reader);
       Reader.Identifier :=
-        Rose.Interfaces.Releasable_Reader.Server.Identifier_Of (Reader);
+        Rose.Interfaces.Streams.Releasable_Reader.Server
+          .Identifier_Of (Reader);
       Reader_Ids.Append (Reader.Identifier);
-      return Rose.Interfaces.Releasable_Reader.Client.From_Cap
-        (Rose.Interfaces.Releasable_Reader.Server.Cap_Of (Reader.all));
+      return Rose.Interfaces.Streams.Releasable_Reader.Client.From_Cap
+        (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of (Reader.all));
    end State;
 
    ---------------
@@ -949,9 +955,10 @@ package body Rose.Replacement is
    ---------------
 
    procedure Take_Back is
-      Set : Rose.Interfaces.Releasable_Cap_Set.Client
+      Set : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
         .Releasable_Cap_Set_Client :=
-          Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Replies_Set);
+          Rose.Interfaces.Caps.Releasable_Cap_Set.Client
+            .From_Cap (Replies_Set);
 
       procedure Put_Back
         (Params : in out Rose.Invocation.Invocation_Record;
@@ -1033,9 +1040,10 @@ package body Rose.Replacement is
    ------------------
 
    procedure Take_Replies is
-      Set : Rose.Interfaces.Releasable_Cap_Set.Client
+      Set : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
         .Releasable_Cap_Set_Client :=
-          Rose.Interfaces.Releasable_Cap_Set.Client.From_Cap (Replies_Set);
+          Rose.Interfaces.Caps.Releasable_Cap_Set.Client
+            .From_Cap (Replies_Set);
    begin
       for Index in 1 .. Taken_Calls.Last_Index loop
          declare
@@ -1072,7 +1080,7 @@ package body Rose.Replacement is
    -----------
 
    function Taken
-     (Set   : in out Rose.Interfaces.Releasable_Cap_Set
+     (Set   : in out Rose.Interfaces.Caps.Releasable_Cap_Set
         .Releasable_Cap_Set_Object'Class;
       Index : Positive)
       return Rose.Capabilities.Capability

@@ -4,8 +4,8 @@ with Rose.Capabilities.Standard;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Interfaces.Process.Client;
-with Rose.Interfaces.Segment;
+with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Processes.Segment;
 
 package body Rose.Shared_Regions is
 
@@ -30,7 +30,7 @@ package body Rose.Shared_Regions is
 
    Mappings : array (1 .. Max_Mappings) of Mapping;
 
-   Self   : Rose.Interfaces.Process.Client.Process_Client;
+   Self   : Rose.Interfaces.Processes.Process.Client.Process_Client;
    Opened : Boolean := False;
    --  This process's own Process interface, opened when it is first
    --  needed.
@@ -80,11 +80,11 @@ package body Rose.Shared_Regions is
    ---------
 
    function Map
-     (Region   : in out Rose.Interfaces.Region.Region_Object'Class;
+     (Region   : in out Rose.Interfaces.Storage.Region.Region_Object'Class;
       Writable : Boolean := True)
       return System.Address
    is
-      use Rose.Interfaces.Segment;
+      use Rose.Interfaces.Processes.Segment;
       use type Rose.Objects.Object_Id;
       Base_Page, Bound_Page : Rose.Objects.Object_Id;
    begin
@@ -133,7 +133,7 @@ package body Rose.Shared_Regions is
    procedure Open is
    begin
       if not Opened then
-         Rose.Interfaces.Process.Client.Open
+         Rose.Interfaces.Processes.Process.Client.Open
            (Self, Rose.Capabilities.Standard.Process_Interface_Cap);
          Opened := True;
       end if;

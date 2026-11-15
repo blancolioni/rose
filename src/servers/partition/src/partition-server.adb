@@ -4,16 +4,16 @@ with Rose.Console_IO;
 with Rose.Objects;
 with Rose.Words;
 
-with Rose.Interfaces.Block_Device.Client;
-with Rose.Interfaces.Block_Device.Server;
-with Rose.Interfaces.Partition_Setup.Server;
+with Rose.Interfaces.Storage.Block_Array.Client;
+with Rose.Interfaces.Storage.Block_Array.Server;
+with Rose.Interfaces.Storage.Partition_Setup.Server;
 
 with Rose.Server;
 with Rose.System_Calls.Client;
 
 package body Partition.Server is
 
-   use Rose.Interfaces.Block_Device;
+   use Rose.Interfaces.Storage.Block_Array;
 
    Partition_Block_Count : Block_Address_Type := 0;
    Partition_Block_Size  : Block_Size_Type := 1;
@@ -26,7 +26,7 @@ package body Partition.Server is
 
    Device_Total_Block_Count : Block_Address_Type;
 
-   Device_Client      : Client.Block_Device_Client;
+   Device_Client      : Client.Block_Array_Client;
    Partition_Server   : Rose.Server.Server_Context;
 
    Invocation_Buffer : System.Storage_Elements.Storage_Array
@@ -42,7 +42,8 @@ package body Partition.Server is
    procedure Get_Parameters
      (Id          : in     Rose.Objects.Capability_Identifier;
       Block_Count :    out Block_Address_Type;
-      Block_Size  :    out Rose.Interfaces.Block_Device.Block_Size_Type);
+      Block_Size  :    out Rose.Interfaces.Storage.Block_Array
+        .Block_Size_Type);
 
    function In_Partition
      (Start : Block_Address_Type;
@@ -111,12 +112,12 @@ package body Partition.Server is
       Client.Get_Parameters
         (Device_Client, Device_Total_Block_Count, Device_Block_Size);
 
-      Rose.Interfaces.Block_Device.Server.Create_Server
+      Rose.Interfaces.Storage.Block_Array.Server.Create_Server
         (Server_Context => Partition_Server,
          Get_Parameters => Get_Parameters'Access,
          Read_Blocks    => Read_Blocks'Access,
          Write_Blocks   => Write_Blocks'Access);
-      Rose.Interfaces.Partition_Setup.Server.Attach_Interface
+      Rose.Interfaces.Storage.Partition_Setup.Server.Attach_Interface
         (Partition_Server, Set_Range'Access);
    end Create_Server;
 
@@ -127,7 +128,7 @@ package body Partition.Server is
    procedure Get_Parameters
      (Id          : in     Rose.Objects.Capability_Identifier;
       Block_Count :    out Block_Address_Type;
-      Block_Size  :    out Rose.Interfaces.Block_Device.Block_Size_Type)
+      Block_Size  :    out Rose.Interfaces.Storage.Block_Array.Block_Size_Type)
    is
       pragma Unreferenced (Id);
    begin

@@ -2,9 +2,9 @@ with System.Storage_Elements;
 
 with Rose.Objects;
 with Rose.Words;
-with Rose.Interfaces.Directory;
+with Rose.Interfaces.Files.Directory;
 
-with Rose.Interfaces.Block_Device.Client;
+with Rose.Interfaces.Storage.Block_Array.Client;
 
 package IsoFS.Directories is
 
@@ -20,7 +20,7 @@ package IsoFS.Directories is
    No_Directory : constant Directory_Type;
 
    function Get_Root_Directory
-     (Device : Rose.Interfaces.Block_Device.Client.Block_Device_Client)
+     (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client)
       return Directory_Type;
 
    function Get_Child_Directory
@@ -45,7 +45,7 @@ package IsoFS.Directories is
    function Get_Entry_Kind
      (Directory : Directory_Type;
       Index     : Positive)
-      return Rose.Interfaces.Directory.File_Kind;
+      return Rose.Interfaces.Files.Directory.File_Kind;
 
    function Get_Entry_Size
      (Directory : Directory_Type;

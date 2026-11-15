@@ -1,0 +1,6 @@
+interface Devices.Interrupt_Handler is
+
+   procedure Handle_Interrupt
+     (Code  : Word);
+   
+end Devices.Interrupt_Handler;

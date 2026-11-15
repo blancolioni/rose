@@ -1,0 +1,5 @@
+interface Processes.Server is
+
+   function Published_Interface return Capability;
+     
+end Processes.Server;

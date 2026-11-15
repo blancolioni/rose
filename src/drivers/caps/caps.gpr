@@ -12,17 +12,20 @@ project Caps is
        "caps-driver.adb",
        "caps-server.ads",
        "caps-server.adb",
-       "rose-interfaces-cap_set.ads",
-       "rose-interfaces-constructor.ads",
-       "rose-interfaces-constructor-server.ads",
-       "rose-interfaces-constructor-server.adb",
-       "rose-interfaces-releasable_cap_set.ads",
-       "rose-interfaces-releasable_cap_set-server.ads",
-       "rose-interfaces-releasable_cap_set-server.adb",
-       "rose-interfaces-resource.ads",
-       "rose-interfaces-restorable.ads",
-       "rose-interfaces-restorable-server.ads",
-       "rose-interfaces-restorable-server.adb");
+       "rose-interfaces-caps.ads",
+       "rose-interfaces-caps-cap_set.ads",
+       "rose-interfaces-caps-constructor.ads",
+       "rose-interfaces-caps-constructor-server.ads",
+       "rose-interfaces-caps-constructor-server.adb",
+       "rose-interfaces-caps-releasable_cap_set.ads",
+       "rose-interfaces-caps-releasable_cap_set-server.ads",
+       "rose-interfaces-caps-releasable_cap_set-server.adb",
+       "rose-interfaces-common.ads",
+       "rose-interfaces-common-resource.ads",
+       "rose-interfaces-processes.ads",
+       "rose-interfaces-processes-restorable.ads",
+       "rose-interfaces-processes-restorable-server.ads",
+       "rose-interfaces-processes-restorable-server.adb");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("caps-driver.adb");

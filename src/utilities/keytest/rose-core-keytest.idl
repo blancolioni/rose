@@ -1,4 +1,4 @@
-command Rose.Core.Keytest : Console
+command Rose.Core.Keytest : Screens.Console
   with Summary     => "Draw at the corners of the screen, and move a mark with the arrow keys.",
        Description => """
           Keytest turns the console's line editing off, clears the screen,

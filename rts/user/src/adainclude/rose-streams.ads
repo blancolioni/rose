@@ -1,7 +1,7 @@
 with Ada.Streams;
 
-with Rose.Interfaces.Reader;
-with Rose.Interfaces.Writer;
+with Rose.Interfaces.Streams.Reader;
+with Rose.Interfaces.Streams.Writer;
 
 package Rose.Streams is
 
@@ -18,7 +18,8 @@ package Rose.Streams is
    --  not release its reader or writer; whoever opened it does.
 
    type Reader_Stream
-     (Reader : not null access Rose.Interfaces.Reader.Reader_Object'Class)
+     (Reader : not null access Rose.Interfaces.Streams.Reader
+       .Reader_Object'Class)
    is new Ada.Streams.Root_Stream_Type with private;
 
    overriding procedure Read
@@ -37,7 +38,8 @@ package Rose.Streams is
    --  Raise Mode_Error.
 
    type Writer_Stream
-     (Writer : not null access Rose.Interfaces.Writer.Writer_Object'Class)
+     (Writer : not null access Rose.Interfaces.Streams.Writer
+       .Writer_Object'Class)
    is new Ada.Streams.Root_Stream_Type with private;
 
    overriding procedure Read
@@ -55,11 +57,13 @@ package Rose.Streams is
 private
 
    type Reader_Stream
-     (Reader : not null access Rose.Interfaces.Reader.Reader_Object'Class)
+     (Reader : not null access Rose.Interfaces.Streams.Reader
+       .Reader_Object'Class)
    is new Ada.Streams.Root_Stream_Type with null record;
 
    type Writer_Stream
-     (Writer : not null access Rose.Interfaces.Writer.Writer_Object'Class)
+     (Writer : not null access Rose.Interfaces.Streams.Writer
+       .Writer_Object'Class)
    is new Ada.Streams.Root_Stream_Type with null record;
 
 end Rose.Streams;

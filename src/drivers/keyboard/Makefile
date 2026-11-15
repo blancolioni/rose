@@ -13,7 +13,7 @@ keyboard:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
-	    $(INTERFACES)/event_source.idl \
-	    $(INTERFACES)/event_listener.idl \
-	    $(INTERFACES)/interrupt_handler.idl
+	    $(INTERFACES)/devices-event_source.idl \
+	    $(INTERFACES)/devices-event_listener.idl \
+	    $(INTERFACES)/devices-interrupt_handler.idl
 	gprbuild $(GPRBUILD_CARGS)
