@@ -23,6 +23,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-memory-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-process_banks.o \
 	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \

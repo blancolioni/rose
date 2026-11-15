@@ -1,0 +1,23 @@
+interface Checkpoints.Page_Log is
+
+   --  The memory server's access to the checkpoint log (ADR 0028). The
+   --  log keeps an entry open from one commit to the next, and the
+   --  memory server appends its pages to it, between checkpoints and
+   --  during one. A log page is a page's number within the log
+   --  partition, from 0. Page 0 is the log's header, so 0 never names a
+   --  page of an entry.
+
+   function Append_Page (Page : Storage_Array) return Word;
+   --  Append Page to the open entry, and return its log page, or 0 if
+   --  the entry has failed because the log is full or a write failed.
+   --  A failed entry is left out of the log when the checkpoint
+   --  commits, with every page appended to it, and the next entry
+   --  starts where it did.
+
+   procedure Read_Page
+     (Log_Page : Word;
+      Page     : out Storage_Array);
+   --  Read log page Log_Page, from a committed entry or from the open
+   --  one. A page that isn't in either reads as zeroes.
+
+end Checkpoints.Page_Log;

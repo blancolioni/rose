@@ -25,6 +25,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-memory-server.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore-server.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-page_log-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process.o \
 	$(BUILDDIR)/rose-interfaces-processes-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process-server.o \

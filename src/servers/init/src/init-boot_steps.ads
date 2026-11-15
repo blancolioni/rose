@@ -30,6 +30,10 @@ package Init.Boot_Steps is
 
    procedure Load_Partitions;
 
+   procedure Connect_Page_Log;
+   --  Give mem the log server's Page_Log (ADR 0028). Mem is launched
+   --  before the log server.
+
    procedure Connect_Process_Banks;
    --  Give mem the storage server's Process_Banks (ADR 0015, #750), which
    --  records each process's own bank. Mem is launched before the store.

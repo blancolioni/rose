@@ -33,7 +33,11 @@ interface Processes.Memory is
       Amount : out Word);
      
    procedure Checkpoint
-     (Append_Page : Capability);
+     (Request_Checkpoint : Capability);
+   --  Write the memory server's part of the checkpoint to the open log
+   --  entry, through its Page_Log. Request_Checkpoint is the checkpoint
+   --  server's Checkpointer.Request_Checkpoint, which the memory server
+   --  keeps, to ask for a checkpoint later (ADR 0028, section 6).
 
    procedure Set_Process_Banks
      (Banks : interface Storage.Process_Banks);
@@ -44,5 +48,11 @@ interface Processes.Memory is
    --  The store has queued processes to end, because their banks were
    --  destroyed: mem asks Process_Banks.Take_Ended for each, and ends
    --  it. The store sends this without waiting.
+
+   procedure Set_Page_Log
+     (Log : interface Checkpoints.Page_Log);
+   --  The log server's Page_Log, which init gives mem at every boot, once
+   --  the log server is running. Mem appends its pages to the open log
+   --  entry through it (ADR 0028).
 	 
 end Processes.Memory;

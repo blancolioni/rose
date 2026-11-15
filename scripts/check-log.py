@@ -465,12 +465,23 @@ def check_entry(log, first, last, verbose):
     """Check the checkpoint stored in pages first .. last.
 
     Returns (ok, description)."""
-    ok, kernel, kernel_pages, oids = check_kernel_tables(log, first, last,
-                                                         verbose)
+    # Batches paged out between checkpoints come before the kernel's
+    # tables (ADR 0028, section 4).
+    ok, message, leading, kernel_first = find_sections(
+        log, first, last, KERNEL_TABLE_MAGIC, "the kernel's tables")
+    if not ok:
+        return False, message
+    for kind, start, headers, listed in leading:
+        if kind != "batch":
+            return False, ("location %d: an index section before the "
+                           "kernel's tables" % start)
+
+    ok, kernel, kernel_pages, oids = check_kernel_tables(
+        log, kernel_first, last, verbose)
     if not ok:
         return False, kernel
     ok, store, store_pages, regions = check_store_tables(
-        log, first + kernel_pages, last, verbose)
+        log, kernel_first + kernel_pages, last, verbose)
     if not ok:
         return False, kernel + "; " + store
     kernel = kernel + "; " + store
@@ -478,9 +489,11 @@ def check_entry(log, first, last, verbose):
     # The memory server's tables come after its batches and index sections
     # (ADR 0028), so they are found by skipping those.
     ok, message, sections, mem_first = find_sections(
-        log, first + kernel_pages + store_pages, last)
+        log, kernel_first + kernel_pages + store_pages, last,
+        MEM_TABLE_MAGIC, "the memory server's tables")
     if not ok:
         return False, kernel + "; " + message
+    sections = leading + sections
 
     ok, tables, table_pages, processes, has_shared = check_mem_tables(
         log, mem_first, last, regions, verbose)
@@ -545,22 +558,22 @@ def check_entry(log, first, last, verbose):
     return True, description
 
 
-def find_sections(log, first, last):
+def find_sections(log, first, last, stop_magic, stop_name):
     """Find the batches and index sections that start at page first, up to
-    the memory server's tables.  Only their header pages are read.
+    the page whose magic number is stop_magic, which starts stop_name.
+    Only their header pages are read.
 
     Returns (ok, message, [(kind, first page, header pages, pages listed)],
-    the first page of the memory server's tables)."""
+    the page with stop_magic)."""
     sections = []
     location = first
     while True:
         page = log.page(location)
         if page is None or location > last:
-            return False, ("expected the memory server's tables after the "
-                           "batches, at location %d" % location), \
-                sections, location
+            return False, ("expected %s after the batches, at location %d"
+                           % (stop_name, location)), sections, location
         magic = u64(page, 0)
-        if magic == MEM_TABLE_MAGIC:
+        if magic == stop_magic:
             return True, None, sections, location
         if magic == CHECKPOINT_MAGIC:
             kind, limit = "batch", MAX_PAGE_REFERENCES

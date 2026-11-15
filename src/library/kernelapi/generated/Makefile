@@ -18,7 +18,7 @@ IDL=caps-cap storage-block_array files-file_system files-directory \
     devices-event_source devices-event_listener commands-lookup \
     commands-map processes-heap caps-receiver common-named \
     processes-kernel_process checkpoints-kernel_log \
-    checkpoints-log_reader commands-command_endpoint \
+    checkpoints-log_reader checkpoints-page_log commands-command_endpoint \
     processes-restorable processes-signalled streams-output_redirect \
     users-auth users-auth_admin checkpoints-checkpointer time-clock \
     time-clock_admin users-rights users-rights_admin screens-surface \
