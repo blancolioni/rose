@@ -120,6 +120,9 @@ package body Log.Server is
    procedure Fail_Entry (Message : String);
    --  Report Message, and leave the current entry out of the log.
 
+   procedure Notify_Store_Committed;
+   --  Tell the store that the entry is committed, and wait for it.
+
    function Load_Entry (Location : Log_Location_Id) return Boolean;
    --  If Location is a committed entry, put its header in Cached_Header
    --  and return True.
@@ -396,6 +399,15 @@ package body Log.Server is
       Page_Buffer_Last := 0;
       Writing := False;
 
+      --  The store holds the space it freed before the checkpoint until
+      --  the entry is committed (ADR 0038, section 6).  It is told here,
+      --  and this waits for it, so that it hears of the commit before
+      --  the next entry is created.
+
+      if not Entry_Failed then
+         Notify_Store_Committed;
+      end if;
+
    end Commit;
 
    ------------
@@ -460,6 +472,7 @@ package body Log.Server is
 
       Console_Cap := Get_Cap (1);
       Start_Log_Cap := Get_Cap (2);
+      Store_Committed_Cap := Get_Cap (4);
 
       --  Nothing reads the cap set again (#826).
 
@@ -662,6 +675,20 @@ package body Log.Server is
          return (if Load_Entry (Next) then Rose.Words.Word_64 (Next) else 0);
       end;
    end Next_Entry;
+
+   ----------------------------
+   -- Notify_Store_Committed --
+   ----------------------------
+
+   procedure Notify_Store_Committed is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Store_Committed_Cap /= Rose.Capabilities.Null_Capability then
+         Rose.System_Calls.Initialize_Send (Params, Store_Committed_Cap);
+         Rose.System_Calls.Invoke_Capability (Params);
+      end if;
+   end Notify_Store_Committed;
 
    -------------
    -- Operate --

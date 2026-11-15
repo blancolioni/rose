@@ -156,6 +156,11 @@ package Store.Devices is
    --  Append the region table to the checkpoint log through Append_Page,
    --  in the format of Rose.Checkpoints, then delete Append_Page.
 
+   procedure Committed
+     (Id : Rose.Objects.Capability_Identifier);
+   --  The log entry that the last Checkpoint appended to is committed
+   --  (ADR 0038, section 6).
+
    procedure Restore_Region
      (Id          : Rose.Objects.Capability_Identifier;
       Index       : Natural;

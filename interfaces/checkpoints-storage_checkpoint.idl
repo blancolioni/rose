@@ -1,13 +1,19 @@
 interface Checkpoints.Storage_Checkpoint is
 
    --  The storage server's part in checkpoints and restores. These are
-   --  kept out of Storage, so that only the checkpoint server and the
-   --  restore server can use them.
+   --  kept out of Storage, so that only the checkpoint server, the log
+   --  server and the restore server can use them.
 
    procedure Checkpoint
      (Append_Page : Capability);
    --  Append the storage server's region table to the checkpoint log
    --  through Append_Page (see Rose.Checkpoints).
+
+   procedure Committed;
+   --  The log entry that the last Checkpoint appended to is committed.
+   --  The log server calls it, after writing the entry's header, and
+   --  only if the entry is committed.  Space that the store freed before
+   --  that checkpoint can then be used again (ADR 0038, section 6).
 
    procedure Restore_Region
      (Index : Natural;

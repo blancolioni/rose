@@ -658,6 +658,21 @@ package body Store.Devices is
       end;
    end Checkpoint;
 
+   ---------------
+   -- Committed --
+   ---------------
+
+   procedure Committed
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      pragma Unreferenced (Id);
+   begin
+      --  Nothing is held for a commit yet: the map is still in memory,
+      --  and freed space is used again at once.  The tree of ADR 0038
+      --  frees the space held for the committed checkpoint here.
+      null;
+   end Committed;
+
    -------------------------
    -- Create_Process_Bank --
    -------------------------
