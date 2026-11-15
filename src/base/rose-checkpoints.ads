@@ -269,35 +269,37 @@ package Rose.Checkpoints is
      with Pack, Size => Rose.Limits.Page_Size * 8;
 
    --  The storage server's part comes next: a header page, then its
-   --  regions, Regions_Per_Page to a page, then its map.  A region is
-   --  saved with its index, which the caps for it carry as their
-   --  identifier, its pages Base .. Bound - 1, and Root, the index of the
-   --  region that the pages were reserved for, which is its own unless
-   --  it is a subregion.  A region's pages are the page ids from the
-   --  header's Next_Page on, never used again.
+   --  regions, Regions_Per_Page to a page.  A region is saved with its
+   --  index, which the caps for it carry as their identifier, its pages
+   --  Base .. Bound - 1, Root, the index of the region that the pages
+   --  were reserved for, which is its own unless it is a subregion, and
+   --  Pages, how many of its pages have space on a backing store, which
+   --  only a region that is its own root counts.  A region's pages are
+   --  the page ids from the header's Next_Page on, never used again.
    --
-   --  The map is Map_Page_Count pages, which hold Map_Entry_Count
-   --  entries, Entries_Per_Page to a page, in no order.  An entry is a
-   --  block of 4 pages that has space on a backing store, from the first
-   --  write to one of them (#305): Page is the first of them, Block is
-   --  the space the allocator gave it, and bit I of Fresh is set while
-   --  page I has not been written, so reads as zeroes.  The blocks that
-   --  aren't in the map are all fresh.  The storage server reads the map
-   --  back itself (Storage_Checkpoint.Restore_Table_Page).
+   --  The block map isn't in the log (ADR 0038).  It is a tree of pages
+   --  on the backing stores, from a page id less Page_Object_Id'First to
+   --  the device page that holds the page, written at each checkpoint
+   --  before this table.  The header names its root, a device page, and
+   --  its height, and which of the two copies of the free map's image the
+   --  checkpoint wrote, at the start of each backing store.  The storage
+   --  server reads them back itself (Storage_Checkpoint.Restore_Table_
+   --  Page).  A page with no entry in the tree reads as zeroes.
    --
    --  The banks come last (ADR 0014, #518): Bank_Page_Count pages, which
    --  hold Bank_Count banks, Banks_Per_Page to a page, each with its
    --  index, which the caps for it carry as their identifier, its parent
    --  (zero for the root bank) and its limits.  A region is saved with
    --  the bank it is charged to.  What a bank has been charged isn't
-   --  saved: the storage server works it out again from the regions and
-   --  the map.
+   --  saved: the storage server works it out again from the regions.
    --
    --  Version 3 replaced the space of each region and its fresh pages
-   --  with the map, and version 4 added the banks.
+   --  with the map, version 4 added the banks, and version 5 replaced the
+   --  map with the tree on the backing stores.  A version of 0 is a table
+   --  whose tree couldn't be written, which can't be restored.
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 4;
+   Store_Table_Version : constant := 5;
 
    type Store_Table_Header is
       record
@@ -307,12 +309,14 @@ package Rose.Checkpoints is
          Page_Count       : Rose.Words.Word_32 := 0;
          --  All of the storage server's pages, including this one.
          Region_Count     : Rose.Words.Word_32 := 0;
-         Map_Page_Count   : Rose.Words.Word_32 := 0;
-         Map_Entry_Count  : Rose.Words.Word_32 := 0;
+         Tree_Height      : Rose.Words.Word_32 := 0;
+         Image_Copy       : Rose.Words.Word_32 := 0;
          Bank_Count       : Rose.Words.Word_32 := 0;
          Bank_Page_Count  : Rose.Words.Word_32 := 0;
+         Unused           : Rose.Words.Word_32 := 0;
+         Tree_Root        : Rose.Words.Word_64 := 0;
          Reserved         : System.Storage_Elements.Storage_Array
-                              (1 .. Rose.Limits.Page_Size - 44) :=
+                              (1 .. Rose.Limits.Page_Size - 56) :=
                                 (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
@@ -323,7 +327,7 @@ package Rose.Checkpoints is
          Root     : Rose.Words.Word_32 := 0;
          Base     : Rose.Words.Word_64 := 0;
          Bound    : Rose.Words.Word_64 := 0;
-         Blocks   : Rose.Words.Word_32 := 0;
+         Pages    : Rose.Words.Word_32 := 0;
          Bank     : Rose.Words.Word_32 := 0;
       end record
      with Pack, Size => 256;
@@ -364,26 +368,6 @@ package Rose.Checkpoints is
          Reserved : System.Storage_Elements.Storage_Array
                       (1 .. Rose.Limits.Page_Size - Banks_Per_Page * 24) :=
                         (others => 0);
-      end record
-     with Pack, Size => Rose.Limits.Page_Size * 8;
-
-   type Saved_Map_Entry is
-      record
-         Page  : Rose.Words.Word_64 := 0;
-         Block : Rose.Words.Word_32 := 0;
-         Fresh : Rose.Words.Word_32 := 0;
-      end record
-     with Pack, Size => 128;
-
-   Entries_Per_Page : constant := Rose.Limits.Page_Size / 16;
-
-   type Saved_Map_Entry_Array is
-     array (1 .. Entries_Per_Page) of Saved_Map_Entry
-     with Pack, Size => Entries_Per_Page * 128;
-
-   type Map_Page is
-      record
-         Entries : Saved_Map_Entry_Array;
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
 

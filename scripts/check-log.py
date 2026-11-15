@@ -59,11 +59,11 @@ SHARED_PAGE_SAVED = 1
 SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 4
+STORE_TABLE_VERSION = 5
 REGIONS_PER_PAGE = PAGE_SIZE // 32
 BANKS_PER_PAGE = PAGE_SIZE // 24
-MAP_ENTRIES_PER_PAGE = PAGE_SIZE // 16
-PAGES_PER_BLOCK = 4
+MAX_TREE_HEIGHT = 7
+MAX_STORE_PAGES = 2 ** 20
 
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 2
@@ -289,8 +289,10 @@ def check_kernel_tables(log, first, last, verbose):
 
 
 def check_store_tables(log, first, last, verbose):
-    """Check the storage server's region table, map and banks, which start
-    at page first.
+    """Check the storage server's region table and banks, which start at
+    page first.  The block map is a tree on the swap partition (ADR 0038),
+    which this doesn't read: only its root, height and image copy, in the
+    header.
 
     Returns (ok, description, page count, set of (base, bound))."""
     regions = set()
@@ -300,28 +302,33 @@ def check_store_tables(log, first, last, verbose):
                        "found %s" % (first, describe_page(page or b""))), \
             0, regions
     next_page = u64(page, 8)
-    version, page_count, region_count, map_pages, map_entries, \
-        bank_count, bank_pages = struct.unpack_from("<IIIIIII", page, 16)
+    version, page_count, region_count, tree_height, image_copy, \
+        bank_count, bank_pages, _ = struct.unpack_from("<IIIIIIII", page, 16)
+    tree_root = u64(page, 48)
     if version != STORE_TABLE_VERSION:
         return False, "storage tables version %d" % version, 0, regions
     region_pages = (region_count + REGIONS_PER_PAGE - 1) // REGIONS_PER_PAGE
-    if map_pages != (map_entries + MAP_ENTRIES_PER_PAGE - 1) \
-            // MAP_ENTRIES_PER_PAGE \
-            or bank_count == 0 \
+    if not 1 <= tree_height <= MAX_TREE_HEIGHT \
+            or image_copy > 1 \
+            or not 0 < tree_root < MAX_STORE_PAGES:
+        return False, ("storage tables: block map root %d, height %d, "
+                       "image copy %d" % (tree_root, tree_height,
+                                          image_copy)), 0, regions
+    if bank_count == 0 \
             or bank_pages != (bank_count + BANKS_PER_PAGE - 1) \
             // BANKS_PER_PAGE \
-            or page_count != 1 + region_pages + map_pages + bank_pages \
+            or page_count != 1 + region_pages + bank_pages \
             or first + page_count - 1 > last:
-        return False, ("storage tables: %d pages for %d regions, %d map "
-                       "entries (%d map pages) and %d banks (%d pages)"
-                       % (page_count, region_count, map_entries,
-                          map_pages, bank_count, bank_pages)), 0, regions
+        return False, ("storage tables: %d pages for %d regions and %d "
+                       "banks (%d pages)"
+                       % (page_count, region_count, bank_count,
+                          bank_pages)), 0, regions
 
     # The banks come last (#518).  Each one's parent must be another bank
     # in the table, and the root bank, 1, has none.
     banks = {}
     for i in range(bank_count):
-        record = log.page(first + 1 + region_pages + map_pages
+        record = log.page(first + 1 + region_pages
                           + i // BANKS_PER_PAGE)
         index, parent, page_limit, region_limit, _ = struct.unpack_from(
             "<IIQII", record, (i % BANKS_PER_PAGE) * 24)
@@ -341,9 +348,10 @@ def check_store_tables(log, first, last, verbose):
 
     indices = set()
     roots = {}
+    mapped = 0
     for i in range(region_count):
         record = log.page(first + 1 + i // REGIONS_PER_PAGE)
-        index, root, base, bound, blocks, bank = \
+        index, root, base, bound, pages, bank = \
             struct.unpack_from("<IIQQII", record,
                                (i % REGIONS_PER_PAGE) * 32)
         if index == 0 or index in indices or bound < base \
@@ -356,12 +364,16 @@ def check_store_tables(log, first, last, verbose):
             return False, ("storage region %d is charged to bank %d, which "
                            "is not in the tables" % (index, bank)), \
                 0, regions
+        if pages > bound - base or (root != index and pages != 0):
+            return False, ("storage region %d: %d pages with space, of "
+                           "%d" % (index, pages, bound - base)), 0, regions
         indices.add(index)
         roots[index] = root
         regions.add((base, bound))
+        mapped += pages
         if verbose:
-            print("    region %3d: %x..%x, %d blocks, bank %d%s"
-                  % (index, base, bound, blocks, bank,
+            print("    region %3d: %x..%x, %d pages with space, bank %d%s"
+                  % (index, base, bound, pages, bank,
                      "" if root == index else " subregion of %d" % root))
     for index, root in roots.items():
         if root not in indices:
@@ -369,25 +381,10 @@ def check_store_tables(log, first, last, verbose):
                            "which is not in the tables" % (index, root)), \
                 0, regions
 
-    mapped = set()
-    for i in range(map_entries):
-        record = log.page(first + 1 + region_pages
-                          + i // MAP_ENTRIES_PER_PAGE)
-        page_id, block, fresh = struct.unpack_from(
-            "<QII", record, (i % MAP_ENTRIES_PER_PAGE) * 16)
-        if page_id in mapped \
-                or fresh >= 1 << PAGES_PER_BLOCK \
-                or not any(base <= page_id < bound
-                           for base, bound in regions):
-            return False, ("storage map entry %d of %d: page %x, block %d, "
-                           "fresh %x"
-                           % (i + 1, map_entries, page_id, block,
-                              fresh)), 0, regions
-        mapped.add(page_id)
-
-    return True, ("storage: %d region%s, %d mapped block%s, %d bank%s"
+    return True, ("storage: %d region%s, %d page%s with space, block map "
+                  "height %d, %d bank%s"
                   % (region_count, "" if region_count == 1 else "s",
-                     map_entries, "" if map_entries == 1 else "s",
+                     mapped, "" if mapped == 1 else "s", tree_height,
                      bank_count, "" if bank_count == 1 else "s")), \
         page_count, regions
 

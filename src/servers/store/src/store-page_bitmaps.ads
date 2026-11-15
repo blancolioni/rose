@@ -39,7 +39,7 @@ package Store.Page_Bitmaps is
 
    procedure Reset;
    --  Every page in use, and none born or held, as before any backing
-   --  store is added.
+   --  store is added.  The bitmap must be reset before it is used.
 
    procedure Add_Range
      (First : Device_Page;

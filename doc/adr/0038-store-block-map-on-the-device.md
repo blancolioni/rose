@@ -85,7 +85,7 @@ Amended by #504: this section first had the checkpoint server call `Committed` a
 - **A checkpoint writes only the pages that changed,** bottom up, with the root last.
 - **When the cache is full of changed pages,** the store writes changed leaves early, to the space that section 3 gives them. The last committed root doesn't name that space, so this is safe. A full cache costs writes, but nothing waits for it.
 
-The hash table and its buckets go, which frees about as much memory as the cache and the bitmaps of section 5 take. The store's memory stays about the same, but it no longer limits how much can be written.
+The hash table and its buckets go, but the cache and the four bitmaps of the free map (sections 4 and 5) take more: the store's bss went from 651 KB to 983 KB in #504. Its memory no longer grows with how much is written, and no longer limits it.
 
 ### 8. What a checkpoint writes, and in what order
 
