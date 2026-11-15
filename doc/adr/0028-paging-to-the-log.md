@@ -1,8 +1,9 @@
 # 28. Paging changed memory out to the checkpoint log
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-05
 - **Related:** #761 (this decision), #759 (heaps without a 1 MiB cap), #760 (files without a size limit), #356 (consolidation), #246 and #305 (store blocks on first write), #200 (the read-only page cache), [ADR 0025](0025-shared-regions.md) (shared regions), [ADR 0014](0014-banks.md) (banks)
+- **Amended by:** [ADR 0030](0030-copy-before-write-during-a-checkpoint.md), which lets persistent processes change pages during a checkpoint (section 10)
 
 ## Context
 
