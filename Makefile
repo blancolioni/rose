@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-restore restore-fixture test-drawing prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -99,6 +99,12 @@ test-screen:
 test-drawing:
 	cd src/library/drawing/tests && gprbuild -q -P drawing_tests.gpr \
 	    && ./build/test_drawing
+
+# The tests of the store's block map and free map (ADR 0038, #504), built
+# and run on the host, in a few seconds.  CI runs them.
+test-store:
+	cd src/servers/store/tests && gprbuild -q -P page_maps_tests.gpr \
+	    && ./build/test_page_maps
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"
