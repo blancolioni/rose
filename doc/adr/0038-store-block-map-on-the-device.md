@@ -55,7 +55,7 @@ A program image is written once, and shared pages are written back rarely, so fe
 ### 4. The free map is two fixed bitmaps on each backing store
 
 - **The first pages of each backing store hold two copies of its free map,** a bit a page: a page of bitmap for each 128 MiB of device. They are allocated when the backing store is added, and never given out.
-- **Checkpoints write the copies in turn,** by the parity of the generation. A checkpoint writes only the bitmap pages that changed since that copy was last written, two generations before.
+- **A checkpoint writes the copy that the last committed checkpoint didn't,** so the copy that a restore needs is never overwritten. While checkpoints are committed, the copies take turns. A checkpoint that isn't committed leaves the next one to write the same copy again, not the committed checkpoint's, which choosing by the parity of the generation would. The table in the log names the copy. A checkpoint writes only the bitmap pages that changed since that copy was last written.
 - **A restore reads the copy that its checkpoint names,** and the root of the tree. It doesn't walk the tree to find the space in use. On a hard-disk boot, which is always a restore (ADR 0008), the time a restore takes doesn't grow with how much has been written.
 
 A bitmap at a fixed place takes no space from itself, so writing it can't change it. A copy-on-write tree for the free map would need space for its new pages, and so change itself while it is being written.
