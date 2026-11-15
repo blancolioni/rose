@@ -1343,6 +1343,24 @@ package body Tests.Replacement is
          end if;
       end Check;
 
+      function New_Bank return Rose.Interfaces.Bank.Bank_Object'Class;
+      --  A new sub-bank of run_self_tests' own bank. Each part of the test
+      --  launches in one, and destroys it when the part is done, which
+      --  ends every process launched in it, so that only a few
+      --  replaceable_test processes are alive at once (#941, #724).
+
+      --------------
+      -- New_Bank --
+      --------------
+
+      function New_Bank return Rose.Interfaces.Bank.Bank_Object'Class is
+         Own : Rose.Interfaces.Bank.Client.Bank_Client :=
+           Rose.Interfaces.Bank.Client.From_Cap
+             (Rose.System_Calls.Own_Bank.Cap);
+      begin
+         return Own.Create_Sub_Bank (0, 0);
+      end New_Bank;
+
    begin
       Ada.Text_IO.Put ("Replacement test");
 
@@ -1352,9 +1370,12 @@ package body Tests.Replacement is
       end if;
 
       declare
-         Old_Version : constant Started := Start ("fred");
+         Fred_Bank   : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+         Old_Version : constant Started :=
+           Start ("fred", Bank => Fred_Bank.Bank_Cap);
       begin
          if not Is_Started (Old_Version) then
+            Fred_Bank.Destroy;
             Ada.Text_IO.Put (": cannot start replaceable_test");
             return False;
          end if;
@@ -1369,8 +1390,11 @@ package body Tests.Replacement is
          --  that the old version owes a reply when it is replaced (#879).
 
          declare
-            Helper : constant Started :=
-              Start ("helper", Target => Old_Version.Held);
+            Helper_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Helper      : constant Started :=
+              Start ("helper",
+                     Target => Old_Version.Held,
+                     Bank   => Helper_Bank.Bank_Cap);
          begin
             Check ("the helper did not start", Is_Started (Helper));
             Check ("the helper's call was not deferred",
@@ -1438,7 +1462,9 @@ package body Tests.Replacement is
 
             declare
                New_Version : constant Started :=
-                 Start ("anne", Previous => Old_Version.Control);
+                 Start ("anne",
+                        Previous => Old_Version.Control,
+                        Bank     => Fred_Bank.Bank_Cap);
             begin
                Check ("the new version did not start",
                       Is_Started (New_Version));
@@ -1468,6 +1494,8 @@ package body Tests.Replacement is
                   end;
                end if;
             end;
+
+            Helper_Bank.Destroy;
          end;
 
          declare
@@ -1487,8 +1515,11 @@ package body Tests.Replacement is
               Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
             Saved    : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
-            Restored : constant Started :=
-              Start ("anne", Saved => Saved.Reader_Cap);
+            Restore_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Restored     : constant Started :=
+              Start ("anne",
+                     Saved => Saved.Reader_Cap,
+                     Bank  => Restore_Bank.Bank_Cap);
          begin
             Saved.Release;
             Check ("the restored one did not start", Is_Started (Restored));
@@ -1513,6 +1544,8 @@ package body Tests.Replacement is
                   Set.Release;
                end;
             end if;
+
+            Restore_Bank.Destroy;
          end;
 
          declare
@@ -1528,15 +1561,18 @@ package body Tests.Replacement is
          declare
             Saveable : Rose.Interfaces.Saveable.Client.Saveable_Client :=
               Rose.Interfaces.Saveable.Client.From_Cap (Old_Version.Saver);
-            Saved    : Rose.Interfaces.Releasable_Reader
+            Saved     : Rose.Interfaces.Releasable_Reader
               .Releasable_Reader_Object'Class := Saveable.State;
+            Both_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
          begin
             Check ("both a version and a state started",
                    not Is_Started
                      (Start ("both",
                              Previous => Old_Version.Control,
-                             Saved    => Saved.Reader_Cap)));
+                             Saved    => Saved.Reader_Cap,
+                             Bank     => Both_Bank.Bank_Cap)));
             Saved.Release;
+            Both_Bank.Destroy;
          end;
 
          declare
@@ -1546,11 +1582,16 @@ package body Tests.Replacement is
               .Releasable_Reader_Object'Class := Saveable.State;
             Skipped  : Ada.Streams.Stream_Element_Array (1 .. 4);
             Last     : Ada.Streams.Stream_Element_Offset;
+            Bad_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
          begin
             Saved.Read (Skipped, Last);
             Check ("a bad state started",
-                   not Is_Started (Start ("bad", Saved => Saved.Reader_Cap)));
+                   not Is_Started
+                     (Start ("bad",
+                             Saved => Saved.Reader_Cap,
+                             Bank  => Bad_Bank.Bank_Cap)));
             Saved.Release;
+            Bad_Bank.Destroy;
          end;
 
          --  Releasing a set that holds a reply cap fails the call, rather
@@ -1561,9 +1602,12 @@ package body Tests.Replacement is
          --  reply caps are given out once.
 
          declare
-            Rounds : constant := 10;
-            Helper : constant Started :=
-              Start ("repeat", Target => Old_Version.Held);
+            Rounds      : constant := 10;
+            Repeat_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+            Helper      : constant Started :=
+              Start ("repeat",
+                     Target => Old_Version.Held,
+                     Bank   => Repeat_Bank.Bank_Cap);
             Old    : Rose.Interfaces.Replaceable.Client.Replaceable_Client :=
               Rose.Interfaces.Replaceable.Client.From_Cap
                 (Old_Version.Control);
@@ -1626,14 +1670,20 @@ package body Tests.Replacement is
                Check ("helper 2: " & Name,
                       Name = "waited 5 after 10 errors");
             end;
+
+            Repeat_Bank.Destroy;
          end;
+
+         Fred_Bank.Destroy;
       end;
 
       --  A version that refuses to take over leaves the old one to answer
       --  the call that it deferred.
 
       declare
-         Refused : constant Started := Start ("refuse");
+         Refuse_Bank : Rose.Interfaces.Bank.Bank_Object'Class := New_Bank;
+         Refused     : constant Started :=
+           Start ("refuse", Bank => Refuse_Bank.Bank_Cap);
       begin
          Check ("the refused version's old version did not start",
                 Is_Started (Refused));
@@ -1641,7 +1691,9 @@ package body Tests.Replacement is
          if Is_Started (Refused) then
             declare
                Helper : constant Started :=
-                 Start ("helper", Target => Refused.Held);
+                 Start ("helper",
+                        Target => Refused.Held,
+                        Bank   => Refuse_Bank.Bank_Cap);
             begin
                Check ("the third helper did not start", Is_Started (Helper));
                Check ("the third helper's call was not deferred",
@@ -1649,7 +1701,9 @@ package body Tests.Replacement is
 
                Check ("a version took over from refuse",
                       not Is_Started
-                        (Start ("barry", Previous => Refused.Control)));
+                        (Start ("barry",
+                                Previous => Refused.Control,
+                                Bank     => Refuse_Bank.Bank_Cap)));
 
                declare
                   Held : Rose.Interfaces.Held_Call.Client.Held_Call_Client :=
@@ -1667,6 +1721,8 @@ package body Tests.Replacement is
                end;
             end;
          end if;
+
+         Refuse_Bank.Destroy;
       end;
 
       return Passed;
