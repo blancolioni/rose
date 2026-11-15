@@ -63,6 +63,7 @@ RESTORE_OBJECTS= \
 COMMON_OBJECTS= \
 	$(BUILDDIR)/ada_rts.o \
 	$(BUILDDIR)/restore-checkpoint_log.o \
+	$(BUILDDIR)/restore-entries.o \
 	$(BUILDDIR)/restore-start.o \
 	$(BUILDDIR)/restore.o \
 	$(BUILDDIR)/rose.o \

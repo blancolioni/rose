@@ -48,7 +48,11 @@ LOG_MAGIC = 0x8F8FFFE0FA39FDF7
 ENTRY_MAGIC = 0x7E753634A3568547
 CHECKPOINT_MAGIC = 0x7E6AF17879CBE048
 IS_LAST_HEADER_PAGE = 0x0001
-HAS_SHARED_PAGES = 0x0002
+MAX_PAGE_REFERENCES = (PAGE_SIZE - 16) // 5
+INDEX_HEADER_MAGIC = 0x494E444558484431
+MAX_INDEX_REFERENCES = (PAGE_SIZE - 16) // 4
+INDEX_ENTRIES_PER_PAGE = 1024
+DIRECTORY_SLOT = 0xFFFF
 SHARED_HEADER_MAGIC = 0x5348415245445031
 MAX_SHARED_REFERENCES = (PAGE_SIZE - 16) // 12
 SHARED_PAGE_SAVED = 1
@@ -62,7 +66,8 @@ MAP_ENTRIES_PER_PAGE = PAGE_SIZE // 16
 PAGES_PER_BLOCK = 4
 
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
-MEM_TABLE_VERSION = 1
+MEM_TABLE_VERSION = 2
+MEM_HAS_SHARED_PAGES = 0x0001
 MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 32
 
@@ -391,21 +396,24 @@ def check_mem_tables(log, first, last, regions, verbose):
     """Check the memory server's tables, which start at page first.  The
     regions of their segments must be among regions.
 
-    Returns (ok, description, page count, {mem process id: object id})."""
+    Returns (ok, description, page count, {mem process id: object id},
+    whether the pages of shared segments follow)."""
     processes = {}
     page = log.page(first)
     if page is None or first > last or u64(page, 0) != MEM_TABLE_MAGIC:
         return False, ("location %d: expected the memory server's tables, "
                        "found %s" % (first, describe_page(page or b""))), \
-            0, processes
+            0, processes, False
     version = u32(page, 8)
     if version != MEM_TABLE_VERSION:
-        return False, "memory tables version %d" % version, 0, processes
+        return False, "memory tables version %d" % version, 0, processes, \
+            False
     page_count = u32(page, 12)
     process_count = u32(page, 16)
+    has_shared = bool(u32(page, 20) & MEM_HAS_SHARED_PAGES)
     if page_count != process_count + 1 or first + page_count - 1 > last:
         return False, ("memory tables: %d pages for %d processes"
-                       % (page_count, process_count)), 0, processes
+                       % (page_count, process_count)), 0, processes, False
 
     for i in range(process_count):
         location = first + 1 + i
@@ -413,18 +421,24 @@ def check_mem_tables(log, first, last, regions, verbose):
         if u64(record, 0) != MEM_PROCESS_MAGIC:
             return False, ("location %d: expected memory process record %d "
                            "of %d" % (location, i + 1, process_count)), \
-                0, processes
+                0, processes, False
         oid = u64(record, 8)
-        mem_pid, state, segment_count = struct.unpack_from("<III", record,
-                                                           16)
+        mem_pid, state, segment_count, directory = \
+            struct.unpack_from("<IIII", record, 16)
         if segment_count > MAX_SAVED_SEGMENTS:
             return False, ("memory process %d: %d segments"
-                           % (mem_pid, segment_count)), 0, processes
+                           % (mem_pid, segment_count)), 0, processes, False
+        if directory >= log.page_count:
+            return False, ("memory process %d: index directory at log page "
+                           "%d, past the log" % (mem_pid, directory)), \
+                0, processes, False
         processes[mem_pid] = oid
         if verbose:
-            print("    memory process %d: object %d, %s, %d segments"
+            print("    memory process %d: object %d, %s, %d segments%s"
                   % (mem_pid, oid, "faulted" if state == 2 else "active",
-                     segment_count))
+                     segment_count,
+                     ", index directory at log page %d" % directory
+                     if directory else ""))
         for s in range(segment_count):
             base, bound, limit, flags, r_base, r_bound, r_offset = \
                 struct.unpack_from("<IIIIQQQ", record, 32 + s * 40)
@@ -447,7 +461,7 @@ def check_mem_tables(log, first, last, regions, verbose):
 
     return True, ("memory tables: %d process%s"
                   % (process_count, "" if process_count == 1 else "es")), \
-        page_count, processes
+        page_count, processes, has_shared
 
 
 def check_entry(log, first, last, verbose):
@@ -463,8 +477,16 @@ def check_entry(log, first, last, verbose):
     if not ok:
         return False, kernel + "; " + store
     kernel = kernel + "; " + store
-    ok, tables, table_pages, processes = check_mem_tables(
-        log, first + kernel_pages + store_pages, last, regions, verbose)
+
+    # The memory server's tables come after its batches and index sections
+    # (ADR 0028), so they are found by skipping those.
+    ok, message, sections, mem_first = find_sections(
+        log, first + kernel_pages + store_pages, last)
+    if not ok:
+        return False, kernel + "; " + message
+
+    ok, tables, table_pages, processes, has_shared = check_mem_tables(
+        log, mem_first, last, regions, verbose)
     if not ok:
         return False, kernel + "; " + tables
     missing = oids - set(processes.values())
@@ -478,36 +500,123 @@ def check_entry(log, first, last, verbose):
         tables += ("; %d process%s not saved by the kernel: %s"
                    % (len(unsaved), "" if len(unsaved) == 1 else "es",
                       ", ".join(str(oid) for oid in unsaved)))
-    ok, memory = check_memory(log,
-                              first + kernel_pages + store_pages
-                              + table_pages,
-                              last, processes, verbose)
-    return ok, kernel + "; " + tables + "; " + memory
+    description = kernel + "; " + tables
+
+    batches = 0
+    batch_headers = 0
+    batch_pages = 0
+    indexes = 0
+    index_pages = 0
+    for kind, start, headers, listed in sections:
+        if kind == "batch":
+            ok, message = check_batch(log, start, headers, processes,
+                                      verbose)
+            batches += 1
+            batch_headers += headers
+            batch_pages += listed
+        else:
+            ok, message = check_index(log, start, headers, processes,
+                                      verbose)
+            indexes += 1
+            index_pages += listed
+        if not ok:
+            return False, description + "; " + message
+    if batches == 0:
+        return False, description + "; no batch of memory pages"
+
+    description += ("; memory: %d batch%s, %d header page%s, %d data pages"
+                    % (batches, "" if batches == 1 else "es",
+                       batch_headers, "" if batch_headers == 1 else "s",
+                       batch_pages))
+    if indexes:
+        description += ("; index: %d section%s, %d page%s"
+                        % (indexes, "" if indexes == 1 else "s",
+                           index_pages, "" if index_pages == 1 else "s"))
+
+    end = mem_first + table_pages
+    if has_shared:
+        ok, shared, shared_headers, saved = check_shared(log, end, last,
+                                                         verbose)
+        if not ok:
+            return False, description + "; " + shared
+        description += "; " + shared
+        end += shared_headers + saved
+
+    if end != last + 1:
+        return False, ("%s: expected %d pages, entry has %d"
+                       % (description, end - first, last - first + 1))
+    return True, description
 
 
-def check_memory(log, first, last, processes, verbose):
-    """Check a memory checkpoint stored in pages first .. last, whose pages
-    belong to the memory server's processes in processes.
+def find_sections(log, first, last):
+    """Find the batches and index sections that start at page first, up to
+    the memory server's tables.  Only their header pages are read.
 
-    Returns (ok, description)."""
-    header_pages = 0
-    listed = 0
+    Returns (ok, message, [(kind, first page, header pages, pages listed)],
+    the first page of the memory server's tables)."""
+    sections = []
     location = first
     while True:
         page = log.page(location)
         if page is None or location > last:
-            return False, ("checkpoint header pages run past the entry "
-                           "at location %d" % location)
-        if u64(page, 0) != CHECKPOINT_MAGIC:
-            return False, ("location %d: expected a checkpoint header "
-                           "page, found %s"
-                           % (location, describe_page(page)))
-        header_pages += 1
+            return False, ("expected the memory server's tables after the "
+                           "batches, at location %d" % location), \
+                sections, location
+        magic = u64(page, 0)
+        if magic == MEM_TABLE_MAGIC:
+            return True, None, sections, location
+        if magic == CHECKPOINT_MAGIC:
+            kind, limit = "batch", MAX_PAGE_REFERENCES
+        elif magic == INDEX_HEADER_MAGIC:
+            kind, limit = "index", MAX_INDEX_REFERENCES
+        else:
+            return False, ("location %d: expected a checkpoint or index "
+                           "header page, found %s"
+                           % (location, describe_page(page))), \
+                sections, location
+
+        start = location
+        headers = 0
+        listed = 0
+        while True:
+            page = log.page(location)
+            if page is None or location > last:
+                return False, ("%s header pages run past the entry at "
+                               "location %d" % (kind, location)), \
+                    sections, location
+            if u64(page, 0) != magic:
+                return False, ("location %d: expected another %s header "
+                               "page, found %s"
+                               % (location, kind, describe_page(page))), \
+                    sections, location
+            count = u32(page, 12)
+            if count > limit:
+                return False, ("location %d: %s header page lists %d pages"
+                               % (location, kind, count)), \
+                    sections, location
+            headers += 1
+            listed += count
+            if u32(page, 8) & IS_LAST_HEADER_PAGE:
+                break
+            location += 1
+
+        if start + headers + listed - 1 > last:
+            return False, ("location %d: %s lists %d pages, past the entry"
+                           % (start, kind, listed)), sections, start
+        sections.append((kind, start, headers, listed))
+        location = start + headers + listed
+
+
+def check_batch(log, first, headers, processes, verbose):
+    """Check the header pages of the batch that starts at page first: each
+    page they list belongs to one of the memory server's processes.
+
+    Returns (ok, message)."""
+    for location in range(first, first + headers):
+        page = log.page(location)
         count = u32(page, 12)
-        listed += count
         if verbose:
-            print("    header page at %d lists %d pages"
-                  % (location, count))
+            print("    header page at %d lists %d pages" % (location, count))
         for i in range(count):
             # A page reference is 40 bits: the memory server's process id
             # in the low 16, then the virtual page address.
@@ -518,29 +627,43 @@ def check_memory(log, first, last, processes, verbose):
                                "process %d, which is not in the tables"
                                % (location, reference >> 16,
                                   reference & 0xFFFF))
-        if u32(page, 8) & IS_LAST_HEADER_PAGE:
-            has_shared = u32(page, 8) & HAS_SHARED_PAGES
-            break
-        location += 1
+    return True, None
 
-    description = ("memory: %d header page%s, %d data pages"
-                   % (header_pages, "" if header_pages == 1 else "s", listed))
 
-    if has_shared:
-        ok, shared, shared_headers, saved = check_shared(
-            log, first + header_pages + listed, last, verbose)
-        if not ok:
-            return False, description + "; " + shared
-        description += "; " + shared
-        header_pages += shared_headers
-        listed += saved
+def check_index(log, first, headers, processes, verbose):
+    """Check the index section that starts at page first (ADR 0028): each
+    index page it lists belongs to one of the memory server's processes,
+    and every log page it names is in the log.
 
-    expected = header_pages + listed
-    actual = last - first + 1
-    if expected != actual:
-        return False, ("%s: expected %d pages, entry has %d"
-                       % (description, expected, actual))
-    return True, description
+    Returns (ok, message)."""
+    location = first + headers
+    for header in range(first, first + headers):
+        page = log.page(header)
+        count = u32(page, 12)
+        if verbose:
+            print("    index header page at %d lists %d pages"
+                  % (header, count))
+        for i in range(count):
+            process, slot = struct.unpack_from("<HH", page, 16 + i * 4)
+            if process not in processes:
+                return False, ("location %d: index page for memory process "
+                               "%d, which is not in the tables"
+                               % (header, process))
+            if slot != DIRECTORY_SLOT and slot >= INDEX_ENTRIES_PER_PAGE:
+                return False, ("location %d: index page for slot %d"
+                               % (header, slot))
+            index = log.page(location)
+            for entry in struct.unpack_from("<%dI" % INDEX_ENTRIES_PER_PAGE,
+                                            index):
+                if entry >= log.page_count:
+                    return False, ("location %d: index page names log page "
+                                   "%d, past the log" % (location, entry))
+            if verbose:
+                print("      %s of memory process %d at %d"
+                      % ("directory" if slot == DIRECTORY_SLOT
+                         else "leaf %d" % slot, process, location))
+            location += 1
+    return True, None
 
 
 def check_shared(log, first, last, verbose):

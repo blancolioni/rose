@@ -11,7 +11,12 @@ with Rose.Interfaces.Checkpoints.Memory_Restore.Client;
 with Rose.Interfaces.Storage.Region.Client;
 with Rose.Interfaces.Checkpoints.Storage_Checkpoint.Client;
 
+with Restore.Entries;
+
 package body Restore.Checkpoints is
+
+   package Entries renames Standard.Restore.Entries;
+   --  The procedure Restore hides the package of the same name here.
 
    use System.Storage_Elements;
    use Rose.Interfaces.Checkpoints.Log_Reader.Client;
@@ -30,8 +35,6 @@ package body Restore.Checkpoints is
    Store_Header  : Rose.Checkpoints.Store_Table_Header
      with Import, Address => Page'Address;
    Region_Table  : Rose.Checkpoints.Region_Page
-     with Import, Address => Page'Address;
-   Mem_Header    : Rose.Checkpoints.Mem_Table_Header
      with Import, Address => Page'Address;
    Mem_Process   : Rose.Checkpoints.Mem_Process_Record
      with Import, Address => Page'Address;
@@ -111,7 +114,7 @@ package body Restore.Checkpoints is
    Max_References  : constant := 4096;
    References      : array (1 .. Max_References) of Page_Reference;
    Reference_Count : Natural := 0;
-   --  The pages listed in the header pages of the entry being read.
+   --  The pages listed in the header pages of the batch being read.
 
    type Shared_Source is
       record
@@ -144,15 +147,14 @@ package body Restore.Checkpoints is
       return Boolean;
    --  Read page Index of the entry at Location into Page.
 
-   procedure Read_Table_Sizes
-     (Reader       : Log_Reader_Client;
-      Location     : Rose.Words.Word_64;
-      Kernel_Pages : out Natural;
-      Store_Pages  : out Natural;
-      Mem_Pages    : out Natural;
-      Success      : out Boolean);
-   --  The pages that the kernel's, storage server's and memory server's
-   --  tables take at the start of the entry at Location.
+   procedure Add_Batch_Pages
+     (Reader   : Log_Reader_Client;
+      Location : Rose.Words.Word_64;
+      First    : Positive;
+      Success  : out Boolean);
+   --  Record the pages of the batch whose first header page is page First
+   --  of the entry at Location in Sources, as the newest contents of
+   --  those pages so far.
 
    procedure Add_Entry_Pages
      (Reader   : Log_Reader_Client;
@@ -164,45 +166,23 @@ package body Restore.Checkpoints is
    procedure Fail (Message : String);
 
    ---------------------
-   -- Add_Entry_Pages --
+   -- Add_Batch_Pages --
    ---------------------
 
-   procedure Add_Entry_Pages
+   procedure Add_Batch_Pages
      (Reader   : Log_Reader_Client;
       Location : Rose.Words.Word_64;
+      First    : Positive;
       Success  : out Boolean)
    is
       use type Rose.Checkpoints.Header_Page_Flags;
-      Kernel_Pages, Store_Pages, Mem_Pages : Natural;
-      Index : Positive;
-      Has_Shared : Boolean := False;
+      Index : Positive := First;
    begin
-      Read_Table_Sizes
-        (Reader, Location, Kernel_Pages, Store_Pages, Mem_Pages, Success);
-      if not Success then
-         return;
-      end if;
       Success := False;
-
-      --  Which object each of the memory server's ids meant in this
-      --  entry.
-
-      Entry_Process_Count := 0;
-      for I in 1 .. Mem_Pages - 1 loop
-         if not Read (Reader, Location, Kernel_Pages + Store_Pages + 1 + I)
-           or else Entry_Process_Count = Max_Processes
-         then
-            return;
-         end if;
-         Entry_Process_Count := Entry_Process_Count + 1;
-         Entry_Processes (Entry_Process_Count) :=
-           (Mem_Process.Mem_Pid, Mem_Process.Oid);
-      end loop;
 
       --  The header pages, then the pages they list, in order.
 
       Reference_Count := 0;
-      Index := Kernel_Pages + Store_Pages + Mem_Pages + 1;
       loop
          if not Read (Reader, Location, Index) then
             return;
@@ -217,11 +197,8 @@ package body Restore.Checkpoints is
                Rose.Words.Word_32 (Header.Pages (I).Page));
          end loop;
          Index := Index + 1;
-         if (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page) /= 0 then
-            Has_Shared :=
-              (Header.Flags and Rose.Checkpoints.Has_Shared_Pages) /= 0;
-            exit;
-         end if;
+         exit when
+           (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
       end loop;
 
       for I in 1 .. Reference_Count loop
@@ -257,12 +234,79 @@ package body Restore.Checkpoints is
          end;
       end loop;
 
-      --  The pages of shared segments, after those pages: their header
-      --  pages, then the pages they list as saved.
+      Success := True;
+   end Add_Batch_Pages;
 
-      if Has_Shared then
+   ---------------------
+   -- Add_Entry_Pages --
+   ---------------------
+
+   procedure Add_Entry_Pages
+     (Reader   : Log_Reader_Client;
+      Location : Rose.Words.Word_64;
+      Success  : out Boolean)
+   is
+      use type Rose.Checkpoints.Header_Page_Flags;
+      use type Entries.Layout_Status;
+      use type Entries.Section_Kind;
+      Layout : Entries.Entry_Layout;
+      Status : Entries.Layout_Status;
+      Index  : Positive;
+   begin
+      Success := False;
+
+      Entries.Find_Layout (Reader, Location, Layout, Status);
+      if Status /= Entries.Found then
+         return;
+      end if;
+
+      --  Which object each of the memory server's ids meant in this
+      --  entry.
+
+      Entry_Process_Count := 0;
+      for I in 1 .. Layout.Mem_Pages - 1 loop
+         if not Read (Reader, Location, Layout.Mem_First + I)
+           or else Entry_Process_Count = Max_Processes
+         then
+            return;
+         end if;
+         Entry_Process_Count := Entry_Process_Count + 1;
+         Entry_Processes (Entry_Process_Count) :=
+           (Mem_Process.Mem_Pid, Mem_Process.Oid);
+      end loop;
+
+      --  Each batch, in order, so that a page's last copy wins. Index
+      --  sections are skipped: a restore reads pages from the batches.
+
+      Index := Layout.Batch_First;
+      while Index < Layout.Mem_First loop
+         declare
+            Kind  : Entries.Section_Kind;
+            Size  : Natural;
+            Added : Boolean;
+         begin
+            Entries.Section_Size
+              (Reader, Location, Index, Layout.Mem_First - 1, Kind, Size,
+               Status);
+            if Status /= Entries.Found then
+               return;
+            end if;
+            if Kind = Entries.Memory_Batch then
+               Add_Batch_Pages (Reader, Location, Index, Added);
+               if not Added then
+                  return;
+               end if;
+            end if;
+            Index := Index + Size;
+         end;
+      end loop;
+
+      --  The pages of shared segments, after the memory server's tables:
+      --  their header pages, then the pages they list as saved.
+
+      if Layout.Has_Shared then
          Shared_Reference_Count := 0;
-         Index := Index + Reference_Count;
+         Index := Layout.Shared_First;
          loop
             if not Read (Reader, Location, Index)
               or else Shared_Header.Magic
@@ -440,48 +484,6 @@ package body Restore.Checkpoints is
       return not Has_Error;
    end Read;
 
-   ----------------------
-   -- Read_Table_Sizes --
-   ----------------------
-
-   procedure Read_Table_Sizes
-     (Reader       : Log_Reader_Client;
-      Location     : Rose.Words.Word_64;
-      Kernel_Pages : out Natural;
-      Store_Pages  : out Natural;
-      Mem_Pages    : out Natural;
-      Success      : out Boolean)
-   is
-   begin
-      Kernel_Pages := 0;
-      Store_Pages := 0;
-      Mem_Pages := 0;
-      Success := False;
-
-      if not Read (Reader, Location, 1)
-        or else Kernel_Header.Magic /= Rose.Checkpoints.Kernel_Table_Magic
-      then
-         return;
-      end if;
-      Kernel_Pages := Natural (Kernel_Header.Page_Count);
-
-      if not Read (Reader, Location, Kernel_Pages + 1)
-        or else Store_Header.Magic /= Rose.Checkpoints.Store_Table_Magic
-      then
-         return;
-      end if;
-      Store_Pages := Natural (Store_Header.Page_Count);
-
-      if not Read (Reader, Location, Kernel_Pages + Store_Pages + 1)
-        or else Mem_Header.Magic /= Rose.Checkpoints.Mem_Table_Magic
-      then
-         return;
-      end if;
-      Mem_Pages := Natural (Mem_Header.Page_Count);
-
-      Success := True;
-   end Read_Table_Sizes;
-
    -------------
    -- Restore --
    -------------
@@ -493,12 +495,14 @@ package body Restore.Checkpoints is
    is
       use Rose.Interfaces.Checkpoints.Memory_Restore.Client;
       use Rose.Interfaces.Checkpoints.Storage_Checkpoint.Client;
+      use type Entries.Layout_Status;
       Reader          : Log_Reader_Client;
       Store           : Storage_Checkpoint_Client;
       Mem             : Memory_Restore_Client;
+      Layout          : Entries.Entry_Layout;
+      Status          : Entries.Layout_Status;
       Kernel_Pages    : Natural;
       Store_Pages     : Natural;
-      Mem_Pages       : Natural;
       Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array;
       Interrupt_Count : Natural;
       Process_Count   : Natural;
@@ -519,14 +523,14 @@ package body Restore.Checkpoints is
 
       Rose.System_Calls.Use_Buffer (Page'Address, Page'Length);
 
-      Read_Table_Sizes
-        (Reader, Checkpoint, Kernel_Pages, Store_Pages, Mem_Pages, Success);
-      if not Success then
+      Entries.Find_Layout (Reader, Checkpoint, Layout, Status);
+      if Status /= Entries.Found then
          Fail ("cannot read the checkpoint's tables");
          Rose.System_Calls.Use_Buffer (System.Null_Address, 0);
          return;
       end if;
-      Success := False;
+      Kernel_Pages := Layout.Kernel_Pages;
+      Store_Pages := Layout.Store_Pages;
 
       --  The kernel's header page lists the processes and interrupts.
 
@@ -695,9 +699,8 @@ package body Restore.Checkpoints is
 
       --  The memory server's processes and their segments.
 
-      for I in 1 .. Mem_Pages - 1 loop
-         if not Read (Reader, Checkpoint, Kernel_Pages + Store_Pages + 1 + I)
-         then
+      for I in 1 .. Layout.Mem_Pages - 1 loop
+         if not Read (Reader, Checkpoint, Layout.Mem_First + I) then
             Fail ("cannot read a memory process record");
             return;
          end if;
