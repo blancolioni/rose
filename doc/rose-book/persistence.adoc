@@ -36,8 +36,15 @@ The low 56 bits are the page; the top byte marks the id as a page object's.
 A region's ids are new, and are never used again, even after the region is released, so a page object id always means the same page (#305).
 
 A region has no space on a backing store until a page of it is written.
-At the first write to any of a block of 4 pages, `store` gives the block space on a backing store, and records where in its _map_.
-Until then, and for each page of the block that hasn't been written since, the page is _fresh_: it reads as zeroes without a read from the disk (#203).
+At a page's first write, `store` gives it a page of a backing store, and records where in its _block map_.
+Until then the page reads as zeroes, without a read from the disk (#203), and writing a page of zeroes gives its space back.
+
+The block map is on the backing stores too (ADR 0038).
+It is a tree of pages, from a page id to the device page that holds the page, of which `store` keeps a few in memory.
+Every page is copy-on-write, whether it holds data or part of the tree: once a checkpoint has been taken, a page is written to new space, not over the old.
+So the root of the tree at a checkpoint names the tree and the data as they were then, and a checkpoint writes only the pages of the tree that changed.
+Space that is freed after a checkpoint isn't used again until a later checkpoint is committed.
+Which pages of a backing store are in use is a bitmap at its start, of which there are two copies, and a checkpoint writes the copy that the last committed checkpoint didn't.
 
 === Where Memory Lives
 
@@ -116,7 +123,7 @@ An entry holds these parts, in order (`Rose.Checkpoints`):
 | Part | Contents
 | Kernel tables | A header page, with the interrupts that persistent processes handle, the next process object id, and the interfaces of the boot set that wrote it; the pages of derivation records; then, for each persistent process, a record page and the pages of its capabilities.
 A process record holds its object id, state, registers and invocation records, the processes waiting to send to it, its endpoints, and its FPU state.
-| Store tables | A header page; the regions, each with its range of page object ids and its bank; then the map, which gives the space on the backing store of each block of 4 pages that has any, and which of its pages are still fresh; then the banks, each with its parent and its limits. What a bank has been charged isn't saved: the storage server works it out again from the regions and the map.
+| Store tables | A header page, which names the root of the block map and the copy of the free bitmap that the checkpoint wrote, on the backing stores; the regions, each with its range of page object ids, how many of its pages have space, and its bank; then the banks, each with its parent and its limits. What a bank has been charged isn't saved: the storage server works it out again from the regions.
 | Memory batches | One or more batches.
 A batch is header pages that list the dirty pages that follow, each named by `mem`'s id for the process and its virtual page, then the pages themselves, in the order the header pages list them.
 | Index sections | None yet.

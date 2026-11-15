@@ -8,9 +8,11 @@ OBJECTS= \
 	$(BUILDDIR)/store-driver.o \
 	$(BUILDDIR)/store-server.o \
 	$(BUILDDIR)/store-devices.o \
+	$(BUILDDIR)/store-device_pages.o \
+	$(BUILDDIR)/store-page_bitmaps.o \
+	$(BUILDDIR)/store-page_trees.o \
 	$(BUILDDIR)/rose.o \
 	$(BUILDDIR)/rose-addresses.o \
-	$(BUILDDIR)/rose-allocators.o \
 	$(BUILDDIR)/rose-checkpoints.o \
 	$(BUILDDIR)/rose-capabilities.o \
 	$(BUILDDIR)/rose-console_io.o \

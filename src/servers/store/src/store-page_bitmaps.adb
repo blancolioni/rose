@@ -15,13 +15,18 @@ package body Store.Page_Bitmaps is
 
    All_Ones : constant Rose.Words.Word_64 := Rose.Words.Word_64'Last;
 
-   In_Use  : Bit_Array := (others => All_Ones);
-   Born    : Bit_Array := (others => 0);
-   Held    : Bit_Array := (others => 0);
-   Waiting : Bit_Array := (others => 0);
+   In_Use  : Bit_Array;
+   Born    : Bit_Array;
+   Held    : Bit_Array;
+   Waiting : Bit_Array;
    --  Born: allocated since the last checkpoint.  Held: freed since the
    --  last checkpoint, and not born.  Waiting: freed before it, until a
-   --  checkpoint is committed.  Held and waiting pages are in use.
+   --  checkpoint is committed.  Held and waiting pages are in use.  They
+   --  have no initial values, so that they take no space in the store's
+   --  image; Reset gives them their values.
+
+   Free_Pages : Natural := 0;
+   --  The pages that aren't in use.
 
    type Dirty_Array is array (Copy_Index, Image_Page_Index) of Boolean;
 
@@ -40,6 +45,9 @@ package body Store.Page_Bitmaps is
      (Page : Device_Page)
       return Rose.Words.Word_64;
    --  Page's bit in its word.
+
+   function Bit_Count (Bits : Rose.Words.Word_64) return Natural;
+   --  How many bits of Bits are set.
 
    procedure Changed (Word : Bit_Word);
    --  The image has changed in Word.
@@ -68,9 +76,12 @@ package body Store.Page_Bitmaps is
       end if;
 
       for Page in First .. Bound - 1 loop
-         if Is_Page (Page) then
+         if Is_Page (Page)
+           and then (In_Use (Word_Of (Page)) and Bit_Of (Page)) /= 0
+         then
             In_Use (Word_Of (Page)) :=
               In_Use (Word_Of (Page)) and not Bit_Of (Page);
+            Free_Pages := Free_Pages + 1;
             Changed (Word_Of (Page));
          end if;
       end loop;
@@ -99,6 +110,7 @@ package body Store.Page_Bitmaps is
                Bit := Shift_Left (1, Bit_Index);
                In_Use (Word) := In_Use (Word) or Bit;
                Born (Word) := Born (Word) or Bit;
+               Free_Pages := Free_Pages - 1;
                Changed (Word);
                Cursor := Word;
                Page := Device_Page (Word * 64 + Bit_Index);
@@ -120,6 +132,21 @@ package body Store.Page_Bitmaps is
      (Page : Device_Page)
       return Rose.Words.Word_64
    is (Shift_Left (1, Natural (Page mod 64)));
+
+   ---------------
+   -- Bit_Count --
+   ---------------
+
+   function Bit_Count (Bits : Rose.Words.Word_64) return Natural is
+      Rest  : Rose.Words.Word_64 := Bits;
+      Count : Natural := 0;
+   begin
+      while Rest /= 0 loop
+         Rest := Rest and (Rest - 1);
+         Count := Count + 1;
+      end loop;
+      return Count;
+   end Bit_Count;
 
    -------------
    -- Changed --
@@ -163,6 +190,7 @@ package body Store.Page_Bitmaps is
       for Word in Bit_Word loop
          if Waiting (Word) /= 0 then
             In_Use (Word) := In_Use (Word) and not Waiting (Word);
+            Free_Pages := Free_Pages + Bit_Count (Waiting (Word));
             Waiting (Word) := 0;
          end if;
       end loop;
@@ -198,6 +226,7 @@ package body Store.Page_Bitmaps is
          if (Born (Word) and Bit) /= 0 then
             In_Use (Word) := In_Use (Word) and not Bit;
             Born (Word) := Born (Word) and not Bit;
+            Free_Pages := Free_Pages + 1;
             Changed (Word);
          else
             Held (Word) := Held (Word) or Bit;
@@ -209,21 +238,7 @@ package body Store.Page_Bitmaps is
    -- Free_Count --
    ----------------
 
-   function Free_Count return Natural is
-      Count : Natural := 0;
-   begin
-      for Bits of In_Use loop
-         declare
-            Free_Bits : Rose.Words.Word_64 := not Bits;
-         begin
-            while Free_Bits /= 0 loop
-               Free_Bits := Free_Bits and (Free_Bits - 1);
-               Count := Count + 1;
-            end loop;
-         end;
-      end loop;
-      return Count;
-   end Free_Count;
+   function Free_Count return Natural is (Free_Pages);
 
    ---------------
    -- Get_Image --
@@ -309,6 +324,9 @@ package body Store.Page_Bitmaps is
       First : constant Bit_Word := (Index - 1) * Words_Per_Image_Page;
    begin
       for I in Data'Range loop
+         Free_Pages := Free_Pages
+           - Bit_Count (not In_Use (First + Natural (I)))
+           + Bit_Count (not Data (I));
          In_Use (First + Natural (I)) := Data (I);
          Born (First + Natural (I)) := 0;
          Held (First + Natural (I)) := 0;
@@ -317,7 +335,8 @@ package body Store.Page_Bitmaps is
 
       --  Page 0 stands for no page, so it is always in use.
 
-      if Index = 1 then
+      if Index = 1 and then (In_Use (0) and 1) = 0 then
+         Free_Pages := Free_Pages - 1;
          In_Use (0) := In_Use (0) or 1;
       end if;
 
@@ -337,6 +356,7 @@ package body Store.Page_Bitmaps is
       Born := (others => 0);
       Held := (others => 0);
       Waiting := (others => 0);
+      Free_Pages := 0;
       Dirty := (others => (others => True));
       Committed_Copy := 1;
       Pending := False;
