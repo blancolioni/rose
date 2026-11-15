@@ -47,19 +47,46 @@ package body Restore.Entries is
       Layout := (others => <>);
       Layout.Page_Count := Page_Count (Reader, Location);
 
-      if Layout.Page_Count = 0
-        or else not Read (Reader, Location, 1)
-        or else Kernel_Header.Magic /= Rose.Checkpoints.Kernel_Table_Magic
-      then
-         Status := No_Kernel_Tables;
-         return;
-      end if;
+      --  Batches paged out between checkpoints, up to the kernel's
+      --  tables (ADR 0028, section 4).
 
+      Index := 1;
+      loop
+         if Index > Layout.Page_Count
+           or else not Read (Reader, Location, Index)
+         then
+            Status := No_Kernel_Tables;
+            return;
+         end if;
+
+         exit when Kernel_Header.Magic = Rose.Checkpoints.Kernel_Table_Magic;
+
+         declare
+            Kind : Section_Kind;
+            Size : Natural;
+         begin
+            Section_Size
+              (Reader, Location, Index, Layout.Page_Count, Kind, Size,
+               Status);
+            if Status /= Found then
+               return;
+            end if;
+            if Kind /= Memory_Batch then
+               Status := Bad_Section;
+               return;
+            end if;
+            Index := Index + Size;
+         end;
+      end loop;
+
+      Layout.Kernel_First := Index;
       Layout.Kernel_Pages := Natural (Kernel_Header.Page_Count);
 
       if Layout.Kernel_Pages = 0
-        or else Layout.Kernel_Pages >= Layout.Page_Count
-        or else not Read (Reader, Location, Layout.Kernel_Pages + 1)
+        or else Layout.Kernel_First + Layout.Kernel_Pages - 1
+          >= Layout.Page_Count
+        or else not Read
+          (Reader, Location, Layout.Kernel_First + Layout.Kernel_Pages)
         or else Store_Header.Magic /= Rose.Checkpoints.Store_Table_Magic
       then
          Status := No_Store_Tables;
@@ -68,14 +95,15 @@ package body Restore.Entries is
 
       Layout.Store_Pages := Natural (Store_Header.Page_Count);
 
+      Layout.Batch_First :=
+        Layout.Kernel_First + Layout.Kernel_Pages + Layout.Store_Pages;
+
       if Layout.Store_Pages = 0
-        or else Layout.Kernel_Pages + Layout.Store_Pages >= Layout.Page_Count
+        or else Layout.Batch_First > Layout.Page_Count
       then
          Status := No_Store_Tables;
          return;
       end if;
-
-      Layout.Batch_First := Layout.Kernel_Pages + Layout.Store_Pages + 1;
 
       --  The batches and index sections, up to the memory server's
       --  tables.

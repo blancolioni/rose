@@ -26,6 +26,27 @@ package body Init.Boot_Steps is
    --  512-byte blocks, tell it so with Partition_Setup, and return its
    --  block device interface, which has blocks of Block_Size bytes.
 
+   ----------------------
+   -- Connect_Page_Log --
+   ----------------------
+
+   procedure Connect_Page_Log is
+      use Rose.Capabilities;
+   begin
+      if Init.Boot.Mem_Set_Page_Log_Cap = Null_Capability
+        or else Init.Boot.Page_Log_Cap = Null_Capability
+      then
+         Init.Calls.Send_String
+           (Init.Boot.Console_Stream_Cap,
+            "init: mem has no Page_Log" & NL);
+         return;
+      end if;
+
+      Init.Calls.Send_Cap
+        (Init.Boot.Mem_Set_Page_Log_Cap, Init.Boot.Page_Log_Cap,
+         Data => (1 .. 0 => 0));
+   end Connect_Page_Log;
+
    ---------------------------
    -- Connect_Process_Banks --
    ---------------------------

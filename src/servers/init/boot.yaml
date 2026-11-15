@@ -142,6 +142,7 @@ stages:
         mem: Processes.Memory.Memory_Interface
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint
         mem_set_process_banks: Processes.Memory.Set_Process_Banks_Endpoint
+        mem_set_page_log: Processes.Memory.Set_Page_Log_Endpoint
         memory_restore: Checkpoints.Memory_Restore.Memory_Restore_Interface
         mem_replace_process: Processes.Replacer.Replacer_Interface
 
@@ -257,6 +258,13 @@ stages:
         append_to_log: Checkpoints.Kernel_Log.Append_Endpoint
         log_reader: Checkpoints.Log_Reader.Log_Reader_Interface
         log_reset: Checkpoints.State.Reset_Endpoint
+        # For mem, to append to the open entry and read pages back (ADR
+        # 0028).
+        page_log: Checkpoints.Page_Log.Page_Log_Interface
+
+    # Mem is launched before the log server, so it is given the log's
+    # Page_Log once the log server is running, on every boot.
+    - call: Connect_Page_Log
 
     # In the order Restore.Start takes them.  Only restore-install has
     # the last nine: five to install from the install media, start a new

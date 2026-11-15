@@ -8,4 +8,11 @@ interface Checkpoints.Checkpointer is
    --  or 0 if there was no checkpoint, because the kernel could not take
    --  its snapshot.
 
+   procedure Request_Checkpoint;
+   --  Take a checkpoint now. The memory server sends this without
+   --  waiting when its table of changes fills (ADR 0028, section 6),
+   --  since the checkpoint needs the memory server. If the checkpoint
+   --  server is busy, the send fails with Request_Would_Block, and a
+   --  checkpoint is being taken anyway.
+
 end Checkpoints.Checkpointer;

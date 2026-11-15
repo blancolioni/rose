@@ -104,11 +104,13 @@ package body Restore.Checkpoint_Log is
      (Reader       : Log_Reader_Client;
       Location     : Rose.Words.Word_64;
       Pages        : Natural;
+      First        : Positive;
       Kernel_Pages : out Natural)
       return Boolean;
-   --  Check the kernel's tables at the start of the entry at Location,
-   --  which has Pages pages, and set Kernel_Pages to the number of pages
-   --  they take.
+   --  Check the kernel's tables, which start at page First of the entry
+   --  at Location, which has Pages pages, and set Kernel_Pages to the
+   --  number of pages they take.  An entry that this boot set can't read
+   --  is refused here (Refuse_Version, Refuse_Interfaces).
 
    function Check_Store_Tables
      (Reader      : Log_Reader_Client;
@@ -166,25 +168,102 @@ package body Restore.Checkpoint_Log is
       Mem_Pages    : Natural;
       Layout       : Restore.Entries.Entry_Layout;
       Status       : Restore.Entries.Layout_Status;
-      Index        : Positive;
       Header_Pages : Natural := 0;
       Saved        : Natural := 0;
+
+      function Check_Batches (First : Positive; Last : Natural) return Boolean;
+      --  Check that every page that the batches from page First to page
+      --  Last list belongs to a process in the memory server's tables.
+      --  Find_Layout has already checked that the batches and index
+      --  sections fill those pages.
+
+      -------------------
+      -- Check_Batches --
+      -------------------
+
+      function Check_Batches (First : Positive; Last : Natural) return Boolean
+      is
+         Index : Positive := First;
+      begin
+         while Index <= Last loop
+            declare
+               Kind : Restore.Entries.Section_Kind;
+               Size : Natural;
+               Next : Positive := Index;
+            begin
+               Restore.Entries.Section_Size
+                 (Reader, Location, Index, Last, Kind, Size, Status);
+               if Status /= Restore.Entries.Found then
+                  Report_Layout (Location, Status);
+                  return False;
+               end if;
+
+               if Kind = Restore.Entries.Memory_Batch then
+                  loop
+                     Read_Page (Reader, Location, Next, Page);
+                     if Has_Error then
+                        Report_Bad_Entry
+                          (Location, "expected a checkpoint header page");
+                        return False;
+                     end if;
+
+                     for I in 1 .. Header.Count loop
+                        if not Is_Mem_Process
+                          (Rose.Words.Word_32 (Header.Pages (I).Process))
+                        then
+                           Report_Bad_Entry
+                             (Location,
+                              "a page belongs to an unknown process");
+                           return False;
+                        end if;
+                     end loop;
+
+                     Next := Next + 1;
+                     exit when
+                       (Header.Flags
+                        and Rose.Checkpoints.Is_Last_Header_Page) /= 0;
+                  end loop;
+               end if;
+
+               Index := Index + Size;
+            end;
+         end loop;
+         return True;
+      end Check_Batches;
+
    begin
-      if not Check_Kernel_Tables (Reader, Location, Pages, Kernel_Pages)
-        or else not Check_Store_Tables
-          (Reader, Location, Pages, Kernel_Pages + 1, Store_Pages)
+      --  Batches paged out between checkpoints come before the kernel's
+      --  tables, and the memory server's tables after its pages (ADR
+      --  0028), so finding the tables means skipping batches and index
+      --  sections.
+
+      Restore.Entries.Find_Layout (Reader, Location, Layout, Status);
+
+      if Layout.Kernel_Pages = 0 then
+         Report_Layout (Location, Status);
+         return False;
+      end if;
+
+      --  The kernel's tables are checked even if the rest of the entry
+      --  isn't readable, since that is where an entry written by a newer
+      --  boot set is refused.
+
+      if not Check_Kernel_Tables
+        (Reader, Location, Pages, Layout.Kernel_First, Kernel_Pages)
       then
          return False;
       end if;
 
-      --  The memory server's tables come after its pages (ADR 0028), so
-      --  finding them means skipping the batches and index sections.
-
-      Restore.Entries.Find_Layout (Reader, Location, Layout, Status);
-
       if Status not in Restore.Entries.Found | Restore.Entries.Other_Version
       then
          Report_Layout (Location, Status);
+         return False;
+      end if;
+
+      if not Check_Store_Tables
+        (Reader, Location, Pages, Layout.Kernel_First + Kernel_Pages,
+         Store_Pages)
+      then
          return False;
       end if;
 
@@ -202,53 +281,14 @@ package body Restore.Checkpoint_Log is
       end if;
 
       --  Every page that a batch lists belongs to a process in the memory
-      --  server's tables. Find_Layout has already checked that the
-      --  batches and index sections fill the pages up to those tables.
+      --  server's tables: the batches before the kernel's tables, and
+      --  those after the storage server's.
 
-      Index := Layout.Batch_First;
-      while Index < Layout.Mem_First loop
-         declare
-            Kind : Restore.Entries.Section_Kind;
-            Size : Natural;
-            Next : Positive := Index;
-         begin
-            Restore.Entries.Section_Size
-              (Reader, Location, Index, Layout.Mem_First - 1, Kind, Size,
-               Status);
-            if Status /= Restore.Entries.Found then
-               Report_Layout (Location, Status);
-               return False;
-            end if;
-
-            if Kind = Restore.Entries.Memory_Batch then
-               loop
-                  Read_Page (Reader, Location, Next, Page);
-                  if Has_Error then
-                     Report_Bad_Entry
-                       (Location, "expected a checkpoint header page");
-                     return False;
-                  end if;
-
-                  for I in 1 .. Header.Count loop
-                     if not Is_Mem_Process
-                       (Rose.Words.Word_32 (Header.Pages (I).Process))
-                     then
-                        Report_Bad_Entry
-                          (Location, "a page belongs to an unknown process");
-                        return False;
-                     end if;
-                  end loop;
-
-                  Next := Next + 1;
-                  exit when
-                    (Header.Flags and Rose.Checkpoints.Is_Last_Header_Page)
-                    /= 0;
-               end loop;
-            end if;
-
-            Index := Index + Size;
-         end;
-      end loop;
+      if not Check_Batches (1, Layout.Kernel_First - 1)
+        or else not Check_Batches (Layout.Batch_First, Layout.Mem_First - 1)
+      then
+         return False;
+      end if;
 
       --  Then the shared header pages, after the memory server's tables,
       --  and then the pages that they list as saved (ADR 0025).
@@ -317,11 +357,12 @@ package body Restore.Checkpoint_Log is
      (Reader       : Log_Reader_Client;
       Location     : Rose.Words.Word_64;
       Pages        : Natural;
+      First        : Positive;
       Kernel_Pages : out Natural)
       return Boolean
    is
       Process_Count : Natural;
-      Index         : Positive := 2;
+      Index         : Positive := First + 1;
    begin
       Kernel_Pages := 0;
 
@@ -330,7 +371,7 @@ package body Restore.Checkpoint_Log is
          return False;
       end if;
 
-      Read_Page (Reader, Location, 1, Page);
+      Read_Page (Reader, Location, First, Page);
 
       if Has_Error
         or else Kernel_Header.Magic /= Rose.Checkpoints.Kernel_Table_Magic
@@ -377,9 +418,9 @@ package body Restore.Checkpoint_Log is
          return False;
       end if;
 
-      Index := 2 + Natural (Kernel_Header.Record_Page_Count);
+      Index := First + 1 + Natural (Kernel_Header.Record_Page_Count);
 
-      if Kernel_Pages = 0 or else Kernel_Pages > Pages then
+      if Kernel_Pages = 0 or else First + Kernel_Pages - 1 > Pages then
          Report_Bad_Entry (Location, "kernel tables run past the entry");
          return False;
       end if;
@@ -390,7 +431,7 @@ package body Restore.Checkpoint_Log is
       end if;
 
       for I in 1 .. Process_Count loop
-         if Index > Kernel_Pages then
+         if Index > First + Kernel_Pages - 1 then
             Report_Bad_Entry (Location, "process records run past the "
                               & "kernel tables");
             return False;
@@ -420,7 +461,7 @@ package body Restore.Checkpoint_Log is
          Index := Index + 1 + Natural (Process.Cap_Page_Count);
       end loop;
 
-      if Index /= Kernel_Pages + 1 then
+      if Index /= First + Kernel_Pages then
          Report_Bad_Entry (Location, "kernel tables page count is wrong");
          return False;
       end if;

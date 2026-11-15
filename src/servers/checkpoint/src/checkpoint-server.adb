@@ -47,6 +47,11 @@ package body Checkpoint.Server is
       return Natural;
    --  Checkpointer.Take_Checkpoint (#413).
 
+   procedure Request_Checkpoint
+     (Id : Rose.Objects.Capability_Identifier);
+   --  Checkpointer.Request_Checkpoint, which the memory server sends
+   --  without waiting (ADR 0028, section 6).
+
    function Checkpoint return Boolean;
    --  Take a checkpoint: False if the kernel could not take its snapshot,
    --  and there is none.
@@ -154,8 +159,9 @@ package body Checkpoint.Server is
         (Server_Context => Server_Context,
          On_Timeout     => On_Timeout'Access);
       Rose.Interfaces.Checkpoints.Checkpointer.Server.Attach_Interface
-        (Server_Context  => Server_Context,
-         Take_Checkpoint => Take_Checkpoint'Access);
+        (Server_Context     => Server_Context,
+         Take_Checkpoint    => Take_Checkpoint'Access,
+         Request_Checkpoint => Request_Checkpoint'Access);
 
       Timeout_Cap :=
         Rose.Interfaces.Time.Timer.Client.Set_Timer
@@ -200,8 +206,14 @@ package body Checkpoint.Server is
    procedure Execute_Checkpoint is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
+      --  The memory server appends to the log through its own Page_Log,
+      --  and keeps this cap, to ask for a checkpoint when its table of
+      --  changes fills (ADR 0028, section 6).
       Rose.System_Calls.Initialize_Send (Params, Memory_Checkpoint_Cap);
-      Rose.System_Calls.Send_Cap (Params, Append_Log_Cap);
+      Rose.System_Calls.Send_Cap
+        (Params,
+         Rose.Interfaces.Checkpoints.Checkpointer.Server
+           .Get_Request_Checkpoint_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end Execute_Checkpoint;
 
@@ -238,6 +250,20 @@ package body Checkpoint.Server is
            Cap          => Rose.Interfaces.Time.Timeout.Server
              .Get_On_Timeout_Cap);
    end On_Timeout;
+
+   ------------------------
+   -- Request_Checkpoint --
+   ------------------------
+
+   procedure Request_Checkpoint
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      pragma Unreferenced (Id);
+      Taken : Boolean with Unreferenced;
+   begin
+      --  There's no reply: the memory server didn't wait for one.
+      Taken := Checkpoint;
+   end Request_Checkpoint;
 
    ------------------
    -- Start_Server --
