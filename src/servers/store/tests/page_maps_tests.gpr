@@ -1,0 +1,55 @@
+project Page_Maps_Tests is
+
+   --  The tests of the store's block map and free map (ADR 0038, #504),
+   --  built and run on the host with its own GNAT and run-time system:
+   --
+   --     gprbuild -P page_maps_tests.gpr && ./build/test_page_maps
+   --
+   --  or "make test-store" at the top.  The store's packages are
+   --  compiled with the store's own warnings and style checks.
+
+   for Source_Dirs use
+     (".",
+      "../src",
+      "../../../base",
+      "../../../library/capabilities");
+
+   for Source_Files use
+     ("test_page_maps.adb",
+      "test_device.ads",
+      "test_device.adb",
+      "test_space.ads",
+      "test_tree.ads",
+      "rose.ads",
+      "rose-words.ads",
+      "rose-capabilities.ads",
+      "store.ads",
+      "store-device_pages.ads",
+      "store-page_bitmaps.ads",
+      "store-page_bitmaps.adb",
+      "store-page_trees.ads",
+      "store-page_trees.adb");
+
+   for Object_Dir use "build";
+   for Exec_Dir use "build";
+   for Main use ("test_page_maps.adb");
+
+   Store_Switches :=
+     ("-g", "-gnat2020", "-gnata", "-gnato", "-gnatVa",
+      "-gnatw.f.h.welc.cfkm.mop.pq.tuv.vwx.xy.a.bg",
+      "-gnatyM79abcefhiklnoprst");
+
+   Test_Switches :=
+     ("-g", "-gnat2020", "-gnata", "-gnato", "-gnatwa", "-gnatwJ",
+      "-gnatyM79abcefhiklnprt");
+
+   package Compiler is
+      for Default_Switches ("ada") use Store_Switches;
+      for Switches ("test_page_maps.adb") use Test_Switches;
+      for Switches ("test_device.ads") use Test_Switches;
+      for Switches ("test_device.adb") use Test_Switches;
+      for Switches ("test_space.ads") use Test_Switches;
+      for Switches ("test_tree.ads") use Test_Switches;
+   end Compiler;
+
+end Page_Maps_Tests;

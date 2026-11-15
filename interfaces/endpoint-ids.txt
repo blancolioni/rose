@@ -176,6 +176,7 @@
 16#ACA7_F019_F72A_43BC#  rose.interfaces.storage.block_array.get_parameters(out rose.interfaces.storage.block_array.block_address_type; out rose.interfaces.storage.block_array.block_size_type)
 16#997E_FD91_A146_F750#  rose.interfaces.storage.block_array.read_blocks(in rose.interfaces.storage.block_array.block_address_type; in natural; out storage_array)
 16#E465_0CF0_82DC_F17B#  rose.interfaces.storage.block_array.write_blocks(in rose.interfaces.storage.block_array.block_address_type; in natural; in storage_array)
+16#37DF_C8E1_060E_E4F9#  rose.interfaces.storage.block_array.flush
 16#AB32_D7D4_1A5D_D977#  interface rose.interfaces.storage.dependent
 16#8F84_824F_7430_F665#  rose.interfaces.storage.dependent.destroyed return boolean
 16#7120_91CB_661F_02C2#  interface rose.interfaces.storage.partition_setup

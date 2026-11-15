@@ -107,6 +107,9 @@ jobs:
       - name: Test the drawing library
         run: make test-drawing
 
+      - name: Test the store's block map and free map
+        run: make test-store
+
       - name: Build
         run: ./clean-build.sh
 

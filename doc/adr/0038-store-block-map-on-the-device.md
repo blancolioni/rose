@@ -1,8 +1,8 @@
 # 38. The store's block map on the device, as a copy-on-write tree
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-15
-- **Related:** #504 (this decision), #305 (blocks on first write, PR #501), #505 (flushing the disk's write cache), #935 (a stable storage format for 0.4.0), [ADR 0008](0008-install-boot-and-pager-path.md) (every hard-disk boot is a restore), [ADR 0014](0014-banks.md) (banks), [ADR 0025](0025-shared-regions.md) (shared pages written back), [ADR 0028](0028-paging-to-the-log.md) (paging to the log)
+- **Related:** #504 (this decision, implemented in PRs #956, #957 and #958), #305 (blocks on first write, PR #501), #505 (flushing the disk's write cache), #935 (a stable storage format for 0.4.0), [ADR 0008](0008-install-boot-and-pager-path.md) (every hard-disk boot is a restore), [ADR 0014](0014-banks.md) (banks), [ADR 0025](0025-shared-regions.md) (shared pages written back), [ADR 0028](0028-paging-to-the-log.md) (paging to the log)
 
 ## Context
 
@@ -55,7 +55,7 @@ A program image is written once, and shared pages are written back rarely, so fe
 ### 4. The free map is two fixed bitmaps on each backing store
 
 - **The first pages of each backing store hold two copies of its free map,** a bit a page: a page of bitmap for each 128 MiB of device. They are allocated when the backing store is added, and never given out.
-- **Checkpoints write the copies in turn,** by the parity of the generation. A checkpoint writes only the bitmap pages that changed since that copy was last written, two generations before.
+- **A checkpoint writes the copy that the last committed checkpoint didn't,** so the copy that a restore needs is never overwritten. While checkpoints are committed, the copies take turns. A checkpoint that isn't committed leaves the next one to write the same copy again, not the committed checkpoint's, which choosing by the parity of the generation would. The table in the log names the copy. A checkpoint writes only the bitmap pages that changed since that copy was last written.
 - **A restore reads the copy that its checkpoint names,** and the root of the tree. It doesn't walk the tree to find the space in use. On a hard-disk boot, which is always a restore (ADR 0008), the time a restore takes doesn't grow with how much has been written.
 
 A bitmap at a fixed place takes no space from itself, so writing it can't change it. A copy-on-write tree for the free map would need space for its new pages, and so change itself while it is being written.
@@ -85,7 +85,7 @@ Amended by #504: this section first had the checkpoint server call `Committed` a
 - **A checkpoint writes only the pages that changed,** bottom up, with the root last.
 - **When the cache is full of changed pages,** the store writes changed leaves early, to the space that section 3 gives them. The last committed root doesn't name that space, so this is safe. A full cache costs writes, but nothing waits for it.
 
-The hash table and its buckets go, which frees about as much memory as the cache and the bitmaps of section 5 take. The store's memory stays about the same, but it no longer limits how much can be written.
+The hash table and its buckets go, but the cache and the four bitmaps of the free map (sections 4 and 5) take more: the store's bss went from 651 KB to 983 KB in #504. Its memory no longer grows with how much is written, and no longer limits it.
 
 ### 8. What a checkpoint writes, and in what order
 

@@ -142,6 +142,10 @@ package body Log.Server is
    --  generation of the log.
 
    procedure Fail_Entry (Message : String);
+
+   procedure Sync_Devices;
+   --  Return when everything written to the log devices is on the medium,
+   --  and not only in a disk's write cache (#505).
    --  Report Message, and leave the current entry out of the log.
 
    procedure Notify_Store_Committed;
@@ -427,10 +431,15 @@ package body Log.Server is
       end if;
 
       --  The entry's pages go to the disk before its header, so that a
-      --  header is only ever found with all of its pages.
+      --  header is only ever found with all of its pages.  A disk can
+      --  report a write complete while it is still in its write cache, and
+      --  write the cache in any order, so the pages are flushed to the
+      --  medium before the header is written, and the header before the
+      --  entry counts as committed (#505).
 
       if not Entry_Failed then
          Flush;
+         Sync_Devices;
       end if;
 
       if not Entry_Failed then
@@ -439,6 +448,7 @@ package body Log.Server is
          begin
             Write (Next_Log_Location, Current_Log_Header'Address, Success);
             if Success then
+               Sync_Devices;
                if First_Committed = 0 then
                   First_Committed := Next_Log_Location;
                end if;
@@ -994,6 +1004,17 @@ package body Log.Server is
    begin
       Rose.Server.Start_Server (Log_Server);
    end Start_Server;
+
+   ------------------
+   -- Sync_Devices --
+   ------------------
+
+   procedure Sync_Devices is
+   begin
+      for Device of Log_Devices (1 .. Last_Log_Device) loop
+         Rose.Interfaces.Storage.Block_Array.Client.Flush (Device.Client);
+      end loop;
+   end Sync_Devices;
 
    -----------
    -- Write --
