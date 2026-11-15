@@ -74,6 +74,10 @@ package ATA.Drives is
      (Drive : ATA_Drive)
       return Rose.Capabilities.Capability;
 
+   function Flush_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability;
+
    function Block_Size
      (Drive : ATA_Drive)
       return Rose.Devices.Block.Block_Size_Type;
@@ -124,6 +128,7 @@ private
          Get_Parameters_Cap : Rose.Capabilities.Capability := 0;
          Read_Block_Cap     : Rose.Capabilities.Capability := 0;
          Write_Block_Cap    : Rose.Capabilities.Capability := 0;
+         Flush_Cap          : Rose.Capabilities.Capability := 0;
          Interrupt_Cap      : Rose.Capabilities.Capability := 0;
       end record;
 
@@ -193,5 +198,10 @@ private
      (Drive : ATA_Drive)
       return Rose.Capabilities.Capability
    is (Drive.Write_Block_Cap);
+
+   function Flush_Cap
+     (Drive : ATA_Drive)
+      return Rose.Capabilities.Capability
+   is (Drive.Flush_Cap);
 
 end ATA.Drives;

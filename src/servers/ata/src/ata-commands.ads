@@ -11,7 +11,7 @@ package ATA.Commands is
    type ATA_Command_Type is new Rose.Words.Word_8;
    ATA_Read_Sectors   : constant ATA_Command_Type := 16#20#;
    ATA_Write_Sectors  : constant ATA_Command_Type := 16#30#;
-   ATA_Flush          : constant ATA_Command_Type := 16#37#;
+   ATA_Flush_Cache    : constant ATA_Command_Type := 16#E7#;
 
    ATA_Identify       : constant ATA_Command_Type := 16#EC#;
 
@@ -63,7 +63,10 @@ package ATA.Commands is
       Success : out Boolean);
 
    procedure Flush
-     (Drive : ATA.Drives.ATA_Drive);
+     (Drive   : ATA.Drives.ATA_Drive;
+      Success : out Boolean);
+   --  Return when the drive's write cache is on the medium (FLUSH CACHE,
+   --  #505).  An ATAPI drive has nothing to flush.
 
    function Current_Selected_Drive return ATA.Drives.ATA_Drive_Index;
 

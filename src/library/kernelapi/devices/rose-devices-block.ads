@@ -36,4 +36,7 @@ package Rose.Devices.Block is
                              Rose.Interfaces.Storage.Block_Array
                                .Write_Blocks_Endpoint;
 
+   Flush_Endpoint : constant Rose.Objects.Endpoint_Id :=
+                      Rose.Interfaces.Storage.Block_Array.Flush_Endpoint;
+
 end Rose.Devices.Block;

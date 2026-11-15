@@ -26,4 +26,9 @@ interface Storage.Block_Array is
       Count   : Natural;
       Blocks  : Storage_Array);
 
+   procedure Flush;
+   --  Return when every block written so far is on the medium, and not
+   --  only in a write cache (#505).  A block array with no write cache
+   --  returns at once.
+
 end Storage.Block_Array;

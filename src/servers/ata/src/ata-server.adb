@@ -46,7 +46,8 @@ package body ATA.Server is
      (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
-      Write_Block_Cap    : out Rose.Capabilities.Capability);
+      Write_Block_Cap    : out Rose.Capabilities.Capability;
+      Flush_Cap          : out Rose.Capabilities.Capability);
 
    -------------------
    -- Create_Server --
@@ -201,7 +202,8 @@ package body ATA.Server is
      (Interface_Id       : Rose.Words.Word;
       Get_Parameters_Cap : out Rose.Capabilities.Capability;
       Read_Block_Cap     : out Rose.Capabilities.Capability;
-      Write_Block_Cap    : out Rose.Capabilities.Capability)
+      Write_Block_Cap    : out Rose.Capabilities.Capability;
+      Flush_Cap          : out Rose.Capabilities.Capability)
    is
       Drive_Index : constant ATA.Drives.ATA_Drive_Index :=
                       ATA.Drives.ATA_Drive_Index (Interface_Id);
@@ -214,6 +216,8 @@ package body ATA.Server is
         ATA.Drives.Read_Block_Cap (Drive);
       Write_Block_Cap :=
         ATA.Drives.Write_Block_Cap (Drive);
+      Flush_Cap :=
+        ATA.Drives.Flush_Cap (Drive);
    end Get_Interface;
 
    --------------------
@@ -279,6 +283,9 @@ package body ATA.Server is
       Rose.System_Calls.Server.Create_Anonymous_Endpoint
         (Create_Endpoint_Cap,
          Rose.Interfaces.Storage.Block_Array.Write_Blocks_Endpoint);
+      Rose.System_Calls.Server.Create_Anonymous_Endpoint
+        (Create_Endpoint_Cap,
+         Rose.Interfaces.Storage.Block_Array.Flush_Endpoint);
 
       loop
          Send_Reply := True;
@@ -328,14 +335,17 @@ package body ATA.Server is
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
                   Read_Block_Cap     : Rose.Capabilities.Capability;
                   Write_Block_Cap    : Rose.Capabilities.Capability;
+                  Flush_Cap          : Rose.Capabilities.Capability;
                begin
                   Get_Interface (Rose.Words.Word (Params.Identifier),
                                  Get_Parameters_Cap,
                                  Read_Block_Cap,
-                                 Write_Block_Cap);
+                                 Write_Block_Cap,
+                                 Flush_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Read_Block_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Write_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Flush_Cap);
                end;
 
             when Rose.Interfaces.Storage.Block_Array.Get_Parameters_Endpoint =>
@@ -438,19 +448,36 @@ package body ATA.Server is
                   end loop;
                end;
 
+            when Rose.Interfaces.Storage.Block_Array.Flush_Endpoint =>
+               declare
+                  Success : Boolean;
+               begin
+                  ATA.Commands.Flush
+                    (Drive   =>
+                       ATA.Drives.Get
+                         (ATA.Drives.ATA_Drive_Index (Params.Identifier)),
+                     Success => Success);
+                  if not Success then
+                     Rose.Console_IO.Put_Line ("ata: flush failed");
+                  end if;
+               end;
+
             when Rose.Interfaces.Devices.Ata.Get_Device_Endpoint =>
                declare
                   Get_Parameters_Cap : Rose.Capabilities.Capability;
                   Read_Block_Cap     : Rose.Capabilities.Capability;
                   Write_Block_Cap    : Rose.Capabilities.Capability;
+                  Flush_Cap          : Rose.Capabilities.Capability;
                begin
                   Get_Interface (Params.Data (0),
                                  Get_Parameters_Cap,
                                  Read_Block_Cap,
-                                 Write_Block_Cap);
+                                 Write_Block_Cap,
+                                 Flush_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Get_Parameters_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Read_Block_Cap);
                   Rose.System_Calls.Send_Cap (Reply, Write_Block_Cap);
+                  Rose.System_Calls.Send_Cap (Reply, Flush_Cap);
                end;
 
             when others =>
