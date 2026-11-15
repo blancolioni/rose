@@ -1,6 +1,6 @@
 # 23. Ada.Command_Line in the userland run-time system
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-02
 - **Related:** #498 (this decision), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, the launch invocation), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (the command is the transaction), [ADR 0017](0017-loading-ada-packages.md) (loading Ada packages), blancolioni/idle (the generated main)
 

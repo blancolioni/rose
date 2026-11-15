@@ -1,6 +1,6 @@
 # 31. Updating an installation
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-09
 - **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), #824 (replacing a running persistent process), #825 (cap sets), #829 (installing the commands again), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities), #890 (updating across a release series)
 

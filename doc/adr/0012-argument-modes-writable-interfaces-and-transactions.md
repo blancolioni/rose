@@ -1,6 +1,6 @@
 # 12. Argument modes, writable interfaces and transactional commands
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 1, 4 and 5), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #345 (petal binds writable directories), Rose.Core project (#332 to #337)
 
