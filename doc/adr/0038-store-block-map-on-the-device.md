@@ -70,7 +70,13 @@ The bitmap replaces `Rose.Allocators` in the store, which only ever allocated on
 
 ### 6. The store is told when a checkpoint is committed
 
-`Checkpoints.Storage_Checkpoint` gets a procedure, `Committed`. The checkpoint server calls it after `Leave_Checkpoint`, once the log entry is committed. The store then frees the pages it held for that generation.
+`Checkpoints.Storage_Checkpoint` gets a procedure, `Committed`. The store then frees the pages it held for that generation.
+
+The log server calls it, after it has written an entry's header, and only if the entry is committed. It waits for the store's reply before it reads its next request. The log is the only server that knows whether an entry was committed: the kernel's `Leave_Checkpoint` sends `Commit` to the log without waiting for it, and the log can still leave the entry out if a write fails. Because the log waits, the store always hears of commit N before the log creates entry N + 1, and so before the store's next `Checkpoint`.
+
+The store only calls the log through the `Append_Page` cap that `Checkpoint` gives it, which has returned before the commit, so the two servers never wait for each other. The log is launched after the store, and init gives it the cap.
+
+Amended by #504: this section first had the checkpoint server call `Committed` after `Leave_Checkpoint`. It can't know when, or whether, the entry is committed.
 
 ### 7. A cache of the tree's pages
 

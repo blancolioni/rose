@@ -33,6 +33,7 @@
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset
 16#417B_75A1_17EC_9F59#  interface rose.interfaces.checkpoints.storage_checkpoint
 16#94F3_36A0_48DA_A075#  rose.interfaces.checkpoints.storage_checkpoint.checkpoint(in capability)
+16#8301_65C1_3A65_610F#  rose.interfaces.checkpoints.storage_checkpoint.committed
 16#35B9_BDC8_C169_6A9C#  rose.interfaces.checkpoints.storage_checkpoint.restore_region(in natural; in object_id; in object_id; in natural)
 16#38DD_7955_7D59_8ED5#  rose.interfaces.checkpoints.storage_checkpoint.restore_table_page(in natural; in storage_array)
 16#4FC5_8F17_2AEC_7365#  rose.interfaces.checkpoints.storage_checkpoint.find_region(in object_id; in object_id) return interface rose.interfaces.storage.region

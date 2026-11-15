@@ -200,6 +200,9 @@ stages:
         # For the checkpoint server, to add the region table to each
         # checkpoint.
         store_checkpoint: Checkpoints.Storage_Checkpoint.Checkpoint_Endpoint
+        # For the log server, to say that an entry is committed (ADR
+        # 0038, section 6).
+        store_committed: Checkpoints.Storage_Checkpoint.Committed_Endpoint
         store_restore: Checkpoints.Storage_Checkpoint.Storage_Checkpoint_Interface
         # For mem: which bank is each process's own (ADR 0015, #750).
         process_banks: Storage.Process_Banks.Process_Banks_Interface
@@ -248,7 +251,7 @@ stages:
     - launch: log
       oid: 16
       priority: log
-      caps: [console_interface, start_log, delete]
+      caps: [console_interface, start_log, delete, store_committed]
       exports:
         add_log_device: Checkpoints.Kernel_Log.Add_Log_Device_Endpoint
         append_to_log: Checkpoints.Kernel_Log.Append_Endpoint

@@ -10,6 +10,10 @@ package Log is
 
    Console_Cap         : Rose.Capabilities.Capability;
    Start_Log_Cap       : Rose.Capabilities.Capability;
+   Store_Committed_Cap : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  The store's Storage_Checkpoint.Committed, which is called after
+   --  each entry is committed (ADR 0038, section 6).
 
    Log_Page_Size : constant := 2 ** 12;
    Log_Page_Bits : constant := Log_Page_Size * 8;
