@@ -20,4 +20,9 @@ interface Checkpoints.Page_Log is
    --  Read log page Log_Page, from a committed entry or from the open
    --  one. A page that isn't in either reads as zeroes.
 
+   procedure Fail_Entry;
+   --  Leave the open entry out of the log when the checkpoint commits,
+   --  as if an append had failed. The memory server calls it when its
+   --  part of a checkpoint can't be completed.
+
 end Checkpoints.Page_Log;

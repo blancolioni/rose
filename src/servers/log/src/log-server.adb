@@ -143,6 +143,10 @@ package body Log.Server is
 
    procedure Fail_Entry (Message : String);
 
+   procedure Fail_Page_Log_Entry
+     (Id : Rose.Objects.Capability_Identifier);
+   --  Page_Log.Fail_Entry.
+
    procedure Sync_Devices;
    --  Return when everything written to the log devices is on the medium,
    --  and not only in a disk's write cache (#505).
@@ -564,7 +568,8 @@ package body Log.Server is
       Rose.Interfaces.Checkpoints.Page_Log.Server.Attach_Interface
         (Server_Context => Log_Server,
          Append_Page    => Append_Page'Access,
-         Read_Page      => Read_Log_Page'Access);
+         Read_Page      => Read_Log_Page'Access,
+         Fail_Entry     => Fail_Page_Log_Entry'Access);
 
       for Page of Page_Buffer loop
          for Element of Page loop
@@ -585,6 +590,20 @@ package body Log.Server is
          Entry_Failed := True;
       end if;
    end Fail_Entry;
+
+   -------------------------
+   -- Fail_Page_Log_Entry --
+   -------------------------
+
+   procedure Fail_Page_Log_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+   is
+      pragma Unreferenced (Id);
+   begin
+      if Writing then
+         Fail_Entry ("log: entry failed by the memory server");
+      end if;
+   end Fail_Page_Log_Entry;
 
    -----------------
    -- First_Entry --

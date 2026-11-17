@@ -391,6 +391,13 @@ package Rose.Checkpoints is
    --  A flag of Mem_Table_Header: the pages of shared segments follow the
    --  tables.
 
+   Mem_Has_Index : constant := 16#0002#;
+   --  A flag of Mem_Table_Header: each process's Index_Directory names
+   --  every page of it that the log holds (ADR 0028, section 2), so a
+   --  restore can read its pages through the index rather than from
+   --  every entry (section 9). Checkpoints from before #949 don't have
+   --  it.
+
    type Mem_Table_Header is
       record
          Magic         : Rose.Words.Word_64 := Mem_Table_Magic;

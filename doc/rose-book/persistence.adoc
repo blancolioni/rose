@@ -133,14 +133,36 @@ A process record holds its object id, state, registers and invocation records, t
 | Store tables | A header page, which names the root of the block map and the copy of the free bitmap that the checkpoint wrote, on the backing stores; the regions, each with its range of page object ids, how many of its pages have space, and its bank; then the banks, each with its parent and its limits. What a bank has been charged isn't saved: the storage server works it out again from the regions.
 | Memory batches | One or more batches.
 A batch is header pages that list the dirty pages that follow, each named by `mem`'s id for the process and its virtual page, then the pages themselves, in the order the header pages list them.
-| Index sections | None yet.
-Under ADR 0028, the pages of each process's index of its pages in the log: header pages that name the process and the place of each index page, then the index pages.
-| Memory tables | A header page, which says whether shared pages follow, then a record for each persistent process: its object id, `mem`'s own id for it, its segments, each with its region, and the log page of its index directory (0 until ADR 0028 is built).
+| Index sections | The pages of each process's index of its pages in the log (ADR 0028), that this checkpoint changed: header pages that name the process and the place of each index page, then the index pages.
+| Memory tables | A header page, which says whether shared pages follow, and whether the processes have an index, then a record for each persistent process: its object id, `mem`'s own id for it, its segments, each with its region, and the log page of its index directory, or 0 if the log has none of its pages.
 | Shared pages | If the memory tables say so: header pages that list the pages of shared segments by page object id, each saved once however many processes map it, then the pages (ADR 0025).
 A page that was written back to its region is listed as released, so that a restore uses the region's copy.
 |===
 
 `mem`'s tables come after its pages, so a reader finds them by skipping each batch and index section by the counts in its header pages (`Restore.Entries`).
+
+=== The Index
+
+Each persistent process has an index from its pages to the log pages that hold their latest copies, which is kept in the log itself (ADR 0028, section 2; `Mem.Log_Index`).
+Its shape follows the i686 page tables:
+
+* A process's _index directory_ is a page of 1,024 entries, each the log page of an _index leaf_, or 0.
+* An index leaf is a page of 1,024 entries, one for each page of 4 MiB of the process's address space: the log page of the page's latest copy, or 0 if the log has none.
+  Log page 0 is the log's header, so 0 never names a page of an entry.
+* `mem` keeps only the log page of each process's directory, and saves it in the process's record.
+
+Index pages are never changed in place.
+At each checkpoint, after its batch, `mem` writes a new copy of each leaf with a page in the batch, and a new copy of the directory of each process with a new leaf.
+A new leaf starts as a copy of the one it replaces, read from the log, so it keeps the pages that didn't change.
+The batch's pages go to consecutive log pages, so `mem` knows each page's log page from its place in the batch.
+
+If any of `mem`'s appends fails, it tells `log` to leave the entry out (`Page_Log.Fail_Entry`), and keeps the index it had.
+The pages the checkpoint would have saved stay dirty, so the next checkpoint saves them.
+
+A process that `mem` gives a slot to, when it is launched or restored, starts with no index.
+A restored process's pages are all dirty, so the first checkpoint after a restore writes a complete index for it.
+`restore` doesn't read the index yet: it still reads every entry (see <<Restore>>).
+`check-log.py` checks that each entry's index names the copies that reading every entry would find.
 
 == Restore
 
