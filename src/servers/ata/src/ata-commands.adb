@@ -461,6 +461,13 @@ package body ATA.Commands is
       LBA     : Rose.Devices.Block.Block_Address_Type;
       Command : out ATA_Command)
    is
+      use type Rose.Devices.Block.Block_Address_Type;
+
+      --  LBA28 addresses the first 2 ** 28 blocks.  A drive with LBA48
+      --  is given the rest with the commands' EXT forms (#325).
+
+      Ext : constant Boolean :=
+              ATA.Drives.Is_LBA48 (Drive) and then LBA >= 2 ** 28;
    begin
       if ATA.Drives.Is_Atapi (Drive) then
          Command := (Command        => ATAPI_Packet,
@@ -472,11 +479,16 @@ package body ATA.Commands is
                      others         => <>);
       else
          Command := (Command      =>
-                       (if not Write
-                        then ATA_Read_Sectors
-                        else ATA_Write_Sectors),
+                       (if Ext
+                        then (if Write
+                              then ATA_Write_Sectors_Ext
+                              else ATA_Read_Sectors_Ext)
+                        elsif Write
+                        then ATA_Write_Sectors
+                        else ATA_Read_Sectors),
                      Master       => ATA.Drives.Is_Master (Drive),
                      Use_LBA      => True,
+                     LBA48        => Ext,
                      Sector_Count => 1,
                      LBA          => LBA,
                      others       => <>);
@@ -519,6 +531,10 @@ package body ATA.Commands is
          return False;
       end if;
 
+      --  Send_Command writes the register again with each command,
+      --  with the command's address.  The drive is the same, so that
+      --  needs no wait.
+
       Selected_Drive := ATA.Drives.Drive_Index (Drive);
       Have_Selected_Drive := True;
 
@@ -550,30 +566,76 @@ package body ATA.Commands is
 
       declare
          use Rose.Words;
-         Data : Rose.Devices.Port_IO.Word_8_Data_Array (1 .. 6);
-      begin
-         Data (1) := (1, 0);
-         Data (2) := (2, Command.Sector_Count);
+         use type Rose.Devices.Block.Block_Address_Type;
 
-         if Command.Use_LBA then
-            declare
-               LBA_28 : constant Word_32 := Word_32 (Command.LBA);
-            begin
-               Data (3) := (3, Word_8 (LBA_28 mod 256));
-               Data (4) := (4, Word_8 (LBA_28 / 256 mod 256));
-               Data (5) := (5, Word_8 (LBA_28 / 65536 mod 256));
-            end;
+         --  The address in two halves, since the run time has no 64-bit
+         --  division.
+
+         LBA  : constant Rose.Devices.Block.Block_Address_Type :=
+                  Command.LBA;
+         Low  : constant Word_32 := Word_32 (LBA mod 2 ** 32);
+         High : constant Word_32 := Word_32 (LBA / 2 ** 32);
+         Data : Rose.Devices.Port_IO.Word_8_Data_Array (1 .. 12);
+         Last : Positive;
+
+      begin
+
+         --  The drive/head register is written with every command.  For
+         --  LBA28 its low four bits are bits 24 to 27 of the address
+         --  (#325); for LBA48 and CHS they are zero.
+
+         Data (1) :=
+           (R_Select_Drive,
+            To_Select_Drive
+              (Master  => ATA.Drives.Is_Master (Drive),
+               LBA     => True,
+               Address =>
+                 (if Command.Use_LBA and then not Command.LBA48
+                  then LBA else 0)));
+
+         if Command.LBA48 then
+
+            --  Each register takes two bytes, the high one first.
+
+            Data (2) := (R_Features, 0);
+            Data (3) := (R_Features, 0);
+            Data (4) := (R_Sector_Count, 0);
+            Data (5) := (R_Sector_Number, Word_8 (Low / 2 ** 24));
+            Data (6) := (R_Cylinder_Low, Word_8 (High mod 256));
+            Data (7) := (R_Cylinder_High, Word_8 (High / 2 ** 8 mod 256));
+            Data (8) := (R_Sector_Count, Command.Sector_Count);
+            Data (9) := (R_Sector_Number, Word_8 (Low mod 256));
+            Data (10) := (R_Cylinder_Low, Word_8 (Low / 2 ** 8 mod 256));
+            Data (11) :=
+              (R_Cylinder_High, Word_8 (Low / 2 ** 16 mod 256));
+            Last := 12;
+
          else
-            Data (3) := (3, Command.Sector);
-            Data (4) := (4, Word_8 (Command.Cylinder mod 256));
-            Data (5) := (5, Word_8 (Command.Cylinder / 256));
+
+            Data (2) := (R_Features, 0);
+            Data (3) := (R_Sector_Count, Command.Sector_Count);
+
+            if Command.Use_LBA then
+               Data (4) := (R_Sector_Number, Word_8 (Low mod 256));
+               Data (5) := (R_Cylinder_Low, Word_8 (Low / 2 ** 8 mod 256));
+               Data (6) :=
+                 (R_Cylinder_High, Word_8 (Low / 2 ** 16 mod 256));
+            else
+               Data (4) := (R_Sector_Number, Command.Sector);
+               Data (5) :=
+                 (R_Cylinder_Low, Word_8 (Command.Cylinder mod 256));
+               Data (6) :=
+                 (R_Cylinder_High, Word_8 (Command.Cylinder / 256));
+            end if;
+            Last := 7;
+
          end if;
 
-         Data (6) := (7, Rose.Words.Word_8 (Command.Command));
+         Data (Last) := (R_Command, Rose.Words.Word_8 (Command.Command));
 
          if False and then Log then
             Rose.Console_IO.Put ("command:");
-            for Item of Data loop
+            for Item of Data (1 .. Last) loop
                Rose.Console_IO.Put (" ");
                Rose.Console_IO.Put (Item.Data);
             end loop;
@@ -582,7 +644,7 @@ package body ATA.Commands is
 
          Rose.Devices.Port_IO.Port_Out_8
            (Port => Command_Port,
-            Data => Data);
+            Data => Data (1 .. Last));
       end;
 
       return True;
@@ -618,7 +680,7 @@ package body ATA.Commands is
       return Boolean'Pos (LBA) * 2 ** 6
         + Boolean'Pos (not Master) * 2 ** 4
         + 2 ** 7 + 2 ** 5
-        + Word_8 (Word_32 (Address) / 2 ** 24);
+        + Word_8 (Word_32 (Address) / 2 ** 24 mod 16);
    end To_Select_Drive;
 
    ---------------------

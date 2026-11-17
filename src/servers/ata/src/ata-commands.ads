@@ -11,6 +11,10 @@ package ATA.Commands is
    type ATA_Command_Type is new Rose.Words.Word_8;
    ATA_Read_Sectors   : constant ATA_Command_Type := 16#20#;
    ATA_Write_Sectors  : constant ATA_Command_Type := 16#30#;
+
+   ATA_Read_Sectors_Ext  : constant ATA_Command_Type := 16#24#;
+   ATA_Write_Sectors_Ext : constant ATA_Command_Type := 16#34#;
+   --  The LBA48 forms, for an address of 2 ** 28 or more (#325)
    ATA_Flush_Cache    : constant ATA_Command_Type := 16#E7#;
 
    ATA_Identify       : constant ATA_Command_Type := 16#EC#;
@@ -84,6 +88,7 @@ private
          Command        : ATA_Command_Type;
          Master         : Boolean;
          Use_LBA        : Boolean            := True;
+         LBA48          : Boolean            := False;
          Atapi          : Boolean            := False;
          LBA            : Rose.Devices.Block.Block_Address_Type := 0;
          Data           : Rose.Words.Word_8  := 0;
