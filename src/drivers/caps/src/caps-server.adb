@@ -44,6 +44,8 @@ package body Caps.Server is
      new Ada.Containers.Vectors (Positive, Rose.Capabilities.Capability,
                                  Rose.Capabilities."=");
 
+   Context : Rose.Server.Server_Context;
+
    type Set_Object;
    type Set_Access is access all Set_Object;
 
@@ -59,19 +61,21 @@ package body Caps.Server is
    overriding function Releasable_Cap_Set_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of (Context, Item));
 
    overriding function Cap_Set_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of
-         (Item, Rose.Interfaces.Caps.Releasable_Cap_Set.Cap_Set_Interface));
+         (Context, Item,
+          Rose.Interfaces.Caps.Releasable_Cap_Set.Cap_Set_Interface));
 
    overriding function Resource_Cap
      (Item : in out Set_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Caps.Releasable_Cap_Set.Server.Cap_Of
-         (Item, Rose.Interfaces.Caps.Releasable_Cap_Set.Resource_Interface));
+         (Context, Item,
+          Rose.Interfaces.Caps.Releasable_Cap_Set.Resource_Interface));
 
    overriding procedure Append
      (Item : in out Set_Object;
@@ -99,12 +103,12 @@ package body Caps.Server is
    overriding function Constructor_Cap
      (Item : in out Constructor_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Caps.Constructor.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Caps.Constructor.Server.Cap_Of (Context, Item));
 
    overriding function Restorable_Cap
      (Item : in out Constructor_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    overriding function Create
      (Item : in out Constructor_Object)
@@ -112,7 +116,6 @@ package body Caps.Server is
 
    overriding procedure Restored (Item : in out Constructor_Object);
 
-   Context         : Rose.Server.Server_Context;
    The_Constructor : aliased Constructor_Object;
 
    Sets            : Set_Access;
@@ -183,7 +186,7 @@ package body Caps.Server is
       Used := Used + Set_Overhead;
       Set_Count := Set_Count + 1;
       return Rose.Interfaces.Caps.Releasable_Cap_Set.Server
-        .Interface_Cap (Set);
+        .Interface_Cap (Context, Set);
    end Create;
 
    -------------

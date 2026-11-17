@@ -187,7 +187,7 @@ package body Exec.Server is
    overriding function Exec_Cap
      (Item : in out Exec_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Exec.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Exec.Server.Cap_Of (Context, Item));
 
    -------------
    -- Install --
@@ -268,7 +268,7 @@ package body Exec.Server is
      (Item : in out Exec_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Processes.Exec.Server.Cap_Of
-         (Item, Rose.Interfaces.Processes.Exec.Launch_Interface));
+         (Context, Item, Rose.Interfaces.Processes.Exec.Launch_Interface));
 
    ----------------
    -- Launch_Cap --
@@ -277,7 +277,7 @@ package body Exec.Server is
    overriding function Launch_Cap
      (Item : in out Program_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Launch.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Launch.Server.Cap_Of (Context, Item));
 
    --------------------
    -- Launch_Command --
@@ -369,7 +369,7 @@ package body Exec.Server is
 
       return Rose.Interfaces.Processes.Launch.Client.From_Cap
         (Rose.Interfaces.Processes.Launch.Server.Cap_Of
-           (Programs (Positive (Id)).all));
+           (Context, Programs (Positive (Id)).all));
    end Launch_Of;
 
    --------------

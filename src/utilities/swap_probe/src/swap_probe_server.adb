@@ -8,6 +8,8 @@ package body Swap_Probe_Server is
 
    Max_Answer : constant := 16;
 
+   Context : Rose.Server.Server_Context;
+
    type Probe_Object is
      limited new Rose.Interfaces.Common.Named.Server.Named_Interface
    with null record;
@@ -15,11 +17,10 @@ package body Swap_Probe_Server is
    overriding function Named_Cap
      (Item : in out Probe_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Context, Item));
 
    overriding function Name (Item : in out Probe_Object) return String;
 
-   Context    : Rose.Server.Server_Context;
    The_Probe  : aliased Probe_Object;
 
    Answer      : String (1 .. Max_Answer);
@@ -52,7 +53,7 @@ package body Swap_Probe_Server is
    function Interface_Cap return Rose.Capabilities.Capability is
    begin
       return Rose.Interfaces.Common.Named.Server
-        .Interface_Cap (The_Probe'Access);
+        .Interface_Cap (Context, The_Probe'Access);
    end Interface_Cap;
 
    ----------

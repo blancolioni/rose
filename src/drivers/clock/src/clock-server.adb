@@ -109,7 +109,7 @@ package body Clock.Server is
    overriding function Clock_Admin_Cap
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Time.Clock_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Time.Clock_Admin.Server.Cap_Of (Context, Item));
 
    ---------------
    -- Clock_Cap --
@@ -119,7 +119,7 @@ package body Clock.Server is
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Time.Clock_Admin.Server.Cap_Of
-         (Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
+         (Context, Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
 
    ------------
    -- Divide --
@@ -259,7 +259,7 @@ package body Clock.Server is
    overriding function Restorable_Cap
      (Item : in out Clock_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    --------------
    -- Restored --

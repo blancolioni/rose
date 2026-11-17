@@ -10,6 +10,8 @@ package body Derived_Holder is
 
    use type Rose.Capabilities.Capability;
 
+   Context : Rose.Server.Server_Context;
+
    type Holder_Object is
      limited new Rose.Interfaces.Processes.Restorable.Server
        .Restorable_Interface
@@ -18,11 +20,10 @@ package body Derived_Holder is
    overriding function Restorable_Cap
      (Item : in out Holder_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    overriding procedure Restored (Item : in out Holder_Object);
 
-   Context    : Rose.Server.Server_Context;
    The_Holder : aliased Holder_Object;
 
    Parent_Cap : Rose.Capabilities.Capability :=

@@ -23,6 +23,8 @@ package body Home_Holder is
    use type Rose.Capabilities.Capability;
    use type System.Storage_Elements.Storage_Count;
 
+   Context : Rose.Server.Server_Context;
+
    type Holder_Object is
      limited new Rose.Interfaces.Processes.Restorable.Server
        .Restorable_Interface
@@ -31,14 +33,13 @@ package body Home_Holder is
    overriding function Restorable_Cap
      (Item : in out Holder_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    overriding procedure Restored (Item : in out Holder_Object);
 
    User_Name : constant String := "hold";
    File_Name : constant String := "before";
 
-   Context    : Rose.Server.Server_Context;
    The_Holder : aliased Holder_Object;
 
    User    : Rose.Interfaces.Users.User.Client.User_Client;

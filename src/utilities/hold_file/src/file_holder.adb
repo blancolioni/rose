@@ -21,6 +21,8 @@ package body File_Holder is
 
    use Ada.Streams;
    use System.Storage_Elements;
+   Context : Rose.Server.Server_Context;
+
    type Holder_Object is
      limited new Rose.Interfaces.Processes.Restorable.Server
        .Restorable_Interface
@@ -29,11 +31,10 @@ package body File_Holder is
    overriding function Restorable_Cap
      (Item : in out Holder_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    overriding procedure Restored (Item : in out Holder_Object);
 
-   Context    : Rose.Server.Server_Context;
    The_Holder : aliased Holder_Object;
 
    File   : Rose.Interfaces.Files.Writable_File.Client.Writable_File_Client;
