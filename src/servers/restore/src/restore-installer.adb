@@ -14,7 +14,7 @@ with Rose.Interfaces.Files.File.Client;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Commands.Map.Client;
 with Rose.Interfaces.Streams.Releasable_Reader.Client.Conversions;
-with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Streams.Reader.Client;
 
 with Restore.Checkpoints;
@@ -387,16 +387,18 @@ package body Restore.Installer is
    is
       use Rose.Capabilities;
       Caps          : Array_Of_Capabilities
-        (1 .. Rose.Interfaces.Processes.Process.Subprogram_Count);
+        (1 .. Rose.Interfaces.Processes.Process_Control.Subprogram_Count);
       Public_Cap    : Rose.Capabilities.Capability;
       Interface_Cap : Rose.Capabilities.Capability :=
                         Rose.Capabilities.Null_Capability;
    begin
-      --  get process interface caps
+      --  The caps of the Process_Control interface that elf's launch
+      --  returns (#99).
       Open_Interface (Process_Cap, Caps);
 
       Public_Cap :=
-        Caps (Rose.Interfaces.Processes.Process.Published_Interface_Index + 1);
+        Caps (Rose.Interfaces.Processes.Process_Control
+                .Published_Interface_Index + 1);
 
       if Public_Cap /= Null_Capability then
          Get_Interface (Public_Cap, Caps);

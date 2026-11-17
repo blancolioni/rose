@@ -32,6 +32,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-process.o \
 	$(BUILDDIR)/rose-interfaces-processes-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control-server.o \
 	$(BUILDDIR)/rose-interfaces-caps-receiver-server.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacement.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacement-server.o \

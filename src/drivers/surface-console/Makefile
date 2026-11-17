@@ -19,6 +19,7 @@ surface_console:
 	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/storage-region.idl $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-heap.idl
 	gprbuild $(GPRBUILD_CARGS)

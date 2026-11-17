@@ -1,0 +1,8 @@
+--  What the launcher of a process holds for it (#99): it can find the
+--  interface that the process publishes, and end it (ADR 0015). It can't
+--  change the process's address space or act as the process, as the
+--  process's own Process cap can. Mem serves it, one for each process,
+--  and Launch.Launch returns it.
+
+interface Processes.Process_Control : Processes.Server, Caps.Cap is
+end Processes.Process_Control;

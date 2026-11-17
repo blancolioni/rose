@@ -6,6 +6,12 @@ interface Processes.Process : Processes.Segment, Processes.Server, Caps.Cap is
    --  The process's own bank (ADR 0015, #750): a sub-bank of the bank it
    --  was launched against, destroyed when the process ends. A null cap
    --  if it has none, as a boot module hasn't.
+
+   function Control_Cap return interface Processes.Process_Control;
+   --  The cap that the process's launcher holds for it (#99): it can
+   --  find the interface the process publishes, and end it, but not
+   --  change its segments or act as it. Elf asks for it when it launches
+   --  the process, and Launch.Launch returns it.
    
    procedure Exit_Process
      (Exit_Status : Natural);

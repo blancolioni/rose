@@ -31,7 +31,7 @@ UPDATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-launch.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process.o \
-	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control-client.o \
 	$(BUILDDIR)/rose-interfaces-commands-map.o \
 	$(BUILDDIR)/rose-interfaces-commands-map-client.o \
 	$(BUILDDIR)/rose-interfaces-commands-lookup.o \
@@ -40,8 +40,6 @@ UPDATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-dependent.o \
 	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
-	$(BUILDDIR)/rose-interfaces-processes-heap.o \
-	$(BUILDDIR)/rose-interfaces-processes-heap-client.o \
 	$(BUILDDIR)/restore-replacing.o \
 	$(BUILDDIR)/rose-interfaces-processes-replaceable.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacer.o \

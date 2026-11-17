@@ -8,7 +8,7 @@ interface Processes.Executable is
       Image : interface Storage.Region;
       Bank  : interface Storage.Bank;
       Caps  : Capability_Array)
-     return interface Processes.Process;
+     return interface Processes.Process_Control;
 
    --  As Launch, but the process also starts with the receive cap of a
    --  command endpoint, and the result is the endpoint cap (ADR 0002).
