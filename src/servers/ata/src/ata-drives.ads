@@ -23,6 +23,9 @@ package ATA.Drives is
    function Is_Slave (Drive : ATA_Drive) return Boolean;
    function Is_Atapi (Drive : ATA_Drive) return Boolean;
 
+   function Is_LBA48 (Drive : ATA_Drive) return Boolean;
+   --  True if the drive takes 48-bit addresses (#325)
+
    function Drive_Index (Drive : ATA_Drive) return ATA_Drive_Index;
 
    function Command_Port
@@ -115,6 +118,7 @@ private
          Dead               : Boolean := False;
          Native             : Boolean := False;
          Atapi              : Boolean := False;
+         LBA48              : Boolean := False;
          Index              : ATA_Drive_Index;
          Status             : ATA_Status := 0;
          Command_Cap        : Rose.Capabilities.Capability := 0;
@@ -142,6 +146,9 @@ private
 
    function Is_Atapi (Drive : ATA_Drive) return Boolean
    is (Drive.Atapi);
+
+   function Is_LBA48 (Drive : ATA_Drive) return Boolean
+   is (Drive.LBA48);
 
    function Drive_Index (Drive : ATA_Drive) return ATA_Drive_Index
    is (Drive.Index);

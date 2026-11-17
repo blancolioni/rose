@@ -215,7 +215,7 @@ install_rose () {
     # install_rose ISO: install Rose on a new disk, answering its questions,
     # and wait for the install to finish
     [ -f "$1" ] || { echo "no install image: $1"; exit 2; }
-    qemu-img create -f raw "$DISK" 6G > /dev/null
+    qemu-img create -f raw "$DISK" "${ROSE_TEST_DISK_SIZE:-6G}" > /dev/null
 
     echo "Installing"
     start_qemu -boot d -drive file="$1",if=ide,index=1,media=cdrom
