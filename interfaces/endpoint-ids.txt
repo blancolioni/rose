@@ -33,6 +33,7 @@
 16#E8C9_E2E2_F9E2_FD43#  interface rose.interfaces.checkpoints.page_log
 16#0806_2377_8396_167A#  rose.interfaces.checkpoints.page_log.append_page(in storage_array) return word
 16#CAA4_CCB5_AA3C_3D72#  rose.interfaces.checkpoints.page_log.read_page(in word; out storage_array)
+16#1017_19B8_1A76_1B2B#  rose.interfaces.checkpoints.page_log.fail_entry
 16#0785_107B_F439_F895#  interface rose.interfaces.checkpoints.state
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset
 16#417B_75A1_17EC_9F59#  interface rose.interfaces.checkpoints.storage_checkpoint

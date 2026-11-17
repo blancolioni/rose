@@ -45,6 +45,9 @@ package body Mem.Page_Table is
 
    procedure Clear_Dirty_Pages is
    begin
+      for Position of Dirty_Pages (1 .. Dirty_Page_Last) loop
+         Mapped_Pages (Position).Dirty := False;
+      end loop;
       Dirty_Page_Last := 0;
    end Clear_Dirty_Pages;
 
@@ -332,7 +335,6 @@ package body Mem.Page_Table is
    procedure Set_Read_Only (Position : Cursor) is
    begin
       Mapped_Pages (Position).Writable := False;
-      Mapped_Pages (Position).Dirty := False;
    end Set_Read_Only;
 
    ------------------
@@ -343,10 +345,11 @@ package body Mem.Page_Table is
       Page : Mapped_Page_Record renames Mapped_Pages (Position);
    begin
       Page.Writable := True;
-      if Page.Persistent then
+      if Page.Persistent and then not Page.Dirty then
          Dirty_Page_Last := Dirty_Page_Last + 1;
          Dirty_Pages (Dirty_Page_Last) := Position;
       end if;
+      Page.Dirty := True;
 
       Mem.Calls.Map
         (Process    =>
