@@ -2,10 +2,13 @@ with System.Storage_Elements;
 
 with Rose.Addresses;
 with Rose.Checkpoints;
+with Rose.Console_IO;
 with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
+with Mem.Log_Index;
+with Mem.Page_Log;
 with Mem.Page_Table;
 with Mem.Processes;
 with Mem.Shared_Pages;
@@ -46,14 +49,67 @@ package body Mem.Checkpoints is
    -- Checkpoint --
    ----------------
 
-   procedure Checkpoint
-     (Append : not null access procedure (Buffer : System.Address))
-   is
+   procedure Checkpoint is
+
+      use type Rose.Words.Word_32;
+
+      Failed      : Boolean := False;
+      --  An append failed, or the batch's pages weren't at consecutive
+      --  log pages.
+
+      Batch_First : Rose.Words.Word_32 := 0;
+      Batch_Count : Rose.Words.Word_32 := 0;
+      --  The log page of the batch's first page, and the number of its
+      --  pages appended so far.
+
+      procedure Append (Buffer : System.Address);
+
+      procedure Append_Batch_Page (Buffer : System.Address);
+      --  Append a page of the batch, which must go at the log page after
+      --  the one before, since Mem.Log_Index finds each page's log page
+      --  by its place in the batch.
 
       procedure Reset_Header;
 
       procedure Update_Header (Position : Mem.Page_Table.Cursor);
       procedure Write_Page (Position : Mem.Page_Table.Cursor);
+
+      ------------
+      -- Append --
+      ------------
+
+      procedure Append (Buffer : System.Address) is
+      begin
+         if not Failed and then Mem.Page_Log.Append (Buffer) = 0 then
+            Failed := True;
+         end if;
+      end Append;
+
+      -----------------------
+      -- Append_Batch_Page --
+      -----------------------
+
+      procedure Append_Batch_Page (Buffer : System.Address) is
+         Log_Page : Rose.Words.Word_32;
+      begin
+         if Failed then
+            return;
+         end if;
+
+         Log_Page := Mem.Page_Log.Append (Buffer);
+
+         if Log_Page = 0 then
+            Failed := True;
+         elsif Batch_Count = 0 then
+            Batch_First := Log_Page;
+         elsif Log_Page /= Batch_First + Batch_Count then
+            Rose.Console_IO.Put_Line
+              ("mem: checkpoint: batch pages are not consecutive");
+            Failed := True;
+         end if;
+
+         Batch_Count := Batch_Count + 1;
+      end Append_Batch_Page;
 
       ------------------
       -- Reset_Header --
@@ -75,7 +131,6 @@ package body Mem.Checkpoints is
       -------------------
 
       procedure Update_Header (Position : Mem.Page_Table.Cursor) is
-         use type Rose.Words.Word_32;
       begin
          --  A shared page is saved once, by its store page, however many
          --  processes have written it.
@@ -110,17 +165,25 @@ package body Mem.Checkpoints is
       begin
          Mem.Page_Table.Set_Read_Only (Position);
          if not Mem.Shared_Pages.Is_Shared (Physical) then
-            Mem.Virtual_Map.With_Page (Physical, Append);
+            Mem.Virtual_Map.With_Page (Physical, Append_Batch_Page'Access);
          end if;
       end Write_Page;
 
       Has_Shared : constant Boolean := Mem.Shared_Pages.Has_Checkpoint_Pages;
+      Index_Written : Boolean;
 
    begin
 
-      --  The batch of changed pages comes first, then the tables, which
-      --  name the processes that the batch's header pages refer to by
-      --  the memory server's ids (ADR 0028, section 4).
+      if not Mem.Page_Log.Is_Available then
+         Rose.Console_IO.Put_Line
+           ("mem: checkpoint: no Page_Log; nothing saved");
+         return;
+      end if;
+
+      --  The batch of changed pages comes first, then the index pages
+      --  that name them, then the tables, which name the processes that
+      --  the header pages refer to by the memory server's ids, and their
+      --  index directories (ADR 0028, section 4).
 
       Reset_Header;
 
@@ -130,12 +193,36 @@ package body Mem.Checkpoints is
         Checkpoint_Header.Flags or Is_Last_Header_Page;
       Append (Checkpoint_Header'Address);
       Mem.Page_Table.Iterate_Dirty_Pages (Write_Page'Access);
-      Mem.Page_Table.Clear_Dirty_Pages;
 
-      Write_Tables (Append, Has_Shared);
+      if not Failed then
+         Mem.Log_Index.Write_Index (Batch_First, Index_Written);
+         Failed := not Index_Written;
+      end if;
 
-      if Has_Shared then
-         Write_Shared_Pages (Append);
+      if not Failed then
+         Write_Tables (Append'Access, Has_Shared);
+      end if;
+
+      if not Failed and then Has_Shared then
+         Write_Shared_Pages (Append'Access);
+      end if;
+
+      --  A failed entry is left out of the log, so the pages it saved are
+      --  still dirty, and the index it wrote is not used (ADR 0028,
+      --  section 11). The log server has already failed the entry if an
+      --  append did, but not if the batch's pages went astray.
+
+      if Failed then
+         Rose.Console_IO.Put_Line
+           ("mem: checkpoint failed; changed pages kept for the next one");
+         Mem.Page_Log.Fail_Entry;
+         Mem.Log_Index.End_Checkpoint (Committed => False);
+      else
+         Mem.Log_Index.End_Checkpoint (Committed => True);
+         Mem.Page_Table.Clear_Dirty_Pages;
+         if Has_Shared then
+            Mem.Shared_Pages.Clear_Checkpoint_Pages;
+         end if;
       end if;
    end Checkpoint;
 
@@ -242,7 +329,6 @@ package body Mem.Checkpoints is
       Append (Shared_Header'Address);
 
       Mem.Shared_Pages.Iterate_Unsaved (Write_Page'Access);
-      Mem.Shared_Pages.Clear_Checkpoint_Pages;
    end Write_Shared_Pages;
 
    ------------------
@@ -253,6 +339,7 @@ package body Mem.Checkpoints is
      (Append     : not null access procedure (Buffer : System.Address);
       Has_Shared : Boolean)
    is
+      use type Rose.Words.Word_32;
       Count : Natural := 0;
 
       procedure Count_Process (Pid : Mem.Process_Id);
@@ -287,7 +374,9 @@ package body Mem.Checkpoints is
       Table_Header.Version := Mem_Table_Version;
       Table_Header.Page_Count := Rose.Words.Word_32 (Count + 1);
       Table_Header.Process_Count := Rose.Words.Word_32 (Count);
-      Table_Header.Flags := (if Has_Shared then Mem_Has_Shared_Pages else 0);
+      Table_Header.Flags :=
+        Mem_Has_Index
+          or (if Has_Shared then Mem_Has_Shared_Pages else 0);
       Append (Checkpoint_Header'Address);
 
       Mem.Processes.Iterate_Saved_Processes (Write_Process'Access);

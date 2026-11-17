@@ -12,6 +12,7 @@ with Rose.Interfaces.Processes.Kernel_Process.Client;
 
 with Mem.Calls;
 
+with Mem.Log_Index;
 with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Physical_Map;
@@ -1073,6 +1074,8 @@ package body Mem.Processes is
               Faults        => <>);
       end;
 
+      Mem.Log_Index.Forget (Next_Pid);
+
       return Next_Pid;
    end Register_Process;
 
@@ -1333,6 +1336,11 @@ package body Mem.Processes is
                        (Client))),
            Bank_Cap      => 0,
            Faults        => <>);
+
+      --  Its pages are given to it with Restore_Page, and are all dirty,
+      --  so the next checkpoint writes a complete index for it.
+
+      Mem.Log_Index.Forget (Pid);
    end Restore_Process;
 
    ---------------------
@@ -1480,8 +1488,7 @@ package body Mem.Processes is
       Item.Mem_Pid := Word_32 (Process);
       Item.State := Process_State'Pos (P.State);
       Item.Segment_Count := Word_32 (P.Num_Segments);
-      Item.Index_Directory := 0;
-      --  The memory server writes no index yet (ADR 0028, #949).
+      Item.Index_Directory := Mem.Log_Index.Saved_Directory (Process);
 
       for I in 1 .. P.Num_Segments loop
          declare

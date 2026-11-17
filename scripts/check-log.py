@@ -68,6 +68,7 @@ MAX_STORE_PAGES = 2 ** 20
 MEM_TABLE_MAGIC = 0x4D454D5441424C31
 MEM_TABLE_VERSION = 2
 MEM_HAS_SHARED_PAGES = 0x0001
+MEM_HAS_INDEX = 0x0002
 MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 32
 
@@ -389,9 +390,11 @@ def check_store_tables(log, first, last, verbose):
         page_count, regions
 
 
-def check_mem_tables(log, first, last, regions, verbose):
+def check_mem_tables(log, first, last, regions, verbose, info):
     """Check the memory server's tables, which start at page first.  The
-    regions of their segments must be among regions.
+    regions of their segments must be among regions.  Sets info's
+    "has_index" and "directories" ({mem process id: log page of its index
+    directory}).
 
     Returns (ok, description, page count, {mem process id: object id},
     whether the pages of shared segments follow)."""
@@ -408,6 +411,8 @@ def check_mem_tables(log, first, last, regions, verbose):
     page_count = u32(page, 12)
     process_count = u32(page, 16)
     has_shared = bool(u32(page, 20) & MEM_HAS_SHARED_PAGES)
+    info["has_index"] = bool(u32(page, 20) & MEM_HAS_INDEX)
+    info["directories"] = {}
     if page_count != process_count + 1 or first + page_count - 1 > last:
         return False, ("memory tables: %d pages for %d processes"
                        % (page_count, process_count)), 0, processes, False
@@ -430,6 +435,7 @@ def check_mem_tables(log, first, last, regions, verbose):
                            "%d, past the log" % (mem_pid, directory)), \
                 0, processes, False
         processes[mem_pid] = oid
+        info["directories"][mem_pid] = directory
         if verbose:
             print("    memory process %d: object %d, %s, %d segments%s"
                   % (mem_pid, oid, "faulted" if state == 2 else "active",
@@ -461,8 +467,11 @@ def check_mem_tables(log, first, last, regions, verbose):
         page_count, processes, has_shared
 
 
-def check_entry(log, first, last, verbose):
-    """Check the checkpoint stored in pages first .. last.
+def check_entry(log, first, last, verbose, info):
+    """Check the checkpoint stored in pages first .. last.  Sets info's
+    "processes" ({mem process id: object id}), "batches" ([(first page,
+    header pages)], in order) and what check_mem_tables sets, for
+    check_index_contents.
 
     Returns (ok, description)."""
     # Batches paged out between checkpoints come before the kernel's
@@ -496,7 +505,11 @@ def check_entry(log, first, last, verbose):
     sections = leading + sections
 
     ok, tables, table_pages, processes, has_shared = check_mem_tables(
-        log, mem_first, last, regions, verbose)
+        log, mem_first, last, regions, verbose, info)
+    info["processes"] = processes
+    info["batches"] = [(start, headers)
+                       for kind, start, headers, listed in sections
+                       if kind == "batch"]
     if not ok:
         return False, kernel + "; " + tables
     missing = oids - set(processes.values())
@@ -676,6 +689,90 @@ def check_index(log, first, headers, processes, verbose):
     return True, None
 
 
+def read_index(log, directory):
+    """Return {virtual page: log page} from the index whose directory is
+    at log page directory, or {} if directory is 0."""
+    pages = {}
+    if not directory:
+        return pages
+    leaves = struct.unpack_from("<%dI" % INDEX_ENTRIES_PER_PAGE,
+                                log.page(directory))
+    for slot, leaf in enumerate(leaves):
+        if not leaf:
+            continue
+        entries = struct.unpack_from("<%dI" % INDEX_ENTRIES_PER_PAGE,
+                                     log.page(leaf))
+        for i, log_page in enumerate(entries):
+            if log_page:
+                pages[slot * INDEX_ENTRIES_PER_PAGE + i] = log_page
+    return pages
+
+
+def batch_pages(log, first, headers):
+    """Yield (mem process id, virtual page, log page) for each page of the
+    batch whose header pages start at page first."""
+    location = first + headers
+    for header in range(first, first + headers):
+        page = log.page(header)
+        for i in range(u32(page, 12)):
+            # 16 bits of process id, then 20 of virtual page; the last
+            # four bits are padding, which mem doesn't clear.
+            reference = int.from_bytes(page[16 + i * 5:21 + i * 5],
+                                       "little")
+            yield reference & 0xFFFF, (reference >> 16) & 0xFFFFF, location
+            location += 1
+
+
+def check_index_contents(log, info, previous):
+    """Check that the index of each process in the entry that info
+    describes names the latest copy of each of its pages: the copies its
+    index in the previous entry named, updated by the batches of this
+    entry.  previous is the info of the previous entry, or None.
+
+    A process's index carries on from the previous entry if it was there
+    with the same memory process id, and its object id was there too: a
+    process that took over another's object id with a replacement (ADR
+    0032) keeps its slot and its pages.  A process that is new to its
+    slot starts with nothing.  Each process's index is read into info's
+    "indexes", for the next entry.
+
+    Returns a description of what is wrong, or None."""
+    info["indexes"] = {}
+    carried = previous is not None and previous.get("has_index")
+    old_oids = set(previous["processes"].values()) if carried else set()
+    expected = {}
+    for pid, oid in info["processes"].items():
+        if carried and pid in previous["processes"] and oid in old_oids:
+            expected[pid] = dict(previous["indexes"].get(pid, {}))
+        else:
+            expected[pid] = {}
+    for first, headers in info["batches"]:
+        for pid, virtual, location in batch_pages(log, first, headers):
+            if pid in expected:
+                expected[pid][virtual] = location
+
+    problems = []
+    for pid in sorted(info["processes"]):
+        actual = read_index(log, info["directories"].get(pid, 0))
+        info["indexes"][pid] = actual
+        if actual == expected[pid]:
+            continue
+        wrong = sorted(set(actual) | set(expected[pid]),
+                       key=lambda v: (actual.get(v) == expected[pid].get(v),
+                                      v))
+        virtual = wrong[0]
+        count = sum(1 for v in wrong
+                    if actual.get(v) != expected[pid].get(v))
+        problems.append("memory process %d (object %d): %d page%s differ, "
+                        "such as %05x: index has log page %s, the log %s"
+                        % (pid, info["processes"][pid], count,
+                           "" if count == 1 else "s", virtual,
+                           actual.get(virtual), expected[pid].get(virtual)))
+    if problems:
+        return "index: " + "; ".join(problems)
+    return None
+
+
 def check_shared(log, first, last, verbose):
     """Check the shared header pages, which start at page first.
 
@@ -751,7 +848,9 @@ def main():
 
         failures = 0
         entries = 0
+        indexed = 0
         location = 1
+        previous = None
         while True:
             fields = entry_fields(log.page(location))
             if fields is None:
@@ -768,16 +867,30 @@ def main():
                 break
 
             entries += 1
-            ok, description = check_entry(log, first, last, args.verbose)
+            info = {}
+            ok, description = check_entry(log, first, last, args.verbose,
+                                          info)
+            if ok and info["has_index"]:
+                # An entry's index has to agree with the log's pages
+                # (ADR 0028): a restore that reads only the last entry
+                # gets what one that reads every entry would.
+                problem = check_index_contents(log, info, previous)
+                if problem:
+                    ok, description = False, description + "; " + problem
+                else:
+                    indexed += 1
             print("entry %d at %d: version %d, pages %d..%d: %s%s"
                   % (entries, location, version, first, last,
                      description, "" if ok else "  ** BAD"))
             if not ok:
                 failures += 1
+            previous = info if "indexes" in info else None
             location = last + 1
 
-        print("%d entr%s; next entry at location %d"
-              % (entries, "y" if entries == 1 else "ies", location))
+        print("%d entr%s, %d with an index that agrees with the log; "
+              "next entry at location %d"
+              % (entries, "y" if entries == 1 else "ies", indexed,
+                 location))
 
         fields = entry_fields(log.page(location))
         if fields is not None:

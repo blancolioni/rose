@@ -1,8 +1,6 @@
-with System;
 
 with Rose.Addresses;
 with Rose.Capabilities;
-with Rose.Limits;
 with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;
@@ -13,7 +11,7 @@ with Rose.Trace;
 with Rose.Interfaces.Processes.Heap.Server;
 with Rose.Interfaces.Processes.Memory.Server;
 with Rose.Interfaces.Checkpoints.Memory_Restore.Server;
-with Rose.Interfaces.Checkpoints.Page_Log.Client;
+
 with Rose.Interfaces.Processes.Process.Server;
 with Rose.Interfaces.Caps.Receiver.Server;
 with Rose.Interfaces.Processes.Replacement.Server;
@@ -30,6 +28,7 @@ with Rose.System_Calls.Server;
 with Mem.Calls;
 with Mem.Checkpoints;
 with Mem.Page_Cache;
+with Mem.Page_Log;
 with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Processes;
@@ -51,12 +50,6 @@ package body Mem.Server is
    Process_State_Cap  : Rose.Capabilities.Capability := 0;
    --  The kernel's handover caps (#862), which init gives mem.
 
-   Page_Log_Cap  : Rose.Capabilities.Capability := 0;
-   Page_Log      : Rose.Interfaces.Checkpoints.Page_Log.Client.Page_Log_Client;
-   Page_Log_Open : Boolean := False;
-   --  The log server's Page_Log (ADR 0028), which init gives mem once the
-   --  log server is running, and which mem opens the first time it
-   --  appends to the log.
 
    Request_Checkpoint_Cap : Rose.Capabilities.Capability := 0;
    --  The checkpoint server's Checkpointer.Request_Checkpoint, from the
@@ -372,28 +365,6 @@ package body Mem.Server is
    is
       pragma Unreferenced (Id);
       use type Rose.Capabilities.Capability;
-      procedure Append (Buffer : System.Address);
-
-      ------------
-      -- Append --
-      ------------
-
-      procedure Append (Buffer : System.Address) is
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         --  The page is sent from where it is mapped, rather than copied
-         --  into an invocation buffer.  The reply is the log page it was
-         --  written to, for the index (#949).
-         Rose.System_Calls.Initialize_Send
-           (Params,
-            Rose.Interfaces.Checkpoints.Page_Log.Client.Get_Append_Page_Cap
-              (Page_Log));
-         Rose.System_Calls.Send_Buffer (Params, Rose.Limits.Page_Size,
-                                        Buffer, False);
-         Rose.System_Calls.Receive_Words (Params, 1);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end Append;
-
    begin
       if Request_Checkpoint /= Request_Checkpoint_Cap then
          if Request_Checkpoint_Cap /= 0 then
@@ -402,18 +373,7 @@ package body Mem.Server is
          Request_Checkpoint_Cap := Request_Checkpoint;
       end if;
 
-      if not Page_Log_Open then
-         if Page_Log_Cap = 0 then
-            Rose.Console_IO.Put_Line
-              ("mem: checkpoint: no Page_Log; nothing saved");
-            return;
-         end if;
-         Rose.Interfaces.Checkpoints.Page_Log.Client.Open
-           (Page_Log, Page_Log_Cap);
-         Page_Log_Open := True;
-      end if;
-
-      Mem.Checkpoints.Checkpoint (Append'Access);
+      Mem.Checkpoints.Checkpoint;
    end Checkpoint;
 
    ------------------------
@@ -1350,9 +1310,7 @@ package body Mem.Server is
    is
       pragma Unreferenced (Id);
    begin
-      --  It is opened the first time mem appends, rather than here, so
-      --  that mem doesn't wait for the log server while init does.
-      Page_Log_Cap := Log;
+      Mem.Page_Log.Set_Cap (Log);
    end Set_Page_Log;
 
    -----------------------

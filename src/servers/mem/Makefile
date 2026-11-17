@@ -8,7 +8,9 @@ OBJECTS= \
 	$(BUILDDIR)/mem-calls.o \
 	$(BUILDDIR)/mem-checkpoints.o \
 	$(BUILDDIR)/mem-driver.o \
+	$(BUILDDIR)/mem-log_index.o \
 	$(BUILDDIR)/mem-page_cache.o \
+	$(BUILDDIR)/mem-page_log.o \
 	$(BUILDDIR)/mem-page_table.o \
 	$(BUILDDIR)/mem-physical_map.o \
 	$(BUILDDIR)/mem-processes.o \

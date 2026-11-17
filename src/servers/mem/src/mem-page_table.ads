@@ -31,14 +31,14 @@ package Mem.Page_Table is
    procedure Set_Writable (Position : Cursor);
    --  Has_Element (Position) must be True.
    --  Is_Writable (Position) must be False.
-   --  Adds the referenced page to the dirty page list.
-   --  Makes the page writable
+   --  Makes the page writable, and dirty. A persistent page that wasn't
+   --  dirty is added to the dirty page list.
 
    procedure Set_Read_Only (Position : Cursor);
    --  Has_Element (Position) must be True.
-   --  Is_Writable (Position) must be True.
-   --  Is_Dirty (Position) must be True
-   --  Makes the page read only and clears dirty flag
+   --  Makes the page read only. It stays dirty, and in the dirty page
+   --  list, until Clear_Dirty_Pages: a checkpoint that fails leaves it
+   --  there, to be saved by the next one.
 
    procedure Insert
      (Process    : Process_Id;
@@ -75,6 +75,8 @@ package Mem.Page_Table is
         procedure (Position : Cursor));
 
    procedure Clear_Dirty_Pages;
+   --  Every page in the dirty page list is clean, and the list is empty:
+   --  a checkpoint has saved them.
 
    function Dirty_Page_Count return Natural;
 
