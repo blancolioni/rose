@@ -133,6 +133,10 @@ package body Store.Devices is
      (Page : Device_Page;
       Data : System.Storage_Elements.Storage_Array);
 
+   procedure Sync_Devices;
+   --  Return when everything written to the backing stores is on the
+   --  medium, and not only in a disk's write cache (#505).
+
    procedure Write_Images;
    --  Write the pages of the free map's image that the copy being
    --  written doesn't have yet.
@@ -560,6 +564,12 @@ package body Store.Devices is
       if Written then
          Space.Checkpoint;
          Write_Images;
+
+         --  The table names the tree's root and the image copy, so they
+         --  are on the medium before the table goes to the log (ADR
+         --  0038, section 8).
+
+         Sync_Devices;
       else
          Rose.Console_IO.Put_Line
            ("storage: checkpoint: no space to write the block map; "
@@ -2167,6 +2177,17 @@ package body Store.Devices is
       end loop;
       return 0;
    end Store_Of;
+
+   ------------------
+   -- Sync_Devices --
+   ------------------
+
+   procedure Sync_Devices is
+   begin
+      for Store of Backing_Stores (1 .. Backing_Store_Count) loop
+         Rose.Interfaces.Storage.Block_Array.Client.Flush (Store.Client);
+      end loop;
+   end Sync_Devices;
 
    ----------------
    -- Take_Ended --
