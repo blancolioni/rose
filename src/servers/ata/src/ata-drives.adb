@@ -74,19 +74,30 @@ package body ATA.Drives is
          Rose.Console_IO.Put (Natural (Id_Buffer (7)));
 
          Rose.Console_IO.Put (": ");
-         if (Id_Buffer (84) and 2 ** 10) /= 0 then
-            Rose.Console_IO.Put ("lba48 ");
-         end if;
+         --  Id_Buffer (N) is identify word N - 1.  A drive with LBA48
+         --  (word 83, bit 10) gives its size in words 100 to 103, and
+         --  no more than 2 ** 28 - 1 sectors in words 60 and 61 (#325).
+
+         Drive.LBA48 := (Id_Buffer (84) and 2 ** 10) /= 0;
 
          declare
-            Sector_Count : constant Word_32 :=
-                             Word_32 (Id_Buffer (61))
-                             + 65536 * Word_32 (Id_Buffer (62));
+            Sector_Count : Word_64 :=
+                             Word_64 (Id_Buffer (61))
+                             + 2 ** 16 * Word_64 (Id_Buffer (62));
          begin
+            if Drive.LBA48 then
+               Sector_Count :=
+                 Word_64 (Id_Buffer (101))
+                 + 2 ** 16 * Word_64 (Id_Buffer (102))
+                 + 2 ** 32 * Word_64 (Id_Buffer (103))
+                 + 2 ** 48 * Word_64 (Id_Buffer (104));
+            end if;
+
             if Sector_Count > 0 then
-               Rose.Console_IO.Put ("lba28 ");
-               Rose.Console_IO.Put (Natural (Sector_Count));
-               Rose.Console_IO.Put (" ");
+               Rose.Console_IO.Put
+                 (if Drive.LBA48 then "lba48 " else "lba28 ");
+               Rose.Console_IO.Put (Natural (Sector_Count / 2 ** 11));
+               Rose.Console_IO.Put ("M ");
                Drive.Block_Count :=
                  Rose.Devices.Block.Block_Address_Type (Sector_Count);
             end if;
