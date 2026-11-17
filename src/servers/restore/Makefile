@@ -30,7 +30,7 @@ UPDATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-exec-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
-	$(BUILDDIR)/rose-interfaces-processes-process.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control.o \
 	$(BUILDDIR)/rose-interfaces-processes-process_control-client.o \
 	$(BUILDDIR)/rose-interfaces-commands-map.o \
 	$(BUILDDIR)/rose-interfaces-commands-map-client.o \
