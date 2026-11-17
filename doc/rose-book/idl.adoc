@@ -440,16 +440,22 @@ The package names other interfaces, and its own client, through `limited with` c
 | `type X_Interface is limited interface and X_Object`, for implementations in the program itself.
 `Attach (Context, Object)` registers an object of any type that implements `X_Interface` with a `Rose.Server` context, as an instanced interface (see <<kernel-target>>), under an identifier of its own.
 `Publish` attaches the object and publishes its interface capability as the server's public interface.
-`Cap_Of` gives an attached object's capability, for its cap functions.
-The generated handlers look the object up and make a dispatching call to its primitive.
+`Cap_Of (Context, Object)` gives an attached object's capability, for its cap functions.
+The generated handlers look the object up in the context that received the call, and make a dispatching call to its primitive.
 |===
+
+A server package keeps nothing of its own: the objects attached to a context are in a table that the context holds, one for each server package (idle#108, #940).
+The package extends `Rose.Server.Interface_Table` with its table, and the first `Attach` to a context adds it with `Rose.Server.Add_Table` and registers the package's handlers there with `Rose.Server.Register_Context_Handler`.
+Its handlers, and its `Owns`, are given the context that received the call, so each context serves only the objects attached to it, and a program can have several contexts, or several copies of the same code, without their objects meeting.
+The table finds an object by its identifier, and by its address, through ordered maps.
+A context has no finalization, so its tables last as long as the program.
 
 An object's identifier comes from `Rose.Server.New_Identifier`, and is unique in the process among the identifiers in use (idle#84).
 The server packages of interfaces with a common ancestor can therefore be attached in one process: each registers its handlers with `Owns`, and `Rose.Server` sends an invocation to the handler whose package has an object with its identifier.
 A resource that is released frees its slot and its identifier once its capabilities are rescinded, and `New_Identifier` gives a freed identifier out again only after every other one.
 Rescinding the capabilities of one object doesn't work yet, though (#769): the kernel checks a capability against the latest one made for its endpoint, whichever object that was for.
 Until then, a server that releases objects is given no rescind capability, and a released object's slot and identifier are retired instead, never to be used again, as the file server's readers are.
-Identifier 0 names the object in a package's first slot.
+Identifier 0 names the object in the first slot of a package's table in the context.
 That is the identifier of the capabilities that a kernel-target server creates when it is not instanced, and of the kernel's restore notice, so a server that serves one object behaves exactly as a kernel-target server that is not instanced.
 A server's table of objects grows as objects are attached (idle#83), and a released resource's slot is used again when it can be.
 An invocation whose identifier has no object gets the error `Invalid_Operation`, and so does one through the capabilities of a released object.
@@ -457,7 +463,7 @@ An invocation whose identifier has no object gets the error `Invalid_Operation`,
 [[replaceable-servers]]
 A new version of a replaceable server (ADR 0032, #865) gives each of its objects the identifier that it had in the old version, because clients' capabilities name it.
 `Attach` takes an optional `Identifier`: 0, the default, gives the object a new one, as before.
-`Identifier_Of` returns an attached object's identifier, for the server to save in its state.
+`Identifier_Of (Context, Object)` returns an attached object's identifier, for the server to save in its state.
 The old version answers the `Replaceable` interface through `Rose.Replacement` (`src/library/replacement`), which the server's package attaches to its context with the procedure that writes its state.
 `State` returns the state as a `Releasable_Reader`:
 
@@ -480,15 +486,15 @@ The test server `replaceable_test`, and the self test that takes over from it, s
 Server packages declare only interfaces, so one type can implement several, and one object can serve each of them.
 `X_Interface` adds nothing to `X_Object`, but it extends it, so an object that a program serves is also an `X_Object` within that program, and can be passed wherever an `X_Object'Class` is expected.
 
-An interface type has no components, so each server package records the identifier and capabilities of the objects attached to it, and `X.Server.Interface_Cap (Object)` returns the capability that reaches an object through interface `X`.
+An interface type has no components, so each server package records the identifier and capabilities of the objects attached to it, in its table in the context, and `X.Server.Interface_Cap (Context, Object)` returns the capability that reaches an object through interface `X`.
 An object attached to two interfaces has two identifiers and two interface capabilities, one for each.
 `X_Client` has its capability already, and `Get_Interface_Cap` returns it, as in the kernel target.
 
 When an object is passed to another process as an `X_Object'Class` argument, the generated code sends `Object.X_Cap`, so every type that implements `X_Object` says how it is reached.
 A client answers with its own capability.
-A type that the program serves implements each cap function in one line, with `Cap_Of` from the server package of the interface it is attached to.
-`X.Server.Cap_Of (Object)` returns the object's interface capability for `X`, and `Cap_Of (Object, A_Interface)` its interface capability for an ancestor `A` of `X`, which the server creates the first time it is asked for, as it does when a client asks for it.
-`Cap_Of` finds the object by its address, and raises `Not_Served` if it is not attached.
+A type that the program serves implements each cap function in one line, with `Cap_Of` from the server package of the interface it is attached to, and the context it is attached to, which the program declares before its types' cap functions.
+`X.Server.Cap_Of (Context, Object)` returns the object's interface capability for `X`, and `Cap_Of (Context, Object, A_Interface)` its interface capability for an ancestor `A` of `X`, which the server creates the first time it is asked for, as it does when a client asks for it.
+`Cap_Of` finds the object by its address, and raises `Not_Served` if it is not attached to that context.
 A subprogram cannot have the name of a cap function of its interface, which idle reports.
 
 Opening a client is not an invocation.
@@ -504,6 +510,8 @@ For example, `vga-console` serves the console's screen both as a stream to write
 
 [source,ada]
 ----
+Context : Rose.Server.Server_Context;
+
 type Console is limited new
   Rose.Interfaces.Streams.Writer.Server.Writer_Interface
   and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
@@ -515,9 +523,9 @@ overriding procedure Write (Item : in out Console; Buffer : Storage_Array);
 overriding procedure Restored (Item : in out Console);
 
 overriding function Writer_Cap (Item : in out Console) return Capability
-is (Rose.Interfaces.Streams.Writer.Server.Cap_Of (Item));
+is (Rose.Interfaces.Streams.Writer.Server.Cap_Of (Context, Item));
 overriding function Restorable_Cap (Item : in out Console) return Capability
-is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
 Screen : aliased Console;
 ...

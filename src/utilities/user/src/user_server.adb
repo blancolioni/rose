@@ -109,7 +109,7 @@ package body User_Server is
 
    function Interface_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Users.User.Server.Cap_Of (The_User);
+      return Rose.Interfaces.Users.User.Server.Cap_Of (Context, The_User);
    end Interface_Cap;
 
    ----------
@@ -130,7 +130,7 @@ package body User_Server is
      (Item : in out User_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Users.User.Server.Cap_Of
-         (Item, Rose.Interfaces.Users.User.Named_Interface));
+         (Context, Item, Rose.Interfaces.Users.User.Named_Interface));
 
    -----------------
    -- New_Session --
@@ -199,7 +199,7 @@ package body User_Server is
    overriding function User_Cap
      (Item : in out User_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Users.User.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.User.Server.Cap_Of (Context, Item));
 
    -----------------
    -- Write_State --
@@ -214,7 +214,7 @@ package body User_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream, Rose.Interfaces.Users.User.Server
-          .Identifier_Of (The_User'Access));
+          .Identifier_Of (Context, The_User'Access));
       Natural'Write (Stream, Name_Last);
       for I in 1 .. Name_Last loop
          Character'Write (Stream, User_Name (I));

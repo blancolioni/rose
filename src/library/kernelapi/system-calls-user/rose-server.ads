@@ -34,6 +34,47 @@ package Rose.Server is
    --  identifier. A handler registered without Owns serves every
    --  identifier.
 
+   --  The server packages that idle generates keep the objects attached
+   --  to a context in the context, not in the package, so that each
+   --  context serves only its own objects (idle#108, #940). Their
+   --  handlers are given the context that received the call.
+
+   type Context_Handler is access
+     procedure (Context    : in out Server_Context;
+                Invocation : in out Rose.Invocation.Invocation_Record);
+
+   type Context_Owner_Function is access
+     function (Context    : Server_Context;
+               Identifier : Rose.Objects.Capability_Identifier)
+               return Boolean;
+
+   procedure Register_Context_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Context_Handler;
+      Owns     : Context_Owner_Function);
+   --  As Register_Handler with Owns, for a handler and an Owns that are
+   --  given the context.
+
+   type Interface_Table is abstract tagged limited null record;
+   --  A server package's table of the objects attached to a context,
+   --  which the package extends.
+
+   type Interface_Table_Access is access all Interface_Table'Class;
+
+   function Table
+     (Context      : Server_Context;
+      Interface_Id : Rose.Objects.Endpoint_Id)
+      return Interface_Table_Access;
+   --  The table that Add_Table added for Interface_Id, or null if none.
+
+   procedure Add_Table
+     (Context      : in out Server_Context;
+      Interface_Id : Rose.Objects.Endpoint_Id;
+      Table        : not null Interface_Table_Access);
+   --  Keep Table for Interface_Id in Context. The table lives as long as
+   --  the program: a context has no finalization to free it.
+
    function New_Identifier return Rose.Objects.Capability_Identifier;
    --  An identifier for a new object, unique in the process among the
    --  identifiers in use, so that the objects of every server package in
@@ -206,12 +247,25 @@ private
 
    type Endpoint_Record is
       record
-         Endpoint  : Rose.Objects.Endpoint_Id;
-         Handler   : Invocation_Handler;
-         Owns      : Owner_Function;
-         Blocked   : Boolean;
-         Params    : Rose.Invocation.Invocation_Record;
+         Endpoint     : Rose.Objects.Endpoint_Id;
+         Handler      : Invocation_Handler;
+         Owns         : Owner_Function;
+         With_Context : Context_Handler;
+         Context_Owns : Context_Owner_Function;
+         Blocked      : Boolean;
+         Params       : Rose.Invocation.Invocation_Record;
       end record;
+   --  A handler is either Handler, with Owns, or With_Context, with
+   --  Context_Owns.
+
+   type Table_Record is
+      record
+         Interface_Id : Rose.Objects.Endpoint_Id;
+         Table        : Interface_Table_Access;
+      end record;
+
+   package Table_Vectors is
+     new Ada.Containers.Vectors (Positive, Table_Record);
 
    type Endpoint_Array is
      array (1 .. Max_Handlers) of Endpoint_Record;
@@ -225,6 +279,7 @@ private
          Block_Reply    : Boolean := False;
          Has_Signals    : Boolean := False;
          Hook           : Receive_Hook := null;
+         Tables         : Table_Vectors.Vector;
       end record;
 
    type Server_Instance is limited

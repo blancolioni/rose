@@ -99,7 +99,7 @@ package body Keyboard.Server is
    overriding function Event_Source_Cap
      (Item : in out Source_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Devices.Event_Source.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Source.Server.Cap_Of (Context, Item));
 
    ----------------------
    -- Handle_Interrupt --
@@ -152,7 +152,8 @@ package body Keyboard.Server is
    overriding function Interrupt_Handler_Cap
      (Item : in out Interrupt_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Devices.Interrupt_Handler.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Interrupt_Handler.Server.Cap_Of
+         (Context, Item));
 
    ------------------
    -- Register_IRQ --

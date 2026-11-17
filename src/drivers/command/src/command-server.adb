@@ -67,7 +67,7 @@ package body Command.Server is
      (Item : in out Registry_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Commands.Map.Server.Cap_Of
-         (Item, Rose.Interfaces.Commands.Map.Lookup_Interface));
+         (Context, Item, Rose.Interfaces.Commands.Map.Lookup_Interface));
 
    -------------------
    -- Create_Server --
@@ -117,7 +117,7 @@ package body Command.Server is
    overriding function Map_Cap
      (Item : in out Registry_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Commands.Map.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Commands.Map.Server.Cap_Of (Context, Item));
 
    ------------
    -- Remove --

@@ -27,13 +27,15 @@ package body Replaceable_Test_Server is
    --  A helper with this name calls Wait_With, and calls it again each
    --  time it fails, until it is answered.
 
+   Context : aliased Rose.Server.Server_Context;
+
    type Named_Server is
      new Rose.Interfaces.Common.Named.Server.Named_Interface with null record;
 
    overriding function Named_Cap
      (Item : in out Named_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Common.Named.Server.Cap_Of (Context, Item));
 
    overriding function Name (Item : in out Named_Server) return String;
 
@@ -44,7 +46,7 @@ package body Replaceable_Test_Server is
    overriding function Held_Call_Cap
      (Item : in out Held_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Held_Call.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Held_Call.Server.Cap_Of (Context, Item));
 
    overriding function Wait (Item : in out Held_Server) return Natural;
 
@@ -59,7 +61,6 @@ package body Replaceable_Test_Server is
      (Item  : in out Held_Server;
       Value : Natural);
 
-   Context         : aliased Rose.Server.Server_Context;
    The_Named       : aliased Named_Server;
    The_Held        : aliased Held_Server;
    Served_Name     : Ada.Strings.Unbounded.Unbounded_String;
@@ -126,10 +127,11 @@ package body Replaceable_Test_Server is
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Service_Cap);
 
-      Served := Rose.Interfaces.Common.Named.Server.Cap_Of (The_Named);
+      Served := Rose.Interfaces.Common.Named.Server.Cap_Of
+        (Context, The_Named);
       Control := Rose.Replacement.Replaceable_Cap;
       Saver := Rose.Replacement.Saveable_Cap;
-      Held := Rose.Interfaces.Held_Call.Server.Cap_Of (The_Held);
+      Held := Rose.Interfaces.Held_Call.Server.Cap_Of (Context, The_Held);
    end Create_Server;
 
    ----------
@@ -316,10 +318,12 @@ package body Replaceable_Test_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream,
-         Rose.Interfaces.Common.Named.Server.Identifier_Of (The_Named'Access));
+         Rose.Interfaces.Common.Named.Server.Identifier_Of
+           (Context, The_Named'Access));
       Rose.Objects.Capability_Identifier'Write
         (Stream,
-         Rose.Interfaces.Held_Call.Server.Identifier_Of (The_Held'Access));
+         Rose.Interfaces.Held_Call.Server.Identifier_Of
+           (Context, The_Held'Access));
       String'Output (Stream, Ada.Strings.Unbounded.To_String (Served_Name));
       Natural'Write (Stream, Calls);
       Named.Add (Service_Name, Service_Cap);

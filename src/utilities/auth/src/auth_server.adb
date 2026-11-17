@@ -166,7 +166,8 @@ package body Auth_Server is
 
    function Admin_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of (The_Admin);
+      return Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of
+        (Context, The_Admin);
    end Admin_Cap;
 
    --------------------
@@ -176,7 +177,7 @@ package body Auth_Server is
    overriding function Auth_Admin_Cap
      (Item : in out Admin_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Auth_Admin.Server.Cap_Of (Context, Item));
 
    --------------
    -- Auth_Cap --
@@ -184,7 +185,7 @@ package body Auth_Server is
 
    function Auth_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Users.Auth.Server.Cap_Of (The_Auth);
+      return Rose.Interfaces.Users.Auth.Server.Cap_Of (Context, The_Auth);
    end Auth_Cap;
 
    --------------
@@ -194,7 +195,7 @@ package body Auth_Server is
    overriding function Auth_Cap
      (Item : in out Auth_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Users.Auth.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Auth.Server.Cap_Of (Context, Item));
 
    -------------------
    -- Create_Server --
@@ -214,7 +215,8 @@ package body Auth_Server is
       Rose.Interfaces.Users.Auth.Server.Attach
         (Context, The_Auth'Access, Auth_Id);
       Rose.Server.Publish_Interface
-        (Rose.Interfaces.Users.Auth.Server.Interface_Cap (The_Auth'Access));
+        (Rose.Interfaces.Users.Auth.Server.Interface_Cap
+           (Context, The_Auth'Access));
       Rose.Interfaces.Users.Auth_Admin.Server.Attach
         (Context, The_Admin'Access, Admin_Id);
       Rose.Replacement.Attach
@@ -535,11 +537,11 @@ package body Auth_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream, Rose.Interfaces.Users.Auth.Server
-          .Identifier_Of (The_Auth'Access));
+          .Identifier_Of (Context, The_Auth'Access));
       Rose.Objects.Capability_Identifier'Write
         (Stream,
          Rose.Interfaces.Users.Auth_Admin.Server
-           .Identifier_Of (The_Admin'Access));
+           .Identifier_Of (Context, The_Admin'Access));
       Natural'Write (Stream, Natural (Users.Length));
 
       for Item of Users loop
