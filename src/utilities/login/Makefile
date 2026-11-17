@@ -41,6 +41,7 @@ login:
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl \
 	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-segment.idl \
 	    $(INTERFACES)/processes-server.idl \

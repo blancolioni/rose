@@ -32,7 +32,6 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
 	$(BUILDDIR)/rose-interfaces-files-directory-client.o \
 	$(BUILDDIR)/rose-interfaces-files-file-client.o \
-	$(BUILDDIR)/rose-interfaces-processes-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \
 	$(BUILDDIR)/rose-interfaces-common-named-client.o \
@@ -40,7 +39,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-partitions-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-partition_setup.o \
 	$(BUILDDIR)/rose-interfaces-storage-partition_setup-client.o \
-	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-region.o \
 	$(BUILDDIR)/rose-interfaces-users-rights.o \
 	$(BUILDDIR)/rose-interfaces-users-rights-client.o \

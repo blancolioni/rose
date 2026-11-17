@@ -19,5 +19,6 @@ screen:
 	    $(INTERFACES)/processes-restorable.idl $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-process.idl $(INTERFACES)/processes-heap.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl
 	gprbuild $(GPRBUILD_CARGS)

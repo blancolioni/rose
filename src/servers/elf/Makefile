@@ -26,6 +26,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-checkpoints-page_log.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-page_log-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-process_control-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-dependent.o \

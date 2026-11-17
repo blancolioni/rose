@@ -16,6 +16,7 @@ with Rose.Interfaces.Processes.Executable.Server;
 with Rose.Interfaces.Processes.Kernel_Process.Client;
 with Rose.Interfaces.Processes.Memory.Client;
 with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Processes.Process_Control.Client;
 with Rose.Interfaces.Storage.Region.Client;
 with Rose.Interfaces.Storage.Bank.Client;
 
@@ -26,12 +27,14 @@ package body Elf.Server is
    Server_Context : Rose.Server.Server_Context;
    Memory_Client  : Rose.Interfaces.Processes.Memory.Client.Memory_Client;
 
-   Last_Process   : Rose.Interfaces.Processes.Process.Client.Process_Client;
+   Last_Control   : Rose.Interfaces.Processes.Process_Control.Client
+     .Process_Control_Client;
    Last_Command   : Rose.Capabilities.Capability := 0;
    Have_Last      : Boolean := False;
-   --  What the last launch returned: the new process's Process interface,
-   --  or a command's endpoint cap. They are kept until the next launch,
-   --  because the reply to the launch sends them.
+   --  What the last launch returned: the new process's Process_Control
+   --  cap, which is all that its launcher gets (#99), or a command's
+   --  endpoint cap. They are kept until the next launch, because the
+   --  reply to the launch sends them.
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
 
@@ -314,7 +317,8 @@ package body Elf.Server is
 
    begin
       if Have_Last then
-         Rose.Interfaces.Processes.Process.Client.Close (Last_Process);
+         Rose.Interfaces.Processes.Process_Control.Client.Close
+           (Last_Control);
          Have_Last := False;
       end if;
       Delete_Cap (Last_Command);
@@ -436,9 +440,15 @@ package body Elf.Server is
          Last_Command := Command_Cap;
          return Command_Cap;
       else
-         Last_Process := Process_Client;
+
+         --  The launcher gets the process's Process_Control cap, not its
+         --  own Process cap, which elf has just used to load it (#99).
+
+         Last_Control := Control_Cap (Process_Client);
+         Rose.Interfaces.Processes.Process.Client.Close (Process_Client);
          Have_Last := True;
-         return Get_Interface_Cap (Process_Client);
+         return Rose.Interfaces.Processes.Process_Control.Client
+           .Get_Interface_Cap (Last_Control);
       end if;
    end Launch_Process;
 

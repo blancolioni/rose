@@ -13,6 +13,7 @@ with Rose.Interfaces.Processes.Memory.Server;
 with Rose.Interfaces.Checkpoints.Memory_Restore.Server;
 
 with Rose.Interfaces.Processes.Process.Server;
+with Rose.Interfaces.Processes.Process_Control.Server;
 with Rose.Interfaces.Caps.Receiver.Server;
 with Rose.Interfaces.Processes.Replacement.Server;
 with Rose.Interfaces.Processes.Replacer.Server;
@@ -197,6 +198,11 @@ package body Mem.Server is
    function Published_Interface
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
+
+   function Control_Cap
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+   --  The cap that the process's launcher holds (#99).
 
    function Heap_Interface
      (Id : Rose.Objects.Capability_Identifier)
@@ -444,6 +450,23 @@ package body Mem.Server is
       return True;
    end Commit_Replacement;
 
+   -----------------
+   -- Control_Cap --
+   -----------------
+
+   function Control_Cap
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
+   begin
+      if Pid = 0 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Mem.Processes.Get_Control_Cap (Pid);
+   end Control_Cap;
+
    -------------------
    -- Create_Server --
    -------------------
@@ -501,6 +524,7 @@ package body Mem.Server is
          Exit_Process   => Exit_Process'Access,
          Heap_Interface => Heap_Interface'Access,
          Bank           => Process_Bank'Access,
+         Control_Cap    => Control_Cap'Access,
          Publish_Interface => Publish_Interface'Access,
          Instanced      => True);
 
@@ -540,6 +564,17 @@ package body Mem.Server is
          Allow          => Allow_New_Version'Access,
          Commit         => Commit_Replacement'Access,
          Instanced      => True);
+
+      --  Attached last, for the same reason (#99). The launcher's cap
+      --  answers only these, so it can't change the process's segments
+      --  or act as the process.
+
+      Rose.Interfaces.Processes.Process_Control.Server.Attach_Interface
+        (Server_Context      => Server,
+         Published_Interface => Published_Interface'Access,
+         Destroy             => Destroy'Access,
+         Get_Object_Id       => Mem.Processes.Get_Object_Id'Access,
+         Instanced           => True);
 
    end Create_Server;
 
@@ -1171,6 +1206,7 @@ package body Mem.Server is
    procedure Remove_Instances (Id : Rose.Objects.Capability_Identifier) is
    begin
       Rose.Interfaces.Processes.Process.Server.Remove_Instance (Id);
+      Rose.Interfaces.Processes.Process_Control.Server.Remove_Instance (Id);
       Rose.Interfaces.Processes.Heap.Server.Remove_Instance (Id);
       Rose.Interfaces.Caps.Receiver.Server.Remove_Instance (Id);
    end Remove_Instances;

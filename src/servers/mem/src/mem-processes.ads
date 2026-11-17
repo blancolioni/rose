@@ -150,6 +150,12 @@ package Mem.Processes is
      (Process : Process_Id)
       return Rose.Capabilities.Capability;
 
+   function Get_Control_Cap
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability;
+   --  The Process_Control cap for Process, which its launcher holds
+   --  (#99). It is made when it is first asked for, and kept.
+
    procedure Set_Published_Interface_Cap
      (Process : Process_Id;
       Cap     : Rose.Capabilities.Capability);

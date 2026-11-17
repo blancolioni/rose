@@ -5,13 +5,15 @@ with Ada.Streams;
 with System.Storage_Elements;
 
 with Rose.Capabilities;
+with Rose.Invocation;
+with Rose.System_Calls;
 
 with Rose.Interfaces.Storage.Bank;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Processes.Launch;
 with Rose.Interfaces.Common.Named.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Files;
@@ -28,8 +30,43 @@ package body Tests.Processes is
      (Character'Pos ('h'), Character'Pos ('e'), Character'Pos ('l'),
       Character'Pos ('l'), Character'Pos ('o'));
 
+   function Answers
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Operation     : Natural)
+      return Boolean;
+   --  True if the object that Interface_Cap names gives a cap for its
+   --  operation number Operation, counted from 0 in the order of its
+   --  interface. It asks for that one cap, as a client does when it
+   --  loads its caps (idle#101).
+
    function Fail (Message : String) return Boolean;
    --  Report Message, and fail the test.
+
+   -------------
+   -- Answers --
+   -------------
+
+   function Answers
+     (Interface_Cap : Rose.Capabilities.Capability;
+      Operation     : Natural)
+      return Boolean
+   is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Interface_Cap);
+      Rose.System_Calls.Send_Word (Params, Natural (0));
+      Rose.System_Calls.Send_Word (Params, Operation);
+      Rose.System_Calls.Send_Word (Params, Natural (1));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return False;
+      end if;
+
+      Rose.System_Calls.Delete_Cap (Params.Caps (0));
+      return True;
+   end Answers;
 
    -------------------
    -- Bank_End_Test --
@@ -89,13 +126,14 @@ package body Tests.Processes is
         Tests.Registry.Launcher ("process_probe");
 
       function Launch_Probe
-        return Rose.Interfaces.Processes.Process.Process_Object'Class
+        return Rose.Interfaces.Processes.Process_Control
+          .Process_Control_Object'Class
       is (Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps));
-      --  A probe, which is launched with Launch and so has a Process cap,
-      --  as a command doesn't (#831).
+      --  A probe, which is launched with Launch and so has a
+      --  Process_Control cap, as a command doesn't (#831).
 
-      First : Rose.Interfaces.Processes.Process
-        .Process_Object'Class := Launch_Probe;
+      First : Rose.Interfaces.Processes.Process_Control
+        .Process_Control_Object'Class := Launch_Probe;
       Probe : Rose.Interfaces.Common.Named.Client.Named_Client;
    begin
       Ada.Text_IO.Put ("End process test");
@@ -103,6 +141,18 @@ package body Tests.Processes is
       Probe.Open (First.Published_Interface);
       if Probe.Name /= "probe" then
          return Fail ("the probe doesn't work");
+      end if;
+
+      --  The launcher holds the probe's Process_Control cap, not the
+      --  probe's own Process cap (#99). Process_Control has three
+      --  operations, Published_Interface, Destroy and Get_Object_Id, so
+      --  the cap answers for the third but not for a fourth: it can't
+      --  change the probe's segments, or exit or publish as the probe.
+
+      if not Answers (First.Process_Control_Cap, 2)
+        or else Answers (First.Process_Control_Cap, 3)
+      then
+         return Fail ("the launcher holds more than a Process_Control cap");
       end if;
 
       --  The launcher ends the probe's process. The caps that are held
@@ -123,8 +173,8 @@ package body Tests.Processes is
       --  again must not reach it.
 
       declare
-         Second       : Rose.Interfaces.Processes.Process
-           .Process_Object'Class :=
+         Second       : Rose.Interfaces.Processes.Process_Control
+           .Process_Control_Object'Class :=
            Launch_Probe;
          Second_Probe : Rose.Interfaces.Common.Named.Client.Named_Client;
       begin

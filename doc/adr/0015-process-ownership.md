@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-10-29
-- **Amended by:** #750, where the store, not mem, records which bank is each process's own, a process asks for its bank rather than starting with it, `Launch`'s bank is a plain cap, and the store tells mem of processes to end by a send that doesn't wait (sections 1, 2 and 6)
+- **Amended by:** #750, where the store, not mem, records which bank is each process's own, a process asks for its bank rather than starting with it, `Launch`'s bank is a plain cap, and the store tells mem of processes to end by a send that doesn't wait (sections 1, 2 and 6); #99, where `Launch` returns a `Process_Control` cap, not the process's own `Process` cap (section 2)
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 8 and 9), [ADR 0006](0006-signals.md) (signals, section 3), [ADR 0014](0014-banks.md) (banks), #424 (end a child process), #346 (delete files and directories), #142 (background job handles), #320 (reuse process table entries)
 
 ## Context
@@ -35,7 +35,7 @@ A process that launches another can end it, but nothing ends the processes that 
 
 ### 2. Ending a process destroys its bank
 
-- **`Destroy` on a `Process` cap, `Exit_Process` and the kill operation of ADR 0006 all destroy the process's bank.** Mem holds a cap for each process's bank, and destroys it when it ends the process.
+- **`Destroy` on a `Process` or `Process_Control` cap, `Exit_Process` and the kill operation of ADR 0006 all destroy the process's bank.** Mem holds a cap for each process's bank, and destroys it when it ends the process.
 - **Destroying the bank ends the subtree.** The store destroys the bank's sub-banks, deepest first. For each process that depends on one of them, the store invokes mem, which ends that process. The storage of all of them is released.
 - **Mem and the store orchestrate ending, not the processes.** Nothing in the processes being ended has to run, so ending works for a process that is blocked, faulting or misbehaving.
 
