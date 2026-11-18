@@ -239,6 +239,20 @@ package body Mem.Calls is
      (Process    : Rose.Objects.Object_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address)
    is
+      Unmapped : Boolean;
+   begin
+      Unmap (Process, Virtual, Unmapped);
+      if not Unmapped then
+         Rose.Console_IO.Put_Line
+           ("mem: unmap refused: page pinned for a call");
+      end if;
+   end Unmap;
+
+   procedure Unmap
+     (Process    : Rose.Objects.Object_Id;
+      Virtual    : Rose.Addresses.Virtual_Page_Address;
+      Unmapped   : out Boolean)
+   is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Rose.System_Calls.Initialize_Send
@@ -246,6 +260,7 @@ package body Mem.Calls is
       Rose.System_Calls.Send_Object_Id (Params, Process);
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Virtual));
       Rose.System_Calls.Invoke_Capability (Params);
+      Unmapped := not Params.Control.Flags (Rose.Invocation.Error);
    end Unmap;
 
 end Mem.Calls;

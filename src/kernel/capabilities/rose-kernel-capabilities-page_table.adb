@@ -47,7 +47,11 @@ package body Rose.Kernel.Capabilities.Page_Table is
          when Unmap_Page =>
 
             --  Data: the process's object id and the virtual page, which
-            --  the memory server no longer maps (ADR 0025).
+            --  the memory server no longer maps (ADR 0025). A page of a
+            --  buffer that the process has lent to a server in its call in
+            --  progress is still mapped in the server's shared slot, so it
+            --  is refused with Request_Would_Block, and stays mapped
+            --  (#972).
 
             declare
                use Rose.Invocation;
@@ -58,16 +62,20 @@ package body Rose.Kernel.Capabilities.Page_Table is
                Page_Index  : constant Parameter_Word_Index :=
                                (if Object_Fits_In_Word
                                 then 1 else 2);
+               Page        : constant Rose.Addresses.Virtual_Page_Address :=
+                               Rose.Addresses.Virtual_Page_Address
+                                 (Params.Data (Page_Index));
             begin
                if Pid = Rose.Kernel.Processes.Null_Process_Id then
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Invalid_Object);
+               elsif Rose.Kernel.Processes.Is_Pinned_Page (Pid, Page) then
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Request_Would_Block);
                else
                   Rose.Kernel.Processes.Unmap_Page
                     (Pid          => Pid,
-                     Virtual_Page =>
-                       Rose.Addresses.Virtual_Page_Address
-                         (Params.Data (Page_Index)));
+                     Virtual_Page => Page);
                   Params.Control :=
                     (Flags  => (Reply => True, others => False),
                      others => <>);
