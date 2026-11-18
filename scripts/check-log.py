@@ -528,15 +528,21 @@ def check_entry(log, first, last, verbose, info):
     batches = 0
     batch_headers = 0
     batch_pages = 0
+    gone_pages = 0
     indexes = 0
     index_pages = 0
-    for kind, start, headers, listed in sections:
+    for number, (kind, start, headers, listed) in enumerate(sections):
         if kind == "batch":
-            ok, message = check_batch(log, start, headers, processes,
-                                      verbose)
+            # A batch before the kernel's tables was paged out between
+            # checkpoints, maybe before a checkpoint that failed (#971),
+            # and may hold pages of processes gone by this checkpoint.
+            ok, message, gone = check_batch(log, start, headers, processes,
+                                            verbose,
+                                            number < len(leading))
             batches += 1
             batch_headers += headers
             batch_pages += listed
+            gone_pages += gone
         else:
             ok, message = check_index(log, start, headers, processes,
                                       verbose)
@@ -551,6 +557,13 @@ def check_entry(log, first, last, verbose, info):
                     % (batches, "" if batches == 1 else "es",
                        batch_headers, "" if batch_headers == 1 else "s",
                        batch_pages))
+    if leading:
+        description += ("; %d paged out before the checkpoint"
+                        % sum(1 for kind, start, headers, listed in leading
+                              if kind == "batch"))
+    if gone_pages:
+        description += ("; %d page%s of processes that are gone"
+                        % (gone_pages, "" if gone_pages == 1 else "s"))
     if indexes:
         description += ("; index: %d section%s, %d page%s"
                         % (indexes, "" if indexes == 1 else "s",
@@ -630,11 +643,14 @@ def find_sections(log, first, last, stop_magic, stop_name):
         location = start + headers + listed
 
 
-def check_batch(log, first, headers, processes, verbose):
+def check_batch(log, first, headers, processes, verbose, paged_out):
     """Check the header pages of the batch that starts at page first: each
-    page they list belongs to one of the memory server's processes.
+    page they list belongs to one of the memory server's processes.  If
+    paged_out, the batch was paged out between checkpoints, and its pages
+    may belong to processes that are gone (ADR 0028, section 4).
 
-    Returns (ok, message)."""
+    Returns (ok, message, pages of processes that are gone)."""
+    gone = 0
     for location in range(first, first + headers):
         page = log.page(location)
         count = u32(page, 12)
@@ -646,11 +662,14 @@ def check_batch(log, first, headers, processes, verbose):
             reference = int.from_bytes(page[16 + i * 5:21 + i * 5],
                                        "little")
             if reference & 0xFFFF not in processes:
+                if paged_out:
+                    gone += 1
+                    continue
                 return False, ("location %d: page %05x belongs to memory "
                                "process %d, which is not in the tables"
                                % (location, reference >> 16,
-                                  reference & 0xFFFF))
-    return True, None
+                                  reference & 0xFFFF)), 0
+    return True, None, gone
 
 
 def check_index(log, first, headers, processes, verbose):

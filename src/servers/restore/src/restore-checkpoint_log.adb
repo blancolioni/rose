@@ -171,9 +171,16 @@ package body Restore.Checkpoint_Log is
       Header_Pages : Natural := 0;
       Saved        : Natural := 0;
 
-      function Check_Batches (First : Positive; Last : Natural) return Boolean;
-      --  Check that every page that the batches from page First to page
-      --  Last list belongs to a process in the memory server's tables.
+      function Check_Batches
+        (First     : Positive;
+         Last      : Natural;
+         Paged_Out : Boolean)
+         return Boolean;
+      --  Check the header pages of the batches from page First to page
+      --  Last, and, unless Paged_Out, that every page they list belongs
+      --  to a process in the memory server's tables.  Batches paged out
+      --  between checkpoints may list pages of processes that are gone by
+      --  the checkpoint, which only waste space (ADR 0028, section 4).
       --  Find_Layout has already checked that the batches and index
       --  sections fill those pages.
 
@@ -181,7 +188,11 @@ package body Restore.Checkpoint_Log is
       -- Check_Batches --
       -------------------
 
-      function Check_Batches (First : Positive; Last : Natural) return Boolean
+      function Check_Batches
+        (First     : Positive;
+         Last      : Natural;
+         Paged_Out : Boolean)
+         return Boolean
       is
          Index : Positive := First;
       begin
@@ -208,8 +219,9 @@ package body Restore.Checkpoint_Log is
                      end if;
 
                      for I in 1 .. Header.Count loop
-                        if not Is_Mem_Process
-                          (Rose.Words.Word_32 (Header.Pages (I).Process))
+                        if not Paged_Out
+                          and then not Is_Mem_Process
+                            (Rose.Words.Word_32 (Header.Pages (I).Process))
                         then
                            Report_Bad_Entry
                              (Location,
@@ -284,8 +296,9 @@ package body Restore.Checkpoint_Log is
       --  server's tables: the batches before the kernel's tables, and
       --  those after the storage server's.
 
-      if not Check_Batches (1, Layout.Kernel_First - 1)
-        or else not Check_Batches (Layout.Batch_First, Layout.Mem_First - 1)
+      if not Check_Batches (1, Layout.Kernel_First - 1, Paged_Out => True)
+        or else not Check_Batches
+          (Layout.Batch_First, Layout.Mem_First - 1, Paged_Out => False)
       then
          return False;
       end if;

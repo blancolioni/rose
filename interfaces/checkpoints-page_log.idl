@@ -9,10 +9,18 @@ interface Checkpoints.Page_Log is
 
    function Append_Page (Page : Storage_Array) return Word;
    --  Append Page to the open entry, and return its log page, or 0 if
-   --  the entry has failed because the log is full or a write failed.
-   --  A failed entry is left out of the log when the checkpoint
-   --  commits, with every page appended to it, and the next entry
-   --  starts where it did.
+   --  it can't be appended. An append fails because the log is full,
+   --  and then every append fails until the checkpoint commits or the
+   --  memory server discards its batch. During a checkpoint, that fails
+   --  the checkpoint: its pages are dropped when it commits, and the
+   --  entry stays open with the pages appended before it started.
+   --  Between checkpoints, the memory server drops its batch with
+   --  Discard_Pages.
+   --
+   --  An append also fails because a write to the disk failed. The log
+   --  can't tell which pages reached the disk, so the whole entry is
+   --  left out of the log when the checkpoint commits, and the next
+   --  entry starts where it did. Discard_Pages doesn't clear that.
 
    procedure Read_Page
      (Log_Page : Word;
@@ -20,9 +28,18 @@ interface Checkpoints.Page_Log is
    --  Read log page Log_Page, from a committed entry or from the open
    --  one. A page that isn't in either reads as zeroes.
 
-   procedure Fail_Entry;
-   --  Leave the open entry out of the log when the checkpoint commits,
-   --  as if an append had failed. The memory server calls it when its
-   --  part of a checkpoint can't be completed.
+   procedure Fail_Checkpoint;
+   --  Fail the checkpoint being written, as if an append had failed:
+   --  its pages are dropped when it commits, and the entry stays open.
+   --  The memory server calls it when its part of a checkpoint can't be
+   --  completed.
+
+   procedure Discard_Pages (From : Word);
+   --  Drop log page From, which Append_Page returned for the open entry,
+   --  and every page appended after it, and let appends go on. From 0
+   --  drops no pages. Between checkpoints, the memory server calls it
+   --  when an append of a batch fails, with the log page of the batch's
+   --  first page, or 0 if that append failed. It does nothing during a
+   --  checkpoint.
 
 end Checkpoints.Page_Log;

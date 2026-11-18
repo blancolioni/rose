@@ -48,9 +48,46 @@ package body Log.Server is
    Active             : Boolean := False;
    Writing            : Boolean := False;
    Entry_Failed       : Boolean := False;
-   --  Set when the entry being written can't be completed, because the
-   --  log is full or a write failed.  Commit then leaves it out of the
-   --  log, so the previous entry is still the last one.
+   --  Set when a write to the disk fails.  log can't tell which of the
+   --  entry's pages reached the disk, so Commit leaves the whole entry
+   --  out of the log, and the previous entry is still the last one.
+
+   Append_Failed      : Boolean := False;
+   --  Set when an append fails, because the log is full or the page is
+   --  the wrong size, or when the memory server fails the checkpoint.
+   --  Only the pages since the checkpoint started, or since the memory
+   --  server's batch started, are lost (ADR 0028, section 11): Commit
+   --  rolls the entry back to Checkpoint_Mark, and between checkpoints
+   --  the memory server drops its batch with Page_Log.Discard_Pages.
+   --  Appends fail until then.
+
+   Checkpoint_Mark    : Log_Location_Id := 0;
+   --  The open entry's last location when the checkpoint being written
+   --  started, or 0 if no checkpoint is being written.  An entry with no
+   --  pages ends at its header, so a mark is never 0.
+
+   --  Nothing is reported to the console when a problem happens.  The
+   --  kernel's Append and Create, and Page_Log, are on the checkpoint's
+   --  path, and mem calls Page_Log while it handles a fault.  A message
+   --  can wait on a persistent console that checkpoint mode has blocked,
+   --  or that is waiting for mem, and the system would hang (#971).
+   --  Commit reports them instead, when the kernel is leaving checkpoint
+   --  mode.
+
+   type Problem_Type is
+     (No_Problem, No_Open_Entry, Bad_Page_Size, Log_Full,
+      Failed_By_Memory_Server, No_Checkpoint_To_Fail,
+      Cannot_Write_Pages, Cannot_Write_Header, No_Checkpoint_Started,
+      Unreported_Failed_Append, Bad_Read, Bad_Discard,
+      Discard_During_Checkpoint);
+
+   Failure       : Problem_Type := No_Problem;
+   --  Why the open entry or the checkpoint failed, if it did.
+
+   Other_Problem : Problem_Type := No_Problem;
+   Problem_Page  : Log_Location_Id := 0;
+   --  The first problem since the last commit that failed nothing, and
+   --  the log page it was about, or 0.
 
    Current_Log_Header : Log.Header.Entry_Header_Type;
    Header             : Log.Header.Log_Header_Type;
@@ -141,16 +178,41 @@ package body Log.Server is
    --  True if Entry_Header, read from Location, is an entry of this
    --  generation of the log.
 
-   procedure Fail_Entry (Message : String);
+   procedure Fail_Entry (Problem : Problem_Type);
+   --  Leave the whole open entry out of the log, because a write to the
+   --  disk failed.
 
-   procedure Fail_Page_Log_Entry
+   procedure Fail_Append (Problem : Problem_Type);
+   --  Fail appends until the checkpoint commits or the memory server
+   --  discards its batch.
+
+   procedure Note_Problem
+     (Problem : Problem_Type;
+      Page    : Log_Location_Id := 0);
+   --  Keep Problem for Commit to report, if it is the first.
+
+   procedure Put_Problem (Problem : Problem_Type);
+   --  Write a description of Problem, with no new line.
+
+   procedure Report_Problems;
+   --  Report the failure and the other problem, if any, and forget them.
+
+   procedure Discard_After (Last : Log_Location_Id);
+   --  Drop the open entry's pages after location Last, which is at or
+   --  after its header.
+
+   procedure Fail_Checkpoint
      (Id : Rose.Objects.Capability_Identifier);
-   --  Page_Log.Fail_Entry.
+   --  Page_Log.Fail_Checkpoint.
+
+   procedure Discard_Pages
+     (Id   : Rose.Objects.Capability_Identifier;
+      From : Rose.Words.Word);
+   --  Page_Log.Discard_Pages.
 
    procedure Sync_Devices;
    --  Return when everything written to the log devices is on the medium,
    --  and not only in a disk's write cache (#505).
-   --  Report Message, and leave the current entry out of the log.
 
    procedure Notify_Store_Committed;
    --  Tell the store that the entry is committed, and wait for it.
@@ -363,26 +425,21 @@ package body Log.Server is
    is
    begin
       if not Writing then
-         Rose.Console_IO.Put_Line ("log: append: no entry is open");
+         Note_Problem (No_Open_Entry);
          return 0;
       end if;
 
-      if Entry_Failed then
+      if Entry_Failed or else Append_Failed then
          return 0;
       end if;
 
       if Data'Length /= Log_Page_Size then
-         Rose.Console_IO.Put ("log: append: page is ");
-         Rose.Console_IO.Put (Natural (Data'Length));
-         Rose.Console_IO.Put (" bytes, expected ");
-         Rose.Console_IO.Put (Natural (Log_Page_Size));
-         Rose.Console_IO.New_Line;
-         Fail_Entry ("log: append: bad page");
+         Fail_Append (Bad_Page_Size);
          return 0;
       end if;
 
       if not Has_Room (Current_Log_Header.Log_Last + 1) then
-         Fail_Entry ("log: log is full");
+         Fail_Append (Log_Full);
          return 0;
       end if;
 
@@ -434,6 +491,31 @@ package body Log.Server is
          return;
       end if;
 
+      --  A checkpoint that failed loses only its own pages.  The pages
+      --  appended before it started may hold the only copy of pages that
+      --  the memory server has paged out, so the entry is rolled back to
+      --  where the checkpoint started, and stays open for the next
+      --  checkpoint to commit (ADR 0028, section 11).  A write to the
+      --  disk that failed still fails the whole entry.
+
+      if Append_Failed and then not Entry_Failed then
+         if Checkpoint_Mark = 0 then
+            Fail_Entry (No_Checkpoint_Started);
+         else
+            Discard_After (Checkpoint_Mark);
+            Append_Failed := False;
+            Checkpoint_Mark := 0;
+            Report_Problems;
+            Rose.Console_IO.Put
+              ("log: checkpoint not committed; the open entry keeps ");
+            Rose.Console_IO.Put
+              (Natural (Current_Log_Header.Log_Last
+               - Current_Log_Header.Log_First + 1));
+            Rose.Console_IO.Put_Line (" pages");
+            return;
+         end if;
+      end if;
+
       --  The entry's pages go to the disk before its header, so that a
       --  header is only ever found with all of its pages.  A disk can
       --  report a write complete while it is still in its write cache, and
@@ -459,10 +541,12 @@ package body Log.Server is
                Last_Committed := Next_Log_Location;
                Next_Log_Location := Current_Log_Header.Log_Last + 1;
             else
-               Fail_Entry ("log: commit: cannot write entry header");
+               Fail_Entry (Cannot_Write_Header);
             end if;
          end;
       end if;
+
+      Report_Problems;
 
       if Entry_Failed then
          Rose.Console_IO.Put_Line ("log: checkpoint not committed");
@@ -509,6 +593,17 @@ package body Log.Server is
 
       if not Writing then
          Open_Entry;
+      end if;
+
+      --  If the checkpoint fails, Commit rolls the entry back to here.
+      --  The memory server drops a batch that failed before anything
+      --  else can start a checkpoint, so a failed append here is one
+      --  that it never discarded, and this checkpoint fails too.
+
+      Checkpoint_Mark := Current_Log_Header.Log_Last;
+
+      if Append_Failed then
+         Note_Problem (Unreported_Failed_Append);
       end if;
 
    end Create;
@@ -569,7 +664,8 @@ package body Log.Server is
         (Server_Context => Log_Server,
          Append_Page    => Append_Page'Access,
          Read_Page      => Read_Log_Page'Access,
-         Fail_Entry     => Fail_Page_Log_Entry'Access);
+         Fail_Checkpoint => Fail_Checkpoint'Access,
+         Discard_Pages  => Discard_Pages'Access);
 
       for Page of Page_Buffer loop
          for Element of Page loop
@@ -579,31 +675,119 @@ package body Log.Server is
 
    end Create_Server;
 
-   ----------------
-   -- Fail_Entry --
-   ----------------
+   -------------------
+   -- Discard_After --
+   -------------------
 
-   procedure Fail_Entry (Message : String) is
+   procedure Discard_After (Last : Log_Location_Id) is
    begin
-      if not Entry_Failed then
-         Rose.Console_IO.Put_Line (Message);
-         Entry_Failed := True;
+      if Last >= Current_Log_Header.Log_Last then
+         return;
       end if;
-   end Fail_Entry;
 
-   -------------------------
-   -- Fail_Page_Log_Entry --
-   -------------------------
+      Current_Log_Header.Log_Last := Last;
 
-   procedure Fail_Page_Log_Entry
+      --  The buffer holds the entry's pages from Page_Buffer_Loc to its
+      --  last.  Pages after Last that were already written stay on the
+      --  disk until later pages overwrite them: nothing reads them,
+      --  since the entry's header is written last and names its end.
+
+      if Last < Page_Buffer_Loc then
+         Page_Buffer_Last := 0;
+         Page_Buffer_Loc := Last + 1;
+      else
+         Page_Buffer_Last := Page_Buffer_Count (Last - Page_Buffer_Loc + 1);
+      end if;
+   end Discard_After;
+
+   -------------------
+   -- Discard_Pages --
+   -------------------
+
+   procedure Discard_Pages
+     (Id   : Rose.Objects.Capability_Identifier;
+      From : Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      Location : constant Log_Location_Id := Log_Location_Id (From);
+   begin
+      if not Writing then
+         Note_Problem (No_Open_Entry);
+         return;
+      end if;
+
+      --  During a checkpoint, a failed append fails the checkpoint, and
+      --  only Commit rolls it back.
+
+      if Checkpoint_Mark /= 0 then
+         Note_Problem (Discard_During_Checkpoint);
+         return;
+      end if;
+
+      if Location /= 0 then
+         if Location < Current_Log_Header.Log_First
+           or else Location > Current_Log_Header.Log_Last
+         then
+            Note_Problem (Bad_Discard, Location);
+            return;
+         end if;
+
+         Discard_After (Location - 1);
+      end if;
+
+      --  After a failed write to the disk, the entry stays failed.
+      --  Otherwise the batch's failure no longer fails anything, but is
+      --  still worth reporting.
+
+      if Append_Failed and then not Entry_Failed then
+         Note_Problem (Failure);
+         Failure := No_Problem;
+      end if;
+
+      Append_Failed := False;
+   end Discard_Pages;
+
+   -----------------
+   -- Fail_Append --
+   -----------------
+
+   procedure Fail_Append (Problem : Problem_Type) is
+   begin
+      if not Append_Failed then
+         Append_Failed := True;
+         if Failure = No_Problem then
+            Failure := Problem;
+         end if;
+      end if;
+   end Fail_Append;
+
+   ---------------------
+   -- Fail_Checkpoint --
+   ---------------------
+
+   procedure Fail_Checkpoint
      (Id : Rose.Objects.Capability_Identifier)
    is
       pragma Unreferenced (Id);
    begin
-      if Writing then
-         Fail_Entry ("log: entry failed by the memory server");
+      if Writing and then Checkpoint_Mark /= 0 then
+         Fail_Append (Failed_By_Memory_Server);
+      else
+         Note_Problem (No_Checkpoint_To_Fail);
       end if;
-   end Fail_Page_Log_Entry;
+   end Fail_Checkpoint;
+
+   ----------------
+   -- Fail_Entry --
+   ----------------
+
+   procedure Fail_Entry (Problem : Problem_Type) is
+   begin
+      if not Entry_Failed then
+         Entry_Failed := True;
+         Failure := Problem;
+      end if;
+   end Fail_Entry;
 
    -----------------
    -- First_Entry --
@@ -646,7 +830,7 @@ package body Log.Server is
                Success    => Success);
             Page_Buffer_Last := 0;
             if not Success then
-               Fail_Entry ("log: cannot write entry pages");
+               Fail_Entry (Cannot_Write_Pages);
             end if;
          end;
 
@@ -758,6 +942,21 @@ package body Log.Server is
       end;
    end Next_Entry;
 
+   ------------------
+   -- Note_Problem --
+   ------------------
+
+   procedure Note_Problem
+     (Problem : Problem_Type;
+      Page    : Log_Location_Id := 0)
+   is
+   begin
+      if Other_Problem = No_Problem then
+         Other_Problem := Problem;
+         Problem_Page := Page;
+      end if;
+   end Note_Problem;
+
    ----------------------------
    -- Notify_Store_Committed --
    ----------------------------
@@ -780,6 +979,8 @@ package body Log.Server is
    begin
       Writing := True;
       Entry_Failed := False;
+      Append_Failed := False;
+      Checkpoint_Mark := 0;
       --  The startup scan reads into Current_Log_Header, so after a
       --  restart it holds whatever page followed the last entry.  Set
       --  each field, rather than assigning a whole header: that would
@@ -794,7 +995,7 @@ package body Log.Server is
       Page_Buffer_Loc := Current_Log_Header.Log_First;
 
       if not Has_Room (Next_Log_Location) then
-         Fail_Entry ("log: log is full");
+         Fail_Append (Log_Full);
       end if;
    end Open_Entry;
 
@@ -884,6 +1085,44 @@ package body Log.Server is
       end if;
    end Page_Count;
 
+   -----------------
+   -- Put_Problem --
+   -----------------
+
+   procedure Put_Problem (Problem : Problem_Type) is
+      procedure Put (Text : String) renames Rose.Console_IO.Put;
+   begin
+      case Problem is
+         when No_Problem =>
+            null;
+         when No_Open_Entry =>
+            Put ("no entry is open");
+         when Bad_Page_Size =>
+            Put ("a page was the wrong size");
+         when Log_Full =>
+            Put ("log is full");
+         when Failed_By_Memory_Server =>
+            Put ("checkpoint failed by the memory server");
+         when No_Checkpoint_To_Fail =>
+            Put ("the memory server failed a checkpoint, "
+                 & "but none was being written");
+         when Cannot_Write_Pages =>
+            Put ("cannot write entry pages");
+         when Cannot_Write_Header =>
+            Put ("cannot write entry header");
+         when No_Checkpoint_Started =>
+            Put ("commit, but no checkpoint was started");
+         when Unreported_Failed_Append =>
+            Put ("checkpoint started after a failed append");
+         when Bad_Read =>
+            Put ("read of a page outside the log");
+         when Bad_Discard =>
+            Put ("discard of a page outside the open entry");
+         when Discard_During_Checkpoint =>
+            Put ("discard during a checkpoint");
+      end case;
+   end Put_Problem;
+
    ----------
    -- Read --
    ----------
@@ -911,7 +1150,7 @@ package body Log.Server is
       Success  : Boolean := False;
    begin
       if Page'Length /= Log_Page_Size then
-         Rose.Console_IO.Put_Line ("log: read page: buffer is not one page");
+         Note_Problem (Bad_Page_Size);
       elsif not Active
         or else Location = 0
         or else Location
@@ -919,9 +1158,7 @@ package body Log.Server is
              then Current_Log_Header.Log_Last
              else Next_Log_Location - 1)
       then
-         Rose.Console_IO.Put ("log: read page: no log page ");
-         Rose.Console_IO.Put (Log_Page);
-         Rose.Console_IO.New_Line;
+         Note_Problem (Bad_Read, Location);
       elsif Writing
         and then Location >= Page_Buffer_Loc
         and then Location
@@ -968,6 +1205,33 @@ package body Log.Server is
          Page := (others => 0);
       end if;
    end Read_Page;
+
+   ---------------------
+   -- Report_Problems --
+   ---------------------
+
+   procedure Report_Problems is
+   begin
+      if Failure /= No_Problem then
+         Rose.Console_IO.Put ("log: ");
+         Put_Problem (Failure);
+         Rose.Console_IO.New_Line;
+      end if;
+
+      if Other_Problem /= No_Problem then
+         Rose.Console_IO.Put ("log: ");
+         Put_Problem (Other_Problem);
+         if Problem_Page /= 0 then
+            Rose.Console_IO.Put (": log page ");
+            Rose.Console_IO.Put (Natural (Problem_Page));
+         end if;
+         Rose.Console_IO.New_Line;
+      end if;
+
+      Failure := No_Problem;
+      Other_Problem := No_Problem;
+      Problem_Page := 0;
+   end Report_Problems;
 
    -----------
    -- Reset --

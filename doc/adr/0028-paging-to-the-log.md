@@ -74,6 +74,7 @@ shared pages                                            → commit
 - **At a checkpoint,** `mem` writes its last batch first: the changed pages still in memory. Then it adds the table of changes to the index, and writes the index pages that changed. Its tables come last, since its process records name the new index directories.
 - **Index pages are preceded by a header page of their own kind,** which counts them, so that a reader can skip them.
 - **After the commit, the table of changes is empty.** Every page it named is in the committed index.
+- **`log` marks where each checkpoint starts** in the open entry. If the checkpoint fails, `log` rolls the entry back to the mark when it commits, rather than leaving the whole entry out. The entry stays open with the batches before the mark, and the next checkpoint commits them. Those batches may hold the only copy of pages that are no longer in memory.
 
 A page that is paged out and not changed again is correct for the checkpoint that commits its entry. To change, it must be faulted back in, and is then written again later in the same entry, or in a later one. The table of changes keeps only its latest copy.
 
@@ -128,6 +129,8 @@ So a restore does about the same work whatever the size of the log, and memory f
 
 - **A fault that finds no page,** after `mem` has paged out everything it can, and with no checkpoint on the way to free the table of changes, fails the faulting process. It no longer leaves the process waiting forever.
 - **If the log is full,** `mem` can't write changed pages. It still drops clean ones, and when only changed pages are left, it fails the faulting process. Neither the table of changes nor the index ever names a page that `log` failed to write.
+- **A failed append loses only its own part of the entry.** During a checkpoint, it fails the checkpoint, and `log` drops the checkpoint's pages (section 4); so does `Page_Log.Fail_Checkpoint`, when `mem` can't complete its part. Between checkpoints, `mem` drops the batch that failed with `Page_Log.Discard_Pages`, which discards the open entry back to the batch's first log page. `mem` frees a page only after its batch is appended, so the pages of a dropped batch are still in memory.
+- **A write to the disk that fails** still fails the whole entry, since `log` can't tell which of its pages reached the disk.
 
 ### 12. Interfaces and formats
 
