@@ -1,4 +1,3 @@
-with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Interfaces.Streams.Reader;
@@ -54,9 +53,11 @@ package Exec.Library is
    --  The name program Id was installed with, or nothing if there is
    --  none.
 
-   procedure Send_Install_Caps
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record);
+   function Install_Caps
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability_Array;
+   --  The caps that program Id was installed with, which every process
+   --  of it starts with.
 
    procedure Get_Metadata
      (Id     : Rose.Objects.Capability_Identifier;

@@ -111,8 +111,6 @@ package body Rose.Kernel.Invocation is
                        or else Log_Invocation)
         and then not Params.Control.Flags
           (No_Trace);
-        --  or else Params.Control.Last_Sent_Cap > 3
-        --      or else Params.Control.Last_Sent_Word > 7;
 
       Log_Details : constant Boolean := False;
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
@@ -131,16 +129,8 @@ package body Rose.Kernel.Invocation is
          Set_Current_State (Pid, Blocked);
       end if;
 
-      if False then
-         if Params.Control.Last_Sent_Cap > 3 then
-            Rose.Boot.Console.Put_Line
-              ("warning: more than 4 sent caps is deprecated");
-         end if;
-         if Params.Control.Last_Sent_Word > 7 then
-            Rose.Boot.Console.Put_Line
-              ("warning: more than 8 sent words is deprecated");
-         end if;
-      end if;
+      --  An invocation sends and asks for at most four caps, because
+      --  Last_Sent_Cap and Last_Recv_Cap have two bits (#234).
 
       Params.Reply_Cap := Params.Cap;
 

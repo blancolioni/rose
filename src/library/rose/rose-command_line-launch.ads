@@ -14,7 +14,10 @@ package Rose.Command_Line.Launch is
    --  call, decodes the arguments, calls the command, and replies.
    --
    --  The IDL compiler gives each argument its place in the call
-   --  (blancolioni/idle#2):
+   --  (blancolioni/idle#2). An invocation carries at most four caps, so
+   --  a call with more comes in parts: the parts before the last have
+   --  the Continued flag and only caps, and Receive keeps their caps, in
+   --  order, before those of the last part (#234).
    --
    --    caps        the members of the roles the command inherits, in
    --                role order
@@ -53,6 +56,9 @@ package Rose.Command_Line.Launch is
 
    Max_Result_Caps : constant := 4;
    --  The most cap results.
+
+   Max_Argument_Caps : constant := 16;
+   --  The most caps a launch call can bring, in all its parts.
 
    type Launch_Call is limited private;
 
@@ -153,9 +159,16 @@ private
    type Result_Cap_Array is
      array (0 .. Max_Result_Caps - 1) of Rose.Capabilities.Capability;
 
+   type Argument_Cap_Array is
+     array (0 .. Max_Argument_Caps - 1) of Rose.Capabilities.Capability;
+
    type Launch_Call is limited
       record
          Params        : aliased Rose.Invocation.Invocation_Record;
+         Argument_Caps : Argument_Cap_Array :=
+           (others => Rose.Capabilities.Null_Capability);
+         Argument_Count : Natural := 0;
+         --  The caps of every part of the call, in order.
          Buffer        : Launch_Buffer;
          Buffer_Length : System.Storage_Elements.Storage_Count := 0;
          Result_Words  : Result_Word_Array := (others => 0);

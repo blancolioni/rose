@@ -3,6 +3,7 @@ with System.Storage_Elements;
 with Rose.Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
+with Rose.System_Calls.Client;
 
 package body Console.Calls is
 
@@ -18,6 +19,47 @@ package body Console.Calls is
       Text   : String);
    --  Write Text to the serial port whose data and line status ports are
    --  Data and Status
+
+   --------------
+   -- Get_Caps --
+   --------------
+
+   procedure Get_Caps is
+
+      Next_Index : Positive := 1;
+
+      procedure Next (Cap : out Rose.Capabilities.Capability);
+
+      ----------
+      -- Next --
+      ----------
+
+      procedure Next (Cap : out Rose.Capabilities.Capability) is
+      begin
+         Cap :=
+           Rose.System_Calls.Client.Get_Capability
+             (Get_Cap_From_Set, (1 => Rose.Words.Word (Next_Index)));
+         Next_Index := Next_Index + 1;
+      end Next;
+
+      Delete_Cap : Rose.Capabilities.Capability;
+
+   begin
+      Next (Console_Memory_Cap);
+      Next (Console_Cursor_Cap);
+      Next (Serial_Data_Cap);
+      Next (Serial_Status_Cap);
+      Next (Framebuffer_Tag_Cap);
+      Next (Command_Line_Cap);
+      Next (Mirror_Data_Cap);
+      Next (Mirror_Status_Cap);
+      Next (Delete_Cap);
+
+      --  Nothing reads the cap set again (#826).
+
+      Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
+   end Get_Caps;
 
    ---------------------
    -- Has_Framebuffer --

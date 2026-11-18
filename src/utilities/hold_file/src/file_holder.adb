@@ -78,7 +78,6 @@ package body File_Holder is
       Cap_Set_Service : Rose.Capabilities.Capability;
       Control         : out Rose.Capabilities.Capability)
    is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Programs : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
       Endpoint : Rose.Capabilities.Capability;
       Served   : Rose.Capabilities.Capability;
@@ -93,7 +92,7 @@ package body File_Holder is
            Programs.Find ("file");
       begin
          Endpoint :=
-           Launcher.Launch_Command (Rose.System_Calls.Own_Bank.Cap, No_Caps);
+           Launcher.Launch_Command (Rose.System_Calls.Own_Bank.Cap);
          Rose.Core.File_Client.Call
            (Endpoint        => Endpoint,
             Create_Endpoint => Rose.System_Calls.Create_Endpoint_Capability,

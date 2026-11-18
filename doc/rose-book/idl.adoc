@@ -195,7 +195,6 @@ The grammar also allows a list of constraints after an interface name, but no in
 | `Stream_Element_Count`, `Stream_Element_Offset` | `System.Storage_Elements.Storage_Count`, `Storage_Offset` | One data word
 | `Address` | `System.Address` | One data word
 | `Capability` | `Rose.Capabilities.Capability` | One capability
-| `Capability_Array` | `Rose.Capabilities.Capability_Array` | All the remaining capabilities
 | `String` | `String` | The shared buffer
 | `Storage_Array`, `Stream_Element_Array` | `System.Storage_Elements.Storage_Array` | The shared buffer
 | `Page` | `Storage_Array (1 .. 4096)`, page aligned | The shared buffer
@@ -317,7 +316,9 @@ A server that answers an interface capability by hand, as the kernel does for `K
 [#encoding]
 ==== How arguments are encoded
 
-An invocation carries up to 16 data words, up to 16 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
+An invocation carries up to 16 data words, up to 4 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
+`idle` refuses a subprogram whose capabilities, or those of its reply, come to more than four.
+There is no capability array: a list of capabilities is passed as one cap set (`Caps.Cap_Set`), or one at a time, as `Processes.Starting_Process` takes them (#234).
 The generated client fills them in the order the parameters are declared, and the generated server reads them back in the same order.
 
 * *Scalars* go in the data words, one after another.
@@ -325,8 +326,6 @@ The generated client fills them in the order the parameters are declared, and th
   So in `+Read_Blocks (Start : Block_Address_Type; Count : Natural; ...)+`, `Start` is in words 0 and 1 and `Count` in word 2.
 * *Capabilities* go in the capability slots, one after another.
   An `interface X` argument is sent as the client's interface capability, and the server's handler receives it as a plain `Capability`.
-* *A `Capability_Array`* is sent one capability at a time, and the server copies every remaining capability into it.
-  It must therefore be the last parameter that carries capabilities.
 * *A `String` or `Storage_Array`* goes in the shared buffer.
   The server does not copy it: its handler sees the client's buffer in place, through `Buffer_Address` and `Buffer_Length`.
   For an `out` parameter the server writes into that buffer directly.

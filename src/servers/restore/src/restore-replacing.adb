@@ -146,7 +146,6 @@ package body Restore.Replacing is
    is
       package Replacements renames Rose.Interfaces.Processes.Replacement
         .Client;
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Replacer : Rose.Interfaces.Processes.Replacer.Client.Replacer_Client;
       Last     : Natural;
@@ -237,8 +236,7 @@ package body Restore.Replacing is
               Rose.Interfaces.Processes.Launch.Client.Launch_Command
                 (Launcher,
                  Rose.Interfaces.Storage.Bank.Client
-                   .Get_Interface_Cap (Sibling),
-                 No_Caps);
+                   .Get_Interface_Cap (Sibling));
          end;
 
          if Endpoint = Rose.Capabilities.Null_Capability then
@@ -253,11 +251,13 @@ package body Restore.Replacing is
          --  and Previous, the old version's Replaceable.
 
          Rose.System_Calls.Initialize_Send (Params, Endpoint);
-         for I in 1 .. Index loop
-            Rose.System_Calls.Send_Cap
-              (Params, Rose.Capabilities.Null_Capability);
-         end loop;
-         Rose.System_Calls.Send_Cap (Params, Control);
+         declare
+            Caps : Rose.Capabilities.Capability_Array (1 .. Index + 1) :=
+              (others => Rose.Capabilities.Null_Capability);
+         begin
+            Caps (Caps'Last) := Control;
+            Rose.System_Calls.Send_Caps (Params, Caps);
+         end;
          Rose.System_Calls.Receive_Words (Params, 1);
          Rose.System_Calls.Receive_Caps (Params, 4);
          Rose.System_Calls.Invoke_Capability (Params);

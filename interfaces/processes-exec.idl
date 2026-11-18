@@ -1,9 +1,14 @@
 interface Processes.Exec : Processes.Launch is
 
-   function Install 
+   --  Install_Caps is a cap set (Caps.Cap_Set) of the caps that every
+   --  process of the program starts with, after its standard caps, or
+   --  the null cap for none. Exec copies them out of it, at most 16, and
+   --  the caller can release the set afterwards (#234).
+
+   function Install
      (Executable   : interface Streams.Reader;
       Name         : String;
-      Install_Caps : Capability_Array)
+      Install_Caps : Capability)
      return interface Processes.Launch;
 
    --  The standard output that exec gives the programs it launches, and
@@ -23,7 +28,7 @@ interface Processes.Exec : Processes.Launch is
    function Update
      (Executable   : interface Streams.Reader;
       Name         : String;
-      Install_Caps : Capability_Array)
+      Install_Caps : Capability)
      return interface Processes.Launch;
 
 end Processes.Exec;

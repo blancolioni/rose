@@ -50,7 +50,6 @@ package body Tests.Rights is
    function Rights_Test return Boolean is
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Tests.Registry.Launcher ("rights");
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Endpoint : Rose.Capabilities.Capability;
       Params   : aliased Rose.Invocation.Invocation_Record;
 
@@ -99,7 +98,7 @@ package body Tests.Rights is
       --  can't set the time.
 
       Endpoint := Launcher.Launch_Command
-        (Rose.System_Calls.Own_Bank.Cap, No_Caps);
+        (Rose.System_Calls.Own_Bank.Cap);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Fail ("cannot launch the broker");
       end if;

@@ -79,7 +79,7 @@ package body Caps.Server is
 
    overriding procedure Append
      (Item : in out Set_Object;
-      Caps : Rose.Capabilities.Capability_Array);
+      Cap  : Rose.Capabilities.Capability);
 
    overriding function Get_Cap
      (Item  : in out Set_Object;
@@ -132,25 +132,23 @@ package body Caps.Server is
    -- Append --
    ------------
 
-   --  A set that can't take every cap takes none of them, and raises. The
-   --  caps have arrived in this process's table already, and the
-   --  generated handler deletes them when the operation raises
-   --  (idle#95), so they must not be kept or deleted here.
+   --  When the sets are full, Append raises. The cap has arrived in this
+   --  process's table already, and the generated handler deletes it when
+   --  the operation raises (idle#95), so it must not be kept or deleted
+   --  here.
 
    overriding procedure Append
      (Item : in out Set_Object;
-      Caps : Rose.Capabilities.Capability_Array)
+      Cap  : Rose.Capabilities.Capability)
    is
    begin
-      if Caps'Length > Limit - Used then
+      if Used = Limit then
          raise Cap_Set_Full with
            "the cap sets are full: " & Image (Used) & " caps are held";
       end if;
 
-      for Cap of Caps loop
-         Item.Caps.Append (Cap);
-      end loop;
-      Used := Used + Caps'Length;
+      Item.Caps.Append (Cap);
+      Used := Used + 1;
    end Append;
 
    ------------

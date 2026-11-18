@@ -2,6 +2,10 @@ with Rose.Words;
 
 package Console.Calls is
 
+   procedure Get_Caps;
+   --  Read the console's caps from its cap set, and delete its cap to
+   --  the set (#826, #234).
+
    function Has_Framebuffer return Boolean;
    --  True if the boot loader gave a graphics framebuffer, so that the VGA
    --  text page isn't on the screen (#654).
