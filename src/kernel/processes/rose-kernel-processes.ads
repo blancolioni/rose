@@ -381,6 +381,14 @@ package Rose.Kernel.Processes is
    procedure Unmap_Invocation_Buffer
      (From_Pid, To_Pid : Process_Id);
 
+   function Is_Pinned_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  True if Virtual_Page is a page of the buffer that Pid has lent to a
+   --  server in its call in progress, which the server maps in a shared
+   --  slot (#519). The memory server must not unmap it (#972).
+
    function Is_User_Page
      (Pid          : Process_Id;
       Virtual_Page : Rose.Addresses.Virtual_Page_Address)
@@ -722,6 +730,12 @@ private
          --  The writable buffer of the call that the process waits on. The
          --  server writes it through its shared slot, which mem doesn't
          --  see, so Check_Reply_Record checks these pages too (#716).
+         Pinned_Page       : Rose.Addresses.Virtual_Page_Address := 0;
+         Pinned_Pages      : Natural := 0;
+         --  The buffer, writable or not, that the process has lent to a
+         --  server in its call in progress, which the server maps in its
+         --  shared slots until it replies. Unmap_Page refuses to unmap
+         --  these pages (#972).
          Shared_Pages      : Shared_Page_Array;
          Saved_Stack_Value : Rose.Words.Word_32;
          Command_Endpoint  : Rose.Objects.Endpoint_Index := 0;
