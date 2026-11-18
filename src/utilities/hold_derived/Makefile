@@ -22,6 +22,7 @@ hold_derived:
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/processes-segment.idl \
 	    $(INTERFACES)/processes-server.idl \

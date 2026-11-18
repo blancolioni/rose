@@ -1,4 +1,3 @@
-with Rose.Invocation;
 with Rose.Objects;
 
 with Rose.Interfaces.Streams.Reader;
@@ -42,9 +41,10 @@ package Exec.Library is
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
-   --  A region of the pages of program Id's ELF image. It is made the
-   --  first time, and kept: the store has room for a limited number of
-   --  regions.
+   --  The Region_Access of a region of the pages of program Id's ELF
+   --  image, which elf maps, and can't release (#403). The region is
+   --  made the first time, and kept: the store has room for a limited
+   --  number of regions.
 
    procedure Get_Program_Name
      (Id   : Rose.Objects.Capability_Identifier;
@@ -53,9 +53,11 @@ package Exec.Library is
    --  The name program Id was installed with, or nothing if there is
    --  none.
 
-   procedure Send_Install_Caps
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record);
+   function Install_Caps
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability_Array;
+   --  The caps that program Id was installed with, which every process
+   --  of it starts with.
 
    procedure Get_Metadata
      (Id     : Rose.Objects.Capability_Identifier;

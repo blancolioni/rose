@@ -2,7 +2,7 @@
 16#A5B2_8B7D_EA22_7358#  rose.interfaces.caps.cap.destroy
 16#7B7D_1260_D804_E856#  rose.interfaces.caps.cap.get_object_id return object_id
 16#3248_E840_CEAE_F595#  interface rose.interfaces.caps.cap_set
-16#D7F4_DC6B_E8FD_9BE6#  rose.interfaces.caps.cap_set.append(in capability_array)
+16#ECE4_CD5F_A207_A657#  rose.interfaces.caps.cap_set.append(in capability)
 16#8ECD_4C55_4A22_7B84#  rose.interfaces.caps.cap_set.get_cap(in positive) return capability
 16#944C_B635_B293_13AC#  rose.interfaces.caps.cap_set.length return natural
 16#948C_2E76_45DD_2FDD#  interface rose.interfaces.caps.constructor
@@ -95,12 +95,12 @@
 16#002F_05A1_84F7_BB94#  rose.interfaces.files.writable_file.rewrite return interface rose.interfaces.streams.releasable_writer
 16#1C9B_98C6_87F7_C407#  rose.interfaces.files.writable_file.new_version return interface rose.interfaces.files.transactional_writable_file
 16#8CEF_3574_F911_CB64#  interface rose.interfaces.processes.exec
-16#83B0_F882_A054_032E#  rose.interfaces.processes.exec.install(in interface rose.interfaces.streams.reader; in string; in capability_array) return interface rose.interfaces.processes.launch
+16#F977_7D4E_8999_11F6#  rose.interfaces.processes.exec.install(in interface rose.interfaces.streams.reader; in string; in capability) return interface rose.interfaces.processes.launch
 16#E01C_44C1_0774_98B2#  rose.interfaces.processes.exec.set_standard_output(in interface rose.interfaces.streams.writer)
-16#6E52_F187_9C24_D3BA#  rose.interfaces.processes.exec.update(in interface rose.interfaces.streams.reader; in string; in capability_array) return interface rose.interfaces.processes.launch
+16#AEF8_354C_CACE_4387#  rose.interfaces.processes.exec.update(in interface rose.interfaces.streams.reader; in string; in capability) return interface rose.interfaces.processes.launch
 16#6C9E_B934_8DF2_AEF4#  interface rose.interfaces.processes.executable
-16#C9CB_3DDE_9E7A_FD8E#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region; in interface rose.interfaces.storage.bank; in capability_array) return interface rose.interfaces.processes.process_control
-16#53C7_2837_9CAC_1956#  rose.interfaces.processes.executable.launch_command(in string; in interface rose.interfaces.storage.region; in interface rose.interfaces.storage.bank; in capability_array) return capability
+16#5CE6_584E_AB0C_44E0#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.starting_process
+16#8514_3AB6_4C31_F989#  rose.interfaces.processes.executable.launch_command(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.starting_process
 16#7F9B_F7DF_57D0_313D#  interface rose.interfaces.processes.heap
 16#BF6F_403E_B61F_E95C#  rose.interfaces.processes.heap.current_bound return word
 16#620F_1859_1E1A_E309#  rose.interfaces.processes.heap.request_new_bound(in word)
@@ -109,8 +109,8 @@
 16#FFA5_351D_B0E0_169C#  rose.interfaces.processes.kernel_process.fault
 16#4020_FF38_FC39_CE22#  rose.interfaces.processes.kernel_process.notify(in word_32)
 16#E6FB_FE14_8616_BA1A#  interface rose.interfaces.processes.launch
-16#8F2B_70B2_BE3E_58FC#  rose.interfaces.processes.launch.launch(in capability; in capability_array) return interface rose.interfaces.processes.process_control
-16#63E3_3AC6_7DBE_3EA0#  rose.interfaces.processes.launch.launch_command(in capability; in capability_array) return capability
+16#1476_1949_6120_178C#  rose.interfaces.processes.launch.launch(in capability) return interface rose.interfaces.processes.process_control
+16#EAB4_B9B0_535F_2A88#  rose.interfaces.processes.launch.launch_command(in capability) return capability
 16#BB1B_7FDF_38D4_76A7#  rose.interfaces.processes.launch.metadata return string
 16#6677_ED47_797E_0AE8#  interface rose.interfaces.processes.memory
 16#D91B_1555_C4AE_6FA3#  rose.interfaces.processes.memory.new_process(in interface rose.interfaces.processes.kernel_process; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.process
@@ -143,16 +143,20 @@
 16#544E_2734_D551_5B48#  interface rose.interfaces.processes.saveable
 16#FB71_94A1_EBCE_08AA#  rose.interfaces.processes.saveable.state return interface rose.interfaces.streams.releasable_reader
 16#232B_3EA3_5A81_D909#  interface rose.interfaces.processes.segment
-16#6F53_A9FF_5EF9_0796#  rose.interfaces.processes.segment.add_segment(in word; in word; in interface rose.interfaces.storage.region; in word; in word)
+16#56BA_6A65_4552_491D#  rose.interfaces.processes.segment.add_segment(in word; in word; in interface rose.interfaces.storage.region_access; in word; in word)
+16#6520_D806_FEC6_07A3#  rose.interfaces.processes.segment.add_private_segment(in word; in word; in interface rose.interfaces.storage.region; in word)
 16#9858_8593_AA59_A917#  rose.interfaces.processes.segment.add_nonpersistent_segment(in word; in word; in word)
 16#5EDC_D1F6_838C_DF14#  rose.interfaces.processes.segment.remove_segment(in word)
 16#CAD8_4C64_1EB0_6E6D#  interface rose.interfaces.processes.server
 16#4D3E_CBAB_6FA8_CECD#  rose.interfaces.processes.server.published_interface return capability
 16#528B_8ECF_97E5_8F59#  interface rose.interfaces.processes.signalled
 16#01E6_4FF2_78E8_9D49#  rose.interfaces.processes.signalled.signal(in word_32)
+16#FE75_CCFE_B02D_75F2#  interface rose.interfaces.processes.starting_process
+16#C2DE_3307_4855_4505#  rose.interfaces.processes.starting_process.add_cap(in capability)
+16#85CC_015E_7E38_3EB0#  rose.interfaces.processes.starting_process.start return capability
 16#39A2_5FBE_F70E_01A5#  interface rose.interfaces.screens.surface
 16#8D60_3A8E_5BF5_8443#  rose.interfaces.screens.surface.get_size(out word; out word)
-16#7127_21EC_EB67_9457#  rose.interfaces.screens.surface.get_buffer return interface rose.interfaces.storage.region
+16#0919_1447_6058_C826#  rose.interfaces.screens.surface.get_buffer return interface rose.interfaces.storage.region_access
 16#087C_2321_D6A3_5BBE#  rose.interfaces.screens.surface.damage(in word; in word; in word; in word)
 16#9941_DEBB_8D77_BA05#  rose.interfaces.screens.surface.notify(in capability)
 16#D3B0_9A6C_D86C_16EF#  rose.interfaces.screens.surface.events return interface rose.interfaces.streams.reader
@@ -198,12 +202,12 @@
 16#86DF_EFC5_13DE_3784#  rose.interfaces.storage.process_banks.hand_over(in object_id; in object_id)
 16#EF93_F0EE_412A_93A0#  rose.interfaces.storage.process_banks.parent_bank(in object_id) return interface rose.interfaces.storage.bank
 16#F990_6951_95F6_F214#  interface rose.interfaces.storage.region
-16#010F_DAEF_C4BD_C32A#  rose.interfaces.storage.region.get_range(out object_id; out object_id)
-16#8FFB_496E_9E43_117B#  rose.interfaces.storage.region.get(in object_id; out storage_array)
-16#C1C4_313C_65C8_1463#  rose.interfaces.storage.region.put(in object_id; in storage_array)
-16#8C7B_9AC2_21BF_B63B#  rose.interfaces.storage.region.read return interface rose.interfaces.streams.reader
 16#D3E7_0FB6_21BD_A433#  rose.interfaces.storage.region.create_subregion(in object_id; in object_id; in word) return interface rose.interfaces.storage.region
-16#D303_DC81_F848_0197#  rose.interfaces.storage.region.release
+16#DEBE_994C_809C_E7FA#  interface rose.interfaces.storage.region_access
+16#8FEF_F7B4_ABA6_99FD#  rose.interfaces.storage.region_access.get_range(out object_id; out object_id)
+16#5A2F_C86C_AC94_F168#  rose.interfaces.storage.region_access.get(in object_id; out storage_array)
+16#6E9A_EB9D_318B_3B3C#  rose.interfaces.storage.region_access.put(in object_id; in storage_array)
+16#F05C_BED1_7AD1_50AC#  rose.interfaces.storage.region_access.read return interface rose.interfaces.streams.reader
 16#A664_354D_4CBE_DE5F#  interface rose.interfaces.storage.store
 16#3195_E09A_2069_74A0#  rose.interfaces.storage.store.add_backing_store(in interface rose.interfaces.storage.block_array)
 16#C7A3_14EF_33E3_E84A#  rose.interfaces.storage.store.get_root_bank return interface rose.interfaces.storage.bank

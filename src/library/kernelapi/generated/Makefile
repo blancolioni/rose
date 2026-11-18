@@ -11,7 +11,9 @@ IDL=caps-cap storage-block_array files-file_system files-directory \
     storage-process_banks checkpoints-state devices-ata \
     storage-partitions storage-partition_setup \
     devices-interrupt_handler processes-launch processes-exec \
-    storage-region processes-executable processes-memory \
+    storage-region storage-region_access processes-executable \
+    processes-starting_process \
+    processes-memory \
     checkpoints-memory_restore processes-process processes-segment \
     processes-server processes-process_control time-timeout \
     time-timer caps-constructor \

@@ -36,6 +36,7 @@ rights:
 	    $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)
 

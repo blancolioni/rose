@@ -80,7 +80,8 @@ package body Rose.Shared_Regions is
    ---------
 
    function Map
-     (Region   : in out Rose.Interfaces.Storage.Region.Region_Object'Class;
+     (Region   : in out
+        Rose.Interfaces.Storage.Region_Access.Region_Access_Object'Class;
       Writable : Boolean := True)
       return System.Address
    is

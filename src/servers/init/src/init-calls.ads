@@ -82,14 +82,6 @@ package Init.Calls is
    --  it, or the null cap if the launch failed.  The module's first cap
    --  is Create_Endpoint.
 
-   function Launch
-     (Launch_Cap  : Rose.Capabilities.Capability;
-      Cap_Set     : Rose.Capabilities.Capability;
-      Name        : String)
-      return Rose.Objects.Object_Id;
-   --  Launch an installed program, whose Launch interface is Launch_Cap,
-   --  with the argument cap set Cap_Set.
-
    procedure Get_Interface
      (Cap            : Rose.Capabilities.Capability;
       Interface_Caps : out Array_Of_Capabilities);

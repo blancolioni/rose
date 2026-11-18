@@ -4,6 +4,17 @@ with Rose.System_Calls.Server;
 
 package body Rose.Server is
 
+   Failure : Rose.Invocation.Invocation_Error := Rose.Invocation.OK;
+   --  Set by Fail while a handler runs. A boot server handles one request
+   --  at a time, so one value is enough.
+
+   procedure Call_Handler
+     (Context : in out Server_Context;
+      Handler : Invocation_Handler;
+      Params  : in out Rose.Invocation.Invocation_Record);
+   --  Call Handler with Params. If it calls Fail, and doesn't block the
+   --  request, its reply becomes an error reply.
+
    ---------------------------
    -- Block_Current_Request --
    ---------------------------
@@ -14,6 +25,39 @@ package body Rose.Server is
    begin
       Context.Block_Reply := True;
    end Block_Current_Request;
+
+   ------------------
+   -- Call_Handler --
+   ------------------
+
+   procedure Call_Handler
+     (Context : in out Server_Context;
+      Handler : Invocation_Handler;
+      Params  : in out Rose.Invocation.Invocation_Record)
+   is
+      use type Rose.Invocation.Invocation_Error;
+
+      --  A handler can unblock another request, which runs that
+      --  request's handler inside this one, so keep this one's failure.
+
+      Outer : constant Rose.Invocation.Invocation_Error := Failure;
+   begin
+      Failure := Rose.Invocation.OK;
+      Handler (Params);
+
+      if Failure /= Rose.Invocation.OK
+        and then not Context.Block_Reply
+      then
+         declare
+            Reply_Cap : constant Rose.Capabilities.Capability := Params.Cap;
+         begin
+            Rose.System_Calls.Initialize_Reply (Params, Reply_Cap);
+            Rose.System_Calls.Send_Error (Params, Failure);
+         end;
+      end if;
+
+      Failure := Outer;
+   end Call_Handler;
 
    -------------------------------
    -- Create_Anonymous_Endpoint --
@@ -41,6 +85,18 @@ package body Rose.Server is
         (Rose.System_Calls.Create_Endpoint_Capability,
          Endpoint_Id, Identifier);
    end Create_Endpoint;
+
+   ----------
+   -- Fail --
+   ----------
+
+   procedure Fail
+     (Error : Rose.Invocation.Invocation_Error :=
+        Rose.Invocation.Request_Error)
+   is
+   begin
+      Failure := Error;
+   end Fail;
 
    ----------------------
    -- Get_Instance_Cap --
@@ -158,7 +214,7 @@ package body Rose.Server is
                if Rec.Endpoint = Params.Endpoint then
                   if Rec.Handler /= null then
                      Context.Block_Reply := False;
-                     Rec.Handler (Params);
+                     Call_Handler (Context, Rec.Handler, Params);
                      if Context.Block_Reply then
                         Rec.Blocked := True;
                         Rec.Params := Saved_Params;
@@ -317,7 +373,7 @@ package body Rose.Server is
 
                if Rec.Handler /= null then
                   Params := Rec.Params;
-                  Rec.Handler (Params);
+                  Call_Handler (Context, Rec.Handler, Params);
                   if not Context.Block_Reply then
                      Rec.Blocked := False;
                   end if;

@@ -44,6 +44,7 @@ run_self_tests:
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/screens-surface.idl \

@@ -8,7 +8,8 @@ with Rose.System_Calls;
 
 with Rose.Interfaces.Checkpoints.Log_Reader.Client;
 with Rose.Interfaces.Checkpoints.Memory_Restore.Client;
-with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Region.Client.Conversions;
+with Rose.Interfaces.Storage.Region_Access.Client;
 with Rose.Interfaces.Checkpoints.Storage_Checkpoint.Client;
 
 with Restore.Entries;
@@ -806,7 +807,14 @@ package body Restore.Checkpoints is
                               (Store,
                                Rose.Objects.Object_Id (Segment.Region_Base),
                                Rose.Objects.Object_Id (Segment.Region_Bound));
+                        Is_Private : constant Boolean :=
+                          (Segment.Flags
+                           and Rose.Checkpoints.Segment_Private_Region) /= 0;
                      begin
+                        --  mem owns a private segment's region, and is
+                        --  given only the Region_Access of any other, as
+                        --  Add_Segment gives it (#403).
+
                         Restore_Segment
                           (Item          => Mem,
                            Mem_Pid       => Natural (Mem_Process.Mem_Pid),
@@ -815,9 +823,13 @@ package body Restore.Checkpoints is
                            Limit         => Segment.Limit,
                            Flags         => Segment.Flags,
                            Region        =>
-                             Rose.Interfaces.Storage.Region.Client
-                               .Get_Interface_Cap
-                               (Region),
+                             (if Is_Private
+                              then Rose.Interfaces.Storage.Region.Client
+                                .Get_Interface_Cap (Region)
+                              else Rose.Interfaces.Storage.Region_Access
+                                .Client.Get_Interface_Cap
+                                  (Rose.Interfaces.Storage.Region.Client
+                                   .Conversions.To_Region_Access (Region))),
                            Region_Offset =>
                              Rose.Words.Word (Segment.Region_Offset));
                      end;
@@ -829,6 +841,17 @@ package body Restore.Checkpoints is
                         Bound   => Segment.Bound,
                         Limit   => Segment.Limit,
                         Flags   => Segment.Flags);
+                  end if;
+
+                  --  Mem refuses a segment that overlaps another (#970),
+                  --  and says which. A process with a segment missing
+                  --  can't be restored.
+
+                  if Rose.Interfaces.Checkpoints.Memory_Restore.Client
+                    .Has_Error
+                  then
+                     Fail ("mem refused a saved segment");
+                     return;
                   end if;
                end loop;
             end if;

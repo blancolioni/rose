@@ -210,7 +210,6 @@ package body Login_Loop is
    procedure Run_Petal
      (User : in out Rose.Interfaces.Users.User.User_Object'Class)
    is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
 
       --  The session's bank (ADR 0014, section 2; #450), a sub-bank of
       --  the user's. Petal is launched against it, and so its jobs are
@@ -221,7 +220,7 @@ package body Login_Loop is
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Commands.Find ("petal");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (Session.Bank_Cap, No_Caps);
+                   Launcher.Launch_Command (Session.Bank_Cap);
       Params   : aliased Rose.Invocation.Invocation_Record;
    begin
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -237,20 +236,19 @@ package body Login_Loop is
       --  call returns when petal logs out (#458).
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Console.Get_Read_Cap);
-      Rose.System_Calls.Send_Cap (Params, Console.Get_Write_Cap);
-      Rose.System_Calls.Send_Cap (Params, Console.Get_Write_Cap);
-      Rose.System_Calls.Send_Cap
-        (Params, Rose.System_Calls.Create_Endpoint_Capability);
-      Rose.System_Calls.Send_Cap
-        (Params, Rose.System_Calls.Delete_Cap_Capability);
-      Rose.System_Calls.Send_Cap
-        (Params, Rose.System_Calls.Rescind_Cap_Capability);
-      Rose.System_Calls.Send_Cap (Params, Commands.Lookup_Cap);
-      Rose.System_Calls.Send_Cap (Params, Console.Terminal_Cap);
-      Rose.System_Calls.Send_Cap (Params, Clock_Interface_Cap);
-      Rose.System_Calls.Send_Cap (Params, Rights_Interface_Cap);
-      Rose.System_Calls.Send_Cap (Params, User.User_Cap);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Console.Get_Read_Cap,
+          Console.Get_Write_Cap,
+          Console.Get_Write_Cap,
+          Rose.System_Calls.Create_Endpoint_Capability,
+          Rose.System_Calls.Delete_Cap_Capability,
+          Rose.System_Calls.Rescind_Cap_Capability,
+          Commands.Lookup_Cap,
+          Console.Terminal_Cap,
+          Clock_Interface_Cap,
+          Rights_Interface_Cap,
+          User.User_Cap));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 

@@ -36,7 +36,7 @@ A cap set holds a list of capabilities, so that a process can pass many capabili
 interface Cap_Set is
 
    procedure Append
-     (Caps : Capability_Array);
+     (Cap : Capability);
 
    function Get_Cap
      (Index : Positive)
@@ -51,8 +51,8 @@ end Cap_Set;
 `Constructor` creates a new object and returns a capability for it; the `bootcaps` server uses it to create cap sets for the boot modules, and the `caps` driver to create them for persistent processes.
 
 `Releasable_Cap_Set` is a `Cap_Set` that is also a `Resource`: its holder releases it when it is done with it, which deletes the capabilities it holds, and every capability to the set fails afterwards.
-Its `Append` raises when the set can't take every capability it is given, and then adds none of them.
-`Cap_Set` itself is unchanged, so the boot modules' endpoint ids stay as they are (ADR 0031, section 2).
+Its `Append` raises when the sets are full.
+It is an interface of its own, rather than a change to `Cap_Set`, so that the boot modules' endpoint ids stayed as they were (ADR 0031, section 2).
 
 == Processes and Memory
 
@@ -64,10 +64,11 @@ Its `Append` raises when the set can't take every capability it is given, and th
 | `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault`, `Notify` | The kernel
 | `Process` | `Segment`, `Server`, `Cap` | `Heap_Interface`, `Bank`, `Control_Cap`, `Exit_Process`, `Publish_Interface` | `mem`
 | `Process_Control` | `Server`, `Cap` | | `mem`
-| `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |
+| `Segment` | | `Add_Segment`, `Add_Private_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint`, `Set_Process_Banks`, `Processes_Ended` | `mem`
-| `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
+| `Region_Access` | | `Get_Range`, `Get`, `Put`, `Read` | `store`
+| `Region` | `Region_Access`, `Resource` | `Create_Subregion` | `store`
 | `Store` | | `Add_Backing_Store`, `Get_Root_Bank` | `store`
 | `Bank` | | `Reserve_Storage`, `Create_Sub_Bank`, `Add_Dependent`, `Get_Usage`, `Destroy`, `Index` | `store`
 | `Process_Banks` | | `Create_Process_Bank`, `Process_Bank`, `End_Process`, `Set_Ended`, `Take_Ended` | `store`, for `mem` only
@@ -95,16 +96,22 @@ interface Process : Segment, Server, Cap is
 end Process;
 ----
 
-A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Private`.
-A private segment's region belongs to its process, and is released when the process is gone.
+A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Shared`.
+`Add_Segment` maps a region that the process doesn't own, such as a program's image or a shared region, and takes its `Region_Access`.
+`Add_Private_Segment` maps a region that the process owns from then on, such as its data, stack and heap, and takes the `Region` itself: it is released when the segment is removed, or the process is gone.
+Segments of a process can't overlap, and nor can a segment and the range a resizable segment can grow into: mem refuses such a segment, and the call fails (#970).
 A nonpersistent segment has no region behind it.
 
 `Process` is the process's own capability: the process uses it to map shared regions, publish its interface and exit.
 Whoever launches the process gets a `Process_Control` instead, from `Control_Cap`, which can only find the interface the process publishes (`Published_Interface`) and end it (`Destroy`).
 It can't change the process's segments or act as the process (#99).
 
-`Store` reserves regions of persistent storage, backed by block arrays, and a `Region` reads and writes its pages.
-`Region.Release` frees a region that is no longer needed, with its storage if it has its own; neither the region nor its subregions can be used afterwards.
+`Store` reserves regions of persistent storage, backed by block arrays.
+A `Region` belongs to whoever reserved it, or was handed it, and is a `Resource` (ADR 0010): `Release`, or closing a client, frees it, with its storage if it has its own, and neither the region nor its subregions can be used afterwards.
+A process that only uses a region holds its `Region_Access`, which reads and writes its pages but can't release it; a `Region` client converts to one.
+A process that hands a region on calls its client's `Forget`, which deletes its caps without releasing the region (#403).
+A region's pages are charged to its bank when they are first written, not when it is reserved, and a page of zeroes takes no space.
+`Put` fails when the bank is at its limit or the store is full, and the page keeps what it had (#945).
 
 == Launching Programs
 
@@ -116,18 +123,22 @@ It can't change the process's segments or act as the process (#99).
 | `Launch` | | `Launch`, `Launch_Command`, `Metadata` | `exec`
 | `Exec` | `Launch` | `Install`, `Set_Standard_Output` | `exec`
 | `Executable` | | `Launch`, `Launch_Command` | `elf`
+| `Starting_Process` | | `Add_Cap`, `Start` | `elf`
 | `Command_Endpoint` | | `Launch` | Each command
 | `Map` | | `Add`, `Remove`, `Find` | `command`
 |===
 
 `Exec.Install` reads an executable from a stream and returns a `Launch` capability for it.
+The capabilities that every process of the program starts with come in a cap set, which `exec` copies them out of.
 `Exec.Set_Standard_Output` sets the standard output that `exec` gives the programs it launches, and uses itself; `init` sets it to the persistent console once that is running.
-`Executable.Launch` creates the process from an image in a region, reserving its writable data, stack and heap from the bank it is given, and returns its `Process_Control`.
+`Executable.Launch` creates the process from an image in a region, reserving its writable data, stack and heap from the bank it is given, and loads it, but does not start it.
+It returns a `Starting_Process`, through which the caller gives the process its capabilities, one at a time, since an invocation carries at most four; its `Start` starts the process and returns its `Process_Control` (#234).
 `Map` holds launch capabilities by name.
 
 A program is started in one of two ways:
 
-* *`Launch.Launch`* takes the bank to launch against, usually the caller's own (`Rose.System_Calls.Own_Bank.Cap`), so that ending the caller ends the process (ADR 0015), and a `Capability_Array`, whose meaning the caller and the program agree on by convention, and returns the new process's `Process_Control`.
+* *`Launch.Launch`* takes the bank to launch against, usually the caller's own (`Rose.System_Calls.Own_Bank.Cap`), so that ending the caller ends the process (ADR 0015), and returns the new process's `Process_Control`.
+  The process starts with its standard capabilities and those it was installed with; anything else it is given as arguments (#234).
 * *`Launch.Launch_Command`* starts the program as a command (ADR 0002, see <<launch-sequence>>).
   Its process starts with the receive capability of a command endpoint, and the result is the endpoint capability, which the shell calls once with the command's arguments.
   `Executable.Launch_Command` does the same for `elf`.

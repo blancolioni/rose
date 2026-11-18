@@ -89,10 +89,10 @@ package body Rose.Command_Line.Launch is
       --  A cap that was not sent is the null cap, as for the Previous
       --  argument of a replaceable server that is started fresh (#865).
 
-      if Index >= Rose.Invocation.Sent_Cap_Count (Call.Params) then
+      if Index >= Call.Argument_Count then
          return Rose.Capabilities.Null_Capability;
       end if;
-      return Call.Params.Caps (Rose.Invocation.Capability_Index (Index));
+      return Call.Argument_Caps (Index);
    end Cap_Argument;
 
    ----------------
@@ -231,16 +231,40 @@ package body Rose.Command_Line.Launch is
       use type Rose.Capabilities.Capability;
    begin
       Rose.Standard_Streams.Set;
+      Call.Argument_Count := 0;
 
-      Rose.System_Calls.Initialize_Receive
-        (Call.Params, Rose.Capabilities.Standard.Command_Endpoint_Cap);
-      Rose.System_Calls.Expect_Buffer (Call.Params);
-      Rose.System_Calls.Receive_Words
-        (Call.Params,
-         Natural (Rose.Invocation.Parameter_Word_Index'Last) + 1);
-      Rose.System_Calls.Receive_Caps
-        (Call.Params, Natural (Rose.Invocation.Capability_Index'Last) + 1);
-      Rose.System_Calls.Invoke_Capability (Call.Params);
+      loop
+         Rose.System_Calls.Initialize_Receive
+           (Call.Params, Rose.Capabilities.Standard.Command_Endpoint_Cap);
+         Rose.System_Calls.Expect_Buffer (Call.Params);
+         Rose.System_Calls.Receive_Words
+           (Call.Params,
+            Natural (Rose.Invocation.Parameter_Word_Index'Last) + 1);
+         Rose.System_Calls.Receive_Caps
+           (Call.Params, Rose.Invocation.Max_Capabilities);
+         Rose.System_Calls.Invoke_Capability (Call.Params);
+
+         for I in 0 .. Rose.Invocation.Sent_Cap_Count (Call.Params) - 1 loop
+            if Call.Argument_Count < Max_Argument_Caps then
+               Call.Argument_Caps (Call.Argument_Count) :=
+                 Call.Params.Caps (Rose.Invocation.Capability_Index (I));
+               Call.Argument_Count := Call.Argument_Count + 1;
+            end if;
+         end loop;
+
+         exit when not Call.Params.Control.Flags
+           (Rose.Invocation.Continued);
+
+         --  The first parts of a call with more than four caps (#234).
+
+         declare
+            Reply : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Reply
+              (Reply, Call.Params.Reply_Cap);
+            Rose.System_Calls.Invoke_Capability (Reply);
+         end;
+      end loop;
 
       Call.Buffer_Length := 0;
       if Call.Params.Control.Flags (Rose.Invocation.Send_Buffer) then

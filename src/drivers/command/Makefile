@@ -23,5 +23,6 @@ command:
 	    $(INTERFACES)/processes-server.idl \
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/processes-heap.idl \
-	    $(INTERFACES)/storage-region.idl
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl
 	gprbuild $(GPRBUILD_CARGS)

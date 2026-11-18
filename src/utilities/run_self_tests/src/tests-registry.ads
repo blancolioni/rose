@@ -67,11 +67,10 @@ package Tests.Registry is
    --  The cap of the Launch interface of the program Name.
 
    function Launch
-     (Name : String;
-      Caps : Rose.Capabilities.Capability_Array)
+     (Name : String)
       return Rose.Capabilities.Capability;
-   --  Launch the program Name with Caps, and return the interface that
-   --  it publishes, or the null cap if the launch failed.
+   --  Launch the program Name, and return the interface that it
+   --  publishes, or the null cap if the launch failed.
 
    --  A directory is a command, Rose.Core.Directory (#831).
 

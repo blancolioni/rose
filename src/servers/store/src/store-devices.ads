@@ -143,7 +143,10 @@ package Store.Devices is
 
    procedure Release
      (Id : Rose.Objects.Capability_Identifier);
-   --  Free the region Id, and its storage if it has its own.
+   --  Free the region Id, and its storage if it has its own. The
+   --  generated Release handler then removes the region's instance, now
+   --  that Region is a Resource (#403); a caller in the store removes it
+   --  itself.
 
    procedure Read
      (Id      : in Rose.Objects.Capability_Identifier;

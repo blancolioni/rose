@@ -3,21 +3,23 @@ interface Processes.Executable is
    --  Bank is the bank that the process's storage is reserved from: its
    --  writable data, its stack and its heap (ADR 0014, section 4).
 
+   --  Launch makes the process and loads Image into it, but does not
+   --  start it. The caller gives it its caps through the result, one at
+   --  a time, and then starts it (#234).
+
    function Launch
      (Name  : String;
-      Image : interface Storage.Region;
-      Bank  : interface Storage.Bank;
-      Caps  : Capability_Array)
-     return interface Processes.Process_Control;
+      Image : interface Storage.Region_Access;
+      Bank  : interface Storage.Bank)
+     return interface Processes.Starting_Process;
 
    --  As Launch, but the process also starts with the receive cap of a
-   --  command endpoint, and the result is the endpoint cap (ADR 0002).
+   --  command endpoint, and Start gives the endpoint cap (ADR 0002).
 
    function Launch_Command
      (Name  : String;
-      Image : interface Storage.Region;
-      Bank  : interface Storage.Bank;
-      Caps  : Capability_Array)
-     return Capability;
+      Image : interface Storage.Region_Access;
+      Bank  : interface Storage.Bank)
+     return interface Processes.Starting_Process;
 
 end Processes.Executable;

@@ -9,10 +9,12 @@ with Rose.Server;
 with Rose.Trace;
 with Rose.System_Calls;
 
+with Rose.Interfaces.Caps.Cap_Set.Client;
 with Rose.Interfaces.Processes.Exec.Server;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Processes.Launch.Server;
 with Rose.Interfaces.Processes.Process_Control.Client;
+with Rose.Interfaces.Processes.Starting_Process.Client;
 with Rose.Interfaces.Streams.Reader;
 with Rose.Interfaces.Streams.Writer;
 
@@ -45,7 +47,7 @@ package body Exec.Server is
      (Item         : in out Exec_Object;
       Executable   : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name         : String;
-      Install_Caps : Rose.Capabilities.Capability_Array)
+      Install_Caps : Rose.Capabilities.Capability)
       return Launch_Class;
 
    overriding procedure Set_Standard_Output
@@ -56,19 +58,17 @@ package body Exec.Server is
      (Item         : in out Exec_Object;
       Executable   : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name         : String;
-      Install_Caps : Rose.Capabilities.Capability_Array)
+      Install_Caps : Rose.Capabilities.Capability)
       return Launch_Class;
 
    overriding function Launch
      (Item : in out Exec_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Control_Class;
 
    overriding function Launch_Command
      (Item : in out Exec_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
    overriding function Metadata (Item : in out Exec_Object) return String;
@@ -86,14 +86,12 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Program_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Control_Class;
 
    overriding function Launch_Command
      (Item : in out Program_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability;
 
    overriding function Metadata (Item : in out Program_Object) return String;
@@ -127,12 +125,23 @@ package body Exec.Server is
    --  the ELF server's Launch and Launch_Command take them: Bank, or
    --  exec's own if Bank is null (ADR 0015, #750).
 
-   function Result
-     (Params : Rose.Invocation.Invocation_Record)
+   function Start_Launched
+     (Params : Rose.Invocation.Invocation_Record;
+      Caps   : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
-   --  The cap in the reply Params to a launch, or null if it failed. It
-   --  is kept until the next launch, because the reply to the launch
-   --  sends it, and then deleted.
+   --  Params is the reply to the ELF server's Launch or Launch_Command,
+   --  which has made the process but not started it (#234): give it
+   --  Caps, one at a time, start it, and return what Start gives, or
+   --  null if the launch failed. That is kept until the next launch,
+   --  because the reply to the launch sends it, and then deleted.
+
+   Max_Install_Caps : constant := 16;
+
+   function Read_Cap_Set
+     (Set_Cap : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability_Array;
+   --  The caps in the cap set Set_Cap, at most Max_Install_Caps, or none
+   --  if it is null; and delete exec's cap to the set.
 
    Last_Result : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
@@ -197,12 +206,13 @@ package body Exec.Server is
      (Item         : in out Exec_Object;
       Executable   : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name         : String;
-      Install_Caps : Rose.Capabilities.Capability_Array)
+      Install_Caps : Rose.Capabilities.Capability)
       return Launch_Class
    is
       pragma Unreferenced (Item);
       Id : constant Rose.Objects.Capability_Identifier :=
-        Exec.Library.Install (Executable, Name, Install_Caps);
+        Exec.Library.Install
+          (Executable, Name, Read_Cap_Set (Install_Caps));
    begin
       return Launch_Of (Id);
    end Install;
@@ -213,11 +223,10 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Exec_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Control_Class
    is
-      pragma Unreferenced (Item, Bank, Caps);
+      pragma Unreferenced (Item, Bank);
    begin
       Not_A_Program;
       return Rose.Interfaces.Processes.Process_Control.Client.From_Cap
@@ -230,34 +239,25 @@ package body Exec.Server is
 
    overriding function Launch
      (Item : in out Program_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Control_Class
    is
       use Rose.System_Calls;
+      use type Rose.Capabilities.Capability_Array;
       Id     : constant Rose.Objects.Capability_Identifier :=
         Newest (Item.Id);
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Initialize_Send (Params, Create_Process_Cap);
       Send_Image (Params, Id, Bank);
-      Exec.Library.Send_Install_Caps (Id, Params);
-
-      for Cap of Caps loop
-         Send_Cap (Params, Cap);
-      end loop;
-
-      Send_Cap (Params, Standard_Output);
-
+      Receive_Caps (Params, 1);
       Invoke_Capability (Params);
-
-      for Cap of Caps loop
-         Delete_Cap (Cap);
-      end loop;
       Delete_Cap (Bank);
 
       return Rose.Interfaces.Processes.Process_Control.Client
-        .From_Cap (Result (Params));
+        .From_Cap
+          (Start_Launched
+             (Params, Exec.Library.Install_Caps (Id) & Standard_Output));
    end Launch;
 
    ----------------
@@ -285,11 +285,10 @@ package body Exec.Server is
 
    overriding function Launch_Command
      (Item : in out Exec_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
-      pragma Unreferenced (Item, Bank, Caps);
+      pragma Unreferenced (Item, Bank);
    begin
       Not_A_Program;
       return Rose.Capabilities.Null_Capability;
@@ -301,8 +300,7 @@ package body Exec.Server is
 
    overriding function Launch_Command
      (Item : in out Program_Object;
-      Bank : Rose.Capabilities.Capability;
-      Caps : Rose.Capabilities.Capability_Array)
+      Bank : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
       use Rose.System_Calls;
@@ -319,23 +317,14 @@ package body Exec.Server is
       Rose.Trace.Event ("launch command, program ", Natural (Id));
       Initialize_Send (Params, Launch_Command_Cap);
       Send_Image (Params, Id, Bank);
-
-      for Cap of Caps loop
-         Send_Cap (Params, Cap);
-      end loop;
-
       Exec.Library.Get_Program_Name (Id, Name, Last);
       Send_Text (Params, Name (1 .. Last));
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
       Rose.Trace.Event ("command launched");
-
-      for Cap of Caps loop
-         Delete_Cap (Cap);
-      end loop;
       Delete_Cap (Bank);
 
-      return Result (Params);
+      return Start_Launched (Params, (1 .. 0 => 0));
    end Launch_Command;
 
    ---------------
@@ -425,29 +414,35 @@ package body Exec.Server is
       raise Constraint_Error with "exec: Exec is not a program";
    end Not_A_Program;
 
-   ------------
-   -- Result --
-   ------------
+   ------------------
+   -- Read_Cap_Set --
+   ------------------
 
-   function Result
-     (Params : Rose.Invocation.Invocation_Record)
-      return Rose.Capabilities.Capability
+   function Read_Cap_Set
+     (Set_Cap : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability_Array
    is
       use type Rose.Capabilities.Capability;
+      Set : Rose.Interfaces.Caps.Cap_Set.Client.Cap_Set_Client;
    begin
-      if Last_Result /= Rose.Capabilities.Null_Capability then
-         Delete_Cap (Last_Result);
+      if Set_Cap = Rose.Capabilities.Null_Capability then
+         return (1 .. 0 => 0);
       end if;
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         Last_Result := Rose.Capabilities.Null_Capability;
-      else
-         Last_Result := Params.Caps (0);
-      end if;
-      return Last_Result;
-   end Result;
+      Rose.Interfaces.Caps.Cap_Set.Client.Open (Set, Set_Cap);
+
+      declare
+         Caps : Rose.Capabilities.Capability_Array
+           (1 .. Natural'Min (Set.Length, Max_Install_Caps));
+      begin
+         for I in Caps'Range loop
+            Caps (I) := Set.Get_Cap (I);
+         end loop;
+         Rose.Interfaces.Caps.Cap_Set.Client.Close (Set);
+         Delete_Cap (Set_Cap);
+         return Caps;
+      end;
+   end Read_Cap_Set;
 
    ----------------
    -- Send_Image --
@@ -481,6 +476,46 @@ package body Exec.Server is
       Exec.Output.Set (Standard_Output);
    end Set_Standard_Output;
 
+   --------------------
+   -- Start_Launched --
+   --------------------
+
+   function Start_Launched
+     (Params : Rose.Invocation.Invocation_Record;
+      Caps   : Rose.Capabilities.Capability_Array)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      Starting_Cap : Rose.Capabilities.Capability;
+      Starting     : Rose.Interfaces.Processes.Starting_Process.Client
+        .Starting_Process_Client;
+   begin
+      if Last_Result /= Rose.Capabilities.Null_Capability then
+         Delete_Cap (Last_Result);
+         Last_Result := Rose.Capabilities.Null_Capability;
+      end if;
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+        or else Params.Caps (0) = Rose.Capabilities.Null_Capability
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Starting_Cap := Params.Caps (0);
+      Rose.Interfaces.Processes.Starting_Process.Client.Open
+        (Starting, Starting_Cap);
+
+      for Cap of Caps loop
+         Starting.Add_Cap (Cap);
+      end loop;
+
+      Last_Result := Starting.Start;
+      Rose.Interfaces.Processes.Starting_Process.Client.Close (Starting);
+      Delete_Cap (Starting_Cap);
+      return Last_Result;
+   end Start_Launched;
+
    ------------------
    -- Start_Server --
    ------------------
@@ -498,13 +533,14 @@ package body Exec.Server is
      (Item         : in out Exec_Object;
       Executable   : in out Rose.Interfaces.Streams.Reader.Reader_Object'Class;
       Name         : String;
-      Install_Caps : Rose.Capabilities.Capability_Array)
+      Install_Caps : Rose.Capabilities.Capability)
       return Launch_Class
    is
       pragma Unreferenced (Item);
       Changed : Boolean;
       Id      : constant Rose.Objects.Capability_Identifier :=
-        Exec.Library.Update (Executable, Name, Install_Caps, Changed);
+        Exec.Library.Update
+          (Executable, Name, Read_Cap_Set (Install_Caps), Changed);
    begin
       if Changed then
          Exec.Output.Put_Line ("exec: new version of " & Name);

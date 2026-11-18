@@ -19,7 +19,6 @@ with Rose.Interfaces.Processes.Replacement.Server;
 with Rose.Interfaces.Processes.Replacer.Server;
 with Rose.Interfaces.Processes.Segment;
 
-with Rose.Interfaces.Storage.Region.Client;
 
 with Rose.Server;
 with Rose.System_Calls;
@@ -185,6 +184,15 @@ package body Mem.Server is
       Offset        : Rose.Words.Word;
       Flags         : Rose.Words.Word);
 
+   procedure Add_Private_Segment
+     (Id            : Rose.Objects.Capability_Identifier;
+      Virtual_Base  : Rose.Words.Word;
+      Virtual_Bound : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Flags         : Rose.Words.Word);
+   --  The process's own region, which it is handed: mem releases it when
+   --  the segment goes, or the process is gone (#403).
+
    procedure Add_Nonpersistent_Segment
      (Id            : in     Rose.Objects.Capability_Identifier;
       Virtual_Base  : in     Rose.Words.Word;
@@ -273,9 +281,11 @@ package body Mem.Server is
       use Rose.Interfaces.Processes.Segment;
       use type Rose.Words.Word;
 
-      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
+      Pid   : constant Process_Id := Mem.Processes.Find_Process (Id);
+      Added : Boolean;
    begin
       if Pid = 0 then
+         Rose.Server.Fail;
          return;
       end if;
 
@@ -286,8 +296,55 @@ package body Mem.Server is
          Readable     => (Flags and Segment_Readable) /= 0,
          Writable     => (Flags and Segment_Writable) /= 0,
          Executable   => (Flags and Segment_Executable) /= 0,
-         Resizable    => (Flags and Segment_Resizable) /= 0);
+         Resizable    => (Flags and Segment_Resizable) /= 0,
+         Success      => Added);
+
+      if not Added then
+         Rose.Server.Fail;
+      end if;
    end Add_Nonpersistent_Segment;
+
+   -------------------------
+   -- Add_Private_Segment --
+   -------------------------
+
+   procedure Add_Private_Segment
+     (Id            : Rose.Objects.Capability_Identifier;
+      Virtual_Base  : Rose.Words.Word;
+      Virtual_Bound : Rose.Words.Word;
+      Region        : Rose.Capabilities.Capability;
+      Flags         : Rose.Words.Word)
+   is
+      use Rose.Interfaces.Processes.Segment;
+      use type Rose.Words.Word;
+
+      Pid    : constant Process_Id := Mem.Processes.Find_Process (Id);
+      Added  : Boolean;
+   begin
+      if Pid = 0 then
+         Rose.System_Calls.Delete_Cap (Region);
+         Rose.Server.Fail;
+         return;
+      end if;
+
+      Mem.Processes.Add_Segment
+        (Process       => Pid,
+         Virtual_Base  => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
+         Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
+         Region        => Region,
+         Region_Offset => 0,
+         Readable      => (Flags and Segment_Readable) /= 0,
+         Writable      => (Flags and Segment_Writable) /= 0,
+         Executable    => (Flags and Segment_Executable) /= 0,
+         Resizable    => (Flags and Segment_Resizable) /= 0,
+         Success       => Added,
+         Private_Region => True,
+         Shared        => (Flags and Segment_Shared) /= 0);
+
+      if not Added then
+         Rose.Server.Fail;
+      end if;
+   end Add_Private_Segment;
 
    -----------------
    -- Add_Segment --
@@ -302,29 +359,34 @@ package body Mem.Server is
       Flags         : Rose.Words.Word)
    is
       use Rose.Interfaces.Processes.Segment;
-      use Rose.Interfaces.Storage.Region.Client;
       use type Rose.Words.Word;
 
-      Client : Region_Client;
       Pid    : constant Process_Id := Mem.Processes.Find_Process (Id);
+      Added  : Boolean;
    begin
       if Pid = 0 then
+         Rose.System_Calls.Delete_Cap (Region);
+         Rose.Server.Fail;
          return;
       end if;
 
-      Open (Client, Region);
       Mem.Processes.Add_Segment
         (Process       => Pid,
          Virtual_Base  => Rose.Addresses.Virtual_Page_Address (Virtual_Base),
          Virtual_Bound => Rose.Addresses.Virtual_Page_Address (Virtual_Bound),
-         Region        => Client,
+         Region        => Region,
          Region_Offset => Offset,
          Readable      => (Flags and Segment_Readable) /= 0,
          Writable      => (Flags and Segment_Writable) /= 0,
          Executable    => (Flags and Segment_Executable) /= 0,
          Resizable    => (Flags and Segment_Resizable) /= 0,
-         Private_Region => (Flags and Segment_Private) /= 0,
+         Success       => Added,
+         Private_Region => False,
          Shared        => (Flags and Segment_Shared) /= 0);
+
+      if not Added then
+         Rose.Server.Fail;
+      end if;
    end Add_Segment;
 
    -----------------------
@@ -517,6 +579,7 @@ package body Mem.Server is
         (Server_Context => Server,
          Destroy => Destroy'Access,
          Add_Segment    => Add_Segment'Access,
+         Add_Private_Segment => Add_Private_Segment'Access,
          Add_Nonpersistent_Segment => Add_Nonpersistent_Segment'Access,
          Remove_Segment => Remove_Segment'Access,
          Published_Interface => Published_Interface'Access,
@@ -1113,6 +1176,11 @@ package body Mem.Server is
          return Rose.Addresses.Virtual_Page_Address
       is (Rose.Addresses.Virtual_Page_Address (Value));
 
+      Added     : Boolean;
+      All_Added : Boolean := True;
+      --  mem lays out a boot module's segments itself, so one that is
+      --  left out is a bug in mem, and there is no caller to fail.
+
    begin
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Pid,
@@ -1121,7 +1189,9 @@ package body Mem.Server is
          Readable      => True,
          Writable      => False,
          Executable    => True,
-         Resizable     => False);
+         Resizable     => False,
+         Success       => Added);
+      All_Added := All_Added and then Added;
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Pid,
          Virtual_Base  => A (Text_Base),
@@ -1129,7 +1199,9 @@ package body Mem.Server is
          Readable      => True,
          Writable      => False,
          Executable    => False,
-         Resizable     => False);
+         Resizable     => False,
+         Success       => Added);
+      All_Added := All_Added and then Added;
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Pid,
          Virtual_Base  => A (Data_Base),
@@ -1137,7 +1209,9 @@ package body Mem.Server is
          Readable      => True,
          Writable      => True,
          Executable    => False,
-         Resizable     => False);
+         Resizable     => False,
+         Success       => Added);
+      All_Added := All_Added and then Added;
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Pid,
          Virtual_Base  => A (Data_Bound),
@@ -1145,7 +1219,9 @@ package body Mem.Server is
          Readable      => True,
          Writable      => True,
          Executable    => False,
-         Resizable     => True);
+         Resizable     => True,
+         Success       => Added);
+      All_Added := All_Added and then Added;
       Mem.Processes.Add_Nonpersistent_Segment
         (Process       => Pid,
          Virtual_Base  => A (Stack_Base),
@@ -1153,7 +1229,14 @@ package body Mem.Server is
          Readable      => True,
          Writable      => True,
          Executable    => False,
-         Resizable     => False);
+         Resizable     => False,
+         Success       => Added);
+      All_Added := All_Added and then Added;
+
+      if not All_Added then
+         Rose.Console_IO.Put_Line
+           ("mem: register boot module: a segment was left out");
+      end if;
    end Register_Process;
 
    -------------------------

@@ -14,7 +14,8 @@ with Rose.Words;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Devices.Event_Listener.Server;
 with Rose.Interfaces.Devices.Event_Source.Client;
-with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Storage.Region_Access.Client;
 with Rose.Interfaces.Processes.Restorable.Server;
 with Rose.Interfaces.Streams.Reader.Client;
 with Rose.Interfaces.Streams.Reader.Server;
@@ -45,7 +46,7 @@ package body Screen.Server is
 
    overriding function Get_Buffer
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Storage.Region.Region_Object'Class;
+      return Rose.Interfaces.Storage.Region_Access.Region_Access_Object'Class;
 
    overriding procedure Damage
      (Item   : in out Screen_Surface;
@@ -125,10 +126,12 @@ package body Screen.Server is
    --  isn't null, a Read of the events never waits.
 
    Buffer_Address : System.Address := System.Null_Address;
-   Buffer_Cap     : Rose.Capabilities.Capability :=
+   Buffer_Access  : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
-   --  The surface's buffer, where this driver maps it, and its Region.
-   --  Without a framebuffer, the surface is 0 by 0 and has no buffer.
+   --  The surface's buffer, where this driver maps it, and the
+   --  Region_Access of its region, which the holder is given. The region
+   --  is the driver's, and the holder can't release it (#403). Without a
+   --  framebuffer, the surface is 0 by 0 and has no buffer.
 
    Invocation_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
@@ -221,11 +224,12 @@ package body Screen.Server is
 
    overriding function Get_Buffer
      (Item : in out Screen_Surface)
-      return Rose.Interfaces.Storage.Region.Region_Object'Class
+      return Rose.Interfaces.Storage.Region_Access.Region_Access_Object'Class
    is
       pragma Unreferenced (Item);
    begin
-      return Rose.Interfaces.Storage.Region.Client.From_Cap (Buffer_Cap);
+      return Rose.Interfaces.Storage.Region_Access.Client.From_Cap
+        (Buffer_Access);
    end Get_Buffer;
 
    -----------------
@@ -425,7 +429,7 @@ package body Screen.Server is
                          (Word_64 (Screen.Framebuffer.Width)
                           * Word_64 (Screen.Framebuffer.Height) * 4);
          begin
-            Buffer_Cap := Region.Region_Cap;
+            Buffer_Access := Region.Region_Access_Cap;
             Buffer_Address := Rose.Shared_Regions.Map (Region);
          end;
          Redraw;

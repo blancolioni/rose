@@ -815,7 +815,6 @@ package body Petal.Command_Launch is
          Cap_Count   : Natural := 0;
          Buffer_Last : Storage_Count := 0;
          Endpoint    : Rose.Capabilities.Capability;
-         No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
 
          procedure Add_Item (Text : String);
          --  Add Text to the buffer, as the next item.
@@ -964,7 +963,7 @@ package body Petal.Command_Launch is
          Rose.Trace.Event ("arguments bound");
          begin
             Endpoint := Client.Launch_Command
-              (Rose.System_Calls.Own_Bank.Cap, No_Caps);
+              (Rose.System_Calls.Own_Bank.Cap);
          exception
             when Invocation_Error =>
                Endpoint := Rose.Capabilities.Null_Capability;
@@ -980,9 +979,7 @@ package body Petal.Command_Launch is
          for I in 0 .. Word_Count - 1 loop
             Rose.System_Calls.Send_Word (Params, Data (I));
          end loop;
-         for I in 1 .. Cap_Count loop
-            Rose.System_Calls.Send_Cap (Params, Caps (I));
-         end loop;
+         Rose.System_Calls.Send_Caps (Params, Caps (1 .. Cap_Count));
          --  The whole buffer is lent writable, so that the command can
          --  write its failure message into it (#431).
 

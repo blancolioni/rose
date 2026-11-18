@@ -4,6 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Limits;
 
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Storage.Region.Client;
 
 with Exec.Output;
@@ -26,6 +27,11 @@ package body Exec.Library is
          ELF_Bound       : Rose.Objects.Page_Object_Id;
          Image           : Rose.Capabilities.Capability :=
                              Rose.Capabilities.Null_Capability;
+         --  A region of the image's pages, which is exec's.
+         Image_Access    : Rose.Capabilities.Capability :=
+                             Rose.Capabilities.Null_Capability;
+         --  Its Region_Access, which elf is given, and can't release
+         --  (#403).
          Metadata_Offset : Storage_Count := 0;
          Metadata_Length : Storage_Count := 0;
          Retired         : Boolean := False;
@@ -263,9 +269,10 @@ package body Exec.Library is
               Region.Create_Subregion (Item.ELF_Base, Item.ELF_Bound, 5);
          begin
             Item.Image := Image.Region_Cap;
+            Item.Image_Access := Image.Region_Access_Cap;
          end;
       end if;
-      return Item.Image;
+      return Item.Image_Access;
    end Image_Region;
 
    -------------
@@ -292,6 +299,27 @@ package body Exec.Library is
       return Rose.Objects.Capability_Identifier
         (Installed_Programs.Last_Index);
    end Install;
+
+   ------------------
+   -- Install_Caps --
+   ------------------
+
+   function Install_Caps
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability_Array
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if Is_Installed (Id) then
+         for I in Program (Id).Caps'Range loop
+            if Program (Id).Caps (I) = 0 then
+               return Program (Id).Caps (1 .. I - 1);
+            end if;
+         end loop;
+         return Program (Id).Caps;
+      end if;
+      return (1 .. 0 => 0);
+   end Install_Caps;
 
    ------------
    -- Newest --
@@ -378,24 +406,6 @@ package body Exec.Library is
          end;
       end loop;
    end Read_Image;
-
-   -----------------------
-   -- Send_Install_Caps --
-   -----------------------
-
-   procedure Send_Install_Caps
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record)
-   is
-      use type Rose.Capabilities.Capability;
-   begin
-      if Is_Installed (Id) then
-         for Cap of Program (Id).Caps loop
-            exit when Cap = 0;
-            Rose.Invocation.Send_Cap (Params, Cap);
-         end loop;
-      end if;
-   end Send_Install_Caps;
 
    --------------------
    -- Set_Region --
@@ -510,6 +520,32 @@ package body Exec.Library is
       Old_Base   : Rose.Objects.Object_Id := 0;
       Old_Bound  : Rose.Objects.Object_Id := 0;
       Page_Index : Rose.Objects.Object_Id := 0;
+
+      procedure Not_Installed (Message : String);
+      --  Report that the image is not installed, and give back the pages
+      --  written for it: a page of zeroes takes no space in the store.
+
+      -------------------
+      -- Not_Installed --
+      -------------------
+
+      procedure Not_Installed (Message : String) is
+      begin
+         Exec.Output.Put_Line ("exec: " & Message & " " & Name);
+         Buffer := (others => 0);
+         for Page in Item.ELF_Base .. Next_Page - 1 loop
+            begin
+               Region.Put (Page, Buffer);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end loop;
+         Next_Page := Item.ELF_Base;
+         Same := False;
+         Success := False;
+      end Not_Installed;
+
    begin
       Item.Caps := (others => 0);
       Item.Caps (1 .. Caps'Length) := Caps;
@@ -536,16 +572,22 @@ package body Exec.Library is
          --  installed with its last pages missing (#669).
 
          if Next_Page >= Page_Bound then
-            Exec.Output.Put_Line ("exec: no room for " & Name);
-            Next_Page := Item.ELF_Base;
-            Same := False;
-            Success := False;
+            Not_Installed ("no room for");
             return;
          end if;
 
          Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
            (others => 0);
-         Region.Put (Next_Page, Buffer);
+
+         --  Nor is one that the store has no space for (#945).
+
+         begin
+            Region.Put (Next_Page, Buffer);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Not_Installed ("no space for");
+               return;
+         end;
 
          if Same then
             if Old_Base + Page_Index < Old_Bound then

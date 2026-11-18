@@ -271,7 +271,6 @@ package body Tests.Replacement is
       --  close to the kernel's 64 (#915).
 
       declare
-         No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
          Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
            Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
@@ -284,7 +283,7 @@ package body Tests.Replacement is
          Launcher  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
            Tests.Registry.Launcher ("auth");
          Endpoint  : constant Rose.Capabilities.Capability :=
-           Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
+           Launcher.Launch_Command (Test_Bank.Bank_Cap);
          Auth_Cap  : Rose.Capabilities.Capability := Null_Cap;
          Admin_Cap : Rose.Capabilities.Capability := Null_Cap;
          Control   : Rose.Capabilities.Capability := Null_Cap;
@@ -345,7 +344,7 @@ package body Tests.Replacement is
                   Check ("the old version is never ready", Ready);
 
                   New_Version :=
-                    Launcher.Launch_Command (Sibling.Bank_Cap, No_Caps);
+                    Launcher.Launch_Command (Sibling.Bank_Cap);
                   Check ("the new version did not launch",
                          New_Version /= Null_Cap);
 
@@ -1194,7 +1193,6 @@ package body Tests.Replacement is
       --  launches a user in the user's bank.
 
       declare
-         No_Caps   : Rose.Capabilities.Capability_Array (1 .. 0);
          Own       : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
            Rose.Interfaces.Storage.Bank.Client.From_Cap
              (Rose.System_Calls.Own_Bank.Cap);
@@ -1209,7 +1207,7 @@ package body Tests.Replacement is
          Home      : Rose.Interfaces.Files.Writable_Directory.Client
            .Writable_Directory_Client;
          Endpoint  : constant Rose.Capabilities.Capability :=
-           Launcher.Launch_Command (Test_Bank.Bank_Cap, No_Caps);
+           Launcher.Launch_Command (Test_Bank.Bank_Cap);
          Served    : Rose.Capabilities.Capability := Null_Cap;
          Control   : Rose.Capabilities.Capability := Null_Cap;
          User      : Rose.Interfaces.Users.User.Client.User_Client;
@@ -1266,7 +1264,7 @@ package body Tests.Replacement is
                   Check ("the old version is never ready", Ready);
 
                   New_Version :=
-                    Launcher.Launch_Command (Sibling.Bank_Cap, No_Caps);
+                    Launcher.Launch_Command (Sibling.Bank_Cap);
                   Check ("the new version did not launch",
                          New_Version /= Null_Cap);
 
@@ -1783,14 +1781,12 @@ package body Tests.Replacement is
    is
       use System.Storage_Elements;
       use type Rose.Words.Word_32;
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("replaceable_test");
       Endpoint : constant Rose.Capabilities.Capability :=
         Launcher.Launch_Command
           ((if Bank /= Null_Cap then Bank
-            else Rose.System_Calls.Own_Bank.Cap),
-           No_Caps);
+            else Rose.System_Calls.Own_Bank.Cap));
       Padded   : constant Storage_Offset :=
         Storage_Offset ((Name'Length + 3) / 4 * 4);
       Params   : aliased Rose.Invocation.Invocation_Record;
@@ -1826,15 +1822,17 @@ package body Tests.Replacement is
       end loop;
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Tests.Registry.Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Tests.Registry.Cap_Sets);
-      Rose.System_Calls.Send_Cap (Params, Target);
-      if Previous /= Null_Cap or else Saved /= Null_Cap then
-         Rose.System_Calls.Send_Cap (Params, Previous);
-      end if;
-      if Saved /= Null_Cap then
-         Rose.System_Calls.Send_Cap (Params, Saved);
-      end if;
+      declare
+         Caps  : constant Rose.Capabilities.Capability_Array (1 .. 5) :=
+           (Tests.Registry.Create_Endpoint, Tests.Registry.Cap_Sets,
+            Target, Previous, Saved);
+         Count : constant Positive :=
+           (if Saved /= Null_Cap then 5
+            elsif Previous /= Null_Cap then 4
+            else 3);
+      begin
+         Rose.System_Calls.Send_Caps (Params, Caps (1 .. Count));
+      end;
       Rose.System_Calls.Send_Buffer
         (Params, 4 + Padded, Name_Buffer'Address, False);
       Rose.System_Calls.Receive_Words (Params, 1);

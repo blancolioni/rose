@@ -14,6 +14,7 @@ with Tests.Invalid_Caps;
 with Tests.Memory;
 with Tests.Numerics;
 with Tests.Processes;
+with Tests.Regions;
 with Tests.Replacement;
 with Tests.Rights;
 with Tests.Screen;
@@ -65,7 +66,9 @@ package Tests.Suite is
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
                    Tests.Memory.Copy_Test'Access,
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
+                   Tests.Shared_Segments.Overlap_Test'Access,
                    Tests.Shared_Regions.Shared_Regions_Test'Access,
+                   Tests.Regions.Put_Limit_Test'Access,
                    Tests.Screen.Screen_Test'Access,
                    Tests.Signals.Signal_Test'Access,
                    Tests.Banks.Dependent_Test'Access,

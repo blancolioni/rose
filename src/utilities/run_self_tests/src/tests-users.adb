@@ -41,7 +41,6 @@ package body Tests.Users is
         Rose.Capabilities.Null_Capability)
       return Rose.Capabilities.Capability
    is
-      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
       User_Launch : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                       Tests.Registry.Launcher ("user");
       User_Bank   : constant Rose.Capabilities.Capability :=
@@ -49,7 +48,7 @@ package body Tests.Users is
                        then Rose.System_Calls.Own_Bank.Cap
                        else Bank);
       Endpoint    : constant Rose.Capabilities.Capability :=
-                      User_Launch.Launch_Command (User_Bank, No_Caps);
+                      User_Launch.Launch_Command (User_Bank);
       User        : Rose.Capabilities.Capability;
       Control     : Rose.Capabilities.Capability;
    begin

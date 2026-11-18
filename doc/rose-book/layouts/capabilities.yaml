@@ -147,16 +147,16 @@ diagrams:
         "1110": Rose.Capabilities.Layout.Arch_Cap
 
   # Flags is a packed array indexed by Rose.Invocation.Invocation_Flag,
-  # so flag N is bit N, from Writable_Buffer (0) to Recv_Caps (12).
+  # so flag N is bit N, from Writable_Buffer (0) to Continued (13).
   invocation-record:
     title: Invocation record
     rows:
-      - - [13, Flags]
+      - - [14, Flags]
         - [4, SW]
         - [4, RW]
-        - [4, SC]
-        - [4, RC]
-        - [3, rsvd]
+        - [2, SC]
+        - [2, RC]
+        - [6, rsvd]
       - {words: 1, name: Capability}
       - {words: 1, name: Reply Capability}
       - {words: 2, name: Endpoint Id}
@@ -165,7 +165,7 @@ diagrams:
         - [5, Error]
         - [3, Extra]
       - {words: 16, name: Parameter words (16), height: 3}
-      - {words: 16, name: Capabilities (16), height: 3}
+      - {words: 4, name: Capabilities (4)}
       - {words: 1, name: Buffer address}
       - {words: 1, name: Buffer length}
     check:
@@ -188,6 +188,6 @@ diagrams:
             Error: Error
             Extra: Extra_Errors
             Parameter words (16): Data
-            Capabilities (16): Caps
+            Capabilities (4): Caps
             Buffer address: Buffer_Address
             Buffer length: Buffer_Length

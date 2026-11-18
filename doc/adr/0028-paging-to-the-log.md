@@ -106,7 +106,7 @@ A fault on a page that has a copy in the log reads that log page and maps it.
 
 - **The boot modules,** including the pager path (`mem`, `store`, `partition`, `ata`, `log`, `checkpoint` and `restore`). They take their memory from the kernel's reservation (`Boot_Module_Pages`), not from `mem`.
 - **Shared pages that anything maps** (ADR 0025, section 3). When the last mapping goes, a shared page is written back to its region, as now.
-- **Pages the kernel has pinned** for a call in progress: the pages of a buffer that the kernel has mapped into another process's shared slot (#519).
+- **Pages the kernel has pinned** for a call in progress: the pages of a buffer that the kernel has mapped into another process's shared slot (#519). The caller's process entry records the buffer it has lent, since a caller has one call at a time, and the kernel's `Unmap_Page` refuses to unmap those pages, so `mem` skips them (#972).
 
 ### 9. Restore reads one entry
 
