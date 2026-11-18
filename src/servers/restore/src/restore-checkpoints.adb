@@ -842,6 +842,17 @@ package body Restore.Checkpoints is
                         Limit   => Segment.Limit,
                         Flags   => Segment.Flags);
                   end if;
+
+                  --  Mem refuses a segment that overlaps another (#970),
+                  --  and says which. A process with a segment missing
+                  --  can't be restored.
+
+                  if Rose.Interfaces.Checkpoints.Memory_Restore.Client
+                    .Has_Error
+                  then
+                     Fail ("mem refused a saved segment");
+                     return;
+                  end if;
                end loop;
             end if;
          end;

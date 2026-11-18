@@ -183,14 +183,18 @@ package Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       Resizable     : Boolean;
+      Success       : out Boolean;
       Private_Region : Boolean := False;
       Shared        : Boolean := False);
    --  Region is the interface cap of a Region_Access, or of a Region if
    --  Private_Region is True: then the region belongs to the process, and
    --  is released when the process is gone (#403). Shared is True if the
    --  segment maps the region's pages themselves, shared with every
-   --  process that maps them shared (ADR 0025). A shared segment that
-   --  overlaps another segment of the process is left out.
+   --  process that maps them shared (ADR 0025). Success is False, and
+   --  the segment is left out, if it overlaps another segment of the
+   --  process, or the range a resizable one can grow into (#970), if the
+   --  process has too many segments, or if the region has no range. Mem
+   --  then doesn't keep Region, which stays the caller's.
 
    procedure Remove_Segment
      (Process      : Process_Id;
@@ -245,7 +249,10 @@ package Mem.Processes is
       Readable      : Boolean;
       Writable      : Boolean;
       Executable    : Boolean;
-      Resizable     : Boolean);
+      Resizable     : Boolean;
+      Success       : out Boolean);
+   --  Success is False, and the segment is left out, if it overlaps
+   --  another segment of the process (#970), or the process has too many.
 
    procedure Resize_Segment
      (Process           : Process_Id;
