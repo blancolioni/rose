@@ -113,6 +113,7 @@ A fault on a page that has a copy in the log reads that log page and maps it.
 
 - **`mem`'s process records give each process's index directory.** `Memory_Restore.Restore_Process` takes that log page as well, and `mem` reads the index on demand from then on.
 - **`Memory_Restore.Restore_Page` is no longer used** for a checkpoint with an index. No page is read until a process faults on it.
+- **The pages of a buffer in a call still in progress are read at restore.** The kernel maps a waiting caller's buffer into the server again when it resumes the caller (#519), and makes the call again if the pages aren't there, which a call that isn't safe to repeat can't afford. `restore` finds those buffers in the kernel's process records and asks `mem` to read their pages with `Memory_Restore.Load_Page`, the way a fault would (#949).
 - **Shared pages are still read from every entry,** as ADR 0025 describes, since they have no index. They are few.
 - **A checkpoint written before this change,** whose `mem` tables have no index directories, is restored as now: every entry is read, and every page is given to `mem` with `Restore_Page`. Those pages are all dirty, so the next checkpoint saves them all and writes a complete index.
 
@@ -133,6 +134,7 @@ So a restore does about the same work whatever the size of the log, and memory f
 - **The log interface that `mem` holds:** append a batch to the open entry, and read a page by log page number. Opening an entry after each commit is `log`'s own business.
 - **The checkpoint server:** a request for a checkpoint now, which doesn't wait for a reply.
 - **`Memory_Restore.Restore_Process`:** also takes the log page of the process's index directory.
+- **`Memory_Restore.Load_Page`:** reads one of a process's pages in now, for the buffers of calls in progress (section 9).
 - **`Rose.Checkpoints`:**
   - index directory and index leaf pages;
   - a header page for index pages;

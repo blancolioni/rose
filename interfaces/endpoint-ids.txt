@@ -25,10 +25,11 @@
 16#F1CD_96F4_D838_C3A1#  rose.interfaces.checkpoints.log_reader.page_count(in word_64) return natural
 16#0835_5971_9475_3D20#  rose.interfaces.checkpoints.log_reader.read_page(in word_64; in positive; out storage_array)
 16#1736_EB8B_30AB_1220#  interface rose.interfaces.checkpoints.memory_restore
-16#8CFF_3B82_F0F9_B43F#  rose.interfaces.checkpoints.memory_restore.restore_process(in capability; in natural)
+16#1661_D4BD_5A5D_3053#  rose.interfaces.checkpoints.memory_restore.restore_process(in capability; in natural; in word)
 16#1225_D699_2B44_F197#  rose.interfaces.checkpoints.memory_restore.restore_segment(in natural; in word; in word; in word; in word; in capability; in word)
 16#8E28_AB14_5B8F_BEA6#  rose.interfaces.checkpoints.memory_restore.restore_zero_segment(in natural; in word; in word; in word; in word)
 16#C2A2_3D85_B6DA_35E6#  rose.interfaces.checkpoints.memory_restore.restore_page(in natural; in word; in storage_array)
+16#DB65_7150_9169_5C2B#  rose.interfaces.checkpoints.memory_restore.load_page(in natural; in word)
 16#6FD8_89CB_06E8_0BD6#  rose.interfaces.checkpoints.memory_restore.restore_shared_page(in object_id; in storage_array)
 16#E8C9_E2E2_F9E2_FD43#  interface rose.interfaces.checkpoints.page_log
 16#0806_2377_8396_167A#  rose.interfaces.checkpoints.page_log.append_page(in storage_array) return word

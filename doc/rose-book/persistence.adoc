@@ -159,9 +159,17 @@ The batch's pages go to consecutive log pages, so `mem` knows each page's log pa
 If any of `mem`'s appends fails, it tells `log` to leave the entry out (`Page_Log.Fail_Entry`), and keeps the index it had.
 The pages the checkpoint would have saved stay dirty, so the next checkpoint saves them.
 
-A process that `mem` gives a slot to, when it is launched or restored, starts with no index.
-A restored process's pages are all dirty, so the first checkpoint after a restore writes a complete index for it.
-`restore` doesn't read the index yet: it still reads every entry (see <<Restore>>).
+A process that `mem` gives a slot to when it is launched starts with no index.
+A restored process starts with the index directory that its record in the checkpoint names.
+
+When a process faults on a page of a writable persistent segment that isn't shared, `mem` looks the page up in the process's index.
+If the log has a copy, `mem` reads it with `Page_Log.Read_Page`, rather than from the segment's region, and maps it clean: its copy in the log is still good until the page is written again.
+
+`mem` keeps a cache of 32 index pages, by log page, in pages that it manages.
+A lookup that misses it costs up to two more reads of the log, for the directory and the leaf.
+The index pages that a checkpoint writes join the cache once the checkpoint is complete.
+When memory runs short, `mem` takes back cached pages of read-only segments first, then index pages.
+
 `check-log.py` checks that each entry's index names the copies that reading every entry would find.
 
 == Restore
@@ -172,13 +180,21 @@ If it finds one, it brings back the persistent processes as they were at that ch
 . the storage server's regions and map, through `Storage_Checkpoint`;
 . the derivation records, which the processes' capabilities name;
 . each process in the kernel, with its capabilities, not yet runnable;
-. each process in the memory server, with its segments, through `Memory_Restore`, leaving out any process that the kernel didn't save;
+. each process in the memory server, with its segments and the log page of its index directory, through `Memory_Restore`, leaving out any process that the kernel didn't save;
 . the pages of shared segments;
-. the newest saved contents of each page the processes changed;
+. the pages of any buffer that a process was sending in a call still in progress, which `mem` reads with `Load_Page`, since the kernel maps them into the server again when it resumes the process;
 . the interrupts they handle.
 
-For the pages, `restore` reads every entry from the first up to the checkpoint, and keeps the newest copy of each page: a page that was saved in an older entry and not changed since is only there.
-It can keep track of at most 4,096 different pages, and as many shared pages (`Max_Sources`); past that, the restore fails.
+A process's own pages aren't read by `restore` (ADR 0028, section 9).
+`mem` reads each one from the log, through the process's index, the first time the process touches it (see <<The Index>>).
+So a restore does about the same work however long the log is, and memory fills as the system runs.
+
+Shared pages have no index, so for them `restore` reads every entry from the first up to the checkpoint, and keeps the newest copy of each: a page that was saved in an older entry and not changed since is only there.
+It can keep track of at most 4,096 different shared pages (`Max_Sources`); past that, the restore fails.
+
+A checkpoint written before the index (#949), whose memory tables don't have `Mem_Has_Index`, is restored by reading every entry for the processes' pages too, and giving each page's newest copy to `mem` with `Restore_Page`, at most 4,096 of them.
+Those pages are all dirty, so the next checkpoint saves them, with a complete index.
+
 The log is never consolidated yet, so it grows with every checkpoint until it is reset (see <<Future Work>>).
 
 When `init` has started the last boot modules and replied, `restore` resumes the processes (see <<restore-boot>>).

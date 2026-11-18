@@ -4,12 +4,16 @@ interface Checkpoints.Memory_Restore is
    --  out of Memory, so that only the restore server can use it.
 
    procedure Restore_Process
-     (Process : Capability;
-      Mem_Pid : Natural);
+     (Process         : Capability;
+      Mem_Pid         : Natural;
+      Index_Directory : Word);
    --  Recreate the memory server's process Mem_Pid for the kernel
    --  process whose Kernel_Process interface is Process.  Mem_Pid must
    --  be the id it had, since the caps the memory server gave it carry
-   --  that id.
+   --  that id.  Index_Directory is the log page of its index directory
+   --  (ADR 0028), from which the memory server reads its pages when it
+   --  faults on them, or 0 if the log has none of its pages or the
+   --  checkpoint has no index.
 
    procedure Restore_Segment
      (Mem_Pid       : Natural;
@@ -35,7 +39,19 @@ interface Checkpoints.Memory_Restore is
       Virtual_Page : Word;
       Page         : Storage_Array);
    --  Give the process the saved contents of one of its pages.  The page
-   --  is dirty, so the next checkpoint saves it again.
+   --  is dirty, so the next checkpoint saves it again.  Used only for a
+   --  checkpoint without an index (ADR 0028, section 9).
+
+   procedure Load_Page
+     (Mem_Pid      : Natural;
+      Virtual_Page : Word);
+   --  Read one of the process's pages in now, as a fault on it would:
+   --  from the log if its index has it, or else from its segment.  The
+   --  page is clean.  Used for the pages of a buffer that the process
+   --  was sending in a call still in progress, which the kernel maps
+   --  into the server again when it resumes the process (ADR 0028,
+   --  section 9).  Nothing happens if the page is already there, or
+   --  isn't in a writable segment of the process's own.
 
    procedure Restore_Shared_Page
      (Store_Page : Object_Id;

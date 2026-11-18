@@ -161,6 +161,8 @@ package body Restore.Entries is
 
       Layout.Has_Shared :=
         (Mem_Header.Flags and Rose.Checkpoints.Mem_Has_Shared_Pages) /= 0;
+      Layout.Has_Index :=
+        (Mem_Header.Flags and Rose.Checkpoints.Mem_Has_Index) /= 0;
       Layout.Shared_First := Layout.Mem_First + Layout.Mem_Pages;
 
       if Layout.Has_Shared

@@ -1,17 +1,19 @@
 with System.Storage_Elements;
 
-with Rose.Addresses;
 with Rose.Checkpoints;
 with Rose.Console_IO;
 with Rose.Limits;
 
+with Mem.Calls;
 with Mem.Page_Log;
 with Mem.Page_Table;
+with Mem.Physical_Map;
 with Mem.Shared_Pages;
 
 package body Mem.Log_Index is
 
    use Rose.Words;
+   use type Rose.Addresses.Physical_Page_Address;
    use type Rose.Addresses.Virtual_Page_Address;
    use type Rose.Checkpoints.Header_Page_Flags;
 
@@ -47,22 +49,86 @@ package body Mem.Log_Index is
    Header_Buffer    : Page_Buffer
      with Alignment => Rose.Limits.Page_Size;
 
+   Window_Buffer    : Page_Buffer
+     with Alignment => Rose.Limits.Page_Size;
+   --  Where a cached page is mapped while it is read.
+   Spare_Buffer     : Page_Buffer
+     with Alignment => Rose.Limits.Page_Size;
+   --  Where a page is read if the cache can't get memory for it.
+
    Leaf      : Rose.Checkpoints.Index_Page
      with Import, Address => Leaf_Buffer'Address;
    Directory : Rose.Checkpoints.Index_Page
      with Import, Address => Directory_Buffer'Address;
    Header    : Rose.Checkpoints.Index_Header_Page
      with Import, Address => Header_Buffer'Address;
+   Window    : Rose.Checkpoints.Index_Page
+     with Import, Address => Window_Buffer'Address;
+   Spare     : Rose.Checkpoints.Index_Page
+     with Import, Address => Spare_Buffer'Address;
+
+   --  The cache of index pages (ADR 0028, section 3), by log page. An
+   --  index page is never changed in place, so a cached copy is good for
+   --  as long as the index names its log page. The pages are taken from
+   --  the pages that mem manages, and given back under pressure (Evict).
+   --  A page that Write_Index wrote is pending until the checkpoint ends:
+   --  lookups don't find it, and it is dropped if the entry fails.
+
+   Cache_Slots : constant := 32;
+
+   type Slot_Count is range 0 .. Cache_Slots;
+   subtype Slot_Index is Slot_Count range 1 .. Slot_Count'Last;
+
+   type Cache_Slot is
+      record
+         Log_Page : Word_32 := 0;
+         --  0 if the slot holds no page.
+         Physical : Rose.Addresses.Physical_Page_Address := 0;
+         --  0 if the slot has no memory.
+         Last_Use : Natural := 0;
+         Pending  : Boolean := False;
+      end record;
+
+   Cache : array (Slot_Index) of Cache_Slot;
+   Clock : Natural := 0;
+
+   procedure Add_Pending
+     (Log_Page : Word_32;
+      Buffer   : System.Address);
+   --  Cache a copy of the page at Buffer, which Write_Index has just
+   --  appended at Log_Page, as pending. Nothing happens if the cache
+   --  can't get memory for it.
+
+   procedure Copy_Page
+     (From : Page_Buffer;
+      To   : out Page_Buffer);
+   --  Copy From to To one element at a time. An assignment between page
+   --  overlays copies through a temporary on the stack, and mem's stack
+   --  is one page.
 
    procedure Fill_Leaf
      (Key         : Integer;
       Batch_First : Word_32);
    --  Set the entries of Leaf for the pages of the batch in leaf Key.
 
+   function Find_Slot (Log_Page : Word_32) return Slot_Count;
+   --  The slot that holds Log_Page and isn't pending, or 0.
+
+   function Get_Entry
+     (Log_Page : Word_32;
+      Index    : Natural)
+      return Word_32;
+   --  Entry Index of the index page at Log_Page, through the cache.
+
    function Key_Of
      (Process : Process_Id;
       Page    : Rose.Addresses.Virtual_Page_Address)
       return Integer;
+
+   function New_Slot return Slot_Count;
+   --  A slot with memory and no page, for a new page: one that is free,
+   --  or one that gets memory now, or else the one used least recently
+   --  that isn't pending. 0 if no slot has memory.
 
    function Next_Key (After : Integer) return Integer;
    --  The smallest key after After of a leaf with a page in the batch, or
@@ -73,10 +139,62 @@ package body Mem.Log_Index is
    procedure Read_Page
      (Log_Page : Word_32;
       Buffer   : System.Address);
-   --  Read log page Log_Page into the page buffer at Buffer, or fill it
-   --  with zeroes if Log_Page is 0.
+   --  Read log page Log_Page into the page buffer at Buffer, from the
+   --  cache or the log, or fill it with zeroes if Log_Page is 0.
 
    function Slot_Of (Key : Integer) return Natural;
+
+   procedure Touch (Slot : Slot_Index);
+   --  Slot has just been used.
+
+   -----------------
+   -- Add_Pending --
+   -----------------
+
+   procedure Add_Pending
+     (Log_Page : Word_32;
+      Buffer   : System.Address)
+   is
+      Source : Page_Buffer
+        with Import, Address => Buffer;
+      Slot   : Slot_Count;
+   begin
+      --  A log page is used again only once nothing names it, so a copy
+      --  of the page that was there before is of no use.
+
+      for Item of Cache loop
+         if Item.Log_Page = Log_Page then
+            Item.Log_Page := 0;
+            Item.Pending := False;
+         end if;
+      end loop;
+
+      Slot := New_Slot;
+      if Slot = 0 then
+         return;
+      end if;
+
+      Mem.Calls.Load_Page (Cache (Slot).Physical, Window_Buffer'Address);
+      Copy_Page (From => Source, To => Window_Buffer);
+      Mem.Calls.Unload_Page (Cache (Slot).Physical, Window_Buffer'Address);
+      Cache (Slot).Log_Page := Log_Page;
+      Cache (Slot).Pending := True;
+      Touch (Slot);
+   end Add_Pending;
+
+   ---------------
+   -- Copy_Page --
+   ---------------
+
+   procedure Copy_Page
+     (From : Page_Buffer;
+      To   : out Page_Buffer)
+   is
+   begin
+      for I in To'Range loop
+         To (I) := From (I);
+      end loop;
+   end Copy_Page;
 
    --------------------
    -- End_Checkpoint --
@@ -89,7 +207,48 @@ package body Mem.Log_Index is
       else
          New_Directories := Directories;
       end if;
+
+      for Item of Cache loop
+         if Item.Pending then
+            Item.Pending := False;
+            if not Committed then
+               Item.Log_Page := 0;
+            end if;
+         end if;
+      end loop;
    end End_Checkpoint;
+
+   -----------
+   -- Evict --
+   -----------
+
+   procedure Evict
+     (Physical : out Rose.Addresses.Physical_Page_Address;
+      Success  : out Boolean)
+   is
+      Best : Slot_Count := 0;
+   begin
+      for I in Cache'Range loop
+         if Cache (I).Physical /= 0
+           and then
+             (Best = 0
+              or else Cache (I).Log_Page = 0
+              or else (Cache (Best).Log_Page /= 0
+                       and then Cache (I).Last_Use < Cache (Best).Last_Use))
+         then
+            Best := I;
+         end if;
+      end loop;
+
+      if Best = 0 then
+         Physical := 0;
+         Success := False;
+      else
+         Physical := Cache (Best).Physical;
+         Cache (Best) := (others => <>);
+         Success := True;
+      end if;
+   end Evict;
 
    ---------------
    -- Fill_Leaf --
@@ -126,6 +285,54 @@ package body Mem.Log_Index is
       Mem.Page_Table.Iterate_Dirty_Pages (Check'Access);
    end Fill_Leaf;
 
+   ----------
+   -- Find --
+   ----------
+
+   function Find
+     (Process : Process_Id;
+      Page    : Rose.Addresses.Virtual_Page_Address)
+      return Rose.Words.Word_32
+   is
+      Leaf_Page : Word_32;
+   begin
+      --  Is_Available also opens the Page_Log client, which nothing
+      --  else has done yet on a boot that restores a checkpoint.
+
+      if Process not in Real_Process_Id
+        or else Directories (Process) = 0
+        or else not Mem.Page_Log.Is_Available
+      then
+         return 0;
+      end if;
+
+      Leaf_Page :=
+        Get_Entry (Directories (Process),
+                   Natural (Page / Entries_Per_Page));
+
+      if Leaf_Page = 0 then
+         return 0;
+      end if;
+
+      return Get_Entry (Leaf_Page, Natural (Page mod Entries_Per_Page));
+   end Find;
+
+   ---------------
+   -- Find_Slot --
+   ---------------
+
+   function Find_Slot (Log_Page : Word_32) return Slot_Count is
+   begin
+      for I in Cache'Range loop
+         if Cache (I).Log_Page = Log_Page
+           and then not Cache (I).Pending
+         then
+            return I;
+         end if;
+      end loop;
+      return 0;
+   end Find_Slot;
+
    ------------
    -- Forget --
    ------------
@@ -137,6 +344,37 @@ package body Mem.Log_Index is
          New_Directories (Process) := 0;
       end if;
    end Forget;
+
+   ---------------
+   -- Get_Entry --
+   ---------------
+
+   function Get_Entry
+     (Log_Page : Word_32;
+      Index    : Natural)
+      return Word_32
+   is
+      Slot   : Slot_Count := Find_Slot (Log_Page);
+      Result : Word_32;
+   begin
+      if Slot = 0 then
+         Slot := New_Slot;
+         if Slot = 0 then
+            Mem.Page_Log.Read (Log_Page, Spare_Buffer'Address);
+            return Spare.Entries (Index);
+         end if;
+         Mem.Calls.Load_Page (Cache (Slot).Physical, Window_Buffer'Address);
+         Mem.Page_Log.Read (Log_Page, Window_Buffer'Address);
+         Cache (Slot).Log_Page := Log_Page;
+      else
+         Mem.Calls.Load_Page (Cache (Slot).Physical, Window_Buffer'Address);
+      end if;
+
+      Result := Window.Entries (Index);
+      Mem.Calls.Unload_Page (Cache (Slot).Physical, Window_Buffer'Address);
+      Touch (Slot);
+      return Result;
+   end Get_Entry;
 
    ------------
    -- Key_Of --
@@ -151,6 +389,52 @@ package body Mem.Log_Index is
       return Integer (Process) * Entries_Per_Page
         + Integer (Page / Entries_Per_Page);
    end Key_Of;
+
+   --------------
+   -- New_Slot --
+   --------------
+
+   function New_Slot return Slot_Count is
+      Best : Slot_Count := 0;
+   begin
+      for I in Cache'Range loop
+         if Cache (I).Physical /= 0 and then Cache (I).Log_Page = 0 then
+            return I;
+         end if;
+      end loop;
+
+      for I in Cache'Range loop
+         if Cache (I).Physical = 0 then
+            declare
+               Page    : Rose.Addresses.Physical_Page_Address;
+               Success : Boolean;
+            begin
+               Mem.Physical_Map.Allocate_Page (Page, Success);
+               if Success then
+                  Cache (I).Physical := Page;
+                  return I;
+               end if;
+            end;
+            exit;
+         end if;
+      end loop;
+
+      for I in Cache'Range loop
+         if Cache (I).Physical /= 0
+           and then not Cache (I).Pending
+           and then
+             (Best = 0 or else Cache (I).Last_Use < Cache (Best).Last_Use)
+         then
+            Best := I;
+         end if;
+      end loop;
+
+      if Best /= 0 then
+         Cache (Best).Log_Page := 0;
+      end if;
+
+      return Best;
+   end New_Slot;
 
    --------------
    -- Next_Key --
@@ -203,9 +487,16 @@ package body Mem.Log_Index is
    is
       Page : Page_Buffer
         with Import, Address => Buffer;
+      Slot : constant Slot_Count :=
+               (if Log_Page = 0 then 0 else Find_Slot (Log_Page));
    begin
       if Log_Page = 0 then
          Page := (others => 0);
+      elsif Slot /= 0 then
+         Mem.Calls.Load_Page (Cache (Slot).Physical, Window_Buffer'Address);
+         Copy_Page (From => Window_Buffer, To => Page);
+         Mem.Calls.Unload_Page (Cache (Slot).Physical, Window_Buffer'Address);
+         Touch (Slot);
       else
          Mem.Page_Log.Read (Log_Page, Buffer);
       end if;
@@ -227,6 +518,21 @@ package body Mem.Log_Index is
       end if;
    end Saved_Directory;
 
+   -------------------
+   -- Set_Directory --
+   -------------------
+
+   procedure Set_Directory
+     (Process   : Process_Id;
+      Directory : Rose.Words.Word_32)
+   is
+   begin
+      if Process in Real_Process_Id then
+         Directories (Process) := Directory;
+         New_Directories (Process) := Directory;
+      end if;
+   end Set_Directory;
+
    -------------
    -- Slot_Of --
    -------------
@@ -235,6 +541,16 @@ package body Mem.Log_Index is
    begin
       return Key mod Entries_Per_Page;
    end Slot_Of;
+
+   -----------
+   -- Touch --
+   -----------
+
+   procedure Touch (Slot : Slot_Index) is
+   begin
+      Clock := Clock + 1;
+      Cache (Slot).Last_Use := Clock;
+   end Touch;
 
    -----------------
    -- Write_Index --
@@ -349,11 +665,17 @@ package body Mem.Log_Index is
          Fill_Leaf (Key, Batch_First);
          Append (Leaf_Buffer'Address);
          Directory.Entries (Slot_Of (Key)) := Log_Page;
+         if Success then
+            Add_Pending (Log_Page, Leaf_Buffer'Address);
+         end if;
 
          Next := Next_Key (Key);
          if Next = No_Key or else Process_Of (Next) /= Process then
             Append (Directory_Buffer'Address);
             New_Directories (Process) := Log_Page;
+            if Success then
+               Add_Pending (Log_Page, Directory_Buffer'Address);
+            end if;
          end if;
          Key := Next;
       end loop;

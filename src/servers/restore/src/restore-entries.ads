@@ -33,6 +33,9 @@ package Restore.Entries is
          Has_Shared   : Boolean := False;
          Shared_First : Positive := 1;
          --  The first shared header page, if Has_Shared.
+         Has_Index    : Boolean := False;
+         --  The memory server's process records name each process's
+         --  index directory (ADR 0028).
       end record;
 
    type Layout_Status is

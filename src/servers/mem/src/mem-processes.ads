@@ -167,7 +167,12 @@ package Mem.Processes is
    procedure Initialize_Page
      (Process       : Process_Id;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address);
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      From_Log      : out Boolean);
+   --  Fill Physical_Page with what Virtual_Page of Process holds: the
+   --  latest copy that the log has, from the process's index (ADR 0028,
+   --  section 7), or else the page of its segment's region, or zeroes.
+   --  From_Log is True if it came from the log.
 
    procedure Add_Segment
      (Process       : Process_Id;
@@ -214,11 +219,13 @@ package Mem.Processes is
    --  its segment has no region.
 
    type Fault_Kind is
-     (Region_Fault, Zero_Fault, Cached_Fault, Write_Fault, Invalid_Fault);
-   --  A page read from its segment's region, a page filled with zeroes,
-   --  a page of a read-only segment that was already in memory (#200), a
-   --  write to a mapped page, which makes it writable and dirty, and an
-   --  access that is not allowed.
+     (Region_Fault, Log_Fault, Zero_Fault, Cached_Fault, Write_Fault,
+      Invalid_Fault);
+   --  A page read from its segment's region, a page read from the
+   --  checkpoint log (ADR 0028), a page filled with zeroes, a page of a
+   --  read-only segment that was already in memory (#200), a write to a
+   --  mapped page, which makes it writable and dirty, and an access that
+   --  is not allowed.
 
    procedure Count_Fault
      (Process : Process_Id;
@@ -263,9 +270,10 @@ package Mem.Processes is
    --  Restoring a checkpoint (the Memory_Restore interface).
 
    procedure Restore_Process
-     (Id      : Rose.Objects.Capability_Identifier;
-      Process : Rose.Capabilities.Capability;
-      Mem_Pid : Natural);
+     (Id              : Rose.Objects.Capability_Identifier;
+      Process         : Rose.Capabilities.Capability;
+      Mem_Pid         : Natural;
+      Index_Directory : Rose.Words.Word);
 
    procedure Restore_Segment
      (Id            : Rose.Objects.Capability_Identifier;
@@ -290,6 +298,13 @@ package Mem.Processes is
       Mem_Pid      : Natural;
       Virtual_Page : Rose.Words.Word;
       Page         : System.Storage_Elements.Storage_Array);
+
+   procedure Load_Page
+     (Id           : Rose.Objects.Capability_Identifier;
+      Mem_Pid      : Natural;
+      Virtual_Page : Rose.Words.Word);
+   --  Memory_Restore.Load_Page: read the page in now, clean, as a fault
+   --  on it would.
 
    procedure Restore_Shared_Page
      (Id         : Rose.Objects.Capability_Identifier;

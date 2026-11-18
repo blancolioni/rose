@@ -15,6 +15,7 @@ with Mem.Calls;
 
 with Mem.Log_Index;
 with Mem.Page_Cache;
+with Mem.Page_Log;
 with Mem.Page_Table;
 with Mem.Physical_Map;
 with Mem.Shared_Pages;
@@ -280,6 +281,8 @@ package body Mem.Processes is
       Have_Page : Boolean;
       Page      : Rose.Addresses.Physical_Page_Address;
       Rec       : Memory_Process_Record renames Process_Table (Process);
+      From_Log  : Boolean;
+      pragma Warnings (Off, From_Log);
    begin
       Mem.Physical_Map.Allocate_Page
         (Page, Have_Page);
@@ -295,7 +298,8 @@ package body Mem.Processes is
          Initialize_Page
            (Process       => Process,
             Physical_Page => Page,
-            Virtual_Page  => Virtual_Page);
+            Virtual_Page  => Virtual_Page,
+            From_Log      => From_Log);
 
          Mem.Virtual_Map.Map
            (Process       => Rec.Oid,
@@ -647,7 +651,8 @@ package body Mem.Processes is
    procedure Initialize_Page
      (Process       : Process_Id;
       Physical_Page : Rose.Addresses.Physical_Page_Address;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address)
+      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
+      From_Log      : out Boolean)
    is
       use Rose.Addresses;
       P : Memory_Process_Record renames Process_Table (Process);
@@ -662,12 +667,33 @@ package body Mem.Processes is
       for Buffer'Address use Addr;
    begin
 
+      From_Log := False;
+
       for Segment of P.Segments loop
          if Virtual_Page >= Segment.Base
            and then Virtual_Page < Segment.Bound
          then
+            declare
+               use type Rose.Words.Word_32;
+               Log_Page : constant Rose.Words.Word_32 :=
+                            (if Segment.Flags (Persistent)
+                             and then Segment.Flags (Write)
+                             and then not Segment.Flags (Shared)
+                             then Mem.Log_Index.Find (Process, Virtual_Page)
+                             else 0);
+               --  Only the private pages of persistent processes'
+               --  writable segments are saved by checkpoints, and so
+               --  indexed.
+            begin
+               Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
 
-            Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
+               if Log_Page /= 0 then
+                  Mem.Page_Log.Read (Log_Page, Buffer'Address);
+                  From_Log := True;
+                  Mem.Calls.Unload_Page (Physical_Page, Buffer'Address);
+                  return;
+               end if;
+            end;
 
             if Segment.Flags (Persistent) then
                declare
@@ -807,6 +833,7 @@ package body Mem.Processes is
       begin
          Rose.Trace.Event ("faults of process ", Natural (P.Oid));
          Report ("  region reads ", Region_Fault);
+         Report ("  log reads ", Log_Fault);
          Report ("  zero-filled ", Zero_Fault);
          Report ("  cached ", Cached_Fault);
          Report ("  writes ", Write_Fault);
@@ -836,6 +863,75 @@ package body Mem.Processes is
       P.Bank_Cap := 0;
       P.State := Available;
    end Kill_Process;
+
+   ---------------
+   -- Load_Page --
+   ---------------
+
+   procedure Load_Page
+     (Id           : Rose.Objects.Capability_Identifier;
+      Mem_Pid      : Natural;
+      Virtual_Page : Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      use Rose.Addresses;
+      use type Rose.Objects.Object_Id;
+      Pid         : constant Process_Id := Process_Id (Mem_Pid);
+      V_Page      : constant Virtual_Page_Address :=
+                      Virtual_Page_Address (Virtual_Page);
+      Page_Object : Rose.Objects.Object_Id;
+      Valid, Readable, Writable, Executable, Persistent : Boolean;
+      Have_Page   : Boolean;
+      Phys_Page   : Physical_Page_Address;
+      From_Log    : Boolean;
+      pragma Warnings (Off, From_Log);
+   begin
+      if not Is_Valid_Process_Id (Pid) then
+         Rose.Console_IO.Put_Line ("mem: load page: bad request");
+         return;
+      end if;
+
+      Get_Process_Segment
+        (Pid, V_Page, Page_Object,
+         Valid, Readable, Writable, Executable, Persistent);
+
+      --  As for Restore_Page, only the pages of the process's own
+      --  writable segments: a fault finds the others where it always
+      --  did, by region page or store page.
+
+      if not Valid
+        or else not Writable
+        or else Shared_Page (Pid, V_Page) /= 0
+        or else Mem.Page_Table.Has_Element (Mem.Page_Table.Find (Pid, V_Page))
+      then
+         return;
+      end if;
+
+      Mem.Physical_Map.Allocate_Page (Phys_Page, Have_Page);
+      if not Have_Page then
+         Mem.Virtual_Map.Reclaim (Phys_Page, Have_Page);
+      end if;
+
+      if not Have_Page then
+         Rose.Console_IO.Put_Line ("mem: load page: out of memory");
+         return;
+      end if;
+
+      Initialize_Page
+        (Process       => Pid,
+         Physical_Page => Phys_Page,
+         Virtual_Page  => V_Page,
+         From_Log      => From_Log);
+
+      Mem.Virtual_Map.Map
+        (Process       => Process_Table (Pid).Oid,
+         Virtual_Page  => V_Page,
+         Physical_Page => Phys_Page,
+         Readable      => Readable,
+         Writable      => Writable,
+         Executable    => Executable,
+         Persistent    => Persistent);
+   end Load_Page;
 
    -----------------
    -- New_Process --
@@ -1312,9 +1408,10 @@ package body Mem.Processes is
    ---------------------
 
    procedure Restore_Process
-     (Id      : Rose.Objects.Capability_Identifier;
-      Process : Rose.Capabilities.Capability;
-      Mem_Pid : Natural)
+     (Id              : Rose.Objects.Capability_Identifier;
+      Process         : Rose.Capabilities.Capability;
+      Mem_Pid         : Natural;
+      Index_Directory : Rose.Words.Word)
    is
       pragma Unreferenced (Id);
       Pid    : constant Process_Id := Process_Id (Mem_Pid);
@@ -1367,10 +1464,13 @@ package body Mem.Processes is
            Bank_Cap      => 0,
            Faults        => <>);
 
-      --  Its pages are given to it with Restore_Page, and are all dirty,
-      --  so the next checkpoint writes a complete index for it.
+      --  Its pages are read from the log through its index when it faults
+      --  on them (ADR 0028, section 9). A checkpoint without an index
+      --  gives them all with Restore_Page instead, as dirty pages, so the
+      --  next checkpoint writes a complete index.
 
-      Mem.Log_Index.Forget (Pid);
+      Mem.Log_Index.Set_Directory
+        (Pid, Rose.Words.Word_32 (Index_Directory));
    end Restore_Process;
 
    ---------------------
