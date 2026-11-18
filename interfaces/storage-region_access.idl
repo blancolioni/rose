@@ -26,6 +26,11 @@ interface Storage.Region_Access is
    procedure Put
      (Page : Object_Id;
       Data : Storage_Array);
+   --  Fails if the store has no space for the page: the region's bank,
+   --  or one above it, is at its page limit, or the store is full. The
+   --  page then keeps what it had. A page is charged when it is first
+   --  written, and a page of zeroes takes no space, so writing one
+   --  frees its page and doesn't fail for want of space (#945).
 
    function Read return interface Streams.Reader;
 

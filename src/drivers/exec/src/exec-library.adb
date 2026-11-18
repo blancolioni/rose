@@ -4,6 +4,7 @@ with System.Storage_Elements;
 
 with Rose.Limits;
 
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Storage.Region.Client;
 
 with Exec.Output;
@@ -516,6 +517,32 @@ package body Exec.Library is
       Old_Base   : Rose.Objects.Object_Id := 0;
       Old_Bound  : Rose.Objects.Object_Id := 0;
       Page_Index : Rose.Objects.Object_Id := 0;
+
+      procedure Not_Installed (Message : String);
+      --  Report that the image is not installed, and give back the pages
+      --  written for it: a page of zeroes takes no space in the store.
+
+      -------------------
+      -- Not_Installed --
+      -------------------
+
+      procedure Not_Installed (Message : String) is
+      begin
+         Exec.Output.Put_Line ("exec: " & Message & " " & Name);
+         Buffer := (others => 0);
+         for Page in Item.ELF_Base .. Next_Page - 1 loop
+            begin
+               Region.Put (Page, Buffer);
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  null;
+            end;
+         end loop;
+         Next_Page := Item.ELF_Base;
+         Same := False;
+         Success := False;
+      end Not_Installed;
+
    begin
       Item.Caps := (others => 0);
       Item.Caps (1 .. Caps'Length) := Caps;
@@ -542,16 +569,22 @@ package body Exec.Library is
          --  installed with its last pages missing (#669).
 
          if Next_Page >= Page_Bound then
-            Exec.Output.Put_Line ("exec: no room for " & Name);
-            Next_Page := Item.ELF_Base;
-            Same := False;
-            Success := False;
+            Not_Installed ("no room for");
             return;
          end if;
 
          Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
            (others => 0);
-         Region.Put (Next_Page, Buffer);
+
+         --  Nor is one that the store has no space for (#945).
+
+         begin
+            Region.Put (Next_Page, Buffer);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Not_Installed ("no space for");
+               return;
+         end;
 
          if Same then
             if Old_Base + Page_Index < Old_Bound then

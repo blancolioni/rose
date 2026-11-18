@@ -1937,6 +1937,15 @@ package body Mem.Processes is
          begin
             Rose.Interfaces.Storage.Region_Access.Client.Put
               (Segment.Region, Page, Data);
+
+            --  The store has no space for the page (#945). The region
+            --  keeps what it last had there, so the segment goes on.
+
+            if Rose.Interfaces.Storage.Region_Access.Client.Has_Error then
+               Rose.Console_IO.Put ("mem: shared page not written back: ");
+               Rose.Console_IO.Put (Page);
+               Rose.Console_IO.New_Line;
+            end if;
          end Put;
 
       begin

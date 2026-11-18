@@ -109,6 +109,8 @@ It can't change the process's segments or act as the process (#99).
 A `Region` belongs to whoever reserved it, or was handed it, and is a `Resource` (ADR 0010): `Release`, or closing a client, frees it, with its storage if it has its own, and neither the region nor its subregions can be used afterwards.
 A process that only uses a region holds its `Region_Access`, which reads and writes its pages but can't release it; a `Region` client converts to one.
 A process that hands a region on calls its client's `Forget`, which deletes its caps without releasing the region (#403).
+A region's pages are charged to its bank when they are first written, not when it is reserved, and a page of zeroes takes no space.
+`Put` fails when the bank is at its limit or the store is full, and the page keeps what it had (#945).
 
 == Launching Programs
 

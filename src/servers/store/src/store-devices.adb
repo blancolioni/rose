@@ -3,6 +3,7 @@ with Rose.Limits;
 
 with Rose.Console_IO;
 with Rose.Invocation;
+with Rose.Server;
 with Rose.Trace;
 with Rose.System_Calls.Server;
 
@@ -1473,6 +1474,21 @@ package body Store.Devices is
       Data : in     System.Storage_Elements.Storage_Array)
    is
       Region_Index : constant Natural := Natural (Id);
+
+      procedure Fail (Message : String);
+      --  The page isn't written: say why, and the caller's Put fails
+      --  (#945).
+
+      ----------
+      -- Fail --
+      ----------
+
+      procedure Fail (Message : String) is
+      begin
+         Rose.Console_IO.Put_Line (Message);
+         Rose.Server.Fail;
+      end Fail;
+
    begin
       if Region_Index not in 1 .. Region_Count
         or else Page < Regions (Region_Index).Base
@@ -1483,17 +1499,19 @@ package body Store.Devices is
          Rose.Console_IO.Put ("/");
          Rose.Console_IO.Put (Page);
          Rose.Console_IO.New_Line;
+         Rose.Server.Fail;
          return;
       end if;
 
       if Regions (Region_Index).Root not in 1 .. Region_Count
         or else not Regions (Regions (Region_Index).Root).In_Use
       then
+         Fail ("store: put: region released");
          return;
       end if;
 
       if Data'Length /= Rose.Limits.Page_Size then
-         Rose.Console_IO.Put_Line ("store: put: not a page");
+         Fail ("store: put: not a page");
          return;
       end if;
 
@@ -1511,7 +1529,7 @@ package body Store.Devices is
          Tree.Find (Key, Location, Success);
 
          if not Success then
-            Rose.Console_IO.Put_Line ("store: out of space");
+            Fail ("store: out of space");
             return;
          end if;
 
@@ -1533,7 +1551,7 @@ package body Store.Devices is
          if Location = No_Page
            and then not Within_Limits (Root.Bank, 1, 0)
          then
-            Rose.Console_IO.Put_Line ("store: bank limit reached");
+            Fail ("store: bank limit reached");
             return;
          end if;
 
@@ -1544,14 +1562,14 @@ package body Store.Devices is
          if (Location = No_Page or else not Space.Is_Born (Location))
            and then Space.Free_Count <= Tree_Reserve
          then
-            Rose.Console_IO.Put_Line ("store: out of space");
+            Fail ("store: out of space");
             return;
          end if;
 
          Tree.Put (Key, Words, Added, Success);
 
          if not Success then
-            Rose.Console_IO.Put_Line ("store: out of space");
+            Fail ("store: out of space");
             return;
          end if;
 

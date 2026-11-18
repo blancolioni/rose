@@ -66,7 +66,10 @@ package body Elf.Loader is
       Memory_Size  : Rose.Words.Word_32;
       Readable     : Boolean;
       Writable     : Boolean;
-      Executable   : Boolean);
+      Executable   : Boolean;
+      Success      : out Boolean);
+   --  Success is False if the store has no space for the segment's pages
+   --  (#945).
 
    --------------------
    -- Load_Elf_Image --
@@ -180,7 +183,8 @@ package body Elf.Loader is
       Memory_Size  : Rose.Words.Word_32;
       Readable     : Boolean;
       Writable     : Boolean;
-      Executable   : Boolean)
+      Executable   : Boolean;
+      Success      : out Boolean)
    is
       use type Rose.Objects.Object_Id;
       use Rose.Words;
@@ -196,6 +200,8 @@ package body Elf.Loader is
       --  start of the next segment.
       Flags         : Word;
    begin
+      Success := True;
+
       case Segment_Type is
          when PT_LOAD =>
             Flags :=
@@ -245,6 +251,18 @@ package body Elf.Loader is
                      Get (Image_Region,
                           Base_Object + Image_Start + Page_Offset, Page);
                      Put (Region, Segment_Base + Page_Offset, Page);
+
+                     --  A process with pages missing is not started. Elf
+                     --  still owns the region, so closing it releases it.
+
+                     if Rose.Interfaces.Storage.Region.Client.Has_Error then
+                        Rose.Console_IO.Put_Line
+                          ("elf: no space for a segment");
+                        Close (Region);
+                        Success := False;
+                        return;
+                     end if;
+
                      Offset := Offset + Rose.Limits.Page_Size;
                   end loop;
                   Rose.Trace.Event ("segment copied, bytes ",
@@ -370,8 +388,10 @@ package body Elf.Loader is
                Memory_Size  => Item.Memory_Size,
                Readable     => Item.Readable,
                Writable     => Item.Writable,
-               Executable   => Item.Executable);
+               Executable   => Item.Executable,
+               Success      => Success);
          end;
+         exit when not Success;
       end loop;
    end Scan_Program_Headers;
 

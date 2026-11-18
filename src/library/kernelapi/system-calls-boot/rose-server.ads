@@ -29,6 +29,15 @@ package Rose.Server is
      (Context  : in out Server_Context;
       Endpoint : Rose.Objects.Endpoint_Id);
 
+   procedure Fail
+     (Error : Rose.Invocation.Invocation_Error :=
+        Rose.Invocation.Request_Error);
+   --  Make the request being handled fail with Error. A boot server can't
+   --  raise, and its generated handlers always reply OK, so when the
+   --  handler returns, its reply is replaced by one that carries only
+   --  Error. The caller's client sees it as Has_Error, or as
+   --  Invocation_Error in the userland RTS (#945).
+
    type Server_Instance is limited private;
 
    function Has_Instance
