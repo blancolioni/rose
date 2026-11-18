@@ -15,7 +15,8 @@ screen:
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
-	    $(INTERFACES)/storage-region.idl $(INTERFACES)/streams-reader.idl \
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/processes-restorable.idl $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-process.idl $(INTERFACES)/processes-heap.idl \

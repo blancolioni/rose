@@ -35,6 +35,7 @@ auth:
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/files-writable_file.idl \

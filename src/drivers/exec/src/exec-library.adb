@@ -26,6 +26,11 @@ package body Exec.Library is
          ELF_Bound       : Rose.Objects.Page_Object_Id;
          Image           : Rose.Capabilities.Capability :=
                              Rose.Capabilities.Null_Capability;
+         --  A region of the image's pages, which is exec's.
+         Image_Access    : Rose.Capabilities.Capability :=
+                             Rose.Capabilities.Null_Capability;
+         --  Its Region_Access, which elf is given, and can't release
+         --  (#403).
          Metadata_Offset : Storage_Count := 0;
          Metadata_Length : Storage_Count := 0;
          Retired         : Boolean := False;
@@ -263,9 +268,10 @@ package body Exec.Library is
               Region.Create_Subregion (Item.ELF_Base, Item.ELF_Bound, 5);
          begin
             Item.Image := Image.Region_Cap;
+            Item.Image_Access := Image.Region_Access_Cap;
          end;
       end if;
-      return Item.Image;
+      return Item.Image_Access;
    end Image_Region;
 
    -------------

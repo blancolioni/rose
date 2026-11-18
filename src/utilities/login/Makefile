@@ -46,5 +46,6 @@ login:
 	    $(INTERFACES)/processes-segment.idl \
 	    $(INTERFACES)/processes-server.idl \
 	    $(INTERFACES)/processes-heap.idl \
-	    $(INTERFACES)/storage-region.idl
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl
 	gprbuild $(GPRBUILD_CARGS)

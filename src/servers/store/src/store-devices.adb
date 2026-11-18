@@ -950,6 +950,8 @@ package body Store.Devices is
            and then Doomed (Regions (Index).Bank)
          then
             Release (Rose.Objects.Capability_Identifier (Index));
+            Rose.Interfaces.Storage.Region.Server.Remove_Instance
+              (Rose.Objects.Capability_Identifier (Index));
          end if;
       end loop;
 
@@ -1770,8 +1772,6 @@ package body Store.Devices is
          Rose.System_Calls.Invoke_Capability (Params);
 
          Uncharge (Region.Bank, Freed, 1);
-
-         Rose.Interfaces.Storage.Region.Server.Remove_Instance (Id);
          Region := (others => <>);
       end;
    end Release;

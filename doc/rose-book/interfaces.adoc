@@ -64,10 +64,11 @@ Its `Append` raises when the set can't take every capability it is given, and th
 | `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault`, `Notify` | The kernel
 | `Process` | `Segment`, `Server`, `Cap` | `Heap_Interface`, `Bank`, `Control_Cap`, `Exit_Process`, `Publish_Interface` | `mem`
 | `Process_Control` | `Server`, `Cap` | | `mem`
-| `Segment` | | `Add_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |
+| `Segment` | | `Add_Segment`, `Add_Private_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |
 | `Heap` | | `Current_Bound`, `Request_New_Bound` | `mem`
 | `Memory` | | `New_Process`, `Register_Process`, `Page_Fault`, `Take_Physical_Memory`, `Checkpoint`, `Set_Process_Banks`, `Processes_Ended` | `mem`
-| `Region` | | `Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release` | `store`
+| `Region_Access` | | `Get_Range`, `Get`, `Put`, `Read` | `store`
+| `Region` | `Region_Access`, `Resource` | `Create_Subregion` | `store`
 | `Store` | | `Add_Backing_Store`, `Get_Root_Bank` | `store`
 | `Bank` | | `Reserve_Storage`, `Create_Sub_Bank`, `Add_Dependent`, `Get_Usage`, `Destroy`, `Index` | `store`
 | `Process_Banks` | | `Create_Process_Bank`, `Process_Bank`, `End_Process`, `Set_Ended`, `Take_Ended` | `store`, for `mem` only
@@ -95,16 +96,19 @@ interface Process : Segment, Server, Cap is
 end Process;
 ----
 
-A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Private`.
-A private segment's region belongs to its process, and is released when the process is gone.
+A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Shared`.
+`Add_Segment` maps a region that the process doesn't own, such as a program's image or a shared region, and takes its `Region_Access`.
+`Add_Private_Segment` maps a region that the process owns from then on, such as its data, stack and heap, and takes the `Region` itself: it is released when the segment is removed, or the process is gone.
 A nonpersistent segment has no region behind it.
 
 `Process` is the process's own capability: the process uses it to map shared regions, publish its interface and exit.
 Whoever launches the process gets a `Process_Control` instead, from `Control_Cap`, which can only find the interface the process publishes (`Published_Interface`) and end it (`Destroy`).
 It can't change the process's segments or act as the process (#99).
 
-`Store` reserves regions of persistent storage, backed by block arrays, and a `Region` reads and writes its pages.
-`Region.Release` frees a region that is no longer needed, with its storage if it has its own; neither the region nor its subregions can be used afterwards.
+`Store` reserves regions of persistent storage, backed by block arrays.
+A `Region` belongs to whoever reserved it, or was handed it, and is a `Resource` (ADR 0010): `Release`, or closing a client, frees it, with its storage if it has its own, and neither the region nor its subregions can be used afterwards.
+A process that only uses a region holds its `Region_Access`, which reads and writes its pages but can't release it; a `Region` client converts to one.
+A process that hands a region on calls its client's `Forget`, which deletes its caps without releasing the region (#403).
 
 == Launching Programs
 

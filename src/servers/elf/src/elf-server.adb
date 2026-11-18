@@ -17,7 +17,7 @@ with Rose.Interfaces.Processes.Kernel_Process.Client;
 with Rose.Interfaces.Processes.Memory.Client;
 with Rose.Interfaces.Processes.Process.Client;
 with Rose.Interfaces.Processes.Process_Control.Client;
-with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Region_Access.Client;
 with Rose.Interfaces.Storage.Bank.Client;
 
 with Elf.Loader;
@@ -286,7 +286,8 @@ package body Elf.Server is
       Kernel_Client  : Rose.Interfaces.Processes.Kernel_Process
         .Client.Kernel_Process_Client;
       Process_Client : Rose.Interfaces.Processes.Process.Client.Process_Client;
-      Region         : Rose.Interfaces.Storage.Region.Client.Region_Client;
+      Region         : Rose.Interfaces.Storage.Region_Access.Client
+                         .Region_Access_Client;
       Bank_Store     : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Process_Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       --  The process's own bank (ADR 0015, #750), which mem makes as a
@@ -303,7 +304,7 @@ package body Elf.Server is
 
       procedure Clean_Up is
       begin
-         Rose.Interfaces.Storage.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Region_Access.Client.Close (Region);
          Rose.Interfaces.Storage.Bank.Client.Close (Bank_Store);
          Rose.Interfaces.Storage.Bank.Client.Close (Process_Bank);
          Rose.Interfaces.Processes.Kernel_Process.Client.Close (Kernel_Client);
@@ -325,7 +326,7 @@ package body Elf.Server is
       Last_Command := 0;
 
       Rose.Trace.Event ("load " & Name);
-      Rose.Interfaces.Storage.Region.Client.Open (Region, Image);
+      Rose.Interfaces.Storage.Region_Access.Client.Open (Region, Image);
       Rose.Interfaces.Storage.Bank.Client.Open (Bank_Store, Bank);
       Rose.Trace.Event ("regions opened");
 
@@ -337,7 +338,7 @@ package body Elf.Server is
 
       if Kernel_Process = 0 then
          Rose.Console_IO.Put_Line ("elf: cannot create process " & Name);
-         Rose.Interfaces.Storage.Region.Client.Close (Region);
+         Rose.Interfaces.Storage.Region_Access.Client.Close (Region);
          Rose.Interfaces.Storage.Bank.Client.Close (Bank_Store);
          for Cap of Caps loop
             Delete_Cap (Cap);

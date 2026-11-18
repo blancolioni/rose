@@ -48,7 +48,8 @@ directory:
 	    $(INTERFACES)/processes-server.idl \
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/processes-heap.idl \
-	    $(INTERFACES)/storage-region.idl
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
 	    ../file/rose-core-file.idl rose-core-directory.idl \

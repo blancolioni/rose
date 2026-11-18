@@ -24,6 +24,7 @@ petal:
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/streams-stream.idl \
 	    $(INTERFACES)/streams-reader.idl \
