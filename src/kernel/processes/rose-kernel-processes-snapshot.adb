@@ -627,6 +627,7 @@ package body Rose.Kernel.Processes.Snapshot is
          end loop;
 
          P.Lent_Buffer_Pages := 0;
+         P.Pinned_Pages := 0;
          Flags (Checkpoint_Page_Fault) := False;
          Flags (Checkpoint_Reply_Held) := False;
          Flags (Fault_Pending) := False;
@@ -765,6 +766,12 @@ package body Rose.Kernel.Processes.Snapshot is
       end if;
       if Success then
          Iterate (Map'Access);
+
+         --  The server maps the buffer again, so it is pinned again
+         --  (#972).
+
+         P.Pinned_Page := First;
+         P.Pinned_Pages := Count;
       end if;
    end Restore_Shared_Buffer;
 

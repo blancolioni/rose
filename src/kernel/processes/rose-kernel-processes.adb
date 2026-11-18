@@ -513,6 +513,7 @@ package body Rose.Kernel.Processes is
       Proc.FPU_Valid := False;
       Proc.Signals := 0;
       Proc.Lent_Buffer_Pages := 0;
+      Proc.Pinned_Pages := 0;
 
       Assign_Object_Id (Pid);
       Proc.Priority := Process_Priority'Last - 1;
@@ -1461,6 +1462,23 @@ package body Rose.Kernel.Processes is
                   or else Caller /= Handovers (Pid).Caller);
    end Is_Held;
 
+   --------------------
+   -- Is_Pinned_Page --
+   --------------------
+
+   function Is_Pinned_Page
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+   begin
+      return P.Pinned_Pages > 0
+        and then Virtual_Page >= P.Pinned_Page
+        and then Virtual_Page - P.Pinned_Page
+                   < Rose.Addresses.Virtual_Page_Address (P.Pinned_Pages);
+   end Is_Pinned_Page;
+
    ----------------------------
    -- Is_Repeated_Single_Use --
    ----------------------------
@@ -2155,6 +2173,7 @@ package body Rose.Kernel.Processes is
       P.Flags (Wait_Reply) := False;
       P.Flags (Interrupt_Resume) := False;
       P.Lent_Buffer_Pages := 0;
+      P.Pinned_Pages := 0;
    end Restart_Call;
 
    ------------------
@@ -2334,6 +2353,11 @@ package body Rose.Kernel.Processes is
          Move_Single_Use_Caps (From_Process_Id, Params);
       end if;
 
+      --  A caller has one call at a time, so a call that lends no buffer
+      --  ends any pin left from an earlier one (#972).
+
+      From.Pinned_Pages := 0;
+
       if Params.Control.Flags (Rose.Invocation.Send_Buffer)
         and then (not Receiver_Expects_Buffer
                   or else not Buffer_Is_Mapped)
@@ -2382,6 +2406,12 @@ package body Rose.Kernel.Processes is
                From.Lent_Buffer_Page := Base;
                From.Lent_Buffer_Pages := Natural (Page - Base);
             end if;
+
+            --  The server maps these pages until it replies, so mem must
+            --  not unmap them (#972).
+
+            From.Pinned_Page := Base;
+            From.Pinned_Pages := Natural (Page - Base);
 
             --  The buffer is where its first page was mapped, which is
             --  not the first slot if the server holds another buffered
@@ -3669,6 +3699,10 @@ package body Rose.Kernel.Processes is
             Rec.Pid := 0;
          end if;
       end loop;
+
+      --  Every slot that named To_Pid was for its one call (#972).
+
+      Process_Table (To_Pid).Pinned_Pages := 0;
 
    end Unmap_Invocation_Buffer;
 
