@@ -3,6 +3,7 @@ with System.Storage_Elements;
 with Rose.Limits;
 
 with Mem.Calls;
+with Mem.Log_Index;
 with Mem.Page_Cache;
 with Mem.Page_Table;
 with Mem.Processes;
@@ -54,7 +55,12 @@ package body Mem.Virtual_Map is
       Success       : out Boolean)
    is
    begin
+      --  Read-only pages first, then index pages: a lookup that misses
+      --  the cache of index pages costs up to two reads of the log.
       Mem.Page_Cache.Evict (Physical_Page, Success);
+      if not Success then
+         Mem.Log_Index.Evict (Physical_Page, Success);
+      end if;
    end Reclaim;
 
    ----------------

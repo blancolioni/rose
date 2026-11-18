@@ -69,9 +69,17 @@ package body Restore.Checkpoints is
          Process : Rose.Capabilities.Capability := 0;
          Mem_Pid : Rose.Words.Word_32 := 0;
          Name    : String (1 .. 16) := (others => ' ');
+         Buffer_First : Rose.Words.Word := 0;
+         Buffer_Count : Natural := 0;
       end record;
    --  Process is the restored process's Kernel_Process interface, and
-   --  Name its name in the checkpoint.
+   --  Name its name in the checkpoint. Buffer_First and Buffer_Count are
+   --  the virtual pages of the buffer it was sending in a call still in
+   --  progress, if any.
+
+   Max_Buffer_Pages : constant := 64;
+   --  More pages than any buffer the kernel maps into a server, so that
+   --  a bad record can't ask for millions of them.
 
    Restored       : array (1 .. Max_Processes) of Restored_Process;
    Restored_Count : Natural := 0;
@@ -157,11 +165,14 @@ package body Restore.Checkpoints is
    --  those pages so far.
 
    procedure Add_Entry_Pages
-     (Reader   : Log_Reader_Client;
-      Location : Rose.Words.Word_64;
-      Success  : out Boolean);
-   --  Record the pages saved in the entry at Location in Sources, as the
-   --  newest contents of those pages so far.
+     (Reader        : Log_Reader_Client;
+      Location      : Rose.Words.Word_64;
+      Private_Pages : Boolean;
+      Success       : out Boolean);
+   --  Record the pages saved in the entry at Location in Sources and
+   --  Shared_Sources, as the newest contents of those pages so far. The
+   --  pages of the batches are left out unless Private_Pages is True: a
+   --  checkpoint with an index doesn't need them (ADR 0028, section 9).
 
    procedure Fail (Message : String);
 
@@ -242,9 +253,10 @@ package body Restore.Checkpoints is
    ---------------------
 
    procedure Add_Entry_Pages
-     (Reader   : Log_Reader_Client;
-      Location : Rose.Words.Word_64;
-      Success  : out Boolean)
+     (Reader        : Log_Reader_Client;
+      Location      : Rose.Words.Word_64;
+      Private_Pages : Boolean;
+      Success       : out Boolean)
    is
       use type Rose.Checkpoints.Header_Page_Flags;
       use type Entries.Layout_Status;
@@ -316,8 +328,11 @@ package body Restore.Checkpoints is
       --  after the storage server's. Index sections are skipped: a
       --  restore reads pages from the batches.
 
-      if not Add_Sections (1, Layout.Kernel_First - 1)
-        or else not Add_Sections (Layout.Batch_First, Layout.Mem_First - 1)
+      if Private_Pages
+        and then
+          (not Add_Sections (1, Layout.Kernel_First - 1)
+           or else not Add_Sections
+             (Layout.Batch_First, Layout.Mem_First - 1))
       then
          return;
       end if;
@@ -535,6 +550,7 @@ package body Restore.Checkpoints is
       Next_Object_Id  : Rose.Objects.Object_Id;
       Restored_Pages  : Natural := 0;
       Shared_Pages    : Natural := 0;
+      Buffer_Pages    : Natural := 0;
    begin
       Success := False;
       Restored_Count := 0;
@@ -680,7 +696,37 @@ package body Restore.Checkpoints is
                Cap_Pages : constant Natural :=
                              Natural (Process_Item.Cap_Page_Count);
                Params    : aliased Rose.Invocation.Invocation_Record;
+               Saved     : Rose.Invocation.Invocation_Record;
+               Saved_Bytes : System.Storage_Elements.Storage_Array
+                 (1 .. Rose.Checkpoints.Saved_Invocation_Bytes)
+                 with Import, Address => Saved'Address;
+               First_Page : Rose.Words.Word := 0;
+               Page_Count : Natural := 0;
             begin
+               --  The kernel's own copy of the call the process was
+               --  making, to find the pages of a buffer it was sending.
+
+               Saved_Bytes := Process_Item.Current_Params;
+               if Saved.Control.Flags (Rose.Invocation.Send_Buffer)
+                 and then Saved.Buffer_Length > 0
+               then
+                  declare
+                     Start : constant Integer_Address :=
+                               To_Integer (Saved.Buffer_Address);
+                     Last  : constant Integer_Address :=
+                               Start
+                               + Integer_Address (Saved.Buffer_Length) - 1;
+                  begin
+                     First_Page :=
+                       Rose.Words.Word (Start / Rose.Limits.Page_Size);
+                     Page_Count :=
+                       Natural'Min
+                         (Max_Buffer_Pages,
+                          Natural (Last / Rose.Limits.Page_Size
+                                   - Start / Rose.Limits.Page_Size + 1));
+                  end;
+               end if;
+
                if 1 + Cap_Pages > Max_Process_Pages then
                   Fail ("a process has too many caps");
                   return;
@@ -712,10 +758,12 @@ package body Restore.Checkpoints is
 
                Restored_Count := Restored_Count + 1;
                Restored (Restored_Count) :=
-                 (Oid     => Process_Item.Oid,
-                  Process => Params.Caps (0),
-                  Mem_Pid => 0,
-                  Name    => Process_Item.Name);
+                 (Oid          => Process_Item.Oid,
+                  Process      => Params.Caps (0),
+                  Mem_Pid      => 0,
+                  Name         => Process_Item.Name,
+                  Buffer_First => First_Page,
+                  Buffer_Count => Page_Count);
 
                Index := Index + 1 + Cap_Pages;
             end;
@@ -740,7 +788,10 @@ package body Restore.Checkpoints is
             if R /= 0 then
                Restored (R).Mem_Pid := Mem_Process.Mem_Pid;
                Restore_Process
-                 (Mem, Restored (R).Process, Natural (Mem_Process.Mem_Pid));
+                 (Mem, Restored (R).Process, Natural (Mem_Process.Mem_Pid),
+                  (if Layout.Has_Index
+                   then Rose.Words.Word (Mem_Process.Index_Directory)
+                   else 0));
 
                for Segment of
                  Mem_Process.Segments
@@ -786,14 +837,18 @@ package body Restore.Checkpoints is
 
       --  The newest saved contents of each page, from all the entries up
       --  to the checkpoint: a page saved in an older entry and not
-      --  changed since is only there.
+      --  changed since is only there. With an index, the memory server
+      --  reads each process's pages from the log when it faults on them,
+      --  so only the pages of shared segments are collected (ADR 0028,
+      --  section 9).
 
       declare
          Location : Rose.Words.Word_64 := First_Entry (Reader);
          Added    : Boolean;
       begin
          while Location /= 0 and then Location <= Checkpoint loop
-            Add_Entry_Pages (Reader, Location, Added);
+            Add_Entry_Pages
+              (Reader, Location, not Layout.Has_Index, Added);
             if not Added then
                Fail ("cannot read the pages of an entry");
                return;
@@ -840,6 +895,24 @@ package body Restore.Checkpoints is
 
       Rose.System_Calls.Use_Buffer (System.Null_Address, 0);
 
+      --  The pages of a buffer that a process was sending in a call still
+      --  in progress. The kernel maps them into the server again when it
+      --  resumes the process, so they must be in memory before then (ADR
+      --  0028, section 9). A checkpoint without an index gave them above.
+
+      if Layout.Has_Index then
+         for Item of Restored (1 .. Restored_Count) loop
+            if Item.Mem_Pid /= 0 then
+               for I in 0 .. Item.Buffer_Count - 1 loop
+                  Load_Page
+                    (Mem, Natural (Item.Mem_Pid),
+                     Item.Buffer_First + Rose.Words.Word (I));
+                  Buffer_Pages := Buffer_Pages + 1;
+               end loop;
+            end if;
+         end loop;
+      end if;
+
       --  The interrupts the restored processes handle.
 
       for Saved of Interrupts (1 .. Interrupt_Count) loop
@@ -864,6 +937,8 @@ package body Restore.Checkpoints is
       Rose.Console_IO.Put (Restored_Pages);
       Rose.Console_IO.Put ("; shared pages: ");
       Rose.Console_IO.Put (Shared_Pages);
+      Rose.Console_IO.Put ("; buffer pages: ");
+      Rose.Console_IO.Put (Buffer_Pages);
       Rose.Console_IO.Put ("; interrupts: ");
       Rose.Console_IO.Put (Interrupt_Count);
       Rose.Console_IO.New_Line;

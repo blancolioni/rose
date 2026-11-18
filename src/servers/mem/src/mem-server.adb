@@ -524,6 +524,7 @@ package body Mem.Server is
          Restore_Segment      => Mem.Processes.Restore_Segment'Access,
          Restore_Zero_Segment => Mem.Processes.Restore_Zero_Segment'Access,
          Restore_Page         => Mem.Processes.Restore_Page'Access,
+         Load_Page            => Mem.Processes.Load_Page'Access,
          Restore_Shared_Page  => Mem.Processes.Restore_Shared_Page'Access);
 
       --  Attached after Memory_Restore, for the same reason (#866).
@@ -847,6 +848,7 @@ package body Mem.Server is
                             else 0);
             Have_Page  : Boolean;
             Page       : Rose.Addresses.Physical_Page_Address;
+            From_Log   : Boolean;
          begin
             if Cached /= 0 then
                Mem.Virtual_Map.Map
@@ -877,7 +879,8 @@ package body Mem.Server is
                Mem.Processes.Initialize_Page
                  (Process       => Pid,
                   Physical_Page => Page,
-                  Virtual_Page  => Virtual_Page);
+                  Virtual_Page  => Virtual_Page,
+                  From_Log      => From_Log);
 
                Mem.Virtual_Map.Map
                  (Process       => Object,
@@ -895,7 +898,8 @@ package body Mem.Server is
                Mem.Processes.Resume_Process (Pid);
                Mem.Processes.Count_Fault
                  (Pid,
-                  (if Persistent then Mem.Processes.Region_Fault
+                  (if From_Log then Mem.Processes.Log_Fault
+                   elsif Persistent then Mem.Processes.Region_Fault
                    else Mem.Processes.Zero_Fault),
                   Rose.Trace.Ticks - Start);
 
@@ -1352,6 +1356,9 @@ package body Mem.Server is
       Page      : Rose.Addresses.Physical_Page_Address;
       Have_Page : Boolean;
       Added     : Boolean;
+      From_Log  : Boolean;
+      pragma Warnings (Off, From_Log);
+      --  A shared page is never read from the log.
    begin
       if Found /= 0 then
          Mem.Shared_Pages.Acquire (Found);
@@ -1377,7 +1384,8 @@ package body Mem.Server is
          Mem.Processes.Initialize_Page
            (Process       => Pid,
             Physical_Page => Page,
-            Virtual_Page  => Virtual_Page);
+            Virtual_Page  => Virtual_Page,
+            From_Log      => From_Log);
       end if;
 
       Mem.Virtual_Map.Map

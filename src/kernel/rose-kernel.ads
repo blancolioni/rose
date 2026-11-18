@@ -75,7 +75,7 @@ private
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
    Boot_Module_Pages : Natural :=
-     18 + 40 + 4 + 8
+     18 + 40 + 4 + 8 + 4
      + (Rose.Limits.Mapped_Page_Table_Bytes + Rose.Limits.Page_Size - 1)
      / Rose.Limits.Page_Size;
    --  Pages of kernel heap kept for boot modules, which are loaded before
@@ -85,7 +85,8 @@ private
    --  32 segments a process and of shared pages (ADR 0025), 4 for the
    --  boot console's copy of its output (#654), 8 for the memory server's
    --  Replacer and Replacement interfaces (#866), which took 3 of them,
-   --  and the pages of the page table. Set by boot-module-pages on the
-   --  command line.
+   --  4 for the memory server's index buffers and cache (#949), which
+   --  took 2 of them, and the pages of the page table. Set by
+   --  boot-module-pages on the command line.
 
 end Rose.Kernel;
