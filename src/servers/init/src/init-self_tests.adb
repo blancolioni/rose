@@ -275,7 +275,7 @@ package body Init.Self_Tests is
 
             First := Derive (Derive_Cap, Find_Cap);
             Child := Derive (Derive_Cap, First);
-            Sets.Append (Set, (1 => First));
+            Sets.Append (Set, First);
             Call_On (Delete_Cap, First);
 
             Check ("a parent in a cap set leaves its child working",
@@ -310,7 +310,6 @@ package body Init.Self_Tests is
       Install_Cap   : Rose.Capabilities.Capability)
       return Forward_Result
    is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Bank     : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Bank_Cap : Rose.Capabilities.Capability;
@@ -346,7 +345,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Old_Launch);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Bank_Cap, No_Caps);
+          (Launcher, Bank_Cap);
 
       --  The command waits for its launch call, which never comes:
       --  destroying its bank ends it.
@@ -594,7 +593,6 @@ package body Init.Self_Tests is
       return Rose.Capabilities.Capability
    is
       use type Rose.Words.Word;
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint : Rose.Capabilities.Capability;
       Params   : aliased Rose.Invocation.Invocation_Record;
@@ -602,7 +600,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Bank, No_Caps);
+          (Launcher, Bank);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
       end if;
@@ -647,7 +645,6 @@ package body Init.Self_Tests is
       use type Rose.Words.Word;
       package Replacements renames Rose.Interfaces.Processes.Replacement
         .Client;
-      No_Caps     : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher    : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint    : Rose.Capabilities.Capability :=
         Rose.Capabilities.Null_Capability;
@@ -709,8 +706,7 @@ package body Init.Self_Tests is
               Rose.Interfaces.Processes.Launch.Client.Launch_Command
                 (Launcher,
                  Rose.Interfaces.Storage.Bank.Client
-                   .Get_Interface_Cap (Sibling),
-                 No_Caps);
+                   .Get_Interface_Cap (Sibling));
          end;
       end if;
 
@@ -720,11 +716,13 @@ package body Init.Self_Tests is
          --  The null caps are sent as the updater sends them (#830).
 
          Rose.System_Calls.Initialize_Send (Params, Endpoint);
-         for I in 1 .. Null_Caps loop
-            Rose.System_Calls.Send_Cap
-              (Params, Rose.Capabilities.Null_Capability);
-         end loop;
-         Rose.System_Calls.Send_Cap (Params, Control);
+         declare
+            Caps : Rose.Capabilities.Capability_Array (1 .. Null_Caps + 1) :=
+              (others => Rose.Capabilities.Null_Capability);
+         begin
+            Caps (Caps'Last) := Control;
+            Rose.System_Calls.Send_Caps (Params, Caps);
+         end;
          if Empty_Strings > 0 then
             Rose.System_Calls.Start_Items (Params);
             for I in 1 .. Empty_Strings loop
@@ -791,7 +789,6 @@ package body Init.Self_Tests is
         Init.Calls.Find_In_Map (Find_Cap, "hold_file");
       File_Cap   : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "file");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -816,7 +813,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Holder_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -827,11 +824,13 @@ package body Init.Self_Tests is
       --  replies with the file's Replaceable, once it holds the file.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Standard_Output);
-      Rose.System_Calls.Send_Cap (Params, Delete_Cap);
-      Rose.System_Calls.Send_Cap (Params, Commands);
-      Rose.System_Calls.Send_Cap (Params, Cap_Sets);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Create_Endpoint,
+          Standard_Output,
+          Delete_Cap,
+          Commands,
+          Cap_Sets));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -877,7 +876,6 @@ package body Init.Self_Tests is
         Init.Calls.Find_In_Map (Find_Cap, "directory");
       User_Ctl   : Rose.Capabilities.Capability;
       Home_Ctl   : Rose.Capabilities.Capability;
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -893,7 +891,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Holder_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -968,7 +966,6 @@ package body Init.Self_Tests is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "run_self_tests");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -980,7 +977,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -988,15 +985,17 @@ package body Init.Self_Tests is
       --  The command replies when the tests have finished.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Standard_Output);
-      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Commands);
-      Rose.System_Calls.Send_Cap (Params, Clock);
-      Rose.System_Calls.Send_Cap (Params, Test_Bank);
-      Rose.System_Calls.Send_Cap (Params, Screen);
-      Rose.System_Calls.Send_Cap (Params, Create_Signal);
-      Rose.System_Calls.Send_Cap (Params, Cap_Sets);
-      Rose.System_Calls.Send_Cap (Params, Replace_Process);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Standard_Output,
+          Create_Endpoint,
+          Commands,
+          Clock,
+          Test_Bank,
+          Screen,
+          Create_Signal,
+          Cap_Sets,
+          Replace_Process));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 
@@ -1022,7 +1021,6 @@ package body Init.Self_Tests is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "hold_derived");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -1052,7 +1050,7 @@ package body Init.Self_Tests is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -1063,11 +1061,13 @@ package body Init.Self_Tests is
       --  Child.  The command replies once it holds them.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Standard_Output);
-      Rose.System_Calls.Send_Cap (Params, Rescind_Cap);
-      Rose.System_Calls.Send_Cap (Params, Parent);
-      Rose.System_Calls.Send_Cap (Params, Child);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Create_Endpoint,
+          Standard_Output,
+          Rescind_Cap,
+          Parent,
+          Child));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 

@@ -24,6 +24,14 @@ is
    --    Block         Sender is willing to block for reply
 
    --  Receive + Block: sender will be block until a message is received
+   --
+   --    Continued     The call is the first part of a longer one: it
+   --                  carries caps, and the call that ends it, without
+   --                  Continued, carries the rest of them and the words
+   --                  and buffer. The receiver keeps the caps, in order,
+   --                  and replies with nothing. An invocation carries at
+   --                  most four caps, and a command launch call more
+   --                  (#234). The kernel does not look at it.
 
    type Invocation_Flag is
      (Writable_Buffer,
@@ -38,7 +46,8 @@ is
       Send_Words,
       Recv_Words,
       Send_Caps,
-      Recv_Caps);
+      Recv_Caps,
+      Continued);
 
    type Invocation_Flags is array (Invocation_Flag) of Boolean;
    pragma Pack (Invocation_Flags);
@@ -78,7 +87,9 @@ is
    use type Rose.Objects.Object_Id;
 
    Max_Parameter_Words : constant := 16;
-   Max_Capabilities    : constant := 16;
+   Max_Capabilities    : constant := 4;
+   --  An invocation carries at most four capabilities, and so does its
+   --  reply. More are sent in a cap set, or one at a time (#234).
 
    type Parameter_Word_Index is mod Max_Parameter_Words;
    type Capability_Index is mod Max_Capabilities;
@@ -93,6 +104,7 @@ is
 
    type Word_3 is mod 2 ** 3;
    type Word_4 is mod 2 ** 4;
+   type Word_6 is mod 2 ** 6;
 
    type Control_Word is
       record
@@ -101,7 +113,7 @@ is
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
          Last_Recv_Cap  : Capability_Index     := 0;
-         Reserved       : Word_3               := 0;
+         Reserved       : Word_6               := 0;
       end record
      with Pack, Size => 32;
 
@@ -120,7 +132,7 @@ is
          Buffer_Address : System.Address := System.Null_Address;
          Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
-     with Size => 40 * 4 * 8;
+     with Size => 28 * 4 * 8;
 
    --  The layout is fixed, because the kernel, every process and every
    --  checkpoint share it. Error has five bits, for up to 32 errors: one
@@ -139,9 +151,9 @@ is
          Error          at  20 range 24 .. 28;
          Extra_Errors   at  20 range 29 .. 31;
          Data           at  24 range  0 .. 16 * 32 - 1;
-         Caps           at  88 range  0 .. 16 * 32 - 1;
-         Buffer_Address at 152 range  0 .. 31;
-         Buffer_Length  at 156 range  0 .. 31;
+         Caps           at  88 range  0 .. 4 * 32 - 1;
+         Buffer_Address at 104 range  0 .. 31;
+         Buffer_Length  at 108 range  0 .. 31;
       end record;
 
    type Invocation_Access is access all Invocation_Record;

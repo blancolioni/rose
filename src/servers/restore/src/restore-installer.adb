@@ -870,8 +870,6 @@ package body Restore.Installer is
       use Rose.Interfaces.Files.Directory.Client;
       use Rose.Interfaces.Streams.Releasable_Reader.Client;
       use type Rose.Capabilities.Capability;
-      No_Caps    : constant Rose.Capabilities.Capability_Array (1 .. 0) :=
-                     (others => <>);
       Exec_Index : Natural;
       Reader     : Releasable_Reader_Client;
    begin
@@ -894,7 +892,7 @@ package body Restore.Installer is
            .Launch_Client :=
                     Rose.Interfaces.Processes.Exec.Client.Update
                       (Exec_Client, Conversions.To_Reader (Reader), Name,
-                       No_Caps);
+                       Rose.Capabilities.Null_Capability);
       begin
          if Rose.Interfaces.Processes.Exec.Client.Has_Error
            or else Rose.Interfaces.Processes.Launch.Client

@@ -532,27 +532,12 @@ package body Rose.Replacement is
       Set     : Rose.Interfaces.Caps.Releasable_Cap_Set.Client
         .Releasable_Cap_Set_Client :=
           Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
-      Next    : Positive := 1;
    begin
       Writer (Discard'Access, Named);
       Add_Arguments (Named);
 
-      --  A call carries at most Max_Capabilities caps.
-
-      while Next <= Named.Caps.Last_Index loop
-         declare
-            Last  : constant Positive :=
-              Positive'Min
-                (Named.Caps.Last_Index,
-                 Next + Rose.Invocation.Max_Capabilities - 1);
-            Batch : Rose.Capabilities.Capability_Array (1 .. Last - Next + 1);
-         begin
-            for I in Batch'Range loop
-               Batch (I) := Named.Caps (Next + I - 1).Cap;
-            end loop;
-            Set.Append (Batch);
-            Next := Last + 1;
-         end;
+      for Item of Named.Caps loop
+         Set.Append (Item.Cap);
       end loop;
 
       return Rose.Interfaces.Caps.Releasable_Cap_Set.Client.From_Cap (Set_Cap);
@@ -782,7 +767,6 @@ package body Rose.Replacement is
       pragma Unreferenced (Item);
       Calls   : constant Call_Vectors.Vector := Deferred_Calls;
       Set_Cap : Rose.Capabilities.Capability;
-      Next    : Positive := 1;
    begin
       if Replies_Given then
          raise Constraint_Error with
@@ -799,21 +783,8 @@ package body Rose.Replacement is
          --  Sending a reply cap moves it (#864): its slot here is left
          --  empty, and kept, until Take_Back deletes it.
 
-         while Next <= Calls.Last_Index loop
-            declare
-               Last  : constant Positive :=
-                 Positive'Min
-                   (Calls.Last_Index,
-                    Next + Rose.Invocation.Max_Capabilities - 1);
-               Batch : Rose.Capabilities.Capability_Array
-                 (1 .. Last - Next + 1);
-            begin
-               for I in Batch'Range loop
-                  Batch (I) := Calls (Next + I - 1).Reply_Cap;
-               end loop;
-               Set.Append (Batch);
-               Next := Last + 1;
-            end;
+         for Call of Calls loop
+            Set.Append (Call.Reply_Cap);
          end loop;
       end;
 

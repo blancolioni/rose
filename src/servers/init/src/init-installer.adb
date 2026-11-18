@@ -4,12 +4,14 @@ with Rose.Init_Capabilities;
 with Rose.Limits;
 with Rose.Objects;
 
+with Rose.Interfaces.Processes.Starting_Process.Client;
 with Rose.Interfaces.Storage.Region.Client;
 with Rose.Interfaces.Streams.Reader.Client;
 
 with Rose.Invocation;
 with Rose.System_Calls;
 
+with Init.Boot;
 with Init.Grants;
 
 package body Init.Installer is
@@ -33,9 +35,25 @@ package body Init.Installer is
      (From : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
       To   : Rose.Interfaces.Storage.Region.Client.Region_Client);
 
+   Max_Granted_Caps : constant := 24;
+
+   type Granted_Caps is
+      record
+         Caps  : Init.Calls.Array_Of_Capabilities (1 .. Max_Granted_Caps) :=
+                   (others => 0);
+         Count : Natural := 0;
+      end record;
+   --  The caps a program starts with, in order. Init has no secondary
+   --  stack, so they are built up here and passed as Caps (1 .. Count).
+
+   procedure Add
+     (To  : in out Granted_Caps;
+      Cap : Rose.Capabilities.Capability);
+   --  Add Cap to To, if there is room.
+
    procedure Grant_Caps
      (From      : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
-      To        : in out Rose.Invocation.Invocation_Record;
+      To        : in out Granted_Caps;
       Is_Driver : Boolean);
    --  From is the program's cap requests: one to a line, each a name and
    --  up to two numbers, with comments from '#'.  Add a cap to To for
@@ -43,9 +61,42 @@ package body Init.Installer is
    --  program may have create-endpoint.  Only drivers may have the
    --  others, and not hardware that another program has.
 
+   function Launch_Library
+     (Launch_Cap : Rose.Capabilities.Capability;
+      Name       : String;
+      Image      : Rose.Capabilities.Capability;
+      Bank_Cap   : Rose.Capabilities.Capability;
+      Caps       : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability;
+   --  Launch Image through the ELF server's Launch, Launch_Cap, give the
+   --  new process Caps, one at a time (#234), and start it. The result
+   --  is its Process_Control cap, or null if the launch failed.
+
+   function Install_Cap_Set
+     (Caps : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability;
+   --  A boot cap set (#826) of Caps, for exec's Install and Update, or
+   --  null if there are none. Exec copies the caps out of it, and init's
+   --  cap to it is deleted once the call is made.
+
    procedure Add_Text
      (Params : in out Rose.Invocation.Invocation_Record;
       Text   : String);
+
+   ---------
+   -- Add --
+   ---------
+
+   procedure Add
+     (To  : in out Granted_Caps;
+      Cap : Rose.Capabilities.Capability)
+   is
+   begin
+      if To.Count < Max_Granted_Caps then
+         To.Count := To.Count + 1;
+         To.Caps (To.Count) := Cap;
+      end if;
+   end Add;
 
    --------------
    -- Add_Text --
@@ -105,7 +156,7 @@ package body Init.Installer is
 
    procedure Grant_Caps
      (From      : Rose.Interfaces.Streams.Reader.Client.Reader_Client;
-      To        : in out Rose.Invocation.Invocation_Record;
+      To        : in out Granted_Caps;
       Is_Driver : Boolean)
    is
       use Rose.Interfaces.Streams.Reader.Client;
@@ -249,12 +300,14 @@ package body Init.Installer is
                             Init_Caps.Port_In_Range_Endpoint);
             end if;
 
-            if Cap = Rose.Capabilities.Null_Capability then
+            if Cap = Rose.Capabilities.Null_Capability
+              or else To.Count = Max_Granted_Caps
+            then
                Init.Calls.Send_String
                  ("init: refused cap request: " & Line
                   & Character'Val (10));
             else
-               Rose.System_Calls.Send_Cap (To, Cap);
+               Add (To, Cap);
             end if;
          end;
       end Request;
@@ -300,6 +353,23 @@ package body Init.Installer is
       end loop;
    end Grant_Caps;
 
+   ---------------------
+   -- Install_Cap_Set --
+   ---------------------
+
+   function Install_Cap_Set
+     (Caps : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if Caps'Length = 0 then
+         return Rose.Capabilities.Null_Capability;
+      else
+         return Init.Calls.Create_Cap_Set_With
+           (Init.Boot.Cap_Set_Cap, Caps);
+      end if;
+   end Install_Cap_Set;
+
    -----------------------------
    -- Install_Command_Library --
    -----------------------------
@@ -322,8 +392,7 @@ package body Init.Installer is
                          Rose.Words.Word_64 (Binary_Length));
       Exec_Reader : Reader_Client;
       Cap_Reader  : Reader_Client;
-
-      Params      : aliased Rose.Invocation.Invocation_Record;
+      Caps        : Granted_Caps;
       Exec_Region : constant Region_Client :=
                       Reserve_Storage
                         (Reserve_Cap, Rose.Words.Word_64 (Exec_Region_Length));
@@ -333,31 +402,16 @@ package body Init.Installer is
       Copy_Stream (Exec_Reader, Region);
 
       Open (Cap_Reader, Cap_Stream);
-      Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
-      Add_Text (Params, "command");
-      Rose.System_Calls.Send_Cap
-        (Params, Get_Interface_Cap (Region));
-      Rose.System_Calls.Send_Cap
-        (Params, Bank_Cap);
-      Grant_Caps (Cap_Reader, Params, Is_Driver => True);
-      Rose.System_Calls.Send_Cap
-        (Params, Standard_Output);
-      Rose.System_Calls.Send_Cap
-        (Params, Launch_Cap);
-      Rose.System_Calls.Send_Cap
-        (Params, Get_Interface_Cap (Exec_Region));
-      Rose.System_Calls.Send_Cap
-        (Params, Bank_Cap);
-      Rose.System_Calls.Invoke_Capability (Params);
+      Grant_Caps (Cap_Reader, Caps, Is_Driver => True);
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         return 0;
-      else
-         return Params.Caps (0);
-      end if;
+      Add (Caps, Standard_Output);
+      Add (Caps, Launch_Cap);
+      Add (Caps, Get_Interface_Cap (Exec_Region));
+      Add (Caps, Bank_Cap);
 
+      return Launch_Library
+        (Launch_Cap, "command", Get_Interface_Cap (Region), Bank_Cap,
+         Caps.Caps (1 .. Caps.Count));
    end Install_Command_Library;
 
    --------------------------
@@ -376,7 +430,6 @@ package body Init.Installer is
       Binary_Length   : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
-      --  use Rose.Words;
       use Rose.Interfaces.Storage.Region.Client;
       use Rose.Interfaces.Streams.Reader.Client;
       Region : constant Region_Client :=
@@ -385,8 +438,7 @@ package body Init.Installer is
                         Rose.Words.Word_64 (Binary_Length));
       Exec_Reader : Reader_Client;
       Cap_Reader  : Reader_Client;
-
-      Params      : aliased Rose.Invocation.Invocation_Record;
+      Caps        : Granted_Caps;
       Exec_Region : constant Region_Client :=
                       Reserve_Storage
                         (Reserve_Cap, Rose.Words.Word_64 (Exec_Region_Length));
@@ -396,37 +448,20 @@ package body Init.Installer is
       Copy_Stream (Exec_Reader, Region);
 
       Open (Cap_Reader, Cap_Stream);
-      Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
+      Grant_Caps (Cap_Reader, Caps, Is_Driver => True);
 
-      Add_Text (Params, "exec");
+      --  Exec's caps after the ones it asks for are in Exec (exec.ads).
 
-      Rose.System_Calls.Send_Cap
-        (Params, Get_Interface_Cap (Region));
-      Rose.System_Calls.Send_Cap
-        (Params, Bank_Cap);
-      Grant_Caps (Cap_Reader, Params, Is_Driver => True);
-      Rose.System_Calls.Send_Cap
-        (Params, Standard_Output);
-      Rose.System_Calls.Send_Cap
-        (Params, Launch_Cap);
-      Rose.System_Calls.Send_Cap
-        (Params, Get_Interface_Cap (Exec_Region));
-      Rose.System_Calls.Send_Cap
-        (Params, Bank_Cap);
-      Rose.System_Calls.Send_Cap
-        (Params, Launch_Command_Cap);
-      Rose.System_Calls.Send_Cap
-        (Params, Trace_Cap);
-      Rose.System_Calls.Invoke_Capability (Params);
+      Add (Caps, Standard_Output);
+      Add (Caps, Launch_Cap);
+      Add (Caps, Get_Interface_Cap (Exec_Region));
+      Add (Caps, Bank_Cap);
+      Add (Caps, Launch_Command_Cap);
+      Add (Caps, Trace_Cap);
 
-      if Params.Control.Flags (Rose.Invocation.Error)
-        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
-      then
-         return 0;
-      else
-         return Params.Caps (0);
-      end if;
-
+      return Launch_Library
+        (Launch_Cap, "exec", Get_Interface_Cap (Region), Bank_Cap,
+         Caps.Caps (1 .. Caps.Count));
    end Install_Exec_Library;
 
    ------------------------
@@ -445,22 +480,24 @@ package body Init.Installer is
    is
       pragma Unreferenced (Binary_Length);
       use Rose.Interfaces.Streams.Reader.Client;
-      Client : Reader_Client;
-      Params : aliased Rose.Invocation.Invocation_Record;
+      Client  : Reader_Client;
+      Caps    : Granted_Caps;
+      Params  : aliased Rose.Invocation.Invocation_Record;
+      Cap_Set : Rose.Capabilities.Capability;
    begin
+      Open (Client, Cap_Stream);
+      Grant_Caps (Client, Caps, Is_Driver);
+      for Cap of Extra_Caps loop
+         Add (Caps, Cap);
+      end loop;
+      Cap_Set := Install_Cap_Set (Caps.Caps (1 .. Caps.Count));
+
       Rose.System_Calls.Initialize_Send (Params, Install_Cap);
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
-
-      Open (Client, Cap_Stream);
-      Grant_Caps (Client, Params, Is_Driver);
-
-      for Cap of Extra_Caps loop
-         Rose.System_Calls.Send_Cap (Params, Cap);
-      end loop;
-
       Add_Text (Params, Name);
-
+      Rose.System_Calls.Send_Cap (Params, Cap_Set);
       Rose.System_Calls.Invoke_Capability (Params);
+      Rose.System_Calls.Delete_Cap (Cap_Set);
 
       if Params.Control.Flags (Rose.Invocation.Error)
         or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
@@ -471,6 +508,50 @@ package body Init.Installer is
       end if;
 
    end Install_Executable;
+
+   --------------------
+   -- Launch_Library --
+   --------------------
+
+   function Launch_Library
+     (Launch_Cap : Rose.Capabilities.Capability;
+      Name       : String;
+      Image      : Rose.Capabilities.Capability;
+      Bank_Cap   : Rose.Capabilities.Capability;
+      Caps       : Init.Calls.Array_Of_Capabilities)
+      return Rose.Capabilities.Capability
+   is
+      use Rose.Interfaces.Processes.Starting_Process.Client;
+      use type Rose.Capabilities.Capability;
+      Params       : aliased Rose.Invocation.Invocation_Record;
+      Starting_Cap : Rose.Capabilities.Capability;
+      Starting     : Starting_Process_Client;
+      Result       : Rose.Capabilities.Capability;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Launch_Cap);
+      Add_Text (Params, Name);
+      Rose.System_Calls.Send_Cap (Params, Image);
+      Rose.System_Calls.Send_Cap (Params, Bank_Cap);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+        or else Params.Caps (0) = Rose.Capabilities.Null_Capability
+      then
+         return 0;
+      end if;
+
+      Starting_Cap := Params.Caps (0);
+      Open (Starting, Starting_Cap);
+      for Cap of Caps loop
+         Add_Cap (Starting, Cap);
+      end loop;
+      Result := Start (Starting);
+      Close (Starting);
+      Rose.System_Calls.Delete_Cap (Starting_Cap);
+      return Result;
+   end Launch_Library;
 
    ---------------------
    -- Reserve_Storage --
@@ -509,15 +590,16 @@ package body Init.Installer is
       Install_Caps  : Init.Calls.Array_Of_Capabilities)
       return Rose.Capabilities.Capability
    is
-      Params : aliased Rose.Invocation.Invocation_Record;
+      Params  : aliased Rose.Invocation.Invocation_Record;
+      Cap_Set : constant Rose.Capabilities.Capability :=
+                  Install_Cap_Set (Install_Caps);
    begin
       Rose.System_Calls.Initialize_Send (Params, Update_Cap);
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
-      for Cap of Install_Caps loop
-         Rose.System_Calls.Send_Cap (Params, Cap);
-      end loop;
       Add_Text (Params, Name);
+      Rose.System_Calls.Send_Cap (Params, Cap_Set);
       Rose.System_Calls.Invoke_Capability (Params);
+      Rose.System_Calls.Delete_Cap (Cap_Set);
 
       if Params.Control.Flags (Rose.Invocation.Error)
         or else not Params.Control.Flags (Rose.Invocation.Send_Caps)

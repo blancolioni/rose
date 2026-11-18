@@ -7,6 +7,8 @@ with Console.Server;
 procedure Console.Driver is
 begin
 
+   Console.Calls.Get_Caps;
+
    if Console.Calls.Has_Framebuffer then
       Console.IO.Use_Serial_Port;
    else

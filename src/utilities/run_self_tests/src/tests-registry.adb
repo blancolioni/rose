@@ -78,15 +78,13 @@ package body Tests.Registry is
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
       Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher ("directory");
    begin
       return Program.Launch_Command
         ((if Bank = Rose.Capabilities.Null_Capability
           then Rose.System_Calls.Own_Bank.Cap
-          else Bank),
-         No_Caps);
+          else Bank));
    exception
       when Rose.Interfaces.Objects.Invocation_Error =>
          return Rose.Capabilities.Null_Capability;
@@ -102,15 +100,13 @@ package body Tests.Registry is
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
-      No_Caps : Rose.Capabilities.Capability_Array (1 .. 0);
       Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher ("file");
    begin
       return Program.Launch_Command
         ((if Bank = Rose.Capabilities.Null_Capability
           then Rose.System_Calls.Own_Bank.Cap
-          else Bank),
-         No_Caps);
+          else Bank));
    exception
       when Rose.Interfaces.Objects.Invocation_Error =>
          return Rose.Capabilities.Null_Capability;
@@ -121,15 +117,14 @@ package body Tests.Registry is
    ------------
 
    function Launch
-     (Name : String;
-      Caps : Rose.Capabilities.Capability_Array)
+     (Name : String)
       return Rose.Capabilities.Capability
    is
       Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher (Name);
       Process : Rose.Interfaces.Processes.Process_Control
         .Process_Control_Object'Class :=
-        Program.Launch (Rose.System_Calls.Own_Bank.Cap, Caps);
+        Program.Launch (Rose.System_Calls.Own_Bank.Cap);
       use type Rose.Capabilities.Capability;
    begin
 

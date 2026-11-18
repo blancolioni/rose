@@ -36,7 +36,7 @@ A cap set holds a list of capabilities, so that a process can pass many capabili
 interface Cap_Set is
 
    procedure Append
-     (Caps : Capability_Array);
+     (Cap : Capability);
 
    function Get_Cap
      (Index : Positive)
@@ -51,8 +51,8 @@ end Cap_Set;
 `Constructor` creates a new object and returns a capability for it; the `bootcaps` server uses it to create cap sets for the boot modules, and the `caps` driver to create them for persistent processes.
 
 `Releasable_Cap_Set` is a `Cap_Set` that is also a `Resource`: its holder releases it when it is done with it, which deletes the capabilities it holds, and every capability to the set fails afterwards.
-Its `Append` raises when the set can't take every capability it is given, and then adds none of them.
-`Cap_Set` itself is unchanged, so the boot modules' endpoint ids stay as they are (ADR 0031, section 2).
+Its `Append` raises when the sets are full.
+It is an interface of its own, rather than a change to `Cap_Set`, so that the boot modules' endpoint ids stayed as they were (ADR 0031, section 2).
 
 == Processes and Memory
 
@@ -123,18 +123,22 @@ A region's pages are charged to its bank when they are first written, not when i
 | `Launch` | | `Launch`, `Launch_Command`, `Metadata` | `exec`
 | `Exec` | `Launch` | `Install`, `Set_Standard_Output` | `exec`
 | `Executable` | | `Launch`, `Launch_Command` | `elf`
+| `Starting_Process` | | `Add_Cap`, `Start` | `elf`
 | `Command_Endpoint` | | `Launch` | Each command
 | `Map` | | `Add`, `Remove`, `Find` | `command`
 |===
 
 `Exec.Install` reads an executable from a stream and returns a `Launch` capability for it.
+The capabilities that every process of the program starts with come in a cap set, which `exec` copies them out of.
 `Exec.Set_Standard_Output` sets the standard output that `exec` gives the programs it launches, and uses itself; `init` sets it to the persistent console once that is running.
-`Executable.Launch` creates the process from an image in a region, reserving its writable data, stack and heap from the bank it is given, and returns its `Process_Control`.
+`Executable.Launch` creates the process from an image in a region, reserving its writable data, stack and heap from the bank it is given, and loads it, but does not start it.
+It returns a `Starting_Process`, through which the caller gives the process its capabilities, one at a time, since an invocation carries at most four; its `Start` starts the process and returns its `Process_Control` (#234).
 `Map` holds launch capabilities by name.
 
 A program is started in one of two ways:
 
-* *`Launch.Launch`* takes the bank to launch against, usually the caller's own (`Rose.System_Calls.Own_Bank.Cap`), so that ending the caller ends the process (ADR 0015), and a `Capability_Array`, whose meaning the caller and the program agree on by convention, and returns the new process's `Process_Control`.
+* *`Launch.Launch`* takes the bank to launch against, usually the caller's own (`Rose.System_Calls.Own_Bank.Cap`), so that ending the caller ends the process (ADR 0015), and returns the new process's `Process_Control`.
+  The process starts with its standard capabilities and those it was installed with; anything else it is given as arguments (#234).
 * *`Launch.Launch_Command`* starts the program as a command (ADR 0002, see <<launch-sequence>>).
   Its process starts with the receive capability of a command endpoint, and the result is the endpoint capability, which the shell calls once with the command's arguments.
   `Executable.Launch_Command` does the same for `elf`.

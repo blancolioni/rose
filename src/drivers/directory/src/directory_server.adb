@@ -667,7 +667,6 @@ package body Directory_Server is
    procedure Launch_Entry (Item : in out Entry_Record) is
       Is_File  : constant Boolean :=
         Item.Kind = Rose.Interfaces.Files.Directory.Ordinary_File;
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Own      : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint : Rose.Capabilities.Capability;
@@ -684,7 +683,7 @@ package body Directory_Server is
       begin
          Launcher.Open
            (if Is_File then File_Launch_Cap else Directory_Launch_Cap);
-         Endpoint := Launcher.Launch_Command (Item.Bank.Bank_Cap, No_Caps);
+         Endpoint := Launcher.Launch_Command (Item.Bank.Bank_Cap);
          if Endpoint = Rose.Capabilities.Null_Capability then
             raise Rose.Interfaces.Objects.Invocation_Error
               with "cannot launch an entry";

@@ -350,7 +350,6 @@ package body Init.Users is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "auth");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -366,7 +365,7 @@ package body Init.Users is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
       end if;
@@ -416,7 +415,6 @@ package body Init.Users is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "login");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -428,7 +426,7 @@ package body Init.Users is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return False;
       end if;
@@ -437,15 +435,17 @@ package body Init.Users is
       --  src/utilities/login/rose-core-login.idl declares them.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Console);
-      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
-      Rose.System_Calls.Send_Cap (Params, Delete_Cap);
-      Rose.System_Calls.Send_Cap (Params, Rescind_Cap);
-      Rose.System_Calls.Send_Cap (Params, Commands);
-      Rose.System_Calls.Send_Cap (Params, Timer);
-      Rose.System_Calls.Send_Cap (Params, Clock);
-      Rose.System_Calls.Send_Cap (Params, Rights);
-      Rose.System_Calls.Send_Cap (Params, Auth);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Console,
+          Create_Endpoint,
+          Delete_Cap,
+          Rescind_Cap,
+          Commands,
+          Timer,
+          Clock,
+          Rights,
+          Auth));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 
@@ -469,7 +469,6 @@ package body Init.Users is
       use type Rose.Words.Word;
       Launch_Cap : constant Rose.Capabilities.Capability :=
         Init.Calls.Find_In_Map (Find_Cap, "rights");
-      No_Caps    : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
       Endpoint   : Rose.Capabilities.Capability;
       Params     : aliased Rose.Invocation.Invocation_Record;
@@ -486,7 +485,7 @@ package body Init.Users is
       Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
       Endpoint :=
         Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability, No_Caps);
+          (Launcher, Rose.Capabilities.Null_Capability);
       if Endpoint = Rose.Capabilities.Null_Capability then
          return;
       end if;

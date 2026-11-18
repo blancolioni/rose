@@ -84,6 +84,7 @@ package body Rose.Kernel.Debug is
       Put_Flag ("RW", Recv_Words);
       Put_Flag ("SC", Send_Caps);
       Put_Flag ("RC", Recv_Caps);
+      Put_Flag ("CT", Continued);
       Put_Flag ("SB", Send_Buffer);
       Put_Flag ("WB", Writable_Buffer);
       Put_Flag ("MR", Create_Reply_Cap);

@@ -94,6 +94,7 @@ A command receives its arguments by invocation, not when its process is created.
 . *The shell calls the command endpoint* with a reply cap.
   The invocation carries the arguments, encoded as for any IDL method call: scalars in words, strings and lists in the shared buffer, and files, directories and streams as caps (see <<encoding>>).
   It also carries the caps of the command's roles.
+  An invocation carries at most four caps, so a call with more is sent in parts: each part but the last carries four of them, with the `Continued` flag, and `Receive` keeps them, in order, and replies to it with nothing (#234, see <<continued-calls>>).
   The send blocks until the process is ready, so there is no race.
 . *The main runs the command.*
   It decodes each argument into an Ada value, so a cap becomes a client object of the argument's interface type, then calls the command's procedure.
@@ -125,7 +126,6 @@ Arguments arrive by invocation so that there is one encoding for them, shared wi
 The reply cap gives the shell its completion signal without a separate result cap.
 The cost is one extra round trip for each launch.
 
-_Today_, `Launch.Launch` takes a `Capability_Array`, whose meaning the caller and the program agree on by convention only.
 Petal does not launch external commands yet: its `Execute` prints `launching:` with the command's launch cap and returns.
 
 [#completion]

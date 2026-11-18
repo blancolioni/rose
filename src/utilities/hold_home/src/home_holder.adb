@@ -64,7 +64,6 @@ package body Home_Holder is
       User_Control    : out Rose.Capabilities.Capability;
       Home_Control    : out Rose.Capabilities.Capability)
    is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Programs : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
       Own      : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Home     : Rose.Interfaces.Files.Writable_Directory.Client
@@ -93,7 +92,7 @@ package body Home_Holder is
            .Launch_Object'Class :=
            Programs.Find ("user");
          Endpoint         : Rose.Capabilities.Capability :=
-           Directory_Launch.Launch_Command (User_Bank.Bank_Cap, No_Caps);
+           Directory_Launch.Launch_Command (User_Bank.Bank_Cap);
          Served_Home      : Rose.Capabilities.Capability;
       begin
          if Endpoint = Rose.Capabilities.Null_Capability then
@@ -123,7 +122,7 @@ package body Home_Holder is
          end;
 
          Endpoint :=
-           User_Launch.Launch_Command (User_Bank.Bank_Cap, No_Caps);
+           User_Launch.Launch_Command (User_Bank.Bank_Cap);
          Rose.Core.User_Client.Call
            (Endpoint        => Endpoint,
             Create_Endpoint => Rose.System_Calls.Create_Endpoint_Capability,

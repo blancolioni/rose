@@ -73,20 +73,17 @@ The boot console's screen and cursor ports are given to nobody, so they are not 
 Each boot module is launched with an object id, a priority, a capability for creating endpoints, and its own capabilities.
 The launch replies with a copy capability for the new process, which `init` uses to copy the endpoints it needs from the module, such as the console's `Writer`.
 
-An invocation is meant to carry at most four capabilities, and most modules need more, so they receive their capabilities in a cap set.
-The boot modules' cap set server, `bootcaps`, is therefore the second module `init` starts.
-The first two modules, `console` and `bootcaps`, receive their capabilities directly in the launch invocation; every later module receives a single cap set, reads its capabilities from it by index at startup, and then deletes its capability to the set.
+An invocation carries at most four capabilities, and most modules need more, so they receive their capabilities in a cap set.
+The boot modules' cap set server, `bootcaps`, is therefore the first module `init` starts.
+It receives its capabilities directly in the launch invocation, which has room for three besides the one for creating endpoints, and it needs only one, to exit; `scripts/make-init` refuses a launch without a cap set that has more.
+Every later module, the console included, receives a single cap set, reads its capabilities from it by index at startup, and then deletes its capability to the set.
 `init` deletes its own capabilities to each set once the module is launched.
+`bootcaps` starts before the console, so it has no console to write to.
 
 Once boot is done, after its last launch, `init` releases `bootcaps` through its `Resource` interface, and `bootcaps` exits, taking every set with it.
 On a boot from the disk, that is after `checkpoint`; on the install media, after `login`.
-A set that would hold more than 30 capabilities takes none of the ones it is given, and `bootcaps` says so on the console; so does running out of sets, of which there are 100.
+A set holds at most 30 capabilities, and takes no more; there are 100 sets, and `init` gets the null capability when they run out.
 Persistent processes have their own cap set server (#825).
-
-[NOTE]
-====
-The four-capability limit is not enforced yet: an invocation can carry up to 16 capabilities (`Max_Capabilities` in `Rose.Invocation`, #234).
-====
 
 == Boot Modules
 

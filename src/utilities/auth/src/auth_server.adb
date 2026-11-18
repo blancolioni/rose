@@ -253,11 +253,10 @@ package body Auth_Server is
       User    : out Rose.Capabilities.Capability;
       Control : out Rose.Capabilities.Capability)
    is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
       Endpoint : constant Rose.Capabilities.Capability :=
-                   Launcher.Launch_Command (Bank, No_Caps);
+                   Launcher.Launch_Command (Bank);
    begin
       User := Rose.Capabilities.Null_Capability;
       Control := Rose.Capabilities.Null_Capability;
@@ -400,7 +399,6 @@ package body Auth_Server is
 
       begin
          declare
-            No_Caps          : Rose.Capabilities.Capability_Array (1 .. 0);
             File_Launch      : Rose.Interfaces.Processes.Launch
               .Launch_Object'Class :=
               Programs.Find ("file");
@@ -409,7 +407,7 @@ package body Auth_Server is
               Programs.Find ("directory");
             Endpoint         : constant Rose.Capabilities.Capability :=
               Directory_Launch.Launch_Command
-                (User_Bank.Get_Interface_Cap, No_Caps);
+                (User_Bank.Get_Interface_Cap);
          begin
 
             --  Elf answers a launch that fails with the null cap (#724).

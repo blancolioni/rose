@@ -93,6 +93,15 @@ package Rose.System_Calls is
    --  If Params already holds as many caps as an invocation carries, it
    --  gets the error Too_Many_Capabilities instead (idle#101).
 
+   procedure Send_Caps
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Caps   : Rose.Capabilities.Capability_Array);
+   --  Send Caps with the call in Params, which has none yet, however many
+   --  there are. An invocation carries at most four, so all but the last
+   --  four or fewer go first, four at a time, in calls to Params.Cap with
+   --  the Continued flag, which the receiver answers with nothing (#234).
+   --  If one of them fails, Params gets its error and is not sent.
+
    procedure Send_Buffer
       (Params   : in out Rose.Invocation.Invocation_Record;
        Bytes    : System.Storage_Elements.Storage_Count;
