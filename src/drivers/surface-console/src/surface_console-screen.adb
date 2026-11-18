@@ -2,7 +2,7 @@ with Rose.Drawing.Text;
 with Rose.Shared_Regions;
 with Rose.Words;
 
-with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Storage.Region_Access;
 with Rose.Interfaces.Streams.Reader.Client;
 with Rose.Interfaces.Screens.Surface.Client;
 
@@ -215,8 +215,9 @@ package body Surface_Console.Screen is
       Surface.Get_Size (Width, Height);
 
       declare
-         Buffer : Rose.Interfaces.Storage.Region.Region_Object'Class :=
-                    Surface.Get_Buffer;
+         Buffer : Rose.Interfaces.Storage.Region_Access
+                    .Region_Access_Object'Class :=
+                      Surface.Get_Buffer;
       begin
          Target :=
            To_Bitmap

@@ -1,6 +1,6 @@
 with System;
 
-with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Storage.Region_Access;
 
 package Rose.Shared_Regions is
 
@@ -14,12 +14,15 @@ package Rose.Shared_Regions is
    Mapping_Error : exception;
 
    function Map
-     (Region   : in out Rose.Interfaces.Storage.Region.Region_Object'Class;
+     (Region   : in out
+        Rose.Interfaces.Storage.Region_Access.Region_Access_Object'Class;
       Writable : Boolean := True)
       return System.Address;
    --  Map all of Region, and return the address of its first page. Raise
    --  Mapping_Error if there is no room for it, or if the process has as
-   --  many shared mappings as it can have.
+   --  many shared mappings as it can have. A Region is a Region_Access
+   --  too, and mem is given only its Region_Access, so unmapping never
+   --  releases the region (#403).
 
    procedure Unmap (Address : System.Address);
    --  Remove the mapping at Address, which Map returned. Once nothing maps

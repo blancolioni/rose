@@ -15,8 +15,6 @@ FILE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-streams-releasable_reader.o \
 	$(BUILDDIR)/rose-interfaces-streams-releasable_reader-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-releasable_reader-client-conversions.o \
-	$(BUILDDIR)/rose-interfaces-common-resource.o \
-	$(BUILDDIR)/rose-interfaces-common-resource-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-seekable_reader.o \
 	$(BUILDDIR)/rose-interfaces-streams-seekable_reader-client.o
 FILE_SYSTEM_OBJECTS= \
@@ -55,6 +53,10 @@ RESTORE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-checkpoints-memory_restore-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-region.o \
 	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region-client-conversions.o \
+	$(BUILDDIR)/rose-interfaces-common-resource.o \
+	$(BUILDDIR)/rose-interfaces-common-resource-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region_access-client.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-storage_checkpoint.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-storage_checkpoint-client.o
 

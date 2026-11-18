@@ -5,7 +5,7 @@ interface Processes.Executable is
 
    function Launch
      (Name  : String;
-      Image : interface Storage.Region;
+      Image : interface Storage.Region_Access;
       Bank  : interface Storage.Bank;
       Caps  : Capability_Array)
      return interface Processes.Process_Control;
@@ -15,7 +15,7 @@ interface Processes.Executable is
 
    function Launch_Command
      (Name  : String;
-      Image : interface Storage.Region;
+      Image : interface Storage.Region_Access;
       Bank  : interface Storage.Bank;
       Caps  : Capability_Array)
      return Capability;

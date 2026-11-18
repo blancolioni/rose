@@ -5,6 +5,7 @@ with Rose.Objects;
 
 with Rose.Console_IO;
 with Rose.Interfaces.Processes.Segment;
+with Rose.Interfaces.Storage.Region.Client;
 with Rose.Trace;
 
 with Elf.Format;
@@ -13,6 +14,7 @@ with Elf.Segments;
 package body Elf.Loader is
 
    use Rose.Interfaces.Storage.Region.Client;
+   use Rose.Interfaces.Storage.Region_Access.Client;
    use Rose.Interfaces.Processes.Process.Client;
    use Rose.Interfaces.Storage.Bank.Client;
 
@@ -30,20 +32,20 @@ package body Elf.Loader is
    --  stack, the store allocates all of its backing blocks now (#305).
 
    procedure Read
-     (Region : Region_Client;
+     (Region : Region_Access_Client;
       Base   : Rose.Objects.Object_Id;
       Offset : System.Storage_Elements.Storage_Count;
       Item   : System.Address;
       Size   : System.Storage_Elements.Storage_Count);
 
    procedure Read_Header
-     (Region : Region_Client;
+     (Region : Region_Access_Client;
       Base   : Rose.Objects.Object_Id;
       Header : out Elf.Format.Elf_Header);
 
    procedure Scan_Program_Headers
      (Bank      : Bank_Client;
-      Region     : Region_Client;
+      Region     : Region_Access_Client;
       Base       : Rose.Objects.Object_Id;
       Process    : Process_Client;
       Header     : Elf.Format.Elf_Header;
@@ -54,7 +56,7 @@ package body Elf.Loader is
 
    procedure Process_Program_Header
      (Top_Bank    : Bank_Client;
-      Image_Region : Region_Client;
+      Image_Region : Region_Access_Client;
       Process      : Process_Client;
       Base_Object  : Rose.Objects.Object_Id;
       Segment_Type : Elf.Format.Program_Header_Type;
@@ -73,7 +75,7 @@ package body Elf.Loader is
    procedure Load_Elf_Image
      (Process : Rose.Interfaces.Processes.Process.Client.Process_Client;
       Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
-      Image   : Rose.Interfaces.Storage.Region.Client.Region_Client;
+      Image   : Region_Access_Client;
       Start   : out Rose.Words.Word;
       Success : out Boolean)
    is
@@ -120,23 +122,25 @@ package body Elf.Loader is
       end if;
       Rose.Trace.Event ("segments added");
 
+      --  The stack and the heap belong to the process: mem releases them
+      --  when it is gone. Elf hands each region over, and forgets it
+      --  rather than closing it, which would release it (#403).
+
       declare
          use type Rose.Words.Word;
          Region : Rose.Interfaces.Storage.Region.Client.Region_Client :=
            Reserve_Storage
              (Bank, Rose.Words.Word_64 (Stack_Size));
       begin
-         Add_Segment
+         Add_Private_Segment
            (Item          => Process,
             Virtual_Base  => Stack_Base / Rose.Limits.Page_Size,
             Virtual_Bound => Stack_Bound / Rose.Limits.Page_Size,
             Region        => Region,
-            Region_Offset => 0,
             Flags         =>
               Rose.Interfaces.Processes.Segment.Segment_Readable
-            + Rose.Interfaces.Processes.Segment.Segment_Writable
-            + Rose.Interfaces.Processes.Segment.Segment_Private);
-         Close (Region);
+            + Rose.Interfaces.Processes.Segment.Segment_Writable);
+         Forget (Region);
          Rose.Trace.Event ("stack added");
       end;
 
@@ -146,18 +150,16 @@ package body Elf.Loader is
            Reserve_Storage
              (Bank, Rose.Words.Word_64 (Heap_Size));
       begin
-         Add_Segment
+         Add_Private_Segment
            (Item          => Process,
             Virtual_Base  => Heap_Base / Rose.Limits.Page_Size,
             Virtual_Bound => (Heap_Base + Heap_Size) / Rose.Limits.Page_Size,
             Region        => Region,
-            Region_Offset => 0,
             Flags         =>
               Rose.Interfaces.Processes.Segment.Segment_Readable
             + Rose.Interfaces.Processes.Segment.Segment_Writable
-            + Rose.Interfaces.Processes.Segment.Segment_Resizable
-            + Rose.Interfaces.Processes.Segment.Segment_Private);
-         Close (Region);
+            + Rose.Interfaces.Processes.Segment.Segment_Resizable);
+         Forget (Region);
          Rose.Trace.Event ("heap added");
       end;
    end Load_Elf_Image;
@@ -168,7 +170,7 @@ package body Elf.Loader is
 
    procedure Process_Program_Header
      (Top_Bank    : Bank_Client;
-      Image_Region : Region_Client;
+      Image_Region : Region_Access_Client;
       Process      : Process_Client;
       Base_Object  : Rose.Objects.Object_Id;
       Segment_Type : Elf.Format.Program_Header_Type;
@@ -185,9 +187,7 @@ package body Elf.Loader is
       use Elf.Format;
       Segment_Base  : Rose.Objects.Object_Id;
       Segment_Bound : Rose.Objects.Object_Id;
-      Region_Offset : Rose.Words.Word_32;
       Virtual_Bound : constant Word := V_Address + Memory_Size;
-      Region        : Region_Client := Image_Region;
       Flags         : Word;
    begin
       case Segment_Type is
@@ -202,28 +202,24 @@ package body Elf.Loader is
                  then Rose.Interfaces.Processes.Segment.Segment_Executable
                  else 0);
 
+            --  A read-only segment is mapped from the program's image,
+            --  which all its processes share, and which none of them
+            --  owns. A writable one has storage of its own, which elf
+            --  hands to the process, and forgets (#403).
+
             if not Writable then
-               Segment_Base :=
-                 Base_Object +
-                   Rose.Objects.Object_Id (File_Offset)
-                 / Rose.Limits.Page_Size;
-               Segment_Bound :=
-                 Segment_Base +
-                   Rose.Objects.Object_Id (File_Size - 1)
-                 / Rose.Limits.Page_Size
-                 + 1;
-               Region_Offset := File_Offset;
+               Add_Segment
+                 (Item          => Process,
+                  Virtual_Base  => V_Address / Rose.Limits.Page_Size,
+                  Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
+                  Region        => Image_Region,
+                  Region_Offset => File_Offset,
+                  Flags         => Flags);
             else
-               Region :=
-                 Reserve_Storage
-                   (Top_Bank, Word_64 (Memory_Size));
-               Region_Offset := 0;
-               Rose.Trace.Event ("storage reserved, bytes ",
-                                 Natural (Memory_Size));
-
-               Get_Range (Region, Segment_Base, Segment_Bound);
-
                declare
+                  Region : Region_Client :=
+                             Reserve_Storage
+                               (Top_Bank, Word_64 (Memory_Size));
                   Offset      : Word_32 := 0;
                   Image_Start : constant Rose.Objects.Object_Id :=
                                   Rose.Objects.Object_Id
@@ -232,6 +228,11 @@ package body Elf.Loader is
                   Page        : System.Storage_Elements.Storage_Array
                     (1 .. Rose.Limits.Page_Size);
                begin
+                  Rose.Trace.Event ("storage reserved, bytes ",
+                                    Natural (Memory_Size));
+
+                  Get_Range (Region, Segment_Base, Segment_Bound);
+
                   while Offset < File_Size loop
                      Page_Offset :=
                        Rose.Objects.Object_Id (Offset / Rose.Limits.Page_Size);
@@ -242,27 +243,16 @@ package body Elf.Loader is
                   end loop;
                   Rose.Trace.Event ("segment copied, bytes ",
                                     Natural (File_Size));
+
+                  Add_Private_Segment
+                    (Item          => Process,
+                     Virtual_Base  => V_Address / Rose.Limits.Page_Size,
+                     Virtual_Bound =>
+                       Virtual_Bound / Rose.Limits.Page_Size + 1,
+                     Region        => Region,
+                     Flags         => Flags);
+                  Forget (Region);
                end;
-            end if;
-
-            --  A read-only segment is mapped from the program's image,
-            --  which all its processes share. A writable one has storage
-            --  of its own, which belongs to the process.
-
-            Add_Segment
-              (Item         => Process,
-               Virtual_Base => V_Address / Rose.Limits.Page_Size,
-               Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
-               Region       => Region,
-               Region_Offset => Region_Offset,
-               Flags        =>
-                 Flags
-               + (if Writable then Rose.Interfaces.Processes.Segment
-                 .Segment_Private
-                  else 0));
-
-            if Writable then
-               Close (Region);
             end if;
 
          when others =>
@@ -275,7 +265,7 @@ package body Elf.Loader is
    ----------
 
    procedure Read
-     (Region : Region_Client;
+     (Region : Region_Access_Client;
       Base   : Rose.Objects.Object_Id;
       Offset : System.Storage_Elements.Storage_Count;
       Item   : System.Address;
@@ -317,7 +307,7 @@ package body Elf.Loader is
    -----------------
 
    procedure Read_Header
-     (Region : Region_Client;
+     (Region : Region_Access_Client;
       Base   : Rose.Objects.Object_Id;
       Header : out Elf.Format.Elf_Header)
    is
@@ -333,7 +323,7 @@ package body Elf.Loader is
 
    procedure Scan_Program_Headers
      (Bank      : Bank_Client;
-      Region     : Region_Client;
+      Region     : Region_Access_Client;
       Base       : Rose.Objects.Object_Id;
       Process    : Process_Client;
       Header     : Elf.Format.Elf_Header;

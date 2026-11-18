@@ -14,7 +14,7 @@ interface Screens.Surface : Common.Resource is
    --  The surface's size in pixels. It changes only when a Size event
    --  has been sent, and the old buffer is no longer the surface's then.
 
-   function Get_Buffer return interface Storage.Region;
+   function Get_Buffer return interface Storage.Region_Access;
    --  The pixels, one 32-bit word each, XRGB (the top byte is unused),
    --  row by row from the top left, with no padding between rows: Width
    --  by Height words. The client and the server share it: each maps it

@@ -40,6 +40,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-replacer.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacer-server.o \
 	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region_access-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-dependent.o \
