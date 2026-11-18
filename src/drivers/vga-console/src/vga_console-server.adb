@@ -221,7 +221,8 @@ package body VGA_Console.Server is
    overriding function Event_Listener_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of
+         (Server_Context, Item));
 
    --------------
    -- On_Event --
@@ -296,7 +297,8 @@ package body VGA_Console.Server is
    overriding function Restorable_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of
+         (Server_Context, Item));
 
    --------------
    -- Restored --
@@ -383,7 +385,8 @@ package body VGA_Console.Server is
      (Item : in out Console)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Screens.Terminal.Stream_Interface));
+         (Server_Context, Item,
+          Rose.Interfaces.Screens.Terminal.Stream_Interface));
 
    -----------------------
    -- Reader_Cap --
@@ -393,7 +396,8 @@ package body VGA_Console.Server is
      (Item : in out Console)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Screens.Terminal.Reader_Interface));
+         (Server_Context, Item,
+          Rose.Interfaces.Screens.Terminal.Reader_Interface));
 
    -----------------------
    -- Writer_Cap --
@@ -403,7 +407,8 @@ package body VGA_Console.Server is
      (Item : in out Console)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of
-         (Item, Rose.Interfaces.Screens.Terminal.Writer_Interface));
+         (Server_Context, Item,
+          Rose.Interfaces.Screens.Terminal.Writer_Interface));
 
    ------------------
    -- Terminal_Cap --
@@ -412,7 +417,7 @@ package body VGA_Console.Server is
    overriding function Terminal_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Screens.Terminal.Server.Cap_Of (Server_Context, Item));
 
    ---------------------
    -- Unblock_Readers --

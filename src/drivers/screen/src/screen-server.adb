@@ -174,7 +174,8 @@ package body Screen.Server is
    overriding function Event_Listener_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Devices.Event_Listener.Server.Cap_Of
+         (Server_Context, Item));
 
    ------------------
    -- Event_Queued --
@@ -210,7 +211,8 @@ package body Screen.Server is
       pragma Unreferenced (Item);
    begin
       return Rose.Interfaces.Streams.Reader.Client.From_Cap
-        (Rose.Interfaces.Streams.Reader.Server.Cap_Of (The_Events));
+        (Rose.Interfaces.Streams.Reader.Server.Cap_Of
+           (Server_Context, The_Events));
    end Events;
 
    ----------------
@@ -357,7 +359,8 @@ package body Screen.Server is
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Screens.Surface.Server.Cap_Of
-         (Item, Rose.Interfaces.Screens.Surface.Resource_Interface));
+         (Server_Context, Item,
+          Rose.Interfaces.Screens.Surface.Resource_Interface));
 
    --------------------
    -- Restorable_Cap --
@@ -366,7 +369,8 @@ package body Screen.Server is
    overriding function Restorable_Cap
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of
+         (Server_Context, Item));
 
    --------------
    -- Restored --
@@ -459,7 +463,7 @@ package body Screen.Server is
    overriding function Reader_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Streams.Reader.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Streams.Reader.Server.Cap_Of (Server_Context, Item));
 
    -----------------
    -- Surface_Cap --
@@ -468,6 +472,6 @@ package body Screen.Server is
    overriding function Surface_Cap
      (Item : in out Screen_Surface)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Screens.Surface.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Screens.Surface.Server.Cap_Of (Server_Context, Item));
 
 end Screen.Server;

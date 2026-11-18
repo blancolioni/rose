@@ -98,7 +98,7 @@
 16#E01C_44C1_0774_98B2#  rose.interfaces.processes.exec.set_standard_output(in interface rose.interfaces.streams.writer)
 16#6E52_F187_9C24_D3BA#  rose.interfaces.processes.exec.update(in interface rose.interfaces.streams.reader; in string; in capability_array) return interface rose.interfaces.processes.launch
 16#6C9E_B934_8DF2_AEF4#  interface rose.interfaces.processes.executable
-16#D3E3_185D_0930_AF4D#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region; in interface rose.interfaces.storage.bank; in capability_array) return interface rose.interfaces.processes.process
+16#C9CB_3DDE_9E7A_FD8E#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region; in interface rose.interfaces.storage.bank; in capability_array) return interface rose.interfaces.processes.process_control
 16#53C7_2837_9CAC_1956#  rose.interfaces.processes.executable.launch_command(in string; in interface rose.interfaces.storage.region; in interface rose.interfaces.storage.bank; in capability_array) return capability
 16#7F9B_F7DF_57D0_313D#  interface rose.interfaces.processes.heap
 16#BF6F_403E_B61F_E95C#  rose.interfaces.processes.heap.current_bound return word
@@ -108,7 +108,7 @@
 16#FFA5_351D_B0E0_169C#  rose.interfaces.processes.kernel_process.fault
 16#4020_FF38_FC39_CE22#  rose.interfaces.processes.kernel_process.notify(in word_32)
 16#E6FB_FE14_8616_BA1A#  interface rose.interfaces.processes.launch
-16#DDEE_D8AD_E6CD_A654#  rose.interfaces.processes.launch.launch(in capability; in capability_array) return interface rose.interfaces.processes.process
+16#8F2B_70B2_BE3E_58FC#  rose.interfaces.processes.launch.launch(in capability; in capability_array) return interface rose.interfaces.processes.process_control
 16#63E3_3AC6_7DBE_3EA0#  rose.interfaces.processes.launch.launch_command(in capability; in capability_array) return capability
 16#BB1B_7FDF_38D4_76A7#  rose.interfaces.processes.launch.metadata return string
 16#6677_ED47_797E_0AE8#  interface rose.interfaces.processes.memory
@@ -123,8 +123,10 @@
 16#C353_4F25_4299_7779#  interface rose.interfaces.processes.process
 16#D79B_C2CA_81C9_6FBC#  rose.interfaces.processes.process.heap_interface return interface rose.interfaces.processes.heap
 16#D969_D83E_E234_B149#  rose.interfaces.processes.process.bank return interface rose.interfaces.storage.bank
+16#C937_9278_3F4D_AFC9#  rose.interfaces.processes.process.control_cap return interface rose.interfaces.processes.process_control
 16#FCEA_1B0A_8323_759B#  rose.interfaces.processes.process.exit_process(in natural)
 16#E608_B425_76C7_13B0#  rose.interfaces.processes.process.publish_interface(in capability)
+16#21B8_8A78_349F_E4A8#  interface rose.interfaces.processes.process_control
 16#EB40_6EAA_1BE6_0EB4#  interface rose.interfaces.processes.replaceable
 16#C7AD_7AFE_C5F3_009C#  rose.interfaces.processes.replaceable.caps return interface rose.interfaces.caps.releasable_cap_set
 16#2641_A82F_B3F0_DC45#  rose.interfaces.processes.replaceable.replies return interface rose.interfaces.caps.releasable_cap_set

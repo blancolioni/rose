@@ -79,6 +79,8 @@ package body Rose.Replacement is
 
    --  The reader of one State: a snapshot, which Release frees.
 
+   Server_Context : access Rose.Server.Server_Context;
+
    type State_Reader is
      new Rose.Interfaces.Streams.Releasable_Reader.Server
        .Releasable_Reader_Interface with
@@ -95,18 +97,21 @@ package body Rose.Replacement is
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Releasable_Reader.Reader_Interface));
+         (Server_Context.all, Item,
+          Rose.Interfaces.Streams.Releasable_Reader.Reader_Interface));
 
    overriding function Resource_Cap
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Releasable_Reader.Resource_Interface));
+         (Server_Context.all, Item,
+          Rose.Interfaces.Streams.Releasable_Reader.Resource_Interface));
 
    overriding function Releasable_Reader_Cap
      (Item : in out State_Reader)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
+         (Server_Context.all, Item));
 
    overriding procedure Read
      (Item   : in out State_Reader;
@@ -124,13 +129,15 @@ package body Rose.Replacement is
    overriding function Replaceable_Cap
      (Item : in out Replaceable_Server)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Replaceable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
+         (Server_Context.all, Item));
 
    overriding function Saveable_Cap
      (Item : in out Replaceable_Server)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
-         (Item, Rose.Interfaces.Processes.Replaceable.Saveable_Interface));
+         (Server_Context.all, Item,
+          Rose.Interfaces.Processes.Replaceable.Saveable_Interface));
 
    overriding function State
      (Item : in out Replaceable_Server)
@@ -148,7 +155,6 @@ package body Rose.Replacement is
         Class;
 
    The_Server     : aliased Replaceable_Server;
-   Server_Context : access Rose.Server.Server_Context;
    Writer         : Write_State_Procedure;
    Constructor    : Rose.Interfaces.Caps.Constructor.Client.Constructor_Client;
    Attached       : Boolean := False;
@@ -618,7 +624,7 @@ package body Rose.Replacement is
    begin
       return Identifier =
         Rose.Interfaces.Processes.Replaceable.Server
-          .Identifier_Of (The_Server'Access)
+          .Identifier_Of (Server_Context.all, The_Server'Access)
         or else Reader_Ids.Contains (Identifier);
    end Is_Handover_Call;
 
@@ -760,7 +766,8 @@ package body Rose.Replacement is
       if not Attached then
          return Rose.Capabilities.Null_Capability;
       end if;
-      return Rose.Interfaces.Processes.Replaceable.Server.Cap_Of (The_Server);
+      return Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
+        (Server_Context.all, The_Server);
    end Replaceable_Cap;
 
    -------------
@@ -882,7 +889,8 @@ package body Rose.Replacement is
          return Rose.Capabilities.Null_Capability;
       end if;
       return Rose.Interfaces.Processes.Replaceable.Server.Cap_Of
-        (The_Server, Rose.Interfaces.Processes.Replaceable.Saveable_Interface);
+        (Server_Context.all, The_Server,
+         Rose.Interfaces.Processes.Replaceable.Saveable_Interface);
    end Saveable_Cap;
 
    -----------
@@ -944,10 +952,11 @@ package body Rose.Replacement is
         (Server_Context.all, Reader);
       Reader.Identifier :=
         Rose.Interfaces.Streams.Releasable_Reader.Server
-          .Identifier_Of (Reader);
+          .Identifier_Of (Server_Context.all, Reader);
       Reader_Ids.Append (Reader.Identifier);
       return Rose.Interfaces.Streams.Releasable_Reader.Client.From_Cap
-        (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of (Reader.all));
+        (Rose.Interfaces.Streams.Releasable_Reader.Server.Cap_Of
+           (Server_Context.all, Reader.all));
    end State;
 
    ---------------

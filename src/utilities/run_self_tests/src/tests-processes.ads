@@ -8,9 +8,11 @@ package Tests.Processes is
    --  sub-bank, and check that the server's caps then fail. A process
    --  that exec launched always has a bank of its own, so it fails
    --  without one.
-   --  Launch a file, and end its process through the Process interface
-   --  that Launch returned (#424). Check that the file's caps then fail
-   --  (#320), and that the ended process's cap doesn't reach a process
-   --  launched after it.
+   --  Launch a probe, and end its process through the Process_Control
+   --  cap that Launch returned (#424). Check that the cap answers only
+   --  Process_Control's operations, and not the probe's own Process
+   --  ones (#99), that the probe's caps fail once it has ended (#320),
+   --  and that the ended process's cap doesn't reach a process launched
+   --  after it.
 
 end Tests.Processes;

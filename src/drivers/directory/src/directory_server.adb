@@ -429,7 +429,8 @@ package body Directory_Server is
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of
-         (Item, Rose.Interfaces.Files.Writable_Directory.Directory_Interface));
+         (Context, Item,
+          Rose.Interfaces.Files.Writable_Directory.Directory_Interface));
 
    ---------------------------
    -- Directory_Entry_Count --
@@ -850,7 +851,7 @@ package body Directory_Server is
    overriding function Writable_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of (Context, Item));
 
    -----------------
    -- Write_State --
@@ -865,7 +866,7 @@ package body Directory_Server is
       Rose.Objects.Capability_Identifier'Write
         (Stream,
          Rose.Interfaces.Files.Writable_Directory.Server.Identifier_Of
-           (The_Directory'Access));
+           (Context, The_Directory'Access));
       Natural'Write (Stream, Entry_Count);
 
       for Index in 1 .. Entry_Count loop

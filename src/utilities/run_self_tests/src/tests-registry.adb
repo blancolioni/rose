@@ -7,7 +7,7 @@ with Rose.Core.File_Client;
 
 with Rose.Interfaces.Commands.Lookup.Client;
 with Rose.Interfaces.Objects;
-with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Process_Control;
 
 package body Tests.Registry is
 
@@ -127,7 +127,8 @@ package body Tests.Registry is
    is
       Program : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Launcher (Name);
-      Process : Rose.Interfaces.Processes.Process.Process_Object'Class :=
+      Process : Rose.Interfaces.Processes.Process_Control
+        .Process_Control_Object'Class :=
         Program.Launch (Rose.System_Calls.Own_Bank.Cap, Caps);
       use type Rose.Capabilities.Capability;
    begin
@@ -135,7 +136,7 @@ package body Tests.Registry is
       --  Elf answers a launch that fails with the null cap, for example
       --  when the kernel's process table is full (#724).
 
-      if Process.Process_Cap = Rose.Capabilities.Null_Capability then
+      if Process.Process_Control_Cap = Rose.Capabilities.Null_Capability then
          return Rose.Capabilities.Null_Capability;
       end if;
 

@@ -7,7 +7,7 @@ with Rose.Words;
 
 with Rose.Interfaces.Processes.Exec;
 with Rose.Interfaces.Commands.Map;
-with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Process_Control;
 
 with Rose.Invocation;
 with Rose.System_Calls;
@@ -178,15 +178,16 @@ package body Init.Run is
          return Rose.Capabilities.Capability
       is
          Caps          : Init.Calls.Array_Of_Capabilities
-           (1 .. Rose.Interfaces.Processes.Process.Subprogram_Count);
+           (1 .. Rose.Interfaces.Processes.Process_Control.Subprogram_Count);
          Public_Cap    : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := Null_Capability;
       begin
-         --  get process interface caps
+         --  The caps of the Process_Control interface that elf's launch
+         --  returns (#99).
          Init.Calls.Open_Interface (Process_Cap, Caps);
 
          Public_Cap :=
-           Caps (Rose.Interfaces.Processes.Process
+           Caps (Rose.Interfaces.Processes.Process_Control
              .Published_Interface_Index + 1);
 
          if Public_Cap /= Null_Capability then

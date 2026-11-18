@@ -26,9 +26,9 @@ DIRS="$DIRS build/gnat-src"
 
 IDLE=${IDLE:-idle}
 INTERFACES="processes-process processes-heap caps-cap_set processes-segment
-    processes-server caps-cap storage-region streams-reader
-    streams-writer storage-bank storage-dependent common-resource
-    processes-signalled"
+    processes-server processes-process_control caps-cap storage-region
+    streams-reader streams-writer storage-bank storage-dependent
+    common-resource processes-signalled"
 mkdir -p build/idl build/interfaces
 rm -f build/interfaces/*.ads
 IDL_FILES=""

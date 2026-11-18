@@ -13,7 +13,8 @@ IDL=caps-cap storage-block_array files-file_system files-directory \
     devices-interrupt_handler processes-launch processes-exec \
     storage-region processes-executable processes-memory \
     checkpoints-memory_restore processes-process processes-segment \
-    processes-server time-timeout time-timer caps-constructor \
+    processes-server processes-process_control time-timeout \
+    time-timer caps-constructor \
     caps-cap_set caps-releasable_cap_set screens-terminal \
     devices-event_source devices-event_listener commands-lookup \
     commands-map processes-heap caps-receiver common-named \

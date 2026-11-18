@@ -15,11 +15,27 @@ package body Rose.Server is
    --  Call the handler of each bit in Signalled.Signal's first word.
 
    procedure Add_Handler
-     (Context  : in out Server_Context;
-      Endpoint : Rose.Objects.Endpoint_Id;
-      Handler  : Invocation_Handler;
-      Owns     : Owner_Function);
-   --  Register_Handler, with or without Owns.
+     (Context      : in out Server_Context;
+      Endpoint     : Rose.Objects.Endpoint_Id;
+      Handler      : Invocation_Handler;
+      Owns         : Owner_Function;
+      With_Context : Context_Handler;
+      Context_Owns : Context_Owner_Function);
+   --  Register_Handler, with or without Owns, or Register_Context_Handler.
+
+   function Serves
+     (Context    : Server_Context;
+      Rec        : Endpoint_Record;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  True if the handler of Rec serves the object Identifier.
+
+   procedure Call_Handler
+     (Context      : in out Server_Context;
+      Handler      : Invocation_Handler;
+      With_Context : Context_Handler;
+      Params       : in out Rose.Invocation.Invocation_Record);
+   --  Call whichever of Handler and With_Context is not null.
 
    type Identifier_Set is
      array (Rose.Objects.Capability_Identifier) of Boolean
@@ -37,10 +53,12 @@ package body Rose.Server is
    -----------------
 
    procedure Add_Handler
-     (Context  : in out Server_Context;
-      Endpoint : Rose.Objects.Endpoint_Id;
-      Handler  : Invocation_Handler;
-      Owns     : Owner_Function)
+     (Context      : in out Server_Context;
+      Endpoint     : Rose.Objects.Endpoint_Id;
+      Handler      : Invocation_Handler;
+      Owns         : Owner_Function;
+      With_Context : Context_Handler;
+      Context_Owns : Context_Owner_Function)
    is
       use type Rose.Capabilities.Capability;
       use type Rose.Objects.Endpoint_Id;
@@ -75,12 +93,30 @@ package body Rose.Server is
       Context.Endpoint_Count := Context.Endpoint_Count + 1;
       Context.Endpoints (Context.Endpoint_Count) :=
         Endpoint_Record'
-          (Endpoint => Endpoint,
-           Handler  => Handler,
-           Owns     => Owns,
-           Blocked  => False,
-           Params   => <>);
+          (Endpoint     => Endpoint,
+           Handler      => Handler,
+           Owns         => Owns,
+           With_Context => With_Context,
+           Context_Owns => Context_Owns,
+           Blocked      => False,
+           Params       => <>);
    end Add_Handler;
+
+   ---------------
+   -- Add_Table --
+   ---------------
+
+   procedure Add_Table
+     (Context      : in out Server_Context;
+      Interface_Id : Rose.Objects.Endpoint_Id;
+      Table        : not null Interface_Table_Access)
+   is
+   begin
+      Context.Tables.Append
+        (Table_Record'
+           (Interface_Id => Interface_Id,
+            Table        => Table));
+   end Add_Table;
 
    ---------------------------
    -- Block_Current_Request --
@@ -92,6 +128,24 @@ package body Rose.Server is
    begin
       Context.Block_Reply := True;
    end Block_Current_Request;
+
+   ------------------
+   -- Call_Handler --
+   ------------------
+
+   procedure Call_Handler
+     (Context      : in out Server_Context;
+      Handler      : Invocation_Handler;
+      With_Context : Context_Handler;
+      Params       : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      if With_Context /= null then
+         With_Context (Context, Params);
+      else
+         Handler (Params);
+      end if;
+   end Call_Handler;
 
    -------------------------------
    -- Create_Anonymous_Endpoint --
@@ -137,8 +191,7 @@ package body Rose.Server is
             Rec : Endpoint_Record renames Context.Endpoints (I);
          begin
             if Rec.Endpoint = Params.Endpoint
-              and then (Rec.Owns = null
-                        or else Rec.Owns (Params.Identifier))
+              and then Serves (Context, Rec, Params.Identifier)
             then
                if not Rec.Blocked then
                   Rec.Blocked := True;
@@ -358,12 +411,12 @@ package body Rose.Server is
                end if;
 
                if Rec.Endpoint = Params.Endpoint
-                 and then (Rec.Owns = null
-                           or else Rec.Owns (Params.Identifier))
+                 and then Serves (Context, Rec, Params.Identifier)
                then
-                  if Rec.Handler /= null then
+                  if Rec.Handler /= null or else Rec.With_Context /= null then
                      Context.Block_Reply := False;
-                     Rec.Handler (Params);
+                     Call_Handler
+                       (Context, Rec.Handler, Rec.With_Context, Params);
                      if Context.Block_Reply then
                         Rec.Blocked := True;
                         Rec.Params := Saved_Params;
@@ -399,6 +452,20 @@ package body Rose.Server is
 
    end Receive_Message;
 
+   ------------------------------
+   -- Register_Context_Handler --
+   ------------------------------
+
+   procedure Register_Context_Handler
+     (Context  : in out Server_Context;
+      Endpoint : Rose.Objects.Endpoint_Id;
+      Handler  : Context_Handler;
+      Owns     : Context_Owner_Function)
+   is
+   begin
+      Add_Handler (Context, Endpoint, null, null, Handler, Owns);
+   end Register_Context_Handler;
+
    ----------------------
    -- Register_Handler --
    ----------------------
@@ -409,7 +476,7 @@ package body Rose.Server is
       Handler  : Invocation_Handler)
    is
    begin
-      Add_Handler (Context, Endpoint, Handler, null);
+      Add_Handler (Context, Endpoint, Handler, null, null, null);
    end Register_Handler;
 
    ----------------------
@@ -423,7 +490,7 @@ package body Rose.Server is
       Owns     : Owner_Function)
    is
    begin
-      Add_Handler (Context, Endpoint, Handler, Owns);
+      Add_Handler (Context, Endpoint, Handler, Owns, null, null);
    end Register_Handler;
 
    ---------------------
@@ -446,6 +513,26 @@ package body Rose.Server is
          Instance.Instances.Delete (Position);
       end if;
    end Remove_Instance;
+
+   ------------
+   -- Serves --
+   ------------
+
+   function Serves
+     (Context    : Server_Context;
+      Rec        : Endpoint_Record;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+   begin
+      if Rec.Context_Owns /= null then
+         return Rec.Context_Owns (Context, Identifier);
+      elsif Rec.Owns /= null then
+         return Rec.Owns (Identifier);
+      else
+         return True;
+      end if;
+   end Serves;
 
    ----------------------
    -- Set_Instance_Cap --
@@ -526,6 +613,25 @@ package body Rose.Server is
       end loop;
    end Start_Server;
 
+   -----------
+   -- Table --
+   -----------
+
+   function Table
+     (Context      : Server_Context;
+      Interface_Id : Rose.Objects.Endpoint_Id)
+      return Interface_Table_Access
+   is
+      use type Rose.Objects.Endpoint_Id;
+   begin
+      for Item of Context.Tables loop
+         if Item.Interface_Id = Interface_Id then
+            return Item.Table;
+         end if;
+      end loop;
+      return null;
+   end Table;
+
    ----------------------
    -- Unblock_Endpoint --
    ----------------------
@@ -554,9 +660,10 @@ package body Rose.Server is
             end if;
 
             if Rec.Endpoint = Endpoint and then Rec.Blocked then
-               if Rec.Handler /= null then
+               if Rec.Handler /= null or else Rec.With_Context /= null then
                   Params := Rec.Params;
-                  Rec.Handler (Params);
+                  Call_Handler
+                    (Context, Rec.Handler, Rec.With_Context, Params);
                   if not Context.Block_Reply then
                      Rec.Blocked := False;
                   end if;

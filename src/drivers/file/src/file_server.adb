@@ -104,6 +104,8 @@ package body File_Server is
 
    --  The file is an object served through Writable_File.
 
+   Context : aliased Rose.Server.Server_Context;
+
    type File_Object is
      limited new File_Interfaces.Writable_File_Interface with null record;
 
@@ -111,12 +113,12 @@ package body File_Server is
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
    is (File_Interfaces.Cap_Of
-         (Item, Rose.Interfaces.Files.Writable_File.File_Interface));
+         (Context, Item, Rose.Interfaces.Files.Writable_File.File_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
-   is (File_Interfaces.Cap_Of (Item));
+   is (File_Interfaces.Cap_Of (Context, Item));
 
    overriding function Size
      (Item : in out File_Object)
@@ -163,27 +165,29 @@ package body File_Server is
    overriding function File_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.File_Interface));
+   is (Version_Server.Cap_Of (Context, Item, Versions.File_Interface));
 
    overriding function Writable_File_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.Writable_File_Interface));
+   is (Version_Server.Cap_Of
+         (Context, Item, Versions.Writable_File_Interface));
 
    overriding function Transactional_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.Transactional_Interface));
+   is (Version_Server.Cap_Of
+         (Context, Item, Versions.Transactional_Interface));
 
    overriding function Resource_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item, Versions.Resource_Interface));
+   is (Version_Server.Cap_Of (Context, Item, Versions.Resource_Interface));
 
    overriding function Transactional_Writable_File_Cap
      (Item : in out Version_Object)
       return Rose.Capabilities.Capability
-   is (Version_Server.Cap_Of (Item));
+   is (Version_Server.Cap_Of (Context, Item));
 
    overriding function Size
      (Item : in out Version_Object)
@@ -255,31 +259,34 @@ package body File_Server is
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Seekable_Reader.Reader_Interface));
+         (Context, Item,
+          Rose.Interfaces.Streams.Seekable_Reader.Reader_Interface));
 
    overriding function Resource_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Seekable_Reader.Resource_Interface));
+         (Context, Item,
+          Rose.Interfaces.Streams.Seekable_Reader.Resource_Interface));
 
    overriding function Releasable_Reader_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Seekable_Reader
+         (Context, Item, Rose.Interfaces.Streams.Seekable_Reader
            .Releasable_Reader_Interface));
 
    overriding function Seekable_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
    is (Reader_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Seekable_Reader.Seekable_Interface));
+         (Context, Item,
+          Rose.Interfaces.Streams.Seekable_Reader.Seekable_Interface));
 
    overriding function Seekable_Reader_Cap
      (Item : in out Reader_Object)
       return Rose.Capabilities.Capability
-   is (Reader_Server.Cap_Of (Item));
+   is (Reader_Server.Cap_Of (Context, Item));
 
    overriding procedure Read
      (Item   : in out Reader_Object;
@@ -324,18 +331,20 @@ package body File_Server is
      (Item : in out Writer_Object)
       return Rose.Capabilities.Capability
    is (Writer_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Releasable_Writer.Writer_Interface));
+         (Context, Item,
+          Rose.Interfaces.Streams.Releasable_Writer.Writer_Interface));
 
    overriding function Resource_Cap
      (Item : in out Writer_Object)
       return Rose.Capabilities.Capability
    is (Writer_Server.Cap_Of
-         (Item, Rose.Interfaces.Streams.Releasable_Writer.Resource_Interface));
+         (Context, Item,
+          Rose.Interfaces.Streams.Releasable_Writer.Resource_Interface));
 
    overriding function Releasable_Writer_Cap
      (Item : in out Writer_Object)
       return Rose.Capabilities.Capability
-   is (Writer_Server.Cap_Of (Item));
+   is (Writer_Server.Cap_Of (Context, Item));
 
    overriding procedure Write
      (Item   : in out Writer_Object;
@@ -348,7 +357,6 @@ package body File_Server is
 
    Ended_Version : exception;
 
-   Context     : aliased Rose.Server.Server_Context;
    The_File    : aliased File_Object;
    The_Version : aliased Version_Object;
    Readers     : Reader_Access;
@@ -902,7 +910,7 @@ package body File_Server is
    begin
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
-        (Stream, File_Interfaces.Identifier_Of (The_File'Access));
+        (Stream, File_Interfaces.Identifier_Of (Context, The_File'Access));
       Write_Contents (Stream, File_Buffer, Lengths (File_Buffer));
       Write_Contents
         (Stream, Version_Buffer,
@@ -910,7 +918,8 @@ package body File_Server is
       Boolean'Write (Stream, The_Version.Open);
       if The_Version.Open then
          Rose.Objects.Capability_Identifier'Write
-           (Stream, Version_Server.Identifier_Of (The_Version'Access));
+           (Stream, Version_Server.Identifier_Of
+              (Context, The_Version'Access));
       end if;
 
       while Reader /= null loop
@@ -924,7 +933,7 @@ package body File_Server is
       while Reader /= null loop
          if Reader.Open then
             Rose.Objects.Capability_Identifier'Write
-              (Stream, Reader_Server.Identifier_Of (Reader));
+              (Stream, Reader_Server.Identifier_Of (Context, Reader));
             Buffer_Index'Write (Stream, Reader.Buffer);
             Boolean'Write (Stream, Reader.Ended);
             Storage_Count'Write (Stream, Reader.Position);
@@ -944,7 +953,7 @@ package body File_Server is
       while Writer /= null loop
          if Writer.Open then
             Rose.Objects.Capability_Identifier'Write
-              (Stream, Writer_Server.Identifier_Of (Writer));
+              (Stream, Writer_Server.Identifier_Of (Context, Writer));
             Buffer_Index'Write (Stream, Writer.Buffer);
             Boolean'Write (Stream, Writer.Ended);
          end if;

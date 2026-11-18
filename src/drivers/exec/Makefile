@@ -20,6 +20,7 @@ exec:
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/processes-segment.idl \
 	    $(INTERFACES)/processes-server.idl \

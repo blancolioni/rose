@@ -38,6 +38,7 @@ run_self_tests:
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl \
 	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/processes-segment.idl \
 	    $(INTERFACES)/processes-server.idl \
 	    $(INTERFACES)/caps-cap.idl \

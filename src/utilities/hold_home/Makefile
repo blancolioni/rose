@@ -19,6 +19,7 @@ hold_home:
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/processes-launch.idl \
 	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/common-resource.idl \

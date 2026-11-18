@@ -151,7 +151,8 @@ package body Rights_Server is
 
    function Admin_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of (The_Admin);
+      return Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of
+        (Context, The_Admin);
    end Admin_Cap;
 
    -----------
@@ -216,7 +217,7 @@ package body Rights_Server is
    overriding function Clock_Admin_Cap
      (Item : in out Grant_Object)
       return Rose.Capabilities.Capability
-   is (Clock_Admin_Server.Cap_Of (Item));
+   is (Clock_Admin_Server.Cap_Of (Context, Item));
 
    ---------------
    -- Clock_Cap --
@@ -226,7 +227,7 @@ package body Rights_Server is
      (Item : in out Grant_Object)
       return Rose.Capabilities.Capability
    is (Clock_Admin_Server.Cap_Of
-         (Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
+         (Context, Item, Rose.Interfaces.Time.Clock_Admin.Clock_Interface));
 
    -------------------
    -- Create_Server --
@@ -452,7 +453,7 @@ package body Rights_Server is
       Clock_Admin_Server.Attach (Context, Grants (Slot));
 
       Grant := Next_Number;
-      Granted := Clock_Admin_Server.Cap_Of (Grants (Slot).all);
+      Granted := Clock_Admin_Server.Cap_Of (Context, Grants (Slot).all);
       Next_Number := Next_Number + 1;
 
       Report ("granted");
@@ -465,7 +466,7 @@ package body Rights_Server is
    overriding function Restorable_Cap
      (Item : in out Broker_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
 
    --------------
    -- Restored --
@@ -501,7 +502,7 @@ package body Rights_Server is
    overriding function Rights_Admin_Cap
      (Item : in out Admin_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Rights_Admin.Server.Cap_Of (Context, Item));
 
    ----------------
    -- Rights_Cap --
@@ -509,7 +510,7 @@ package body Rights_Server is
 
    function Rights_Cap return Rose.Capabilities.Capability is
    begin
-      return Rose.Interfaces.Users.Rights.Server.Cap_Of (The_Broker);
+      return Rose.Interfaces.Users.Rights.Server.Cap_Of (Context, The_Broker);
    end Rights_Cap;
 
    ----------------
@@ -519,7 +520,7 @@ package body Rights_Server is
    overriding function Rights_Cap
      (Item : in out Broker_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Users.Rights.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Users.Rights.Server.Cap_Of (Context, Item));
 
    ------------------
    -- Set_Realtime --

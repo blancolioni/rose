@@ -6,6 +6,7 @@ with Rose.Limits;
 
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Processes.Heap;
+with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Processes.Process;
 with Rose.Interfaces.Storage.Process_Banks.Client;
 with Rose.Interfaces.Processes.Kernel_Process.Client;
@@ -81,6 +82,7 @@ package body Mem.Processes is
          Heap         : Rose.Capabilities.Capability;
          Server       : Rose.Capabilities.Capability;
          Interface_Cap : Rose.Capabilities.Capability := 0;
+         Control_Cap   : Rose.Capabilities.Capability := 0;
          Bank_Cap      : Rose.Capabilities.Capability := 0;
          Faults        : Fault_Count_Array;
       end record;
@@ -451,6 +453,30 @@ package body Mem.Processes is
          return P.Bank_Cap;
       end;
    end Get_Bank_Cap;
+
+   ---------------------
+   -- Get_Control_Cap --
+   ---------------------
+
+   function Get_Control_Cap
+     (Process : Process_Id)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      P : Memory_Process_Record renames Process_Table (Process);
+   begin
+      if P.Control_Cap = 0 then
+         P.Control_Cap :=
+           Rose.System_Calls.Server.Create_Endpoint
+             (Create_Cap   => Create_Endpoint_Cap,
+              Endpoint_Id  =>
+                Rose.Interfaces.Processes.Process_Control
+                  .Process_Control_Interface,
+              Identifier   => Identifier_Of (P.Oid));
+      end if;
+
+      return P.Control_Cap;
+   end Get_Control_Cap;
 
    ------------------
    -- Get_Heap_Cap --
@@ -831,6 +857,8 @@ package body Mem.Processes is
       Delete (P.Heap);
       Delete (P.Server);
       Delete (P.Interface_Cap);
+      Delete (P.Control_Cap);
+      P.Control_Cap := 0;
       Delete (P.Bank_Cap);
       P.Bank_Cap := 0;
       P.State := Available;
@@ -1166,6 +1194,7 @@ package body Mem.Processes is
               Server       => 0,
               Process      => Client,
               Interface_Cap => 0,
+              Control_Cap   => 0,
               Bank_Cap      => 0,
               Faults        => <>);
       end;
@@ -1431,6 +1460,7 @@ package body Mem.Processes is
                     (Rose.Interfaces.Processes.Kernel_Process.Client
                       .Get_Object_Id
                        (Client))),
+           Control_Cap   => 0,
            Bank_Cap      => 0,
            Faults        => <>);
 
@@ -1706,18 +1736,22 @@ package body Mem.Processes is
       Server        : constant Rose.Capabilities.Capability := A.Server;
       Interface_Cap : constant Rose.Capabilities.Capability :=
                         A.Interface_Cap;
+      Control_Cap   : constant Rose.Capabilities.Capability :=
+                        A.Control_Cap;
    begin
       A.Oid := B.Oid;
       A.Process := B.Process;
       A.Heap := B.Heap;
       A.Server := B.Server;
       A.Interface_Cap := B.Interface_Cap;
+      A.Control_Cap := B.Control_Cap;
 
       B.Oid := Oid;
       B.Process := Process;
       B.Heap := Heap;
       B.Server := Server;
       B.Interface_Cap := Interface_Cap;
+      B.Control_Cap := Control_Cap;
    end Swap_Records;
 
    ----------------

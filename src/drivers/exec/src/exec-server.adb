@@ -12,7 +12,7 @@ with Rose.System_Calls;
 with Rose.Interfaces.Processes.Exec.Server;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Processes.Launch.Server;
-with Rose.Interfaces.Processes.Process.Client;
+with Rose.Interfaces.Processes.Process_Control.Client;
 with Rose.Interfaces.Streams.Reader;
 with Rose.Interfaces.Streams.Writer;
 
@@ -23,8 +23,8 @@ package body Exec.Server is
 
    subtype Launch_Class is Rose.Interfaces.Processes.Launch
      .Launch_Object'Class;
-   subtype Process_Class is Rose.Interfaces.Processes.Process
-     .Process_Object'Class;
+   subtype Control_Class is Rose.Interfaces.Processes.Process_Control
+     .Process_Control_Object'Class;
 
    --  One object serves Exec. Each installed program is an object of its
    --  own, which serves its Launch interface; Exec's own Launch
@@ -63,7 +63,7 @@ package body Exec.Server is
      (Item : in out Exec_Object;
       Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
-      return Process_Class;
+      return Control_Class;
 
    overriding function Launch_Command
      (Item : in out Exec_Object;
@@ -88,7 +88,7 @@ package body Exec.Server is
      (Item : in out Program_Object;
       Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
-      return Process_Class;
+      return Control_Class;
 
    overriding function Launch_Command
      (Item : in out Program_Object;
@@ -187,7 +187,7 @@ package body Exec.Server is
    overriding function Exec_Cap
      (Item : in out Exec_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Exec.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Exec.Server.Cap_Of (Context, Item));
 
    -------------
    -- Install --
@@ -215,12 +215,12 @@ package body Exec.Server is
      (Item : in out Exec_Object;
       Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
-      return Process_Class
+      return Control_Class
    is
       pragma Unreferenced (Item, Bank, Caps);
    begin
       Not_A_Program;
-      return Rose.Interfaces.Processes.Process.Client.From_Cap
+      return Rose.Interfaces.Processes.Process_Control.Client.From_Cap
         (Rose.Capabilities.Null_Capability);
    end Launch;
 
@@ -232,7 +232,7 @@ package body Exec.Server is
      (Item : in out Program_Object;
       Bank : Rose.Capabilities.Capability;
       Caps : Rose.Capabilities.Capability_Array)
-      return Process_Class
+      return Control_Class
    is
       use Rose.System_Calls;
       Id     : constant Rose.Objects.Capability_Identifier :=
@@ -256,7 +256,7 @@ package body Exec.Server is
       end loop;
       Delete_Cap (Bank);
 
-      return Rose.Interfaces.Processes.Process.Client
+      return Rose.Interfaces.Processes.Process_Control.Client
         .From_Cap (Result (Params));
    end Launch;
 
@@ -268,7 +268,7 @@ package body Exec.Server is
      (Item : in out Exec_Object)
       return Rose.Capabilities.Capability
    is (Rose.Interfaces.Processes.Exec.Server.Cap_Of
-         (Item, Rose.Interfaces.Processes.Exec.Launch_Interface));
+         (Context, Item, Rose.Interfaces.Processes.Exec.Launch_Interface));
 
    ----------------
    -- Launch_Cap --
@@ -277,7 +277,7 @@ package body Exec.Server is
    overriding function Launch_Cap
      (Item : in out Program_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Processes.Launch.Server.Cap_Of (Item));
+   is (Rose.Interfaces.Processes.Launch.Server.Cap_Of (Context, Item));
 
    --------------------
    -- Launch_Command --
@@ -369,7 +369,7 @@ package body Exec.Server is
 
       return Rose.Interfaces.Processes.Launch.Client.From_Cap
         (Rose.Interfaces.Processes.Launch.Server.Cap_Of
-           (Programs (Positive (Id)).all));
+           (Context, Programs (Positive (Id)).all));
    end Launch_Of;
 
    --------------
