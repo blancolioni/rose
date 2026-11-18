@@ -33,6 +33,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-region.o \
 	$(BUILDDIR)/rose-interfaces-storage-region-client.o \
+	$(BUILDDIR)/rose-interfaces-storage-region_access-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-reader-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-server.o \

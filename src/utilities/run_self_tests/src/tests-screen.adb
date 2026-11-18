@@ -8,7 +8,7 @@ with Rose.Capabilities;
 with Rose.Shared_Regions;
 with Rose.Words;
 
-with Rose.Interfaces.Storage.Region;
+with Rose.Interfaces.Storage.Region_Access;
 with Rose.Interfaces.Screens.Surface.Client;
 
 with Tests.Registry;
@@ -72,7 +72,8 @@ package body Tests.Screen is
          --  the console's.
 
          declare
-            Region  : Rose.Interfaces.Storage.Region.Region_Object'Class :=
+            Region  : Rose.Interfaces.Storage.Region_Access
+                          .Region_Access_Object'Class :=
                         Surface.Get_Buffer;
             Address : constant System.Address :=
                         Rose.Shared_Regions.Map (Region);

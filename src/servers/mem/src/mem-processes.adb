@@ -5,6 +5,8 @@ with Rose.System_Calls.Server;
 with Rose.Limits;
 
 with Rose.Interfaces.Storage.Bank.Client;
+with Rose.Interfaces.Storage.Region.Client;
+with Rose.Interfaces.Storage.Region_Access.Client;
 with Rose.Interfaces.Processes.Heap;
 with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Processes.Process;
@@ -46,7 +48,10 @@ package body Mem.Processes is
          Base          : Rose.Addresses.Virtual_Page_Address := 0;
          Bound         : Rose.Addresses.Virtual_Page_Address := 0;
          Limit         : Rose.Addresses.Virtual_Page_Address := 0;
-         Region        : Rose.Interfaces.Storage.Region.Client.Region_Client;
+         Region        : Rose.Interfaces.Storage.Region_Access.Client
+                           .Region_Access_Client;
+         Owner         : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
          Region_Base   : Rose.Objects.Object_Id := 0;
          Region_Bound  : Rose.Objects.Object_Id := 0;
          Region_Offset : Rose.Objects.Object_Id := 0;
@@ -54,9 +59,24 @@ package body Mem.Processes is
          Private_Region : Boolean := False;
       end record;
    --  Private_Region is True if the region belongs to the process, and is
-   --  released when it is gone.
+   --  released when it is gone. Pages are read and written through
+   --  Region, a Region_Access, which can't release the region. Owner is
+   --  the cap of a private segment's Region, which mem opens only to
+   --  release it, so that a segment holds one client (#403).
 
    type Segment_Record_Array is array (Segment_Index) of Segment_Record;
+
+   procedure Open_Region
+     (Segment : in out Segment_Record;
+      Cap     : Rose.Capabilities.Capability);
+   --  Open the segment's Region from Cap, which is a Region_Access, or
+   --  for a private segment the Region itself, which is kept as Owner.
+
+   procedure Get_Range
+     (Segment : Segment_Record;
+      Base    : out Rose.Objects.Object_Id;
+      Bound   : out Rose.Objects.Object_Id;
+      Success : out Boolean);
 
    subtype Kernel_Process_Client is
      Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
@@ -173,6 +193,7 @@ package body Mem.Processes is
          Bound        => (if Resizable then Virtual_Base else Virtual_Bound),
          Limit        => Virtual_Bound,
          Region       => <>,
+         Owner        => Rose.Capabilities.Null_Capability,
          Region_Base  => 0,
          Region_Bound => 0,
          Region_Offset => 0,
@@ -195,7 +216,7 @@ package body Mem.Processes is
      (Process       : Process_Id;
       Virtual_Base  : Rose.Addresses.Virtual_Page_Address;
       Virtual_Bound : Rose.Addresses.Virtual_Page_Address;
-      Region        : Rose.Interfaces.Storage.Region.Client.Region_Client;
+      Region        : Rose.Capabilities.Capability;
       Region_Offset : Rose.Words.Word;
       Readable      : Boolean;
       Writable      : Boolean;
@@ -208,6 +229,8 @@ package body Mem.Processes is
       P : Memory_Process_Record renames Process_Table (Process);
       Region_Base : Rose.Objects.Page_Object_Id;
       Region_Bound : Rose.Objects.Page_Object_Id;
+      New_Segment  : Segment_Record;
+      Has_Range    : Boolean;
    begin
       if P.Num_Segments = Max_Segments then
          Rose.Console_IO.Put
@@ -225,15 +248,16 @@ package body Mem.Processes is
          return;
       end if;
 
-      Rose.Interfaces.Storage.Region.Client.Get_Range
-        (Region, Region_Base, Region_Bound);
+      New_Segment.Private_Region := Private_Region;
+      Open_Region (New_Segment, Region);
+      Get_Range (New_Segment, Region_Base, Region_Bound, Has_Range);
 
       --  Without its range, the segment would be read from page 0 of the
       --  store, which gives zeroes, and the process would run zeroes as
       --  code (#261). Leave the segment out, so that a fault in it is
       --  reported as an invalid page reference.
 
-      if Rose.Interfaces.Storage.Region.Client.Has_Error
+      if not Has_Range
         or else not Region_Base'Valid
         or else not Region_Bound'Valid
       then
@@ -249,7 +273,8 @@ package body Mem.Processes is
         (Base         => Virtual_Base,
          Bound        => (if Resizable then Virtual_Base else Virtual_Bound),
          Limit        => Virtual_Bound,
-         Region       => Region,
+         Region       => New_Segment.Region,
+         Owner        => New_Segment.Owner,
          Region_Base  => Region_Base,
          Region_Bound => Region_Bound,
          Region_Offset =>
@@ -329,14 +354,25 @@ package body Mem.Processes is
    procedure Close_Segment (Segment : in out Segment_Record) is
       use type Rose.Capabilities.Capability;
    begin
-      if Segment.Private_Region then
-         Rose.Interfaces.Storage.Region.Client.Release (Segment.Region);
-      end if;
-      if Rose.Interfaces.Storage.Region.Client.Get_Interface_Cap (Segment
-        .Region)
-        /= 0
+      --  Closing the process's own region releases it, since Region is
+      --  a Resource; closing a Region_Access leaves the region (#403).
+
+      if Rose.Interfaces.Storage.Region_Access.Client.Get_Interface_Cap
+        (Segment.Region) /= 0
       then
-         Rose.Interfaces.Storage.Region.Client.Close (Segment.Region);
+         Rose.Interfaces.Storage.Region_Access.Client.Close (Segment.Region);
+      end if;
+
+      if Segment.Private_Region
+        and then Segment.Owner /= Rose.Capabilities.Null_Capability
+      then
+         declare
+            Owned : Rose.Interfaces.Storage.Region.Client.Region_Client;
+         begin
+            Rose.Interfaces.Storage.Region.Client.Open (Owned, Segment.Owner);
+            Rose.Interfaces.Storage.Region.Client.Close (Owned);
+            Segment.Owner := Rose.Capabilities.Null_Capability;
+         end;
       end if;
    end Close_Segment;
 
@@ -606,6 +642,22 @@ package body Mem.Processes is
       Valid := False;
    end Get_Process_Segment;
 
+   ---------------
+   -- Get_Range --
+   ---------------
+
+   procedure Get_Range
+     (Segment : Segment_Record;
+      Base    : out Rose.Objects.Object_Id;
+      Bound   : out Rose.Objects.Object_Id;
+      Success : out Boolean)
+   is
+   begin
+      Rose.Interfaces.Storage.Region_Access.Client.Get_Range
+        (Segment.Region, Base, Bound);
+      Success := not Rose.Interfaces.Storage.Region_Access.Client.Has_Error;
+   end Get_Range;
+
    -------------------------
    -- Get_Virtual_Address --
    -------------------------
@@ -704,7 +756,7 @@ package body Mem.Processes is
                              + Segment.Region_Offset;
                begin
                   Store_Reads := Store_Reads + 1;
-                  Rose.Interfaces.Storage.Region.Client.Get
+                  Rose.Interfaces.Storage.Region_Access.Client.Get
                     (Item => Segment.Region,
                      Page => Page,
                      Data => Buffer);
@@ -1015,6 +1067,42 @@ package body Mem.Processes is
          Mem.Calls.Unload_Page (Physical, Buffer'Address);
       end;
    end New_Restored_Page;
+
+   -----------------
+   -- Open_Region --
+   -----------------
+
+   procedure Open_Region
+     (Segment : in out Segment_Record;
+      Cap     : Rose.Capabilities.Capability)
+   is
+      Access_Cap : Rose.Capabilities.Capability := Cap;
+   begin
+      if Segment.Private_Region then
+
+         --  Ask the Region for its Region_Access, which is its first
+         --  ancestor, as Rose.Interfaces.Storage.Region.Client.Conversions
+         --  .To_Region_Access does, without opening a client of the Region
+         --  itself.
+
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Cap);
+            Rose.System_Calls.Send_Word (Params, Natural (1));
+            Rose.System_Calls.Receive_Caps (Params, 1);
+            Rose.System_Calls.Invoke_Capability (Params);
+            Access_Cap :=
+              (if Params.Control.Flags (Rose.Invocation.Error)
+               then Rose.Capabilities.Null_Capability
+               else Params.Caps (0));
+         end;
+         Segment.Owner := Cap;
+      end if;
+
+      Rose.Interfaces.Storage.Region_Access.Client.Open
+        (Segment.Region, Access_Cap);
+   end Open_Region;
 
    --------------
    -- Overlaps --
@@ -1487,7 +1575,8 @@ package body Mem.Processes is
       Region        : Rose.Capabilities.Capability;
       Region_Offset : Rose.Words.Word)
    is
-      Pid : constant Process_Id := Process_Id (Mem_Pid);
+      Pid       : constant Process_Id := Process_Id (Mem_Pid);
+      Has_Range : Boolean;
    begin
       Restore_Zero_Segment (Id, Mem_Pid, Base, Bound, Limit, Flags);
 
@@ -1495,13 +1584,17 @@ package body Mem.Processes is
         and then Process_Table (Pid).Num_Segments > 0
       then
          declare
-            P       : Memory_Process_Record renames Process_Table (Pid);
-            Segment : Segment_Record renames P.Segments (P.Num_Segments);
+            P            : Memory_Process_Record renames Process_Table (Pid);
+            Segment      : Segment_Record renames P.Segments (P.Num_Segments);
+            Region_Base  : Rose.Objects.Object_Id;
+            Region_Bound : Rose.Objects.Object_Id;
          begin
-            Rose.Interfaces.Storage.Region.Client.Open (Segment
-              .Region, Region);
-            Rose.Interfaces.Storage.Region.Client.Get_Range
-              (Segment.Region, Segment.Region_Base, Segment.Region_Bound);
+            Open_Region (Segment, Region);
+            Get_Range (Segment, Region_Base, Region_Bound, Has_Range);
+            if Has_Range then
+               Segment.Region_Base := Region_Base;
+               Segment.Region_Bound := Region_Bound;
+            end if;
             Segment.Region_Offset := Rose.Objects.Object_Id (Region_Offset);
          end;
       end if;
@@ -1575,6 +1668,7 @@ package body Mem.Processes is
               Bound          => Rose.Addresses.Virtual_Page_Address (Bound),
               Limit          => Rose.Addresses.Virtual_Page_Address (Limit),
               Region         => <>,
+              Owner          => Rose.Capabilities.Null_Capability,
               Region_Base    => 0,
               Region_Bound   => 0,
               Region_Offset  => 0,
@@ -1841,8 +1935,8 @@ package body Mem.Processes is
          procedure Put (Address : System.Address) is
             Data : Page_Buffer with Import, Address => Address;
          begin
-            Rose.Interfaces.Storage.Region.Client.Put (Segment
-              .Region, Page, Data);
+            Rose.Interfaces.Storage.Region_Access.Client.Put
+              (Segment.Region, Page, Data);
          end Put;
 
       begin

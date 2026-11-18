@@ -73,14 +73,14 @@ package body Store.Server is
          Destroyed => Store.Devices.Dependent_Destroyed'Access,
          Instanced => True);
       Rose.Interfaces.Storage.Region.Server.Attach_Interface
-        (Server_Context,
-         Store.Devices.Get_Range'Access,
-         Store.Devices.Get'Access,
-         Store.Devices.Put'Access,
-         Store.Devices.Read_Stream'Access,
-         Store.Devices.Create_Subregion'Access,
-         Store.Devices.Release'Access,
-         Instanced => True);
+        (Server_Context   => Server_Context,
+         Get_Range        => Store.Devices.Get_Range'Access,
+         Get              => Store.Devices.Get'Access,
+         Put              => Store.Devices.Put'Access,
+         Read             => Store.Devices.Read_Stream'Access,
+         Release          => Store.Devices.Release'Access,
+         Create_Subregion => Store.Devices.Create_Subregion'Access,
+         Instanced        => True);
 
       Rose.Interfaces.Streams.Reader.Server.Attach_Interface
         (Server_Context => Server_Context,
