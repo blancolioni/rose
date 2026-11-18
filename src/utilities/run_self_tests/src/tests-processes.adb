@@ -121,14 +121,13 @@ package body Tests.Processes is
    ----------------------
 
    function End_Process_Test return Boolean is
-      No_Caps  : Rose.Capabilities.Capability_Array (1 .. 0);
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
         Tests.Registry.Launcher ("process_probe");
 
       function Launch_Probe
         return Rose.Interfaces.Processes.Process_Control
           .Process_Control_Object'Class
-      is (Launcher.Launch (Rose.System_Calls.Own_Bank.Cap, No_Caps));
+      is (Launcher.Launch (Rose.System_Calls.Own_Bank.Cap));
       --  A probe, which is launched with Launch and so has a
       --  Process_Control cap, as a command doesn't (#831).
 

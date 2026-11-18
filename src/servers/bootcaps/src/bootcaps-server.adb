@@ -1,4 +1,3 @@
-with Rose.Console_IO;
 with Rose.Invocation;
 with Rose.Objects;
 
@@ -43,8 +42,8 @@ package body Bootcaps.Server is
       return Rose.Capabilities.Capability;
 
    procedure Append
-     (Id   : Rose.Objects.Capability_Identifier;
-      Caps : Rose.Capabilities.Capability_Array);
+     (Id  : Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability);
 
    function Get_Cap
      (Id    : Rose.Objects.Capability_Identifier;
@@ -72,8 +71,8 @@ package body Bootcaps.Server is
    ------------
 
    procedure Append
-     (Id   : Rose.Objects.Capability_Identifier;
-      Caps : Rose.Capabilities.Capability_Array)
+     (Id  : Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability)
    is
    begin
       if Id not in 1 .. Max_Cap_Set_Count then
@@ -83,26 +82,15 @@ package body Bootcaps.Server is
       declare
          Set : Cap_Set_Entry renames Cap_Sets (Cap_Set_Index (Id));
       begin
+         --  A full set takes no more. Bootcaps has no console to say so:
+         --  the module finds the cap missing when it reads its set.
 
-         --  A set that can't take every cap takes none of them, so that
-         --  no module starts with only some of its caps (#826).
-
-         if Caps'Length > Max_Cap_Set_Size - Set.Last then
-            Rose.Console_IO.Put ("bootcaps: cap set ");
-            Rose.Console_IO.Put (Natural (Id));
-            Rose.Console_IO.Put (" is full: ");
-            Rose.Console_IO.Put
-              (Natural (Caps'Length - (Max_Cap_Set_Size - Set.Last)));
-            Rose.Console_IO.Put (" of ");
-            Rose.Console_IO.Put (Natural (Caps'Length));
-            Rose.Console_IO.Put_Line (" caps do not fit; none added");
+         if Set.Last = Max_Cap_Set_Size then
             return;
          end if;
 
-         for Cap of Caps loop
-            Set.Last := Set.Last + 1;
-            Set.Set (Set.Last) := Cap;
-         end loop;
+         Set.Last := Set.Last + 1;
+         Set.Set (Set.Last) := Cap;
       end;
    end Append;
 
@@ -138,9 +126,8 @@ package body Bootcaps.Server is
          end if;
       end loop;
 
-      Rose.Console_IO.Put ("bootcaps: no free cap sets: all ");
-      Rose.Console_IO.Put (Natural (Max_Cap_Set_Count));
-      Rose.Console_IO.Put_Line (" are in use");
+      --  Every set is in use: init gets the null cap.
+
       return Rose.Capabilities.Null_Capability;
    end Create;
 
@@ -289,8 +276,6 @@ package body Bootcaps.Server is
 
       --  Boot is done, and init has had its reply. Every cap to this
       --  server fails from now on, whoever holds it.
-
-      Rose.Console_IO.Put_Line ("bootcaps: boot done; exiting");
 
       declare
          Params : aliased Rose.Invocation.Invocation_Record;

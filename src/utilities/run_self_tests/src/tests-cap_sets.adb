@@ -1,7 +1,6 @@
 with Ada.Text_IO;
 
 with Rose.Capabilities;
-with Rose.Invocation;
 
 with Rose.Interfaces.Caps.Constructor.Client;
 with Rose.Interfaces.Caps.Releasable_Cap_Set.Client;
@@ -60,20 +59,18 @@ package body Tests.Cap_Sets is
          Filled : out Natural;
          Raised : out Boolean)
       is
-         Copies : constant Rose.Capabilities.Capability_Array
-           (1 .. Rose.Invocation.Max_Capabilities) := (others => Cap);
       begin
          Filled := 0;
          Raised := False;
          while Filled < 8_192 loop
             begin
-               Set.Append (Copies);
+               Set.Append (Cap);
             exception
                when others =>
                   Raised := True;
                   return;
             end;
-            Filled := Filled + Copies'Length;
+            Filled := Filled + 1;
          end loop;
       end Fill;
 

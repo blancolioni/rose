@@ -1,0 +1,16 @@
+--  A process that Executable.Launch has made and loaded, but not yet
+--  started. An invocation carries at most four caps (#234), so the caps
+--  that the process starts with are given one at a time: each one takes
+--  the process's next cap slot, after its standard caps (see
+--  Rose.Capabilities.Standard).
+interface Processes.Starting_Process is
+
+   procedure Add_Cap (Cap : Capability);
+
+   --  Start the process. The result is its Process_Control cap, or for a
+   --  command, the cap of its command endpoint. The Starting_Process
+   --  cap is no use afterwards, and the caller deletes it.
+
+   function Start return Capability;
+
+end Processes.Starting_Process;

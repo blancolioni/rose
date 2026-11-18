@@ -129,9 +129,14 @@ package body Rose.Command_Line.Launch_Client is
       for Value of Call.Words (0 .. Call.Word_Count - 1) loop
          Rose.System_Calls.Send_Word (Call.Params, Value);
       end loop;
-      for Cap of Call.Caps (0 .. Call.Cap_Count - 1) loop
-         Rose.System_Calls.Send_Cap (Call.Params, Cap);
-      end loop;
+      declare
+         Caps : Rose.Capabilities.Capability_Array (1 .. Call.Cap_Count);
+      begin
+         for I in Caps'Range loop
+            Caps (I) := Call.Caps (I - 1);
+         end loop;
+         Rose.System_Calls.Send_Caps (Call.Params, Caps);
+      end;
       Rose.System_Calls.Send_Buffer
         (Call.Params, Buffer'Length, Buffer'Address, True);
       Rose.System_Calls.Receive_Words

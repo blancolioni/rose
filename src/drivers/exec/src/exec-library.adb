@@ -300,6 +300,27 @@ package body Exec.Library is
         (Installed_Programs.Last_Index);
    end Install;
 
+   ------------------
+   -- Install_Caps --
+   ------------------
+
+   function Install_Caps
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability_Array
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if Is_Installed (Id) then
+         for I in Program (Id).Caps'Range loop
+            if Program (Id).Caps (I) = 0 then
+               return Program (Id).Caps (1 .. I - 1);
+            end if;
+         end loop;
+         return Program (Id).Caps;
+      end if;
+      return (1 .. 0 => 0);
+   end Install_Caps;
+
    ------------
    -- Newest --
    ------------
@@ -385,24 +406,6 @@ package body Exec.Library is
          end;
       end loop;
    end Read_Image;
-
-   -----------------------
-   -- Send_Install_Caps --
-   -----------------------
-
-   procedure Send_Install_Caps
-     (Id     : Rose.Objects.Capability_Identifier;
-      Params : in out Rose.Invocation.Invocation_Record)
-   is
-      use type Rose.Capabilities.Capability;
-   begin
-      if Is_Installed (Id) then
-         for Cap of Program (Id).Caps loop
-            exit when Cap = 0;
-            Rose.Invocation.Send_Cap (Params, Cap);
-         end loop;
-      end if;
-   end Send_Install_Caps;
 
    --------------------
    -- Set_Region --

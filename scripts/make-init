@@ -233,6 +233,12 @@ class Generator:
                                condition(v) if v != variants else None))
                 caps.append((v, grant))
 
+        # Without a cap set, the caps go in the launch invocation, which
+        # carries at most four, the first of them Create_Endpoint (#234).
+        if cap_set == "none" and len(caps) > 3:
+            fail("%s: %d caps without a cap set; a launch carries at "
+                 "most 3 besides Create_Endpoint" % (where, len(caps)))
+
         cap_set_cap = self.use(cap_set, variants, where)
 
         exports = []

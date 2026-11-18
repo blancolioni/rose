@@ -40,6 +40,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-partition_setup.o \
 	$(BUILDDIR)/rose-interfaces-storage-partition_setup-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-process_control-client.o \
+	$(BUILDDIR)/rose-interfaces-processes-starting_process.o \
+	$(BUILDDIR)/rose-interfaces-processes-starting_process-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-region.o \
 	$(BUILDDIR)/rose-interfaces-users-rights.o \
 	$(BUILDDIR)/rose-interfaces-users-rights-client.o \

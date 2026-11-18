@@ -88,13 +88,27 @@ stages:
 
   boot_servers:
 
+    # The boot modules' cap sets.  Every module launched after it reads
+    # its caps from its set at startup, and then deletes its cap to the
+    # set.  Once boot is done, init releases it, and it exits (#826).
+    # It is first, so that the console can have a cap set: a launch
+    # without one carries at most three caps (#234).  So it has no
+    # console.
+    - launch: bootcaps
+      oid: 14
+      priority: device_driver
+      cap_set: none
+      caps: [exit]
+      exports:
+        cap_set: Caps.Constructor.Create_Endpoint
+        bootcaps_release: Common.Resource.Release_Endpoint
+
     # The boot console's screen and cursor aren't recorded as granted,
     # because the persistent console takes the screen over from the boot
     # console (#304).
     - launch: console
       oid: 3
       priority: low
-      cap_set: none
       caps:
         - {device_page: 0xB8, owner: none}
         - {ports: [out_range, 8, 0x3D4, 0x3D5], owner: none}
@@ -111,6 +125,7 @@ stages:
         - {boot_tag: 1}
         - {ports: [out, 8, 0x2F8, 0x2F8], owner: none}
         - {ports: [in, 8, 0x2FD, 0x2FD], owner: none}
+        - delete
       exports:
         console_interface: Streams.Writer.Writer_Interface
         console_stream: Streams.Writer.Write_Endpoint
@@ -119,18 +134,6 @@ stages:
     # Where Init.Calls.Send_String reports, as when the installer refuses
     # a cap request.
     - call: Set_Console
-
-    # The boot modules' cap sets.  Every module launched after it reads
-    # its caps from its set at startup, and then deletes its cap to the
-    # set.  Once boot is done, init releases it, and it exits (#826).
-    - launch: bootcaps
-      oid: 14
-      priority: device_driver
-      cap_set: none
-      caps: [console_interface, exit]
-      exports:
-        cap_set: Caps.Constructor.Create_Endpoint
-        bootcaps_release: Common.Resource.Release_Endpoint
 
     - launch: mem
       oid: 4

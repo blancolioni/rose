@@ -18,6 +18,8 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-commands-command_endpoint.o \
 	$(BUILDDIR)/rose-interfaces-processes-executable.o \
 	$(BUILDDIR)/rose-interfaces-processes-executable-server.o \
+	$(BUILDDIR)/rose-interfaces-processes-starting_process.o \
+	$(BUILDDIR)/rose-interfaces-processes-starting_process-server.o \
 	$(BUILDDIR)/rose-interfaces-processes-heap-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-kernel_process-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-memory-client.o \

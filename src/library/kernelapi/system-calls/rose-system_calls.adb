@@ -808,6 +808,42 @@ package body Rose.System_Calls is
       Params.Caps (Params.Control.Last_Sent_Cap) := Cap;
    end Send_Cap;
 
+   ---------------
+   -- Send_Caps --
+   ---------------
+
+   procedure Send_Caps
+     (Params : in out Rose.Invocation.Invocation_Record;
+      Caps   : Rose.Capabilities.Capability_Array)
+   is
+      Per_Call : constant := Rose.Invocation.Max_Capabilities;
+      Next     : Natural := Caps'First;
+   begin
+      while Caps'Last - Next + 1 > Per_Call loop
+         declare
+            Part : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Initialize_Send (Part, Params.Cap);
+            Part.Control.Flags (Rose.Invocation.Continued) := True;
+            for Cap of Caps (Next .. Next + Per_Call - 1) loop
+               Send_Cap (Part, Cap);
+            end loop;
+            Invoke_Capability (Part);
+            if Part.Control.Flags (Rose.Invocation.Error) then
+               Params.Control.Flags (Rose.Invocation.Error) := True;
+               Params.Error := Part.Error;
+               Params.Cap := 0;
+               return;
+            end if;
+         end;
+         Next := Next + Per_Call;
+      end loop;
+
+      for Cap of Caps (Next .. Caps'Last) loop
+         Send_Cap (Params, Cap);
+      end loop;
+   end Send_Caps;
+
    -------------------
    -- Send_Endpoint --
    -------------------

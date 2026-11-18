@@ -1,4 +1,4 @@
---  A set of caps, given in one cap.  Append copies caps into the set,
+--  A set of caps, given in one cap.  Append copies a cap into the set,
 --  and Get_Cap copies one out, except a single-use cap, such as a reply
 --  cap, which the kernel moves rather than copies (ADR 0032, #864): it
 --  leaves the sender when it is appended, and leaves the set the first
@@ -8,8 +8,8 @@
 interface Caps.Cap_Set is
 
    procedure Append
-     (Caps : Capability_Array);
-     
+     (Cap : Capability);
+
    function Get_Cap
      (Index : Positive)
      return Capability;
