@@ -188,6 +188,12 @@ package body Elf.Loader is
       Segment_Base  : Rose.Objects.Object_Id;
       Segment_Bound : Rose.Objects.Object_Id;
       Virtual_Bound : constant Word := V_Address + Memory_Size;
+      Page_Bound    : constant Word :=
+                        (Virtual_Bound + Rose.Limits.Page_Size - 1)
+                        / Rose.Limits.Page_Size;
+      --  The page after the segment's last one. A segment that ends on a
+      --  page boundary doesn't reach the next page, which may be the
+      --  start of the next segment.
       Flags         : Word;
    begin
       case Segment_Type is
@@ -211,7 +217,7 @@ package body Elf.Loader is
                Add_Segment
                  (Item          => Process,
                   Virtual_Base  => V_Address / Rose.Limits.Page_Size,
-                  Virtual_Bound => Virtual_Bound / Rose.Limits.Page_Size + 1,
+                  Virtual_Bound => Page_Bound,
                   Region        => Image_Region,
                   Region_Offset => File_Offset,
                   Flags         => Flags);
@@ -247,8 +253,7 @@ package body Elf.Loader is
                   Add_Private_Segment
                     (Item          => Process,
                      Virtual_Base  => V_Address / Rose.Limits.Page_Size,
-                     Virtual_Bound =>
-                       Virtual_Bound / Rose.Limits.Page_Size + 1,
+                     Virtual_Bound => Page_Bound,
                      Region        => Region,
                      Flags         => Flags);
                   Forget (Region);
