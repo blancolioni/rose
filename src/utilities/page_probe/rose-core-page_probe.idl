@@ -1,0 +1,31 @@
+command Rose.Core.Page_Probe : Caps.Create_Endpoint, Streams.Standard_Output
+  with Summary     => "Touch more memory than is free, for the test of paging.",
+       Description => """
+          Page_Probe is part of init's test of dropping clean pages
+          (ADR 0028, section 5; #973). Init launches two. The filler is
+          given a page count and init's Take_Checkpoint. Its Writer's
+          Write fills that many pages of its own memory, a chunk at a
+          time, taking a checkpoint after each chunk, so that they are
+          clean and mem can drop them. Then it reads them all back, and
+          checks the buffer it was given. It fails if any page or the
+          buffer is wrong.
+          The caller is given the filler's Writer. It fills a buffer when
+          it is launched, and its Named's Name sends the buffer to the
+          filler's Write, so that the buffer's pages are pinned while the
+          filler runs (#972). Name answers "passed", or "failed". Both
+          say what went wrong on standard output.
+          """,
+       Server      => Page_Probe_Server.Start_Server,
+       Live
+is
+   Pages : Natural
+     with Help => "the pages to fill, or 0 for the caller";
+   Checkpoint : in Caps.Cap
+     with Help => "init's Take_Checkpoint, or the null cap for the caller";
+   Target : in Streams.Writer
+     with Help => "the filler's Writer, or the null cap for the filler";
+   Writer : out Streams.Writer
+     with Help => "its Writer interface";
+   Probe : out Common.Named
+     with Help => "its Named interface";
+end Rose.Core.Page_Probe;

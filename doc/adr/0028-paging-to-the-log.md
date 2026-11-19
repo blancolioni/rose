@@ -84,8 +84,8 @@ Pages of a process that is gone by the time of the checkpoint are not added to a
 
 - **Clean pages are dropped first.** A clean page is either read-only, or has a copy in the log or its region and hasn't changed since. `mem` unmaps it and frees it, with no write.
 - **Changed pages are written as a batch** to the open entry, then unmapped and freed.
-- **Which pages go:** the least recently used, as far as `mem` can tell. A checkpoint's write protection tells `mem` when a page is first written (`Set_Read_Only`, a write fault, `Set_Writable`). `mem` can also unmap a clean page that is still in memory, and count a fault on it as a use, without reading the page again. Whether the kernel's accessed bit is worth reading is left to the implementation.
-- **`mem` keeps a reserve of free pages,** and pages out when the reserve falls below a low-water mark. It doesn't wait until a fault finds no page. Writing a batch goes through `log`, `partition` and `ata`, and `mem` must never wait on a fault that it would have to handle itself.
+- **Which pages go:** the least recently used, as far as `mem` can tell. A checkpoint's write protection tells `mem` when a page is first written (`Set_Read_Only`, a write fault, `Set_Writable`). `mem` can also unmap a clean page that is still in memory, and count a fault on it as a use, without reading the page again. Whether the kernel's accessed bit is worth reading is left to the implementation. For now, a clock hand goes round `mem`'s page table, and the clean pages it passes go first (#973).
+- **`mem` keeps a reserve of free pages,** and pages out when the reserve falls below a low-water mark. It doesn't wait until a fault finds no page. Writing a batch goes through `log`, `partition` and `ata`, and `mem` must never wait on a fault that it would have to handle itself. When fewer than 64 pages are free, `mem` frees cached pages that nothing maps, and then clean pages, until 128 are free (`Rose.Limits.Reserve_Low_Pages` and `Reserve_High_Pages`, #973).
 
 ### 6. When the table of changes fills
 
@@ -106,7 +106,9 @@ A fault on a page that has a copy in the log reads that log page and maps it.
 
 - **The boot modules,** including the pager path (`mem`, `store`, `partition`, `ata`, `log`, `checkpoint` and `restore`). They take their memory from the kernel's reservation (`Boot_Module_Pages`), not from `mem`.
 - **Shared pages that anything maps** (ADR 0025, section 3). When the last mapping goes, a shared page is written back to its region, as now.
-- **Pages the kernel has pinned** for a call in progress: the pages of a buffer that the kernel has mapped into another process's shared slot (#519). The caller's process entry records the buffer it has lent, since a caller has one call at a time, and the kernel's `Unmap_Page` refuses to unmap those pages, so `mem` skips them (#972).
+- **Pages the kernel has pinned** for a call in progress: the pages of a buffer that the kernel has mapped into another process's shared slot (#519). The caller's process entry records the buffer it has lent, since a caller has one call at a time, and the kernel's `Unmap_Page` refuses to unmap those pages, so `mem` skips them (#972). The kernel says so in its log.
+
+`mem` must also never wait, while it pages, on a process whose pages it may have paged out, since only `mem` can bring them back (#914). So it writes nothing to the console then: the console calls its driver, which is a launched process (#973).
 
 ### 9. Restore reads one entry
 

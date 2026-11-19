@@ -438,11 +438,7 @@ package body Mem.Processes is
       From_Log  : Boolean;
       pragma Warnings (Off, From_Log);
    begin
-      Mem.Physical_Map.Allocate_Page
-        (Page, Have_Page);
-      if not Have_Page then
-         Mem.Virtual_Map.Reclaim (Page, Have_Page);
-      end if;
+      Mem.Virtual_Map.Allocate_Page (Page, Have_Page);
 
       if not Have_Page then
          Rose.Console_IO.Put_Line ("no page");
@@ -1088,10 +1084,7 @@ package body Mem.Processes is
          return;
       end if;
 
-      Mem.Physical_Map.Allocate_Page (Phys_Page, Have_Page);
-      if not Have_Page then
-         Mem.Virtual_Map.Reclaim (Phys_Page, Have_Page);
-      end if;
+      Mem.Virtual_Map.Allocate_Page (Phys_Page, Have_Page);
 
       if not Have_Page then
          Rose.Console_IO.Put_Line ("mem: load page: out of memory");
@@ -1172,10 +1165,7 @@ package body Mem.Processes is
    is
       use Rose.Addresses;
    begin
-      Mem.Physical_Map.Allocate_Page (Physical, Success);
-      if not Success then
-         Mem.Virtual_Map.Reclaim (Physical, Success);
-      end if;
+      Mem.Virtual_Map.Allocate_Page (Physical, Success);
 
       if not Success then
          return;

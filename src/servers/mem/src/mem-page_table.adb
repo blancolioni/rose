@@ -34,6 +34,9 @@ package body Mem.Page_Table is
    Dirty_Pages     : array (1 .. Rose.Limits.Max_Mapped_Pages) of Cursor;
    Dirty_Page_Last : Natural := 0;
 
+   Clock_Hand : Cursor := 0;
+   --  The page that Sweep_Clean_Pages last stopped at.
+
    procedure Drop_Deleted_Dirty_Pages;
    --  Take pages that have been deleted out of the dirty page list, so
    --  that the next checkpoint doesn't save them: their slots will be
@@ -56,10 +59,18 @@ package body Mem.Page_Table is
    ------------
 
    procedure Delete (Position : Cursor) is
+      Was_Dirty : constant Boolean := Mapped_Pages (Position).Dirty;
    begin
       Mapped_Pages (Position).Process := 0;
       Free_Count := Free_Count + 1;
-      Drop_Deleted_Dirty_Pages;
+
+      --  Only a dirty page is in the dirty page list. Dropping a clean
+      --  page can happen during a checkpoint, which is going through the
+      --  list (#973).
+
+      if Was_Dirty then
+         Drop_Deleted_Dirty_Pages;
+      end if;
    end Delete;
 
    ----------------
@@ -360,6 +371,43 @@ package body Mem.Page_Table is
          Writeable  => Page.Writable,
          Executable => Page.Executable);
    end Set_Writable;
+
+   -----------------------
+   -- Sweep_Clean_Pages --
+   -----------------------
+
+   procedure Sweep_Clean_Pages
+     (Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor)
+   is
+   begin
+      Position := 0;
+
+      for Step in 1 .. Mapped_Page_Last loop
+         Clock_Hand :=
+           (if Clock_Hand >= Mapped_Page_Last then 1 else Clock_Hand + 1);
+
+         declare
+            Page  : Mapped_Page_Record renames Mapped_Pages (Clock_Hand);
+            Taken : Boolean;
+         begin
+            if Page.Process /= 0
+              and then Page.Mapped
+              and then Page.Persistent
+              and then not Page.Dirty
+              and then not Page.Writable
+            then
+               Try_Page (Clock_Hand, Taken);
+               if Taken then
+                  Position := Clock_Hand;
+                  return;
+               end if;
+            end if;
+         end;
+      end loop;
+   end Sweep_Clean_Pages;
 
    ---------------------
    -- Virtual_Address --

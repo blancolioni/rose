@@ -65,6 +65,24 @@ package Init.Self_Tests is
    --  probes. It reports each check on Standard_Output, and is True if
    --  they all passed.
 
+   function Page_Out_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Checkpointer    : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Mem drops clean pages to keep a reserve of free pages (ADR 0028,
+   --  section 5; #973). Launch two page_probe commands, found through
+   --  Find_Cap, in a test bank: a filler, given Checkpointer, init's
+   --  Take_Checkpoint, and a caller, given the filler's Writer, which
+   --  fills a buffer. Take a checkpoint, so the buffer is clean, and ask
+   --  the caller's Name, which sends the buffer to the filler. The filler
+   --  fills more memory than the machine has, with a checkpoint after
+   --  each chunk, and then checks it all and the buffer, whose pages mem
+   --  must skip while the call is in progress (#972). Destroying the bank
+   --  ends the probes, and their caps with them. It reports each check
+   --  on Standard_Output, and is True if they all passed.
+
    type Forward_Result is
      (Passed, No_Update_Cap, Nothing_From_Restore, Update_Failed,
       No_Test_Bank, Launch_Failed);
