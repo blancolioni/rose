@@ -8,6 +8,7 @@ with Rose.Server;
 with Rose.System_Calls;
 with Rose.Words;
 
+with Rose.Interfaces.Processes.Restorable.Server;
 with Rose.Interfaces.Screens.Terminal.Server;
 
 with Text_Console;
@@ -32,6 +33,7 @@ package body Surface_Console.Server is
 
    type Console is limited new
      Rose.Interfaces.Screens.Terminal.Server.Terminal_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
      with null record;
 
    overriding procedure Read
@@ -92,6 +94,13 @@ package body Surface_Console.Server is
       return Rose.Capabilities.Capability;
 
    overriding function Writer_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability;
+
+   overriding procedure Restored (Item : in out Console);
+   --  Drop what was typed before the checkpoint (#523).
+
+   overriding function Restorable_Cap
      (Item : in out Console)
       return Rose.Capabilities.Capability;
 
@@ -301,6 +310,30 @@ package body Surface_Console.Server is
       end if;
    end Read_Key;
 
+   --------------------
+   -- Restorable_Cap --
+   --------------------
+
+   overriding function Restorable_Cap
+     (Item : in out Console)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of
+         (Server_Context, Item));
+
+   --------------
+   -- Restored --
+   --------------
+
+   overriding procedure Restored (Item : in out Console) is
+      pragma Unreferenced (Item);
+   begin
+      --  The screen driver redraws the screen, so only the input is
+      --  left: what was typed before the checkpoint isn't for the
+      --  program that reads next (#523).
+
+      Surface_Console.Line_Discipline.Discard_Input;
+   end Restored;
+
    ------------
    -- Scroll --
    ------------
@@ -346,6 +379,8 @@ package body Surface_Console.Server is
       Surface_Console.Screen.Open;
 
       Rose.Interfaces.Screens.Terminal.Server.Publish
+        (Server_Context, The_Console'Access);
+      Rose.Interfaces.Processes.Restorable.Server.Attach
         (Server_Context, The_Console'Access);
 
       Rose.Server.Set_Signal_Handler
