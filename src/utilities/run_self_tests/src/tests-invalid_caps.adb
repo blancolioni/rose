@@ -27,7 +27,7 @@ package body Tests.Invalid_Caps is
       Rose.System_Calls.Invoke_Capability (Params);
 
       return Params.Control.Flags (Rose.Invocation.Error)
-        and then Params.Error = Rose.Invocation.Invalid_Capability;
+        and then Params.Control.Error = Rose.Invocation.Invalid_Capability;
    end Invalid_Cap_Test;
 
    --------------------
@@ -49,7 +49,7 @@ package body Tests.Invalid_Caps is
         (Params : Rose.Invocation.Invocation_Record)
          return Boolean
       is (Params.Control.Flags (Rose.Invocation.Error)
-          and then Params.Error = Rose.Invocation.No_Invoke_Buffer);
+          and then Params.Control.Error = Rose.Invocation.No_Invoke_Buffer);
 
    begin
       Ada.Text_IO.Put ("No invoke buffer test");

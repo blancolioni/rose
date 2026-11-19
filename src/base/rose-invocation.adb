@@ -111,6 +111,7 @@ is
    begin
       Params.Control.Flags :=
         (Rose.Invocation.Error => True, Send_Words => True, others => False);
+      Params.Control.Error := Error;
       Params.Data (1) := Invocation_Error'Pos (Error);
       Params.Data (2) := X;
       Params.Data (3) := Y;
