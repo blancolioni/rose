@@ -1,6 +1,6 @@
 with Rose.Capabilities;
 
-private with Rose.Invocation;
+with Rose.Invocation;
 private with Rose.Words;
 
 package Rose.Command_Line.Launch is
@@ -51,8 +51,9 @@ package Rose.Command_Line.Launch is
    Max_Result_Length : constant := 1024;
    --  The longest string result.
 
-   Max_Result_Words : constant := 15;
-   --  The most scalar results.
+   Max_Result_Words : constant := Rose.Invocation.Max_Parameter_Words - 1;
+   --  The most scalar results: the reply's first word says that the
+   --  command completed (#985).
 
    Max_Result_Caps : constant := 4;
    --  The most cap results.

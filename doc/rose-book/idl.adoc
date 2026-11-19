@@ -316,7 +316,7 @@ A server that answers an interface capability by hand, as the kernel does for `K
 [#encoding]
 ==== How arguments are encoded
 
-An invocation carries up to 16 data words, up to 4 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
+An invocation carries up to 8 data words (a `Word_64` or an `Object_Id` takes two), up to 4 capabilities, and one shared buffer (see the invocation record in the capabilities chapter).
 `idle` refuses a subprogram whose capabilities, or those of its reply, come to more than four.
 There is no capability array: a list of capabilities is passed as one cap set (`Caps.Cap_Set`), or one at a time, as `Processes.Starting_Process` takes them (#234).
 The generated client fills them in the order the parameters are declared, and the generated server reads them back in the same order.

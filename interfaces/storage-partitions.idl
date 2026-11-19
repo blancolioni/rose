@@ -9,7 +9,6 @@ interface Storage.Partitions : Common.Resource is
      (Index               : Positive;
       Partition_Type_Low  : out Word_64;
       Partition_Type_High : out Word_64;      
-      Partition_Flags     : out Word_64;
       Start_Address       : out Word_64;
       Length              : out Word_64);
    

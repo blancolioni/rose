@@ -197,7 +197,6 @@ package body Init.Boot_Steps is
          use type Rose.Words.Word_64;
          Partition_Type_Low  : Rose.Words.Word_64;
          Partition_Type_High : Rose.Words.Word_64;
-         Partition_Flags     : Rose.Words.Word_64;
          Start_Address       : Rose.Words.Word_64;
          Length              : Rose.Words.Word_64;
 
@@ -218,8 +217,7 @@ package body Init.Boot_Steps is
       begin
          Client.Get_Partition
            (Parts, Index, Partition_Type_Low,
-            Partition_Type_High, Partition_Flags,
-            Start_Address, Length);
+            Partition_Type_High, Start_Address, Length);
 
          --  Only the first partition of each type is used.  The install
          --  media's init also uses GRUB's, to write the boot loader

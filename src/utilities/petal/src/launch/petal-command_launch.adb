@@ -808,7 +808,9 @@ package body Petal.Command_Launch is
 
       declare
          Params      : aliased Rose.Invocation.Invocation_Record;
-         Data        : array (0 .. 15) of Rose.Words.Word := (others => 0);
+         Data        : array
+           (0 .. Rose.Invocation.Max_Parameter_Words - 1) of Rose.Words.Word :=
+             (others => 0);
          Word_Count  : Natural := 0;
          Caps        : Rose.Capabilities.Capability_Array (1 .. 16) :=
            (others => Rose.Capabilities.Null_Capability);

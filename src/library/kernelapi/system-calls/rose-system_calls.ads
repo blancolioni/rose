@@ -24,8 +24,9 @@ package Rose.System_Calls is
      (Item : aliased in out Rose.Invocation.Invocation_Record);
    --  If Item already has an error that a send routine set, it returns
    --  without entering the kernel and Item keeps that error:
-   --  No_Invoke_Buffer, Buffer_Too_Small, or Too_Many_Capabilities if
-   --  Send_Cap had no room for another cap.
+   --  No_Invoke_Buffer, Buffer_Too_Small, Too_Many_Capabilities if
+   --  Send_Cap had no room for another cap, or Too_Many_Words if
+   --  Send_Word had no room for another word.
 
    procedure Invoke
      (Cap       : Rose.Capabilities.Capability;
@@ -201,6 +202,9 @@ package Rose.System_Calls is
    procedure Send_Word
      (Params : in out Rose.Invocation.Invocation_Record;
       Value  : Rose.Words.Word_64);
+   --  If Params already holds as many words as an invocation carries, it
+   --  gets the error Too_Many_Words instead of wrapping around (#985).
+   --  The same goes for the other Send_Word procedures.
 
    procedure Send_Integer_32
      (Params : in out Rose.Invocation.Invocation_Record;

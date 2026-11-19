@@ -197,12 +197,30 @@ package body Text_Console.Serial is
             Params : aliased Rose.Invocation.Invocation_Record;
          begin
             Wait_Until_Empty;
-            Rose.System_Calls.Initialize_Send (Params, Data_Cap);
-            for Ch of Text (Start .. Last) loop
-               Rose.System_Calls.Send_Word
-                 (Params, Rose.Words.Word (Character'Pos (Ch)));
-            end loop;
-            Rose.System_Calls.Invoke_Capability (Params);
+
+            --  A FIFO's worth after each wait, in calls of at most
+            --  Max_Parameter_Words characters (#985).
+
+            declare
+               Part : Positive := Start;
+            begin
+               while Part <= Last loop
+                  declare
+                     Part_Last : constant Natural :=
+                       Natural'Min
+                         (Part + Rose.Invocation.Max_Parameter_Words - 1,
+                          Last);
+                  begin
+                     Rose.System_Calls.Initialize_Send (Params, Data_Cap);
+                     for Ch of Text (Part .. Part_Last) loop
+                        Rose.System_Calls.Send_Word
+                          (Params, Rose.Words.Word (Character'Pos (Ch)));
+                     end loop;
+                     Rose.System_Calls.Invoke_Capability (Params);
+                     Part := Part_Last + 1;
+                  end;
+               end loop;
+            end;
             Start := Last + 1;
          end;
       end loop;
