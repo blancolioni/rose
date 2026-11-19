@@ -27,7 +27,7 @@
 .global stack_fault_exception, protection_fault_exception, protection_fault_exception, page_fault_exception
 .global reserved_15_exception
 
-.set INVOKE_WORDS, 28      # size of invocation record (Rose.Invocation, #234)
+.set INVOKE_WORDS, 20      # size of invocation record (Rose.Invocation, #985)
 
 .set CURR_PROC_PTR, 20     # offset from stack pointer to process table entry address after trap
 

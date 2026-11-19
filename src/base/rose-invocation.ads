@@ -72,7 +72,8 @@ is
       No_Invoke_Buffer,
       Buffer_Too_Small,
       Exception_Raised,
-      Too_Many_Capabilities);
+      Too_Many_Capabilities,
+      Too_Many_Words);
    --  No_Invoke_Buffer is reported by the user library, and never by the
    --  kernel, when a process sends text or a storage array without having
    --  set up an invoke buffer (#239). Buffer_Too_Small is reported by the
@@ -81,15 +82,17 @@ is
    --  server when the handler of an operation raises an exception
    --  (idle#60). Too_Many_Capabilities is reported by the user library,
    --  when a process sends more capabilities than an invocation carries
-   --  (idle#101).
+   --  (idle#101), and Too_Many_Words when it sends more data words
+   --  (#985).
 
    use type Rose.Capabilities.Capability;
    use type Rose.Objects.Object_Id;
 
-   Max_Parameter_Words : constant := 16;
+   Max_Parameter_Words : constant := 8;
    Max_Capabilities    : constant := 4;
-   --  An invocation carries at most four capabilities, and so does its
-   --  reply. More are sent in a cap set, or one at a time (#234).
+   --  An invocation carries at most eight data words and four
+   --  capabilities, and so does its reply (#985, #234). More caps are
+   --  sent in a cap set, or one at a time.
 
    type Parameter_Word_Index is mod Max_Parameter_Words;
    type Capability_Index is mod Max_Capabilities;
@@ -103,8 +106,6 @@ is
    type Control_Word_Header is new Word_8;
 
    type Word_3 is mod 2 ** 3;
-   type Word_4 is mod 2 ** 4;
-   type Word_6 is mod 2 ** 6;
 
    type Control_Word is
       record
@@ -113,7 +114,7 @@ is
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
          Last_Recv_Cap  : Capability_Index     := 0;
-         Reserved       : Word_6               := 0;
+         Reserved       : Word_8               := 0;
       end record
      with Pack, Size => 32;
 
@@ -132,7 +133,7 @@ is
          Buffer_Address : System.Address := System.Null_Address;
          Buffer_Length  : System.Storage_Elements.Storage_Count := 0;
       end record
-     with Size => 28 * 4 * 8;
+     with Size => 20 * 4 * 8;
 
    --  The layout is fixed, because the kernel, every process and every
    --  checkpoint share it. Error has five bits, for up to 32 errors: one
@@ -150,10 +151,10 @@ is
          Unused         at  20 range 16 .. 23;
          Error          at  20 range 24 .. 28;
          Extra_Errors   at  20 range 29 .. 31;
-         Data           at  24 range  0 .. 16 * 32 - 1;
-         Caps           at  88 range  0 .. 4 * 32 - 1;
-         Buffer_Address at 104 range  0 .. 31;
-         Buffer_Length  at 108 range  0 .. 31;
+         Data           at  24 range  0 .. 8 * 32 - 1;
+         Caps           at  56 range  0 .. 4 * 32 - 1;
+         Buffer_Address at  72 range  0 .. 31;
+         Buffer_Length  at  76 range  0 .. 31;
       end record;
 
    type Invocation_Access is access all Invocation_Record;
