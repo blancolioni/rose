@@ -108,7 +108,8 @@ package body Mem.Log_Index is
 
    procedure Fill_Leaf
      (Key         : Integer;
-      Batch_First : Word_32);
+      Batch_First : Word_32;
+      Batch_Wrap  : Word_32);
    --  Set the entries of Leaf for the pages of the batch in leaf Key.
 
    function Find_Slot (Log_Page : Word_32) return Slot_Count;
@@ -256,7 +257,8 @@ package body Mem.Log_Index is
 
    procedure Fill_Leaf
      (Key         : Integer;
-      Batch_First : Word_32)
+      Batch_First : Word_32;
+      Batch_Wrap  : Word_32)
    is
       Index : Word_32 := 0;
 
@@ -274,8 +276,12 @@ package body Mem.Log_Index is
            (Mem.Page_Table.Physical_Address (Position))
          then
             if Key_Of (Mem.Page_Table.Process (Position), Page) = Key then
+               --  The pages after the log wraps around are from log
+               --  page 1 on.
                Leaf.Entries (Natural (Page mod Entries_Per_Page)) :=
-                 Batch_First + Index;
+                 (if Batch_Wrap /= 0 and then Index >= Batch_Wrap
+                  then 1 + (Index - Batch_Wrap)
+                  else Batch_First + Index);
             end if;
             Index := Index + 1;
          end if;
@@ -558,6 +564,7 @@ package body Mem.Log_Index is
 
    procedure Write_Index
      (Batch_First : Rose.Words.Word_32;
+      Batch_Wrap  : Rose.Words.Word_32;
       Success     : out Boolean)
    is
       Log_Page : Word_32 := 0;
@@ -662,7 +669,7 @@ package body Mem.Log_Index is
          end if;
 
          Read_Page (Directory.Entries (Slot_Of (Key)), Leaf_Buffer'Address);
-         Fill_Leaf (Key, Batch_First);
+         Fill_Leaf (Key, Batch_First, Batch_Wrap);
          Append (Leaf_Buffer'Address);
          Directory.Entries (Slot_Of (Key)) := Log_Page;
          if Success then
