@@ -369,12 +369,13 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 * `SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`: the index of the last word or capability that is sent, or that the sender is prepared to receive in the reply.
   They are meaningful only when the flag for sending or receiving words or capabilities is set.
   A call has up to 8 words and 4 capabilities; `SW` and `RW` have three bits and `SC` and `RC` two, so the kernel can't be asked for more (#985, #234).
+* `Error` is the reason that an invocation failed, if the `Error` flag is set.
+  It is in the control word, with the flags and counts, so that the first two words of the record say everything about a call except what it carries (#990).
 * `Capability` is the capability that is being invoked.
 * `Reply Capability` is set by the kernel, when the flag asks for it, and gives the target of an invocation a capability on which to send a reply.
 * `Endpoint Id` is set by the kernel when it delivers a call, to the 64-bit id of the endpoint that the capability names.
 * `Identifier` is the identifier of the capability that was invoked.
-* `Error` is the reason that an invocation failed, if the `Error` flag is set.
-  `Extra Errors` and `Unused` are not used.
+  The rest of its word is not used.
 * `Parameter words` and `Capabilities` are the words and capabilities that are sent, and where those that are received are put.
 * `Buffer address` and `Buffer length` are the buffer that is shared with the receiver, if `Send_Buffer` is set.
 
