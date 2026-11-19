@@ -10,11 +10,13 @@
 #
 #   1. installs Rose on a new disk, which makes the log partition;
 #   2. writes a new, empty log header with set-log-start.py, whose first
-#      entry is 50 locations before the end of the partition;
+#      entry is 150 locations before the end of the partition;
 #   3. installs again, onto the same disk, so that the install's entries
 #      go past the end of the log and wrap around to location 1, and
-#      checks with check-log.py that the log is consistent, and starts
-#      where set-log-start.py put it;
+#      checks with check-log.py that the log is consistent, starts where
+#      set-log-start.py put it, and has a batch of the memory server's
+#      pages that wraps around (#989): the first entry's kernel and
+#      storage tables take less than 150 pages, and its batch hundreds;
 #   4. boots from the disk three times, each of which has to restore the
 #      last checkpoint, whose pages are on both sides of the wrap, and
 #      show the login prompt; then waits for a checkpoint, stops the
@@ -27,7 +29,7 @@
 
 ISO=${1:-images/rose.iso}
 HERE=$(cd "$(dirname "$0")" && pwd)
-FROM_END=50
+FROM_END=150
 
 command -v qemu-system-i386 > /dev/null || {
     echo "qemu-system-i386 not found"
@@ -69,6 +71,9 @@ last=$(sed -n 's/^log: .*, \([0-9]*\) pages,.*/\1/p' "$WORK/check-log.txt")
 [ -n "$start" ] && [ -n "$last" ] \
     && [ "$start" -eq $((last - 1 - FROM_END)) ] \
     || fail "the second install's log does not start where set-log-start.py put it"
+grep "a batch wraps round the log" "$WORK/check-log.txt" | cut -c1-60
+grep -q "a batch wraps round the log" "$WORK/check-log.txt" \
+    || fail "no batch of the memory server's pages wraps round the log"
 
 for boot in 1 2 3; do
     echo "Boot $boot from the disk, which restores the last checkpoint"

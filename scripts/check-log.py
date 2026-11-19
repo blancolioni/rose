@@ -585,6 +585,7 @@ def check_entry(log, first, last, verbose, info):
     batches = 0
     batch_headers = 0
     batch_pages = 0
+    wrapped_batches = 0
     gone_pages = 0
     indexes = 0
     index_pages = 0
@@ -600,6 +601,12 @@ def check_entry(log, first, last, verbose, info):
             batch_headers += headers
             batch_pages += listed
             gone_pages += gone
+            # Locations here count on past the end of the log, so a batch
+            # whose pages wrap around starts before it and ends after it
+            # (#989).
+            if start + headers < log.page_count \
+               <= start + headers + listed - 1:
+                wrapped_batches += 1
         else:
             ok, message = check_index(log, start, headers, processes,
                                       verbose)
@@ -614,6 +621,8 @@ def check_entry(log, first, last, verbose, info):
                     % (batches, "" if batches == 1 else "es",
                        batch_headers, "" if batch_headers == 1 else "s",
                        batch_pages))
+    if wrapped_batches:
+        description += "; a batch wraps round the log"
     if leading:
         description += ("; %d paged out before the checkpoint"
                         % sum(1 for kind, start, headers, listed in leading
