@@ -120,6 +120,7 @@ package body Mem.Calls is
       Address    : System.Address)
    is
       use type Rose.Capabilities.Capability;
+      use type Rose.Words.Word;
       Cap    : constant Rose.Capabilities.Capability :=
                  Mem.Physical_Map.Region_Set_Page_Cap (Physical);
       Params : aliased Rose.Invocation.Invocation_Record;
@@ -133,6 +134,9 @@ package body Mem.Calls is
          return;
       end if;
 
+      --  As for Map, the permissions (read and write) are in the top
+      --  three bits of the virtual page's word (#985).
+
       Rose.System_Calls.Initialize_Send (Params, Cap);
       Rose.System_Calls.Send_Word
         (Params, Rose.Words.Word (Physical));
@@ -140,9 +144,8 @@ package body Mem.Calls is
         (Params,
          Rose.Words.Word
            (Rose.Addresses.Virtual_Address_To_Page
-                (Rose.Addresses.To_Virtual_Address (Address))));
-      Rose.System_Calls.Send_Word
-        (Params, Rose.Words.Word'(3));
+                (Rose.Addresses.To_Virtual_Address (Address)))
+         + 2 ** 29 * 3);
 
       Rose.System_Calls.Invoke_Capability (Params);
    end Load_Page;
@@ -175,10 +178,14 @@ package body Mem.Calls is
          Rose.System_Calls.Initialize_Send (Params, Cap);
          Rose.System_Calls.Send_Object_Id (Params, Process);
          Rose.System_Calls.Send_Word (Params, Word (Physical));
-         Rose.System_Calls.Send_Word (Params, Word (Virtual));
+
+         --  The permissions are in the top three bits of the virtual
+         --  page's word, so that the call fits in eight words (#985).
+
          Rose.System_Calls.Send_Word
            (Params,
-            Rose.Words.Word'
+            Word (Virtual)
+            + 2 ** 29 * Rose.Words.Word'
               (Boolean'Pos (Readable)
                + 2 * Boolean'Pos (Writeable)
                + 4 * Boolean'Pos (Executable)));

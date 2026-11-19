@@ -34,7 +34,9 @@
 16#E8C9_E2E2_F9E2_FD43#  interface rose.interfaces.checkpoints.page_log
 16#0806_2377_8396_167A#  rose.interfaces.checkpoints.page_log.append_page(in storage_array) return word
 16#CAA4_CCB5_AA3C_3D72#  rose.interfaces.checkpoints.page_log.read_page(in word; out storage_array)
-16#1017_19B8_1A76_1B2B#  rose.interfaces.checkpoints.page_log.fail_entry
+16#FE81_2E1E_398E_CB4D#  rose.interfaces.checkpoints.page_log.fail_checkpoint
+16#3BB1_4721_85A0_CA1E#  rose.interfaces.checkpoints.page_log.discard_pages(in word)
+16#C3CC_47F7_9676_7CAC#  rose.interfaces.checkpoints.page_log.free_before(in word)
 16#0785_107B_F439_F895#  interface rose.interfaces.checkpoints.state
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset
 16#417B_75A1_17EC_9F59#  interface rose.interfaces.checkpoints.storage_checkpoint
@@ -191,7 +193,7 @@
 16#3023_88B7_D6DF_E1D0#  rose.interfaces.storage.partition_setup.set_range(in word_64; in word_64; in word)
 16#0408_FB8A_8D6A_A228#  interface rose.interfaces.storage.partitions
 16#3DA1_3F2D_90DB_EFAA#  rose.interfaces.storage.partitions.partition_count return natural
-16#E46F_335E_41B8_D452#  rose.interfaces.storage.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64; out word_64)
+16#1E1B_6A21_AA16_F0BA#  rose.interfaces.storage.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64)
 16#9BC9_6546_EAF3_D521#  interface rose.interfaces.storage.process_banks
 16#DFF6_463D_0BED_A2B8#  rose.interfaces.storage.process_banks.create_process_bank(in word; in object_id) return interface rose.interfaces.storage.bank
 16#307F_F96C_BDAA_2182#  rose.interfaces.storage.process_banks.process_bank(in object_id) return interface rose.interfaces.storage.bank

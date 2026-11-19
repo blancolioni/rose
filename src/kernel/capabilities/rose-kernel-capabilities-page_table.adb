@@ -140,19 +140,24 @@ package body Rose.Kernel.Capabilities.Page_Table is
       Physical_Page   : constant Physical_Page_Address :=
                           Rose.Addresses.Physical_Page_Address
                             (Params.Data (Page_Index + 0));
+      Virtual_Word    : constant Rose.Words.Word :=
+                          Params.Data (Page_Index + 1);
+      --  The virtual page, with the permissions in its top three bits
+      --  (#985). Mem's Map (Map_Page) and Load_Page (Set_Page) send
+      --  them so; only Map sends the statistics.
       Virtual_Page    : constant Virtual_Page_Address :=
                           Virtual_Page_Address
-                            (Params.Data (Page_Index + 1));
+                            (Virtual_Word mod 2 ** 20);
       Permissions     : constant Rose.Words.Word :=
-                          Params.Data (Page_Index + 2);
+                          Virtual_Word / 2 ** 29;
       Available_Pages : constant Rose.Words.Word :=
-                          Params.Data (Page_Index + 3);
+                          Params.Data (Page_Index + 2);
       Allocated_Pages : constant Rose.Words.Word :=
-                          Params.Data (Page_Index + 4);
+                          Params.Data (Page_Index + 3);
       Dirty_Pages     : constant Rose.Words.Word :=
-                          Params.Data (Page_Index + 5);
+                          Params.Data (Page_Index + 4);
       Store_Reads     : constant Rose.Words.Word :=
-                          Params.Data (Page_Index + 6);
+                          Params.Data (Page_Index + 5);
       Readable        : constant Boolean :=
                           (Permissions and 1) /= 0;
       Writable        : constant Boolean :=

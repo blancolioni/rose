@@ -66,6 +66,7 @@ package Tests.Suite is
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
                    Tests.Memory.Copy_Test'Access,
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
+                   Tests.Shared_Segments.Overlap_Test'Access,
                    Tests.Shared_Regions.Shared_Regions_Test'Access,
                    Tests.Regions.Put_Limit_Test'Access,
                    Tests.Screen.Screen_Test'Access,

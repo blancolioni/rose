@@ -2,7 +2,9 @@
 """Check the checkpoint log on a Rose disk image.
 
 Finds the log partition in the image's GPT, reads the log header, and
-walks the entries the way the log server's startup scan does.  Each
+walks the entries the way the log server's startup scan does: from the
+header's first entry, each entry with the next sequence number, wrapping
+around from the end of the log to location 1 (#951).  Each
 entry should be a checkpoint: the kernel's tables, the storage
 server's region table, then the memory server's tables and pages.
 The check is that each part's header agrees with what follows it, that
@@ -73,7 +75,7 @@ MEM_PROCESS_MAGIC = 0x4D50524F43455331
 MAX_SAVED_SEGMENTS = 32
 
 KERNEL_TABLE_MAGIC = 0x4B5441424C455331
-KERNEL_TABLE_VERSION = 10
+KERNEL_TABLE_VERSION = 13
 MAX_SAVED_INTERRUPTS = 32
 RECORDS_PER_PAGE = PAGE_SIZE // 4
 MAX_RECORD_PAGES = 4
@@ -122,10 +124,27 @@ class Log:
         self.page_count = ((last_block - first_block + 1) * BLOCK_SIZE
                            // PAGE_SIZE)
 
+    # Locations 1 .. page_count - 1 hold entries, and wrap around from the
+    # last back to 1 (#951).  The checks count an entry's pages on from
+    # its header, so a location past the last is taken round to the start.
+
+    def physical(self, location):
+        """The log page that location names, after wrapping around."""
+        if location < self.page_count:
+            return location
+        return (location - 1) % (self.page_count - 1) + 1
+
+    def next(self, location):
+        return 1 if location >= self.page_count - 1 else location + 1
+
+    def distance(self, start, end):
+        """How many locations end is after start, going round the log."""
+        if end >= start:
+            return end - start
+        return self.page_count - 1 - start + end
+
     def page(self, location):
-        if location >= self.page_count:
-            return None
-        self.image.seek(self.base + location * PAGE_SIZE)
+        self.image.seek(self.base + self.physical(location) * PAGE_SIZE)
         return self.image.read(PAGE_SIZE)
 
 
@@ -133,16 +152,54 @@ def log_generation(header):
     return u64(header, 8)
 
 
+def log_start(header):
+    """Return (first entry, its sequence number) from the log header.  A
+    header from before version 3 has a sequence number of 0."""
+    return u64(header, 4088), u64(header, 4080)
+
+
 def entry_fields(page):
-    """Return (version, flags, generation, first, last) of an entry header,
-    or None if the page is not one."""
+    """Return (version, flags, generation, first, last, sequence) of an
+    entry header, or None if the page is not one.  Generation is None
+    before version 2, and sequence before version 3."""
     if page is None or u64(page, 0) != ENTRY_MAGIC:
         return None
     version = u32(page, 8)
     flags = u32(page, 12)
     if version == 1:
-        return version, flags, None, u64(page, 16), u64(page, 24)
-    return version, flags, u64(page, 16), u64(page, 24), u64(page, 32)
+        return version, flags, None, u64(page, 16), u64(page, 24), None
+    return (version, flags, u64(page, 16), u64(page, 24), u64(page, 32),
+            u64(page, 40) if version >= 3 else None)
+
+
+def walk_entries(log, header):
+    """Yield (location, first page, last page) of each entry of the log
+    whose header is header, as the log server's startup scan finds them,
+    for the scripts that change a log.  main does the same walk, and says
+    why it stops."""
+    generation = log_generation(header)
+    start, sequence = log_start(header)
+    if not 1 <= start < log.page_count:
+        return
+    location = start
+    while True:
+        fields = entry_fields(log.page(location))
+        if fields is None:
+            return
+        version, flags, entry_generation, first, last, entry_sequence = \
+            fields
+        if version >= 2 and entry_generation != generation \
+           or version >= 3 and entry_sequence != sequence \
+           or version not in (1, 2, 3) \
+           or first != log.next(location) \
+           or not 1 <= last < log.page_count:
+            return
+        yield location, first, last
+        location = log.next(last)
+        if sequence:
+            sequence += 1
+        if location == start:
+            return
 
 
 def describe_page(page):
@@ -528,15 +585,28 @@ def check_entry(log, first, last, verbose, info):
     batches = 0
     batch_headers = 0
     batch_pages = 0
+    wrapped_batches = 0
+    gone_pages = 0
     indexes = 0
     index_pages = 0
-    for kind, start, headers, listed in sections:
+    for number, (kind, start, headers, listed) in enumerate(sections):
         if kind == "batch":
-            ok, message = check_batch(log, start, headers, processes,
-                                      verbose)
+            # A batch before the kernel's tables was paged out between
+            # checkpoints, maybe before a checkpoint that failed (#971),
+            # and may hold pages of processes gone by this checkpoint.
+            ok, message, gone = check_batch(log, start, headers, processes,
+                                            verbose,
+                                            number < len(leading))
             batches += 1
             batch_headers += headers
             batch_pages += listed
+            gone_pages += gone
+            # Locations here count on past the end of the log, so a batch
+            # whose pages wrap around starts before it and ends after it
+            # (#989).
+            if start + headers < log.page_count \
+               <= start + headers + listed - 1:
+                wrapped_batches += 1
         else:
             ok, message = check_index(log, start, headers, processes,
                                       verbose)
@@ -551,6 +621,15 @@ def check_entry(log, first, last, verbose, info):
                     % (batches, "" if batches == 1 else "es",
                        batch_headers, "" if batch_headers == 1 else "s",
                        batch_pages))
+    if wrapped_batches:
+        description += "; a batch wraps round the log"
+    if leading:
+        description += ("; %d paged out before the checkpoint"
+                        % sum(1 for kind, start, headers, listed in leading
+                              if kind == "batch"))
+    if gone_pages:
+        description += ("; %d page%s of processes that are gone"
+                        % (gone_pages, "" if gone_pages == 1 else "s"))
     if indexes:
         description += ("; index: %d section%s, %d page%s"
                         % (indexes, "" if indexes == 1 else "s",
@@ -630,11 +709,14 @@ def find_sections(log, first, last, stop_magic, stop_name):
         location = start + headers + listed
 
 
-def check_batch(log, first, headers, processes, verbose):
+def check_batch(log, first, headers, processes, verbose, paged_out):
     """Check the header pages of the batch that starts at page first: each
-    page they list belongs to one of the memory server's processes.
+    page they list belongs to one of the memory server's processes.  If
+    paged_out, the batch was paged out between checkpoints, and its pages
+    may belong to processes that are gone (ADR 0028, section 4).
 
-    Returns (ok, message)."""
+    Returns (ok, message, pages of processes that are gone)."""
+    gone = 0
     for location in range(first, first + headers):
         page = log.page(location)
         count = u32(page, 12)
@@ -646,11 +728,14 @@ def check_batch(log, first, headers, processes, verbose):
             reference = int.from_bytes(page[16 + i * 5:21 + i * 5],
                                        "little")
             if reference & 0xFFFF not in processes:
+                if paged_out:
+                    gone += 1
+                    continue
                 return False, ("location %d: page %05x belongs to memory "
                                "process %d, which is not in the tables"
                                % (location, reference >> 16,
-                                  reference & 0xFFFF))
-    return True, None
+                                  reference & 0xFFFF)), 0
+    return True, None, gone
 
 
 def check_index(log, first, headers, processes, verbose):
@@ -719,7 +804,8 @@ def batch_pages(log, first, headers):
             # four bits are padding, which mem doesn't clear.
             reference = int.from_bytes(page[16 + i * 5:21 + i * 5],
                                        "little")
-            yield reference & 0xFFFF, (reference >> 16) & 0xFFFFF, location
+            yield (reference & 0xFFFF, (reference >> 16) & 0xFFFFF,
+                   log.physical(location))
             location += 1
 
 
@@ -843,33 +929,57 @@ def main():
             return 1
 
         generation = log_generation(header)
+        start, sequence = log_start(header)
         print("log: blocks %d..%d, %d pages, generation %d"
               % (partition + (log.page_count, generation)))
+
+        # A log from before version 3 starts at 1, and its sequence
+        # number is 0.  From version 3, the log starts at the header's
+        # first entry, and each entry has the next sequence number: one
+        # with another is left over from an earlier lap (#951).
+        if not 1 <= start < log.page_count:
+            print("log header's first entry, %d, is outside the log" % start)
+            return 1
+        if sequence:
+            print("log starts at location %d, sequence number %d"
+                  % (start, sequence))
 
         failures = 0
         entries = 0
         indexed = 0
-        location = 1
+        wrapped = False
+        location = start
         previous = None
         while True:
             fields = entry_fields(log.page(location))
             if fields is None:
                 break
-            version, flags, entry_generation, first, last = fields
-            if version == 2 and entry_generation != generation:
+            version, flags, entry_generation, first, last, \
+                entry_sequence = fields
+            if version >= 2 and entry_generation != generation:
                 break
-            if version not in (1, 2) or first != location + 1 \
-               or last < location:
+            if version >= 3 and entry_sequence != sequence:
+                break
+            if version not in (1, 2, 3) \
+               or first != log.next(location) \
+               or not 1 <= last < log.page_count \
+               or (version < 3 and last < location):
                 print("location %d: entry header with version %d, pages "
                       "%d..%d does not fit; scan stops"
                       % (location, version, first, last))
                 failures += 1
                 break
 
+            # The checks count on from the header, past the end of the log
+            # if the entry wraps around.
+            end = location + log.distance(location, last)
+            if end >= log.page_count or location < start:
+                wrapped = True
+
             entries += 1
             info = {}
-            ok, description = check_entry(log, first, last, args.verbose,
-                                          info)
+            ok, description = check_entry(log, location + 1, end,
+                                          args.verbose, info)
             if ok and info["has_index"]:
                 # An entry's index has to agree with the log's pages
                 # (ADR 0028): a restore that reads only the last entry
@@ -879,25 +989,36 @@ def main():
                     ok, description = False, description + "; " + problem
                 else:
                     indexed += 1
-            print("entry %d at %d: version %d, pages %d..%d: %s%s"
-                  % (entries, location, version, first, last,
-                     description, "" if ok else "  ** BAD"))
+            print("entry %d at %d: version %d, %spages %d..%d: %s%s"
+                  % (entries, location, version,
+                     "" if entry_sequence is None
+                     else "sequence %d, " % entry_sequence,
+                     first, last, description, "" if ok else "  ** BAD"))
             if not ok:
                 failures += 1
             previous = info if "indexes" in info else None
-            location = last + 1
+            location = log.next(last)
+            if sequence:
+                sequence += 1
+            if location == start:
+                print("the log is full")
+                break
 
         print("%d entr%s, %d with an index that agrees with the log; "
-              "next entry at location %d"
+              "next entry at location %d%s"
               % (entries, "y" if entries == 1 else "ies", indexed,
-                 location))
+                 location, "; the log has wrapped around" if wrapped
+                 else ""))
 
         fields = entry_fields(log.page(location))
-        if fields is not None:
-            version, flags, entry_generation, first, last = fields
+        if fields is not None and location != start:
+            version, flags, entry_generation, first, last, \
+                entry_sequence = fields
             print("location %d holds an entry header that is not part of "
-                  "this log (version %d, generation %s, pages %d..%d)"
-                  % (location, version, entry_generation, first, last))
+                  "this log (version %d, generation %s, sequence %s, "
+                  "pages %d..%d)"
+                  % (location, version, entry_generation, entry_sequence,
+                     first, last))
 
         if failures:
             print("%d inconsistent entr%s"

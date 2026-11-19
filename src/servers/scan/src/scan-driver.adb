@@ -273,8 +273,6 @@ begin
                         Rose.System_Calls.Send_Word
                           (Reply, Partition_Type_High);
                         Rose.System_Calls.Send_Word
-                          (Reply, Partition_Flags);
-                        Rose.System_Calls.Send_Word
                           (Reply, Rose.Words.Word_64 (First_Block));
                         --  The length: the GPT's last block is the
                         --  partition's own (#405).

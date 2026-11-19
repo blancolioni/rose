@@ -2193,12 +2193,12 @@ package body Rose.Kernel.Processes is
          others                     => False);
       Params.Control.Last_Sent_Word := 0;
       Params.Data (0) := Data;
-      Params.Error := Error;
+      Params.Control.Error := Error;
       --  Params is the kernel's copy of the invocation, which the caller
       --  copies back over Current_Params when the invocation finishes, so
       --  the error has to be in both.
       Current_Process.Current_Params.Data (0) := Data;
-      Current_Process.Current_Params.Error := Error;
+      Current_Process.Current_Params.Control.Error := Error;
       Current_Process.Flags (Invoke_Reply) := True;
    end Return_Error;
 
@@ -3862,7 +3862,7 @@ package body Rose.Kernel.Processes is
          Rose.Invocation.Reply => True,
          others                => False);
       W.Current_Params.Control.Last_Sent_Word := 0;
-      W.Current_Params.Error := Error;
+      W.Current_Params.Control.Error := Error;
       W.Current_Params.Cap := W.Receive_Cap;
       Set_Current_State (Pid, Ready);
    end Wake_With_Error;

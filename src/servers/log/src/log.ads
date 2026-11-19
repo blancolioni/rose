@@ -18,8 +18,10 @@ package Log is
    Log_Page_Size : constant := 2 ** 12;
    Log_Page_Bits : constant := Log_Page_Size * 8;
 
-   Log_Version   : constant Rose.Words.Word_32 := 16#0002#;
-   --  Version 2 added the generation to the log and entry headers.
+   Log_Version   : constant Rose.Words.Word_32 := 16#0003#;
+   --  Version 2 added the generation to the log and entry headers, and
+   --  version 3 the sequence number to the entry header, so that the
+   --  log can wrap around (#951).
    type Log_Location_Id is new Rose.Words.Word_64;
 
 end Log;

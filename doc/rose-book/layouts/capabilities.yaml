@@ -152,19 +152,18 @@ diagrams:
     title: Invocation record
     rows:
       - - [14, Flags]
-        - [4, SW]
-        - [4, RW]
+        - [3, rsvd]
+        - [3, SW]
+        - [3, RW]
         - [2, SC]
         - [2, RC]
-        - [6, rsvd]
+        - [5, Error]
       - {words: 1, name: Capability}
       - {words: 1, name: Reply Capability}
       - {words: 2, name: Endpoint Id}
       - - [16, Identifier]
-        - [8, unused]
-        - [5, Error]
-        - [3, Extra]
-      - {words: 16, name: Parameter words (16), height: 3}
+        - [16, unused]
+      - {words: 8, name: Parameter words (8), height: 2}
       - {words: 4, name: Capabilities (4)}
       - {words: 1, name: Buffer address}
       - {words: 1, name: Buffer length}
@@ -177,6 +176,7 @@ diagrams:
             RW: Last_Recv_Word
             SC: Last_Sent_Cap
             RC: Last_Recv_Cap
+            Error: Error
             rsvd: Reserved
         - record: Rose.Invocation.Invocation_Record
           fields:
@@ -185,9 +185,7 @@ diagrams:
             Endpoint Id: Endpoint
             Identifier: Identifier
             unused: Unused
-            Error: Error
-            Extra: Extra_Errors
-            Parameter words (16): Data
+            Parameter words (8): Data
             Capabilities (4): Caps
             Buffer address: Buffer_Address
             Buffer length: Buffer_Length

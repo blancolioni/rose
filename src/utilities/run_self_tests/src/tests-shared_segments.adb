@@ -5,6 +5,7 @@ with System.Storage_Elements;
 with Rose.Capabilities.Standard;
 with Rose.Words;
 
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Processes.Process.Client;
 with Rose.Interfaces.Storage.Region;
@@ -25,6 +26,7 @@ package body Tests.Shared_Segments is
    First_Shared  : constant Word := 16#C_0000#;
    Second_Shared : constant Word := 16#C_0010#;
    Private_Copy  : constant Word := 16#C_0020#;
+   Overlap_Base  : constant Word := 16#C_0030#;
 
    Last_Index : constant := Pages * Page_Size / 4;
 
@@ -43,6 +45,72 @@ package body Tests.Shared_Segments is
       Ada.Text_IO.Put (": " & Message);
       return False;
    end Fail;
+
+   ------------------
+   -- Overlap_Test --
+   ------------------
+
+   function Overlap_Test return Boolean is
+      use Rose.Interfaces.Processes.Segment;
+      Flags : constant Word := Segment_Readable + Segment_Writable;
+   begin
+      Ada.Text_IO.Put ("Segment overlap test");
+
+      if Tests.Registry.Bank = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (" (skipped: no bank)");
+         return True;
+      end if;
+
+      declare
+         Bank   : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                    Rose.Interfaces.Storage.Bank.Client.From_Cap
+                      (Tests.Registry.Bank);
+         Region : Rose.Interfaces.Storage.Region.Region_Object'Class :=
+                    Bank.Reserve_Storage (Pages * Page_Size);
+         Self   : Rose.Interfaces.Processes.Process.Client.Process_Client :=
+                    Rose.Interfaces.Processes.Process.Client.From_Cap
+                      (Rose.Capabilities.Standard.Process_Interface_Cap);
+         Passed : Boolean := True;
+
+         function Refused (Base : Word) return Boolean;
+         --  Map the region from Base. True if mem refused it; if it
+         --  didn't, the segment is removed again.
+
+         -------------
+         -- Refused --
+         -------------
+
+         function Refused (Base : Word) return Boolean is
+         begin
+            Self.Add_Segment (Base, Base + Pages, Region, 0, Flags);
+            Self.Remove_Segment (Base);
+            return False;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return True;
+         end Refused;
+
+      begin
+         Self.Add_Segment
+           (Overlap_Base, Overlap_Base + Pages, Region, 0, Flags);
+
+         if not Refused (Overlap_Base + 1) then
+            Passed := Fail ("a segment over the end of another was added");
+         end if;
+
+         if not Refused (Overlap_Base - 1) then
+            Passed := Fail ("a segment over the start of another was added");
+         end if;
+
+         if Refused (Overlap_Base + Pages) then
+            Passed := Fail ("a segment next to another was refused");
+         end if;
+
+         Self.Remove_Segment (Overlap_Base);
+         Region.Release;
+         return Passed;
+      end;
+   end Overlap_Test;
 
    -------------------------
    -- Shared_Segment_Test --

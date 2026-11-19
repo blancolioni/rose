@@ -1,4 +1,5 @@
 with Rose.Console_IO;
+with Rose.Server;
 with Rose.Invocation;
 with Rose.Trace;
 with Rose.System_Calls.Server;
@@ -140,6 +141,25 @@ package body Mem.Processes is
 
    procedure Report_Segment (Segment : Segment_Record);
 
+   procedure Add_Restored_Segment
+     (Mem_Pid : Natural;
+      Base    : Rose.Words.Word;
+      Bound   : Rose.Words.Word;
+      Limit   : Rose.Words.Word;
+      Flags   : Rose.Words.Word;
+      Success : out Boolean);
+   --  Add a segment saved in a checkpoint to process Mem_Pid, without a
+   --  region. Success is False, and the request fails, if the process
+   --  isn't valid, has too many segments, or the segment overlaps one it
+   --  has (#970).
+
+   procedure Report_Overlap
+     (Process : Process_Id;
+      Base    : Rose.Addresses.Virtual_Page_Address;
+      Bound   : Rose.Addresses.Virtual_Page_Address);
+   --  Say that the segment from Base to Bound overlaps one of Process's,
+   --  and which (#970).
+
    function Overlaps
      (P     : Memory_Process_Record;
       Base  : Rose.Addresses.Virtual_Page_Address;
@@ -179,11 +199,23 @@ package body Mem.Processes is
       Readable       : Boolean;
       Writable       : Boolean;
       Executable     : Boolean;
-      Resizable      : Boolean)
+      Resizable      : Boolean;
+      Success        : out Boolean)
    is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
+      Success := False;
+
       if P.Num_Segments = Max_Segments then
+         Rose.Console_IO.Put
+           ("mem: add segment: too many segments, process ");
+         Rose.Console_IO.Put (Natural (Process));
+         Rose.Console_IO.New_Line;
+         return;
+      end if;
+
+      if Overlaps (P, Virtual_Base, Virtual_Bound) then
+         Report_Overlap (Process, Virtual_Base, Virtual_Bound);
          return;
       end if;
 
@@ -205,8 +237,75 @@ package body Mem.Processes is
             Persistent => False,
             Shared     => False),
          Private_Region => False);
+      Success := True;
 
    end Add_Nonpersistent_Segment;
+
+   --------------------------
+   -- Add_Restored_Segment --
+   --------------------------
+
+   procedure Add_Restored_Segment
+     (Mem_Pid : Natural;
+      Base    : Rose.Words.Word;
+      Bound   : Rose.Words.Word;
+      Limit   : Rose.Words.Word;
+      Flags   : Rose.Words.Word;
+      Success : out Boolean)
+   is
+      use Rose.Words;
+      Pid : constant Process_Id := Process_Id (Mem_Pid);
+
+      function Has (Flag : Word) return Boolean is ((Flags and Flag) /= 0);
+
+   begin
+      Success := False;
+
+      if not Is_Valid_Process_Id (Pid)
+        or else Process_Table (Pid).Num_Segments = Max_Segments
+      then
+         Rose.Console_IO.Put_Line ("mem: restore segment: bad request");
+         Rose.Server.Fail;
+         return;
+      end if;
+
+      if Overlaps (Process_Table (Pid),
+                   Rose.Addresses.Virtual_Page_Address (Base),
+                   Rose.Addresses.Virtual_Page_Address (Limit))
+      then
+         Report_Overlap (Pid,
+                         Rose.Addresses.Virtual_Page_Address (Base),
+                         Rose.Addresses.Virtual_Page_Address (Limit));
+         Rose.Server.Fail;
+         return;
+      end if;
+
+      declare
+         P : Memory_Process_Record renames Process_Table (Pid);
+      begin
+         P.Num_Segments := P.Num_Segments + 1;
+         P.Segments (P.Num_Segments) :=
+           Segment_Record'
+             (Base           => Rose.Addresses.Virtual_Page_Address (Base),
+              Bound          => Rose.Addresses.Virtual_Page_Address (Bound),
+              Limit          => Rose.Addresses.Virtual_Page_Address (Limit),
+              Region         => <>,
+              Owner          => Rose.Capabilities.Null_Capability,
+              Region_Base    => 0,
+              Region_Bound   => 0,
+              Region_Offset  => 0,
+              Flags          =>
+                (Read       => Has (Rose.Checkpoints.Segment_Readable),
+                 Write      => Has (Rose.Checkpoints.Segment_Writable),
+                 Execute    => Has (Rose.Checkpoints.Segment_Executable),
+                 Extensible => Has (Rose.Checkpoints.Segment_Extensible),
+                 Persistent => Has (Rose.Checkpoints.Segment_Persistent),
+                 Shared     => Has (Rose.Checkpoints.Segment_Shared)),
+              Private_Region =>
+                Has (Rose.Checkpoints.Segment_Private_Region));
+      end;
+      Success := True;
+   end Add_Restored_Segment;
 
    -----------------
    -- Add_Segment --
@@ -222,6 +321,7 @@ package body Mem.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       Resizable     : Boolean;
+      Success       : out Boolean;
       Private_Region : Boolean := False;
       Shared        : Boolean := False)
    is
@@ -231,20 +331,39 @@ package body Mem.Processes is
       Region_Bound : Rose.Objects.Page_Object_Id;
       New_Segment  : Segment_Record;
       Has_Range    : Boolean;
+
+      procedure Give_Back;
+      --  Mem doesn't keep a segment it refuses: delete its copy of Region,
+      --  which leaves the region to the caller, who still has it.
+
+      ---------------
+      -- Give_Back --
+      ---------------
+
+      procedure Give_Back is
+      begin
+         Rose.System_Calls.Delete_Cap (Region);
+      end Give_Back;
+
    begin
+      Success := False;
+
       if P.Num_Segments = Max_Segments then
          Rose.Console_IO.Put
            ("mem: add segment: too many segments, process ");
          Rose.Console_IO.Put (Natural (Process));
          Rose.Console_IO.New_Line;
+         Give_Back;
          return;
       end if;
 
-      if Shared and then Overlaps (P, Virtual_Base, Virtual_Bound) then
-         Rose.Console_IO.Put
-           ("mem: add segment: shared segment overlaps another, process ");
-         Rose.Console_IO.Put (Natural (Process));
-         Rose.Console_IO.New_Line;
+      --  A page in two segments would be served from whichever comes
+      --  first, with its region and rights, and nothing would say so
+      --  (#970).
+
+      if Overlaps (P, Virtual_Base, Virtual_Bound) then
+         Report_Overlap (Process, Virtual_Base, Virtual_Bound);
+         Give_Back;
          return;
       end if;
 
@@ -265,6 +384,15 @@ package body Mem.Processes is
            ("mem: add segment: region has no range, process ");
          Rose.Console_IO.Put (Natural (Process));
          Rose.Console_IO.New_Line;
+
+         --  Closing the Region_Access deletes its cap, which is Region
+         --  itself unless the region is private, when it was asked for.
+
+         Rose.Interfaces.Storage.Region_Access.Client.Close
+           (New_Segment.Region);
+         if Private_Region then
+            Give_Back;
+         end if;
          return;
       end if;
 
@@ -292,6 +420,7 @@ package body Mem.Processes is
          Report_Segment (P.Segments (P.Num_Segments));
       end if;
 
+      Success := True;
    end Add_Segment;
 
    ----------------------------
@@ -1326,6 +1455,50 @@ package body Mem.Processes is
    end Remove_Segment;
 
    --------------------
+   -- Report_Overlap --
+   --------------------
+
+   procedure Report_Overlap
+     (Process : Process_Id;
+      Base    : Rose.Addresses.Virtual_Page_Address;
+      Bound   : Rose.Addresses.Virtual_Page_Address)
+   is
+      use type Rose.Addresses.Virtual_Page_Address;
+      use type Rose.Words.Word;
+      P : Memory_Process_Record renames Process_Table (Process);
+
+      procedure Put_Range
+        (From, To : Rose.Addresses.Virtual_Page_Address);
+
+      ---------------
+      -- Put_Range --
+      ---------------
+
+      procedure Put_Range
+        (From, To : Rose.Addresses.Virtual_Page_Address)
+      is
+      begin
+         Rose.Console_IO.Put (Rose.Words.Word (From) * 4096);
+         Rose.Console_IO.Put ("-");
+         Rose.Console_IO.Put (Rose.Words.Word (To) * 4096);
+      end Put_Range;
+
+   begin
+      Rose.Console_IO.Put ("mem: add segment: process ");
+      Rose.Console_IO.Put (Natural (Process));
+      Rose.Console_IO.Put (": ");
+      Put_Range (Base, Bound);
+      Rose.Console_IO.Put (" overlaps ");
+      for Segment of P.Segments (1 .. P.Num_Segments) loop
+         if Base < Segment.Limit and then Segment.Base < Bound then
+            Put_Range (Segment.Base, Segment.Limit);
+            exit;
+         end if;
+      end loop;
+      Rose.Console_IO.New_Line;
+   end Report_Overlap;
+
+   --------------------
    -- Report_Segment --
    --------------------
 
@@ -1565,10 +1738,17 @@ package body Mem.Processes is
       Region        : Rose.Capabilities.Capability;
       Region_Offset : Rose.Words.Word)
    is
+      pragma Unreferenced (Id);
       Pid       : constant Process_Id := Process_Id (Mem_Pid);
       Has_Range : Boolean;
+      Added     : Boolean;
    begin
-      Restore_Zero_Segment (Id, Mem_Pid, Base, Bound, Limit, Flags);
+      Add_Restored_Segment (Mem_Pid, Base, Bound, Limit, Flags, Added);
+
+      if not Added then
+         Rose.System_Calls.Delete_Cap (Region);
+         return;
+      end if;
 
       if Is_Valid_Process_Id (Pid)
         and then Process_Table (Pid).Num_Segments > 0
@@ -1635,43 +1815,9 @@ package body Mem.Processes is
       Flags   : Rose.Words.Word)
    is
       pragma Unreferenced (Id);
-      use Rose.Words;
-      Pid : constant Process_Id := Process_Id (Mem_Pid);
-
-      function Has (Flag : Word) return Boolean is ((Flags and Flag) /= 0);
-
+      Added : Boolean;
    begin
-      if not Is_Valid_Process_Id (Pid)
-        or else Process_Table (Pid).Num_Segments = Max_Segments
-      then
-         Rose.Console_IO.Put_Line ("mem: restore segment: bad request");
-         return;
-      end if;
-
-      declare
-         P : Memory_Process_Record renames Process_Table (Pid);
-      begin
-         P.Num_Segments := P.Num_Segments + 1;
-         P.Segments (P.Num_Segments) :=
-           Segment_Record'
-             (Base           => Rose.Addresses.Virtual_Page_Address (Base),
-              Bound          => Rose.Addresses.Virtual_Page_Address (Bound),
-              Limit          => Rose.Addresses.Virtual_Page_Address (Limit),
-              Region         => <>,
-              Owner          => Rose.Capabilities.Null_Capability,
-              Region_Base    => 0,
-              Region_Bound   => 0,
-              Region_Offset  => 0,
-              Flags          =>
-                (Read       => Has (Rose.Checkpoints.Segment_Readable),
-                 Write      => Has (Rose.Checkpoints.Segment_Writable),
-                 Execute    => Has (Rose.Checkpoints.Segment_Executable),
-                 Extensible => Has (Rose.Checkpoints.Segment_Extensible),
-                 Persistent => Has (Rose.Checkpoints.Segment_Persistent),
-                 Shared     => Has (Rose.Checkpoints.Segment_Shared)),
-              Private_Region =>
-                Has (Rose.Checkpoints.Segment_Private_Region));
-      end;
+      Add_Restored_Segment (Mem_Pid, Base, Bound, Limit, Flags, Added);
    end Restore_Zero_Segment;
 
    --------------------

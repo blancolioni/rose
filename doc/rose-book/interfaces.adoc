@@ -99,6 +99,7 @@ end Process;
 A segment maps a range of virtual addresses onto a region of storage, with flags for `Segment_Readable`, `Segment_Writable`, `Segment_Executable`, `Segment_Resizable`, `Segment_Initialized` and `Segment_Shared`.
 `Add_Segment` maps a region that the process doesn't own, such as a program's image or a shared region, and takes its `Region_Access`.
 `Add_Private_Segment` maps a region that the process owns from then on, such as its data, stack and heap, and takes the `Region` itself: it is released when the segment is removed, or the process is gone.
+Segments of a process can't overlap, and nor can a segment and the range a resizable segment can grow into: mem refuses such a segment, and the call fails (#970).
 A nonpersistent segment has no region behind it.
 
 `Process` is the process's own capability: the process uses it to map shared regions, publish its interface and exit.

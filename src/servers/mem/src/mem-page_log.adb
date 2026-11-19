@@ -37,14 +37,24 @@ package body Mem.Page_Log is
       return Rose.Words.Word_32 (Params.Data (0));
    end Append;
 
-   ----------------
-   -- Fail_Entry --
-   ----------------
+   -------------------
+   -- Discard_Pages --
+   -------------------
 
-   procedure Fail_Entry is
+   procedure Discard_Pages (From : Rose.Words.Word_32) is
    begin
-      Rose.Interfaces.Checkpoints.Page_Log.Client.Fail_Entry (Client);
-   end Fail_Entry;
+      Rose.Interfaces.Checkpoints.Page_Log.Client.Discard_Pages
+        (Client, Rose.Words.Word (From));
+   end Discard_Pages;
+
+   ---------------------
+   -- Fail_Checkpoint --
+   ---------------------
+
+   procedure Fail_Checkpoint is
+   begin
+      Rose.Interfaces.Checkpoints.Page_Log.Client.Fail_Checkpoint (Client);
+   end Fail_Checkpoint;
 
    ------------------
    -- Is_Available --

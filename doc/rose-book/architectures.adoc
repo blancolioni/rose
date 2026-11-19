@@ -18,7 +18,7 @@ A process passes its invocation record to the kernel by address, not in register
 | `ebx`, `esi`, `edi`, `ebp` | Saved, and restored when the process resumes
 |===
 
-The kernel copies the whole record, 40 words, from the caller's memory, and handles the call.
+The kernel copies the whole record, 20 words, from the caller's memory, and handles the call.
 When it resumes the process with a reply, it copies the record back to the same address, past the write protection of a checkpoint, which is why a persistent process waits for its reply until a checkpoint has finished (see <<Persistence>>).
 
 === Page Table

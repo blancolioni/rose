@@ -53,6 +53,12 @@ package body Rose.System_Calls is
    --  Fail the invocation in Params, which needs an invoke buffer that
    --  the process has not set up (#239).
 
+   procedure Report_Too_Many_Words
+     (Params : in out Rose.Invocation.Invocation_Record);
+   --  Fail the invocation in Params, which already holds as many words
+   --  as an invocation carries: the next one would wrap around and
+   --  replace the first (#985).
+
    --------------------
    -- Buffer_Address --
    --------------------
@@ -631,9 +637,10 @@ package body Rose.System_Calls is
       use type Rose.Invocation.Invocation_Error;
    begin
       if Item.Control.Flags (Rose.Invocation.Error)
-        and then Item.Error in Rose.Invocation.No_Invoke_Buffer
+        and then Item.Control.Error in Rose.Invocation.No_Invoke_Buffer
                              | Rose.Invocation.Buffer_Too_Small
                              | Rose.Invocation.Too_Many_Capabilities
+                             | Rose.Invocation.Too_Many_Words
       then
          return;
       end if;
@@ -739,12 +746,25 @@ package body Rose.System_Calls is
    is
    begin
       Params.Control.Flags (Rose.Invocation.Error) := True;
-      Params.Error := Rose.Invocation.No_Invoke_Buffer;
+      Params.Control.Error := Rose.Invocation.No_Invoke_Buffer;
 
       --  Invoke_Capability does not enter the kernel with this error, but
       --  a caller that does gets Invalid_Capability, not a panic.
       Params.Cap := 0;
    end Report_No_Buffer;
+
+   ---------------------------
+   -- Report_Too_Many_Words --
+   ---------------------------
+
+   procedure Report_Too_Many_Words
+     (Params : in out Rose.Invocation.Invocation_Record)
+   is
+   begin
+      Params.Control.Flags (Rose.Invocation.Error) := True;
+      Params.Control.Error := Rose.Invocation.Too_Many_Words;
+      Params.Cap := 0;
+   end Report_Too_Many_Words;
 
    -----------------
    -- Rescind_Cap --
@@ -798,7 +818,7 @@ package body Rose.System_Calls is
          --  The index would wrap around and replace the first cap.
 
          Params.Control.Flags (Rose.Invocation.Error) := True;
-         Params.Error := Rose.Invocation.Too_Many_Capabilities;
+         Params.Control.Error := Rose.Invocation.Too_Many_Capabilities;
          Params.Cap := 0;
          return;
       else
@@ -831,7 +851,7 @@ package body Rose.System_Calls is
             Invoke_Capability (Part);
             if Part.Control.Flags (Rose.Invocation.Error) then
                Params.Control.Flags (Rose.Invocation.Error) := True;
-               Params.Error := Part.Error;
+               Params.Control.Error := Part.Control.Error;
                Params.Cap := 0;
                return;
             end if;
@@ -867,7 +887,7 @@ package body Rose.System_Calls is
    is
    begin
       Params.Control.Flags (Rose.Invocation.Error) := True;
-      Params.Error := Error;
+      Params.Control.Error := Error;
    end Send_Error;
 
    ---------------------
@@ -907,6 +927,11 @@ package body Rose.System_Calls is
       if not Params.Control.Flags (Rose.Invocation.Send_Words) then
          Params.Control.Flags (Rose.Invocation.Send_Words) := True;
          Params.Control.Last_Sent_Word := 0;
+      elsif Params.Control.Last_Sent_Word
+        = Rose.Invocation.Parameter_Word_Index'Last
+      then
+         Report_Too_Many_Words (Params);
+         return;
       else
          Params.Control.Last_Sent_Word :=
            Params.Control.Last_Sent_Word + 1;
@@ -974,7 +999,7 @@ package body Rose.System_Calls is
          return;
       elsif Size > Invoke_Buffer_Len - Start then
          Params.Control.Flags (Rose.Invocation.Error) := True;
-         Params.Error := Rose.Invocation.Buffer_Too_Small;
+         Params.Control.Error := Rose.Invocation.Buffer_Too_Small;
          Params.Cap := 0;
          return;
       end if;
@@ -1102,6 +1127,11 @@ package body Rose.System_Calls is
          if not Params.Control.Flags (Rose.Invocation.Send_Words) then
             Params.Control.Flags (Rose.Invocation.Send_Words) := True;
             Params.Control.Last_Sent_Word := 0;
+         elsif Params.Control.Last_Sent_Word
+           = Rose.Invocation.Parameter_Word_Index'Last
+         then
+            Report_Too_Many_Words (Params);
+            return;
          else
             Params.Control.Last_Sent_Word :=
               Params.Control.Last_Sent_Word + 1;

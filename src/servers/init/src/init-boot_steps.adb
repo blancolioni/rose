@@ -197,7 +197,6 @@ package body Init.Boot_Steps is
          use type Rose.Words.Word_64;
          Partition_Type_Low  : Rose.Words.Word_64;
          Partition_Type_High : Rose.Words.Word_64;
-         Partition_Flags     : Rose.Words.Word_64;
          Start_Address       : Rose.Words.Word_64;
          Length              : Rose.Words.Word_64;
 
@@ -209,13 +208,16 @@ package body Init.Boot_Steps is
             Block_Size : Rose.Words.Word)
             return Rose.Capabilities.Capability
          is (Launch_Partition_Server
-               (Oid, Start_Address, Start_Address + Length, Block_Size));
+               (Oid, Start_Address, Start_Address + Length - 1,
+                Block_Size));
+         --  The bound is the partition's last block.  It was one past it,
+         --  which gave the log a last page that ended in the block after
+         --  the partition, and a log that wraps around reaches it (#951).
 
       begin
          Client.Get_Partition
            (Parts, Index, Partition_Type_Low,
-            Partition_Type_High, Partition_Flags,
-            Start_Address, Length);
+            Partition_Type_High, Start_Address, Length);
 
          --  Only the first partition of each type is used.  The install
          --  media's init also uses GRUB's, to write the boot loader
