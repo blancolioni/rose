@@ -70,8 +70,6 @@ package body Rose.Kernel.Debug is
       Put (Rose.Words.Word_16 (Layout.Header.Endpoint));
       Put (" id=");
       Put (Natural (Layout.Header.Identifier));
-      Put ("/");
-      Put (Natural (Params.Identifier));
       Put (" payload=");
       Put (Rose.Words.Word_32 (Layout.Payload));
       Put_Flag ("E", Error);
@@ -94,10 +92,9 @@ package body Rose.Kernel.Debug is
       Put_Value ("lsc", Send_Caps, Natural (Params.Control.Last_Sent_Cap));
       Put_Value ("lrc", Recv_Caps, Natural (Params.Control.Last_Recv_Cap));
 
-      Put (" ep=");
-      Put (Word_32 (Word_64 (Params.Endpoint) / 2 ** 32));
-      Put ("_");
-      Put (Word_32 (Params.Endpoint));
+      --  The caller's Endpoint and Identifier are not printed: the kernel
+      --  never reads them, and writes them on delivery (#892). The cap's
+      --  endpoint and identifier above are the ones that count.
 
       if Params.Control.Flags (Send_Words) then
          Put (" [");
