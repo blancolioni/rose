@@ -114,9 +114,15 @@ is
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
          Last_Recv_Cap  : Capability_Index     := 0;
-         Reserved       : Word_8               := 0;
+         Error          : Invocation_Error     := OK;
+         Reserved       : Word_3               := 0;
       end record
      with Pack, Size => 32;
+   --  Error means something only when Flags (Error) is set. It is in the
+   --  control word, so that the kernel copies in only the first two words
+   --  of the header (#990, #892). Its five bits, for up to 32 errors,
+   --  fill the word with the other fields and Reserved: one more error,
+   --  and Size no longer holds (#692).
 
    type Invocation_Record is
       record
@@ -125,9 +131,7 @@ is
          Reply_Cap      : Rose.Capabilities.Capability := 0;
          Endpoint       : Rose.Objects.Endpoint_Id     := 0;
          Identifier     : Rose.Objects.Capability_Identifier := 0;
-         Unused         : Word_8 := 0;
-         Error          : Invocation_Error := OK;
-         Extra_Errors   : Word_3 := 0;
+         Unused         : Word_16 := 0;
          Data           : Parameter_Words := (others => 0);
          Caps           : Capability_Words := (others => 0);
          Buffer_Address : System.Address := System.Null_Address;
@@ -136,9 +140,7 @@ is
      with Size => 20 * 4 * 8;
 
    --  The layout is fixed, because the kernel, every process and every
-   --  checkpoint share it. Error has five bits, for up to 32 errors: one
-   --  more than that, and this clause no longer compiles, rather than
-   --  Extra_Errors shrinking without a word (#692). The book's diagram,
+   --  checkpoint share it. The book's diagram,
    --  doc/rose-book/layouts/capabilities.yaml, is checked against it.
 
    for Invocation_Record use
@@ -148,9 +150,7 @@ is
          Reply_Cap      at   8 range  0 .. 31;
          Endpoint       at  12 range  0 .. 63;
          Identifier     at  20 range  0 .. 15;
-         Unused         at  20 range 16 .. 23;
-         Error          at  20 range 24 .. 28;
-         Extra_Errors   at  20 range 29 .. 31;
+         Unused         at  20 range 16 .. 31;
          Data           at  24 range  0 .. 8 * 32 - 1;
          Caps           at  56 range  0 .. 4 * 32 - 1;
          Buffer_Address at  72 range  0 .. 31;
@@ -238,6 +238,7 @@ is
       X, Y, Z : Rose.Words.Word := 0)
    with
      Post => Params.Control.Flags (Rose.Invocation.Error)
+             and then Params.Control.Error = Error
              and then Sent_Word_Count (Params) = 4;
 
    procedure For_Each_Sent_Word
