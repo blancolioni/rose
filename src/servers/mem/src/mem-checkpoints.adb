@@ -59,15 +59,18 @@ package body Mem.Checkpoints is
 
       Batch_First : Rose.Words.Word_32 := 0;
       Batch_Count : Rose.Words.Word_32 := 0;
-      --  The log page of the batch's first page, and the number of its
-      --  pages appended so far.
+      Batch_Wrap  : Rose.Words.Word_32 := 0;
+      --  The log page of the batch's first page, the number of its pages
+      --  appended so far, and how many of them came before the log
+      --  wrapped around to log page 1, or 0 if it hasn't (#989).
 
       procedure Append (Buffer : System.Address);
 
       procedure Append_Batch_Page (Buffer : System.Address);
       --  Append a page of the batch, which must go at the log page after
-      --  the one before, since Mem.Log_Index finds each page's log page
-      --  by its place in the batch.
+      --  the one before, or at log page 1 where the log wraps around,
+      --  since Mem.Log_Index finds each page's log page by its place in
+      --  the batch.
 
       procedure Reset_Header;
 
@@ -102,7 +105,14 @@ package body Mem.Checkpoints is
             Failed := True;
          elsif Batch_Count = 0 then
             Batch_First := Log_Page;
-         elsif Log_Page /= Batch_First + Batch_Count then
+         elsif Log_Page
+           = (if Batch_Wrap = 0 then Batch_First + Batch_Count
+              else 1 + Batch_Count - Batch_Wrap)
+         then
+            null;
+         elsif Batch_Wrap = 0 and then Log_Page = 1 then
+            Batch_Wrap := Batch_Count;
+         else
             Failed := True;
          end if;
 
@@ -193,7 +203,7 @@ package body Mem.Checkpoints is
       Mem.Page_Table.Iterate_Dirty_Pages (Write_Page'Access);
 
       if not Failed then
-         Mem.Log_Index.Write_Index (Batch_First, Index_Written);
+         Mem.Log_Index.Write_Index (Batch_First, Batch_Wrap, Index_Written);
          Failed := not Index_Written;
       end if;
 

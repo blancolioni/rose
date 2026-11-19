@@ -43,13 +43,16 @@ package Mem.Log_Index is
 
    procedure Write_Index
      (Batch_First : Rose.Words.Word_32;
+      Batch_Wrap  : Rose.Words.Word_32;
       Success     : out Boolean);
    --  Append the index pages that the checkpoint's batch changes: an
    --  index section with a leaf for each 4 MiB of a process's address
    --  space with a page in the batch, and a directory for each process
    --  with a leaf. The batch saved the dirty pages that are not shared
    --  (Mem.Page_Table.Iterate_Dirty_Pages), in order, at consecutive log
-   --  pages from Batch_First. Success is False if an append failed.
+   --  pages from Batch_First. If Batch_Wrap is not 0, the log wrapped
+   --  around after that many of them, and the rest are at consecutive
+   --  log pages from 1 (#989). Success is False if an append failed.
 
    procedure End_Checkpoint (Committed : Boolean);
    --  The checkpoint's part of the entry is complete. If Committed, the
