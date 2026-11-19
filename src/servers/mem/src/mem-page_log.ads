@@ -26,8 +26,13 @@ package Mem.Page_Log is
       Page     : System.Address);
    --  Read log page Log_Page into the page at Page.
 
-   procedure Fail_Entry;
-   --  Tell the log server to leave the open entry out of the log when it
-   --  commits.
+   procedure Fail_Checkpoint;
+   --  Tell the log server to drop the checkpoint's pages when it commits.
+   --  The pages appended before the checkpoint stay in the open entry.
+
+   procedure Discard_Pages (From : Rose.Words.Word_32);
+   --  Between checkpoints, drop log page From of the open entry, and
+   --  every page after it, after an append of a batch failed. From is
+   --  the log page of the batch's first page, or 0 if that append failed.
 
 end Mem.Page_Log;

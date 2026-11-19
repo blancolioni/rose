@@ -103,8 +103,6 @@ package body Mem.Checkpoints is
          elsif Batch_Count = 0 then
             Batch_First := Log_Page;
          elsif Log_Page /= Batch_First + Batch_Count then
-            Rose.Console_IO.Put_Line
-              ("mem: checkpoint: batch pages are not consecutive");
             Failed := True;
          end if;
 
@@ -207,15 +205,19 @@ package body Mem.Checkpoints is
          Write_Shared_Pages (Append'Access);
       end if;
 
-      --  A failed entry is left out of the log, so the pages it saved are
-      --  still dirty, and the index it wrote is not used (ADR 0028,
-      --  section 11). The log server has already failed the entry if an
-      --  append did, but not if the batch's pages went astray.
+      --  A failed checkpoint's pages are dropped from the log, so the
+      --  pages it saved are still dirty, and the index it wrote is not
+      --  used (ADR 0028, section 11). The log server has already failed
+      --  the checkpoint if an append did, but not if the batch's pages
+      --  went astray.
+      --
+      --  There is no message here.  The console may be waiting on a
+      --  process that checkpoint mode has blocked, and the checkpoint is
+      --  waiting on mem (#971).  The log server reports the failure when
+      --  the checkpoint commits.
 
       if Failed then
-         Rose.Console_IO.Put_Line
-           ("mem: checkpoint failed; changed pages kept for the next one");
-         Mem.Page_Log.Fail_Entry;
+         Mem.Page_Log.Fail_Checkpoint;
          Mem.Log_Index.End_Checkpoint (Committed => False);
       else
          Mem.Log_Index.End_Checkpoint (Committed => True);

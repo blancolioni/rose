@@ -9,8 +9,12 @@ interface Processes.Segment is
    Segment_Shared      : constant := 64;
    --  The segment maps the region's pages themselves, not copies of
    --  them: every process that maps a page of the region shared sees the
-   --  same page, and its writes (ADR 0025). A shared segment can't
-   --  overlap another segment of the process.
+   --  same page, and its writes (ADR 0025).
+   --
+   --  No segment can overlap another segment of the process, or the
+   --  range a resizable one can grow into. Adding one that does fails,
+   --  as it does when the process has too many segments, and the region
+   --  stays the caller's (#970).
 
    procedure Add_Segment
      (Virtual_Base  : Word;
@@ -30,7 +34,8 @@ interface Processes.Segment is
    --  Map a region that belongs to the process from now on, from its
    --  first page, such as its data, stack or heap. The caller hands the
    --  region over, and forgets it rather than closing it. It is released
-   --  when the segment is removed, or the process is gone (#403).
+   --  when the segment is removed, or the process is gone (#403). If the
+   --  call fails, the region is still the caller's, to release.
 
    procedure Add_Nonpersistent_Segment
      (Virtual_Base  : Word;

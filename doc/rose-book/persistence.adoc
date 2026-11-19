@@ -112,7 +112,11 @@ The boot modules go on running, which is what lets `checkpoint`, `mem`, `store`,
   `Page_Log.Read_Page` reads a page back by its log page, from a committed entry or the open one.
   `Commit` completes the entry.
   `Commit` writes the entry's pages before its header, so that a header is only ever found with all its pages.
-* If an entry can't be completed, because the log is full or a write failed, `Commit` leaves it out, and the previous entry is still the last.
+* `log` marks where each checkpoint starts in the open entry.
+  If an append fails during a checkpoint, because the log is full, or `mem` fails its part with `Page_Log.Fail_Checkpoint`, `Commit` rolls the entry back to the mark.
+  The entry stays open with the pages appended before the checkpoint, and the next checkpoint commits them.
+* Between checkpoints, `mem` drops a batch whose append failed with `Page_Log.Discard_Pages`, which discards the open entry back to the batch's first log page.
+* If a write to the disk fails, `log` can't tell which pages reached the disk, so `Commit` leaves the whole entry out, and the previous entry is still the last.
 * `Reset` starts a new log by adding one to the generation.
   An entry counts only if its generation is the log's, so entries written before a reset are never found again.
   `restore-install` resets the log before it installs a system.
@@ -156,7 +160,7 @@ At each checkpoint, after its batch, `mem` writes a new copy of each leaf with a
 A new leaf starts as a copy of the one it replaces, read from the log, so it keeps the pages that didn't change.
 The batch's pages go to consecutive log pages, so `mem` knows each page's log page from its place in the batch.
 
-If any of `mem`'s appends fails, it tells `log` to leave the entry out (`Page_Log.Fail_Entry`), and keeps the index it had.
+If any of `mem`'s appends fails, it tells `log` to drop the checkpoint's pages (`Page_Log.Fail_Checkpoint`), and keeps the index it had.
 The pages the checkpoint would have saved stay dirty, so the next checkpoint saves them.
 
 A process that `mem` gives a slot to when it is launched starts with no index.
