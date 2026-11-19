@@ -53,21 +53,11 @@ def main():
         if check_log.u64(header, 0) != check_log.LOG_MAGIC:
             print("%s: the log partition has no log header" % args.image)
             return 1
-        generation = check_log.log_generation(header)
-
         last_first = None
         last_location = None
-        location = 1
-        while True:
-            fields = check_log.entry_fields(log.page(location))
-            if fields is None:
-                break
-            version, flags, entry_generation, first, last = fields
-            if version == 2 and entry_generation != generation:
-                break
+        for location, first, last in check_log.walk_entries(log, header):
             last_first = first
             last_location = location
-            location = last + 1
 
         if last_first is None:
             print("%s: the log has no entries" % args.image)

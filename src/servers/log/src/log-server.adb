@@ -79,7 +79,7 @@ package body Log.Server is
       Failed_By_Memory_Server, No_Checkpoint_To_Fail,
       Cannot_Write_Pages, Cannot_Write_Header, No_Checkpoint_Started,
       Unreported_Failed_Append, Bad_Read, Bad_Discard,
-      Discard_During_Checkpoint);
+      Discard_During_Checkpoint, Bad_Free, Cannot_Write_Log_Header);
 
    Failure       : Problem_Type := No_Problem;
    --  Why the open entry or the checkpoint failed, if it did.
@@ -92,11 +92,25 @@ package body Log.Server is
    Current_Log_Header : Log.Header.Entry_Header_Type;
    Header             : Log.Header.Log_Header_Type;
    Next_Log_Location  : Log_Location_Id;
+   Next_Sequence      : Rose.Words.Word_64 := 1;
+   --  Where the open entry's header goes, and its sequence number.
 
    First_Committed    : Log_Location_Id := 0;
    Last_Committed     : Log_Location_Id := 0;
    --  The locations of the first and last committed entries, or 0 if
-   --  there are none.  Readers only see entries in this range.
+   --  there are none.  Readers only see entries in this range.  The log
+   --  header's First_Entry is First_Committed if there is a committed
+   --  entry, and otherwise where the first entry will go.
+
+   New_First_Entry    : Log_Location_Id := 0;
+   New_First_Sequence : Rose.Words.Word_64 := 0;
+   --  The entry that Free_Before asked the next commit to start the log
+   --  at, and its sequence number, or 0.
+
+   --  The log's locations run from 1 to the end of the last device, and
+   --  then wrap around to 1 (#951).  An entry is its header and the
+   --  pages after it, which can wrap.  Space is free from the open
+   --  entry's header up to the log header's First_Entry.
 
    Cached_Location    : Log_Location_Id := 0;
    Cached_Header      : Log.Header.Entry_Header_Type;
@@ -166,17 +180,79 @@ package body Log.Server is
      (Location : Log_Location_Id)
       return Log_Device_Count;
 
-   function Has_Room (Location : Log_Location_Id) return Boolean
-   is (Last_Log_Device > 0
-       and then Location <= Log_Devices (Last_Log_Device).Last_Location);
-   --  True if Location is on a log device.
+   function Last_Location return Log_Location_Id
+   is (if Last_Log_Device = 0 then 0
+       else Log_Devices (Last_Log_Device).Last_Location);
+   --  The log's last location, after which it wraps around to 1.
+
+   function Is_Location (Location : Log_Location_Id) return Boolean
+   is (Location in 1 .. Last_Location);
+   --  True if Location is a page of the log other than its header.
+
+   function Next_Location
+     (Location : Log_Location_Id)
+      return Log_Location_Id
+   is (if Location >= Last_Location then 1 else Location + 1);
+
+   function Previous_Location
+     (Location : Log_Location_Id)
+      return Log_Location_Id
+   is (if Location <= 1 then Last_Location else Location - 1);
+
+   function Distance
+     (From, To : Log_Location_Id)
+      return Log_Location_Id
+   is (if To >= From then To - From else Last_Location - From + To);
+   --  How many locations To is after From, going forwards round the log.
+
+   function Advance
+     (Location : Log_Location_Id;
+      Count    : Log_Location_Id)
+      return Log_Location_Id
+   is (if Count <= Last_Location - Location then Location + Count
+       else Count - (Last_Location - Location));
+   --  The location Count after Location, going forwards round the log,
+   --  where Count is less than the log's size.  (A 64-bit mod would need
+   --  libgcc, which boot servers don't link.)
+
+   function In_Range
+     (Location    : Log_Location_Id;
+      First, Last : Log_Location_Id)
+      return Boolean
+   is (Is_Location (Location)
+       and then Distance (First, Location) <= Distance (First, Last));
+   --  True if Location is one of First .. Last, going forwards round the
+   --  log from First.
 
    function Is_Log_Entry
-     (Location : Log_Location_Id;
-      Entry_Header : Log.Header.Entry_Header_Type)
+     (Location     : Log_Location_Id;
+      Entry_Header : Log.Header.Entry_Header_Type;
+      Sequence     : Rose.Words.Word_64)
       return Boolean;
    --  True if Entry_Header, read from Location, is an entry of this
-   --  generation of the log.
+   --  generation of the log with sequence number Sequence, or with any
+   --  sequence number if Sequence is 0.
+
+   function Find_Entry
+     (Location : Log_Location_Id;
+      Found    : out Log_Location_Id;
+      Sequence : out Rose.Words.Word_64)
+      return Boolean;
+   --  If Location is a page of a committed entry, or of the open one,
+   --  set Found to that entry's location and Sequence to its sequence
+   --  number, and return True.
+
+   function Readable (Location : Log_Location_Id) return Boolean;
+   --  True if Location is a page of a committed entry or of the open
+   --  one.
+
+   procedure Free_Before
+     (Id       : Rose.Objects.Capability_Identifier;
+      Log_Page : Rose.Words.Word);
+   --  Page_Log.Free_Before.
+
+   procedure Move_First_Entry;
+   --  Start the log at New_First_Entry, once the entry is committed.
 
    procedure Fail_Entry (Problem : Problem_Type);
    --  Leave the whole open entry out of the log, because a write to the
@@ -333,21 +409,31 @@ package body Log.Server is
                Success : Boolean;
             begin
                Read (0, Header'Address, Success);
-               if Success and then Header.Magic = Log.Header.Log_Magic then
+               --  A header from before version 3 has no sequence number,
+               --  and its entries are of an older version, so a new log
+               --  replaces it.
+
+               if Success
+                 and then Header.Magic = Log.Header.Log_Magic
+                 and then Header.First_Sequence /= 0
+                 and then Is_Location (Header.First_Entry)
+               then
                   Rose.Console_IO.Put_Line ("log: found valid log device");
 
-                  Next_Log_Location := 1;
-                  loop
-                     if not Has_Room (Next_Log_Location) then
-                        Rose.Console_IO.Put_Line ("log: log is full");
-                        exit;
-                     end if;
+                  --  The log starts at the header's First_Entry, and each
+                  --  entry is followed by the next, with the next sequence
+                  --  number, until a page that isn't.  A header from an
+                  --  earlier lap of the log has an older sequence number.
 
+                  Next_Log_Location := Header.First_Entry;
+                  Next_Sequence := Header.First_Sequence;
+                  loop
                      Read (Next_Log_Location, Current_Log_Header'Address,
                            Success);
                      exit when not Success
                        or else not Is_Log_Entry
-                         (Next_Log_Location, Current_Log_Header);
+                         (Next_Log_Location, Current_Log_Header,
+                          Next_Sequence);
 
                      Rose.Console_IO.Put
                        ("log: skipping entry at location ");
@@ -359,7 +445,14 @@ package body Log.Server is
                      end if;
                      Last_Committed := Next_Log_Location;
 
-                     Next_Log_Location := Current_Log_Header.Log_Last + 1;
+                     Next_Log_Location :=
+                       Next_Location (Current_Log_Header.Log_Last);
+                     Next_Sequence := Next_Sequence + 1;
+
+                     if Next_Log_Location = Header.First_Entry then
+                        Rose.Console_IO.Put_Line ("log: log is full");
+                        exit;
+                     end if;
                   end loop;
 
                   Rose.Console_IO.Put
@@ -438,21 +531,42 @@ package body Log.Server is
          return 0;
       end if;
 
-      if not Has_Room (Current_Log_Header.Log_Last + 1) then
-         Fail_Append (Log_Full);
-         return 0;
-      end if;
+      declare
+         Location : constant Log_Location_Id :=
+                      Next_Location (Current_Log_Header.Log_Last);
+      begin
+         --  The space from the log's first entry on is still in use.
 
-      Current_Log_Header.Log_Last :=
-        Current_Log_Header.Log_Last + 1;
-
-      if Page_Buffer_Last = Log_Page_Buffer_Count then
-         Flush;
-         if Entry_Failed then
+         if Location = Header.First_Entry then
+            Fail_Append (Log_Full);
             return 0;
          end if;
-         Page_Buffer_Loc := Current_Log_Header.Log_Last;
-      end if;
+
+         Current_Log_Header.Log_Last := Location;
+
+         --  The buffer is written to the disk in one go, so its pages
+         --  have to be next to each other on one device: not on both
+         --  sides of where the log wraps around.
+
+         if Page_Buffer_Last = Log_Page_Buffer_Count
+           or else (Page_Buffer_Last > 0
+                    and then
+                      (Location
+                       /= Page_Buffer_Loc
+                       + Log_Location_Id (Page_Buffer_Last)
+                       or else Get_Device_Index (Location)
+                       /= Get_Device_Index (Page_Buffer_Loc)))
+         then
+            Flush;
+            if Entry_Failed then
+               return 0;
+            end if;
+         end if;
+
+         if Page_Buffer_Last = 0 then
+            Page_Buffer_Loc := Location;
+         end if;
+      end;
 
       Page_Buffer_Last := Page_Buffer_Last + 1;
       Page_Buffer (Page_Buffer_Last) := Data;
@@ -505,6 +619,7 @@ package body Log.Server is
             Discard_After (Checkpoint_Mark);
             Append_Failed := False;
             Checkpoint_Mark := 0;
+            New_First_Entry := 0;
             Report_Problems;
             Rose.Console_IO.Put
               ("log: checkpoint not committed; the open entry keeps ");
@@ -530,6 +645,7 @@ package body Log.Server is
 
       if not Entry_Failed then
          declare
+            use type Rose.Words.Word_64;
             Success : Boolean;
          begin
             Write (Next_Log_Location, Current_Log_Header'Address, Success);
@@ -539,12 +655,23 @@ package body Log.Server is
                   First_Committed := Next_Log_Location;
                end if;
                Last_Committed := Next_Log_Location;
-               Next_Log_Location := Current_Log_Header.Log_Last + 1;
+               Next_Log_Location :=
+                 Next_Location (Current_Log_Header.Log_Last);
+               Next_Sequence := Next_Sequence + 1;
             else
                Fail_Entry (Cannot_Write_Header);
             end if;
          end;
       end if;
+
+      --  The log's header moves its first entry only once the entry is
+      --  on the medium, so a crash before then leaves the log starting
+      --  where it did, and nothing has been overwritten yet.
+
+      if not Entry_Failed and then New_First_Entry /= 0 then
+         Move_First_Entry;
+      end if;
+      New_First_Entry := 0;
 
       Report_Problems;
 
@@ -665,7 +792,8 @@ package body Log.Server is
          Append_Page    => Append_Page'Access,
          Read_Page      => Read_Log_Page'Access,
          Fail_Checkpoint => Fail_Checkpoint'Access,
-         Discard_Pages  => Discard_Pages'Access);
+         Discard_Pages  => Discard_Pages'Access,
+         Free_Before    => Free_Before'Access);
 
       for Page of Page_Buffer loop
          for Element of Page loop
@@ -680,21 +808,28 @@ package body Log.Server is
    -------------------
 
    procedure Discard_After (Last : Log_Location_Id) is
+      Start : constant Log_Location_Id := Next_Log_Location;
+      --  The open entry's header.  Its pages are compared by how far
+      --  they are from it, since they can wrap around.
    begin
-      if Last >= Current_Log_Header.Log_Last then
+      if Distance (Start, Last)
+        >= Distance (Start, Current_Log_Header.Log_Last)
+      then
          return;
       end if;
 
       Current_Log_Header.Log_Last := Last;
 
       --  The buffer holds the entry's pages from Page_Buffer_Loc to its
-      --  last.  Pages after Last that were already written stay on the
-      --  disk until later pages overwrite them: nothing reads them,
-      --  since the entry's header is written last and names its end.
+      --  last, next to each other on the disk.  Pages after Last that
+      --  were already written stay on the disk until later pages
+      --  overwrite them: nothing reads them, since the entry's header is
+      --  written last and names its end.
 
-      if Last < Page_Buffer_Loc then
+      if Page_Buffer_Last = 0 then
+         null;
+      elsif Distance (Start, Last) < Distance (Start, Page_Buffer_Loc) then
          Page_Buffer_Last := 0;
-         Page_Buffer_Loc := Last + 1;
       else
          Page_Buffer_Last := Page_Buffer_Count (Last - Page_Buffer_Loc + 1);
       end if;
@@ -725,14 +860,15 @@ package body Log.Server is
       end if;
 
       if Location /= 0 then
-         if Location < Current_Log_Header.Log_First
-           or else Location > Current_Log_Header.Log_Last
+         if Location = Next_Log_Location
+           or else not In_Range
+             (Location, Next_Log_Location, Current_Log_Header.Log_Last)
          then
             Note_Problem (Bad_Discard, Location);
             return;
          end if;
 
-         Discard_After (Location - 1);
+         Discard_After (Previous_Location (Location));
       end if;
 
       --  After a failed write to the disk, the entry stays failed.
@@ -789,6 +925,58 @@ package body Log.Server is
       end if;
    end Fail_Entry;
 
+   ----------------
+   -- Find_Entry --
+   ----------------
+
+   function Find_Entry
+     (Location : Log_Location_Id;
+      Found    : out Log_Location_Id;
+      Sequence : out Rose.Words.Word_64)
+      return Boolean
+   is
+      use type Rose.Words.Word_64;
+   begin
+      Found := 0;
+      Sequence := 0;
+
+      if not Is_Location (Location) then
+         return False;
+      end if;
+
+      if Writing and then not Entry_Failed
+        and then In_Range
+          (Location, Next_Log_Location, Current_Log_Header.Log_Last)
+      then
+         Found := Next_Log_Location;
+         Sequence := Next_Sequence;
+         return True;
+      end if;
+
+      if First_Committed = 0 then
+         return False;
+      end if;
+
+      declare
+         Current          : Log_Location_Id := First_Committed;
+         Current_Sequence : Rose.Words.Word_64 := Header.First_Sequence;
+      begin
+         while Load_Entry (Current) loop
+            if In_Range (Location, Current, Cached_Header.Log_Last) then
+               Found := Current;
+               Sequence := Current_Sequence;
+               return True;
+            end if;
+
+            exit when Current = Last_Committed;
+            Current := Next_Location (Cached_Header.Log_Last);
+            Current_Sequence := Current_Sequence + 1;
+         end loop;
+      end;
+
+      return False;
+   end Find_Entry;
+
    -----------------
    -- First_Entry --
    -----------------
@@ -839,6 +1027,29 @@ package body Log.Server is
       end if;
    end Flush;
 
+   -----------------
+   -- Free_Before --
+   -----------------
+
+   procedure Free_Before
+     (Id       : Rose.Objects.Capability_Identifier;
+      Log_Page : Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      Location : constant Log_Location_Id := Log_Location_Id (Log_Page);
+      Found    : Log_Location_Id;
+      Sequence : Rose.Words.Word_64;
+   begin
+      if not Find_Entry (Location, Found, Sequence) then
+         Note_Problem (Bad_Free, Location);
+      elsif Found = Header.First_Entry then
+         New_First_Entry := 0;
+      else
+         New_First_Entry := Found;
+         New_First_Sequence := Sequence;
+      end if;
+   end Free_Before;
+
    ----------------------
    -- Get_Device_Index --
    ----------------------
@@ -865,8 +1076,9 @@ package body Log.Server is
    ------------------
 
    function Is_Log_Entry
-     (Location : Log_Location_Id;
-      Entry_Header : Log.Header.Entry_Header_Type)
+     (Location     : Log_Location_Id;
+      Entry_Header : Log.Header.Entry_Header_Type;
+      Sequence     : Rose.Words.Word_64)
       return Boolean
    is
       use type Rose.Words.Word_32;
@@ -875,8 +1087,9 @@ package body Log.Server is
       return Entry_Header.Magic = Log.Header.Entry_Magic
         and then Entry_Header.Version = Log_Version
         and then Entry_Header.Generation = Header.Generation
-        and then Entry_Header.Log_First = Location + 1
-        and then Entry_Header.Log_Last >= Location;
+        and then (Sequence = 0 or else Entry_Header.Sequence = Sequence)
+        and then Entry_Header.Log_First = Next_Location (Location)
+        and then Is_Location (Entry_Header.Log_Last);
    end Is_Log_Entry;
 
    ----------------
@@ -899,9 +1112,8 @@ package body Log.Server is
    function Load_Entry (Location : Log_Location_Id) return Boolean is
       Success : Boolean;
    begin
-      if Location = 0
-        or else Location < First_Committed
-        or else Location > Last_Committed
+      if First_Committed = 0
+        or else not In_Range (Location, First_Committed, Last_Committed)
       then
          return False;
       end if;
@@ -912,12 +1124,39 @@ package body Log.Server is
 
       Cached_Location := 0;
       Read (Location, Cached_Header'Address, Success);
-      if Success and then Is_Log_Entry (Location, Cached_Header) then
+      if Success and then Is_Log_Entry (Location, Cached_Header, 0) then
          Cached_Location := Location;
       end if;
 
       return Cached_Location /= 0;
    end Load_Entry;
+
+   ----------------------
+   -- Move_First_Entry --
+   ----------------------
+
+   procedure Move_First_Entry is
+      Old_First    : constant Log_Location_Id := Header.First_Entry;
+      Old_Sequence : constant Rose.Words.Word_64 := Header.First_Sequence;
+      Success      : Boolean;
+   begin
+      Header.First_Entry := New_First_Entry;
+      Header.First_Sequence := New_First_Sequence;
+      Write (0, Header'Address, Success);
+
+      --  The space before the new first entry can only be written again
+      --  once the header that frees it is on the medium.
+
+      if Success then
+         Sync_Devices;
+         First_Committed := New_First_Entry;
+         Cached_Location := 0;
+      else
+         Header.First_Entry := Old_First;
+         Header.First_Sequence := Old_Sequence;
+         Note_Problem (Cannot_Write_Log_Header);
+      end if;
+   end Move_First_Entry;
 
    ----------------
    -- Next_Entry --
@@ -935,10 +1174,19 @@ package body Log.Server is
          return 0;
       end if;
 
+      --  The next entry has to have the next sequence number, or it is
+      --  left over from an earlier lap of the log.
+
       declare
-         Next : constant Log_Location_Id := Cached_Header.Log_Last + 1;
+         use type Rose.Words.Word_64;
+         Sequence : constant Rose.Words.Word_64 := Cached_Header.Sequence;
+         Next     : constant Log_Location_Id :=
+                      Next_Location (Cached_Header.Log_Last);
       begin
-         return (if Load_Entry (Next) then Rose.Words.Word_64 (Next) else 0);
+         return (if Load_Entry (Next)
+                 and then Cached_Header.Sequence = Sequence + 1
+                 then Rose.Words.Word_64 (Next)
+                 else 0);
       end;
    end Next_Entry;
 
@@ -989,12 +1237,19 @@ package body Log.Server is
       Current_Log_Header.Version := Log_Version;
       Current_Log_Header.Flags := Log.Header.Is_Active_Entry;
       Current_Log_Header.Generation := Header.Generation;
-      Current_Log_Header.Log_First := Next_Log_Location + 1;
+      Current_Log_Header.Log_First := Next_Location (Next_Log_Location);
       Current_Log_Header.Log_Last := Next_Log_Location;
+      Current_Log_Header.Sequence := Next_Sequence;
       Page_Buffer_Last := 0;
       Page_Buffer_Loc := Current_Log_Header.Log_First;
 
-      if not Has_Room (Next_Log_Location) then
+      --  The header can't go where the first committed entry is: the log
+      --  has wrapped around to it, and is full.
+
+      if Last_Log_Device = 0
+        or else (First_Committed /= 0
+                 and then Next_Log_Location = Header.First_Entry)
+      then
          Fail_Append (Log_Full);
       end if;
    end Open_Entry;
@@ -1079,7 +1334,7 @@ package body Log.Server is
       Item : constant Log_Location_Id := Log_Location_Id (Location);
    begin
       if Load_Entry (Item) then
-         return Natural (Cached_Header.Log_Last - Item);
+         return Natural (Distance (Item, Cached_Header.Log_Last));
       else
          return 0;
       end if;
@@ -1120,6 +1375,10 @@ package body Log.Server is
             Put ("discard of a page outside the open entry");
          when Discard_During_Checkpoint =>
             Put ("discard during a checkpoint");
+         when Bad_Free =>
+            Put ("free before a page outside the log");
+         when Cannot_Write_Log_Header =>
+            Put ("cannot write the log header; its first entry stays");
       end case;
    end Put_Problem;
 
@@ -1151,13 +1410,7 @@ package body Log.Server is
    begin
       if Page'Length /= Log_Page_Size then
          Note_Problem (Bad_Page_Size);
-      elsif not Active
-        or else Location = 0
-        or else Location
-          > (if Writing and then not Entry_Failed
-             then Current_Log_Header.Log_Last
-             else Next_Log_Location - 1)
-      then
+      elsif not Active or else not Readable (Location) then
          Note_Problem (Bad_Read, Location);
       elsif Writing
         and then Location >= Page_Buffer_Loc
@@ -1195,16 +1448,37 @@ package body Log.Server is
          Rose.Console_IO.Put_Line ("log: read: buffer is not one page");
       elsif not Load_Entry (Item) then
          Rose.Console_IO.Put_Line ("log: read: not an entry");
-      elsif Log_Location_Id (Index) > Cached_Header.Log_Last - Item then
+      elsif Log_Location_Id (Index) > Distance (Item, Cached_Header.Log_Last)
+      then
          Rose.Console_IO.Put_Line ("log: read: no such page in entry");
       else
-         Read (Item + Log_Location_Id (Index), Page'Address, Success);
+         Read (Advance (Item, Log_Location_Id (Index)), Page'Address,
+               Success);
       end if;
 
       if not Success then
          Page := (others => 0);
       end if;
    end Read_Page;
+
+   --------------
+   -- Readable --
+   --------------
+
+   function Readable (Location : Log_Location_Id) return Boolean is
+      Start : constant Log_Location_Id :=
+                (if First_Committed /= 0 then First_Committed
+                 else Next_Log_Location);
+   begin
+      if Writing and then not Entry_Failed then
+         return In_Range (Location, Start, Current_Log_Header.Log_Last);
+      elsif First_Committed /= 0 then
+         return In_Range
+           (Location, Start, Previous_Location (Next_Log_Location));
+      else
+         return False;
+      end if;
+   end Readable;
 
    ---------------------
    -- Report_Problems --
@@ -1254,18 +1528,32 @@ package body Log.Server is
                            (if Header.Magic = Log.Header.Log_Magic
                             then Header.Generation + 1
                             else 1);
+
+            --  The new log starts where the old one did, which is
+            --  location 1 unless something moved it.  The test of a log
+            --  that wraps around (scripts/test-log-wrap) starts one near
+            --  the end of the partition, and an install resets it.
+
+            Start      : constant Log_Location_Id :=
+                           (if Header.Magic = Log.Header.Log_Magic
+                            and then Is_Location (Header.First_Entry)
+                            then Header.First_Entry
+                            else 1);
             Success    : Boolean;
          begin
             Header := (others => <>);
             Header.Generation := Generation;
+            Header.First_Entry := Start;
             Write (0, Header'Address, Success);
             if not Success then
                Rose.Console_IO.Put_Line ("log: reset: cannot write header");
             end if;
-            Next_Log_Location := 1;
+            Next_Log_Location := Header.First_Entry;
+            Next_Sequence := Header.First_Sequence;
             First_Committed := 0;
             Last_Committed := 0;
             Cached_Location := 0;
+            New_First_Entry := 0;
          end;
 
          --  An open entry is dropped, with anything appended to it, and
