@@ -368,7 +368,7 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 * `Flags` says what the invocation is, and which of the fields below are in use (see the table).
 * `SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`: the index of the last word or capability that is sent, or that the sender is prepared to receive in the reply.
   They are meaningful only when the flag for sending or receiving words or capabilities is set.
-  A call has up to 16 words and 4 capabilities; `SC` and `RC` have two bits, so the kernel can't be asked for more (#234).
+  A call has up to 8 words and 4 capabilities; `SW` and `RW` have three bits and `SC` and `RC` two, so the kernel can't be asked for more (#985, #234).
 * `Capability` is the capability that is being invoked.
 * `Reply Capability` is set by the kernel, when the flag asks for it, and gives the target of an invocation a capability on which to send a reply.
 * `Endpoint Id` is set by the kernel when it delivers a call, to the 64-bit id of the endpoint that the capability names.
@@ -406,4 +406,4 @@ An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability`
 A call that needs more than four capabilities, as a command launch can (#234), is sent in parts: each part but the last has the `Continued` flag and carries up to four capabilities, and the receiver keeps them and replies with nothing; the last part carries the remaining capabilities, the words and the buffer, and gets the real reply.
 `Rose.System_Calls.Send_Caps` sends the parts, and `Rose.Command_Line.Launch.Receive` collects them.
 
-The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, and `Too_Many_Capabilities` when `Send_Cap` has no room for another capability; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.
+The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, `Too_Many_Capabilities` when `Send_Cap` has no room for another capability, and `Too_Many_Words` when `Send_Word` has no room for another word; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.

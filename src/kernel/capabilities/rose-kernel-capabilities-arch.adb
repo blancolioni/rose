@@ -209,12 +209,10 @@ package body Rose.Kernel.Capabilities.Arch is
             elsif Size = Data_32 then
                declare
                   Index : Parameter_Word_Index := 0;
+                  --  A group is a word of port offsets and four values:
+                  --  eight words hold one group (#985).
                   Last  : constant Parameter_Word_Index :=
-                            (if Params.Control.Last_Sent_Word = 15
-                             then 11
-                             elsif Params.Control.Last_Sent_Word >= 10
-                             then 6
-                             elsif Params.Control.Last_Sent_Word >= 5
+                            (if Params.Control.Last_Sent_Word >= 4
                              then 1
                              else 0);
                begin

@@ -159,23 +159,33 @@ package body Rose.Devices.Port_IO is
       use Rose.Words;
       use Rose.Invocation;
       Params : aliased Invocation_Record;
-      Index  : Parameter_Word_Index := Parameter_Word_Index'Last;
+      First  : Positive := Data'First;
    begin
-      Params.Cap := Port;
-      Params.Control.Flags := (Send       => True,
-                               Block      => True,
-                               Send_Words => True,
-                               others     => False);
-      Params.Cap := Port;
 
-      for I in Data'Range loop
-         Index := Index + 1;
-         Params.Data (Index) :=
-           Word (Data (I).Offset) + 256 * Word (Data (I).Data);
+      --  The writes go in order, in calls of at most
+      --  Max_Parameter_Words: an ATA LBA48 command is twelve (#985).
+
+      while First <= Data'Last loop
+         declare
+            Last : constant Positive :=
+                     Positive'Min (Data'Last,
+                                   First + Max_Parameter_Words - 1);
+         begin
+            Params.Cap := Port;
+            Params.Control.Flags := (Send       => True,
+                                     Block      => True,
+                                     Send_Words => True,
+                                     others     => False);
+            Params.Control.Last_Sent_Word :=
+              Parameter_Word_Index (Last - First);
+            for I in First .. Last loop
+               Params.Data (Parameter_Word_Index (I - First)) :=
+                 Word (Data (I).Offset) + 256 * Word (Data (I).Data);
+            end loop;
+            Rose.System_Calls.Invoke_Capability (Params);
+            First := Last + 1;
+         end;
       end loop;
-
-      Params.Control.Last_Sent_Word := Index;
-      Rose.System_Calls.Invoke_Capability (Params);
    end Port_Out_8;
 
    -----------------

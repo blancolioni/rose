@@ -191,7 +191,7 @@
 16#3023_88B7_D6DF_E1D0#  rose.interfaces.storage.partition_setup.set_range(in word_64; in word_64; in word)
 16#0408_FB8A_8D6A_A228#  interface rose.interfaces.storage.partitions
 16#3DA1_3F2D_90DB_EFAA#  rose.interfaces.storage.partitions.partition_count return natural
-16#E46F_335E_41B8_D452#  rose.interfaces.storage.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64; out word_64)
+16#1E1B_6A21_AA16_F0BA#  rose.interfaces.storage.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64)
 16#9BC9_6546_EAF3_D521#  interface rose.interfaces.storage.process_banks
 16#DFF6_463D_0BED_A2B8#  rose.interfaces.storage.process_banks.create_process_bank(in word; in object_id) return interface rose.interfaces.storage.bank
 16#307F_F96C_BDAA_2182#  rose.interfaces.storage.process_banks.process_bank(in object_id) return interface rose.interfaces.storage.bank
