@@ -42,4 +42,14 @@ interface Checkpoints.Page_Log is
    --  first page, or 0 if that append failed. It does nothing during a
    --  checkpoint.
 
+   procedure Free_Before (Log_Page : Word);
+   --  When the open entry commits, start the log at the entry that holds
+   --  log page Log_Page, which is in a committed entry or in the open
+   --  one, so that the space of every entry before it can be written
+   --  again (#951). The log's header is written after the entry's, so a
+   --  crash between the two leaves the log starting where it did. A
+   --  later call before the commit replaces an earlier one, and a
+   --  checkpoint that doesn't commit forgets it. The memory server
+   --  calls it once nothing it still needs is in those entries.
+
 end Checkpoints.Page_Log;

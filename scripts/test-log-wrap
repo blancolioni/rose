@@ -1,0 +1,96 @@
+#!/bin/sh
+# The test of a checkpoint log that wraps around (#951), under QEMU.
+#
+#   scripts/test-log-wrap [ISO]
+#
+# ISO is the install image, images/rose.iso by default. Nothing frees
+# space in the log until the memory server cleans it (#952), so a log
+# that starts at location 1 never wraps. Instead, the test starts the
+# log near the end of its partition:
+#
+#   1. installs Rose on a new disk, which makes the log partition;
+#   2. writes a new, empty log header with set-log-start.py, whose first
+#      entry is 50 locations before the end of the partition;
+#   3. installs again, onto the same disk, so that the install's entries
+#      go past the end of the log and wrap around to location 1, and
+#      checks with check-log.py that the log is consistent, and starts
+#      where set-log-start.py put it;
+#   4. boots from the disk three times, each of which has to restore the
+#      last checkpoint, whose pages are on both sides of the wrap, and
+#      show the login prompt; then waits for a checkpoint, stops the
+#      machine, and runs check-log.py, which has to find the log
+#      consistent and wrapped around.
+#
+# It takes about fifteen minutes, and needs qemu-system-i386, qemu-img
+# and python3. It exits with 0 if everything passed, and keeps the disk
+# image and QEMU's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+FROM_END=50
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+check_log () {
+    # check_log WHEN: run check-log.py on the disk, and fail if it finds
+    # the log inconsistent
+    python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" 2>&1 \
+        || { cat "$WORK/check-log.txt"; fail "check-log.py: $1"; }
+    grep -E "^log|entries|entry .* at|wrapped|full" "$WORK/check-log.txt" \
+        | tail -4
+}
+
+install_rose "$ISO"
+
+echo "Starting a new log $FROM_END locations before the end of its partition"
+python3 "$HERE/set-log-start.py" "$DISK" --from-end $FROM_END \
+    || fail "set-log-start.py could not write the log header"
+
+# wait_for_install looks for the kernel's restart in the serial log, so
+# the first install's has to go.
+mv "$WORK/serial" "$WORK/serial.first-install"
+mv "$CONSOLE" "$CONSOLE.first-install"
+
+echo "Installing again, into the new log"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+choose_last_entry
+wait_for_install 400 || fail "the second install did not finish"
+sleep 15
+stop_qemu
+
+check_log "after the second install"
+start=$(sed -n 's/^log starts at location \([0-9]*\),.*/\1/p' \
+            "$WORK/check-log.txt")
+last=$(sed -n 's/^log: .*, \([0-9]*\) pages,.*/\1/p' "$WORK/check-log.txt")
+[ -n "$start" ] && [ -n "$last" ] \
+    && [ "$start" -eq $((last - 1 - FROM_END)) ] \
+    || fail "the second install's log does not start where set-log-start.py put it"
+
+for boot in 1 2 3; do
+    echo "Boot $boot from the disk, which restores the last checkpoint"
+    # QEMU may start CONSOLE again, so the mark is taken once it has.
+    start_qemu
+    mark=$(console_mark)
+    choose_last_entry
+    wait_for "login:" 200 || fail "boot $boot: no login prompt"
+    console_since "$mark" | grep "restore: log:"
+    console_since "$mark" \
+        | grep -q "restore: restored processes are running" \
+        || fail "boot $boot: the checkpoint was not restored"
+
+    echo "Waiting for a checkpoint, then stopping the machine"
+    sleep 45
+    stop_qemu
+    check_log "after boot $boot"
+done
+
+grep -q "the log has wrapped around" "$WORK/check-log.txt" \
+    || fail "the log did not wrap around"
+
+echo "PASS: the log wrapped around, and every boot restored"
+rm -rf "$WORK"
+exit 0

@@ -208,7 +208,11 @@ package body Init.Boot_Steps is
             Block_Size : Rose.Words.Word)
             return Rose.Capabilities.Capability
          is (Launch_Partition_Server
-               (Oid, Start_Address, Start_Address + Length, Block_Size));
+               (Oid, Start_Address, Start_Address + Length - 1,
+                Block_Size));
+         --  The bound is the partition's last block.  It was one past it,
+         --  which gave the log a last page that ended in the block after
+         --  the partition, and a log that wraps around reaches it (#951).
 
       begin
          Client.Get_Partition
