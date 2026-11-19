@@ -50,4 +50,12 @@ package Text_Console.Line_Discipline is
    procedure Set_Echo (Enabled : Boolean);
    --  Echo what is typed, with line editing on, or not.
 
+   procedure Discard_Input;
+   --  Drop everything typed that hasn't been read: the lines, the line
+   --  being typed, an end of file, and the keys typed with line editing
+   --  off. Echo and line editing stay as they are. After a restore, the
+   --  input is what was typed before the checkpoint, and may be part of
+   --  a password (#523). The program reading it was restored too, so the
+   --  modes it set still hold.
+
 end Text_Console.Line_Discipline;

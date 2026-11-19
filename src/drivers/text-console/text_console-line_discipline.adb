@@ -73,6 +73,25 @@ package body Text_Console.Line_Discipline is
       end if;
    end Append;
 
+   -------------------
+   -- Discard_Input --
+   -------------------
+
+   procedure Discard_Input is
+   begin
+      --  Clear what was typed as well, so that the next checkpoint
+      --  doesn't save it again.
+
+      Input_Buffer (1 .. Input_Last) := (others => 0);
+      Input_Last := 0;
+      Line_Start := 0;
+      End_Of_File := False;
+
+      Keys := (others => <>);
+      First_Key := 0;
+      Key_Count := 0;
+   end Discard_Input;
+
    ----------
    -- Echo --
    ----------
