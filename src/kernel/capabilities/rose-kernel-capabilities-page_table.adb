@@ -5,6 +5,7 @@ with Rose.Words;
 
 with Rose.Kernel.Clock;
 with Rose.Kernel.Processes;
+with Rose.Kernel.Processes.Debug;
 
 package body Rose.Kernel.Capabilities.Page_Table is
 
@@ -70,6 +71,15 @@ package body Rose.Kernel.Capabilities.Page_Table is
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Invalid_Object);
                elsif Rose.Kernel.Processes.Is_Pinned_Page (Pid, Page) then
+
+                  --  Said here, not by mem, which writes nothing to the
+                  --  console while it pages out (#973).
+
+                  Rose.Kernel.Processes.Debug.Put (Pid);
+                  Rose.Boot.Console.Put (": unmap refused: page ");
+                  Rose.Boot.Console.Put (Rose.Words.Word (Page));
+                  Rose.Boot.Console.Put (" pinned for a call");
+                  Rose.Boot.Console.New_Line;
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Request_Would_Block);
                else

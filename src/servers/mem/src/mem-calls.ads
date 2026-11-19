@@ -18,8 +18,9 @@ private package Mem.Calls is
    procedure Unmap
      (Process    : Rose.Objects.Object_Id;
       Virtual    : Rose.Addresses.Virtual_Page_Address);
-   --  Unmap Virtual from Process, and say so on the console if the kernel
-   --  refuses because the page is pinned for a call in progress (#972).
+   --  Unmap Virtual from Process. The kernel refuses a page that is pinned
+   --  for a call in progress, and says so in its log (#972). Mem says
+   --  nothing on the console, whose driver may be waiting on mem (#973).
 
    procedure Unmap
      (Process    : Rose.Objects.Object_Id;

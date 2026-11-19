@@ -240,12 +240,9 @@ package body Mem.Calls is
       Virtual    : Rose.Addresses.Virtual_Page_Address)
    is
       Unmapped : Boolean;
+      pragma Warnings (Off, Unmapped);
    begin
       Unmap (Process, Virtual, Unmapped);
-      if not Unmapped then
-         Rose.Console_IO.Put_Line
-           ("mem: unmap refused: page pinned for a call");
-      end if;
    end Unmap;
 
    procedure Unmap

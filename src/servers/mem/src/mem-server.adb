@@ -843,6 +843,8 @@ package body Mem.Server is
       pragma Unreferenced (Id);
       use Rose.Addresses;
       use all type Rose.Interfaces.Processes.Memory.Page_Access_Type;
+      Absent : Boolean;
+      --  No page is mapped there, as far as mem knows.
       Valid,
       Readable,
       Writable,
@@ -896,7 +898,16 @@ package body Mem.Server is
             end if;
       end case;
 
-      if Physical_Page = 0
+      --  A page can be dropped while a write fault on it waits here,
+      --  for a fault from another process may need its frame (#973).
+      --  The kernel reported a frame, but it has gone, so the page is
+      --  brought back as if it had never been mapped.
+
+      Absent := Physical_Page = 0
+        or else not Mem.Page_Table.Has_Element
+          (Mem.Page_Table.Find (Pid, Virtual_Page));
+
+      if Absent
         and then Mem.Processes.Shared_Page (Pid, Virtual_Page) /= 0
       then
          Shared_Page_Fault
@@ -908,7 +919,7 @@ package body Mem.Server is
             Writable     => Writable,
             Executable   => Executable,
             Start        => Start);
-      elsif Physical_Page = 0 then
+      elsif Absent then
          declare
             Shared     : constant Boolean := Persistent and then not Writable;
             --  Pages of read-only segments are cached, and shared by the
@@ -941,11 +952,7 @@ package body Mem.Server is
                return;
             end if;
 
-            Mem.Physical_Map.Allocate_Page
-              (Page, Have_Page);
-            if not Have_Page then
-               Mem.Virtual_Map.Reclaim (Page, Have_Page);
-            end if;
+            Mem.Virtual_Map.Allocate_Page (Page, Have_Page);
 
             if not Have_Page then
                Mem.Processes.Fault_Process (Pid, "out of memory");
@@ -1440,10 +1447,7 @@ package body Mem.Server is
          Mem.Shared_Pages.Acquire (Found);
          Page := Found;
       else
-         Mem.Physical_Map.Allocate_Page (Page, Have_Page);
-         if not Have_Page then
-            Mem.Virtual_Map.Reclaim (Page, Have_Page);
-         end if;
+         Mem.Virtual_Map.Allocate_Page (Page, Have_Page);
 
          if not Have_Page then
             Mem.Processes.Fault_Process (Pid, "out of memory");

@@ -245,6 +245,13 @@ install_rose () {
     grep -a "takes over from" "$WORK/serial" \
         || { echo "FAIL: init's swap test did not swap its probes"; exit 1; }
 
+    # Init's page test fills more memory than the machine has, so mem drops
+    # clean pages, and skips those of the buffer that the test holds in a
+    # call (#972, #973).
+    grep -a "unmap refused" "$WORK/serial" | tail -1
+    grep -a -q "unmap refused" "$WORK/serial" \
+        || { echo "FAIL: init's page test did not meet a pinned page"; exit 1; }
+
     # The install's run of the self tests is the one that has the cap set
     # server, which petal doesn't give (#825).
     if grep -q "self tests failed" "$CONSOLE"; then
