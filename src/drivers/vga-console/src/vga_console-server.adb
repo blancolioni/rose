@@ -309,6 +309,11 @@ package body VGA_Console.Server is
    begin
       VGA_Console.Screen.Redraw;
 
+      --  What was typed before the checkpoint isn't for the program that
+      --  reads next (#523).
+
+      VGA_Console.Line_Discipline.Discard_Input;
+
       --  This boot's command line says whether to copy to COM2.
 
       Text_Console.Serial.Start
