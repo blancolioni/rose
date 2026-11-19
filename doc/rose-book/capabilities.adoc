@@ -366,6 +366,7 @@ image::invocation-record.svg[Invocation record]
 The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 
 * `Flags` says what the invocation is, and which of the fields below are in use (see the table).
+  The reserved bits after it are for new flags, so that adding one doesn't move the fields that follow (#994).
 * `SW`, `RW`, `SC` and `RC` are `Last_Sent_Word`, `Last_Recv_Word`, `Last_Sent_Cap` and `Last_Recv_Cap`: the index of the last word or capability that is sent, or that the sender is prepared to receive in the reply.
   They are meaningful only when the flag for sending or receiving words or capabilities is set.
   A call has up to 8 words and 4 capabilities; `SW` and `RW` have three bits and `SC` and `RC` two, so the kernel can't be asked for more (#985, #234).

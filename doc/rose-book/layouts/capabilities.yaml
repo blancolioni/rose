@@ -152,12 +152,12 @@ diagrams:
     title: Invocation record
     rows:
       - - [14, Flags]
+        - [3, rsvd]
         - [3, SW]
         - [3, RW]
         - [2, SC]
         - [2, RC]
         - [5, Error]
-        - [3, rsvd]
       - {words: 1, name: Capability}
       - {words: 1, name: Reply Capability}
       - {words: 2, name: Endpoint Id}

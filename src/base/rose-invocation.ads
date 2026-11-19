@@ -110,19 +110,23 @@ is
    type Control_Word is
       record
          Flags          : Invocation_Flags  := (others => False);
+         Reserved       : Word_3               := 0;
          Last_Sent_Word : Parameter_Word_Index := 0;
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
          Last_Recv_Cap  : Capability_Index     := 0;
          Error          : Invocation_Error     := OK;
-         Reserved       : Word_3               := 0;
       end record
      with Pack, Size => 32;
+   --  Reserved is room for new flags, next to the others (#994). A new
+   --  flag takes a bit from Reserved, so that the counts and Error stay
+   --  where they are; the kernel's copy reads them by their bit positions
+   --  (#892). If Reserved doesn't shrink, Size no longer holds.
+   --
    --  Error means something only when Flags (Error) is set. It is in the
    --  control word, so that the kernel copies in only the first two words
-   --  of the header (#990, #892). Its five bits, for up to 32 errors,
-   --  fill the word with the other fields and Reserved: one more error,
-   --  and Size no longer holds (#692).
+   --  of the header (#990, #892). Its five bits allow up to 32 errors:
+   --  one more, and Size no longer holds (#692).
 
    type Invocation_Record is
       record
