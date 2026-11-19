@@ -775,6 +775,21 @@ package body Init.Run is
            (Console_Stream_Cap, "init: hand over test failed" & NL);
       end if;
 
+      --  Mem drops clean pages to keep a reserve of free pages, but not
+      --  the pages of a buffer lent for a call in progress (ADR 0028,
+      --  section 5; #972, #973). It ends its probes before the first
+      --  checkpoint that init takes.
+
+      if not Init.Self_Tests.Page_Out_Test
+        (Find_Cap        => Find_Cap,
+         Standard_Output => Console_Stream_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Checkpointer    => Init.Boot.Checkpointer_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: page test failed" & NL);
+      end if;
+
       --  A persistent holder of derived caps, which checks them after a
       --  restore (#691).
 

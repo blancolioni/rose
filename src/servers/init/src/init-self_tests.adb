@@ -71,6 +71,10 @@ package body Init.Self_Tests is
    Probe_Region_Limit : constant := 128;
    --  The swap test's bank, which holds three probes.
 
+   Page_Probe_Page_Limit : constant := 24_576;
+   --  The page test's bank: each of its two probes has 40 MiB of bss,
+   --  whose storage the store reserves when it is launched (#973).
+
    Test_Page_Limit   : constant := 16;
    Test_Region_Limit : constant := 4;
    --  The test bank's limits: the shared segment test reserves one
@@ -628,6 +632,177 @@ package body Init.Self_Tests is
 
       return Params.Caps (0);
    end Launch_Probe;
+
+   -------------------
+   -- Page_Out_Test --
+   -------------------
+
+   function Page_Out_Test
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Checkpointer    : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      package Named renames Rose.Interfaces.Common.Named.Client;
+
+      Fill_Pages : constant := 10_240;
+      --  40 MiB: more than a 32 MiB machine has (scripts/qemu-test-lib.sh).
+
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+                     Init.Calls.Find_In_Map (Find_Cap, "page_probe");
+      Bank_Cap   : constant Rose.Capabilities.Capability :=
+                     Init.Grants.Bank (Page_Probe_Page_Limit,
+                                       Probe_Region_Limit);
+      Bank       : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+      Passed     : Boolean := True;
+      Filler     : Rose.Capabilities.Capability;
+      Caller     : Rose.Capabilities.Capability;
+      Writer     : Rose.Capabilities.Capability;
+      Unused     : Rose.Capabilities.Capability;
+      Client     : Named.Named_Client;
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      procedure Launch
+        (Pages      : Natural;
+         Checkpoint : Rose.Capabilities.Capability;
+         Target     : Rose.Capabilities.Capability;
+         Writer     : out Rose.Capabilities.Capability;
+         Probe      : out Rose.Capabilities.Capability);
+      --  Launch page_probe against Bank_Cap, with Pages, Checkpoint and
+      --  Target, and return its Writer and Named interfaces, or null
+      --  caps if it did not start.
+
+      function Take_Checkpoint return Boolean;
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String
+           (Standard_Output,
+            "page test: " & Name & (if Ok then ": ok" else ": FAIL")
+            & NL);
+         Passed := Passed and then Ok;
+      end Check;
+
+      ------------
+      -- Launch --
+      ------------
+
+      procedure Launch
+        (Pages      : Natural;
+         Checkpoint : Rose.Capabilities.Capability;
+         Target     : Rose.Capabilities.Capability;
+         Writer     : out Rose.Capabilities.Capability;
+         Probe      : out Rose.Capabilities.Capability)
+      is
+         Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+         Endpoint : Rose.Capabilities.Capability;
+         Params   : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Writer := Rose.Capabilities.Null_Capability;
+         Probe := Rose.Capabilities.Null_Capability;
+
+         Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
+         Endpoint :=
+           Rose.Interfaces.Processes.Launch.Client.Launch_Command
+             (Launcher, Bank_Cap);
+         if Endpoint = Rose.Capabilities.Null_Capability then
+            return;
+         end if;
+
+         --  Its roles' caps and its arguments, as src/utilities/
+         --  page_probe/rose-core-page_probe.idl declares them:
+         --  Create_Endpoint and Standard_Output, then Checkpoint and
+         --  Target, and Pages in the first data word. It replies with its
+         --  Writer and Named interfaces.
+
+         Rose.System_Calls.Initialize_Send (Params, Endpoint);
+         Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
+         Rose.System_Calls.Send_Cap (Params, Standard_Output);
+         Rose.System_Calls.Send_Cap (Params, Checkpoint);
+         Rose.System_Calls.Send_Cap (Params, Target);
+         Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Pages));
+         Rose.System_Calls.Receive_Words (Params, 1);
+         Rose.System_Calls.Receive_Caps (Params, 2);
+         Rose.System_Calls.Invoke_Capability (Params);
+
+         if not Params.Control.Flags (Rose.Invocation.Error)
+           and then Params.Control.Flags (Rose.Invocation.Send_Words)
+           and then Params.Data (0) = Completed
+           and then Params.Control.Flags (Rose.Invocation.Send_Caps)
+         then
+            Writer := Params.Caps (0);
+            Probe := Params.Caps (1);
+         end if;
+      end Launch;
+
+      ---------------------
+      -- Take_Checkpoint --
+      ---------------------
+
+      function Take_Checkpoint return Boolean is
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Checkpointer);
+         Rose.System_Calls.Receive_Words (Params, 1);
+         Rose.System_Calls.Invoke_Capability (Params);
+         return not Params.Control.Flags (Rose.Invocation.Error)
+           and then Params.Control.Flags (Rose.Invocation.Send_Words)
+           and then Params.Data (0) = 1;
+      end Take_Checkpoint;
+
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability
+        or else Bank_Cap = Rose.Capabilities.Null_Capability
+        or else Checkpointer = Rose.Capabilities.Null_Capability
+      then
+         return False;
+      end if;
+
+      Rose.Interfaces.Storage.Bank.Client.Open (Bank, Bank_Cap);
+
+      Launch (Fill_Pages, Checkpointer, Rose.Capabilities.Null_Capability,
+              Writer, Unused);
+      Filler := Writer;
+      Launch (0, Rose.Capabilities.Null_Capability, Filler,
+              Unused, Caller);
+
+      if Filler = Rose.Capabilities.Null_Capability
+        or else Caller = Rose.Capabilities.Null_Capability
+      then
+         Check ("launch the filler and the caller", False);
+         Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
+         return False;
+      end if;
+
+      --  The caller filled its buffer when it was launched. After the
+      --  checkpoint the buffer is clean, so mem could drop it, but for
+      --  the call in progress.
+
+      Check ("checkpoint the caller's buffer", Take_Checkpoint);
+
+      declare
+         Text : String (1 .. 16);
+         Last : Natural;
+      begin
+         Named.Open (Client, Caller);
+         Named.Name (Client, Text, Last);
+         Check ("fill 40 MiB, and read it and the pinned buffer back",
+                not Named.Has_Error
+                and then Last in Text'Range
+                and then Text (1 .. Last) = "passed");
+      end;
+
+      Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
+      return Passed;
+   end Page_Out_Test;
 
    -------------
    -- Replace --

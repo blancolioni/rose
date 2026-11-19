@@ -57,6 +57,18 @@ package Mem.Page_Table is
    --  Forget the page at Position, without freeing its physical page or
    --  unmapping it. The next checkpoint doesn't save it.
 
+   procedure Sweep_Clean_Pages
+     (Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor);
+   --  Move a clock hand round the table, once at most, offering Try_Page
+   --  each page that is mapped, persistent, clean and read only, from the
+   --  page after the one the hand last stopped at: the pages that have
+   --  been longest since the hand passed them come first (#973). Stop at
+   --  the first page that Try_Page takes, and return it, or zero if it
+   --  took none. Try_Page must not change the table.
+
    procedure Iterate_Process_Pages
      (Process : Process_Id;
       Base    : Rose.Addresses.Virtual_Page_Address;

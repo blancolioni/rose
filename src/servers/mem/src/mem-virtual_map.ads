@@ -5,9 +5,20 @@ with Rose.Objects;
 
 package Mem.Virtual_Map is
 
+   procedure Allocate_Page
+     (Physical_Page : out Rose.Addresses.Physical_Page_Address;
+      Success       : out Boolean);
+   --  A physical page for a process or a restore: a free one, or else one
+   --  that Reclaim frees. Then, if fewer than Rose.Limits.Reserve_Low_Pages
+   --  are free, free pages until Rose.Limits.Reserve_High_Pages are
+   --  (#973). Success is False if there is no page.
+
    procedure Reclaim
      (Physical_Page : out Rose.Addresses.Physical_Page_Address;
       Success       : out Boolean);
+   --  Free a page that mem can read again when it is needed: a cached
+   --  page that nothing maps, a page of the cache of index pages, or a
+   --  clean page of a process (#973).
 
    procedure Map (Process       : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;

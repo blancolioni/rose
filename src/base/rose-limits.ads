@@ -18,6 +18,13 @@ package Rose.Limits is
    --  The kernel makes room for it when it loads the boot modules
    --  (Rose.Kernel.Boot_Module_Pages).
 
+   Reserve_Low_Pages  : constant := 64;
+   Reserve_High_Pages : constant := 128;
+   --  The memory server's reserve of free pages: when fewer than
+   --  Reserve_Low_Pages are free, it frees pages that it can read again,
+   --  cached pages that nothing maps and then clean pages of processes,
+   --  until Reserve_High_Pages are free (ADR 0028, section 5; #973).
+
    Page_Size : constant := 2 ** 12;
 
 end Rose.Limits;
