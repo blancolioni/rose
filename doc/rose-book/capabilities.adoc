@@ -373,12 +373,20 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 * `Error` is the reason that an invocation failed, if the `Error` flag is set.
   It is in the control word, with the flags and counts, so that the first two words of the record say everything about a call except what it carries (#990).
 * `Capability` is the capability that is being invoked.
-* `Reply Capability` is set by the kernel, when the flag asks for it, and gives the target of an invocation a capability on which to send a reply.
+* `Reply Capability` is set by the kernel, when `Create_Reply_Cap` asks for it, and gives the target of an invocation a capability on which to send a reply.
+  Otherwise it is null, so that a null `Reply Capability` means that no reply is wanted; the kernel never reads the caller's.
 * `Endpoint Id` is set by the kernel when it delivers a call, to the 64-bit id of the endpoint that the capability names.
 * `Identifier` is the identifier of the capability that was invoked.
   The rest of its word is not used.
 * `Parameter words` and `Capabilities` are the words and capabilities that are sent, and where those that are received are put.
 * `Buffer address` and `Buffer length` are the buffer that is shared with the receiver, if `Send_Buffer` is set.
+
+A receiver can rely only on what was sent: the words up to `SW`, the capabilities up to `SC` and the buffer, each only when its flag is set.
+The other slots hold whatever was there before, in the kernel's copy and in the receiver's own record (#892).
+`Rose.Invocation.Sent_Word`, `Sent_Cap` and `Sent_Buffer_Length` give 0, the null capability or 0 for what wasn't sent, and generated code reads through them.
+
+With `poison-invocations` on the kernel command line, the kernel fills every slot that wasn't sent, on the way in and on the way out: word _N_ with `BAD0_000N`, capability _N_ with `BAD0_0C0N`, and the buffer with a kernel address and a length of `0BAD_0B00`.
+A boot test with it shows any reader that goes past what was sent.
 
 `Flags` is a packed array indexed by `Invocation_Flag`, so flag _N_ is bit _N_.
 
