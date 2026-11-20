@@ -104,13 +104,9 @@ package body Tests.Reply_Caps is
          return Fail ("no bank of its own");
       end if;
 
-      --  The test frees cap numbers, which it can't do without the
-      --  Delete_Cap cap, as when petal runs it without that role.
-
-      if Rose.System_Calls.Delete_Cap_Capability = Null_Capability then
-         Ada.Text_IO.Put (" (skipped: no Delete_Cap cap)");
-         return True;
-      end if;
+      --  The test frees cap numbers with Delete_Cap, which any process
+      --  can do, with or without the Delete_Cap role (#1022). So it also
+      --  runs when petal runs it without that role.
 
       --  Take the lowest free cap numbers until five in a row are
       --  consecutive. Then free those five: every number below the

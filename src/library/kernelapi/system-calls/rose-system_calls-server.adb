@@ -121,11 +121,8 @@ package body Rose.System_Calls.Server is
    procedure Delete_Cap
      (Cap : Rose.Capabilities.Capability)
    is
-      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Initialize_Send (Params, Delete_Cap_Capability);
-      Send_Cap (Params, Cap);
-      Invoke_Capability (Params);
+      Rose.System_Calls.Delete_Cap (Cap);
    end Delete_Cap;
 
    -----------------

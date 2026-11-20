@@ -117,13 +117,14 @@ package body Exec.Server is
    --  The newest version of program Id, which a launch through Id's caps
    --  launches (#902). Fails the call if there is no program Id.
 
-   procedure Send_Image
+   procedure Send_Launch_Arguments
      (Params : in out Rose.Invocation.Invocation_Record;
       Id     : Rose.Objects.Capability_Identifier;
       Bank   : Rose.Capabilities.Capability);
-   --  Send the image of program Id and the bank to launch it against, as
-   --  the ELF server's Launch and Launch_Command take them: Bank, or
-   --  exec's own if Bank is null (ADR 0015, #750).
+   --  Send what the ELF server's Launch and Launch_Command take: the name
+   --  of program Id, which becomes the process's name (#1005), its
+   --  image, and the bank to launch it against: Bank, or exec's own if
+   --  Bank is null (ADR 0015, #750).
 
    function Start_Launched
      (Params : Rose.Invocation.Invocation_Record;
@@ -181,12 +182,8 @@ package body Exec.Server is
    ----------------
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
-      Params : aliased Rose.Invocation.Invocation_Record;
    begin
-      Rose.System_Calls.Initialize_Send
-        (Params, Rose.System_Calls.Delete_Cap_Capability);
-      Rose.System_Calls.Send_Cap (Params, Cap);
-      Rose.System_Calls.Invoke_Capability (Params);
+      Rose.System_Calls.Delete_Cap (Cap);
    end Delete_Cap;
 
    --------------
@@ -249,7 +246,7 @@ package body Exec.Server is
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       Initialize_Send (Params, Create_Process_Cap);
-      Send_Image (Params, Id, Bank);
+      Send_Launch_Arguments (Params, Id, Bank);
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
       Delete_Cap (Bank);
@@ -307,8 +304,6 @@ package body Exec.Server is
       Id     : constant Rose.Objects.Capability_Identifier :=
         Newest (Item.Id);
       Params : aliased Rose.Invocation.Invocation_Record;
-      Name   : String (1 .. 16);
-      Last   : Natural;
    begin
 
       --  A command has only the caps it is given (ADR 0002): no install
@@ -316,9 +311,7 @@ package body Exec.Server is
 
       Rose.Trace.Event ("launch command, program ", Natural (Id));
       Initialize_Send (Params, Launch_Command_Cap);
-      Send_Image (Params, Id, Bank);
-      Exec.Library.Get_Program_Name (Id, Name, Last);
-      Send_Text (Params, Name (1 .. Last));
+      Send_Launch_Arguments (Params, Id, Bank);
       Receive_Caps (Params, 1);
       Invoke_Capability (Params);
       Rose.Trace.Event ("command launched");
@@ -444,23 +437,27 @@ package body Exec.Server is
       end;
    end Read_Cap_Set;
 
-   ----------------
-   -- Send_Image --
-   ----------------
+   ---------------------------
+   -- Send_Launch_Arguments --
+   ---------------------------
 
-   procedure Send_Image
+   procedure Send_Launch_Arguments
      (Params : in out Rose.Invocation.Invocation_Record;
       Id     : Rose.Objects.Capability_Identifier;
       Bank   : Rose.Capabilities.Capability)
    is
       use type Rose.Capabilities.Capability;
+      Name : String (1 .. Exec.Library.Max_Name_Length);
+      Last : Natural;
    begin
+      Exec.Library.Get_Program_Name (Id, Name, Last);
+      Rose.System_Calls.Send_Text (Params, Name (1 .. Last));
       Rose.System_Calls.Send_Cap (Params, Exec.Library.Image_Region (Id));
       Rose.System_Calls.Send_Cap
         (Params,
          (if Bank /= Rose.Capabilities.Null_Capability
           then Bank else Bank_Cap));
-   end Send_Image;
+   end Send_Launch_Arguments;
 
    -------------------------
    -- Set_Standard_Output --
