@@ -9,6 +9,14 @@ interface Checkpoints.Log_Reader is
    function Last_Entry return Word_64;
    --  The last committed entry, or 0 if the log is empty.
 
+   function First_Checkpoint return Word_64;
+   --  The first entry that can be restored, or 0 if there is none. Once
+   --  the memory server has cleaned the log (#952), an entry from before
+   --  the commit that last moved the log's start can have an index that
+   --  names pages that were freed, so only this entry and the ones after
+   --  it can be restored (#953). The entries before it are still read
+   --  for their shared pages.
+
    function Next_Entry (Location : Word_64) return Word_64;
    --  The entry after the one at Location, or 0 if that is the last
    --  entry or Location is not an entry.

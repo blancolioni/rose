@@ -107,6 +107,11 @@ package body Log.Server is
    --  The entry that Free_Before asked the next commit to start the log
    --  at, and its sequence number, or 0.
 
+   First_Restorable   : Log_Location_Id := 0;
+   --  The first committed entry whose header's Start_Sequence is the
+   --  log's start, or 0 if there is none: only it and the entries after
+   --  it can be restored (Log_Reader.First_Checkpoint, #953).
+
    --  The log's locations run from 1 to the end of the last device, and
    --  then wrap around to 1 (#951).  An entry is its header and the
    --  pages after it, which can wrap.  Space is free from the open
@@ -274,6 +279,17 @@ package body Log.Server is
    procedure Move_First_Entry;
    --  Start the log at New_First_Entry, once the entry is committed.
 
+   procedure Finish_Start
+     (Last_Start : Rose.Words.Word_64;
+      Run_First  : Log_Location_Id);
+   --  After the startup scan: Last_Start is the last committed entry's
+   --  Start_Sequence, and Run_First the first entry of the run that
+   --  ends with it, in which every Start_Sequence is Last_Start or 0.
+   --  If the log's header doesn't start at Last_Start yet, because the
+   --  system stopped between writing that entry's header and the log's
+   --  (#953), move it there now: the entry is on the medium, and its
+   --  pages are all from there on.  Then set First_Restorable.
+
    procedure Fail_Entry (Problem : Problem_Type);
    --  Leave the whole open entry out of the log, because a write to the
    --  disk failed.
@@ -327,6 +343,10 @@ package body Log.Server is
       return Rose.Words.Word_64;
 
    function Last_Entry
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64;
+
+   function First_Checkpoint
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Words.Word_64;
 
@@ -431,7 +451,9 @@ package body Log.Server is
 
             declare
                use type Rose.Words.Word_64;
-               Success : Boolean;
+               Success    : Boolean;
+               Last_Start : Rose.Words.Word_64 := 0;
+               Run_First  : Log_Location_Id := 0;
             begin
                Read (0, Header'Address, Success);
                --  A header from before version 3 has no sequence number,
@@ -467,8 +489,26 @@ package body Log.Server is
 
                      if First_Committed = 0 then
                         First_Committed := Next_Log_Location;
+                        Run_First := Next_Log_Location;
                      end if;
                      Last_Committed := Next_Log_Location;
+
+                     --  An entry with another start begins a new run;
+                     --  one that didn't record its start (0) carries on
+                     --  the run it is in.
+
+                     declare
+                        Start : constant Rose.Words.Word_64 :=
+                                  Current_Log_Header.Start_Sequence;
+                     begin
+                        if Start /= 0 then
+                           if Last_Start /= 0 and then Start /= Last_Start
+                           then
+                              Run_First := Next_Log_Location;
+                           end if;
+                           Last_Start := Start;
+                        end if;
+                     end;
 
                      Next_Log_Location :=
                        Next_Location (Current_Log_Header.Log_Last);
@@ -484,6 +524,8 @@ package body Log.Server is
                     ("log: next log at location ");
                   Rose.Console_IO.Put (Natural (Next_Log_Location));
                   Rose.Console_IO.New_Line;
+
+                  Finish_Start (Last_Start, Run_First);
 
                else
 
@@ -740,11 +782,23 @@ package body Log.Server is
             use type Rose.Words.Word_64;
             Success : Boolean;
          begin
+            --  The entry records where the log starts once it is
+            --  committed: a restore can use it only while the log starts
+            --  there (#953).
+
+            Current_Log_Header.Start_Sequence :=
+              (if New_First_Entry /= 0
+               then New_First_Sequence
+               else Header.First_Sequence);
+
             Write (Next_Log_Location, Current_Log_Header'Address, Success);
             if Success then
                Sync_Devices;
                if First_Committed = 0 then
                   First_Committed := Next_Log_Location;
+               end if;
+               if First_Restorable = 0 then
+                  First_Restorable := Next_Log_Location;
                end if;
                Last_Committed := Next_Log_Location;
                Next_Log_Location :=
@@ -758,10 +812,17 @@ package body Log.Server is
 
       --  The log's header moves its first entry only once the entry is
       --  on the medium, so a crash before then leaves the log starting
-      --  where it did, and nothing has been overwritten yet.
+      --  where it did, and nothing has been overwritten yet.  A crash
+      --  between the two writes leaves an entry that starts later than
+      --  the log's header, and the next startup finishes the move
+      --  (Finish_Start).  From then on, the entries before this one can't
+      --  be restored.
 
       if not Entry_Failed and then New_First_Entry /= 0 then
          Move_First_Entry;
+         if Header.First_Entry = New_First_Entry then
+            First_Restorable := Last_Committed;
+         end if;
       end if;
       New_First_Entry := 0;
 
@@ -886,6 +947,7 @@ package body Log.Server is
         (Server_Context => Log_Server,
          First_Entry    => First_Entry'Access,
          Last_Entry     => Last_Entry'Access,
+         First_Checkpoint => First_Checkpoint'Access,
          Next_Entry     => Next_Entry'Access,
          Page_Count     => Page_Count'Access,
          Read_Page      => Read_Page'Access);
@@ -1101,6 +1163,77 @@ package body Log.Server is
 
       return False;
    end Find_Entry;
+
+   ------------------
+   -- Finish_Start --
+   ------------------
+
+   procedure Finish_Start
+     (Last_Start : Rose.Words.Word_64;
+      Run_First  : Log_Location_Id)
+   is
+      use type Rose.Words.Word_64;
+   begin
+      First_Restorable := 0;
+      if Last_Committed = 0 then
+         return;
+      end if;
+
+      --  The last entry's start is between the header's and the last
+      --  entry itself if the header's write was cut short; anything else
+      --  is not a start that this log can move to.
+
+      if Last_Start > Header.First_Sequence
+        and then Last_Start < Next_Sequence
+      then
+         declare
+            Location : Log_Location_Id := First_Committed;
+            Sequence : Rose.Words.Word_64 := Header.First_Sequence;
+         begin
+            while Sequence /= Last_Start loop
+               exit when not Load_Entry (Location);
+               Location := Next_Location (Cached_Header.Log_Last);
+               Sequence := Sequence + 1;
+            end loop;
+
+            if Sequence = Last_Start then
+               New_First_Entry := Location;
+               New_First_Sequence := Last_Start;
+               Move_First_Entry;
+               New_First_Entry := 0;
+               Rose.Console_IO.Put
+                 ("log: the last entry's commit had moved the start to ");
+               Rose.Console_IO.Put (Natural (Header.First_Entry));
+               Rose.Console_IO.New_Line;
+               Report_Problems;
+            end if;
+         end;
+      end if;
+
+      --  The run's entries name pages from their start on, which are
+      --  still in the log if the log starts there or before.  An entry
+      --  before the run has an earlier start, which may have been freed.
+
+      if Last_Start = 0 or else Last_Start >= Header.First_Sequence then
+         First_Restorable := Run_First;
+      else
+         Rose.Console_IO.Put_Line
+           ("log: the last entry needs entries that were freed");
+      end if;
+   end Finish_Start;
+
+   ----------------------
+   -- First_Checkpoint --
+   ----------------------
+
+   function First_Checkpoint
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Words.Word_64
+   is
+      pragma Unreferenced (Id);
+   begin
+      return Rose.Words.Word_64 (First_Restorable);
+   end First_Checkpoint;
 
    -----------------
    -- First_Entry --
@@ -1712,6 +1845,7 @@ package body Log.Server is
             Next_Sequence := Header.First_Sequence;
             First_Committed := 0;
             Last_Committed := 0;
+            First_Restorable := 0;
             Cached_Location := 0;
             New_First_Entry := 0;
          end;

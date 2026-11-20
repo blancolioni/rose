@@ -32,13 +32,21 @@ private package Log.Header is
      with Pack, Size => Log_Page_Bits;
 
    subtype Entry_Reserved is
-     System.Storage_Elements.Storage_Array (1 .. 4048);
+     System.Storage_Elements.Storage_Array (1 .. 4040);
 
    --  An entry's pages follow its header, and wrap around from the end
    --  of the log to location 1, so Log_Last can be before the header.
    --  Sequence is one more than the previous entry's: a header from an
    --  earlier lap names the right location and generation, but not the
    --  right sequence number.
+
+   --  Start_Sequence is the sequence number of the log's first entry
+   --  once the entry is committed (#953).  The memory server's index in
+   --  the entry names only pages from there on, so the entry can be
+   --  restored only while the log still starts there: an older entry's
+   --  index can name pages that cleaning has freed (#952).  It is 0 in
+   --  an entry written before it was recorded, which restores as it did
+   --  before.
 
    type Entry_Flags is new Rose.Words.Word_32;
 
@@ -53,6 +61,7 @@ private package Log.Header is
          Log_First : Log_Location_Id;
          Log_Last  : Log_Location_Id;
          Sequence  : Rose.Words.Word_64 := 0;
+         Start_Sequence : Rose.Words.Word_64 := 0;
          Reserved  : Entry_Reserved := (others => 0);
       end record
      with Pack, Size => Log_Page_Bits;

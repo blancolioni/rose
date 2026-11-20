@@ -21,6 +21,7 @@
 16#3535_7DC2_DE7C_6538#  interface rose.interfaces.checkpoints.log_reader
 16#1597_207E_03B8_8CDF#  rose.interfaces.checkpoints.log_reader.first_entry return word_64
 16#5C4C_A5F1_405C_9B23#  rose.interfaces.checkpoints.log_reader.last_entry return word_64
+16#C6E6_A266_E2D3_3B6D#  rose.interfaces.checkpoints.log_reader.first_checkpoint return word_64
 16#79FD_6FC2_A528_7EF4#  rose.interfaces.checkpoints.log_reader.next_entry(in word_64) return word_64
 16#F1CD_96F4_D838_C3A1#  rose.interfaces.checkpoints.log_reader.page_count(in word_64) return natural
 16#0835_5971_9475_3D20#  rose.interfaces.checkpoints.log_reader.read_page(in word_64; in positive; out storage_array)

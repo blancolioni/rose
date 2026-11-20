@@ -25,18 +25,27 @@ as an entry left over from before a reset.
 
 The memory server cleans the log (#952): it copies the pages that are
 still in use out of the oldest entries, then frees them, and new
-entries can then overwrite them.  So in a cleaned log the first entries'
-indexes can't be checked against earlier ones:
+entries can then overwrite them.  Each entry's header records the
+sequence number of the log's start once it was committed (#953), and
+only the last run of entries with the same start, from the entry that
+moved the start on, can be restored, as the log server's
+Log_Reader.First_Checkpoint says:
 
-  - an entry whose index's own pages (directory and leaves) are not all
-    in the log, from its start to the entry's end, can't be read at
-    all, and is left unchecked;
-  - the first entry whose index can be read is taken as it is, for the
-    pages that its own batches don't hold;
+  - the entries before that run are not checked against each other:
+    their indexes can name pages that were freed;
+  - the first entry of the run is taken as it is, for the pages that its
+    own batches don't hold, but every page of its index, and every page
+    it names, has to be in the log;
   - each entry after that is checked as usual.
 
-The last entry's index, which is the one a restore reads, has to be
-readable, and has to name only pages that are in the log.
+If the last entry's start is after the log header's, the system stopped
+between writing that entry's header and the log's, and the log server
+finishes the move when it starts; it is reported, and isn't a failure.
+
+The last restorable entry is the checkpoint that a restore reads: its
+index has to name only pages in the log.  The script also says how many
+shared pages that restore loads, which is the number that restore's
+"shared pages" reports, for scripts/test-log-crash.
 
 The layouts are those of src/servers/log/src/log-header.ads,
 src/base/rose-checkpoints.ads and
@@ -187,6 +196,12 @@ def entry_fields(page):
         return version, flags, None, u64(page, 16), u64(page, 24), None
     return (version, flags, u64(page, 16), u64(page, 24), u64(page, 32),
             u64(page, 40) if version >= 3 else None)
+
+
+def entry_start(page):
+    """The sequence number of the log's start that an entry header
+    records (#953), or 0 if it records none."""
+    return u64(page, 48)
 
 
 def walk_entries(log, header):
@@ -673,7 +688,7 @@ def check_entry(log, first, last, verbose, info):
     end = mem_first + table_pages
     if has_shared:
         ok, shared, shared_headers, saved = check_shared(log, end, last,
-                                                         verbose)
+                                                         verbose, info)
         if not ok:
             return False, description + "; " + shared
         description += "; " + shared
@@ -854,7 +869,7 @@ def batch_pages(log, first, headers):
             location += 1
 
 
-def check_index_contents(log, info, previous, baseline=False):
+def check_index_contents(log, info, previous, inside=None):
     """Check that the index of each process in the entry that info
     describes names the latest copy of each of its pages: the copies its
     index in the previous entry named, updated by the batches of this
@@ -867,11 +882,12 @@ def check_index_contents(log, info, previous, baseline=False):
     slot starts with nothing.  Each process's index is read into info's
     "indexes", for the next entry.
 
-    baseline is True for the first readable index of a cleaned log
-    (#952): the entries before it were freed, or their indexes can't be
-    read, so each process starts with the pages of its index that its
-    batches don't hold, which can't be checked.  They are counted in
-    info's "baseline_pages".
+    inside is given for the first restorable entry of a cleaned log
+    (#953): the entries before it can't be restored, so their indexes
+    aren't checked, and each process starts with the pages of its index
+    that its batches don't hold, which are counted in info's
+    "baseline_pages".  inside tells whether a log page is in the log;
+    each of those pages has to be.
 
     A slot can have a new process between a batch paged out before the
     checkpoint and the checkpoint itself, and the memory server forgets
@@ -909,9 +925,16 @@ def check_index_contents(log, info, previous, baseline=False):
     for pid in sorted(info["processes"]):
         actual = read_index(log, info["directories"].get(pid, 0))
         info["indexes"][pid] = actual
-        if baseline:
+        if inside is not None:
             for virtual, location in actual.items():
                 if virtual not in expected[pid]:
+                    if not inside(location):
+                        problems.append(
+                            "memory process %d (object %d): its index "
+                            "names page %05x at %d, which is not in the log"
+                            % (pid, info["processes"][pid], virtual,
+                               location))
+                        break
                     expected[pid][virtual] = location
                     info["baseline_pages"] += 1
         for virtual in maybe_earlier[pid]:
@@ -936,10 +959,12 @@ def check_index_contents(log, info, previous, baseline=False):
     return None
 
 
-def check_shared(log, first, last, verbose):
-    """Check the shared header pages, which start at page first.
+def check_shared(log, first, last, verbose, info):
+    """Check the shared header pages, which start at page first, and set
+    info's "shared" to {store page: True if saved, False if released}.
 
     Returns (ok, description, header pages, saved pages)."""
+    info["shared"] = {}
     header_pages = 0
     saved = 0
     released = 0
@@ -963,6 +988,7 @@ def check_shared(log, first, last, verbose):
                   % (location, count))
         for i in range(count):
             store_page, flags = struct.unpack_from("<QI", page, 16 + i * 12)
+            info["shared"][store_page] = flags == SHARED_PAGE_SAVED
             if flags == SHARED_PAGE_SAVED:
                 saved += 1
             elif flags == SHARED_PAGE_RELEASED:
@@ -1029,10 +1055,43 @@ def main():
         previous = None
         last_info = None
         # A log whose first entry is not the first one written has been
-        # cleaned (#952); until an entry's index can be read, there is
-        # nothing to check the indexes against.
+        # cleaned (#952).  Only the last run of entries that record the
+        # same start can be restored (#953), as the log server finds it:
+        # an entry that records no start (0) carries on the run it is in.
         cleaned = sequence > 1
-        baseline = cleaned
+        walked = list(walk_entries(log, header))
+        last_start = 0
+        run_first = walked[0][0] if walked else 0
+        for at, _, _ in walked:
+            entry_start_sequence = entry_start(log.page(at))
+            if entry_start_sequence:
+                if last_start and entry_start_sequence != last_start:
+                    run_first = at
+                last_start = entry_start_sequence
+        start_sequence = sequence
+        if sequence < last_start < sequence + len(walked):
+            print("the last entry's commit moved the log's start to "
+                  "sequence %d, and the log's header doesn't say so yet: "
+                  "the log server finishes the move when it starts"
+                  % last_start)
+            start_sequence = last_start
+        if last_start and last_start < start_sequence:
+            print("the last entry records a start, sequence %d, that is "
+                  "before the log's" % last_start)
+            failures += 1
+            run_first = 0
+        restorable = False
+        baseline = False
+        shared = {}
+        checkpoint = 0
+        shared_to_load = 0
+
+        def inside(at):
+            """True if log page at is in the log, from its start to the
+            end of the entry being checked."""
+            return 1 <= at < log.page_count \
+                and log.distance(start, at) <= log.distance(start, last)
+
         while True:
             fields = entry_fields(log.page(location))
             if fields is None:
@@ -1060,28 +1119,33 @@ def main():
                 wrapped = True
 
             entries += 1
+            if location == run_first:
+                restorable = True
+                baseline = cleaned
             info = {}
             ok, description = check_entry(log, location + 1, end,
                                           args.verbose, info)
-            unread = 0
-            if ok and info["has_index"] and baseline:
-                # The pages of the log up to this entry's end are the
-                # ones its index can be in; the rest were freed, and
-                # may have been written over.
-                unread = sum(
+            outside = 0
+            if ok and info["has_index"] and restorable and cleaned:
+                # A restorable entry's index is all in the log: cleaning
+                # writes again the index pages that it frees.
+                outside = sum(
                     1 for directory in info["directories"].values()
                     for at in index_pages(log, directory)
-                    if not 1 <= at < log.page_count
-                    or log.distance(start, at) > log.distance(start, last))
-            if unread:
-                description += ("; index not checked: %d of its pages "
-                                "are in freed entries" % unread)
+                    if not inside(at))
+            if ok and info["has_index"] and not restorable:
+                description += "; not restorable, so its index isn't checked"
+            elif outside:
+                ok = False
+                description += ("; %d of its index pages are not in the log"
+                                % outside)
             elif ok and info["has_index"]:
                 # An entry's index has to agree with the log's pages
                 # (ADR 0028): a restore that reads only the last entry
                 # gets what one that reads every entry would.
-                problem = check_index_contents(log, info, previous,
-                                               baseline=baseline)
+                problem = check_index_contents(
+                    log, info, previous,
+                    inside=inside if baseline else None)
                 baseline = False
                 if problem:
                     ok, description = False, description + "; " + problem
@@ -1107,6 +1171,16 @@ def main():
                 failures += 1
             previous = info if "indexes" in info else None
             last_info = info if ok else None
+
+            # Restore collects the newest copy of each shared page from
+            # the first entry to the checkpoint, the last restorable
+            # entry that is consistent, and loads the saved ones.
+            if ok:
+                shared.update(info.get("shared", {}))
+                if restorable:
+                    checkpoint = location
+                    shared_to_load = sum(1 for saved in shared.values()
+                                         if saved)
             location = log.next(last)
             if sequence:
                 sequence += 1
@@ -1120,13 +1194,20 @@ def main():
                  location, "; the log has wrapped around" if wrapped
                  else ""))
 
+        if checkpoint:
+            print("restore reads the entry at %d%s, and loads %d shared "
+                  "page%s"
+                  % (checkpoint,
+                     "" if run_first == walked[0][0]
+                     else "; entries from %d can be restored" % run_first,
+                     shared_to_load, "" if shared_to_load == 1 else "s"))
+        elif entries:
+            print("no entry can be restored")
+            failures += 1
+
         # The last entry's index is what a restore reads: every page it
         # names has to be in the log, not in an entry that was freed.
-        if cleaned and last_info is not None and last_info.get("has_index") \
-           and "indexes" not in last_info:
-            print("the last entry's index is in freed entries")
-            failures += 1
-        elif cleaned and last_info is not None and "indexes" in last_info:
+        if cleaned and last_info is not None and "indexes" in last_info:
             used = log.distance(start, location) if location != start \
                 else log.page_count - 1
             outside = [(pid, virtual, at)

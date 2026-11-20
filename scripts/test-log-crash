@@ -1,0 +1,124 @@
+#!/bin/sh
+# The test of a restore after a crash in the commit that moves the
+# checkpoint log's start (#953), under QEMU.
+#
+#   scripts/test-log-crash [ISO]
+#
+# ISO is the install image, images/rose.iso by default.  The commit that
+# moves the log's start writes the new entry's header, which records the
+# new start, then the log's header.  The test:
+#
+#   1. installs Rose on a new disk, and shrinks the log with
+#      set-log-size.py, as scripts/test-log-clean does, so that the memory
+#      server starts cleaning it at once;
+#   2. boots from the disk, and leaves it idle until check-log.py finds
+#      that the log's start has moved, for at most ROUNDS boots of MINUTES
+#      minutes each;
+#   3. for each of the three places the system could have stopped in that
+#      commit (before, between and after the two writes), makes a copy of
+#      the disk look as that crash would have left it, with
+#      make-log-crash.py, and boots from it.  The boot has to restore the
+#      entry that make-log-crash.py says, load the number of shared pages
+#      that check-log.py says, and show the login prompt; after "between",
+#      the log server has to finish moving the start.  Then it waits for a
+#      checkpoint, stops the machine, and check-log.py has to find the log
+#      consistent.
+#
+# It takes about half an hour, and needs qemu-system-i386, qemu-img and
+# python3.  It exits with 0 if everything passed, and keeps the disk
+# images and QEMU's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+MARGIN=${MARGIN:-3000}
+ROUNDS=${ROUNDS:-4}
+MINUTES=${MINUTES:-6}
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+check_log () {
+    # check_log WHEN: run check-log.py on the disk, and fail if it finds
+    # the log inconsistent
+    python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" 2>&1 \
+        || { cat "$WORK/check-log.txt"; fail "check-log.py: $1"; }
+    grep -E "^log|entries|wrapped|full|restore reads|finishes" \
+         "$WORK/check-log.txt" | tail -4
+}
+
+boot_and_check () {
+    # boot_and_check WHEN CHECKPOINT: boot from the disk, which has to
+    # restore the entry at CHECKPOINT, and load the shared pages that the
+    # last check_log said it would
+    shared=$(sed -n 's/^restore reads .*loads \([0-9]*\) shared.*/\1/p' \
+                 "$WORK/check-log.txt")
+    start_qemu
+    mark=$(console_mark)
+    choose_last_entry
+    wait_for "login:" 300 || fail "$1: no login prompt"
+    console_since "$mark" > "$WORK/boot.txt"
+    grep -q "restore: restored processes are running" "$WORK/boot.txt" \
+        || fail "$1: the checkpoint was not restored"
+    grep -q -E "restore: log: checkpoint at $2([^0-9]|\$)" "$WORK/boot.txt" \
+        || { grep "restore: log:" "$WORK/boot.txt"
+             fail "$1: restore did not choose the entry at $2"; }
+    grep -q "shared pages: $shared;" "$WORK/boot.txt" \
+        || { grep "restore: processes" "$WORK/boot.txt"
+             fail "$1: restore did not load $shared shared pages"; }
+    echo "$1: restored the entry at $2, with $shared shared pages"
+}
+
+install_rose "$ISO"
+
+check_log "after the install"
+used=$(sed -n 's/^.*next entry at location \([0-9]*\).*$/\1/p' \
+           "$WORK/check-log.txt")
+[ -n "$used" ] || fail "check-log.py did not say where the next entry goes"
+python3 "$HERE/set-log-size.py" "$DISK" $((used + MARGIN)) \
+    || fail "set-log-size.py could not shrink the log"
+
+round=1
+moved=no
+while [ $round -le $ROUNDS ] && [ $moved = no ]; do
+    echo "Boot $round, idle for $MINUTES minutes"
+    checkpoint=$(sed -n 's/^restore reads the entry at \([0-9]*\).*/\1/p' \
+                     "$WORK/check-log.txt")
+    boot_and_check "boot $round" "$checkpoint"
+    sleep $((MINUTES * 60))
+    stop_qemu
+    check_log "after boot $round"
+    grep -q "^log starts at location 1," "$WORK/check-log.txt" \
+        || moved=yes
+    round=$((round + 1))
+done
+[ $moved = yes ] || fail "the log's start did not move in $ROUNDS boots"
+
+cp --sparse=always "$DISK" "$WORK/moved.img"
+for case in before between after; do
+    echo "A crash $case the writes of the commit that moved the start"
+    cp --sparse=always "$WORK/moved.img" "$DISK"
+    python3 "$HERE/make-log-crash.py" "$DISK" $case \
+        > "$WORK/crash-$case.txt" 2>&1 \
+        || { cat "$WORK/crash-$case.txt"; fail "make-log-crash.py $case"; }
+    cat "$WORK/crash-$case.txt"
+    expect=$(sed -n 's/^expect checkpoint at \([0-9]*\)$/\1/p' \
+                 "$WORK/crash-$case.txt")
+    check_log "after making the crash $case"
+    boot_and_check "$case" "$expect"
+    if [ $case = between ]; then
+        grep -q "log: the last entry's commit had moved the start" \
+             "$WORK/boot.txt" \
+            || fail "between: the log server did not finish the move"
+    fi
+    echo "Waiting for a checkpoint, then stopping the machine"
+    sleep 45
+    stop_qemu
+    check_log "after the boot $case"
+done
+
+echo "PASS: each crash in the commit that moves the start restored"
+rm -rf "$WORK"
+exit 0

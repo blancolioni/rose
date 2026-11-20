@@ -15,7 +15,8 @@
 #      and an idle system would fill it in about half an hour if nothing
 #      were freed;
 #   3. boots from the disk ROUNDS times, each of which has to restore the
-#      last checkpoint and show the login prompt, leaves the system idle
+#      checkpoint that check-log.py says, with the shared pages it says,
+#      and show the login prompt, leaves the system idle
 #      for MINUTES minutes, and stops the machine wherever it is; then
 #      runs check-log.py, which has to find the log consistent.
 #
@@ -44,7 +45,8 @@ check_log () {
     # the log inconsistent
     python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" 2>&1 \
         || { cat "$WORK/check-log.txt"; fail "check-log.py: $1"; }
-    grep -E "^log|entries|wrapped|full" "$WORK/check-log.txt" | tail -3
+    grep -E "^log|entries|wrapped|full|restore reads" "$WORK/check-log.txt" \
+        | tail -4
 }
 
 install_rose "$ISO"
@@ -61,18 +63,33 @@ python3 "$HERE/set-log-size.py" "$DISK" $((used + MARGIN)) \
 round=1
 while [ $round -le $ROUNDS ]; do
     echo "Boot $round from the disk, which restores the last checkpoint"
+    # Restore has to choose the entry that check-log.py says, and load
+    # the shared pages it says, from entries on both sides of the wrap
+    # once the log has wrapped around (#953).
+    checkpoint=$(sed -n 's/^restore reads the entry at \([0-9]*\).*/\1/p' \
+                     "$WORK/check-log.txt")
+    shared=$(sed -n 's/^restore reads .*loads \([0-9]*\) shared.*/\1/p' \
+                 "$WORK/check-log.txt")
     # QEMU may start CONSOLE again, so the mark is taken once it has.
     start_qemu
     mark=$(console_mark)
     choose_last_entry
     wait_for "login:" 300 || fail "boot $round: no login prompt"
-    console_since "$mark" \
-        | grep -q "restore: restored processes are running" \
+    console_since "$mark" > "$WORK/boot.txt"
+    grep -q "restore: restored processes are running" "$WORK/boot.txt" \
         || fail "boot $round: the checkpoint was not restored"
+    grep -q -E "restore: log: checkpoint at $checkpoint([^0-9]|\$)" \
+         "$WORK/boot.txt" \
+        || { grep "restore: log:" "$WORK/boot.txt"
+             fail "boot $round: restore did not choose $checkpoint"; }
+    grep -q "shared pages: $shared;" "$WORK/boot.txt" \
+        || { grep "restore: processes" "$WORK/boot.txt"
+             fail "boot $round: restore did not load $shared shared pages"; }
 
     echo "Leaving it idle for $MINUTES minutes, then stopping it"
     sleep $((MINUTES * 60))
-    console_since "$mark" | grep -E "log: .*(full|not committed)" | head -3
+    console_since "$mark" | grep -E "log: .*(full|not committed|freed)" \
+        | head -3
     stop_qemu
     check_log "after boot $round"
     round=$((round + 1))
