@@ -364,6 +364,7 @@ package body Page_Probe_Server is
       Buffer : Ada.Streams.Stream_Element_Array)
    is
       pragma Unreferenced (Item);
+      use type Rose.Capabilities.Capability;
       Chunk_Count : constant Natural := Fill_Pages / Chunk_Pages;
       Bad         : Natural := 0;
       Filled      : Natural := 0;
@@ -384,9 +385,14 @@ package body Page_Probe_Server is
                & Image (Natural (Buffer'Length)));
       end if;
 
+      --  With no checkpoint cap, nothing is checkpointed here, so mem
+      --  has to page the changed pages out to the log (#974).
+
       for Chunk in 1 .. Chunk_Count loop
          Fill_Chunk (Chunk);
-         Take_Checkpoint;
+         if Checkpoint_Cap /= Rose.Capabilities.Null_Capability then
+            Take_Checkpoint;
+         end if;
          Filled := Chunk;
       end loop;
 

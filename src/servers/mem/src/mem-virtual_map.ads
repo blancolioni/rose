@@ -17,8 +17,18 @@ package Mem.Virtual_Map is
      (Physical_Page : out Rose.Addresses.Physical_Page_Address;
       Success       : out Boolean);
    --  Free a page that mem can read again when it is needed: a cached
-   --  page that nothing maps, a page of the cache of index pages, or a
-   --  clean page of a process (#973).
+   --  page that nothing maps, a page of the cache of index pages, a clean
+   --  page of a process (#973), or else a batch of changed pages, paged
+   --  out to the log (#974).
+
+   function Changes_Stopped return Boolean;
+   --  No more changed pages can be paged out until a checkpoint ends:
+   --  the table of changes is full, or the log refused a batch (ADR 0028,
+   --  section 6; #974). Only clean pages can be freed.
+
+   procedure End_Checkpoint;
+   --  mem's part of a checkpoint is done, so changed pages can be paged
+   --  out again.
 
    procedure Map (Process       : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;

@@ -80,8 +80,11 @@ package Init.Self_Tests is
    --  fills more memory than the machine has, with a checkpoint after
    --  each chunk, and then checks it all and the buffer, whose pages mem
    --  must skip while the call is in progress (#972). Destroying the bank
-   --  ends the probes, and their caps with them. It reports each check
-   --  on Standard_Output, and is True if they all passed.
+   --  ends the probes, and their caps with them. Then do it all again in
+   --  a new bank, with no checkpoints, so that mem has to page changed
+   --  pages out to the log, and ask for checkpoints as its table of
+   --  changes fills (#974). It reports each check on Standard_Output, and
+   --  is True if they all passed.
 
    type Forward_Result is
      (Passed, No_Update_Cap, Nothing_From_Restore, Update_Failed,

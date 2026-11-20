@@ -69,6 +69,15 @@ package Mem.Page_Table is
    --  the first page that Try_Page takes, and return it, or zero if it
    --  took none. Try_Page must not change the table.
 
+   procedure Sweep_Changed_Pages
+     (Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor);
+   --  As Sweep_Clean_Pages, with the same clock hand, for each page that
+   --  is mapped, persistent and dirty: a page to page out to the log
+   --  (#974).
+
    procedure Iterate_Process_Pages
      (Process : Process_Id;
       Base    : Rose.Addresses.Virtual_Page_Address;

@@ -77,7 +77,10 @@ private
    Boot_Module_Pages : Natural :=
      18 + 40 + 4 + 8 + 8 + 4
      + (Rose.Limits.Mapped_Page_Table_Bytes + Rose.Limits.Page_Size - 1)
-     / Rose.Limits.Page_Size;
+     / Rose.Limits.Page_Size
+     + (Rose.Limits.Change_Table_Bytes + Rose.Limits.Page_Size - 1)
+     / Rose.Limits.Page_Size
+     + Rose.Limits.Page_Out_Batch_Pages + 1;
    --  Pages of kernel heap kept for boot modules, which are loaded before
    --  the memory server can add to the heap (#309): 18 for what they
    --  needed before the memory server's page table was sized from
@@ -87,7 +90,8 @@ private
    --  Replacer and Replacement interfaces (#866), which took 3 of them,
    --  8 for its Process_Control interface (#99), whose table of instances
    --  takes 5, 4 for its index buffers and cache (#949), which take 2,
-   --  and the pages of the page table. Set by boot-module-pages on the
-   --  command line.
+   --  the pages of the page table, and of its table of changes and the
+   --  window it pages out through (#974). Set by boot-module-pages on
+   --  the command line.
 
 end Rose.Kernel;

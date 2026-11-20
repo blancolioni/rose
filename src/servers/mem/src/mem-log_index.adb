@@ -5,6 +5,7 @@ with Rose.Console_IO;
 with Rose.Limits;
 
 with Mem.Calls;
+with Mem.Change_Table;
 with Mem.Page_Log;
 with Mem.Page_Table;
 with Mem.Physical_Map;
@@ -205,6 +206,11 @@ package body Mem.Log_Index is
    begin
       if Committed then
          Directories := New_Directories;
+
+         --  The index names every page that the table of changes did
+         --  (ADR 0028, section 4).
+
+         Mem.Change_Table.Clear;
       else
          New_Directories := Directories;
       end if;
@@ -264,6 +270,11 @@ package body Mem.Log_Index is
 
       procedure Check (Position : Mem.Page_Table.Cursor);
 
+      procedure Check_Change
+        (Owner    : Process_Id;
+         Page     : Rose.Addresses.Virtual_Page_Address;
+         Log_Page : Word_32);
+
       -----------
       -- Check --
       -----------
@@ -287,7 +298,27 @@ package body Mem.Log_Index is
          end if;
       end Check;
 
+      ------------------
+      -- Check_Change --
+      ------------------
+
+      procedure Check_Change
+        (Owner    : Process_Id;
+         Page     : Rose.Addresses.Virtual_Page_Address;
+         Log_Page : Word_32)
+      is
+      begin
+         if Key_Of (Owner, Page) = Key then
+            Leaf.Entries (Natural (Page mod Entries_Per_Page)) := Log_Page;
+         end if;
+      end Check_Change;
+
    begin
+      --  The pages paged out since the last checkpoint first, then the
+      --  batch: a page that changed again after it was paged out takes
+      --  the batch's copy.
+
+      Mem.Change_Table.Iterate (Check_Change'Access);
       Mem.Page_Table.Iterate_Dirty_Pages (Check'Access);
    end Fill_Leaf;
 
@@ -301,7 +332,15 @@ package body Mem.Log_Index is
       return Rose.Words.Word_32
    is
       Leaf_Page : Word_32;
+      Changed   : constant Word_32 := Mem.Change_Table.Find (Process, Page);
    begin
+      --  A page paged out since the last checkpoint is in the table of
+      --  changes, and not yet in the index (ADR 0028, section 3).
+
+      if Changed /= 0 then
+         return Changed;
+      end if;
+
       --  Is_Available also opens the Page_Log client, which nothing
       --  else has done yet on a boot that restores a checkpoint.
 
@@ -349,6 +388,7 @@ package body Mem.Log_Index is
          Directories (Process) := 0;
          New_Directories (Process) := 0;
       end if;
+      Mem.Change_Table.Forget (Process);
    end Forget;
 
    ---------------
@@ -451,6 +491,11 @@ package body Mem.Log_Index is
 
       procedure Check (Position : Mem.Page_Table.Cursor);
 
+      procedure Check_Change
+        (Owner    : Process_Id;
+         Page     : Rose.Addresses.Virtual_Page_Address;
+         Log_Page : Word_32);
+
       -----------
       -- Check --
       -----------
@@ -469,8 +514,26 @@ package body Mem.Log_Index is
          end if;
       end Check;
 
+      ------------------
+      -- Check_Change --
+      ------------------
+
+      procedure Check_Change
+        (Owner    : Process_Id;
+         Page     : Rose.Addresses.Virtual_Page_Address;
+         Log_Page : Word_32)
+      is
+         pragma Unreferenced (Log_Page);
+         Key : constant Integer := Key_Of (Owner, Page);
+      begin
+         if Key > After and then Key < Result then
+            Result := Key;
+         end if;
+      end Check_Change;
+
    begin
       Mem.Page_Table.Iterate_Dirty_Pages (Check'Access);
+      Mem.Change_Table.Iterate (Check_Change'Access);
       return Result;
    end Next_Key;
 

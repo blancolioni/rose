@@ -2656,6 +2656,14 @@ package body Rose.Kernel.Processes is
       To.Current_Params := Params;
       To.Current_Params.Cap := To.Receive_Cap;
 
+      --  The reply is the server's record, so its Reply_Cap, Endpoint
+      --  and Identifier are the server's, about the call it received.
+      --  They mean nothing to the caller (#892).
+
+      To.Current_Params.Reply_Cap := Null_Capability;
+      To.Current_Params.Endpoint := 0;
+      To.Current_Params.Identifier := 0;
+
       if Params.Control.Flags (Rose.Invocation.Send_Caps) then
          for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
             if Params.Caps (Cap_Index) /= Null_Capability
