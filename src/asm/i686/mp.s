@@ -27,7 +27,21 @@
 .global stack_fault_exception, protection_fault_exception, protection_fault_exception, page_fault_exception
 .global reserved_15_exception
 
-.set INVOKE_WORDS, 20      # size of invocation record (Rose.Invocation, #985)
+# The invocation record, Rose.Invocation.Invocation_Record (#892). The
+# kernel copies in the first two words and what the control word says was
+# sent, and copies out the six header words and what was sent. The bit
+# positions are fixed by the representation clause of Control_Word.
+.set INVOKE_HEADER_WORDS, 6        # Control .. Identifier and Unused
+.set INVOKE_DATA, 24               # Data, Max_Parameter_Words words
+.set INVOKE_CAPS, 56               # Caps, Max_Capabilities words
+.set INVOKE_BUFFER, 72             # Buffer_Address, then Buffer_Length
+
+.set WRITABLE_BUFFER_BIT, 1 << 0   # Flags (Writable_Buffer)
+.set SEND_BUFFER_BIT, 1 << 1       # Flags (Send_Buffer)
+.set SEND_WORDS_BIT, 1 << 9        # Flags (Send_Words)
+.set SEND_CAPS_BIT, 1 << 11        # Flags (Send_Caps)
+.set LAST_SENT_WORD_SHIFT, 17      # Last_Sent_Word, 3 bits
+.set LAST_SENT_CAP_SHIFT, 23       # Last_Sent_Cap, 2 bits
 
 .set CURR_PROC_PTR, 20     # offset from stack pointer to process table entry address after trap
 
@@ -62,6 +76,39 @@
 kernel_stack_top:
     .long 0
 .text
+
+# Copy the data words, caps and buffer that the control word in %edx says
+# were sent, from the record at %ebx to the record at %eax. Uses %ecx,
+# %esi and %edi; the direction flag must be clear.
+.macro copy_sent_items
+    test    $SEND_WORDS_BIT, %edx
+    jz      .Lno_words\@
+    mov     %edx, %ecx
+    shr     $LAST_SENT_WORD_SHIFT, %ecx
+    and     $7, %ecx
+    inc     %ecx
+    lea     INVOKE_DATA(%ebx), %esi
+    lea     INVOKE_DATA(%eax), %edi
+    rep movsl
+.Lno_words\@:
+    test    $SEND_CAPS_BIT, %edx
+    jz      .Lno_caps\@
+    mov     %edx, %ecx
+    shr     $LAST_SENT_CAP_SHIFT, %ecx
+    and     $3, %ecx
+    inc     %ecx
+    lea     INVOKE_CAPS(%ebx), %esi
+    lea     INVOKE_CAPS(%eax), %edi
+    rep movsl
+.Lno_caps\@:
+    test    $(SEND_BUFFER_BIT | WRITABLE_BUFFER_BIT), %edx
+    jz      .Lno_buffer\@
+    mov     INVOKE_BUFFER(%ebx), %ecx
+    mov     %ecx, INVOKE_BUFFER(%eax)
+    mov     INVOKE_BUFFER + 4(%ebx), %ecx
+    mov     %ecx, INVOKE_BUFFER + 4(%eax)
+.Lno_buffer\@:
+.endm
 
 .macro restore_kernel_segments
     
@@ -346,12 +393,14 @@ system_call:
     mov     $invocation_record, %esi
     jmp     continue
 2:
-    mov     Process_EAX(%ebp), %eax
-    movl %eax, %esi
-    movl $invocation_record, %edi
-    movl $INVOKE_WORDS,%ecx
+    mov     Process_EAX(%ebp), %ebx            # copy in from the caller's record
+    mov     $invocation_record, %eax
     cld                                        # the caller's direction flag is unknown
-    rep movsl
+    mov     (%ebx), %edx                       # the control word, and the cap; the
+    mov     %edx, (%eax)                       # kernel never reads the caller's
+    mov     4(%ebx), %ecx                      # Reply_Cap, Endpoint or Identifier
+    mov     %ecx, 4(%eax)
+    copy_sent_items
 
     push    $invocation_record
     call    invoke_capability
@@ -387,11 +436,15 @@ continue:
     cmp     $0, %eax                           # are we sending a reply to their invocation?
     jz      no_reply_continue                  # if not, skip invocation record copy
     
-    mov Process_EAX(%ebp), %edi                # process eax had the pointer to user space invocation record
-
-    movl $INVOKE_WORDS,%ecx
+    mov     Process_EAX(%ebp), %eax            # process eax had the pointer to user space invocation record
+    mov     $invocation_record, %ebx
+    mov     %ebx, %esi
+    mov     %eax, %edi
+    mov     $INVOKE_HEADER_WORDS, %ecx
     cld                                        # an interrupted process may have set it
-    rep movsl
+    rep movsl                                  # the header, which the kernel wrote
+    mov     (%ebx), %edx
+    copy_sent_items
 
 no_reply_continue:    
     mov     Process_EDI(%ebp), %edi

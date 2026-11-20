@@ -117,11 +117,24 @@ is
          Last_Recv_Cap  : Capability_Index     := 0;
          Error          : Invocation_Error     := OK;
       end record
-     with Pack, Size => 32;
+     with Size => 32;
+
+   for Control_Word use
+      record
+         Flags          at 0 range  0 .. 13;
+         Reserved       at 0 range 14 .. 16;
+         Last_Sent_Word at 0 range 17 .. 19;
+         Last_Recv_Word at 0 range 20 .. 22;
+         Last_Sent_Cap  at 0 range 23 .. 24;
+         Last_Recv_Cap  at 0 range 25 .. 26;
+         Error          at 0 range 27 .. 31;
+      end record;
+
    --  Reserved is room for new flags, next to the others (#994). A new
    --  flag takes a bit from Reserved, so that the counts and Error stay
-   --  where they are; the kernel's copy reads them by their bit positions
-   --  (#892). If Reserved doesn't shrink, Size no longer holds.
+   --  where they are. The kernel's copy in src/asm/i686/mp.s reads the
+   --  flags and counts by these bit positions (#892), so a change here
+   --  must change it too.
    --
    --  Error means something only when Flags (Error) is set. It is in the
    --  control word, so that the kernel copies in only the first two words
