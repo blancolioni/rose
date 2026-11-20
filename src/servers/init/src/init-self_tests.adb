@@ -1159,6 +1159,7 @@ package body Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
@@ -1193,6 +1194,7 @@ package body Init.Self_Tests is
         (Params,
          (Standard_Output,
           Create_Endpoint,
+          Delete_Cap,
           Commands,
           Clock,
           Test_Bank,

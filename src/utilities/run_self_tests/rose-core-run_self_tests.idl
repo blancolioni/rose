@@ -1,5 +1,5 @@
 command Rose.Core.Run_Self_Tests
-  : Streams.Standard_Output, Caps.Create_Endpoint, Commands.Find_Command, Time.Clock_Service,
+  : Streams.Standard_Output, Caps.Create_Endpoint, Caps.Delete_Cap, Commands.Find_Command, Time.Clock_Service,
     Storage.Storage_Service, Screens.Screen_Service, Caps.Create_Signal, Caps.Cap_Set_Service,
     Processes.Replace_Process
   with Summary     => "Run Rose's self tests.",

@@ -2653,19 +2653,42 @@ package body Rose.Kernel.Processes is
 
       To.Flags (Wait_Reply) := False;
 
-      To.Current_Params := Params;
-      To.Current_Params.Cap := To.Receive_Cap;
+      --  The caller gets at most the caps it asked for, and none if it
+      --  asked for none, so that a server cannot fill its cap table with
+      --  caps that it never looks at. The server keeps any caps that are
+      --  not delivered, as it keeps any words (#895).
+
+      declare
+         Wants_Caps : constant Boolean :=
+                        To.Current_Params.Control.Flags (Recv_Caps);
+         Last_Wanted : constant Capability_Index :=
+                         To.Current_Params.Control.Last_Recv_Cap;
+      begin
+         To.Current_Params := Params;
+         To.Current_Params.Cap := To.Receive_Cap;
+
+         if Params.Control.Flags (Send_Caps) then
+            if not Wants_Caps then
+               To.Current_Params.Control.Flags (Send_Caps) := False;
+               To.Current_Params.Control.Last_Sent_Cap := 0;
+            elsif Params.Control.Last_Sent_Cap > Last_Wanted then
+               To.Current_Params.Control.Last_Sent_Cap := Last_Wanted;
+            end if;
+         end if;
+      end;
 
       --  The reply is the server's record, so its Reply_Cap, Endpoint
       --  and Identifier are the server's, about the call it received.
-      --  They mean nothing to the caller (#892).
+      --  They mean nothing to the caller (#892). Nor do the cap numbers
+      --  it sent, which are replaced below by the caller's own.
 
       To.Current_Params.Reply_Cap := Null_Capability;
       To.Current_Params.Endpoint := 0;
       To.Current_Params.Identifier := 0;
+      To.Current_Params.Caps := (others => Null_Capability);
 
-      if Params.Control.Flags (Rose.Invocation.Send_Caps) then
-         for Cap_Index in 0 .. Params.Control.Last_Sent_Cap loop
+      if To.Current_Params.Control.Flags (Send_Caps) then
+         for Cap_Index in 0 .. To.Current_Params.Control.Last_Sent_Cap loop
             if Params.Caps (Cap_Index) /= Null_Capability
               and then Has_Cap (From_Process_Id, Params.Caps (Cap_Index))
               and then not Is_Repeated_Single_Use
@@ -2708,7 +2731,12 @@ package body Rose.Kernel.Processes is
                To.Current_Params.Caps (Cap_Index) := Null_Capability;
             end if;
          end loop;
+      end if;
 
+      --  A single-use cap that the server sent leaves it, whether or not
+      --  the caller asked for it.
+
+      if Params.Control.Flags (Send_Caps) then
          Move_Single_Use_Caps (From_Process_Id, Params);
       end if;
 
