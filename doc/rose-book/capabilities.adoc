@@ -408,4 +408,9 @@ An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability`
 A call that needs more than four capabilities, as a command launch can (#234), is sent in parts: each part but the last has the `Continued` flag and carries up to four capabilities, and the receiver keeps them and replies with nothing; the last part carries the remaining capabilities, the words and the buffer, and gets the real reply.
 `Rose.System_Calls.Send_Caps` sends the parts, and `Rose.Command_Line.Launch.Receive` collects them.
 
+A reply brings the caller at most the capabilities it asked for: those up to `RC`, and none if it did not set `Recv_Caps` (#895).
+The kernel lowers `SC` in the record the caller gets, or clears `Send_Caps`, to match, and the server keeps the capabilities that were not delivered.
+A single-use capability in the reply leaves the server whether or not it is delivered.
+A send to a receiving server is not limited in this way, since a receive does not say how many capabilities it takes: the receiver gets every capability that was sent, and `SC` says how many.
+
 The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, `Too_Many_Capabilities` when `Send_Cap` has no room for another capability, and `Too_Many_Words` when `Send_Word` has no room for another word; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.
