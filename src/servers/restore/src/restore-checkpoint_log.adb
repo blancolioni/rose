@@ -702,12 +702,14 @@ package body Restore.Checkpoint_Log is
      (Reader_Cap : Rose.Capabilities.Capability)
       return Rose.Words.Word_64
    is
-      Reader   : Log_Reader_Client;
-      Location : Rose.Words.Word_64;
-      Last     : Rose.Words.Word_64 := 0;
-      Latest   : Rose.Words.Word_64 := 0;
-      Count    : Natural := 0;
-      Bad      : Natural := 0;
+      Reader     : Log_Reader_Client;
+      Location   : Rose.Words.Word_64;
+      Last       : Rose.Words.Word_64 := 0;
+      Latest     : Rose.Words.Word_64 := 0;
+      Count      : Natural := 0;
+      Bad        : Natural := 0;
+      First      : Rose.Words.Word_64;
+      Restorable : Boolean := False;
    begin
       Refused_Count := 0;
       Last_Summary := (others => <>);
@@ -719,11 +721,21 @@ package body Restore.Checkpoint_Log is
 
       Rose.System_Calls.Use_Buffer (Page'Address, Page'Length);
 
+      --  Every entry is checked, but only one from First_Checkpoint on
+      --  can be the checkpoint: an older one's index can name pages that
+      --  the memory server's cleaning has freed (#953).
+
+      First := First_Checkpoint (Reader);
       Location := First_Entry (Reader);
       while Location /= 0 loop
          Count := Count + 1;
+         if Location = First then
+            Restorable := True;
+         end if;
          if Check_Entry (Reader, Location) then
-            Latest := Location;
+            if Restorable then
+               Latest := Location;
+            end if;
          else
             Bad := Bad + 1;
          end if;
@@ -767,6 +779,17 @@ package body Restore.Checkpoint_Log is
          Rose.Console_IO.Put ("restore: log: last entry should be ");
          Rose.Console_IO.Put (Natural (Last_Entry (Reader)));
          Rose.Console_IO.New_Line;
+      end if;
+
+      if Count > 0 and then First /= First_Entry (Reader) then
+         if Restorable then
+            Rose.Console_IO.Put ("restore: log: entries from ");
+            Rose.Console_IO.Put (Natural (First));
+            Rose.Console_IO.Put_Line (" can be restored");
+         else
+            Rose.Console_IO.Put_Line
+              ("restore: log: no entry can be restored");
+         end if;
       end if;
 
       if Refused_Count > 0 then
