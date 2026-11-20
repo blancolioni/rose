@@ -14,7 +14,6 @@ package body Exec.Library is
    use System.Storage_Elements;
 
    Max_Start_Caps         : constant := 16;
-   Max_Name_Length        : constant := 16;
 
    subtype Installed_Program_Name is String (1 .. Max_Name_Length);
 
