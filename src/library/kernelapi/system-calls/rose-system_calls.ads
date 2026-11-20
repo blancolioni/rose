@@ -268,12 +268,17 @@ package Rose.System_Calls is
    function Rescind_Cap_Capability return Rose.Capabilities.Capability;
    --  The process's caps for creating endpoints, and for deleting and
    --  rescinding caps: the ones given to Use_Capabilities, and a null cap
-   --  for the others.
+   --  for the others. Delete_Cap_Capability is retired: Delete_Cap below
+   --  doesn't need it (#1022).
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+   --  Delete Cap from the process's table, by invoking it with the Delete
+   --  flag (#1022). Any process can, with no cap to delete with. Nothing
+   --  happens if Cap is null.
+
    procedure Rescind_Cap (Cap : Rose.Capabilities.Capability);
-   --  Delete or rescind Cap. Nothing happens if Cap is null, or if the
-   --  process has no cap to delete or rescind with.
+   --  Rescind Cap. Nothing happens if Cap is null, or if the process has
+   --  no cap to rescind with.
 
    procedure Use_Capabilities
      (Create_Endpoint, Delete_Cap, Rescind_Cap : Rose.Capabilities.Capability

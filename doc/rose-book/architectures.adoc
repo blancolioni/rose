@@ -18,8 +18,14 @@ A process passes its invocation record to the kernel by address, not in register
 | `ebx`, `esi`, `edi`, `ebp` | Saved, and restored when the process resumes
 |===
 
-The kernel copies the whole record, 20 words, from the caller's memory, and handles the call.
-When it resumes the process with a reply, it copies the record back to the same address, past the write protection of a checkpoint, which is why a persistent process waits for its reply until a checkpoint has finished (see <<Persistence>>).
+The kernel copies in the first two words of the record, the control word and the capability, and then what the control word says was sent: the words up to `SW` if `Send_Words` is set, the capabilities up to `SC` if `Send_Caps` is set, and the buffer's address and length if `Send_Buffer` or `Writable_Buffer` is set (#892).
+It never reads the caller's `Reply Capability`, `Endpoint Id` or `Identifier`.
+When it resumes the process with a reply, it copies out the six header words, which it writes on every delivery, and what the reply sent, to the same address, past the write protection of a checkpoint, which is why a persistent process waits for its reply until a checkpoint has finished (see <<Persistence>>).
+The copy reads the flags and counts by their bit positions, which the representation clause of `Rose.Invocation.Control_Word` fixes; `mp.s` names the same positions.
+
+Passing words 0 and 1 in registers, which are free on `sysenter`, would save the copy and the validity check for calls that need nothing else.
+It isn't done: #698 found it not worth the change to the system call page.
+Copying only what was sent made a call that the kernel answers itself about 11% faster in QEMU, and a round trip to another process about 1% faster.
 
 === Page Table
 

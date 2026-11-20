@@ -46,6 +46,9 @@ package Exec.Library is
    --  made the first time, and kept: the store has room for a limited
    --  number of regions.
 
+   Max_Name_Length : constant := 16;
+   --  A program's name is kept to this many characters.
+
    procedure Get_Program_Name
      (Id   : Rose.Objects.Capability_Identifier;
       Name : out String;

@@ -12,6 +12,7 @@ Each layout defines the capability type, and the object to which it applies.
 A process can have up to 4095 capabilities, numbered from 1.
 Layouts are 16 bytes, and are stored in pages of the kernel's heap that the kernel takes as the process needs them: 256 to a page, and at most 16 pages (ADR 0023).
 A new capability has the lowest number that is free, and deleting a capability frees its number.
+Any process can delete a capability that it holds, of any kind and valid or not, by invoking it with the `Delete` flag (<<invocation-flags>>), and it needs no other capability to do it (#1022).
 
 Capabilities are copied when they are sent, as <<operations>> describes, and the copy is a layout in the receiver's table, with a number of the receiver's own.
 A process cannot make a capability from nothing: it has those that the kernel gave it, those it was sent, and those that the kernel's operations return to it.
@@ -164,7 +165,7 @@ Its endpoints are:
 | Receive On Any Cap | 17 | Receives on any of the process's endpoints
 | Enable Kernel Debug | 28 | Turns the kernel's logging of calls on or off
 | Rescind Cap | 29 | Rescinds the capabilities in the invocation
-| Delete Cap | 30 | Deletes the capabilities in the invocation
+| Delete Cap | 30 | Deletes the capabilities in the invocation; retired, since the `Delete` flag does this for any process (#1022)
 | Exit Process | 31 | Ends the process
 |===
 
@@ -373,12 +374,20 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 * `Error` is the reason that an invocation failed, if the `Error` flag is set.
   It is in the control word, with the flags and counts, so that the first two words of the record say everything about a call except what it carries (#990).
 * `Capability` is the capability that is being invoked.
-* `Reply Capability` is set by the kernel, when the flag asks for it, and gives the target of an invocation a capability on which to send a reply.
+* `Reply Capability` is set by the kernel, when `Create_Reply_Cap` asks for it, and gives the target of an invocation a capability on which to send a reply.
+  Otherwise it is null, so that a null `Reply Capability` means that no reply is wanted; the kernel never reads the caller's.
 * `Endpoint Id` is set by the kernel when it delivers a call, to the 64-bit id of the endpoint that the capability names.
 * `Identifier` is the identifier of the capability that was invoked.
   The rest of its word is not used.
 * `Parameter words` and `Capabilities` are the words and capabilities that are sent, and where those that are received are put.
 * `Buffer address` and `Buffer length` are the buffer that is shared with the receiver, if `Send_Buffer` is set.
+
+A receiver can rely only on what was sent: the words up to `SW`, the capabilities up to `SC` and the buffer, each only when its flag is set.
+The other slots hold whatever was there before, in the kernel's copy and in the receiver's own record (#892).
+`Rose.Invocation.Sent_Word`, `Sent_Cap` and `Sent_Buffer_Length` give 0, the null capability or 0 for what wasn't sent, and generated code reads through them.
+
+With `poison-invocations` on the kernel command line, the kernel fills every slot that wasn't sent, on the way in and on the way out: word _N_ with `BAD0_000N`, capability _N_ with `BAD0_0C0N`, and the buffer with a kernel address and a length of `0BAD_0B00`.
+A boot test with it shows any reader that goes past what was sent.
 
 `Flags` is a packed array indexed by `Invocation_Flag`, so flag _N_ is bit _N_.
 
@@ -401,6 +410,7 @@ The diagram above is generated from `Rose.Invocation.Invocation_Record`.
 | 11 | Send_Caps | `SC` is the index of the last sent capability
 | 12 | Recv_Caps | `RC` is the index of the last capability that the sender will receive
 | 13 | Continued | The first part of a longer call, which only carries capabilities; the kernel does not look at it (see <<continued-calls>>)
+| 14 | Delete | Delete the invoked capability from the caller's table instead of invoking it, and reply; the rest of the record is ignored (#1022)
 |===
 
 An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability` (the capability is null, has no handler, or is not valid), `Out_Of_Capabilities`, `Out_Of_Endpoints`, `Unknown_Request`, `Request_Error`, `No_Access`, `Request_Would_Block`, `Closed`, `Invalid_Endpoint`, `Invalid_Operation`, `Invalid_Object`, `Operation_Not_Implemented`, `Missing_Data`, `Unknown_Error` and `Undefined_Error`.
@@ -412,5 +422,8 @@ A reply brings the caller at most the capabilities it asked for: those up to `RC
 The kernel lowers `SC` in the record the caller gets, or clears `Send_Caps`, to match, and the server keeps the capabilities that were not delivered.
 A single-use capability in the reply leaves the server whether or not it is delivered.
 A send to a receiving server is not limited in this way, since a receive does not say how many capabilities it takes: the receiver gets every capability that was sent, and `SC` says how many.
+The capabilities are then the receiver's, to keep, invoke, pass on or delete, and the kernel does not check them against the operation (#1018).
+A server that does not want to run out of capability slots deletes those it does not need, and the servers that idle generates are to delete any that an operation does not take (idle#125).
+A client that does not want to give its capabilities away sends only those that the interface takes, as a generated client does.
 
 The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, `Too_Many_Capabilities` when `Send_Cap` has no room for another capability, and `Too_Many_Words` when `Send_Word` has no room for another word; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.

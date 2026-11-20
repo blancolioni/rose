@@ -1,3 +1,4 @@
+with Rose.Kernel.Checkpoint;
 with Rose.Kernel.Processes;
 
 package body Rose.Kernel.Capabilities.Receive is
@@ -40,6 +41,17 @@ package body Rose.Kernel.Capabilities.Receive is
 
          Rose.Kernel.Processes.Receive (Receiver_Id, Params.all);
          Rose.Kernel.Processes.Send_Signals (Receiver_Id);
+         Rose.Kernel.Processes.Get_Current_Invocation
+           (Receiver_Id, Params.all);
+      elsif Rose.Kernel.Checkpoint.Has_Log_Notice
+        (Receiver_Id, Cap.Header.Endpoint)
+      then
+
+         --  A checkpoint started or ended while the log was busy, so it
+         --  is told now, before any caller that waits for it (#1013).
+
+         Rose.Kernel.Processes.Receive (Receiver_Id, Params.all);
+         Rose.Kernel.Checkpoint.Send_Log_Notice;
          Rose.Kernel.Processes.Get_Current_Invocation
            (Receiver_Id, Params.all);
       elsif Rose.Kernel.Processes.Has_Queued_Message
