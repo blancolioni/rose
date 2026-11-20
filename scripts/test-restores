@@ -1,0 +1,73 @@
+#!/bin/sh
+# Three boots from one install, each restoring the checkpoint that the
+# boot before it wrote (#975).
+#
+#   scripts/test-restores [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test installs
+# Rose on a new disk, and then boots from it three times. On boot N,
+# hold_pages, which holds 48 MiB on the 32 MiB machine, has to report
+# restore N with every page intact. It writes a quarter of its pages
+# again, so the boot waits for a checkpoint that begins after the report,
+# and then stops the machine; the next boot finds those pages in a later
+# entry of the log than the rest. Last, check-log.py has to find the log
+# consistent.
+#
+# It isn't part of "make test", or of CI. It takes about fifteen minutes,
+# exits with 0 if everything passed, and keeps the disk image and QEMU's
+# files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+count_serial () {
+    # count_serial TEXT: the lines of the serial log with TEXT
+    grep -a -c -- "$1" "$WORK/serial" 2> /dev/null || true
+}
+
+install_rose "$ISO"
+
+for n in 1 2 3; do
+    echo "Boot $n from the disk"
+    start_qemu
+    mark=$(console_mark)
+    choose_last_entry
+    log_in
+
+    wait_for_console "hold_pages: restore $n:" 300 "$mark" \
+        || fail "hold_pages did not report restore $n"
+    report=$(console_since "$mark" | grep "hold_pages: restore $n:" | tail -1)
+    echo "$report"
+    echo "$report" | grep -q "pages intact" \
+        || fail "hold_pages found its pages wrong after restore $n"
+
+    # A checkpoint that was running when hold_pages wrote its pages again
+    # doesn't have them all, so wait for the next one to end.
+    entered=$(count_serial "Entering checkpoint")
+    waited=0
+    while [ "$(count_serial "Leaving checkpoint")" -le "$entered" ]; do
+        [ $waited -lt 180 ] || fail "no checkpoint after restore $n"
+        sleep 5
+        waited=$((waited + 5))
+    done
+
+    stop_qemu
+    mv "$WORK/serial" "$WORK/boot$n-serial"
+done
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.out" || {
+    cat "$WORK/check-log.out"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+tail -1 "$WORK/check-log.out"
+
+rm -rf "$WORK"
+echo "PASS"

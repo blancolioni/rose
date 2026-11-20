@@ -6,13 +6,15 @@
 # ISO is the install image, images/rose.iso by default. The test:
 #
 #   1. installs Rose on a new disk, waits for the install to finish, and
-#      checks that init's derive test (#116) and swap test (#862) passed;
+#      checks that init's derive test (#116) and swap test (#862) passed,
+#      and that hold_pages filled its 48 MiB (#975);
 #   2. boots from the disk, which restores the checkpoint, checks that the
 #      kernel restored the derivation records that init gave hold_derived,
 #      and that a restored process names them, and that hold_derived
 #      found its derived capability working and revoked by rescinding its
-#      parent (#691), and that the cap set server was restored with
-#      init's set (#825); then logs in as the first user, and runs
+#      parent (#691), that hold_pages found its 48 MiB intact (#975),
+#      and that the cap set server was restored with init's set (#825);
+#      then logs in as the first user, and runs
 #      run_self_tests, which has to
 #      pass every test, then keytest, which has to draw in the corners of
 #      the 80 by 24 screen and move its mark with the arrow keys (#734),
@@ -36,6 +38,15 @@ command -v qemu-system-i386 > /dev/null || {
 . "$HERE/qemu-test-lib.sh"
 
 install_rose "$ISO"
+
+# The next boot writes over CONSOLE, so keep the install's.
+cp "$CONSOLE" "$WORK/install-console"
+
+# Hold_pages fills 48 MiB, more than the machine has, during the install
+# (#975).
+grep "hold_pages:" "$CONSOLE" | tail -1
+grep -q "hold_pages: filled 12288 pages: ok" "$CONSOLE" \
+    || fail "hold_pages did not fill its pages at the install"
 
 echo "Booting from the disk, which restores the install's checkpoint"
 start_qemu
@@ -74,6 +85,14 @@ grep -q "hold_file: restored: the replaced file has its contents" "$CONSOLE" \
 grep "hold_home:" "$CONSOLE" | tail -1
 grep -q "hold_home: restored: the replaced user has its name" "$CONSOLE" \
     || fail "hold_home did not find its replaced user intact after the restore"
+
+# Hold_pages checks every page each time it is restored (#975). It checks
+# while the login runs, so its report can come after it.
+wait_for_console "hold_pages: restore 1:" 300 \
+    || fail "hold_pages did not report the restore"
+grep "hold_pages: restore 1:" "$CONSOLE" | tail -1
+grep -q "hold_pages: restore 1: 12288 pages intact" "$CONSOLE" \
+    || fail "hold_pages found its pages wrong after the restore"
 
 # caps writes what it holds when it is restored. Init leaves it one set,
 # of two capabilities, for this check (#825); the install's self tests

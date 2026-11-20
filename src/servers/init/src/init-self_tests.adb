@@ -75,6 +75,9 @@ package body Init.Self_Tests is
    --  The page test's bank: each of its two probes has 40 MiB of bss,
    --  whose storage the store reserves when it is launched (#973).
 
+   Hold_Pages_Page_Limit : constant := 13_312;
+   --  Hold_pages' bank: its 48 MiB of bss, and its code and data.
+
    Test_Page_Limit   : constant := 16;
    Test_Region_Limit : constant := 8;
    --  The test bank's limits: the shared segment test reserves one
@@ -1314,6 +1317,61 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Start_Derived_Holder;
+
+   -----------------------
+   -- Start_Page_Holder --
+   -----------------------
+
+   function Start_Page_Holder
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "hold_pages");
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      Bank_Cap   : Rose.Capabilities.Capability;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  The bank is never destroyed: hold_pages runs for as long as the
+      --  installation does.
+
+      Bank_Cap :=
+        Init.Grants.Bank (Hold_Pages_Page_Limit, Probe_Region_Limit);
+      if Bank_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
+          (Launcher, Bank_Cap);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps, as src/utilities/hold_pages/
+      --  rose-core-hold_pages.idl declares them: Create_Endpoint and
+      --  Standard_Output. The command replies once its pages are filled
+      --  and checked, and has said how that went on Standard_Output.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Caps
+        (Params, (Create_Endpoint, Standard_Output));
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      return not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Params.Data (0) = Completed;
+   end Start_Page_Holder;
 
    ---------------
    -- Swap_Test --

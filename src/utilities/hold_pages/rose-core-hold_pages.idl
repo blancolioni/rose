@@ -1,0 +1,18 @@
+command Rose.Core.Hold_Pages : Caps.Create_Endpoint, Streams.Standard_Output
+  with Summary     => "Hold 48 MiB of pages across restores.",
+       Description => """
+          Hold_Pages is the paging self test (#975, ADR 0028). Init
+          launches it on a new install. It fills 48 MiB of its own
+          memory, more than the 32 MiB machine of the boot tests has,
+          with a pattern that depends on each page's place and a
+          generation, reads it all back, and writes the result to
+          standard output. Each time it is restored, it checks every
+          page again, writes one page in four again with a new
+          generation, so that the next restore finds their copies in a
+          later entry of the log, and writes the result. It never
+          completes.
+          """,
+       Server      => Page_Holder.Start_Server,
+       Live
+is
+end Rose.Core.Hold_Pages;

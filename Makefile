@@ -14,7 +14,7 @@ PROJDRIVERS=projects/drivers_$(ARCH).gpr
 NULLSTREAM=./build/$(TARGET)/rose-drivers-null_stream
 #DRIVERS=$(NULLSTREAM)
 DRIVERS=command keyboard exec file directory vga-console clock caps screen surface-console process_probe
-UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests hold_derived hold_file hold_home swap_probe page_probe replaceable_test petal argv keytest kilo
+UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login run_self_tests hold_derived hold_file hold_home swap_probe page_probe hold_pages replaceable_test petal argv keytest kilo
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
 # the GRUB menus' module2 lines come from.
@@ -73,6 +73,13 @@ test:
 # fixture, and it passes with a message.  CI runs it.
 test-restore:
 	sh ./scripts/test-restore-fixture
+
+# Three boots from one install, each restoring the checkpoint of the boot
+# before, with hold_pages' 48 MiB checked each time (#975).  It needs
+# images/rose.iso, so run "make" first.  It takes about fifteen minutes,
+# and isn't part of CI.
+test-restores:
+	sh ./scripts/test-restores
 
 # The update test (#830): this build's install media has to update the
 # same fixture, keeping its checkpoint and replacing its replaceable
