@@ -61,7 +61,9 @@ SHARED_PAGE_SAVED = 1
 SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 5
+STORE_TABLE_VERSION = 6
+MAX_STORE_SLOTS = 255           # Rose.Checkpoints.Max_Store_Slots (#967)
+RETIRED_GENERATION = 255
 REGIONS_PER_PAGE = PAGE_SIZE // 32
 BANKS_PER_PAGE = PAGE_SIZE // 24
 MAX_TREE_HEIGHT = 7
@@ -382,6 +384,13 @@ def check_store_tables(log, first, last, verbose):
                        % (page_count, region_count, bank_count,
                           bank_pages)), 0, regions
 
+    # Each slot's generation (#967), which no region or bank in the
+    # tables can have retired.
+    region_generations = page[56:56 + MAX_STORE_SLOTS]
+    bank_generations = page[56 + MAX_STORE_SLOTS:56 + 2 * MAX_STORE_SLOTS]
+    retired = sum(1 for g in region_generations + bank_generations
+                  if g == RETIRED_GENERATION)
+
     # The banks come last (#518).  Each one's parent must be another bank
     # in the table, and the root bank, 1, has none.
     banks = {}
@@ -390,9 +399,12 @@ def check_store_tables(log, first, last, verbose):
                           + i // BANKS_PER_PAGE)
         index, parent, page_limit, region_limit, _ = struct.unpack_from(
             "<IIQII", record, (i % BANKS_PER_PAGE) * 24)
-        if index == 0 or index in banks:
+        if index == 0 or index in banks or index > MAX_STORE_SLOTS:
             return False, ("storage bank %d of %d: index %d"
                            % (i + 1, bank_count, index)), 0, regions
+        if bank_generations[index - 1] == RETIRED_GENERATION:
+            return False, ("storage bank %d is in a retired slot"
+                           % index), 0, regions
         banks[index] = parent
         if verbose:
             print("    bank %3d: parent %d, limits %d pages, %d regions"
@@ -412,12 +424,15 @@ def check_store_tables(log, first, last, verbose):
         index, root, base, bound, pages, bank = \
             struct.unpack_from("<IIQQII", record,
                                (i % REGIONS_PER_PAGE) * 32)
-        if index == 0 or index in indices or bound < base \
-                or bound > next_page:
+        if index == 0 or index in indices or index > MAX_STORE_SLOTS \
+                or bound < base or bound > next_page:
             return False, ("storage region %d of %d: index %d, pages "
                            "%x..%x, next page %x"
                            % (i + 1, region_count, index, base, bound,
                               next_page)), 0, regions
+        if region_generations[index - 1] == RETIRED_GENERATION:
+            return False, ("storage region %d is in a retired slot"
+                           % index), 0, regions
         if bank not in banks:
             return False, ("storage region %d is charged to bank %d, which "
                            "is not in the tables" % (index, bank)), \
@@ -440,10 +455,13 @@ def check_store_tables(log, first, last, verbose):
                 0, regions
 
     return True, ("storage: %d region%s, %d page%s with space, block map "
-                  "height %d, %d bank%s"
+                  "height %d, %d bank%s%s"
                   % (region_count, "" if region_count == 1 else "s",
                      mapped, "" if mapped == 1 else "s", tree_height,
-                     bank_count, "" if bank_count == 1 else "s")), \
+                     bank_count, "" if bank_count == 1 else "s",
+                     ", %d retired slot%s" % (retired,
+                                              "" if retired == 1 else "s")
+                     if retired else "")), \
         page_count, regions
 
 
@@ -567,6 +585,8 @@ def check_entry(log, first, last, verbose, info):
     info["batches"] = [(start, headers)
                        for kind, start, headers, listed in sections
                        if kind == "batch"]
+    info["leading_batches"] = sum(1 for kind, start, headers, listed
+                                  in leading if kind == "batch")
     if not ok:
         return False, kernel + "; " + tables
     missing = oids - set(processes.values())
@@ -822,25 +842,45 @@ def check_index_contents(log, info, previous):
     slot starts with nothing.  Each process's index is read into info's
     "indexes", for the next entry.
 
+    A slot can have a new process between a batch paged out before the
+    checkpoint and the checkpoint itself, and the memory server forgets
+    the old process's pages then (#974).  So, for a process that is new
+    to its slot, a page of a batch before the checkpoint that its index
+    doesn't name is taken to be an earlier process's, and is counted in
+    info's "earlier_pages".
+
     Returns a description of what is wrong, or None."""
     info["indexes"] = {}
     carried = previous is not None and previous.get("has_index")
     old_oids = set(previous["processes"].values()) if carried else set()
     expected = {}
+    new_to_slot = set()
     for pid, oid in info["processes"].items():
         if carried and pid in previous["processes"] and oid in old_oids:
             expected[pid] = dict(previous["indexes"].get(pid, {}))
         else:
             expected[pid] = {}
-    for first, headers in info["batches"]:
+            new_to_slot.add(pid)
+    maybe_earlier = {pid: set() for pid in expected}
+    leading = info.get("leading_batches", 0)
+    for number, (first, headers) in enumerate(info["batches"]):
         for pid, virtual, location in batch_pages(log, first, headers):
             if pid in expected:
                 expected[pid][virtual] = location
+                if number < leading and pid in new_to_slot:
+                    maybe_earlier[pid].add(virtual)
+                else:
+                    maybe_earlier[pid].discard(virtual)
 
     problems = []
+    info["earlier_pages"] = 0
     for pid in sorted(info["processes"]):
         actual = read_index(log, info["directories"].get(pid, 0))
         info["indexes"][pid] = actual
+        for virtual in maybe_earlier[pid]:
+            if virtual not in actual:
+                del expected[pid][virtual]
+                info["earlier_pages"] += 1
         if actual == expected[pid]:
             continue
         wrong = sorted(set(actual) | set(expected[pid]),
@@ -989,6 +1029,12 @@ def main():
                     ok, description = False, description + "; " + problem
                 else:
                     indexed += 1
+                if info.get("earlier_pages"):
+                    description += ("; %d page%s of earlier processes in "
+                                    "reused slots"
+                                    % (info["earlier_pages"],
+                                       "" if info["earlier_pages"] == 1
+                                       else "s"))
             print("entry %d at %d: version %d, %spages %d..%d: %s%s"
                   % (entries, location, version,
                      "" if entry_sequence is None

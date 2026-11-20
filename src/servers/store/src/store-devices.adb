@@ -23,13 +23,15 @@ with Store.Page_Trees;
 package body Store.Devices is
 
    use type Rose.Objects.Object_Id;
+   use type Rose.Words.Word_8;
    use type Rose.Words.Word_32;
    use type Rose.Words.Word_64;
 
    Max_Backing_Stores  : constant := 16;
-   Max_Regions         : constant := 256;
-   Max_Banks           : constant := 256;
+   Max_Regions         : constant := Rose.Checkpoints.Max_Store_Slots;
+   Max_Banks           : constant := Rose.Checkpoints.Max_Store_Slots;
    --  A bank for each process (ADR 0015, #750), user and session (#450).
+   --  A slot fits in the low byte of a cap's identifier (#967).
    Max_Open_Streams    : constant := 10;
 
    Root_Bank : constant := 1;
@@ -177,7 +179,40 @@ package body Store.Devices is
    Regions      : Region_Array;
    Region_Count : Natural := 0;
    --  The highest region index used. A released region's index is used
-   --  again.
+   --  again, with the next generation.
+
+   Region_Generations : Rose.Checkpoints.Store_Generations :=
+                          (others => 0);
+   Bank_Generations   : Rose.Checkpoints.Store_Generations :=
+                          (others => 0);
+   --  The generation of each region and bank slot (#967).  A cap to a
+   --  region or bank carries its slot and the slot's generation as its
+   --  identifier, so a cap to one that has gone doesn't reach the next
+   --  one in the slot.  A slot whose generation is Retired_Generation is
+   --  never used again.
+
+   function Region_Id
+     (Index : Positive)
+      return Rose.Objects.Capability_Identifier;
+   --  The identifier of the caps to region Index.
+
+   function Region_Slot
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural;
+   --  The region whose caps carry Id, or zero if Id is not the current
+   --  generation of its slot: a region that has been released.
+
+   function Bank_Id
+     (Index : Positive)
+      return Rose.Objects.Capability_Identifier;
+
+   function Bank_Slot
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural;
+   --  As Region_Id and Region_Slot, for banks.
+
+   procedure Next_Generation (Generation : in out Rose.Words.Word_8);
+   --  A region or bank has gone from the slot of Generation.
 
    type Bank_Record is
       record
@@ -326,7 +361,8 @@ package body Store.Devices is
       record
          Open           : Boolean := False;
          Cap            : Rose.Capabilities.Capability := 0;
-         Region     : Positive;
+         Region         : Rose.Objects.Capability_Identifier := 0;
+         --  The identifier of the region that the stream reads.
          Current_Page   : Rose.Objects.Page_Object_Id;
          Current_Offset : System.Storage_Elements.Storage_Offset;
          Stream_Length  : System.Storage_Elements.Storage_Count;
@@ -444,7 +480,7 @@ package body Store.Devices is
       Signal : Rose.Capabilities.Capability)
       return Rose.Capabilities.Capability
    is
-      Bank : constant Natural := Natural (Id);
+      Bank : constant Natural := Bank_Slot (Id);
    begin
       if Bank not in Banks'Range or else not Banks (Bank).In_Use then
          Delete_Cap (Signal);
@@ -488,6 +524,20 @@ package body Store.Devices is
          Bound => This.First + Device_Page (This.Count));
    end Add_Space;
 
+   -------------
+   -- Bank_Id --
+   -------------
+
+   function Bank_Id
+     (Index : Positive)
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      return Rose.Objects.Capability_Identifier (Index)
+        + 256 * Rose.Objects.Capability_Identifier (Bank_Generations (Index));
+   end Bank_Id;
+
    ----------------
    -- Bank_Index --
    ----------------
@@ -497,8 +547,32 @@ package body Store.Devices is
       return Rose.Words.Word
    is
    begin
+
+      --  The identifier, generation and all, which Create_Process_Bank
+      --  takes back.
+
       return Rose.Words.Word (Id);
    end Bank_Index;
+
+   ---------------
+   -- Bank_Slot --
+   ---------------
+
+   function Bank_Slot
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Index : constant Natural := Natural (Id mod 256);
+   begin
+      if Index in 1 .. Max_Banks
+        and then Natural (Id / 256) = Natural (Bank_Generations (Index))
+      then
+         return Index;
+      else
+         return 0;
+      end if;
+   end Bank_Slot;
 
    ------------
    -- Charge --
@@ -605,6 +679,8 @@ package body Store.Devices is
       Table_Header.Bank_Count := Rose.Words.Word_32 (Bank_Count);
       Table_Header.Bank_Page_Count := Rose.Words.Word_32 (Bank_Pages);
       Table_Header.Tree_Root := Rose.Words.Word_64 (Root);
+      Table_Header.Region_Generations := Region_Generations;
+      Table_Header.Bank_Generations := Bank_Generations;
       Append;
 
       for Index in 1 .. Region_Count loop
@@ -721,7 +797,7 @@ package body Store.Devices is
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
                  Rose.Interfaces.Storage.Bank.Bank_Interface,
-                 Rose.Objects.Capability_Identifier (Root_Bank)),
+                 Bank_Id (Root_Bank)),
             others     => <>);
       end if;
    end Create_Root_Bank;
@@ -736,14 +812,17 @@ package body Store.Devices is
       Region_Limit : Rose.Words.Word)
       return Rose.Capabilities.Capability
    is
-      Parent : constant Natural := Natural (Id);
+      Parent : constant Natural := Bank_Slot (Id);
    begin
       if Parent not in 1 .. Max_Banks or else not Banks (Parent).In_Use then
          return 0;
       end if;
 
       for Index in Root_Bank + 1 .. Max_Banks loop
-         if not Banks (Index).In_Use then
+         if not Banks (Index).In_Use
+           and then Bank_Generations (Index)
+             /= Rose.Checkpoints.Retired_Generation
+         then
             Banks (Index) :=
               (In_Use       => True,
                Parent       => Parent,
@@ -751,7 +830,7 @@ package body Store.Devices is
                  Rose.System_Calls.Server.Create_Endpoint
                    (Create_Endpoint_Cap,
                     Rose.Interfaces.Storage.Bank.Bank_Interface,
-                    Rose.Objects.Capability_Identifier (Index)),
+                    Bank_Id (Index)),
                Page_Limit   => Page_Limit,
                Region_Limit => Region_Limit,
                others       => <>);
@@ -776,18 +855,20 @@ package body Store.Devices is
    is
       pragma Unreferenced (Flags);
       use Rose.Objects;
-      Parent : Region_Record renames Regions (Positive (Id));
+      Parent_Index : constant Natural := Region_Slot (Id);
+      Parent       : Region_Record renames
+                       Regions (Natural'Max (Parent_Index, 1));
+      --  Only used once Parent_Index is known to be a region.
    begin
 
-      if Natural (Id) > Region_Count then
-         Rose.Console_IO.Put ("storage: id ");
+      if Parent_Index not in 1 .. Region_Count
+        or else not Regions (Parent_Index).In_Use
+      then
+         Rose.Console_IO.Put ("storage: subregion: no region ");
          Rose.Console_IO.Put (Natural (Id));
-         Rose.Console_IO.Put (" too large (max is ");
-         Rose.Console_IO.Put (Region_Count);
-         Rose.Console_IO.Put (")");
          Rose.Console_IO.New_Line;
+         return 0;
       end if;
-
 
       if Base < Parent.Base then
          Rose.Console_IO.Put_Line ("storage: invalid request: base too small");
@@ -868,7 +949,7 @@ package body Store.Devices is
                           Rose.System_Calls.Server.Create_Endpoint
                             (Create_Endpoint_Cap,
                              Rose.Interfaces.Storage.Region.Region_Interface,
-                             Capability_Identifier (Index)));
+                             Region_Id (Index)));
 
             Charge (Child.Bank, 0, 1);
 
@@ -917,7 +998,7 @@ package body Store.Devices is
      (Id : Rose.Objects.Capability_Identifier)
    is
    begin
-      Destroy_Bank_Tree (Natural (Id), Ending => 0);
+      Destroy_Bank_Tree (Bank_Slot (Id), Ending => 0);
    end Destroy_Bank;
 
    -----------------------
@@ -950,9 +1031,7 @@ package body Store.Devices is
            and then Regions (Index).Bank in Doomed'Range
            and then Doomed (Regions (Index).Bank)
          then
-            Release (Rose.Objects.Capability_Identifier (Index));
-            Rose.Interfaces.Storage.Region.Server.Remove_Instance
-              (Rose.Objects.Capability_Identifier (Index));
+            Release (Region_Id (Index));
          end if;
       end loop;
 
@@ -1011,8 +1090,13 @@ package body Store.Devices is
             Rose.System_Calls.Invoke_Capability (Params);
 
             Rose.Interfaces.Storage.Bank.Server.Remove_Instance
-              (Rose.Objects.Capability_Identifier (Index));
+              (Bank_Id (Index));
             Banks (Index) := (others => <>);
+
+            --  The slot's next bank has another identifier, so the caps
+            --  that clients still hold don't reach it (#967).
+
+            Next_Generation (Bank_Generations (Index));
          end if;
       end loop;
    end Destroy_Bank_Tree;
@@ -1152,7 +1236,7 @@ package body Store.Devices is
       Page : in     Rose.Objects.Object_Id;
       Data :    out System.Storage_Elements.Storage_Array)
    is
-      Region_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Region_Slot (Id);
    begin
       if Region_Index not in 1 .. Region_Count
         or else Page < Regions (Region_Index).Base
@@ -1200,9 +1284,11 @@ package body Store.Devices is
       Base  : out Rose.Objects.Object_Id;
       Bound : out Rose.Objects.Object_Id)
    is
-      Region_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Region_Slot (Id);
    begin
-      if Region_Index not in 1 .. Region_Count then
+      if Region_Index not in 1 .. Region_Count
+        or else not Regions (Region_Index).In_Use
+      then
          Rose.Console_IO.Put ("store: get-range: no such region: ");
          Rose.Console_IO.Put (Natural (Id));
          Rose.Console_IO.New_Line;
@@ -1241,7 +1327,7 @@ package body Store.Devices is
       Page_Limit   :    out Rose.Words.Word_64;
       Region_Limit :    out Rose.Words.Word)
    is
-      Bank : constant Natural := Natural (Id);
+      Bank : constant Natural := Bank_Slot (Id);
    begin
       Pages := 0;
       Regions := 0;
@@ -1401,21 +1487,56 @@ package body Store.Devices is
 
    function New_Region return Natural is
    begin
-      for Index in 1 .. Region_Count loop
-         if not Regions (Index).In_Use then
+      for Index in 1 .. Max_Regions loop
+         if not Regions (Index).In_Use
+           and then Region_Generations (Index)
+             /= Rose.Checkpoints.Retired_Generation
+         then
             Regions (Index).In_Use := True;
+            Region_Count := Natural'Max (Region_Count, Index);
             return Index;
          end if;
       end loop;
 
-      if Region_Count < Max_Regions then
-         Region_Count := Region_Count + 1;
-         Regions (Region_Count).In_Use := True;
-         return Region_Count;
-      end if;
-
       return 0;
    end New_Region;
+
+   ---------------------
+   -- Next_Generation --
+   ---------------------
+
+   procedure Next_Generation (Generation : in out Rose.Words.Word_8) is
+   begin
+      if Generation < Rose.Checkpoints.Retired_Generation then
+         Generation := Generation + 1;
+      end if;
+   end Next_Generation;
+
+   ---------------
+   -- Owns_Bank --
+   ---------------
+
+   function Owns_Bank
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      Index : constant Natural := Bank_Slot (Identifier);
+   begin
+      return Index /= 0 and then Banks (Index).In_Use;
+   end Owns_Bank;
+
+   ----------------
+   -- Owns_Region --
+   ----------------
+
+   function Owns_Region
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      Index : constant Natural := Region_Slot (Identifier);
+   begin
+      return Index /= 0 and then Regions (Index).In_Use;
+   end Owns_Region;
 
    -----------------
    -- Parent_Bank --
@@ -1473,7 +1594,7 @@ package body Store.Devices is
       Page : in     Rose.Objects.Object_Id;
       Data : in     System.Storage_Elements.Storage_Array)
    is
-      Region_Index : constant Natural := Natural (Id);
+      Region_Index : constant Natural := Region_Slot (Id);
 
       procedure Fail (Message : String);
       --  The page isn't written: say why, and the caller's Put fails
@@ -1612,8 +1733,7 @@ package body Store.Devices is
          Last := Last + 1;
          if Rec.Buffer_Offset > Rec.Buffer_Length then
             Rec.Current_Page := Rec.Current_Page + 1;
-            Get (Rose.Objects.Capability_Identifier (Rec.Region),
-                 Rec.Current_Page, Rec.Current_Buffer);
+            Get (Rec.Region, Rec.Current_Page, Rec.Current_Buffer);
             Rec.Buffer_Offset := 1;
          end if;
 
@@ -1666,8 +1786,15 @@ package body Store.Devices is
       return Rose.Capabilities.Capability
    is
       use Rose.Objects;
+      Index     : constant Natural := Region_Slot (Id);
       Stream_Id : Capability_Identifier := 0;
    begin
+      if Index not in 1 .. Region_Count
+        or else not Regions (Index).In_Use
+      then
+         return 0;
+      end if;
+
       for I in Region_Streams'Range loop
          if not Region_Streams (I).Open then
             Stream_Id := I;
@@ -1687,13 +1814,13 @@ package body Store.Devices is
          Stream_Rec  : Region_Stream_Record renames
                          Region_Streams (Stream_Id);
          Region  : Region_Record renames
-                         Regions (Positive (Id));
+                         Regions (Index);
       begin
          Stream_Rec :=
            Region_Stream_Record'
              (Open           => True,
               Cap            => Current_Cap,
-              Region     => Positive (Id),
+              Region         => Id,
               Current_Page   => Region.Base,
               Stream_Length  =>
                 System.Storage_Elements.Storage_Count
@@ -1730,6 +1857,41 @@ package body Store.Devices is
       Read_Device (Page, Bytes);
    end Read_Tree_Page;
 
+   ---------------
+   -- Region_Id --
+   ---------------
+
+   function Region_Id
+     (Index : Positive)
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      return Rose.Objects.Capability_Identifier (Index)
+        + 256
+          * Rose.Objects.Capability_Identifier (Region_Generations (Index));
+   end Region_Id;
+
+   -----------------
+   -- Region_Slot --
+   -----------------
+
+   function Region_Slot
+     (Id : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      use type Rose.Objects.Capability_Identifier;
+      Index : constant Natural := Natural (Id mod 256);
+   begin
+      if Index in 1 .. Max_Regions
+        and then Natural (Id / 256) = Natural (Region_Generations (Index))
+      then
+         return Index;
+      else
+         return 0;
+      end if;
+   end Region_Slot;
+
    -------------
    -- Release --
    -------------
@@ -1737,7 +1899,7 @@ package body Store.Devices is
    procedure Release
      (Id : Rose.Objects.Capability_Identifier)
    is
-      Index : constant Natural := Natural (Id);
+      Index : constant Natural := Region_Slot (Id);
    begin
       if Index not in 1 .. Region_Count
         or else not Regions (Index).In_Use
@@ -1792,6 +1954,13 @@ package body Store.Devices is
          Uncharge (Region.Bank, Freed, 1);
          Region := (others => <>);
       end;
+
+      --  The caps that the server made for the region's interfaces go,
+      --  and the slot's next region has another identifier, so the caps
+      --  that clients still hold don't reach it (#967).
+
+      Rose.Interfaces.Storage.Region.Server.Remove_Instance (Id);
+      Next_Generation (Region_Generations (Index));
    end Release;
 
    -----------------------
@@ -1857,7 +2026,7 @@ package body Store.Devices is
               Rose.System_Calls.Server.Create_Endpoint
                 (Create_Endpoint_Cap,
                  Rose.Interfaces.Storage.Region.Region_Interface,
-                 Capability_Identifier (Region_Index));
+                 Region_Id (Region_Index));
 
       begin
          Next_Page := Base + Object_Id (Pages);
@@ -1889,7 +2058,7 @@ package body Store.Devices is
       Size : Rose.Words.Word_64)
       return Rose.Capabilities.Capability
    is
-      Bank : constant Natural := Natural (Id);
+      Bank : constant Natural := Bank_Slot (Id);
    begin
       if Bank not in 1 .. Max_Banks or else not Banks (Bank).In_Use then
          return 0;
@@ -1936,7 +2105,7 @@ package body Store.Devices is
                     Rose.System_Calls.Server.Create_Endpoint
                       (Create_Endpoint_Cap,
                        Rose.Interfaces.Storage.Bank.Bank_Interface,
-                       Rose.Objects.Capability_Identifier (Index)),
+                       Bank_Id (Index)),
                   Page_Limit   => Saved.Page_Limit,
                   Region_Limit => Rose.Words.Word (Saved.Region_Limit),
                   Owner        => Rose.Objects.Object_Id (Saved.Owner),
@@ -1960,7 +2129,6 @@ package body Store.Devices is
       Root        : Natural)
    is
       pragma Unreferenced (Id);
-      use Rose.Objects;
    begin
       Create_Root_Bank;
 
@@ -1971,16 +2139,15 @@ package body Store.Devices is
          return;
       end if;
 
+      --  The region's cap is made when the table's header comes, with the
+      --  slot's generation (Restore_Table_Page).
+
       Regions (Index) :=
         Region_Record'
           (In_Use         => True,
            Base           => Base,
            Bound          => Bound,
-           Access_Cap     =>
-             Rose.System_Calls.Server.Create_Endpoint
-               (Create_Endpoint_Cap,
-                Rose.Interfaces.Storage.Region.Region_Interface,
-                Capability_Identifier (Index)),
+           Access_Cap     => Rose.Capabilities.Null_Capability,
            Root           => (if Root in Regions'Range then Root else Index),
            Mapped_Pages   => 0,
            Reads          => 0,
@@ -2048,6 +2215,7 @@ package body Store.Devices is
    is
       pragma Unreferenced (Id);
       use Rose.Checkpoints;
+      use type Rose.Capabilities.Capability;
    begin
       if Page'Length /= Rose.Limits.Page_Size then
          Rose.Console_IO.Put ("storage: restore: table page ");
@@ -2088,6 +2256,8 @@ package body Store.Devices is
                Restore_Last_Bank :=
                  Restore_Last_Region + Natural (Header.Bank_Page_Count);
                Restore_Banks_Left := Natural (Header.Bank_Count);
+               Region_Generations := Header.Region_Generations;
+               Bank_Generations := Header.Bank_Generations;
 
                Restore_Space
                  (Root   => Device_Page (Header.Tree_Root),
@@ -2107,6 +2277,22 @@ package body Store.Devices is
                  ("storage: restore: the table header is not one I read");
             end if;
          end;
+
+         --  Restore_Region recreated the regions before the header came,
+         --  and now their slots' generations are known (#967).
+
+         for Region in 1 .. Region_Count loop
+            if Regions (Region).In_Use
+              and then Regions (Region).Access_Cap
+                = Rose.Capabilities.Null_Capability
+            then
+               Regions (Region).Access_Cap :=
+                 Rose.System_Calls.Server.Create_Endpoint
+                   (Create_Endpoint_Cap,
+                    Rose.Interfaces.Storage.Region.Region_Interface,
+                    Region_Id (Region));
+            end if;
+         end loop;
 
       elsif Index in 2 .. Restore_Last_Region then
 

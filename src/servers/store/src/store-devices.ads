@@ -115,6 +115,18 @@ package Store.Devices is
    --  dependents destroyed and raise their signals, and destroy the
    --  banks.  The root bank stays.
 
+   function Owns_Region
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  True if Identifier is that of a region the store has: not one
+   --  that has been released, whose slot has another generation now
+   --  (#967).
+
+   function Owns_Bank
+     (Identifier : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  As Owns_Region, for banks.
+
    procedure Get_Range
      (Id    : Rose.Objects.Capability_Identifier;
       Base  : out Rose.Objects.Object_Id;

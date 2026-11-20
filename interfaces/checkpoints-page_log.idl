@@ -22,6 +22,24 @@ interface Checkpoints.Page_Log is
    --  left out of the log when the checkpoint commits, and the next
    --  entry starts where it did. Discard_Pages doesn't clear that.
 
+   procedure Append_Batch
+     (Pages : Storage_Array;
+      First : out Word;
+      Wrap  : out Word);
+   --  Append Pages, a whole number of pages, to the open entry in one
+   --  go: a batch of pages paged out between checkpoints, which is a
+   --  header page and the pages it lists (ADR 0028, section 4). Nothing
+   --  else is appended between them, so a checkpoint can't start in the
+   --  middle of a batch (#974). First is the log page of the first page,
+   --  and Wrap is how many pages went before the log wrapped round to
+   --  log page 1, or 0 if it didn't, so that the page at Index from 0
+   --  is at First + Index, or at 1 + Index - Wrap from Wrap on.
+   --
+   --  First is 0 if the batch wasn't appended: while a checkpoint is
+   --  being written, or if an append fails. A batch that fails partway
+   --  is dropped, and appends can go on, unless a write to the disk
+   --  failed, which fails the whole entry as for Append_Page.
+
    procedure Read_Page
      (Log_Page : Word;
       Page     : out Storage_Array);

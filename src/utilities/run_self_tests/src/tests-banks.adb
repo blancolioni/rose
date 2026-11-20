@@ -3,6 +3,7 @@ with Ada.Text_IO;
 with Rose.Capabilities;
 with Rose.Server;
 with Rose.System_Calls;
+with Rose.Words;
 
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Storage.Dependent;
@@ -128,5 +129,83 @@ package body Tests.Banks is
    begin
       Signal_Count := Signal_Count + 1;
    end On_Dependent_Bit;
+
+   ----------------
+   -- Reuse_Test --
+   ----------------
+
+   function Reuse_Test return Boolean is
+      use type Rose.Words.Word;
+      use type Rose.Words.Word_64;
+      subtype Bank_Class is Rose.Interfaces.Storage.Bank.Bank_Object'Class;
+
+      Page_Limit   : constant := 7;
+      Region_Limit : constant := 3;
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+   begin
+      Ada.Text_IO.Put ("Bank reuse test");
+
+      if Tests.Registry.Bank = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (" (skipped: no bank)");
+         return True;
+      end if;
+
+      declare
+         Test_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                       Rose.Interfaces.Storage.Bank.Client.From_Cap
+                         (Tests.Registry.Bank);
+         Old_Bank  : Bank_Class := Test_Bank.Create_Sub_Bank (0, 0);
+         Old_Index : constant Rose.Words.Word := Old_Bank.Index;
+      begin
+
+         --  The destroyed bank's slot is the first free one, so the next
+         --  bank takes it. The cap to the old bank is still in this
+         --  process's table.
+
+         Old_Bank.Destroy;
+
+         declare
+            New_Bank     : Bank_Class :=
+                             Test_Bank.Create_Sub_Bank
+                               (Page_Limit, Region_Limit);
+            Pages        : Rose.Words.Word_64;
+            Regions      : Rose.Words.Word;
+            Pages_Limit  : Rose.Words.Word_64;
+            Region_Count : Rose.Words.Word;
+         begin
+            Check ("the new bank has the destroyed bank's index",
+                   New_Bank.Index /= Old_Index);
+
+            Old_Bank.Get_Usage (Pages, Regions, Pages_Limit, Region_Count);
+            Check ("the destroyed bank's cap has the new bank's limits",
+                   Pages_Limit /= Page_Limit
+                   or else Region_Count /= Region_Limit);
+
+            New_Bank.Destroy;
+         end;
+      end;
+
+      return Passed;
+   exception
+      when others =>
+         Ada.Text_IO.Put (": an operation failed");
+         return False;
+   end Reuse_Test;
 
 end Tests.Banks;

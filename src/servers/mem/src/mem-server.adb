@@ -2,6 +2,7 @@
 with Rose.Addresses;
 with Rose.Capabilities;
 with Rose.Invocation;
+with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
@@ -26,6 +27,7 @@ with Rose.System_Calls.Client;
 with Rose.System_Calls.Server;
 
 with Mem.Calls;
+with Mem.Change_Table;
 with Mem.Checkpoints;
 with Mem.Page_Cache;
 with Mem.Page_Log;
@@ -55,6 +57,43 @@ package body Mem.Server is
    --  The checkpoint server's Checkpointer.Request_Checkpoint, from the
    --  last checkpoint, for asking for a checkpoint sooner than the timer
    --  would (ADR 0028, section 6).
+
+   Checkpoint_Requested : Boolean := False;
+   --  mem has asked for a checkpoint, and it hasn't happened yet.
+
+   type Held_Fault is
+      record
+         Object  : Rose.Objects.Object_Id;
+         Virtual : Rose.Words.Word;
+         Action  : Rose.Interfaces.Processes.Memory.Page_Access_Type;
+      end record;
+
+   Held_Faults : array (1 .. Rose.Limits.Max_Processes) of Held_Fault;
+   Held_Count  : Natural := 0;
+   --  Faults that found no page, with a checkpoint on the way that will
+   --  let mem free pages again. A process has one fault at a time. They
+   --  are handled again when mem's part of the checkpoint is done (ADR
+   --  0028, section 6; #974).
+
+   procedure Ask_For_Checkpoint;
+   --  If mem needs a checkpoint, to empty its table of changes or to
+   --  page out again, or for its held faults, and hasn't asked for one,
+   --  ask now, without waiting for a reply. The checkpoint can start at
+   --  once, so this is the last thing mem does before it waits for its
+   --  next message (#950).
+
+   procedure Handle_Fault
+     (Object   : Rose.Objects.Object_Id;
+      Virtual  : Rose.Words.Word;
+      Physical : Rose.Words.Word;
+      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type;
+      May_Wait : Boolean);
+   --  Page_Fault, or a held fault handled again. A fault that finds no
+   --  page is held if May_Wait and a checkpoint will free pages, and
+   --  otherwise fails its process.
+
+   procedure Replay_Held_Faults;
+   --  Handle the held faults again, after mem's part of a checkpoint.
 
    type Replacement_Record is
       record
@@ -423,6 +462,30 @@ package body Mem.Server is
       R.New_Oid := Oid;
    end Allow_New_Version;
 
+   ------------------------
+   -- Ask_For_Checkpoint --
+   ------------------------
+
+   procedure Ask_For_Checkpoint is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Checkpoint_Requested
+        or else Request_Checkpoint_Cap = 0
+        or else not (Held_Count > 0
+                     or else Mem.Change_Table.Wants_Checkpoint
+                     or else Mem.Virtual_Map.Changes_Stopped)
+      then
+         return;
+      end if;
+
+      Params.Control.Flags := (Rose.Invocation.Send => True,
+                               others              => False);
+      Params.Cap := Request_Checkpoint_Cap;
+      Rose.System_Calls.Invoke_Capability (Params);
+      Checkpoint_Requested := True;
+   end Ask_For_Checkpoint;
+
    ----------------
    -- Checkpoint --
    ----------------
@@ -442,6 +505,14 @@ package body Mem.Server is
       end if;
 
       Mem.Checkpoints.Checkpoint;
+
+      --  Whether it asked for this one or not, mem can page out again,
+      --  and the held faults can find pages: the changed pages are clean,
+      --  and the table of changes is empty, unless the checkpoint failed.
+
+      Checkpoint_Requested := False;
+      Mem.Virtual_Map.End_Checkpoint;
+      Replay_Held_Faults;
    end Checkpoint;
 
    ------------------------
@@ -717,6 +788,11 @@ package body Mem.Server is
    begin
       Mem.Processes.Release_Shared_Segments (Pid);
       Mem.Page_Table.Delete_All (Pid);
+
+      --  Its pages paged out since the last checkpoint are not added to
+      --  any index (ADR 0028, section 4).
+
+      Mem.Change_Table.Forget (Pid);
       Mem.Processes.Kill_Process (Pid);
       if not Bank_Gone then
          Mem.Processes.End_Bank (Oid);
@@ -759,111 +835,18 @@ package body Mem.Server is
       Remove_Instances (Id);
    end Exit_Process;
 
-   --------------------
-   -- Heap_Interface --
-   --------------------
+   ------------------
+   -- Handle_Fault --
+   ------------------
 
-   function Heap_Interface
-     (Id : Rose.Objects.Capability_Identifier)
-      return Rose.Capabilities.Capability
-   is
-      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
-   begin
-      if Pid = 0 then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-
-      return Mem.Processes.Get_Heap_Cap (Pid);
-   end Heap_Interface;
-
-   ---------------------
-   -- Kernel_Activity --
-   ---------------------
-
-   procedure Kernel_Activity
-     (Cap      : Rose.Capabilities.Capability;
-      Activity : out Rose.Words.Word;
-      Oid      : out Rose.Objects.Object_Id)
-   is
-      use type Rose.Capabilities.Capability;
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      Activity := 0;
-      Oid := 0;
-
-      if Process_State_Cap = 0 or else Cap = 0 then
-         return;
-      end if;
-
-      Rose.System_Calls.Initialize_Send (Params, Process_State_Cap);
-      Rose.System_Calls.Send_Cap (Params, Cap);
-      Rose.System_Calls.Receive_Words
-        (Params, 1 + Rose.Invocation.Object_Id_Words);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      if not Params.Control.Flags (Rose.Invocation.Error)
-        and then Params.Control.Flags (Rose.Invocation.Send_Words)
-        and then Natural (Params.Control.Last_Sent_Word)
-          >= Rose.Invocation.Object_Id_Words
-      then
-         Activity := Params.Data (0);
-         Oid := Rose.Invocation.Get_Object_Id (Params, 1);
-      end if;
-   end Kernel_Activity;
-
-   ---------------------
-   -- Kernel_Handover --
-   ---------------------
-
-   function Kernel_Handover
-     (Op     : Rose.Capabilities.Capability;
-      First  : Rose.Capabilities.Capability;
-      Second : Rose.Capabilities.Capability := 0)
-      return Boolean
-   is
-      use type Rose.Capabilities.Capability;
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      if Op = 0 or else First = 0 then
-         return False;
-      end if;
-
-      Rose.System_Calls.Initialize_Send (Params, Op);
-      Rose.System_Calls.Send_Cap (Params, First);
-      if Second /= 0 then
-         Rose.System_Calls.Send_Cap (Params, Second);
-      end if;
-      Rose.System_Calls.Invoke_Capability (Params);
-      return not Params.Control.Flags (Rose.Invocation.Error);
-   end Kernel_Handover;
-
-   -----------------
-   -- New_Process --
-   -----------------
-
-   function New_Process
-     (Id          : Rose.Objects.Capability_Identifier;
-      Process     : Rose.Capabilities.Capability;
-      Bank        : Rose.Capabilities.Capability)
-      return Rose.Capabilities.Capability
-   is
-      pragma Unreferenced (Id);
-   begin
-      return Mem.Processes.New_Process (Process, Bank);
-   end New_Process;
-
-   -------------------
-   -- On_Page_Fault --
-   -------------------
-
-   procedure Page_Fault
-     (Id       : Rose.Objects.Capability_Identifier;
-      Object   : Rose.Objects.Object_Id;
+   procedure Handle_Fault
+     (Object   : Rose.Objects.Object_Id;
       Virtual  : Rose.Words.Word;
       Physical : Rose.Words.Word;
-      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type)
+      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type;
+      May_Wait : Boolean)
    is
-      pragma Unreferenced (Id);
+      use type Rose.Capabilities.Capability;
       use Rose.Addresses;
       use all type Rose.Interfaces.Processes.Memory.Page_Access_Type;
       Absent : Boolean;
@@ -977,7 +960,24 @@ package body Mem.Server is
 
             Mem.Virtual_Map.Allocate_Page (Page, Have_Page);
 
-            if not Have_Page then
+            if not Have_Page
+              and then May_Wait
+              and then Request_Checkpoint_Cap /= 0
+              and then Held_Count < Held_Faults'Last
+              and then
+                (Checkpoint_Requested
+                 or else Mem.Change_Table.Count > 0
+                 or else Mem.Page_Table.Dirty_Page_Count > 0)
+            then
+
+               --  A checkpoint makes the changed pages clean, and empties
+               --  the table of changes, so pages can be freed again. The
+               --  process waits for it (ADR 0028, section 6).
+
+               Held_Count := Held_Count + 1;
+               Held_Faults (Held_Count) := (Object, Virtual, Action);
+
+            elsif not Have_Page then
                Mem.Processes.Fault_Process (Pid, "out of memory");
             else
 
@@ -1064,6 +1064,116 @@ package body Mem.Server is
          end;
       end if;
 
+   end Handle_Fault;
+
+   --------------------
+   -- Heap_Interface --
+   --------------------
+
+   function Heap_Interface
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      Pid : constant Process_Id := Mem.Processes.Find_Process (Id);
+   begin
+      if Pid = 0 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Mem.Processes.Get_Heap_Cap (Pid);
+   end Heap_Interface;
+
+   ---------------------
+   -- Kernel_Activity --
+   ---------------------
+
+   procedure Kernel_Activity
+     (Cap      : Rose.Capabilities.Capability;
+      Activity : out Rose.Words.Word;
+      Oid      : out Rose.Objects.Object_Id)
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Activity := 0;
+      Oid := 0;
+
+      if Process_State_Cap = 0 or else Cap = 0 then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Process_State_Cap);
+      Rose.System_Calls.Send_Cap (Params, Cap);
+      Rose.System_Calls.Receive_Words
+        (Params, 1 + Rose.Invocation.Object_Id_Words);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Natural (Params.Control.Last_Sent_Word)
+          >= Rose.Invocation.Object_Id_Words
+      then
+         Activity := Params.Data (0);
+         Oid := Rose.Invocation.Get_Object_Id (Params, 1);
+      end if;
+   end Kernel_Activity;
+
+   ---------------------
+   -- Kernel_Handover --
+   ---------------------
+
+   function Kernel_Handover
+     (Op     : Rose.Capabilities.Capability;
+      First  : Rose.Capabilities.Capability;
+      Second : Rose.Capabilities.Capability := 0)
+      return Boolean
+   is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Op = 0 or else First = 0 then
+         return False;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Op);
+      Rose.System_Calls.Send_Cap (Params, First);
+      if Second /= 0 then
+         Rose.System_Calls.Send_Cap (Params, Second);
+      end if;
+      Rose.System_Calls.Invoke_Capability (Params);
+      return not Params.Control.Flags (Rose.Invocation.Error);
+   end Kernel_Handover;
+
+   -----------------
+   -- New_Process --
+   -----------------
+
+   function New_Process
+     (Id          : Rose.Objects.Capability_Identifier;
+      Process     : Rose.Capabilities.Capability;
+      Bank        : Rose.Capabilities.Capability)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id);
+   begin
+      return Mem.Processes.New_Process (Process, Bank);
+   end New_Process;
+
+   ----------------
+   -- Page_Fault --
+   ----------------
+
+   procedure Page_Fault
+     (Id       : Rose.Objects.Capability_Identifier;
+      Object   : Rose.Objects.Object_Id;
+      Virtual  : Rose.Words.Word;
+      Physical : Rose.Words.Word;
+      Action   : Rose.Interfaces.Processes.Memory.Page_Access_Type)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Handle_Fault (Object, Virtual, Physical, Action, May_Wait => True);
+      Ask_For_Checkpoint;
    end Page_Fault;
 
    ------------------
@@ -1409,6 +1519,24 @@ package body Mem.Server is
       Kernel_Activity (Current_Replacement.Old_Cap, Activity, Unused);
       return Activity = 1;
    end Replacement_Ready;
+
+   ------------------------
+   -- Replay_Held_Faults --
+   ------------------------
+
+   procedure Replay_Held_Faults is
+   begin
+      --  A fault that still finds no page fails its process now, rather
+      --  than wait for another checkpoint, so nothing is added to the
+      --  held faults while they are handled.
+
+      for Fault of Held_Faults (1 .. Held_Count) loop
+         Handle_Fault
+           (Fault.Object, Fault.Virtual, 0, Fault.Action,
+            May_Wait => False);
+      end loop;
+      Held_Count := 0;
+   end Replay_Held_Faults;
 
    ----------------------
    -- Request_Heap_Top --

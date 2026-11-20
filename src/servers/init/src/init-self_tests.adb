@@ -76,9 +76,10 @@ package body Init.Self_Tests is
    --  whose storage the store reserves when it is launched (#973).
 
    Test_Page_Limit   : constant := 16;
-   Test_Region_Limit : constant := 4;
+   Test_Region_Limit : constant := 8;
    --  The test bank's limits: the shared segment test reserves one
-   --  region of two pages (ADR 0025).
+   --  region of two pages (ADR 0025), and the region reuse test two
+   --  regions of a page (#967).
 
    function Replace
      (Replace_Process : Rose.Capabilities.Capability;
@@ -652,22 +653,14 @@ package body Init.Self_Tests is
 
       Launch_Cap : constant Rose.Capabilities.Capability :=
                      Init.Calls.Find_In_Map (Find_Cap, "page_probe");
-      Bank_Cap   : constant Rose.Capabilities.Capability :=
-                     Init.Grants.Bank (Page_Probe_Page_Limit,
-                                       Probe_Region_Limit);
-      Bank       : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
       Passed     : Boolean := True;
-      Filler     : Rose.Capabilities.Capability;
-      Caller     : Rose.Capabilities.Capability;
-      Writer     : Rose.Capabilities.Capability;
-      Unused     : Rose.Capabilities.Capability;
-      Client     : Named.Named_Client;
 
       procedure Check (Name : String; Ok : Boolean);
       --  Report the check Name, and fail the test if it did not hold.
 
       procedure Launch
-        (Pages      : Natural;
+        (Bank_Cap   : Rose.Capabilities.Capability;
+         Pages      : Natural;
          Checkpoint : Rose.Capabilities.Capability;
          Target     : Rose.Capabilities.Capability;
          Writer     : out Rose.Capabilities.Capability;
@@ -675,6 +668,14 @@ package body Init.Self_Tests is
       --  Launch page_probe against Bank_Cap, with Pages, Checkpoint and
       --  Target, and return its Writer and Named interfaces, or null
       --  caps if it did not start.
+
+      procedure Run (With_Checkpoints : Boolean);
+      --  Fill Fill_Pages with a filler in a bank of its own, while a
+      --  caller's buffer is lent to it, and read them back. With
+      --  checkpoints, the filler takes one after each chunk, so the pages
+      --  mem frees are clean. Without, every page it frees is changed,
+      --  so it pages them out to the log, and asks for checkpoints when
+      --  its table of changes fills (#974).
 
       function Take_Checkpoint return Boolean;
 
@@ -696,7 +697,8 @@ package body Init.Self_Tests is
       ------------
 
       procedure Launch
-        (Pages      : Natural;
+        (Bank_Cap   : Rose.Capabilities.Capability;
+         Pages      : Natural;
          Checkpoint : Rose.Capabilities.Capability;
          Target     : Rose.Capabilities.Capability;
          Writer     : out Rose.Capabilities.Capability;
@@ -743,6 +745,67 @@ package body Init.Self_Tests is
          end if;
       end Launch;
 
+      ---------
+      -- Run --
+      ---------
+
+      procedure Run (With_Checkpoints : Boolean) is
+         Bank_Cap : constant Rose.Capabilities.Capability :=
+                      Init.Grants.Bank (Page_Probe_Page_Limit,
+                                        Probe_Region_Limit);
+         Bank     : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+         Filler   : Rose.Capabilities.Capability;
+         Caller   : Rose.Capabilities.Capability;
+         Unused   : Rose.Capabilities.Capability;
+         Client   : Named.Named_Client;
+         Text     : String (1 .. 16);
+         Last     : Natural;
+      begin
+         if Bank_Cap = Rose.Capabilities.Null_Capability then
+            Check ("make a bank", False);
+            return;
+         end if;
+
+         Rose.Interfaces.Storage.Bank.Client.Open (Bank, Bank_Cap);
+
+         Launch (Bank_Cap, Fill_Pages,
+                 (if With_Checkpoints then Checkpointer
+                  else Rose.Capabilities.Null_Capability),
+                 Rose.Capabilities.Null_Capability,
+                 Filler, Unused);
+         Launch (Bank_Cap, 0, Rose.Capabilities.Null_Capability, Filler,
+                 Unused, Caller);
+
+         if Filler = Rose.Capabilities.Null_Capability
+           or else Caller = Rose.Capabilities.Null_Capability
+         then
+            Check ("launch the filler and the caller", False);
+            Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
+            return;
+         end if;
+
+         --  The caller filled its buffer when it was launched. After the
+         --  checkpoint the buffer is clean, so mem could drop it, but for
+         --  the call in progress. Without, it is changed, so mem could
+         --  page it out, but for the call.
+
+         if With_Checkpoints then
+            Check ("checkpoint the caller's buffer", Take_Checkpoint);
+         end if;
+
+         Named.Open (Client, Caller);
+         Named.Name (Client, Text, Last);
+         Check ((if With_Checkpoints
+                 then "fill 40 MiB, checkpointing as it goes"
+                 else "fill 40 MiB with no checkpoints")
+                & ", and read it and the pinned buffer back",
+                not Named.Has_Error
+                and then Last in Text'Range
+                and then Text (1 .. Last) = "passed");
+
+         Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
+      end Run;
+
       ---------------------
       -- Take_Checkpoint --
       ---------------------
@@ -760,47 +823,13 @@ package body Init.Self_Tests is
 
    begin
       if Launch_Cap = Rose.Capabilities.Null_Capability
-        or else Bank_Cap = Rose.Capabilities.Null_Capability
         or else Checkpointer = Rose.Capabilities.Null_Capability
       then
          return False;
       end if;
 
-      Rose.Interfaces.Storage.Bank.Client.Open (Bank, Bank_Cap);
-
-      Launch (Fill_Pages, Checkpointer, Rose.Capabilities.Null_Capability,
-              Writer, Unused);
-      Filler := Writer;
-      Launch (0, Rose.Capabilities.Null_Capability, Filler,
-              Unused, Caller);
-
-      if Filler = Rose.Capabilities.Null_Capability
-        or else Caller = Rose.Capabilities.Null_Capability
-      then
-         Check ("launch the filler and the caller", False);
-         Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
-         return False;
-      end if;
-
-      --  The caller filled its buffer when it was launched. After the
-      --  checkpoint the buffer is clean, so mem could drop it, but for
-      --  the call in progress.
-
-      Check ("checkpoint the caller's buffer", Take_Checkpoint);
-
-      declare
-         Text : String (1 .. 16);
-         Last : Natural;
-      begin
-         Named.Open (Client, Caller);
-         Named.Name (Client, Text, Last);
-         Check ("fill 40 MiB, and read it and the pinned buffer back",
-                not Named.Has_Error
-                and then Last in Text'Range
-                and then Text (1 .. Last) = "passed");
-      end;
-
-      Rose.Interfaces.Storage.Bank.Client.Destroy (Bank);
+      Run (With_Checkpoints => True);
+      Run (With_Checkpoints => False);
       return Passed;
    end Page_Out_Test;
 
