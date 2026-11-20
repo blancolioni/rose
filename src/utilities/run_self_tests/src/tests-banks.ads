@@ -9,4 +9,11 @@ package Tests.Banks is
    --  Skipped without a bank or the Create_Signal cap, as when petal runs
    --  it.
 
+   function Reuse_Test return Boolean;
+   --  A destroyed bank's caps don't reach the next bank in its slot
+   --  (#967). Make a sub-bank of the test bank, destroy it while keeping
+   --  its cap, and make another, which takes the slot. The new bank's
+   --  index must differ from the old one's, and the old cap must not see
+   --  the new bank's limits. Skipped without a bank.
+
 end Tests.Banks;

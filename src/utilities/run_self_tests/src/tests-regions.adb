@@ -138,4 +138,106 @@ package body Tests.Regions is
          return False;
    end Put_Limit_Test;
 
+   ----------------
+   -- Reuse_Test --
+   ----------------
+
+   function Reuse_Test return Boolean is
+      use System.Storage_Elements;
+      use type Rose.Capabilities.Capability;
+      use type Rose.Objects.Object_Id;
+
+      subtype Region_Class is
+        Rose.Interfaces.Storage.Region.Region_Object'Class;
+      subtype Page_Data is Storage_Array (1 .. Rose.Limits.Page_Size);
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report Name, and fail the test, if Ok is False.
+
+      function Filled (Value : Storage_Element) return Page_Data
+      is (others => Value);
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         if not Ok then
+            Ada.Text_IO.Put (": " & Name);
+            Passed := False;
+         end if;
+      end Check;
+
+   begin
+      Ada.Text_IO.Put ("Region reuse test");
+
+      if Tests.Registry.Bank = Rose.Capabilities.Null_Capability then
+         Ada.Text_IO.Put (" (skipped: no bank)");
+         return True;
+      end if;
+
+      declare
+         Test_Bank  : Rose.Interfaces.Storage.Bank.Client.Bank_Client :=
+                        Rose.Interfaces.Storage.Bank.Client.From_Cap
+                          (Tests.Registry.Bank);
+         Old_Region : Region_Class :=
+                        Test_Bank.Reserve_Storage (Rose.Limits.Page_Size);
+         Base       : Rose.Objects.Object_Id;
+         Bound      : Rose.Objects.Object_Id;
+         Old_Base   : Rose.Objects.Object_Id;
+         Old_Bound  : Rose.Objects.Object_Id;
+         Data       : Page_Data;
+         Refused    : Boolean := False;
+      begin
+         Old_Region.Get_Range (Old_Base, Old_Bound);
+         Old_Region.Put (Old_Base, Filled (1));
+
+         --  The released region's slot is the first free one, so the next
+         --  region takes it. The cap to the old region is still in this
+         --  process's table.
+
+         Old_Region.Release;
+
+         declare
+            New_Region : Region_Class :=
+                           Test_Bank.Reserve_Storage (Rose.Limits.Page_Size);
+         begin
+            New_Region.Get_Range (Base, Bound);
+            Check ("the new region has the old region's pages",
+                   Base /= Old_Base);
+            New_Region.Put (Base, Filled (2));
+
+            Old_Region.Get_Range (Old_Base, Old_Bound);
+            Check ("the released region's cap has the new region's range",
+                   Old_Base /= Base or else Old_Bound /= Bound);
+
+            begin
+               Old_Region.Put (Base, Filled (3));
+            exception
+               when Rose.Interfaces.Objects.Invocation_Error =>
+                  Refused := True;
+            end;
+            Check ("the released region's cap wrote a page", Refused);
+
+            Old_Region.Get (Base, Data);
+            Check ("the released region's cap read the new region's page",
+                   Data /= Filled (2));
+
+            New_Region.Get (Base, Data);
+            Check ("the new region's page changed", Data = Filled (2));
+
+            New_Region.Release;
+         end;
+      end;
+
+      return Passed;
+   exception
+      when others =>
+         Ada.Text_IO.Put (": an operation failed");
+         return False;
+   end Reuse_Test;
+
 end Tests.Regions;
