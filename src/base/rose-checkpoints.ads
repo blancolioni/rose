@@ -302,13 +302,31 @@ package Rose.Checkpoints is
    --  the bank it is charged to.  What a bank has been charged isn't
    --  saved: the storage server works it out again from the regions.
    --
+   --  A region or a bank is in a slot, 1 .. Max_Store_Slots, and the
+   --  identifier that its caps carry is its slot and the slot's
+   --  generation: slot + 256 * generation (#967).  Releasing a region, or
+   --  destroying a bank, moves its slot to the next generation, so the
+   --  caps to it don't reach the next region or bank in the slot.  A slot
+   --  that reaches Retired_Generation is never used again (ADR 0010,
+   --  section 3).  The header has the generation of every slot, used or
+   --  not, so that a restore doesn't make old caps work again.  The
+   --  tables' index of a region or bank is its slot.
+   --
    --  Version 3 replaced the space of each region and its fresh pages
-   --  with the map, version 4 added the banks, and version 5 replaced the
-   --  map with the tree on the backing stores.  A version of 0 is a table
-   --  whose tree couldn't be written, which can't be restored.
+   --  with the map, version 4 added the banks, version 5 replaced the
+   --  map with the tree on the backing stores, and version 6 added the
+   --  generations.  A version of 0 is a table whose tree couldn't be
+   --  written, which can't be restored.
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 5;
+   Store_Table_Version : constant := 6;
+
+   Max_Store_Slots    : constant := 255;
+   Retired_Generation : constant := 255;
+
+   type Store_Generations is
+     array (1 .. Max_Store_Slots) of Rose.Words.Word_8
+     with Pack, Size => Max_Store_Slots * 8;
 
    type Store_Table_Header is
       record
@@ -324,8 +342,11 @@ package Rose.Checkpoints is
          Bank_Page_Count  : Rose.Words.Word_32 := 0;
          Unused           : Rose.Words.Word_32 := 0;
          Tree_Root        : Rose.Words.Word_64 := 0;
+         Region_Generations : Store_Generations := (others => 0);
+         Bank_Generations   : Store_Generations := (others => 0);
          Reserved         : System.Storage_Elements.Storage_Array
-                              (1 .. Rose.Limits.Page_Size - 56) :=
+                              (1 .. Rose.Limits.Page_Size - 56
+                                      - 2 * Max_Store_Slots) :=
                                 (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;

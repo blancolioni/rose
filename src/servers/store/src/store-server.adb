@@ -82,6 +82,14 @@ package body Store.Server is
          Create_Subregion => Store.Devices.Create_Subregion'Access,
          Instanced        => True);
 
+      --  The interface caps of a released region or bank make no caps
+      --  for it: they would never be removed (#967).
+
+      Rose.Interfaces.Storage.Bank.Server.Set_Owns
+        (Store.Devices.Owns_Bank'Access);
+      Rose.Interfaces.Storage.Region.Server.Set_Owns
+        (Store.Devices.Owns_Region'Access);
+
       Rose.Interfaces.Streams.Reader.Server.Attach_Interface
         (Server_Context => Server_Context,
          Read           => Store.Devices.Read'Access,

@@ -76,9 +76,10 @@ package body Init.Self_Tests is
    --  whose storage the store reserves when it is launched (#973).
 
    Test_Page_Limit   : constant := 16;
-   Test_Region_Limit : constant := 4;
+   Test_Region_Limit : constant := 8;
    --  The test bank's limits: the shared segment test reserves one
-   --  region of two pages (ADR 0025).
+   --  region of two pages (ADR 0025), and the region reuse test two
+   --  regions of a page (#967).
 
    function Replace
      (Replace_Process : Rose.Capabilities.Capability;

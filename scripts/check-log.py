@@ -61,7 +61,9 @@ SHARED_PAGE_SAVED = 1
 SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 5
+STORE_TABLE_VERSION = 6
+MAX_STORE_SLOTS = 255           # Rose.Checkpoints.Max_Store_Slots (#967)
+RETIRED_GENERATION = 255
 REGIONS_PER_PAGE = PAGE_SIZE // 32
 BANKS_PER_PAGE = PAGE_SIZE // 24
 MAX_TREE_HEIGHT = 7
@@ -382,6 +384,13 @@ def check_store_tables(log, first, last, verbose):
                        % (page_count, region_count, bank_count,
                           bank_pages)), 0, regions
 
+    # Each slot's generation (#967), which no region or bank in the
+    # tables can have retired.
+    region_generations = page[56:56 + MAX_STORE_SLOTS]
+    bank_generations = page[56 + MAX_STORE_SLOTS:56 + 2 * MAX_STORE_SLOTS]
+    retired = sum(1 for g in region_generations + bank_generations
+                  if g == RETIRED_GENERATION)
+
     # The banks come last (#518).  Each one's parent must be another bank
     # in the table, and the root bank, 1, has none.
     banks = {}
@@ -390,9 +399,12 @@ def check_store_tables(log, first, last, verbose):
                           + i // BANKS_PER_PAGE)
         index, parent, page_limit, region_limit, _ = struct.unpack_from(
             "<IIQII", record, (i % BANKS_PER_PAGE) * 24)
-        if index == 0 or index in banks:
+        if index == 0 or index in banks or index > MAX_STORE_SLOTS:
             return False, ("storage bank %d of %d: index %d"
                            % (i + 1, bank_count, index)), 0, regions
+        if bank_generations[index - 1] == RETIRED_GENERATION:
+            return False, ("storage bank %d is in a retired slot"
+                           % index), 0, regions
         banks[index] = parent
         if verbose:
             print("    bank %3d: parent %d, limits %d pages, %d regions"
@@ -412,12 +424,15 @@ def check_store_tables(log, first, last, verbose):
         index, root, base, bound, pages, bank = \
             struct.unpack_from("<IIQQII", record,
                                (i % REGIONS_PER_PAGE) * 32)
-        if index == 0 or index in indices or bound < base \
-                or bound > next_page:
+        if index == 0 or index in indices or index > MAX_STORE_SLOTS \
+                or bound < base or bound > next_page:
             return False, ("storage region %d of %d: index %d, pages "
                            "%x..%x, next page %x"
                            % (i + 1, region_count, index, base, bound,
                               next_page)), 0, regions
+        if region_generations[index - 1] == RETIRED_GENERATION:
+            return False, ("storage region %d is in a retired slot"
+                           % index), 0, regions
         if bank not in banks:
             return False, ("storage region %d is charged to bank %d, which "
                            "is not in the tables" % (index, bank)), \
@@ -440,10 +455,13 @@ def check_store_tables(log, first, last, verbose):
                 0, regions
 
     return True, ("storage: %d region%s, %d page%s with space, block map "
-                  "height %d, %d bank%s"
+                  "height %d, %d bank%s%s"
                   % (region_count, "" if region_count == 1 else "s",
                      mapped, "" if mapped == 1 else "s", tree_height,
-                     bank_count, "" if bank_count == 1 else "s")), \
+                     bank_count, "" if bank_count == 1 else "s",
+                     ", %d retired slot%s" % (retired,
+                                              "" if retired == 1 else "s")
+                     if retired else "")), \
         page_count, regions
 
 
