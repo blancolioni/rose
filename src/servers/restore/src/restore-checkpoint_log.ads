@@ -10,9 +10,9 @@ package Restore.Checkpoint_Log is
    --  Log_Reader interface at Reader_Cap, check that each one is a
    --  complete checkpoint (the kernel's tables, the memory server's
    --  tables, and the memory server's pages), and write a summary to
-   --  the console.  Return the location of the last consistent entry,
-   --  which is the checkpoint to restore from, or 0 if there is none or
-   --  the log is Refused.
+   --  the console.  Return the location of the last consistent entry
+   --  from the log's First_Checkpoint on, which is the checkpoint to
+   --  restore from, or 0 if there is none or the log is Refused.
 
    function Refused return Boolean;
    --  True if Find_Checkpoint found an entry that this boot set can't

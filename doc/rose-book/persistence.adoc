@@ -126,9 +126,12 @@ The boot modules go on running, which is what lets `checkpoint`, `mem`, `store`,
 
 `log` writes the checkpoint log to the log partition, in 4K pages that it numbers from 0 (`log-server.adb`).
 
-* Page 0 is the log's header, with its _generation_.
+* Page 0 is the log's header, with its _generation_, and its first entry with that entry's _sequence number_.
 * Each entry starts with a header page, followed by its pages.
-  The header has the entry's generation, and the first and last of its pages.
+  The header has the entry's generation, its sequence number, which is one more than the previous entry's, the first and last of its pages, and the sequence number of the log's first entry once it is committed (see <<Cleaning and Wrap-Around>>).
+* The log's pages run from 1 to the end of the partition, and then wrap around to 1 (#951).
+  An entry's pages can wrap around too.
+  At startup, `log` finds the entries from the header's first entry on, each with the next sequence number, until a page that isn't one: an entry header left from an earlier lap has an older sequence number.
 * An entry is open from one commit to the next, so that `mem` can append pages to it between checkpoints (ADR 0028).
   `log` opens the first entry when it starts or is reset, and the next as soon as one commits.
   The kernel's `Create`, when a checkpoint starts, finds the entry already open.
@@ -147,7 +150,7 @@ The boot modules go on running, which is what lets `checkpoint`, `mem`, `store`,
   An entry counts only if its generation is the log's, so entries written before a reset are never found again.
   `restore-install` resets the log before it installs a system.
 
-The last complete entry is the checkpoint that a restore uses.
+The last complete entry that can be restored is the checkpoint that a restore uses.
 
 === What an Entry Holds
 
@@ -201,9 +204,47 @@ When memory runs short, `mem` takes back cached pages of read-only segments firs
 
 `check-log.py` checks that each entry's index names the copies that reading every entry would find.
 
+=== Cleaning and Wrap-Around
+
+Every checkpoint adds an entry, so `mem` frees the oldest entries as the system runs, and the log wraps around into the space they leave (#356).
+An old entry can only be freed once nothing that is still live is only in it.
+Rather than writing, from time to time, one entry with the whole state, which would hold up the persistent processes for as long as the copy takes, `mem` cleans a little between each pair of checkpoints (#952; `Mem.Cleaning`):
+
+* When `log` commits an entry, it opens the next and then tells `mem`, with `Processes.Memory.Log_Committed`, which it sends without waiting.
+  `mem` may be busy and miss it, in which case it cleans after the next commit.
+* `mem` cleans only while the log is more than half full (`Rose.Limits.Clean_Start_Percent`).
+  It asks `log` where the first committed entry, the open entry and the end of the log are, with `Page_Log.Get_Space`.
+* It reads the oldest entries' header pages in order, from where it stopped, the way `restore` finds the parts of an entry (see <<What an Entry Holds>>): it skips the kernel's and the store's tables by their page counts, and reads the header pages of each batch and index section.
+  So the work grows with what is cleaned, not with all of persistent memory.
+* A process's page in a batch is live if the process's index still names that log page for it.
+  `mem` reads it back from the log and appends it to the open entry in a batch of its own, which updates the index as any batch does.
+* An index page is live if it is a process's committed directory, or the leaf that the directory names.
+  `mem` writes it again at the next checkpoint, with the leaves that it changes.
+* Each round reads at most 64 header pages and copies at most 128 pages (`Clean_Read_Limit`, `Clean_Copy_Limit`), and stops while `mem`'s table of changes is half full, so that cleaning never holds up the system for long.
+
+The kernel's, the store's and `mem`'s tables are complete in every entry, so only pages hold an entry back.
+A shared page that anything maps is in `mem`'s memory, and one that nothing maps was written back to its region (ADR 0025), so `mem` doesn't look for them in the log: before the checkpoint that frees an entry, it marks every saved shared page unsaved, so that the checkpoint writes them all again.
+
+Once `mem` has read the whole of an entry, it asks `log`, at its next checkpoint, to start the log at the entry after it (`Page_Log.Free_Before`).
+That checkpoint's commit moves the start in two writes:
+
+. the new entry's header, after its pages, which records the new start's sequence number;
+. the log's header, which moves its first entry, and so frees the space before it.
+
+Space is only written again once the log's header that frees it is on the medium.
+If the system stops before the first write, the log starts where it did, and nothing was freed.
+If it stops between the two, the last entry records a start after the log header's, and `log` finishes the move when it starts (#953).
+If the start didn't move, because the checkpoint failed, `mem` starts again from the first entry.
+
+An entry's index names only pages from the start that its header records, but an older entry's index can name pages in entries that were freed, and may have been written over since.
+So only the entries from the one that last moved the start can be restored, and `log` says which is the first of them with `Log_Reader.First_Checkpoint`.
+
+`scripts/test-log-clean` shrinks the log partition after an install, so that cleaning starts at once, and boots until the log has been cleaned and has wrapped around.
+`scripts/test-log-crash` makes copies of such a disk look as each of the three crashes would have left it, with `make-log-crash.py`, and restores each.
+
 == Restore
 
-At boot, `restore` looks for a checkpoint: the last complete entry in the checkpoint log.
+At boot, `restore` looks for a checkpoint: the last complete entry in the checkpoint log, from the log's `First_Checkpoint` on (see <<Cleaning and Wrap-Around>>).
 If it finds one, it brings back the persistent processes as they were at that checkpoint, in this order (`restore-checkpoints.adb`):
 
 . the storage server's regions and map, through `Storage_Checkpoint`;
@@ -219,12 +260,12 @@ A process's own pages aren't read by `restore` (ADR 0028, section 9).
 So a restore does about the same work however long the log is, and memory fills as the system runs.
 
 Shared pages have no index, so for them `restore` reads every entry from the first up to the checkpoint, and keeps the newest copy of each: a page that was saved in an older entry and not changed since is only there.
+It follows the entries from one to the next, since once the log has wrapped around, the checkpoint can be at a lower log page than the first entry.
 It can keep track of at most 4,096 different shared pages (`Max_Sources`); past that, the restore fails.
+Cleaning keeps this short: the checkpoint that frees entries saves every shared page again.
 
 A checkpoint written before the index (#949), whose memory tables don't have `Mem_Has_Index`, is restored by reading every entry for the processes' pages too, and giving each page's newest copy to `mem` with `Restore_Page`, at most 4,096 of them.
 Those pages are all dirty, so the next checkpoint saves them, with a complete index.
-
-The log is never consolidated yet, so it grows with every checkpoint until it is reset (see <<Future Work>>).
 
 When `init` has started the last boot modules and replied, `restore` resumes the processes (see <<restore-boot>>).
 A restored process continues from where it was.
@@ -306,10 +347,6 @@ If there is none, it says that there is no system on the disk, and the install m
 
 == Future Work
 
-* *Cleaning* (#356, #952).
-  The log wraps around into the space before the oldest entry that is still needed (#951).
-  But a page that never changes again keeps its entry needed, and with it every entry after it, so the log still fills.
-  Rolling cleaning will copy the live pages of the oldest entries forward into the open entry between checkpoints, so that those entries can be freed.
 * *Fixed tables in boot modules.*
   `mem`'s table of mapped pages (8,192, #998) and its table of changes (4,096) are sized when it is built, and taken from the memory that the kernel sets aside for boot modules, as are the store's tables.
   ADR 0039 (proposed) looks at moving such state out of the boot modules.

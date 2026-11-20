@@ -865,11 +865,16 @@ package body Restore.Checkpoints is
       --  so only the pages of shared segments are collected (ADR 0028,
       --  section 9).
 
+      --  The entries are followed from the first to the checkpoint, not
+      --  compared by location: once the log has wrapped around, the
+      --  checkpoint can be at a lower location than the first entry
+      --  (#953).
+
       declare
          Location : Rose.Words.Word_64 := First_Entry (Reader);
          Added    : Boolean;
       begin
-         while Location /= 0 and then Location <= Checkpoint loop
+         while Location /= 0 loop
             Add_Entry_Pages
               (Reader, Location, not Layout.Has_Index, Added);
             if not Added then
