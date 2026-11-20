@@ -3,6 +3,7 @@ with Rose.Kernel.Debug;
 with Rose.Kernel.Panic;
 
 with Rose.Kernel.Heap;
+with Rose.Kernel.Invocation;
 with Rose.Kernel.Processes.Debug;
 with Rose.Boot.Console;
 
@@ -233,6 +234,11 @@ package body Rose.Kernel.Processes.Queue is
 
          Process_Invocation_Record := Current_Process.Current_Params;
          Current_Process.Flags (Invoke_Reply) := False;
+
+         if Poison_Invocations then
+            Rose.Kernel.Invocation.Poison_Unsent
+              (Process_Invocation_Record);
+         end if;
       end if;
 
       if Current_Process.Flags (Interrupt_Resume) then

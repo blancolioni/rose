@@ -441,7 +441,7 @@ package body Rose.System_Calls is
       return Rose.Words.Word_32
    is
    begin
-      return Rose.Words.Word_32 (Params.Data (Index));
+      return Rose.Words.Word_32 (Rose.Invocation.Sent_Word (Params, Index));
    end Get_Word_32;
 
    -----------------
@@ -456,11 +456,13 @@ package body Rose.System_Calls is
       use Rose.Invocation;
       use Rose.Words;
    begin
+      --  A word that wasn't sent reads as 0 (#892).
+
       if Default_32_Bit then
-         return Word_64 (Params.Data (Index))
-           + 2 ** 32 * Word_64 (Params.Data (Index + 1));
+         return Word_64 (Sent_Word (Params, Index))
+           + 2 ** 32 * Word_64 (Sent_Word (Params, Index + 1));
       else
-         return Word_64 (Params.Data (Index));
+         return Word_64 (Sent_Word (Params, Index));
       end if;
    end Get_Word_64;
 

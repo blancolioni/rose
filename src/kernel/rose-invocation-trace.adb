@@ -13,7 +13,7 @@ package body Rose.Invocation.Trace is
    is
    begin
       Rose.Boot.Console.Put ("cap=");
-      Rose.Boot.Console.Put (Rose.Words.Word_8 (Invocation.Cap));
+      Rose.Boot.Console.Put (Rose.Words.Word_32 (Invocation.Cap));
       if Invocation.Control.Flags (Rose.Invocation.Send) then
          Rose.Boot.Console.Put (" S");
       end if;
@@ -103,7 +103,8 @@ package body Rose.Invocation.Trace is
                Rose.Boot.Console.Put ("cap ");
                Rose.Boot.Console.Put (Rose.Words.Word_8 (I));
                Rose.Boot.Console.Put (": ");
-               Rose.Boot.Console.Put (Rose.Words.Word_8 (Invocation.Caps (I)));
+               Rose.Boot.Console.Put
+                 (Rose.Words.Word_32 (Invocation.Caps (I)));
                Rose.Boot.Console.New_Line;
             end loop;
          end if;

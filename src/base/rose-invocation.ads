@@ -184,6 +184,35 @@ is
        else 0);
    --  The same for the capabilities, and Caps.
 
+   function Sent_Buffer_Length
+     (Params : Invocation_Record)
+      return System.Storage_Elements.Storage_Count
+   is (if Params.Control.Flags (Send_Buffer)
+       then Params.Buffer_Length
+       else 0);
+   --  The length of the buffer that has been sent, or 0 if none was:
+   --  Buffer_Address and Buffer_Length are not meaningful until
+   --  Send_Buffer is set (#892). A writable buffer sets Send_Buffer too.
+
+   function Sent_Word
+     (Params : Invocation_Record;
+      Index  : Parameter_Word_Index)
+      return Rose.Words.Word
+   is (if Natural (Index) < Sent_Word_Count (Params)
+       then Params.Data (Index)
+       else 0);
+   --  Data (Index) if it was sent, and 0 if not: a word that wasn't sent
+   --  holds whatever was there before (#892).
+
+   function Sent_Cap
+     (Params : Invocation_Record;
+      Index  : Capability_Index)
+      return Rose.Capabilities.Capability
+   is (if Natural (Index) < Sent_Cap_Count (Params)
+       then Params.Caps (Index)
+       else Rose.Capabilities.Null_Capability);
+   --  The same for Caps (Index), and the null cap if it wasn't sent.
+
    function Object_Id_Words return Positive
    is (if Object_Fits_In_Word then 1 else 2);
    --  How many words Send_Object_Id sends.

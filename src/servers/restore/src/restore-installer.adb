@@ -580,34 +580,40 @@ package body Restore.Installer is
                begin
                   case Action is
                      when Launch =>
+                        --  Launch takes the bank to launch against; a
+                        --  null bank is exec's own. It used to send the
+                        --  name instead, and no bank, which exec read as
+                        --  null only because the slot held 0 (#892).
+
                         Rose.System_Calls.Initialize_Send
                           (Reply, Params.Caps (0));
+                        Rose.System_Calls.Send_Cap
+                          (Reply, Rose.Capabilities.Null_Capability);
                         Rose.System_Calls.Receive_Caps (Reply, 1);
-                        Rose.System_Calls.Send_Text (Reply, Name);
                         Rose.System_Calls.Invoke_Capability (Reply);
 
                         if Flags (Provides_Keyboard_Interface) then
                            Keyboard_Interface_Cap :=
                              Get_Public_Interface_From_Process
-                               (Reply.Caps (0));
+                               (Rose.Invocation.Sent_Cap (Reply, 0));
                         end if;
 
                         if Flags (Provides_Clock) then
                            Send_Clock
                              (Get_Public_Interface_From_Process
-                                (Reply.Caps (0)));
+                                (Rose.Invocation.Sent_Cap (Reply, 0)));
                         end if;
 
                         if Flags (Provides_Cap_Sets) then
                            Send_Cap_Sets
                              (Get_Public_Interface_From_Process
-                                (Reply.Caps (0)));
+                                (Rose.Invocation.Sent_Cap (Reply, 0)));
                         end if;
 
                         if Flags (Provides_Screen) then
                            Screen_Surface_Cap :=
                              Get_Public_Interface_From_Process
-                               (Reply.Caps (0));
+                               (Rose.Invocation.Sent_Cap (Reply, 0));
                            Send_Screen (Screen_Surface_Cap);
                         end if;
 
@@ -620,7 +626,7 @@ package body Restore.Installer is
 
                            Terminal_Cap :=
                              Get_Public_Interface_From_Process
-                               (Reply.Caps (0));
+                               (Rose.Invocation.Sent_Cap (Reply, 0));
                            Console_Writer_Cap :=
                              Get_Ancestor_Interface
                                (Terminal_Cap, Writer_Ancestor);
@@ -634,7 +640,7 @@ package body Restore.Installer is
                         elsif Flags (Provides_Input_Stream) then
                            Input_Stream_Cap :=
                              Get_Public_Interface_From_Process
-                               (Reply.Caps (0));
+                               (Rose.Invocation.Sent_Cap (Reply, 0));
                         end if;
 
                      when Save =>
