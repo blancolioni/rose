@@ -12,6 +12,7 @@ Each layout defines the capability type, and the object to which it applies.
 A process can have up to 4095 capabilities, numbered from 1.
 Layouts are 16 bytes, and are stored in pages of the kernel's heap that the kernel takes as the process needs them: 256 to a page, and at most 16 pages (ADR 0023).
 A new capability has the lowest number that is free, and deleting a capability frees its number.
+Any process can delete a capability that it holds, of any kind and valid or not, by invoking it with the `Delete` flag (<<invocation-flags>>), and it needs no other capability to do it (#1022).
 
 Capabilities are copied when they are sent, as <<operations>> describes, and the copy is a layout in the receiver's table, with a number of the receiver's own.
 A process cannot make a capability from nothing: it has those that the kernel gave it, those it was sent, and those that the kernel's operations return to it.
@@ -164,7 +165,7 @@ Its endpoints are:
 | Receive On Any Cap | 17 | Receives on any of the process's endpoints
 | Enable Kernel Debug | 28 | Turns the kernel's logging of calls on or off
 | Rescind Cap | 29 | Rescinds the capabilities in the invocation
-| Delete Cap | 30 | Deletes the capabilities in the invocation
+| Delete Cap | 30 | Deletes the capabilities in the invocation; retired, since the `Delete` flag does this for any process (#1022)
 | Exit Process | 31 | Ends the process
 |===
 
@@ -409,6 +410,7 @@ A boot test with it shows any reader that goes past what was sent.
 | 11 | Send_Caps | `SC` is the index of the last sent capability
 | 12 | Recv_Caps | `RC` is the index of the last capability that the sender will receive
 | 13 | Continued | The first part of a longer call, which only carries capabilities; the kernel does not look at it (see <<continued-calls>>)
+| 14 | Delete | Delete the invoked capability from the caller's table instead of invoking it, and reply; the rest of the record is ignored (#1022)
 |===
 
 An invocation fails with an `Invocation_Error`, in `Error`: `Invalid_Capability` (the capability is null, has no handler, or is not valid), `Out_Of_Capabilities`, `Out_Of_Endpoints`, `Unknown_Request`, `Request_Error`, `No_Access`, `Request_Would_Block`, `Closed`, `Invalid_Endpoint`, `Invalid_Operation`, `Invalid_Object`, `Operation_Not_Implemented`, `Missing_Data`, `Unknown_Error` and `Undefined_Error`.

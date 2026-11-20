@@ -171,6 +171,12 @@ package body Init.Self_Tests is
       procedure Delete_Chain (Chain : Chain_Array; Length : Natural);
       --  Delete what Derive_Chain made.
 
+      function Deleted (Cap : Rose.Capabilities.Capability) return Boolean;
+      --  Invoke Cap with the Delete flag (#1022), which needs no cap to
+      --  delete with. True if the kernel deleted it; False if it failed,
+      --  as it does with Invalid_Capability, and a "bad cap" line on the
+      --  kernel's console, when the number is not in use.
+
       -----------
       -- Check --
       -----------
@@ -194,6 +200,20 @@ package body Init.Self_Tests is
             Call_On (Delete_Cap, Chain (I));
          end loop;
       end Delete_Chain;
+
+      -------------
+      -- Deleted --
+      -------------
+
+      function Deleted (Cap : Rose.Capabilities.Capability) return Boolean
+      is
+         Params : aliased Rose.Invocation.Invocation_Record;
+      begin
+         Rose.System_Calls.Initialize_Send (Params, Cap);
+         Params.Control.Flags (Rose.Invocation.Delete) := True;
+         Rose.System_Calls.Invoke_Capability (Params);
+         return not Params.Control.Flags (Rose.Invocation.Error);
+      end Deleted;
 
       ------------------
       -- Derive_Chain --
@@ -237,8 +257,16 @@ package body Init.Self_Tests is
              Works (Sibling) and then Works (Find_Cap));
 
       Call_On (Delete_Cap, First);
-      Call_On (Delete_Cap, Child);
-      Call_On (Delete_Cap, Sibling);
+
+      --  Any process can give up a cap with the Delete flag, valid or not
+      --  (#1022): Child is revoked, and Sibling isn't. Deleting each again
+      --  fails, since the number is no longer in use.
+
+      Check ("a revoked capability is deleted with the Delete flag",
+             Deleted (Child));
+      Check ("so is a valid one", Deleted (Sibling));
+      Check ("and their numbers are free",
+             not Deleted (Child) and then not Deleted (Sibling));
 
       --  The records that those used are free again, so there is room to
       --  derive to the depth that is allowed, twice, and not further.

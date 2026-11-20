@@ -147,12 +147,12 @@ diagrams:
         "1110": Rose.Capabilities.Layout.Arch_Cap
 
   # Flags is a packed array indexed by Rose.Invocation.Invocation_Flag,
-  # so flag N is bit N, from Writable_Buffer (0) to Continued (13).
+  # so flag N is bit N, from Writable_Buffer (0) to Delete (14).
   invocation-record:
     title: Invocation record
     rows:
-      - - [14, Flags]
-        - [3, rsvd]
+      - - [15, Flags]
+        - [2, rsvd]
         - [3, SW]
         - [3, RW]
         - [2, SC]
