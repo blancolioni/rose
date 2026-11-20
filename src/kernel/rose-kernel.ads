@@ -71,6 +71,12 @@ private
    --  the same address with no page table changed since, and panic if
    --  they no longer pass (#717). Set by check-record-cache on the
    --  command line.
+   Poison_Invocations       : Boolean := False;
+   --  Fill each data word, cap and buffer field of an invocation record
+   --  that its flags and counts say wasn't sent, when the record comes
+   --  into the kernel and when it goes out to a process, so that a
+   --  reader that goes past what was sent gets garbage instead of an
+   --  old value (#892). Set by poison-invocations on the command line.
 
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 

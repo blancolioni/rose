@@ -108,6 +108,9 @@ package body Rose.Kernel.Init is
       Check_Record_Cache :=
         Rose.Kernel.Command_Line.Have_Argument ("check-record-cache");
 
+      Poison_Invocations :=
+        Rose.Kernel.Command_Line.Have_Argument ("poison-invocations");
+
       if Rose.Kernel.Command_Line.Have_Argument ("trace-object-id") then
          Trace_Object_Id := Rose.Objects.Object_Id
            (Rose.Kernel.Command_Line.Integer_Argument

@@ -31,4 +31,12 @@ package Rose.Kernel.Invocation is
 
    pragma Export (C, Fault_Invocation_Record, "fault_invocation_record");
 
+   procedure Poison_Unsent
+     (Params : in out Rose.Invocation.Invocation_Record);
+   --  Fill each data word, cap and buffer field of Params that its flags
+   --  and counts say wasn't sent: data word N with BAD0_000N, cap N with
+   --  BAD0_0C0N, which is never a valid cap, and the buffer with an
+   --  address in the kernel and a length that no buffer has. Used when
+   --  Poison_Invocations is set (#892).
+
 end Rose.Kernel.Invocation;

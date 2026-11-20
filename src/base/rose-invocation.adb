@@ -112,10 +112,10 @@ is
       Params.Control.Flags :=
         (Rose.Invocation.Error => True, Send_Words => True, others => False);
       Params.Control.Error := Error;
-      Params.Data (1) := Invocation_Error'Pos (Error);
-      Params.Data (2) := X;
-      Params.Data (3) := Y;
-      Params.Data (4) := Z;
+      Params.Data (0) := Invocation_Error'Pos (Error);
+      Params.Data (1) := X;
+      Params.Data (2) := Y;
+      Params.Data (3) := Z;
       Params.Control.Last_Sent_Word := 3;
    end Set_Error;
 

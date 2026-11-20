@@ -1,3 +1,5 @@
+with System.Storage_Elements;
+
 with Rose.Addresses;
 with Rose.Words;
 with Rose.Boot.Console;
@@ -116,6 +118,10 @@ package body Rose.Kernel.Invocation is
       Cap         : Rose.Capabilities.Layout.Capability_Layout;
    begin
 
+      if Poison_Invocations then
+         Poison_Unsent (Params.all);
+      end if;
+
       --  The buffer is checked before anything else, so that a call
       --  that faults on it has done nothing when it is made again.
 
@@ -139,12 +145,20 @@ package body Rose.Kernel.Invocation is
       --  an index in the caller's table that meant nothing to the
       --  receiver, which took it for a reply cap.
 
+      --  Endpoint and Identifier aren't read either: a delivery writes
+      --  them. A call that the kernel answers gets its own record back,
+      --  so they are written here, so that the reply doesn't depend on
+      --  what the caller left in them, or, once the kernel copies in only
+      --  the words in use, on what its copy last held (#892).
+
       Params.Reply_Cap := Rose.Capabilities.Null_Capability;
+      Params.Endpoint := 0;
+      Params.Identifier := 0;
 
       if not Has_Cap (Pid, Params.Cap) then
          Rose.Kernel.Processes.Debug.Put (Pid);
          Rose.Boot.Console.Put (": invoke: bad cap ");
-         Rose.Boot.Console.Put (Rose.Words.Word_8 (Params.Cap));
+         Rose.Boot.Console.Put (Rose.Words.Word_32 (Params.Cap));
          Rose.Boot.Console.New_Line;
          Rose.Invocation.Trace.Put (Params.all, True);
          Rose.Kernel.Processes.Return_Error
@@ -239,5 +253,38 @@ package body Rose.Kernel.Invocation is
       Set_Checked_Record (Pid, Address);
       return 1;
    end Is_Valid_Invocation_Record;
+
+   -------------------
+   -- Poison_Unsent --
+   -------------------
+
+   procedure Poison_Unsent
+     (Params : in out Rose.Invocation.Invocation_Record)
+   is
+      use Rose.Invocation;
+      use type Rose.Capabilities.Capability;
+      use type Rose.Words.Word;
+   begin
+      for I in Params.Data'Range loop
+         if Natural (I) >= Sent_Word_Count (Params) then
+            Params.Data (I) := 16#BAD0_0000# + Rose.Words.Word (I);
+         end if;
+      end loop;
+
+      for I in Params.Caps'Range loop
+         if Natural (I) >= Sent_Cap_Count (Params) then
+            Params.Caps (I) :=
+              16#BAD0_0C00# + Rose.Capabilities.Capability (I);
+         end if;
+      end loop;
+
+      if not Params.Control.Flags (Send_Buffer)
+        and then not Params.Control.Flags (Writable_Buffer)
+      then
+         Params.Buffer_Address :=
+           System.Storage_Elements.To_Address (16#BAD0_0B00#);
+         Params.Buffer_Length := 16#0BAD_0B00#;
+      end if;
+   end Poison_Unsent;
 
 end Rose.Kernel.Invocation;
