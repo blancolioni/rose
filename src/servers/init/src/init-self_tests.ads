@@ -6,6 +6,7 @@ package Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
@@ -17,6 +18,7 @@ package Init.Self_Tests is
    --  registry's Find_Cap, and wait for it to finish (#460). It is called
    --  with the caps of its roles (src/utilities/run_self_tests/
    --  rose-core-run_self_tests.idl): Standard_Output, Create_Endpoint,
+   --  Delete_Cap, without which the tests' deletes do nothing (#895),
    --  Commands, the registry's Commands interface, Clock, the clock's
    --  Clock interface, a sub-bank of the system bank (Init.Grants), for
    --  its Storage_Service role,

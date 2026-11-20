@@ -829,6 +829,7 @@ package body Init.Run is
         (Find_Cap        => Find_Cap,
          Standard_Output => Console_Stream_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Cap,
          Commands        => Commands_Cap,
          Clock           => Clock_Cap,
          Screen          => Screen_Cap,

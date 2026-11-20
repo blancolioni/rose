@@ -560,7 +560,10 @@ package body Restore.Installer is
             Rose.System_Calls.Send_Cap (Params, Console_Writer_Cap);
          end if;
 
-         Rose.System_Calls.Receive_Caps (Params, 1);
+         --  Init replies with the Launch cap for a launch, and with the
+         --  command map's Add cap and the Launch cap for a save (#895).
+
+         Rose.System_Calls.Receive_Caps (Params, 2);
          Rose.System_Calls.Invoke_Capability (Params);
          if Params.Control.Flags (Rose.Invocation.Error) then
             Rose.Console_IO.Put_Line ("FAIL");
