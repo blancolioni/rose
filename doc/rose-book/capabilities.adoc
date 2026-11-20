@@ -420,5 +420,8 @@ A reply brings the caller at most the capabilities it asked for: those up to `RC
 The kernel lowers `SC` in the record the caller gets, or clears `Send_Caps`, to match, and the server keeps the capabilities that were not delivered.
 A single-use capability in the reply leaves the server whether or not it is delivered.
 A send to a receiving server is not limited in this way, since a receive does not say how many capabilities it takes: the receiver gets every capability that was sent, and `SC` says how many.
+The capabilities are then the receiver's, to keep, invoke, pass on or delete, and the kernel does not check them against the operation (#1018).
+A server that does not want to run out of capability slots deletes those it does not need, and the servers that idle generates are to delete any that an operation does not take (idle#125).
+A client that does not want to give its capabilities away sends only those that the interface takes, as a generated client does.
 
 The library reports `No_Invoke_Buffer` and `Buffer_Too_Small`, `Too_Many_Capabilities` when `Send_Cap` has no room for another capability, and `Too_Many_Words` when `Send_Word` has no room for another word; a generated server reports `Exception_Raised` when the handler of an operation raises an exception.
