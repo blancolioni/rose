@@ -37,6 +37,38 @@ package body Mem.Page_Log is
       return Rose.Words.Word_32 (Params.Data (0));
    end Append;
 
+   ------------------
+   -- Append_Batch --
+   ------------------
+
+   procedure Append_Batch
+     (Pages : System.Address;
+      Count : Positive;
+      First : out Rose.Words.Word_32;
+      Wrap  : out Rose.Words.Word_32)
+   is
+      use System.Storage_Elements;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send
+        (Params,
+         Rose.Interfaces.Checkpoints.Page_Log.Client.Get_Append_Batch_Cap
+           (Client));
+      Rose.System_Calls.Send_Buffer
+        (Params, Storage_Count (Count) * Rose.Limits.Page_Size,
+         Pages, False);
+      Rose.System_Calls.Receive_Words (Params, 2);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         First := 0;
+         Wrap := 0;
+      else
+         First := Rose.Words.Word_32 (Params.Data (0));
+         Wrap := Rose.Words.Word_32 (Params.Data (1));
+      end if;
+   end Append_Batch;
+
    -------------------
    -- Discard_Pages --
    -------------------

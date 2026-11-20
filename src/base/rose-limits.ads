@@ -25,6 +25,20 @@ package Rose.Limits is
    --  cached pages that nothing maps and then clean pages of processes,
    --  until Reserve_High_Pages are free (ADR 0028, section 5; #973).
 
+   Change_Table_Entries : constant := 4096;
+   Change_Table_Bytes   : constant := Change_Table_Entries * 12;
+   --  The memory server's table of changes: for each page it has paged
+   --  out since the last checkpoint, the process, the page and the log
+   --  page it went to (ADR 0028, sections 3 and 6; #974). Part of its
+   --  writable data, like Mapped_Page_Table_Bytes.
+
+   Page_Out_Batch_Pages : constant := 7;
+   --  The changed pages that the memory server pages out in one batch,
+   --  after a header page. It maps them next to each other to append
+   --  them in one call, in a window of its writable data (#974). The
+   --  header and the pages are lent to the log, and the kernel shares at
+   --  most 8 pages with a process at once (Max_Shared_Pages).
+
    Page_Size : constant := 2 ** 12;
 
 end Rose.Limits;

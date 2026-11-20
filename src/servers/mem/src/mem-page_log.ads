@@ -21,6 +21,17 @@ package Mem.Page_Log is
    --  sent from where it is, rather than copied into an invocation
    --  buffer.
 
+   procedure Append_Batch
+     (Pages : System.Address;
+      Count : Positive;
+      First : out Rose.Words.Word_32;
+      Wrap  : out Rose.Words.Word_32);
+   --  Append the Count pages at Pages, next to each other and page
+   --  aligned, to the open entry in one call (Page_Log.Append_Batch,
+   --  #974). They are sent from where they are. First is the log page
+   --  of the first, or 0 if the batch wasn't appended, and Wrap is how
+   --  many went before the log wrapped round to log page 1, or 0.
+
    procedure Read
      (Log_Page : Rose.Words.Word_32;
       Page     : System.Address);

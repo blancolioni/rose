@@ -166,6 +166,13 @@ package body Log.Server is
       return Rose.Words.Word;
    --  Page_Log.Append_Page.
 
+   procedure Append_Batch
+     (Id    : Rose.Objects.Capability_Identifier;
+      Pages : System.Storage_Elements.Storage_Array;
+      First : out Rose.Words.Word;
+      Wrap  : out Rose.Words.Word);
+   --  Page_Log.Append_Batch.
+
    procedure Read_Log_Page
      (Id       : Rose.Objects.Capability_Identifier;
       Log_Page : Rose.Words.Word;
@@ -508,6 +515,73 @@ package body Log.Server is
       end if;
    end Append;
 
+   ------------------
+   -- Append_Batch --
+   ------------------
+
+   procedure Append_Batch
+     (Id    : Rose.Objects.Capability_Identifier;
+      Pages : System.Storage_Elements.Storage_Array;
+      First : out Rose.Words.Word;
+      Wrap  : out Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+      use System.Storage_Elements;
+      use type Rose.Words.Word;
+      Count : constant Storage_Count := Pages'Length / Log_Page_Size;
+      Start : constant Log_Location_Id := Current_Log_Header.Log_Last;
+      --  Where the batch is dropped back to if an append fails.
+      Location : Log_Location_Id;
+   begin
+      First := 0;
+      Wrap := 0;
+
+      --  A checkpoint being written owns the end of the entry, and the
+      --  memory server's batch waits for the next one. That is not a
+      --  problem to report.
+
+      if not Writing or else Checkpoint_Mark /= 0 then
+         return;
+      end if;
+
+      if Count = 0 or else Pages'Length mod Log_Page_Size /= 0 then
+         Note_Problem (Bad_Page_Size);
+         return;
+      end if;
+
+      for Index in 0 .. Count - 1 loop
+         Location :=
+           Append_Data
+             (Pages (Pages'First + Index * Log_Page_Size
+                     .. Pages'First + (Index + 1) * Log_Page_Size - 1));
+
+         if Location = 0 then
+
+            --  As Discard_Pages does: the batch is dropped, and its
+            --  failure fails nothing else, unless a write to the disk
+            --  failed, which fails the entry.
+
+            if Writing then
+               Discard_After (Start);
+            end if;
+            if Append_Failed and then not Entry_Failed then
+               Note_Problem (Failure);
+               Failure := No_Problem;
+               Append_Failed := False;
+            end if;
+            First := 0;
+            Wrap := 0;
+            return;
+         end if;
+
+         if Index = 0 then
+            First := Rose.Words.Word (Location);
+         elsif Location = 1 and then Wrap = 0 then
+            Wrap := Rose.Words.Word (Index);
+         end if;
+      end loop;
+   end Append_Batch;
+
    -----------------
    -- Append_Data --
    -----------------
@@ -723,9 +797,10 @@ package body Log.Server is
       end if;
 
       --  If the checkpoint fails, Commit rolls the entry back to here.
-      --  The memory server drops a batch that failed before anything
-      --  else can start a checkpoint, so a failed append here is one
-      --  that it never discarded, and this checkpoint fails too.
+      --  A batch from the memory server is appended in one call, and
+      --  dropped if it fails (Append_Batch, #974), so a failed append
+      --  here is one that it never discarded, and this checkpoint fails
+      --  too.
 
       Checkpoint_Mark := Current_Log_Header.Log_Last;
 
@@ -790,6 +865,7 @@ package body Log.Server is
       Rose.Interfaces.Checkpoints.Page_Log.Server.Attach_Interface
         (Server_Context => Log_Server,
          Append_Page    => Append_Page'Access,
+         Append_Batch   => Append_Batch'Access,
          Read_Page      => Read_Log_Page'Access,
          Fail_Checkpoint => Fail_Checkpoint'Access,
          Discard_Pages  => Discard_Pages'Access,

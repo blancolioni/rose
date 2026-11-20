@@ -567,6 +567,8 @@ def check_entry(log, first, last, verbose, info):
     info["batches"] = [(start, headers)
                        for kind, start, headers, listed in sections
                        if kind == "batch"]
+    info["leading_batches"] = sum(1 for kind, start, headers, listed
+                                  in leading if kind == "batch")
     if not ok:
         return False, kernel + "; " + tables
     missing = oids - set(processes.values())
@@ -822,25 +824,45 @@ def check_index_contents(log, info, previous):
     slot starts with nothing.  Each process's index is read into info's
     "indexes", for the next entry.
 
+    A slot can have a new process between a batch paged out before the
+    checkpoint and the checkpoint itself, and the memory server forgets
+    the old process's pages then (#974).  So, for a process that is new
+    to its slot, a page of a batch before the checkpoint that its index
+    doesn't name is taken to be an earlier process's, and is counted in
+    info's "earlier_pages".
+
     Returns a description of what is wrong, or None."""
     info["indexes"] = {}
     carried = previous is not None and previous.get("has_index")
     old_oids = set(previous["processes"].values()) if carried else set()
     expected = {}
+    new_to_slot = set()
     for pid, oid in info["processes"].items():
         if carried and pid in previous["processes"] and oid in old_oids:
             expected[pid] = dict(previous["indexes"].get(pid, {}))
         else:
             expected[pid] = {}
-    for first, headers in info["batches"]:
+            new_to_slot.add(pid)
+    maybe_earlier = {pid: set() for pid in expected}
+    leading = info.get("leading_batches", 0)
+    for number, (first, headers) in enumerate(info["batches"]):
         for pid, virtual, location in batch_pages(log, first, headers):
             if pid in expected:
                 expected[pid][virtual] = location
+                if number < leading and pid in new_to_slot:
+                    maybe_earlier[pid].add(virtual)
+                else:
+                    maybe_earlier[pid].discard(virtual)
 
     problems = []
+    info["earlier_pages"] = 0
     for pid in sorted(info["processes"]):
         actual = read_index(log, info["directories"].get(pid, 0))
         info["indexes"][pid] = actual
+        for virtual in maybe_earlier[pid]:
+            if virtual not in actual:
+                del expected[pid][virtual]
+                info["earlier_pages"] += 1
         if actual == expected[pid]:
             continue
         wrong = sorted(set(actual) | set(expected[pid]),
@@ -989,6 +1011,12 @@ def main():
                     ok, description = False, description + "; " + problem
                 else:
                     indexed += 1
+                if info.get("earlier_pages"):
+                    description += ("; %d page%s of earlier processes in "
+                                    "reused slots"
+                                    % (info["earlier_pages"],
+                                       "" if info["earlier_pages"] == 1
+                                       else "s"))
             print("entry %d at %d: version %d, %spages %d..%d: %s%s"
                   % (entries, location, version,
                      "" if entry_sequence is None

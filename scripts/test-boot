@@ -139,8 +139,18 @@ sleep 45
 stop_qemu
 
 echo "Checking the log"
-python3 "$HERE/check-log.py" "$DISK" || {
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.out" || {
+    cat "$WORK/check-log.out"
     echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+cat "$WORK/check-log.out"
+
+# Init's page test fills memory with no checkpoints, so mem pages changed
+# pages out to the log between them (#974).
+grep -q "paged out before the checkpoint" "$WORK/check-log.out" || {
+    echo "FAIL: no entry has pages paged out between checkpoints;" \
+         "the disk image is in $WORK"
     exit 1
 }
 
