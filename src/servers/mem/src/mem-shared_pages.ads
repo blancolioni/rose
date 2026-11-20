@@ -73,4 +73,9 @@ package Mem.Shared_Pages is
    procedure Clear_Checkpoint_Pages;
    --  The checkpoint has saved the pages and listed the released ones.
 
+   procedure Unsave_Modified;
+   --  Every page that has been written since it was read from its
+   --  region is saved again by the next checkpoint, which frees the
+   --  log entries that hold its earlier copies (#952).
+
 end Mem.Shared_Pages;

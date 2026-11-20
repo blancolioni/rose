@@ -41,6 +41,26 @@ package Mem.Log_Index is
    --  checkpoint being written: the one that Write_Index wrote for it,
    --  or else the last one committed. 0 if the log has none of its pages.
 
+   function Is_Live_Index_Page
+     (Process  : Process_Id;
+      Slot     : Rose.Words.Word_16;
+      Log_Page : Rose.Words.Word_32)
+      return Boolean;
+   --  True if the committed index of Process still names the index page
+   --  at Log_Page: as its directory, if Slot is
+   --  Rose.Checkpoints.Directory_Slot, or else as the leaf in Slot of
+   --  its directory (#952).
+
+   procedure Rewrite
+     (Process : Process_Id;
+      Slot    : Rose.Words.Word_16;
+      Success : out Boolean);
+   --  Write the leaf in Slot of Process's directory again at the next
+   --  checkpoint, or its directory if Slot is Directory_Slot, though
+   --  none of their pages changed, so that the copy in an old entry is
+   --  no longer needed (#952). Success is False if too many are
+   --  waiting already.
+
    procedure Write_Index
      (Batch_First : Rose.Words.Word_32;
       Batch_Wrap  : Rose.Words.Word_32;

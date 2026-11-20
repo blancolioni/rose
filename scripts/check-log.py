@@ -23,6 +23,21 @@ After walking the entries it also looks at the location after the last
 one, and reports anything there that looks like an entry header, such
 as an entry left over from before a reset.
 
+The memory server cleans the log (#952): it copies the pages that are
+still in use out of the oldest entries, then frees them, and new
+entries can then overwrite them.  So in a cleaned log the first entries'
+indexes can't be checked against earlier ones:
+
+  - an entry whose index's own pages (directory and leaves) are not all
+    in the log, from its start to the entry's end, can't be read at
+    all, and is left unchecked;
+  - the first entry whose index can be read is taken as it is, for the
+    pages that its own batches don't hold;
+  - each entry after that is checked as usual.
+
+The last entry's index, which is the one a restore reads, has to be
+readable, and has to name only pages that are in the log.
+
 The layouts are those of src/servers/log/src/log-header.ads,
 src/base/rose-checkpoints.ads and
 src/library/kernelapi/devices/rose-devices-gpt.adb.
@@ -813,6 +828,16 @@ def read_index(log, directory):
     return pages
 
 
+def index_pages(log, directory):
+    """The log pages of the index whose directory is at log page
+    directory: the directory and its leaves."""
+    if not directory:
+        return []
+    leaves = struct.unpack_from("<%dI" % INDEX_ENTRIES_PER_PAGE,
+                                log.page(directory))
+    return [directory] + [leaf for leaf in leaves if leaf]
+
+
 def batch_pages(log, first, headers):
     """Yield (mem process id, virtual page, log page) for each page of the
     batch whose header pages start at page first."""
@@ -829,7 +854,7 @@ def batch_pages(log, first, headers):
             location += 1
 
 
-def check_index_contents(log, info, previous):
+def check_index_contents(log, info, previous, baseline=False):
     """Check that the index of each process in the entry that info
     describes names the latest copy of each of its pages: the copies its
     index in the previous entry named, updated by the batches of this
@@ -841,6 +866,12 @@ def check_index_contents(log, info, previous):
     0032) keeps its slot and its pages.  A process that is new to its
     slot starts with nothing.  Each process's index is read into info's
     "indexes", for the next entry.
+
+    baseline is True for the first readable index of a cleaned log
+    (#952): the entries before it were freed, or their indexes can't be
+    read, so each process starts with the pages of its index that its
+    batches don't hold, which can't be checked.  They are counted in
+    info's "baseline_pages".
 
     A slot can have a new process between a batch paged out before the
     checkpoint and the checkpoint itself, and the memory server forgets
@@ -874,9 +905,15 @@ def check_index_contents(log, info, previous):
 
     problems = []
     info["earlier_pages"] = 0
+    info["baseline_pages"] = 0
     for pid in sorted(info["processes"]):
         actual = read_index(log, info["directories"].get(pid, 0))
         info["indexes"][pid] = actual
+        if baseline:
+            for virtual, location in actual.items():
+                if virtual not in expected[pid]:
+                    expected[pid][virtual] = location
+                    info["baseline_pages"] += 1
         for virtual in maybe_earlier[pid]:
             if virtual not in actual:
                 del expected[pid][virtual]
@@ -990,6 +1027,12 @@ def main():
         wrapped = False
         location = start
         previous = None
+        last_info = None
+        # A log whose first entry is not the first one written has been
+        # cleaned (#952); until an entry's index can be read, there is
+        # nothing to check the indexes against.
+        cleaned = sequence > 1
+        baseline = cleaned
         while True:
             fields = entry_fields(log.page(location))
             if fields is None:
@@ -1020,15 +1063,35 @@ def main():
             info = {}
             ok, description = check_entry(log, location + 1, end,
                                           args.verbose, info)
-            if ok and info["has_index"]:
+            unread = 0
+            if ok and info["has_index"] and baseline:
+                # The pages of the log up to this entry's end are the
+                # ones its index can be in; the rest were freed, and
+                # may have been written over.
+                unread = sum(
+                    1 for directory in info["directories"].values()
+                    for at in index_pages(log, directory)
+                    if not 1 <= at < log.page_count
+                    or log.distance(start, at) > log.distance(start, last))
+            if unread:
+                description += ("; index not checked: %d of its pages "
+                                "are in freed entries" % unread)
+            elif ok and info["has_index"]:
                 # An entry's index has to agree with the log's pages
                 # (ADR 0028): a restore that reads only the last entry
                 # gets what one that reads every entry would.
-                problem = check_index_contents(log, info, previous)
+                problem = check_index_contents(log, info, previous,
+                                               baseline=baseline)
+                baseline = False
                 if problem:
                     ok, description = False, description + "; " + problem
                 else:
                     indexed += 1
+                if info.get("baseline_pages"):
+                    description += ("; %d page%s of its index taken as "
+                                    "they are" % (info["baseline_pages"],
+                                                  "" if info["baseline_pages"]
+                                                  == 1 else "s"))
                 if info.get("earlier_pages"):
                     description += ("; %d page%s of earlier processes in "
                                     "reused slots"
@@ -1043,6 +1106,7 @@ def main():
             if not ok:
                 failures += 1
             previous = info if "indexes" in info else None
+            last_info = info if ok else None
             location = log.next(last)
             if sequence:
                 sequence += 1
@@ -1055,6 +1119,27 @@ def main():
               % (entries, "y" if entries == 1 else "ies", indexed,
                  location, "; the log has wrapped around" if wrapped
                  else ""))
+
+        # The last entry's index is what a restore reads: every page it
+        # names has to be in the log, not in an entry that was freed.
+        if cleaned and last_info is not None and last_info.get("has_index") \
+           and "indexes" not in last_info:
+            print("the last entry's index is in freed entries")
+            failures += 1
+        elif cleaned and last_info is not None and "indexes" in last_info:
+            used = log.distance(start, location) if location != start \
+                else log.page_count - 1
+            outside = [(pid, virtual, at)
+                       for pid, index in sorted(last_info["indexes"].items())
+                       for virtual, at in sorted(index.items())
+                       if at == 0 or log.distance(start, at) >= used]
+            if outside:
+                pid, virtual, at = outside[0]
+                print("the last entry's index names %d page%s outside the "
+                      "log, such as memory process %d page %05x at %d"
+                      % (len(outside), "" if len(outside) == 1 else "s",
+                         pid, virtual, at))
+                failures += 1
 
         fields = entry_fields(log.page(location))
         if fields is not None and location != start:

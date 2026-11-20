@@ -29,6 +29,7 @@ with Rose.System_Calls.Server;
 with Mem.Calls;
 with Mem.Change_Table;
 with Mem.Checkpoints;
+with Mem.Cleaning;
 with Mem.Page_Cache;
 with Mem.Page_Log;
 with Mem.Page_Table;
@@ -178,6 +179,8 @@ package body Mem.Server is
       Log : Rose.Capabilities.Capability);
 
    procedure Processes_Ended (Id : Rose.Objects.Capability_Identifier);
+
+   procedure Log_Committed (Id : Rose.Objects.Capability_Identifier);
 
    function Process_Bank
      (Id : Rose.Objects.Capability_Identifier)
@@ -504,6 +507,7 @@ package body Mem.Server is
          Request_Checkpoint_Cap := Request_Checkpoint;
       end if;
 
+      Mem.Cleaning.Prepare_Checkpoint;
       Mem.Checkpoints.Checkpoint;
 
       --  Whether it asked for this one or not, mem can page out again,
@@ -644,7 +648,8 @@ package body Mem.Server is
          Checkpoint => Checkpoint'Access,
          Set_Process_Banks => Set_Process_Banks'Access,
          Processes_Ended => Processes_Ended'Access,
-         Set_Page_Log => Set_Page_Log'Access);
+         Set_Page_Log => Set_Page_Log'Access,
+         Log_Committed => Log_Committed'Access);
 
       Rose.Interfaces.Processes.Process.Server.Attach_Interface
         (Server_Context => Server,
@@ -1143,6 +1148,21 @@ package body Mem.Server is
       Rose.System_Calls.Invoke_Capability (Params);
       return not Params.Control.Flags (Rose.Invocation.Error);
    end Kernel_Handover;
+
+   -------------------
+   -- Log_Committed --
+   -------------------
+
+   procedure Log_Committed (Id : Rose.Objects.Capability_Identifier) is
+      pragma Unreferenced (Id);
+   begin
+      --  The log takes batches again, even if it refused one between
+      --  mem's part of the checkpoint and the commit.
+
+      Mem.Virtual_Map.End_Checkpoint;
+      Mem.Cleaning.Clean;
+      Ask_For_Checkpoint;
+   end Log_Committed;
 
    -----------------
    -- New_Process --

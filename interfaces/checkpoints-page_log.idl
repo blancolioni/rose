@@ -70,4 +70,21 @@ interface Checkpoints.Page_Log is
    --  checkpoint that doesn't commit forgets it. The memory server
    --  calls it once nothing it still needs is in those entries.
 
+   procedure Get_Space
+     (First : out Word;
+      Open  : out Word;
+      Last  : out Word);
+   --  Where the log's entries are, for the memory server's cleaning
+   --  (#952). First is the log page of the first committed entry's
+   --  header, and Open that of the open entry's header, or 0 if no
+   --  entry is open. First is Open if no entry is committed. Last is
+   --  the log's last page, after which it wraps round to log page 1.
+
+   function Entry_Last (Header : Word) return Word;
+   --  The log page of the last page of the committed entry whose
+   --  header is at log page Header, or 0 if no committed entry's
+   --  header is there. The entry's pages are those after its header
+   --  up to that one, round the log, and the next entry's header is
+   --  the page after it.
+
 end Checkpoints.Page_Log;

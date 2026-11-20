@@ -1,0 +1,90 @@
+#!/bin/sh
+# The test of the memory server's cleaning of the checkpoint log (#952),
+# under QEMU.
+#
+#   scripts/test-log-clean [ISO]
+#
+# ISO is the install image, images/rose.iso by default. A test disk's log
+# is about half of the disk, which an idle system would take days to fill,
+# so the test makes it smaller:
+#
+#   1. installs Rose on a new disk;
+#   2. shrinks the log partition with set-log-size.py to MARGIN pages more
+#      than the install's entries take, so that the log is far past the
+#      level at which mem starts cleaning (Rose.Limits.Clean_Start_Percent),
+#      and an idle system would fill it in about half an hour if nothing
+#      were freed;
+#   3. boots from the disk ROUNDS times, each of which has to restore the
+#      last checkpoint and show the login prompt, leaves the system idle
+#      for MINUTES minutes, and stops the machine wherever it is; then
+#      runs check-log.py, which has to find the log consistent.
+#
+# At the end, the log has to start after location 1, which only cleaning
+# makes happen, and to have wrapped around: the system ran for longer than
+# the log would have lasted without cleaning, and restored each time.
+#
+# It takes about an hour, and needs qemu-system-i386, qemu-img and python3.
+# It exits with 0 if everything passed, and keeps the disk image and QEMU's
+# files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+MARGIN=${MARGIN:-3000}
+ROUNDS=${ROUNDS:-6}
+MINUTES=${MINUTES:-6}
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+check_log () {
+    # check_log WHEN: run check-log.py on the disk, and fail if it finds
+    # the log inconsistent
+    python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" 2>&1 \
+        || { cat "$WORK/check-log.txt"; fail "check-log.py: $1"; }
+    grep -E "^log|entries|wrapped|full" "$WORK/check-log.txt" | tail -3
+}
+
+install_rose "$ISO"
+
+check_log "after the install"
+used=$(sed -n 's/^.*next entry at location \([0-9]*\).*$/\1/p' \
+           "$WORK/check-log.txt")
+[ -n "$used" ] || fail "check-log.py did not say where the next entry goes"
+
+echo "Shrinking the log to $MARGIN pages more than the install's $used"
+python3 "$HERE/set-log-size.py" "$DISK" $((used + MARGIN)) \
+    || fail "set-log-size.py could not shrink the log"
+
+round=1
+while [ $round -le $ROUNDS ]; do
+    echo "Boot $round from the disk, which restores the last checkpoint"
+    # QEMU may start CONSOLE again, so the mark is taken once it has.
+    start_qemu
+    mark=$(console_mark)
+    choose_last_entry
+    wait_for "login:" 300 || fail "boot $round: no login prompt"
+    console_since "$mark" \
+        | grep -q "restore: restored processes are running" \
+        || fail "boot $round: the checkpoint was not restored"
+
+    echo "Leaving it idle for $MINUTES minutes, then stopping it"
+    sleep $((MINUTES * 60))
+    console_since "$mark" | grep -E "log: .*(full|not committed)" | head -3
+    stop_qemu
+    check_log "after boot $round"
+    round=$((round + 1))
+done
+
+start=$(sed -n 's/^log starts at location \([0-9]*\),.*/\1/p' \
+            "$WORK/check-log.txt")
+[ -n "$start" ] && [ "$start" -gt 1 ] \
+    || fail "the log still starts at location 1: nothing was freed"
+grep -q "the log has wrapped around" "$WORK/check-log.txt" \
+    || fail "the log did not wrap around"
+
+echo "PASS: the log was cleaned and wrapped around, and every boot restored"
+rm -rf "$WORK"
+exit 0

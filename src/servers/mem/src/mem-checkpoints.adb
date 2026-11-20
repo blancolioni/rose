@@ -7,6 +7,7 @@ with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
+with Mem.Cleaning;
 with Mem.Log_Index;
 with Mem.Page_Log;
 with Mem.Page_Table;
@@ -230,6 +231,7 @@ package body Mem.Checkpoints is
          Mem.Page_Log.Fail_Checkpoint;
          Mem.Log_Index.End_Checkpoint (Committed => False);
       else
+         Mem.Cleaning.Free_Cleaned;
          Mem.Log_Index.End_Checkpoint (Committed => True);
          Mem.Page_Table.Clear_Dirty_Pages;
          if Has_Shared then

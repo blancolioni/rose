@@ -79,6 +79,20 @@ package body Mem.Page_Log is
         (Client, Rose.Words.Word (From));
    end Discard_Pages;
 
+   ----------------
+   -- Entry_Last --
+   ----------------
+
+   function Entry_Last
+     (Header : Rose.Words.Word_32)
+      return Rose.Words.Word_32
+   is
+   begin
+      return Rose.Words.Word_32
+        (Rose.Interfaces.Checkpoints.Page_Log.Client.Entry_Last
+           (Client, Rose.Words.Word (Header)));
+   end Entry_Last;
+
    ---------------------
    -- Fail_Checkpoint --
    ---------------------
@@ -87,6 +101,34 @@ package body Mem.Page_Log is
    begin
       Rose.Interfaces.Checkpoints.Page_Log.Client.Fail_Checkpoint (Client);
    end Fail_Checkpoint;
+
+   -----------------
+   -- Free_Before --
+   -----------------
+
+   procedure Free_Before (Log_Page : Rose.Words.Word_32) is
+   begin
+      Rose.Interfaces.Checkpoints.Page_Log.Client.Free_Before
+        (Client, Rose.Words.Word (Log_Page));
+   end Free_Before;
+
+   ---------------
+   -- Get_Space --
+   ---------------
+
+   procedure Get_Space
+     (First : out Rose.Words.Word_32;
+      Open  : out Rose.Words.Word_32;
+      Last  : out Rose.Words.Word_32)
+   is
+      First_Word, Open_Word, Last_Word : Rose.Words.Word;
+   begin
+      Rose.Interfaces.Checkpoints.Page_Log.Client.Get_Space
+        (Client, First_Word, Open_Word, Last_Word);
+      First := Rose.Words.Word_32 (First_Word);
+      Open := Rose.Words.Word_32 (Open_Word);
+      Last := Rose.Words.Word_32 (Last_Word);
+   end Get_Space;
 
    ------------------
    -- Is_Available --

@@ -2,7 +2,6 @@ with System.Storage_Elements;
 
 with Rose.Checkpoints;
 with Rose.Limits;
-with Rose.Words;
 
 with Mem.Calls;
 with Mem.Change_Table;
@@ -33,6 +32,13 @@ package body Mem.Virtual_Map is
 
    Batch_Header : Rose.Checkpoints.Header_Page
      with Import, Address => Batch_Window'Address;
+
+   function Batch_Page (Index : Natural) return System.Address
+   is (Batch_Window (Batch_Window'First
+                     + System.Storage_Elements.Storage_Offset (Index)
+                     * Rose.Limits.Page_Size)
+       'Address);
+   --  Where page Index of a batch goes, from 0 for the header.
 
    Stopped : Boolean := False;
    --  The log refused a batch, because a checkpoint was being written or
@@ -90,6 +96,16 @@ package body Mem.Virtual_Map is
       end if;
    end Allocate_Page;
 
+   --------------
+   -- Can_Copy --
+   --------------
+
+   function Can_Copy return Boolean is
+   begin
+      return Has_Room
+        and then Mem.Change_Table.Count < Mem.Change_Table.Capacity / 2;
+   end Can_Copy;
+
    ---------------------
    -- Changes_Stopped --
    ---------------------
@@ -98,6 +114,73 @@ package body Mem.Virtual_Map is
    begin
       return not Has_Room;
    end Changes_Stopped;
+
+   ------------------
+   -- Copy_Forward --
+   ------------------
+
+   procedure Copy_Forward
+     (Pages   : Copied_Pages;
+      Success : out Boolean)
+   is
+      use type Rose.Words.Word_32;
+      Count : constant Natural := Pages'Length;
+      First : Rose.Words.Word_32;
+      Wrap  : Rose.Words.Word_32;
+   begin
+      Success := False;
+
+      if Count = 0 or else Count > Batch_Pages or else not Has_Room then
+         return;
+      end if;
+
+      --  Field by field: a whole-page aggregate would be built on mem's
+      --  one-page stack.
+
+      Batch_Header.Magic := Rose.Checkpoints.Header_Page_Magic;
+      for Element of Batch_Header.Pages loop
+         Element := (others => <>);
+      end loop;
+      Batch_Header.Flags := Rose.Checkpoints.Is_Last_Header_Page;
+      Batch_Header.Count := Rose.Words.Word_32 (Count);
+
+      for I in 1 .. Count loop
+         declare
+            Item : Copied_Page renames Pages (Pages'First + I - 1);
+         begin
+            Batch_Header.Pages (Rose.Words.Word_32 (I)) :=
+              (Process => Rose.Words.Word_16 (Item.Process),
+               Page    => Item.Page);
+            Mem.Page_Log.Read (Item.Log_Page, Batch_Page (I));
+         end;
+      end loop;
+
+      Mem.Page_Log.Append_Batch (Batch_Page (0), Count + 1, First, Wrap);
+
+      if First = 0 then
+         Stopped := True;
+         return;
+      end if;
+
+      --  Page I of the batch is at index I, after the header at 0.
+
+      for I in 1 .. Count loop
+         declare
+            Item  : Copied_Page renames Pages (Pages'First + I - 1);
+            Index : constant Rose.Words.Word_32 := Rose.Words.Word_32 (I);
+         begin
+            Mem.Change_Table.Add
+              (Process  => Item.Process,
+               Page     => Item.Page,
+               Log_Page =>
+                 (if Wrap /= 0 and then Index >= Wrap
+                  then 1 + (Index - Wrap)
+                  else First + Index));
+         end;
+      end loop;
+
+      Success := True;
+   end Copy_Forward;
 
    ---------------------
    -- Drop_Clean_Page --

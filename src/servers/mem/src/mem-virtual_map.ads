@@ -2,6 +2,7 @@ with System;
 
 with Rose.Addresses;
 with Rose.Objects;
+with Rose.Words;
 
 package Mem.Virtual_Map is
 
@@ -26,9 +27,33 @@ package Mem.Virtual_Map is
    --  the table of changes is full, or the log refused a batch (ADR 0028,
    --  section 6; #974). Only clean pages can be freed.
 
+   type Copied_Page is
+      record
+         Process  : Process_Id := 0;
+         Page     : Rose.Addresses.Virtual_Page_Address := 0;
+         Log_Page : Rose.Words.Word_32 := 0;
+      end record;
+
+   type Copied_Pages is array (Positive range <>) of Copied_Page;
+
+   function Can_Copy return Boolean;
+   --  Copy_Forward can append a batch: the log takes batches, and the
+   --  table of changes is less than half full, which leaves room for
+   --  paging out (#952).
+
+   procedure Copy_Forward
+     (Pages   : Copied_Pages;
+      Success : out Boolean);
+   --  Append a batch of copies of Pages, at most
+   --  Rose.Limits.Page_Out_Batch_Pages, each read from its Log_Page, to
+   --  the open entry, and add them to the table of changes, so that the
+   --  copies in old entries are no longer needed (#952). Success is
+   --  False if the batch wasn't appended: then nothing is added, and
+   --  no batch is written until a checkpoint ends.
+
    procedure End_Checkpoint;
-   --  mem's part of a checkpoint is done, so changed pages can be paged
-   --  out again.
+   --  mem's part of a checkpoint is done, or the log has committed it,
+   --  so changed pages can be paged out again.
 
    procedure Map (Process       : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;
