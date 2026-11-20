@@ -1,6 +1,6 @@
 # 1. Capability revocation
 
-- **Status:** Proposed
+- **Status:** Accepted. Layer 1, per-grant revocation in the kernel, is implemented (#116). Layers 2 and 3 are not built yet: #118, #119 and #120.
 - **Date:** 2026-10-22
 - **Related:** #115 (remove the Create capability), Capabilities project, [ADR 0023](0023-kernel-capability-table.md) (the kernel capability table)
 - **Amended by:** #116, which settles the derivation record (in section 1)
@@ -109,8 +109,8 @@ That is at most nine reads, and no allocation. A depth of 8 is what bounds it, s
 
 ## Follow-up work
 
-- #116: add per-grant counts and derivation records to the derive operation in #115.
-- #117: the kernel writes its tables to the log at checkpoint start, including derivation records.
+- #116: add per-grant counts and derivation records to the derive operation in #115 (done).
+- #117: the kernel writes its tables to the log at checkpoint start, including derivation records (done).
 - #118: membrane library.
 - #119: petal runs commands inside a membrane.
 - #120: memory server revocation: unmap a revoked page or region from every process that has it mapped.
