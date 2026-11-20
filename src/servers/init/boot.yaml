@@ -146,6 +146,9 @@ stages:
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint
         mem_set_process_banks: Processes.Memory.Set_Process_Banks_Endpoint
         mem_set_page_log: Processes.Memory.Set_Page_Log_Endpoint
+        # For the log server, to say that an entry is committed, so
+        # that mem cleans the log (#952).
+        mem_log_committed: Processes.Memory.Log_Committed_Endpoint
         memory_restore: Checkpoints.Memory_Restore.Memory_Restore_Interface
         mem_replace_process: Processes.Replacer.Replacer_Interface
 
@@ -255,7 +258,8 @@ stages:
     - launch: log
       oid: 16
       priority: log
-      caps: [console_interface, start_log, delete, store_committed]
+      caps: [console_interface, start_log, delete, store_committed,
+             mem_log_committed]
       exports:
         add_log_device: Checkpoints.Kernel_Log.Add_Log_Device_Endpoint
         append_to_log: Checkpoints.Kernel_Log.Append_Endpoint

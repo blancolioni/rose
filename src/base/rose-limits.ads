@@ -39,6 +39,14 @@ package Rose.Limits is
    --  header and the pages are lent to the log, and the kernel shares at
    --  most 8 pages with a process at once (Max_Shared_Pages).
 
+   Clean_Start_Percent : constant := 50;
+   Clean_Read_Limit    : constant := 64;
+   Clean_Copy_Limit    : constant := 128;
+   --  The memory server cleans the checkpoint log once it is
+   --  Clean_Start_Percent full. After each commit, it reads at most
+   --  Clean_Read_Limit header pages of the oldest entries, and copies
+   --  at most Clean_Copy_Limit of their live pages forward (#952).
+
    Page_Size : constant := 2 ** 12;
 
 end Rose.Limits;

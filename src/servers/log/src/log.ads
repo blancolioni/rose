@@ -15,6 +15,11 @@ package Log is
    --  The store's Storage_Checkpoint.Committed, which is called after
    --  each entry is committed (ADR 0038, section 6).
 
+   Mem_Committed_Cap   : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+   --  The memory server's Log_Committed, which is sent to without
+   --  waiting after each entry is committed (#952).
+
    Log_Page_Size : constant := 2 ** 12;
    Log_Page_Bits : constant := Log_Page_Size * 8;
 

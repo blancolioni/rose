@@ -38,6 +38,8 @@
 16#FE81_2E1E_398E_CB4D#  rose.interfaces.checkpoints.page_log.fail_checkpoint
 16#3BB1_4721_85A0_CA1E#  rose.interfaces.checkpoints.page_log.discard_pages(in word)
 16#C3CC_47F7_9676_7CAC#  rose.interfaces.checkpoints.page_log.free_before(in word)
+16#9122_716E_974B_4D93#  rose.interfaces.checkpoints.page_log.get_space(out word; out word; out word)
+16#2D66_162D_5EF1_167C#  rose.interfaces.checkpoints.page_log.entry_last(in word) return word
 16#0785_107B_F439_F895#  interface rose.interfaces.checkpoints.state
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset
 16#417B_75A1_17EC_9F59#  interface rose.interfaces.checkpoints.storage_checkpoint
@@ -123,6 +125,7 @@
 16#1F7B_E47C_2FED_3DA2#  rose.interfaces.processes.memory.set_process_banks(in interface rose.interfaces.storage.process_banks)
 16#AC92_8D24_2B6B_0251#  rose.interfaces.processes.memory.processes_ended
 16#B560_3ACC_A08B_D37F#  rose.interfaces.processes.memory.set_page_log(in interface rose.interfaces.checkpoints.page_log)
+16#B622_D70E_0BBD_A457#  rose.interfaces.processes.memory.log_committed
 16#C353_4F25_4299_7779#  interface rose.interfaces.processes.process
 16#D79B_C2CA_81C9_6FBC#  rose.interfaces.processes.process.heap_interface return interface rose.interfaces.processes.heap
 16#D969_D83E_E234_B149#  rose.interfaces.processes.process.bank return interface rose.interfaces.storage.bank

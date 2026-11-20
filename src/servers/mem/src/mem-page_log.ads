@@ -46,4 +46,21 @@ package Mem.Page_Log is
    --  every page after it, after an append of a batch failed. From is
    --  the log page of the batch's first page, or 0 if that append failed.
 
+   procedure Get_Space
+     (First : out Rose.Words.Word_32;
+      Open  : out Rose.Words.Word_32;
+      Last  : out Rose.Words.Word_32);
+   --  The headers of the first committed entry and of the open one, and
+   --  the log's last page (Page_Log.Get_Space, #952).
+
+   function Entry_Last
+     (Header : Rose.Words.Word_32)
+      return Rose.Words.Word_32;
+   --  The last page of the committed entry whose header is at Header,
+   --  or 0 (Page_Log.Entry_Last).
+
+   procedure Free_Before (Log_Page : Rose.Words.Word_32);
+   --  When the open entry commits, start the log at the entry that
+   --  holds Log_Page (Page_Log.Free_Before, #951).
+
 end Mem.Page_Log;

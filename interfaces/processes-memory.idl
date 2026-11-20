@@ -54,5 +54,13 @@ interface Processes.Memory is
    --  The log server's Page_Log, which init gives mem at every boot, once
    --  the log server is running. Mem appends its pages to the open log
    --  entry through it (ADR 0028).
+
+   procedure Log_Committed;
+   --  The log server has committed an entry and opened the next, so
+   --  the memory server cleans the log a little: it copies the live
+   --  pages of the oldest entries forward, so that their space can be
+   --  freed (#952). The log server sends this without waiting, and it
+   --  is lost if the memory server is busy; the next commit sends it
+   --  again.
 	 
 end Processes.Memory;

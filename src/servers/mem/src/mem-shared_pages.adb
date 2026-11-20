@@ -279,4 +279,17 @@ package body Mem.Shared_Pages is
       end if;
    end Set_Modified;
 
+   ---------------------
+   -- Unsave_Modified --
+   ---------------------
+
+   procedure Unsave_Modified is
+   begin
+      for Item of Table loop
+         if Item.Used and then Item.Modified then
+            Item.Unsaved := True;
+         end if;
+      end loop;
+   end Unsave_Modified;
+
 end Mem.Shared_Pages;

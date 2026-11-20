@@ -40,6 +40,14 @@ package body Mem.Log_Index is
    No_Key       : constant Integer := Integer'Last;
    Before_First : constant Integer := -1;
 
+   Max_Rewrites  : constant := 64;
+   Rewrites      : array (1 .. Max_Rewrites) of Integer := (others => 0);
+   Rewrite_Count : Natural := 0;
+   --  The keys of the leaves that the next checkpoint writes again
+   --  although none of their pages changed, with their directories,
+   --  because the entries that hold their copies are to be freed
+   --  (Rewrite, #952).
+
    subtype Page_Buffer is
      System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size);
 
@@ -134,7 +142,8 @@ package body Mem.Log_Index is
 
    function Next_Key (After : Integer) return Integer;
    --  The smallest key after After of a leaf with a page in the batch, or
-   --  No_Key if there is none.
+   --  that is to be written again (Rewrites), or No_Key if there is
+   --  none.
 
    function Process_Of (Key : Integer) return Process_Id;
 
@@ -206,6 +215,7 @@ package body Mem.Log_Index is
    begin
       if Committed then
          Directories := New_Directories;
+         Rewrite_Count := 0;
 
          --  The index names every page that the table of changes did
          --  (ADR 0028, section 4).
@@ -389,6 +399,18 @@ package body Mem.Log_Index is
          New_Directories (Process) := 0;
       end if;
       Mem.Change_Table.Forget (Process);
+
+      declare
+         Kept : Natural := 0;
+      begin
+         for I in 1 .. Rewrite_Count loop
+            if Process_Of (Rewrites (I)) /= Process then
+               Kept := Kept + 1;
+               Rewrites (Kept) := Rewrites (I);
+            end if;
+         end loop;
+         Rewrite_Count := Kept;
+      end;
    end Forget;
 
    ---------------
@@ -421,6 +443,32 @@ package body Mem.Log_Index is
       Touch (Slot);
       return Result;
    end Get_Entry;
+
+   ------------------------
+   -- Is_Live_Index_Page --
+   ------------------------
+
+   function Is_Live_Index_Page
+     (Process  : Process_Id;
+      Slot     : Rose.Words.Word_16;
+      Log_Page : Rose.Words.Word_32)
+      return Boolean
+   is
+   begin
+      if Process not in Real_Process_Id
+        or else Directories (Process) = 0
+        or else Log_Page = 0
+      then
+         return False;
+      elsif Slot = Rose.Checkpoints.Directory_Slot then
+         return Directories (Process) = Log_Page;
+      elsif Natural (Slot) >= Entries_Per_Page then
+         return False;
+      else
+         return Get_Entry (Directories (Process), Natural (Slot))
+           = Log_Page;
+      end if;
+   end Is_Live_Index_Page;
 
    ------------
    -- Key_Of --
@@ -534,6 +582,11 @@ package body Mem.Log_Index is
    begin
       Mem.Page_Table.Iterate_Dirty_Pages (Check'Access);
       Mem.Change_Table.Iterate (Check_Change'Access);
+      for Key of Rewrites (1 .. Rewrite_Count) loop
+         if Key > After and then Key < Result then
+            Result := Key;
+         end if;
+      end loop;
       return Result;
    end Next_Key;
 
@@ -570,6 +623,63 @@ package body Mem.Log_Index is
          Mem.Page_Log.Read (Log_Page, Buffer);
       end if;
    end Read_Page;
+
+   -------------
+   -- Rewrite --
+   -------------
+
+   procedure Rewrite
+     (Process : Process_Id;
+      Slot    : Rose.Words.Word_16;
+      Success : out Boolean)
+   is
+      Leaf_Slot : Natural := Natural (Slot);
+      Key       : Integer;
+   begin
+      Success := True;
+
+      if Process not in Real_Process_Id
+        or else Directories (Process) = 0
+      then
+         return;
+      end if;
+
+      --  A directory is written after the leaves of its process that
+      --  are written, so writing one of its leaves again writes it
+      --  again too. It names at least one, or it wouldn't have been
+      --  written. Nothing else uses Directory between checkpoints.
+
+      if Slot = Rose.Checkpoints.Directory_Slot then
+         Read_Page (Directories (Process), Directory_Buffer'Address);
+         Leaf_Slot := Entries_Per_Page;
+         for I in Directory.Entries'Range loop
+            if Directory.Entries (I) /= 0 then
+               Leaf_Slot := I;
+               exit;
+            end if;
+         end loop;
+      end if;
+
+      if Leaf_Slot >= Entries_Per_Page then
+         return;
+      end if;
+
+      Key := Integer (Process) * Entries_Per_Page + Leaf_Slot;
+
+      for Item of Rewrites (1 .. Rewrite_Count) loop
+         if Item = Key then
+            return;
+         end if;
+      end loop;
+
+      if Rewrite_Count = Max_Rewrites then
+         Success := False;
+         return;
+      end if;
+
+      Rewrite_Count := Rewrite_Count + 1;
+      Rewrites (Rewrite_Count) := Key;
+   end Rewrite;
 
    ---------------------
    -- Saved_Directory --

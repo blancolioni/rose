@@ -258,6 +258,19 @@ package body Log.Server is
       Log_Page : Rose.Words.Word);
    --  Page_Log.Free_Before.
 
+   procedure Get_Space
+     (Id    : Rose.Objects.Capability_Identifier;
+      First : out Rose.Words.Word;
+      Open  : out Rose.Words.Word;
+      Last  : out Rose.Words.Word);
+   --  Page_Log.Get_Space.
+
+   function Entry_Last
+     (Id     : Rose.Objects.Capability_Identifier;
+      Header : Rose.Words.Word)
+      return Rose.Words.Word;
+   --  Page_Log.Entry_Last.
+
    procedure Move_First_Entry;
    --  Start the log at New_First_Entry, once the entry is committed.
 
@@ -296,6 +309,11 @@ package body Log.Server is
    procedure Sync_Devices;
    --  Return when everything written to the log devices is on the medium,
    --  and not only in a disk's write cache (#505).
+
+   procedure Notify_Mem_Committed;
+   --  Tell the memory server that an entry is committed, without
+   --  waiting: it cleans the log then, and calls the log server to
+   --  do it (#952).
 
    procedure Notify_Store_Committed;
    --  Tell the store that the entry is committed, and wait for it.
@@ -771,6 +789,15 @@ package body Log.Server is
 
       Open_Entry;
 
+      --  The memory server is told after the entry opens: it may call
+      --  back at once to append the pages it copies forward. It is
+      --  sent without waiting, since the memory server may be waiting
+      --  on the log server itself.
+
+      if not Entry_Failed then
+         Notify_Mem_Committed;
+      end if;
+
    end Commit;
 
    ------------
@@ -832,6 +859,7 @@ package body Log.Server is
       Console_Cap := Get_Cap (1);
       Start_Log_Cap := Get_Cap (2);
       Store_Committed_Cap := Get_Cap (4);
+      Mem_Committed_Cap := Get_Cap (5);
 
       --  Nothing reads the cap set again (#826).
 
@@ -869,7 +897,9 @@ package body Log.Server is
          Read_Page      => Read_Log_Page'Access,
          Fail_Checkpoint => Fail_Checkpoint'Access,
          Discard_Pages  => Discard_Pages'Access,
-         Free_Before    => Free_Before'Access);
+         Free_Before    => Free_Before'Access,
+         Get_Space      => Get_Space'Access,
+         Entry_Last     => Entry_Last'Access);
 
       for Page of Page_Buffer loop
          for Element of Page loop
@@ -958,6 +988,25 @@ package body Log.Server is
 
       Append_Failed := False;
    end Discard_Pages;
+
+   ----------------
+   -- Entry_Last --
+   ----------------
+
+   function Entry_Last
+     (Id     : Rose.Objects.Capability_Identifier;
+      Header : Rose.Words.Word)
+      return Rose.Words.Word
+   is
+      pragma Unreferenced (Id);
+      Location : constant Log_Location_Id := Log_Location_Id (Header);
+   begin
+      if Is_Location (Location) and then Load_Entry (Location) then
+         return Rose.Words.Word (Cached_Header.Log_Last);
+      else
+         return 0;
+      end if;
+   end Entry_Last;
 
    -----------------
    -- Fail_Append --
@@ -1147,6 +1196,25 @@ package body Log.Server is
       return 0;
    end Get_Device_Index;
 
+   ---------------
+   -- Get_Space --
+   ---------------
+
+   procedure Get_Space
+     (Id    : Rose.Objects.Capability_Identifier;
+      First : out Rose.Words.Word;
+      Open  : out Rose.Words.Word;
+      Last  : out Rose.Words.Word)
+   is
+      pragma Unreferenced (Id);
+   begin
+      Open := (if Writing then Rose.Words.Word (Next_Log_Location) else 0);
+      First :=
+        (if First_Committed = 0 then Open
+         else Rose.Words.Word (First_Committed));
+      Last := Rose.Words.Word (Last_Location);
+   end Get_Space;
+
    ------------------
    -- Is_Log_Entry --
    ------------------
@@ -1280,6 +1348,22 @@ package body Log.Server is
          Problem_Page := Page;
       end if;
    end Note_Problem;
+
+   --------------------------
+   -- Notify_Mem_Committed --
+   --------------------------
+
+   procedure Notify_Mem_Committed is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Mem_Committed_Cap /= Rose.Capabilities.Null_Capability then
+         Rose.System_Calls.Initialize_Send (Params, Mem_Committed_Cap);
+         Params.Control.Flags (Rose.Invocation.Block) := False;
+         Params.Control.Flags (Rose.Invocation.Create_Reply_Cap) := False;
+         Rose.System_Calls.Invoke_Capability (Params);
+      end if;
+   end Notify_Mem_Committed;
 
    ----------------------------
    -- Notify_Store_Committed --
