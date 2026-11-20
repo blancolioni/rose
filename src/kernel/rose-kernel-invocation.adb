@@ -132,7 +132,14 @@ package body Rose.Kernel.Invocation is
       --  An invocation sends and asks for at most four caps, because
       --  Last_Sent_Cap and Last_Recv_Cap have two bits (#234).
 
-      Params.Reply_Cap := Params.Cap;
+      --  The caller's Reply_Cap is never read. A receiver gets a reply
+      --  cap only when the caller asks for one with Create_Reply_Cap,
+      --  and null otherwise, so that a null Reply_Cap means that no reply
+      --  is wanted (#892). It used to be the cap that the caller invoked,
+      --  an index in the caller's table that meant nothing to the
+      --  receiver, which took it for a reply cap.
+
+      Params.Reply_Cap := Rose.Capabilities.Null_Capability;
 
       if not Has_Cap (Pid, Params.Cap) then
          Rose.Kernel.Processes.Debug.Put (Pid);

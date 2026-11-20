@@ -22,5 +22,5 @@ surface_console:
 	    $(INTERFACES)/storage-region_access.idl $(INTERFACES)/processes-process.idl \
 	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
-	    $(INTERFACES)/processes-heap.idl
+	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)

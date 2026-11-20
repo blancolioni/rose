@@ -1,0 +1,82 @@
+#!/bin/sh
+# The test that a restore drops what was typed before the checkpoint
+# (#523), under QEMU.
+#
+#   scripts/test-restore-input [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test:
+#
+#   1. installs Rose on a new disk;
+#   2. boots from the disk, types a few letters at the login prompt,
+#      without Enter, waits for a checkpoint that has them in the
+#      console's input, and stops the machine;
+#   3. boots from the disk again, which restores that checkpoint, and
+#      logs in as the first user. The login has to succeed: if the
+#      console kept the letters, they are the start of the name that
+#      login reads, and the login fails.
+#
+# The menu's serial-console entry is in text mode, so this tests
+# vga-console. surface-console, on a framebuffer, runs the same code
+# from the shared line discipline (Text_Console.Line_Discipline).
+#
+# It is not one of the CI tests: it takes about ten minutes, and the
+# letters have to be typed before a checkpoint that the next boot
+# restores. It needs qemu-system-i386, qemu-img and python3. It exits
+# with 0 if everything passed, and keeps the disk image and QEMU's files
+# if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+TYPED=xyz
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+install_rose "$ISO"
+
+echo "Booting from the disk, and typing '$TYPED' at the login prompt"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 || fail "first boot: no login prompt"
+sleep 45
+type_text "$TYPED"
+
+# The kernel logs each checkpoint; the next one after the letters were
+# typed has them in vga-console's memory.
+checkpoints=$(grep -a -c "Leaving checkpoint" "$WORK/serial")
+waited=0
+while [ "$(grep -a -c "Leaving checkpoint" "$WORK/serial")" -le "$checkpoints" ]
+do
+    [ $waited -lt 90 ] || fail "no checkpoint after the letters were typed"
+    sleep 5
+    waited=$((waited + 5))
+done
+sleep 10
+stop_qemu
+
+echo "Booting from the disk again, which restores that checkpoint"
+start_qemu
+mark=$(console_mark)
+choose_last_entry
+wait_for "login:" 200 || fail "second boot: no login prompt"
+console_since "$mark" \
+    | grep -q "restore: restored processes are running" \
+    || fail "second boot: the checkpoint was not restored"
+sleep 45
+type_text "$first_user
+"
+wait_for "password:" 20 || fail "no password prompt"
+type_text "$first_password
+"
+wait_for "petal>" 60 || {
+    screen
+    fail "could not log in: the restored console kept '$TYPED'?"
+}
+stop_qemu
+
+echo "PASS: the restore dropped what was typed before the checkpoint"
+rm -rf "$WORK"
+exit 0
