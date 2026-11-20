@@ -35,7 +35,16 @@ package body Mem.Page_Table is
    Dirty_Page_Last : Natural := 0;
 
    Clock_Hand : Cursor := 0;
-   --  The page that Sweep_Clean_Pages last stopped at.
+   --  The page that Sweep_Clean_Pages or Sweep_Changed_Pages last
+   --  stopped at.
+
+   procedure Sweep
+     (Changed  : Boolean;
+      Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor);
+   --  Sweep_Clean_Pages if not Changed, else Sweep_Changed_Pages.
 
    procedure Drop_Deleted_Dirty_Pages;
    --  Take pages that have been deleted out of the dirty page list, so
@@ -372,12 +381,13 @@ package body Mem.Page_Table is
          Executable => Page.Executable);
    end Set_Writable;
 
-   -----------------------
-   -- Sweep_Clean_Pages --
-   -----------------------
+   -----------
+   -- Sweep --
+   -----------
 
-   procedure Sweep_Clean_Pages
-     (Try_Page : not null access
+   procedure Sweep
+     (Changed  : Boolean;
+      Try_Page : not null access
         procedure (Position : Cursor;
                    Taken    : out Boolean);
       Position : out Cursor)
@@ -396,8 +406,9 @@ package body Mem.Page_Table is
             if Page.Process /= 0
               and then Page.Mapped
               and then Page.Persistent
-              and then not Page.Dirty
-              and then not Page.Writable
+              and then
+                (if Changed then Page.Dirty
+                 else not Page.Dirty and then not Page.Writable)
             then
                Try_Page (Clock_Hand, Taken);
                if Taken then
@@ -407,6 +418,34 @@ package body Mem.Page_Table is
             end if;
          end;
       end loop;
+   end Sweep;
+
+   -------------------------
+   -- Sweep_Changed_Pages --
+   -------------------------
+
+   procedure Sweep_Changed_Pages
+     (Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor)
+   is
+   begin
+      Sweep (True, Try_Page, Position);
+   end Sweep_Changed_Pages;
+
+   -----------------------
+   -- Sweep_Clean_Pages --
+   -----------------------
+
+   procedure Sweep_Clean_Pages
+     (Try_Page : not null access
+        procedure (Position : Cursor;
+                   Taken    : out Boolean);
+      Position : out Cursor)
+   is
+   begin
+      Sweep (False, Try_Page, Position);
    end Sweep_Clean_Pages;
 
    ---------------------

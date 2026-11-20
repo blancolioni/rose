@@ -6,6 +6,7 @@ RELOC=$(BUILDDIR)/mem.reloc.o
 OBJECTS= \
 	$(BUILDDIR)/mem.o \
 	$(BUILDDIR)/mem-calls.o \
+	$(BUILDDIR)/mem-change_table.o \
 	$(BUILDDIR)/mem-checkpoints.o \
 	$(BUILDDIR)/mem-driver.o \
 	$(BUILDDIR)/mem-log_index.o \

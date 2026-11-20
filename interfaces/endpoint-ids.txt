@@ -33,6 +33,7 @@
 16#6FD8_89CB_06E8_0BD6#  rose.interfaces.checkpoints.memory_restore.restore_shared_page(in object_id; in storage_array)
 16#E8C9_E2E2_F9E2_FD43#  interface rose.interfaces.checkpoints.page_log
 16#0806_2377_8396_167A#  rose.interfaces.checkpoints.page_log.append_page(in storage_array) return word
+16#BBE2_2741_F31C_8DB5#  rose.interfaces.checkpoints.page_log.append_batch(in storage_array; out word; out word)
 16#CAA4_CCB5_AA3C_3D72#  rose.interfaces.checkpoints.page_log.read_page(in word; out storage_array)
 16#FE81_2E1E_398E_CB4D#  rose.interfaces.checkpoints.page_log.fail_checkpoint
 16#3BB1_4721_85A0_CA1E#  rose.interfaces.checkpoints.page_log.discard_pages(in word)
