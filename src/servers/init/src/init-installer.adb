@@ -496,6 +496,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
       Add_Text (Params, Name);
       Rose.System_Calls.Send_Cap (Params, Cap_Set);
+      Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
       Rose.System_Calls.Delete_Cap (Cap_Set);
 
@@ -598,6 +599,7 @@ package body Init.Installer is
       Rose.System_Calls.Send_Cap (Params, Binary_Stream);
       Add_Text (Params, Name);
       Rose.System_Calls.Send_Cap (Params, Cap_Set);
+      Rose.System_Calls.Receive_Caps (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
       Rose.System_Calls.Delete_Cap (Cap_Set);
 

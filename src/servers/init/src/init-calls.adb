@@ -190,7 +190,9 @@ package body Init.Calls is
                                Send_Buffer      => True,
                                Block            => True,
                                Create_Reply_Cap => True,
+                               Recv_Caps        => True,
                                others           => False);
+      Params.Control.Last_Recv_Cap := 0;
       Local_Buffer := (others => 0);
 
       declare

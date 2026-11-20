@@ -16,6 +16,7 @@ with Tests.Numerics;
 with Tests.Processes;
 with Tests.Regions;
 with Tests.Replacement;
+with Tests.Reply_Caps;
 with Tests.Rights;
 with Tests.Screen;
 with Tests.Secondary_Stack;
@@ -64,6 +65,7 @@ package Tests.Suite is
                    Tests.Rights.Rights_Test'Access,
                    Tests.Invalid_Caps.Invalid_Cap_Test'Access,
                    Tests.Invalid_Caps.No_Buffer_Test'Access,
+                   Tests.Reply_Caps.Reply_Caps_Test'Access,
                    Tests.Memory.Copy_Test'Access,
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
                    Tests.Shared_Segments.Overlap_Test'Access,
