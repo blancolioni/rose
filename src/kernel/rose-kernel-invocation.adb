@@ -163,6 +163,20 @@ package body Rose.Kernel.Invocation is
          Rose.Invocation.Trace.Put (Params.all, True);
          Rose.Kernel.Processes.Return_Error
            (Params, Rose.Invocation.Invalid_Capability);
+
+      elsif Params.Control.Flags (Rose.Invocation.Delete) then
+
+         --  Giving up a cap grants nothing, so any process may do it, with
+         --  no cap to do it with (#1022). It is done before the cap's
+         --  handler, so that it works for a cap of any kind, and for one
+         --  that is no longer valid, which is when a holder most wants to
+         --  drop it. A reply cap whose caller waits fails the call with
+         --  Closed, as Discard_Cap does for the Delete_Cap cap.
+
+         Rose.Kernel.Processes.Discard_Cap (Pid, Params.Cap);
+         Params.Control.Flags := (Reply => True, others => False);
+         Set_Current_State (Pid, Ready);
+
       else
          Get_Cap (Pid, Params.Cap, Cap);
          if Log then

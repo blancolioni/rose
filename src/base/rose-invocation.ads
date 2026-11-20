@@ -32,6 +32,12 @@ is
    --                  and replies with nothing. An invocation carries at
    --                  most four caps, and a command launch call more
    --                  (#234). The kernel does not look at it.
+   --
+   --    Delete        Delete the invoked cap from the caller's table,
+   --                  instead of invoking it (#1022). Any process can
+   --                  give up a cap that it holds, of any kind, and
+   --                  valid or not: it needs no cap to do it. The kernel
+   --                  ignores the rest of the record, and replies.
 
    type Invocation_Flag is
      (Writable_Buffer,
@@ -47,7 +53,8 @@ is
       Recv_Words,
       Send_Caps,
       Recv_Caps,
-      Continued);
+      Continued,
+      Delete);
 
    type Invocation_Flags is array (Invocation_Flag) of Boolean;
    pragma Pack (Invocation_Flags);
@@ -105,12 +112,12 @@ is
 
    type Control_Word_Header is new Word_8;
 
-   type Word_3 is mod 2 ** 3;
+   type Word_2 is mod 2 ** 2;
 
    type Control_Word is
       record
          Flags          : Invocation_Flags  := (others => False);
-         Reserved       : Word_3               := 0;
+         Reserved       : Word_2               := 0;
          Last_Sent_Word : Parameter_Word_Index := 0;
          Last_Recv_Word : Parameter_Word_Index := 0;
          Last_Sent_Cap  : Capability_Index     := 0;
@@ -121,8 +128,8 @@ is
 
    for Control_Word use
       record
-         Flags          at 0 range  0 .. 13;
-         Reserved       at 0 range 14 .. 16;
+         Flags          at 0 range  0 .. 14;
+         Reserved       at 0 range 15 .. 16;
          Last_Sent_Word at 0 range 17 .. 19;
          Last_Recv_Word at 0 range 20 .. 22;
          Last_Sent_Cap  at 0 range 23 .. 24;
@@ -132,7 +139,8 @@ is
 
    --  Reserved is room for new flags, next to the others (#994). A new
    --  flag takes a bit from Reserved, so that the counts and Error stay
-   --  where they are. The kernel's copy in src/asm/i686/mp.s reads the
+   --  where they are; Delete took bit 14 (#1022), and two are left. The
+   --  kernel's copy in src/asm/i686/mp.s reads the
    --  flags and counts by these bit positions (#892), so a change here
    --  must change it too.
    --
