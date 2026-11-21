@@ -9,20 +9,23 @@
 # so the test makes it smaller:
 #
 #   1. installs Rose on a new disk;
-#   2. shrinks the log partition with set-log-size.py to MARGIN pages more
-#      than the install's entries take, so that the log is far past the
-#      level at which mem starts cleaning (Rose.Limits.Clean_Start_Percent),
-#      and an idle system would fill it in about half an hour if nothing
-#      were freed;
-#   3. boots from the disk ROUNDS times, each of which has to restore the
-#      checkpoint that check-log.py says, with the shared pages it says,
-#      and show the login prompt, leaves the system idle
-#      for MINUTES minutes, and stops the machine wherever it is; then
-#      runs check-log.py, which has to find the log consistent.
+#   2. shrinks the log partition with set-log-size.py so that the install's
+#      entries fill FILL percent of it, past the level at which mem starts
+#      cleaning (Rose.Limits.Clean_Start_Percent), with room for cleaning
+#      to copy into.  The room is in proportion to the install, since what
+#      a boot writes grows with it: hold_pages (#975) writes a quarter of
+#      its 48 MiB again after each restore;
+#   3. boots from the disk, at most ROUNDS times, each of which has to
+#      restore the checkpoint that check-log.py says, with the shared pages
+#      it says, and show the login prompt, leaves the system idle for
+#      MINUTES minutes, and stops the machine wherever it is; then runs
+#      check-log.py, which has to find the log consistent.  The log must
+#      never fill up, which it can't recover from (#1029).  The boots stop
+#      once the log has both wrapped around and been cleaned.
 #
 # At the end, the log has to start after location 1, which only cleaning
-# makes happen, and to have wrapped around: the system ran for longer than
-# the log would have lasted without cleaning, and restored each time.
+# makes happen, and to have wrapped around: the system wrote more than the
+# log would have held without cleaning, and restored each time.
 #
 # It takes about an hour, and needs qemu-system-i386, qemu-img and python3.
 # It exits with 0 if everything passed, and keeps the disk image and QEMU's
@@ -30,9 +33,9 @@
 
 ISO=${1:-images/rose.iso}
 HERE=$(cd "$(dirname "$0")" && pwd)
-MARGIN=${MARGIN:-3000}
-ROUNDS=${ROUNDS:-6}
-MINUTES=${MINUTES:-6}
+FILL=${FILL:-60}
+ROUNDS=${ROUNDS:-12}
+MINUTES=${MINUTES:-4}
 
 command -v qemu-system-i386 > /dev/null || {
     echo "qemu-system-i386 not found"
@@ -56,12 +59,23 @@ used=$(sed -n 's/^.*next entry at location \([0-9]*\).*$/\1/p' \
            "$WORK/check-log.txt")
 [ -n "$used" ] || fail "check-log.py did not say where the next entry goes"
 
-echo "Shrinking the log to $MARGIN pages more than the install's $used"
-python3 "$HERE/set-log-size.py" "$DISK" $((used + MARGIN)) \
+size=$((used * 100 / FILL))
+echo "Shrinking the log to $size pages, which the install's $used fill" \
+     "$FILL percent of"
+python3 "$HERE/set-log-size.py" "$DISK" $size \
     || fail "set-log-size.py could not shrink the log"
 
+cleaned () {
+    # cleaned: true if the last check_log found the log both wrapped
+    # around and started after location 1
+    start=$(sed -n 's/^log starts at location \([0-9]*\),.*/\1/p' \
+                "$WORK/check-log.txt")
+    [ -n "$start" ] && [ "$start" -gt 1 ] \
+        && grep -q "the log has wrapped around" "$WORK/check-log.txt"
+}
+
 round=1
-while [ $round -le $ROUNDS ]; do
+while [ $round -le $ROUNDS ] && ! cleaned; do
     echo "Boot $round from the disk, which restores the last checkpoint"
     # Restore has to choose the entry that check-log.py says, and load
     # the shared pages it says, from entries on both sides of the wrap
@@ -88,9 +102,12 @@ while [ $round -le $ROUNDS ]; do
 
     echo "Leaving it idle for $MINUTES minutes, then stopping it"
     sleep $((MINUTES * 60))
-    console_since "$mark" | grep -E "log: .*(full|not committed|freed)" \
-        | head -3
+    console_since "$mark" > "$WORK/boot.txt"
+    grep -E "log: .*(full|not committed|freed)" "$WORK/boot.txt" | head -3
     stop_qemu
+    ! grep -q "log: log is full" "$WORK/boot.txt" \
+        || fail "boot $round: the log filled up, which it can't recover" \
+                "from (#1029)"
     check_log "after boot $round"
     round=$((round + 1))
 done
