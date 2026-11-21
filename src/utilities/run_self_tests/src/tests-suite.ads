@@ -78,6 +78,7 @@ package Tests.Suite is
                    Tests.Banks.Reuse_Test'Access,
                    Tests.Banks.Limit_Test'Access,
                    Tests.Cap_Sets.Cap_Set_Test'Access,
+                   Tests.Cap_Sets.Bank_Set_Test'Access,
                    Tests.Replacement.Replacement_Test'Access,
                    Tests.Replacement.Replace_Process_Test'Access,
                    Tests.Replacement.Replace_File_Test'Access,

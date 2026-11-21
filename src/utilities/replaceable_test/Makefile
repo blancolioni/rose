@@ -27,5 +27,9 @@ replaceable_test:
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/caps-constructor.idl
 	gprbuild $(GPRBUILD_CARGS)

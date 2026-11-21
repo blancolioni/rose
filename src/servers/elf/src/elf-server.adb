@@ -359,7 +359,9 @@ package body Elf.Server is
       --  Close and delete what the launch no longer needs.
 
       procedure Fail;
-      --  Give up the launch, after Create_Process.
+      --  Give up the launch, after Create_Process, and end the process
+      --  that it made, so that its kernel entry, and mem's, are free
+      --  again (#915).
 
       --------------
       -- Clean_Up --
@@ -379,9 +381,21 @@ package body Elf.Server is
       ----------
 
       procedure Fail is
+         use Rose.Interfaces.Processes.Process.Client;
          Item : Starting_Record renames Starting (Index);
       begin
-         Rose.Interfaces.Processes.Process.Client.Close (Item.Process_Client);
+         --  Once mem has the process, ending it there ends the kernel's
+         --  process too, and its bank. Before then, only the kernel has
+         --  it.
+
+         if Get_Interface_Cap (Item.Process_Client) /= 0 then
+            Exit_Process (Item.Process_Client, 1);
+         else
+            Rose.Interfaces.Processes.Kernel_Process.Client.Destroy
+              (Kernel_Client);
+         end if;
+
+         Close (Item.Process_Client);
          Clean_Up;
          Delete_Cap (Item.Start_Cap);
          Delete_Cap (Item.Initial_Cap);
@@ -439,6 +453,18 @@ package body Elf.Server is
              (Item    => Memory_Client,
               Process => Kernel_Client,
               Bank    => Bank_Store);
+
+         --  Mem gives a null cap when it has no room for another process
+         --  (#915).
+
+         if Rose.Interfaces.Processes.Process.Client.Get_Interface_Cap
+           (Item.Process_Client) = 0
+         then
+            Rose.Console_IO.Put_Line ("elf: no room in mem for " & Name);
+            Fail;
+            return 0;
+         end if;
+
          Process_Bank := Rose.Interfaces.Processes.Process.Client
            .Bank (Item.Process_Client);
          Rose.Trace.Event ("mem process");

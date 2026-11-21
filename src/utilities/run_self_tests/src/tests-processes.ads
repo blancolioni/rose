@@ -2,6 +2,14 @@ package Tests.Processes is
 
    function End_Process_Test return Boolean;
 
+   function Process_Limit_Test return Boolean;
+   --  Launch probes until a launch fails, as it has to once the system
+   --  is out of processes, then end them all, and check that a launch
+   --  works again (#915). Scripts/test-boot checks that no probe is left
+   --  starting at the next checkpoint, which a failed launch did before.
+   --  It is out of the suite for now: in CI, running out of processes
+   --  can stop the whole system in mem's New_Process (#915, case 2).
+
    function Bank_End_Test return Boolean;
    --  A destroyed bank ends its processes (ADR 0015, #750): launch a file
    --  server against a sub-bank of this process's own bank, destroy the

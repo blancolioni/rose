@@ -48,6 +48,7 @@ run_self_tests:
 	    $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/screens-surface.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \

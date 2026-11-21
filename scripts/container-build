@@ -1,0 +1,70 @@
+#!/bin/sh
+# Run a build in a container that scripts/make-build-container made:
+#
+#   scripts/container-build [-c NAME] [COMMAND [ARGUMENT...]]
+#
+# COMMAND runs in the current directory, which has to be inside the
+# directory the container mounts (the one above the tree it was made
+# from).  Without a COMMAND it runs ./clean-build.sh.  For example:
+#
+#   scripts/container-build
+#   scripts/container-build make -j8
+#   scripts/container-build make test
+#
+# NAME is rose-build by default (or ROSE_CONTAINER).  A stopped container
+# is started first.  IDLE is set to the idle built in the container, and
+# JOBS and ROSE_TEST_DIR are passed on if they are set; a ROSE_TEST_DIR
+# inside the mounted directory keeps the boot tests' logs where the host
+# can see them.
+#
+# CONTAINER_ENGINE chooses podman or docker, as for make-build-container.
+# Under docker the command runs as the current user, so that the files it
+# writes in the tree are the user's and not root's.
+
+set -e
+
+here=`dirname "$0"`
+. "$here/container-env.sh"
+
+while [ $# -gt 0 ]; do
+    case $1 in
+        -c) [ $# -ge 2 ] || { echo "container-build: -c needs a name" >&2; exit 2; }
+            CONTAINER_NAME=$2; shift 2 ;;
+        --) shift; break ;;
+        -*) echo "usage: container-build [-c NAME] [COMMAND [ARGUMENT...]]" >&2
+            exit 2 ;;
+        *) break ;;
+    esac
+done
+
+[ $# -gt 0 ] || set -- ./clean-build.sh
+
+container_exists "$CONTAINER_NAME" || {
+    echo "container-build: there is no container $CONTAINER_NAME;" \
+         "make it with scripts/make-build-container" >&2
+    exit 1
+}
+
+mount=`"$CONTAINER_ENGINE" container inspect \
+    -f "{{index .Config.Labels \"$CONTAINER_MOUNT_LABEL\"}}" "$CONTAINER_NAME"`
+dir=`pwd -P`
+case $dir in
+    "$mount"|"$mount"/*) ;;
+    *) echo "container-build: $dir is not inside $mount," \
+            "which $CONTAINER_NAME mounts" >&2
+       exit 1 ;;
+esac
+
+running=`"$CONTAINER_ENGINE" container inspect -f '{{.State.Running}}' "$CONTAINER_NAME"`
+if [ "$running" != true ]; then
+    "$CONTAINER_ENGINE" start "$CONTAINER_NAME" > /dev/null
+fi
+
+tty=""
+[ -t 0 ] && [ -t 1 ] && tty=-t
+
+set -- -e IDLE="$CONTAINER_IDLE" "$CONTAINER_NAME" "$@"
+[ -n "$ROSE_TEST_DIR" ] && set -- -e ROSE_TEST_DIR="$ROSE_TEST_DIR" "$@"
+[ -n "$JOBS" ] && set -- -e JOBS="$JOBS" "$@"
+
+exec "$CONTAINER_ENGINE" exec -i $tty -w "$dir" `container_user_options` "$@"

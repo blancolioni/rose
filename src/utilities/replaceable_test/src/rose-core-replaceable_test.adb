@@ -2,7 +2,8 @@ with Replaceable_Test_Server;
 
 procedure Rose.Core.Replaceable_Test
   (Cap_Set_Service : in out
-     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Bank_Constructor
+       .Bank_Constructor_Object'Class;
    Name            : String;
    Target          : in out Rose.Interfaces.Held_Call.Held_Call_Object'Class;
    Served          : out Rose.Capabilities.Capability;
@@ -13,7 +14,7 @@ is
 begin
    Replaceable_Test_Server.Create_Server
      (Name            => Name,
-      Cap_Set_Service => Cap_Set_Service.Constructor_Cap,
+      Cap_Set_Service => Cap_Set_Service.Bank_Constructor_Cap,
       Target          => Target.Held_Call_Cap,
       Served          => Served,
       Control         => Control,

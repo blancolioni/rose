@@ -4,7 +4,8 @@ procedure Rose.Core.Hold_File
   (Find_Command    : in out Rose.Interfaces.Commands.Lookup
     .Lookup_Object'Class;
    Cap_Set_Service : in out
-     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Bank_Constructor
+       .Bank_Constructor_Object'Class;
    Control         : out Rose.Capabilities.Capability)
 is
 begin
@@ -15,6 +16,6 @@ begin
 
    File_Holder.Create_Server
      (Commands        => Find_Command.Lookup_Cap,
-      Cap_Set_Service => Cap_Set_Service.Constructor_Cap,
+      Cap_Set_Service => Cap_Set_Service.Bank_Constructor_Cap,
       Control         => Control);
 end Rose.Core.Hold_File;

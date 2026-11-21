@@ -4,7 +4,8 @@ with User_Server;
 
 procedure Rose.Core.User
   (Cap_Set_Service : in out
-     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Bank_Constructor
+       .Bank_Constructor_Object'Class;
    Name            : String;
    Home            : in out
      Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
@@ -30,7 +31,7 @@ begin
      (User_Name       => Name,
       Home            => Home.Writable_Directory_Cap,
       Bank            => Bank.Bank_Cap,
-      Cap_Set_Service => Cap_Set_Service.Constructor_Cap,
+      Cap_Set_Service => Cap_Set_Service.Bank_Constructor_Cap,
       Control         => Control);
    User := User_Server.Interface_Cap;
 end Rose.Core.User;
