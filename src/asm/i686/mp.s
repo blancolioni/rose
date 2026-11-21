@@ -110,8 +110,30 @@ kernel_stack_top:
 .Lno_buffer\@:
 .endm
 
+# Data segment selectors. The CPU loads only CS and SS on a way into the
+# kernel, and sysexit loads only CS and SS on the way out, so the kernel
+# loads the others itself (#1031). An iret to user mode replaces a data
+# segment register that holds the kernel's selector with null, and on
+# real hardware (not QEMU) the next access through it is a #GP.
+.set KERNEL_DATA_SELECTOR, 0x10
+.set USER_DATA_SELECTOR, 0x23     # GDT entry 4, RPL 3
+
+# Load the kernel's data selector into DS and ES, using %ax. The kernel
+# makes no use of FS or GS.
 .macro restore_kernel_segments
-    
+    mov     $KERNEL_DATA_SELECTOR, %ax
+    mov     %ax, %ds
+    mov     %ax, %es
+.endm
+
+# Load the user data selector into every data segment register before
+# sysexit, using %ax, so a process never runs with the kernel's.
+.macro load_user_segments
+    mov     $USER_DATA_SELECTOR, %ax
+    mov     %ax, %ds
+    mov     %ax, %es
+    mov     %ax, %fs
+    mov     %ax, %gs
 .endm
 
 .macro save_registers
@@ -136,7 +158,8 @@ kernel_stack_top:
 
 .macro save_process_context displacement
     cld
-    save_registers
+    save_registers                       # the interrupted DS and ES, then
+    restore_kernel_segments              # the kernel's (%eax is saved)
     movl    $0, interrupted_from_user
     testl   $3, Process_CS(%esp)         # CPL of saved CS: 0 = ring-0 (kernel), 3 = ring-3 (user)
     jz      1f                            # ring-0 interrupt: skip process structure update
@@ -328,7 +351,7 @@ protection_fault_exception:
 page_fault_exception:
     pushl %eax
     mov %cr2, %eax
-    mov %eax, page_fault_address
+    mov %eax, %ss:page_fault_address     # DS is still the interrupted one
     pop %eax
     pushl $PAGE_FAULT_VECTOR
     jmp cpu_exception_code
@@ -341,16 +364,18 @@ reserved_15_exception:
 
 cpu_exception:
     # cpu exception with no error code
-    movl $0, exception_code
-    popl exception_number
+    # DS is still the interrupted one, which may be null, so these go
+    # through SS, which is always the kernel's here (#1031)
+    movl $0, %ss:exception_code
+    popl %ss:exception_number
     jmp cpu_exception_common
-    
+
 .global cpu_exception_code
 
 cpu_exception_code:
     # cpu exception with error code
-    popl exception_number
-    popl exception_code
+    popl %ss:exception_number
+    popl %ss:exception_code
     
 cpu_exception_common:
     save_process_context 0    
@@ -368,6 +393,9 @@ cpu_exception_common:
 
 system_call:
     push    %ebp                            # save %ebp for later
+    push    %eax                            # the caller's DS and ES are
+    restore_kernel_segments                 # not saved: sysexit loads
+    pop     %eax                            # the user selector (#1031)
     mov     current_process_ptr, %ebp       # currently running process
     mov     %ecx, Process_ESP(%ebp)         # %esp is passed to us via %ecx
     mov     %edx, Process_EIP(%ebp)         # %eip is passed to us via %edx
@@ -455,6 +483,7 @@ no_reply_continue:
     pushl   Process_PSW(%ebp)
     lea Process_Stack_Top(%ebp), %eax
     mov %eax, (global_tss + 4)
+    load_user_segments                         # sysexit leaves DS and ES alone
     mov     Process_EBP(%ebp), %ebp
     popf
     sysexit
@@ -463,6 +492,13 @@ rti_continue:
     mov current_process_ptr, %esp
     lea Process_Stack_Top(%esp), %eax
     mov %eax, (global_tss + 4)
+    testl   $3, Process_CS(%esp)               # back to user mode?
+    jz      1f
+    movw    $USER_DATA_SELECTOR, Process_DS(%esp)  # iret would null the kernel's
+    movw    $USER_DATA_SELECTOR, Process_ES(%esp)  # selector, so a record saved
+    movw    $USER_DATA_SELECTOR, Process_FS(%esp)  # before #1031 gets the user's
+    movw    $USER_DATA_SELECTOR, Process_GS(%esp)
+1:
     restore_registers
     iret
 
