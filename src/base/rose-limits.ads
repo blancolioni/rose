@@ -40,12 +40,20 @@ package Rose.Limits is
    --  most 8 pages with a process at once (Max_Shared_Pages).
 
    Clean_Start_Percent : constant := 50;
-   Clean_Read_Limit    : constant := 64;
-   Clean_Copy_Limit    : constant := 128;
+   Clean_Read_Limit    : constant := 256;
+   Clean_Copy_Limit    : constant := 512;
    --  The memory server cleans the checkpoint log once it is
    --  Clean_Start_Percent full. After each commit, it reads at most
    --  Clean_Read_Limit header pages of the oldest entries, and copies
-   --  at most Clean_Copy_Limit of their live pages forward (#952).
+   --  at most Clean_Copy_Limit of their live pages forward (#952), and
+   --  never while its table of changes is half full or more. It has to
+   --  keep up with what the system writes: hold_pages (#975) writes about
+   --  3,000 pages again after each restore, and 128 a commit couldn't.
+   --  Where it is in the walk isn't saved, so after a restore it starts
+   --  again from the first entry, and has to read the whole of an entry's
+   --  header pages within one run of the system to free it: one of the
+   --  install's entries has 456, which 64 a commit didn't manage in a
+   --  four-minute run.
 
    Page_Size : constant := 2 ** 12;
 

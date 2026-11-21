@@ -9,8 +9,9 @@
 # new start, then the log's header.  The test:
 #
 #   1. installs Rose on a new disk, and shrinks the log with
-#      set-log-size.py, as scripts/test-log-clean does, so that the memory
-#      server starts cleaning it at once;
+#      set-log-size.py, as scripts/test-log-clean does, so that the
+#      install's entries fill FILL percent of it, and the memory server
+#      starts cleaning it at once;
 #   2. boots from the disk, and leaves it idle until check-log.py finds
 #      that the log's start has moved, for at most ROUNDS boots of MINUTES
 #      minutes each;
@@ -30,7 +31,7 @@
 
 ISO=${1:-images/rose.iso}
 HERE=$(cd "$(dirname "$0")" && pwd)
-MARGIN=${MARGIN:-3000}
+FILL=${FILL:-60}
 ROUNDS=${ROUNDS:-4}
 MINUTES=${MINUTES:-6}
 
@@ -77,7 +78,7 @@ check_log "after the install"
 used=$(sed -n 's/^.*next entry at location \([0-9]*\).*$/\1/p' \
            "$WORK/check-log.txt")
 [ -n "$used" ] || fail "check-log.py did not say where the next entry goes"
-python3 "$HERE/set-log-size.py" "$DISK" $((used + MARGIN)) \
+python3 "$HERE/set-log-size.py" "$DISK" $((used * 100 / FILL)) \
     || fail "set-log-size.py could not shrink the log"
 
 round=1
