@@ -16,6 +16,7 @@ hold_home:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-hold_home.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands-lookup.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/processes-launch.idl \
 	    $(INTERFACES)/processes-process.idl \

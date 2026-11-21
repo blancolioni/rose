@@ -1,4 +1,6 @@
-role Caps.Cap_Set_Service : Caps.Constructor;
---  The userland cap set server's Constructor (#825). Run_Self_Tests has
---  it, for the test of cap sets: init gives it. Petal gives none, and a
---  command must work without it.
+role Caps.Cap_Set_Service : Caps.Bank_Constructor;
+--  The userland cap set server's Bank_Constructor (#825, #849), which
+--  makes sets with Create, as a Constructor, or in a bank with Create_In.
+--  Run_Self_Tests has it, for the tests of cap sets: init gives it. The
+--  replaceable servers have it for their handovers (#831). Petal gives
+--  none, and a command must work without it.

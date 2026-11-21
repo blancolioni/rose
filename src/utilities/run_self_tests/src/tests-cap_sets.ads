@@ -1,5 +1,13 @@
 package Tests.Cap_Sets is
 
+   function Bank_Set_Test return Boolean;
+   --  Cap sets made in a bank (#849): make two sub-banks of the tests'
+   --  bank, a set in each, and put a cap in each. Destroy the first bank,
+   --  and check that its set no longer answers, that the other still
+   --  holds its cap, and that no set can be made in the destroyed bank.
+   --  Skipped without the Cap_Set_Service role or a bank, as when petal
+   --  runs it.
+
    function Cap_Set_Test return Boolean;
    --  The userland cap set server (#825), through the Cap_Set_Service
    --  role: fill a set with copies of one cap until Append raises, and
