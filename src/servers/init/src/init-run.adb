@@ -790,6 +790,18 @@ package body Init.Run is
            (Console_Stream_Cap, "init: page test failed" & NL);
       end if;
 
+      --  A persistent holder of 48 MiB, which checks every page after
+      --  each restore (#975).
+
+      if not Init.Self_Tests.Start_Page_Holder
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Standard_Output => Console_Stream_Cap)
+      then
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "init: hold_pages did not start" & NL);
+      end if;
+
       --  A persistent holder of derived caps, which checks them after a
       --  restore (#691).
 

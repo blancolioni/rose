@@ -139,6 +139,17 @@ package Init.Self_Tests is
    --  the first time it is restored, it checks that Child still works
    --  and is revoked when it rescinds Parent.  True if it was launched.
 
+   function Start_Page_Holder
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Launch the hold_pages command, found through Find_Cap, in a bank
+   --  of its own, with Create_Endpoint and Standard_Output for its roles
+   --  (#975). It fills 48 MiB, more than the machine has, and checks it;
+   --  it is persistent, and checks every page again each time it is
+   --  restored. True if it was launched and its pages were filled.
+
    function Replace_Held_File
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
