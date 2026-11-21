@@ -10,7 +10,8 @@ run-time system is built from the GNAT sources, which `rts/kernel/copy-runtime.s
 and `rts/user/create-sources.sh` copy from the installed compiler, and Rose's
 own versions of some of those units are based on gcc 15's.  Other versions of
 gcc ship different run-time units, so the build fails with them.  On a newer
-Fedora, build in a `fedora:43` container.
+Fedora, build in a `fedora:43` container (see
+[Building in a container](#building-in-a-container)).
 `make check-env` checks that everything the build needs is installed, and
 `clean-build.sh` runs it first.
 
@@ -66,6 +67,31 @@ that.
 The drivers and the utilities are built with run-time checks: range, index and
 overflow checks, and assertions.  `ROSE_CHECKS=unchecked make` builds them
 without any, as they were built before, which makes them 1% to 6% smaller.
+
+### Building in a container
+
+On a system without gcc 15, or without the packages above, build in a
+container instead.  `scripts/make-build-container`, run from the top of the
+tree, makes a Fedora 43 container called `rose-build`, installs the packages
+and Alire in it, and builds idle and Syn there, from GitHub.  It needs only
+podman or docker on the host.  `scripts/container-build` then runs a build
+in it:
+
+```
+scripts/make-build-container
+scripts/container-build                 # ./clean-build.sh
+scripts/container-build make test
+```
+
+The container mounts the directory above the tree at the same path, so a
+git worktree next to the tree builds in it too: run `container-build` from
+the worktree.  Both scripts take another name for the container
+(`make-build-container NAME`, `container-build -c NAME`), and
+`make-build-container --replace` makes it again, for a newer idle, say.
+`CONTAINER_ENGINE` chooses podman or docker (podman if it is installed).
+Under docker, builds run as your own user, so that the files they write in
+the tree are yours.  Set `ROSE_TEST_DIR` to a directory inside the mount to
+keep the boot tests' work directories where the host can see them.
 
 ## Status
 

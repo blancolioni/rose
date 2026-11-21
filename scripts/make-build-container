@@ -1,0 +1,114 @@
+#!/bin/sh
+# Create a container to build Rose in, and set it up: the packages the
+# build and the boot tests need, Alire, and idle (with Syn), built from
+# GitHub as CI builds them.  Run it from the top of the tree:
+#
+#   scripts/make-build-container [--replace] [NAME]
+#
+# NAME is rose-build by default (or ROSE_CONTAINER).  --replace removes a
+# container that already has the name; without it, an existing container
+# is an error.  scripts/container-build then runs builds in the container.
+#
+# The container mounts the directory above the tree at the same path, so
+# that git worktrees next to the tree (and their .git files) work in it
+# too.  SELinux labels are not used for the container (label=disable), so
+# the mounted directory is not relabelled.
+#
+# The container is Fedora 43, for GCC 15 (see the README).  The package
+# list is the one in .github/workflows/ci.yml; keep them in step.
+#
+# Settings, from the environment:
+#   CONTAINER_ENGINE  podman or docker (podman if it is installed)
+#   ROSE_BUILD_IMAGE  the image (registry.fedoraproject.org/fedora:43)
+#   ALIRE_VERSION     the Alire release that builds idle (2.1.0)
+#   SYN_REF, IDLE_REF the Syn and idle commits to build (main)
+
+set -e
+
+[ -f scripts/container-env.sh ] || {
+    echo "make-build-container: run it from the top of the Rose tree" >&2
+    exit 2
+}
+. ./scripts/container-env.sh
+
+replace=no
+while [ $# -gt 0 ]; do
+    case $1 in
+        --replace) replace=yes ;;
+        -*) echo "usage: make-build-container [--replace] [NAME]" >&2; exit 2 ;;
+        *) CONTAINER_NAME=$1 ;;
+    esac
+    shift
+done
+
+IMAGE=${ROSE_BUILD_IMAGE:-registry.fedoraproject.org/fedora:43}
+ALIRE_VERSION=${ALIRE_VERSION:-2.1.0}
+SYN_REF=${SYN_REF:-main}
+IDLE_REF=${IDLE_REF:-main}
+
+top=`pwd -P`
+mount=`dirname "$top"`
+
+if container_exists "$CONTAINER_NAME"; then
+    if [ $replace = yes ]; then
+        echo "make-build-container: removing the old $CONTAINER_NAME"
+        "$CONTAINER_ENGINE" rm -f "$CONTAINER_NAME" > /dev/null
+    else
+        echo "make-build-container: $CONTAINER_NAME already exists;" \
+             "use --replace to make it again" >&2
+        exit 1
+    fi
+fi
+
+echo "make-build-container: creating $CONTAINER_NAME ($CONTAINER_ENGINE," \
+     "$IMAGE), mounting $mount"
+"$CONTAINER_ENGINE" run -d --init --name "$CONTAINER_NAME" \
+    --security-opt label=disable \
+    --label "$CONTAINER_MOUNT_LABEL=$mount" \
+    -v "$mount:$mount" -w "$top" \
+    "$IMAGE" sleep infinity > /dev/null
+
+# The setup runs as root in the container, under either engine.  Syn and
+# idle go in $CONTAINER_TOOLS, outside the mounted directory, so that they
+# don't touch the host's own clones.
+echo "make-build-container: installing packages, Alire and idle"
+"$CONTAINER_ENGINE" exec -i -u 0 \
+    -e ALIRE_VERSION="$ALIRE_VERSION" \
+    -e SYN_REF="$SYN_REF" -e IDLE_REF="$IDLE_REF" \
+    -e TOOLS="$CONTAINER_TOOLS" \
+    "$CONTAINER_NAME" sh -s <<'EOF'
+set -e
+dnf install -y -q --setopt=install_weak_deps=False \
+    git-core make gcc gcc-gnat gprbuild binutils findutils gawk sed \
+    python3 python3-pyyaml xorriso grub2-tools grub2-tools-extra \
+    grub2-pc-modules mtools qemu-img qemu-system-x86-core \
+    curl unzip
+dnf clean all -q
+
+mkdir -p "$TOOLS"
+cd "$TOOLS"
+curl -sSfL -o alr.zip "https://github.com/alire-project/alire/releases/download/v${ALIRE_VERSION}/alr-${ALIRE_VERSION}-bin-x86_64-linux.zip"
+unzip -q alr.zip -d alire
+rm alr.zip
+alr=$TOOLS/alire/bin/alr
+"$alr" settings --global --set toolchain.assistant false
+# The solver gives up after 5 seconds by default and then builds idle
+# without Syn.
+"$alr" settings --global --set solver.timeout 600
+
+git clone -q https://github.com/blancolioni/syn syn
+git -C syn checkout -q "$SYN_REF"
+git clone -q https://github.com/blancolioni/idle idle
+git -C idle checkout -q "$IDLE_REF"
+(cd idle && "$alr" --non-interactive build)
+
+# Builds under docker run as the host's user, who has to be able to run
+# idle and read Syn.
+chmod -R a+rX "$TOOLS"
+EOF
+
+echo "make-build-container: checking the build requirements"
+scripts/container-build -c "$CONTAINER_NAME" make check-env
+
+echo "make-build-container: $CONTAINER_NAME is ready;" \
+     "build with scripts/container-build"
