@@ -220,7 +220,9 @@ Rather than writing, from time to time, one entry with the whole state, which wo
   `mem` reads it back from the log and appends it to the open entry in a batch of its own, which updates the index as any batch does.
 * An index page is live if it is a process's committed directory, or the leaf that the directory names.
   `mem` writes it again at the next checkpoint, with the leaves that it changes.
-* Each round reads at most 64 header pages and copies at most 128 pages (`Clean_Read_Limit`, `Clean_Copy_Limit`), and stops while `mem`'s table of changes is half full, so that cleaning never holds up the system for long.
+* Each round reads at most 256 header pages and copies at most 512 pages (`Clean_Read_Limit`, `Clean_Copy_Limit`), and stops while `mem`'s table of changes is half full, so that cleaning never holds up the system for long, but keeps up with a process that writes thousands of pages after each restore, as `hold_pages` does.
+  Where `mem` is in the walk isn't saved, so after a restore it starts again from the oldest entry, and has to read all of an entry's header pages in one run of the system to free it.
+  Once the log is full, though, nothing commits, so cleaning can't free anything, and the log stays full (#1029).
 
 The kernel's, the store's and `mem`'s tables are complete in every entry, so only pages hold an entry back.
 A shared page that anything maps is in `mem`'s memory, and one that nothing maps was written back to its region (ADR 0025), so `mem` doesn't look for them in the log: before the checkpoint that frees an entry, it marks every saved shared page unsaved, so that the checkpoint writes them all again.
