@@ -76,6 +76,7 @@ package Tests.Suite is
                    Tests.Signals.Signal_Test'Access,
                    Tests.Banks.Dependent_Test'Access,
                    Tests.Banks.Reuse_Test'Access,
+                   Tests.Banks.Limit_Test'Access,
                    Tests.Cap_Sets.Cap_Set_Test'Access,
                    Tests.Replacement.Replacement_Test'Access,
                    Tests.Replacement.Replace_Process_Test'Access,

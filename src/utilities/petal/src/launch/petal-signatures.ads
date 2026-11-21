@@ -7,7 +7,10 @@ package Petal.Signatures is
    Max_Text      : constant := 4096;
    Max_Arguments : constant := 16;
    Max_Streams   : constant := 3;
-   Max_Role_Caps : constant := 4;
+   Max_Role_Caps : constant := 16;
+   --  As many as a command's launch call can carry (Petal.Command_Launch
+   --  has 16 cap slots). It was 4, which dropped run_self_tests' fifth
+   --  role and the ones after it, its bank among them (#517).
 
    type Slice is
       record
@@ -70,17 +73,19 @@ package Petal.Signatures is
      (Create_Endpoint_Cap, Delete_Cap, Rescind_Cap, Find_Command_Cap,
       Console_Cap, Clock_Service_Cap, Storage_Service_Cap,
       Screen_Service_Cap, Create_Signal_Cap, Cap_Set_Service_Cap,
-      Other_Role_Cap);
+      Replace_Process_Cap, Other_Role_Cap);
    --  A cap that one of the command's roles needs, other than a stream:
    --  a system cap, a bank for the Storage_Service role, which petal
-   --  doesn't have yet and gives as the null cap (ADR 0025), the screen
-   --  for the Screen_Service role, which petal gives as the null cap too
+   --  makes below its own for each command (ADR 0025, #517), the screen
+   --  for the Screen_Service role, which petal gives as the null cap
    --  (#582), the cap set server for the Cap_Set_Service role, which
    --  petal gives as the null cap as well (#825), petal's own cap that
    --  makes signal caps for the Create_Signal role, which it doesn't have
    --  yet either (#708), the command registry's Commands interface for
    --  the Find_Command role (#460), the console's Terminal for the
-   --  Console role (#454), or a role the shell does not supply.
+   --  Console role (#454), the null cap for the Replace_Process role,
+   --  since petal holds no Replacer (#866), or a role the shell does not
+   --  supply.
 
    type Role_Cap_Record is
       record
