@@ -1,3 +1,5 @@
+16#D47E_21CD_8DD9_6C83#  interface rose.interfaces.caps.bank_constructor
+16#61CE_77AE_0676_0513#  rose.interfaces.caps.bank_constructor.create_in(in interface rose.interfaces.storage.bank) return capability
 16#9840_01A1_D74B_114B#  interface rose.interfaces.caps.cap
 16#A5B2_8B7D_EA22_7358#  rose.interfaces.caps.cap.destroy
 16#7B7D_1260_D804_E856#  rose.interfaces.caps.cap.get_object_id return object_id

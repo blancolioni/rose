@@ -25,6 +25,13 @@ package Tests.Registry is
    function Bank return Rose.Capabilities.Capability;
    --  The bank, or the null cap.
 
+   procedure Set_Bank_Cap_Sets (Cap_Sets : Rose.Capabilities.Capability);
+   --  The same cap set server's Bank_Constructor (#849), or the null
+   --  cap.
+
+   function Bank_Cap_Sets return Rose.Capabilities.Capability;
+   --  The cap set server's Bank_Constructor, or the null cap.
+
    procedure Set_Screen (Screen : Rose.Capabilities.Capability);
    --  The screen driver's Surface, which Run_Self_Tests is given for its
    --  Screen_Service role when there is a framebuffer (#582), or the null

@@ -25,6 +25,7 @@ auth:
 	    $(INTERFACES)/users-user.idl \
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/commands-lookup.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/processes-launch.idl \
 	    $(INTERFACES)/processes-process.idl \

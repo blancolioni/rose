@@ -1,0 +1,15 @@
+--  A Constructor that can also make a set in a bank (#849). A set made
+--  with Create_In belongs to whoever holds the bank: when the bank, or a
+--  bank above it, is destroyed, the server releases the set, as if its
+--  holder had (ADR 0014, section 3). A set made with Create belongs to
+--  the server, as before.
+
+interface Caps.Bank_Constructor : Caps.Constructor is
+
+   function Create_In
+     (Bank : interface Storage.Bank)
+     return Capability;
+   --  Fails if the bank has been destroyed, or the storage server has no
+   --  room to register the set with it.
+
+end Caps.Bank_Constructor;

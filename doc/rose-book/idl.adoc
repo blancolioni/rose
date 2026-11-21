@@ -54,7 +54,7 @@ ADR 0034 says which interface is in which group, and why:
 |===
 | Group | Interfaces and roles
 
-| `Caps` | `Cap`, `Cap_Set`, `Releasable_Cap_Set`, `Constructor`, `Receiver`; the roles `Create_Endpoint`, `Create_Signal`, `Delete_Cap`, `Rescind_Cap` and `Cap_Set_Service`
+| `Caps` | `Cap`, `Cap_Set`, `Releasable_Cap_Set`, `Constructor`, `Bank_Constructor`, `Receiver`; the roles `Create_Endpoint`, `Create_Signal`, `Delete_Cap`, `Rescind_Cap` and `Cap_Set_Service`
 | `Common` | `Named`, `Resource`, `Transactional`: the mix-ins that interfaces of several groups descend from
 | `Streams` | `Reader`, `Writer`, `Stream`, `Releasable_Reader`, `Releasable_Writer`, `Seekable`, `Seekable_Reader`, `Output_Redirect`; the roles `Standard_Input`, `Standard_Output`, `Standard_Error` and `Standard_IO`
 | `Processes` | `Process`, `Kernel_Process`, `Segment`, `Heap`, `Server`, `Launch`, `Exec`, `Executable`, `Memory`, `Signalled`, `Restorable`, `Replaceable`, `Saveable`, `Replacement`, `Replacer`; the role `Replace_Process`

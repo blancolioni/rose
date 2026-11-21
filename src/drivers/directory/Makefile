@@ -25,6 +25,7 @@ directory:
 	    $(INTERFACES)/processes-saveable.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
 	    $(INTERFACES)/files-directory.idl \

@@ -21,6 +21,7 @@ user:
 	    $(INTERFACES)/processes-saveable.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
