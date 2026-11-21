@@ -14,6 +14,7 @@ with Rose.Interfaces.Processes.Launch;
 with Rose.Interfaces.Common.Named.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Processes.Process_Control;
+with Rose.Interfaces.Processes.Process_Control.Client;
 with Rose.Interfaces.Files.Writable_File.Client;
 
 with Tests.Files;
@@ -211,5 +212,83 @@ package body Tests.Processes is
       Ada.Text_IO.Put (Message);
       return False;
    end Fail;
+
+   ------------------------
+   -- Process_Limit_Test --
+   ------------------------
+
+   function Process_Limit_Test return Boolean is
+      use type Rose.Capabilities.Capability;
+      package Control renames
+        Rose.Interfaces.Processes.Process_Control.Client;
+
+      Max_Probes : constant := 300;
+      --  More than the system can run, at 64 processes or at 256 (#913).
+
+      Probes     : array (1 .. Max_Probes) of Control.Process_Control_Client;
+      Count      : Natural := 0;
+      Launcher   : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+                     Tests.Registry.Launcher ("process_probe");
+
+      function Launch_Probe return Rose.Capabilities.Capability;
+      --  The Process_Control cap of a new probe, or the null cap if the
+      --  launch fails.
+
+      ------------------
+      -- Launch_Probe --
+      ------------------
+
+      function Launch_Probe return Rose.Capabilities.Capability is
+      begin
+         declare
+            Probe : Rose.Interfaces.Processes.Process_Control
+              .Process_Control_Object'Class :=
+                Launcher.Launch (Rose.System_Calls.Own_Bank.Cap);
+         begin
+            return Probe.Process_Control_Cap;
+         end;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return Rose.Capabilities.Null_Capability;
+      end Launch_Probe;
+
+   begin
+      Ada.Text_IO.Put ("Process limit test");
+
+      while Count < Max_Probes loop
+         declare
+            Cap : constant Rose.Capabilities.Capability := Launch_Probe;
+         begin
+            exit when Cap = Rose.Capabilities.Null_Capability;
+            Count := Count + 1;
+            Probes (Count).Open (Cap);
+         end;
+      end loop;
+
+      Ada.Text_IO.Put (":" & Natural'Image (Count) & " probes");
+
+      for Probe of Probes (1 .. Count) loop
+         Probe.Destroy;
+      end loop;
+
+      if Count = Max_Probes then
+         return Fail ("never ran out of processes");
+      end if;
+
+      --  Ending them makes room again.
+
+      declare
+         Cap   : constant Rose.Capabilities.Capability := Launch_Probe;
+         Again : Control.Process_Control_Client;
+      begin
+         if Cap = Rose.Capabilities.Null_Capability then
+            return Fail ("no launch after ending the probes");
+         end if;
+         Again.Open (Cap);
+         Again.Destroy;
+      end;
+
+      return True;
+   end Process_Limit_Test;
 
 end Tests.Processes;
