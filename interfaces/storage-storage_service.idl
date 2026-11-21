@@ -1,5 +1,6 @@
 role Storage.Storage_Service : Storage.Bank;
 --  A bank to reserve storage from (ADR 0014). Run_Self_Tests has it, for
---  the test of shared segments (ADR 0025): init gives it a sub-bank of the
---  root bank. Petal holds no bank yet, so it gives none, and a command
---  must work without one.
+--  the tests of banks and shared segments (ADR 0025): init gives it a
+--  sub-bank of the root bank. Petal gives each command a new sub-bank of
+--  its own, with no limits of its own, and destroys it when the command
+--  ends (#517). A command must still work without one.

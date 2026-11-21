@@ -5,6 +5,7 @@ with Ada_Text_IO;
 
 with Rose.Interfaces.Commands.Lookup.Client;
 with Rose.Interfaces.Processes.Launch.Client;
+with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Users.Rights.Client;
 with Rose.Interfaces.Screens.Terminal.Client;
@@ -55,6 +56,12 @@ package body Petal.Command_Launch is
 
    Rights : Rose.Interfaces.Users.Rights.Client.Rights_Client;
    --  The same Rights interface, opened, if there is one.
+
+   Own_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+   Own_Bank_Open : Boolean := False;
+   --  Petal's own bank (ADR 0015), opened the first time a command has
+   --  the Storage_Service role, and kept open, since its cap is the
+   --  process's.
 
    Max_Words : constant := 64;
    type Word_Array is array (1 .. Max_Words) of Slice;
@@ -260,6 +267,13 @@ package body Petal.Command_Launch is
       --  The grants that the rights broker made for the command's
       --  categorised roles, and their caps.
 
+      Command_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+      Have_Bank    : Boolean := False;
+      --  The bank for the command's Storage_Service role: a sub-bank of
+      --  petal's own, with no limits of its own, so that the session's
+      --  limits apply. Petal destroys it when the command ends, which
+      --  releases what the command reserved from it (#517).
+
       Gave_Console : Boolean := False;
       --  The command has the Console role.
 
@@ -280,6 +294,14 @@ package body Petal.Command_Launch is
       function Next_Positional return Natural;
 
       procedure Fail (Message : String);
+
+      function New_Command_Bank return Rose.Capabilities.Capability;
+      --  Make Command_Bank, and return its cap, or the null cap if petal
+      --  has no bank, or can't make one below it.
+
+      procedure Release_Command_Bank;
+      --  Destroy Command_Bank, if the command was given one, and delete
+      --  petal's caps to it.
 
       procedure Release_Grants;
       --  Tell the broker that the command has finished, so that it revokes
@@ -344,6 +366,38 @@ package body Petal.Command_Launch is
          return 0;
       end Find_Short;
 
+      ----------------------
+      -- New_Command_Bank --
+      ----------------------
+
+      function New_Command_Bank return Rose.Capabilities.Capability is
+      begin
+         if Rose.System_Calls.Own_Bank.Cap = Rose.Capabilities.Null_Capability
+         then
+            return Rose.Capabilities.Null_Capability;
+         end if;
+
+         if not Own_Bank_Open then
+            Own_Bank.Open (Rose.System_Calls.Own_Bank.Cap);
+            Own_Bank_Open := True;
+         end if;
+
+         declare
+            Sub : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
+                    Own_Bank.Create_Sub_Bank (0, 0);
+         begin
+            if Sub.Bank_Cap = Rose.Capabilities.Null_Capability then
+               return Rose.Capabilities.Null_Capability;
+            end if;
+            Command_Bank.Open (Sub.Bank_Cap);
+         end;
+         Have_Bank := True;
+         return Command_Bank.Bank_Cap;
+      exception
+         when Invocation_Error =>
+            return Rose.Capabilities.Null_Capability;
+      end New_Command_Bank;
+
       ---------------------
       -- Next_Positional --
       ---------------------
@@ -361,6 +415,28 @@ package body Petal.Command_Launch is
          end loop;
          return 0;
       end Next_Positional;
+
+      --------------------------
+      -- Release_Command_Bank --
+      --------------------------
+
+      procedure Release_Command_Bank is
+      begin
+         if not Have_Bank then
+            return;
+         end if;
+
+         --  The bank is gone already if the session's bank was destroyed.
+
+         begin
+            Command_Bank.Destroy;
+         exception
+            when Invocation_Error =>
+               null;
+         end;
+         Command_Bank.Close;
+         Have_Bank := False;
+      end Release_Command_Bank;
 
       --------------------
       -- Release_Grants --
@@ -941,8 +1017,10 @@ package body Petal.Command_Launch is
                when Create_Signal_Cap =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.System_Calls.Create_Signal_Capability;
-               when Storage_Service_Cap | Screen_Service_Cap
-                  | Cap_Set_Service_Cap
+               when Storage_Service_Cap =>
+                  Caps (Role.Cap_Index + 1) := New_Command_Bank;
+               when Screen_Service_Cap | Cap_Set_Service_Cap
+                  | Replace_Process_Cap
                =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.Capabilities.Null_Capability;
@@ -959,6 +1037,7 @@ package body Petal.Command_Launch is
 
          if Failed then
             Release_Grants;
+            Release_Command_Bank;
             return;
          end if;
 
@@ -974,6 +1053,7 @@ package body Petal.Command_Launch is
          if Endpoint = Rose.Capabilities.Null_Capability then
             Fail ("cannot launch");
             Release_Grants;
+            Release_Command_Bank;
             return;
          end if;
 
@@ -1026,6 +1106,7 @@ package body Petal.Command_Launch is
          Rose.System_Calls.Send_Cap (Params, Endpoint);
          Rose.System_Calls.Invoke_Capability (Params);
          Release_Grants;
+         Release_Command_Bank;
       end;
    end Launch;
 
