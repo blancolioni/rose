@@ -4,7 +4,8 @@ procedure Rose.Core.Hold_Home
   (Find_Command    : in out Rose.Interfaces.Commands.Lookup
     .Lookup_Object'Class;
    Cap_Set_Service : in out
-     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Bank_Constructor
+       .Bank_Constructor_Object'Class;
    User_Control    : out Rose.Capabilities.Capability;
    Home_Control    : out Rose.Capabilities.Capability)
 is
@@ -15,7 +16,7 @@ begin
 
    Home_Holder.Create_Server
      (Commands        => Find_Command.Lookup_Cap,
-      Cap_Set_Service => Cap_Set_Service.Constructor_Cap,
+      Cap_Set_Service => Cap_Set_Service.Bank_Constructor_Cap,
       User_Control    => User_Control,
       Home_Control    => Home_Control);
 end Rose.Core.Hold_Home;

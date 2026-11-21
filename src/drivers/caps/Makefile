@@ -12,6 +12,11 @@ caps:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	    $(INTERFACES)/caps-bank_constructor.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/caps-constructor.idl $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/common-resource.idl $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/processes-restorable.idl

@@ -1,3 +1,4 @@
 create-endpoint
 delete-endpoint
 rescind-endpoint
+create-signal               # for the banks' signals (#849)

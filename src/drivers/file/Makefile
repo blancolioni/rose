@@ -24,6 +24,10 @@ file:
 	    $(INTERFACES)/processes-saveable.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
+	    $(INTERFACES)/caps-bank_constructor.idl \
+	    $(INTERFACES)/storage-bank.idl \
+	    $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/caps-constructor.idl \
 	    $(INTERFACES)/files-writable_file.idl \
 	    $(INTERFACES)/files-transactional_writable_file.idl \

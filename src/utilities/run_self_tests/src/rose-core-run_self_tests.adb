@@ -14,7 +14,7 @@ procedure Rose.Core.Run_Self_Tests
      .Surface_Object'Class;
    Create_Signal   : in out Rose.Interfaces.Caps.Cap.Cap_Object'Class;
    Cap_Set_Service : in out
-     Rose.Interfaces.Caps.Constructor.Constructor_Object'Class;
+     Rose.Interfaces.Caps.Bank_Constructor.Bank_Constructor_Object'Class;
    Replace_Process : in out Rose.Interfaces.Processes.Replacer
      .Replacer_Object'Class)
 is
@@ -44,6 +44,7 @@ begin
    Tests.Registry.Set_Bank (Storage_Service.Bank_Cap);
    Tests.Registry.Set_Screen (Screen_Service.Surface_Cap);
    Tests.Registry.Set_Cap_Sets (Cap_Set_Service.Constructor_Cap);
+   Tests.Registry.Set_Bank_Cap_Sets (Cap_Set_Service.Bank_Constructor_Cap);
    Tests.Registry.Set_Replacer (Replace_Process.Replacer_Cap);
    Rose.System_Calls.Use_Capabilities
      (Create_Signal => Create_Signal.Cap_Cap);
