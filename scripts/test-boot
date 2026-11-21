@@ -21,7 +21,8 @@
 #      then kilo, which has to make, save and read back a file, and drop
 #      a change that isn't saved (#735); then logs out and in again,
 #      which ends the first session's bank and makes another (#450);
-#   3. waits for a checkpoint, stops the machine, and runs check-log.py on
+#   3. waits for a checkpoint, checks that it lists no self-test probe
+#      left starting (#915), stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent.
 #
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
@@ -156,6 +157,19 @@ wait_for "^second session" 20 || fail "the second session does not run commands"
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45
 stop_qemu
+
+# The self tests end every probe that they launch, including in the
+# process limit test, where the last launch fails. A failed launch used
+# to leave its process in the kernel's table, never started (#915), so
+# the last checkpoint must not list a probe.
+probes=$(awk '/Entering checkpoint/ { n = 0 }
+              /process_probe\[S\]: disable write pages/ { n++ }
+              END { print n + 0 }' "$WORK/serial")
+[ "$probes" -eq 0 ] || {
+    echo "FAIL: $probes probes left starting at the last checkpoint;" \
+         "the disk image is in $WORK"
+    exit 1
+}
 
 echo "Checking the log"
 python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.out" || {
