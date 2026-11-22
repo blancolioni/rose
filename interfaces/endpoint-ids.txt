@@ -265,3 +265,4 @@
 16#90A5_5A92_B47A_619D#  interface rose.interfaces.users.user
 16#92F7_E9F1_B3B6_AFFD#  rose.interfaces.users.user.home_directory return interface rose.interfaces.files.writable_directory
 16#A3C5_53FF_F18C_1429#  rose.interfaces.users.user.new_session return interface rose.interfaces.storage.bank
+16#5C70_BE3F_24A4_FCC9#  rose.interfaces.users.user.first_process return interface rose.interfaces.processes.launch

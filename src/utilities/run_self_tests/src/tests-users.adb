@@ -209,6 +209,8 @@ package body Tests.Users is
          Name            => (if Fresh then Name else ""),
          Home            => Given (Home),
          Bank            => Given (Bank),
+         First_Process   =>
+           Given (Tests.Registry.Launcher_Cap ("petal")),
          User            => User,
          Control         => Control,
          Previous        => Previous);
@@ -264,6 +266,22 @@ package body Tests.Users is
       then
          return Fail ("the home directory is not the one given");
       end if;
+
+      --  The user starts with petal (#525): its first process is petal's
+      --  Launch, whose metadata is petal's.
+
+      declare
+         First : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+                   User.First_Process;
+         Petal : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+                   Tests.Registry.Launcher ("petal");
+      begin
+         if First.Metadata'Length = 0
+           or else First.Metadata /= Petal.Metadata
+         then
+            return Fail ("the first process is not petal");
+         end if;
+      end;
 
       return True;
    end User_Test;

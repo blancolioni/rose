@@ -20,6 +20,8 @@ rights:
 	    $(INTERFACES)/time-clock.idl \
 	    $(INTERFACES)/processes-restorable.idl \
 	    $(INTERFACES)/users-user.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
