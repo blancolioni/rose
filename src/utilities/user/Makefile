@@ -17,6 +17,8 @@ user:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-user.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-user.idl \
+	    $(INTERFACES)/processes-launch.idl \
+	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/processes-replaceable.idl \
 	    $(INTERFACES)/processes-saveable.idl \
 	    $(INTERFACES)/caps-releasable_cap_set.idl \

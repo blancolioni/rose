@@ -1159,7 +1159,8 @@ package body Init.Self_Tests is
 
       --  The user command's launch call, as src/utilities/user/
       --  rose-core-user.idl declares it: Create_Endpoint,
-      --  Cap_Set_Service, Home and Bank, then Previous, and its name,
+      --  Cap_Set_Service, Home, Bank and First_Process, then Previous,
+      --  and its name,
       --  which a new version takes from the old one; and its results
       --  User and Control. Then the directory command's, as src/drivers/
       --  directory/rose-core-directory.idl declares it: Create_Endpoint,
@@ -1170,7 +1171,7 @@ package body Init.Self_Tests is
           (Replace_Process => Replace_Process,
            Control         => User_Ctl,
            Program         => User_Cap,
-           Null_Caps       => 4,
+           Null_Caps       => 5,
            Empty_Strings   => 1,
            Results         => 2)
         and then Replace

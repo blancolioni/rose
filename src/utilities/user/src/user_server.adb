@@ -2,6 +2,8 @@ with Rose.Objects;
 with Rose.Server;
 with Rose.Words;
 
+with Rose.Interfaces.Objects;
+with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Users.User.Server;
 with Rose.Interfaces.Files.Writable_Directory.Client;
@@ -16,9 +18,11 @@ package body User_Server is
    --    the User object's identifier
    --    the length of the user's name, then its characters
    --
-   --  The caps it holds, Home, Bank and Cap_Set_Service, are its
+   --  The caps it holds, Home, Bank, First_Process and Cap_Set_Service,
+   --  are its
    --  command's arguments, which Rose.Replacement hands over (#901), so
-   --  it names none of its own.
+   --  it names none of its own. An old version without First_Process
+   --  (#525) hands over none, and the new one has the null cap.
 
    --  One object serves User, and Named as its ancestor. Its state is the
    --  package's, so that a checkpoint holds it with the process's memory.
@@ -49,6 +53,13 @@ package body User_Server is
      (Item : in out User_Object)
       return Bank_Class;
 
+   subtype Launch_Class is
+     Rose.Interfaces.Processes.Launch.Launch_Object'Class;
+
+   overriding function First_Process
+     (Item : in out User_Object)
+      return Launch_Class;
+
    Context    : aliased Rose.Server.Server_Context;
    The_User   : aliased User_Object;
    User_Name  : String (1 .. Max_Name_Length);
@@ -56,6 +67,8 @@ package body User_Server is
    Home_Cap   : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    Bank_Cap   : Rose.Capabilities.Capability :=
+     Rose.Capabilities.Null_Capability;
+   First_Cap  : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    User_Id    : Rose.Objects.Capability_Identifier := 0;
    --  The identifier that the User object had in the version that this
@@ -71,6 +84,7 @@ package body User_Server is
      (User_Name       : String;
       Home            : Rose.Capabilities.Capability;
       Bank            : Rose.Capabilities.Capability;
+      First_Process   : Rose.Capabilities.Capability;
       Cap_Set_Service : Rose.Capabilities.Capability;
       Control         : out Rose.Capabilities.Capability)
    is
@@ -82,12 +96,31 @@ package body User_Server is
 
       Home_Cap := Home;
       Bank_Cap := Bank;
+      First_Cap := First_Process;
       Rose.Interfaces.Users.User.Server.Attach
         (Context, The_User'Access, User_Id);
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Cap_Set_Service);
       Control := Rose.Replacement.Replaceable_Cap;
    end Create_Server;
+
+   -------------------
+   -- First_Process --
+   -------------------
+
+   overriding function First_Process
+     (Item : in out User_Object)
+      return Launch_Class
+   is
+      pragma Unreferenced (Item);
+      use type Rose.Capabilities.Capability;
+   begin
+      if First_Cap = Rose.Capabilities.Null_Capability then
+         raise Rose.Interfaces.Objects.Invocation_Error
+           with "no first process";
+      end if;
+      return Rose.Interfaces.Processes.Launch.Client.From_Cap (First_Cap);
+   end First_Process;
 
    --------------------
    -- Home_Directory --

@@ -10,6 +10,8 @@ procedure Rose.Core.User
    Home            : in out
      Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
    Bank            : in out Rose.Interfaces.Storage.Bank.Bank_Object'Class;
+   First_Process   : in out
+     Rose.Interfaces.Processes.Launch.Launch_Object'Class;
    User            : out Rose.Capabilities.Capability;
    Control         : out Rose.Capabilities.Capability)
 is
@@ -31,6 +33,7 @@ begin
      (User_Name       => Name,
       Home            => Home.Writable_Directory_Cap,
       Bank            => Bank.Bank_Cap,
+      First_Process   => First_Process.Launch_Cap,
       Cap_Set_Service => Cap_Set_Service.Bank_Constructor_Cap,
       Control         => Control);
    User := User_Server.Interface_Cap;
