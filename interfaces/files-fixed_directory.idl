@@ -1,0 +1,18 @@
+--  A directory that can't change, but whose entries keep their own rights
+--  (ADR 0036, case 1). Nobody can add, rename or delete an entry through
+--  it, but a file in it can be written, a child directory comes back as a
+--  Fixed_Directory, so the view holds all the way down, and a special file
+--  is the Stream it was added as.
+
+interface Files.Fixed_Directory : Files.Directory is
+
+   function Get_Writable_File
+     (Index : Positive) return interface Files.Writable_File;
+
+   function Get_Fixed_Directory
+     (Index : Positive) return interface Files.Fixed_Directory;
+
+   function Get_Special_File (Index : Positive) return interface Streams.Stream;
+   --  Fails if the entry isn't a special file.
+
+end Files.Fixed_Directory;

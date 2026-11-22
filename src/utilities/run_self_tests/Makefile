@@ -25,6 +25,8 @@ run_self_tests:
 	    $(INTERFACES)/users-user.idl \
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-fixed_directory.idl \
+	    $(INTERFACES)/streams-stream.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-writable_file.idl \

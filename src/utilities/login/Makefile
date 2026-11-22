@@ -30,6 +30,7 @@ login:
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/processes-launch.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-fixed_directory.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-writable_file.idl \

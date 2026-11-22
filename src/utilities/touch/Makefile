@@ -16,6 +16,8 @@ touch:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-touch.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-fixed_directory.idl \
+	    $(INTERFACES)/streams-stream.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-writable_file.idl \

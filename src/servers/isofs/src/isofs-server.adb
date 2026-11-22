@@ -84,6 +84,13 @@ package body IsoFS.Server is
       Index : in     Positive)
       return Rose.Capabilities.Capability;
 
+   function Get_Special_Reader
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+   --  A CD has no special files (ADR 0036, section 5), so this is always
+   --  a null cap.
+
    function Check_Directory
      (Id : Rose.Objects.Capability_Identifier)
       return IsoFS.Directories.Directory_Type;
@@ -365,6 +372,20 @@ package body IsoFS.Server is
          Identifier  => Rose.Objects.Capability_Identifier (File));
    end Get_Ordinary_File;
 
+   ------------------------
+   -- Get_Special_Reader --
+   ------------------------
+
+   function Get_Special_Reader
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      pragma Unreferenced (Id, Index);
+   begin
+      return Rose.Capabilities.Null_Capability;
+   end Get_Special_Reader;
+
    -----------------
    -- Open_Reader --
    -----------------
@@ -520,6 +541,7 @@ package body IsoFS.Server is
          Entry_Size            => Entry_Size'Access,
          Get_Ordinary_File     => Get_Ordinary_File'Access,
          Get_Directory         => Get_Directory'Access,
+         Get_Special_Reader    => Get_Special_Reader'Access,
          Instanced             => True);
 
       Rose.Interfaces.Files.File.Server.Attach_Interface

@@ -18,6 +18,8 @@ with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Files.Directory.Client;
 with Rose.Interfaces.Files.File;
 with Rose.Interfaces.Files.File.Client;
+with Rose.Interfaces.Files.Fixed_Directory;
+with Rose.Interfaces.Files.Fixed_Directory.Client;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Writable_Directory.Client;
@@ -26,6 +28,10 @@ with Rose.Interfaces.Files.Writable_File;
 with Rose.Interfaces.Files.Writable_File.Client;
 with Rose.Interfaces.Streams.Readable;
 with Rose.Interfaces.Streams.Readable.Client;
+with Rose.Interfaces.Streams.Reader;
+with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Streams.Stream;
+with Rose.Interfaces.Streams.Stream.Client;
 
 package body Directory_Server is
 
@@ -39,6 +45,8 @@ package body Directory_Server is
 
    subtype Writable_Directory_Class is
      Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
+   subtype Fixed_Directory_Class is
+     Rose.Interfaces.Files.Fixed_Directory.Fixed_Directory_Object'Class;
 
    Format : constant Rose.Words.Word_32 := 1;
    --  The version of this server's part of the state (#831):
@@ -112,6 +120,10 @@ package body Directory_Server is
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability;
 
+   overriding function Fixed_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
    overriding function Writable_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability;
@@ -173,6 +185,25 @@ package body Directory_Server is
      (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Files.Writable_File.Writable_File_Object'Class;
+
+   overriding function Get_Fixed_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Fixed_Directory_Class;
+   --  The directory Index, which can't be changed through what this
+   --  returns, but whose entries keep their rights (ADR 0036).
+
+   overriding function Get_Special_Reader
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class;
+
+   overriding function Get_Special_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Stream.Stream_Object'Class;
+   --  Both raise if the entry isn't a special file. Nothing makes one
+   --  yet (#929).
 
    overriding function Get_Writable_Directory
      (Item  : in out Directory_Object;
@@ -587,6 +618,17 @@ package body Directory_Server is
       return Find (Name);
    end Find_Entry;
 
+   -------------------------
+   -- Fixed_Directory_Cap --
+   -------------------------
+
+   overriding function Fixed_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of
+         (Context, Item,
+          Rose.Interfaces.Files.Writable_Directory.Fixed_Directory_Interface));
+
    ----------------
    -- Get_Branch --
    ----------------
@@ -632,6 +674,25 @@ package body Directory_Server is
            .Read_Only);
       end;
    end Get_Directory;
+
+   -------------------------
+   -- Get_Fixed_Directory --
+   -------------------------
+
+   overriding function Get_Fixed_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Fixed_Directory_Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Directory) then
+         raise Constraint_Error with "get fixed directory: not a directory";
+      end if;
+
+      return Rose.Interfaces.Files.Fixed_Directory.Client.From_Cap
+        (Entries (Index).Child.Fixed_Directory_Cap);
+   end Get_Fixed_Directory;
 
    --------------
    -- Get_Leaf --
@@ -681,6 +742,46 @@ package body Directory_Server is
          return Rose.Interfaces.Files.File.Client.From_Cap (Listed.Read_Only);
       end;
    end Get_Ordinary_File;
+
+   ----------------------
+   -- Get_Special_File --
+   ----------------------
+
+   overriding function Get_Special_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Stream.Stream_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Special_File)
+      then
+         raise Constraint_Error with "get special file: not a special file";
+      end if;
+
+      return Rose.Interfaces.Streams.Stream.Client.From_Cap
+        (Rose.Capabilities.Null_Capability);
+   end Get_Special_File;
+
+   ------------------------
+   -- Get_Special_Reader --
+   ------------------------
+
+   overriding function Get_Special_Reader
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Special_File)
+      then
+         raise Constraint_Error with "get special reader: not a special file";
+      end if;
+
+      return Rose.Interfaces.Streams.Reader.Client.From_Cap
+        (Rose.Capabilities.Null_Capability);
+   end Get_Special_Reader;
 
    ----------------------------
    -- Get_Writable_Directory --

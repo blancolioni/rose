@@ -86,14 +86,18 @@
 16#AC27_39EA_3493_1BEC#  rose.interfaces.files.directory.entry_size(in positive) return storage_count
 16#68DC_F411_9D2F_9BBA#  rose.interfaces.files.directory.get_ordinary_file(in positive) return interface rose.interfaces.files.file
 16#0626_346A_6D45_9717#  rose.interfaces.files.directory.get_directory(in positive) return interface rose.interfaces.files.directory
+16#FA04_C460_CEC8_6FDF#  rose.interfaces.files.directory.get_special_reader(in positive) return interface rose.interfaces.streams.reader
 16#159C_F386_7342_D811#  interface rose.interfaces.files.file
 16#E83F_FD09_82C9_A171#  rose.interfaces.files.file.size return storage_count
 16#21CF_C43A_5CE7_89F1#  rose.interfaces.files.file.open_seekable_reader return interface rose.interfaces.streams.seekable_reader
 16#B060_3DCC_C9E9_9361#  interface rose.interfaces.files.file_system
 16#F114_9F1A_16BA_4445#  rose.interfaces.files.file_system.root_directory return interface rose.interfaces.files.directory
+16#5FB2_656F_F5BE_1473#  interface rose.interfaces.files.fixed_directory
+16#44DE_9D6C_CB1E_8028#  rose.interfaces.files.fixed_directory.get_writable_file(in positive) return interface rose.interfaces.files.writable_file
+16#D5EC_4E6C_0EF1_968E#  rose.interfaces.files.fixed_directory.get_fixed_directory(in positive) return interface rose.interfaces.files.fixed_directory
+16#9CB6_DCD9_A7BD_908B#  rose.interfaces.files.fixed_directory.get_special_file(in positive) return interface rose.interfaces.streams.stream
 16#0861_E01B_E970_BC14#  interface rose.interfaces.files.transactional_writable_file
 16#3931_F38F_6323_5EEF#  interface rose.interfaces.files.writable_directory
-16#A136_0A8E_2CFD_2D2D#  rose.interfaces.files.writable_directory.get_writable_file(in positive) return interface rose.interfaces.files.writable_file
 16#60A5_01F4_CA1B_CB23#  rose.interfaces.files.writable_directory.get_writable_directory(in positive) return interface rose.interfaces.files.writable_directory
 16#B243_FE95_492A_CFC4#  rose.interfaces.files.writable_directory.create_file(in string) return interface rose.interfaces.files.writable_file
 16#6158_F08E_3793_0231#  rose.interfaces.files.writable_directory.create_directory(in string) return interface rose.interfaces.files.writable_directory
