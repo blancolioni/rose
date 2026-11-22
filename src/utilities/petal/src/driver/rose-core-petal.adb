@@ -11,6 +11,8 @@ procedure Rose.Core.Petal
      .Terminal_Object'Class;
    Clock_Service  : in out Rose.Interfaces.Time.Clock.Clock_Object'Class;
    Rights_Service : in out Rose.Interfaces.Users.Rights.Rights_Object'Class;
+   System_Directory : in out Rose.Interfaces.Files.Fixed_Directory
+     .Fixed_Directory_Object'Class;
    User           : in out Rose.Interfaces.Users.User.User_Object'Class)
 is
 begin
@@ -25,6 +27,8 @@ begin
       & Standard.Petal.Version.Version_Name);
 
    Standard.Petal.Session.Start (User);
+   Standard.Petal.Session.Set_System
+     (System_Directory.Fixed_Directory_Cap);
    Standard.Petal.Session.Run_Startup_File;
    Standard.Petal.Read.Reader_Loop;
 end Rose.Core.Petal;

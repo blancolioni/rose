@@ -146,6 +146,9 @@ package body Init.Run is
       --  types (#456).
       Auth_Cap       : Rose.Capabilities.Capability;
       Auth_Admin_Cap : Rose.Capabilities.Capability;
+      System_Directory_Cap : Rose.Capabilities.Capability :=
+        Null_Capability;
+      --  The system directory, as a Fixed_Directory (ADR 0035, 0036).
       Auth_Control   : Rose.Capabilities.Capability;
       --  Auth's Replaceable interface, which init replaces it through
       --  once the first user is made (#831), and then deletes.
@@ -929,6 +932,21 @@ package body Init.Run is
       Rose.System_Calls.Delete_Cap (Clock_Admin_Cap);
       Clock_Admin_Cap := Null_Capability;
 
+      --  The system directory, with the null stream in it as null (ADR
+      --  0035). Login gives it to petal, as a Fixed_Directory (ADR 0036).
+
+      Init.Users.Create_System_Directory
+        (Find_Cap        => Find_Cap,
+         Create_Endpoint => Create_Endpoint_Cap,
+         Delete_Cap      => Delete_Cap,
+         Cap_Sets        => Cap_Sets_Cap,
+         System          => System_Directory_Cap);
+      if System_Directory_Cap = Null_Capability then
+         Init.Calls.Send_String
+           (Console_Stream_Cap,
+            "init: unable to create the system directory" & NL);
+      end if;
+
       --  The first user, with a home directory (ADR 0003), whose name and
       --  password the person installing types (#456). Init runs only on
       --  a fresh boot, so it is created once.
@@ -1052,6 +1070,7 @@ package body Init.Run is
          Timer           => Init.Boot.Timer_Interface_Cap,
          Clock           => Clock_Cap,
          Rights          => Rights_Cap,
+         System          => System_Directory_Cap,
          Auth            => Auth_Cap)
       then
          Init.Calls.Send_String

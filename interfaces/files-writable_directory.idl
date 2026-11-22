@@ -22,10 +22,19 @@ is
 
    procedure Delete_File (Name : String);
    --  Remove the file Name, and end its process. It fails if Name is not
-   --  a file.
+   --  a file. For a special file, it removes the entry and deletes the
+   --  directory's cap, but doesn't end the server, which the directory
+   --  didn't launch (ADR 0035, section 3).
 
    procedure Delete_Directory (Name : String);
    --  Remove the directory Name, and end its process. It fails if Name is
    --  not a directory, or if the directory has entries.
+
+   procedure Add_Special_File
+     (Name : String;
+      File : interface Streams.Stream);
+   --  Add an entry Name that holds File, a cap the directory keeps and
+   --  hands out, rather than a file it serves (ADR 0035, section 3). It
+   --  fails if Name is already an entry, or is empty or too long.
 
 end Files.Writable_Directory;

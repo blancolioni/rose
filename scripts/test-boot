@@ -140,6 +140,28 @@ check_keytest
 echo "Editing a file with kilo"
 check_kilo
 
+# The system directory and its null (ADR 0035): list shows null as a
+# special file, writing to it succeeds and keeps nothing, and reading it
+# gives nothing.
+echo "Using system/null"
+mark=$(console_mark)
+type_text "list system
+"
+wait_for_console "null  (special file)" 20 "$mark" \
+    || fail "list system does not show null as a special file"
+type_text "echo discarded > system/null
+"
+type_text "cat system/null
+"
+type_text "echo null done
+"
+wait_for_console "^null done" 20 "$mark" \
+    || fail "petal stopped after using system/null"
+if console_since "$mark" | grep -q "^discarded\|petal: "; then
+    console_since "$mark"
+    fail "system/null kept what was written, or petal refused it"
+fi
+
 # An end of file logs out of petal (#458). Login then destroys the
 # session's bank, and makes a new one from the user's bank for the next
 # session (#450).

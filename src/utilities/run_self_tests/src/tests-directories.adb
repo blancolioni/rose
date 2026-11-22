@@ -15,6 +15,7 @@ with Rose.Interfaces.Files.Fixed_Directory;
 with Rose.Interfaces.Streams.Readable;
 with Rose.Interfaces.Streams.Reader;
 with Rose.Interfaces.Streams.Stream;
+with Rose.Interfaces.Streams.Stream.Client;
 with Rose.Interfaces.Streams.Releasable_Reader;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Transactional_Writable_File;
@@ -320,6 +321,89 @@ package body Tests.Directories is
       if not Special_Refused (1) or else not Special_Refused (2) then
          return Fail ("an entry that isn't special was given as one");
       end if;
+
+      --  A special file (ADR 0035): the directory holds a stream that it
+      --  was given, here a null stream, and hands it out. Through a
+      --  Directory it gives only the Reader (ADR 0036). It is neither a
+      --  branch nor a leaf, and deleting it removes the entry, but not
+      --  the server.
+
+      declare
+         Null_Stream : Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+      begin
+         Null_Stream.Open (Tests.Registry.Launch_Null_Stream);
+         if Null_Stream.Stream_Cap = Rose.Capabilities.Null_Capability then
+            return Fail ("no null stream server");
+         end if;
+
+         begin
+            Top.Add_Special_File ("null", Null_Stream);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return Fail ("cannot add a special file");
+         end;
+
+         if Top.Find_Entry ("null") /= 3
+           or else Top.Entry_File_Kind (3)
+             /= Rose.Interfaces.Files.Directory.Special_File
+           or else Top.Entry_Kind_Of (3) /= Rose.Interfaces.Common.Tree.Other
+           or else Top.Entry_Size (3) /= 0
+         then
+            return Fail ("wrong entry for the special file");
+         end if;
+
+         if not Getter_Refused (3, Leaf => True)
+           or else not Getter_Refused (3, Leaf => False)
+         then
+            return Fail ("a special file was given as a branch or a leaf");
+         end if;
+
+         declare
+            Reader : Rose.Interfaces.Streams.Reader.Reader_Object'Class :=
+              Top.Get_Special_Reader (3);
+            Stream : Rose.Interfaces.Streams.Stream.Stream_Object'Class :=
+              Top.Get_Special_File (3);
+         begin
+            Reader.Read (Buffer, Last);
+            if Last /= Buffer'First - 1 then
+               return Fail ("the null stream gave data");
+            end if;
+            Stream.Write (Hello);
+            Stream.Read (Buffer, Last);
+            if Last /= Buffer'First - 1 then
+               return Fail ("the null stream gave back what was written");
+            end if;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return Fail ("cannot use the special file");
+         end;
+
+         begin
+            Top.Add_Special_File ("null", Null_Stream);
+            return Fail ("a special file was added twice");
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               null;
+         end;
+
+         begin
+            Top.Delete_File ("null");
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return Fail ("cannot delete a special file");
+         end;
+
+         if Top.Find_Entry ("null") /= 0 or else Top.Entry_Count /= 2 then
+            return Fail ("the special file is still there");
+         end if;
+
+         begin
+            Null_Stream.Write (Hello);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return Fail ("deleting the special file ended its server");
+         end;
+      end;
 
       --  Renaming changes only the entry. The file is the same, so a
       --  cap that was taken for it before still writes to it (#425).

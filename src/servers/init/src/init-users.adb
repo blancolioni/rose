@@ -13,6 +13,7 @@ with Rose.Interfaces.Screens.Terminal.Client;
 with Rose.Interfaces.Users.User.Client;
 with Rose.Interfaces.Files.Writable_Directory.Client;
 with Rose.Interfaces.Files.Writable_File.Client;
+with Rose.Interfaces.Streams.Stream.Client;
 
 with Init.Calls;
 
@@ -282,6 +283,152 @@ package body Init.Users is
       Home := Get_Interface_Cap (Directory);
    end Create_First_User;
 
+   -----------------------------
+   -- Create_System_Directory --
+   -----------------------------
+
+   procedure Create_System_Directory
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
+      System          : out Rose.Capabilities.Capability)
+   is
+      use type Rose.Words.Word;
+
+      Directory_Launch : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "directory");
+      File_Launch      : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "file");
+      Null_Launch      : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "null_stream");
+
+      Fixed_Ancestor : constant := 3;
+      --  Asked for its Nth ancestor, a Writable_Directory interface cap
+      --  gives Tree for 1, Directory for 2 and Fixed_Directory for 3, as
+      --  the generated clients ask for them.
+
+      function Launch_Command
+        (Program : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability;
+      --  Launch Program as a command, against init's own bank, and return
+      --  its command endpoint, or the null cap.
+
+      --------------------
+      -- Launch_Command --
+      --------------------
+
+      function Launch_Command
+        (Program : Rose.Capabilities.Capability)
+         return Rose.Capabilities.Capability
+      is
+         Launcher : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      begin
+         Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Program);
+         return Rose.Interfaces.Processes.Launch.Client.Launch_Command
+           (Launcher, Rose.Capabilities.Null_Capability);
+      end Launch_Command;
+
+      Params      : aliased Rose.Invocation.Invocation_Record;
+      Endpoint    : Rose.Capabilities.Capability;
+      Served      : Rose.Capabilities.Capability;
+      Null_Cap    : Rose.Capabilities.Capability;
+      Directory   : Rose.Interfaces.Files.Writable_Directory.Client
+        .Writable_Directory_Client;
+      Null_Stream : Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+   begin
+      System := Rose.Capabilities.Null_Capability;
+
+      if Directory_Launch = Rose.Capabilities.Null_Capability
+        or else File_Launch = Rose.Capabilities.Null_Capability
+        or else Null_Launch = Rose.Capabilities.Null_Capability
+      then
+         return;
+      end if;
+
+      --  The directory command's roles' caps, as src/drivers/directory/
+      --  rose-core-directory.idl declares them: Create_Endpoint,
+      --  Delete_Cap, Cap_Set_Service, File_Launch and Directory_Launch,
+      --  then Previous, which is null for a new directory; and its
+      --  results Served and Control. Nothing holds its Control yet, so
+      --  the system directory isn't replaced by an update.
+
+      Endpoint := Launch_Command (Directory_Launch);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Create_Endpoint,
+          Delete_Cap,
+          Cap_Sets,
+          File_Launch,
+          Directory_Launch,
+          Rose.Capabilities.Null_Capability));
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 2);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else Params.Data (0) /= Completed
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return;
+      end if;
+
+      Served := Params.Caps (0);
+      Rose.System_Calls.Delete_Cap (Params.Caps (1));
+
+      --  The null stream command's: Create_Endpoint and Delete_Cap; and
+      --  its result Served (src/drivers/null_stream/
+      --  rose-core-null_stream.idl).
+
+      Endpoint := Launch_Command (Null_Launch);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Caps (Params, (Create_Endpoint, Delete_Cap));
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else Params.Data (0) /= Completed
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return;
+      end if;
+
+      Null_Cap := Params.Caps (0);
+
+      Rose.Interfaces.Files.Writable_Directory.Client.Open
+        (Directory, Served);
+      Rose.Interfaces.Streams.Stream.Client.Open (Null_Stream, Null_Cap);
+      Rose.Interfaces.Files.Writable_Directory.Client.Add_Special_File
+        (Directory, "null", Null_Stream);
+
+      if Rose.Interfaces.Files.Writable_Directory.Client.Find_Entry
+        (Directory, "null") = 0
+      then
+         return;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Served);
+      Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Fixed_Ancestor));
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if not Params.Control.Flags (Rose.Invocation.Error) then
+         System := Params.Caps (0);
+      end if;
+   end Create_System_Directory;
+
    ------------
    -- Forget --
    ------------
@@ -409,6 +556,7 @@ package body Init.Users is
       Timer           : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Rights          : Rose.Capabilities.Capability;
+      System          : Rose.Capabilities.Capability;
       Auth            : Rose.Capabilities.Capability)
       return Boolean
    is
@@ -445,6 +593,7 @@ package body Init.Users is
           Timer,
           Clock,
           Rights,
+          System,
           Auth));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);

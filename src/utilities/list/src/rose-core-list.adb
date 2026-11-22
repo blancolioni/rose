@@ -5,6 +5,21 @@ procedure Rose.Core.List
 is
 begin
    for Index in 1 .. Directory.Entry_Count loop
-      Ada.Text_IO.Put_Line (Directory.Entry_Name (Index));
+      declare
+         Name : constant String := Directory.Entry_Name (Index);
+      begin
+
+         --  A directory and a special file say what they are (ADR 0035,
+         --  section 5); an ordinary file is just its name.
+
+         case Directory.Entry_File_Kind (Index) is
+            when Rose.Interfaces.Files.Directory.Ordinary_File =>
+               Ada.Text_IO.Put_Line (Name);
+            when Rose.Interfaces.Files.Directory.Directory =>
+               Ada.Text_IO.Put_Line (Name & "  (directory)");
+            when Rose.Interfaces.Files.Directory.Special_File =>
+               Ada.Text_IO.Put_Line (Name & "  (special file)");
+         end case;
+      end;
    end loop;
 end Rose.Core.List;

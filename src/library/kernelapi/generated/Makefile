@@ -39,7 +39,7 @@ COMMANDS=rose-core streams-standard_input streams-standard_output \
     time-clock_admin_service users-rights_service \
     users-rights_admin_service storage-storage_service \
     caps-create_signal screens-screen_service caps-cap_set_service \
-    processes-replace_process
+    processes-replace_process files-system_directory
 
 SOURCES=$(IDL:%=../../../../interfaces/%.idl)
 COMMAND_SOURCES=$(COMMANDS:%=../../../../interfaces/%.idl)

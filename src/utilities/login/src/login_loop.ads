@@ -10,6 +10,7 @@ package Login_Loop is
       Timer    : Rose.Capabilities.Capability;
       Clock    : Rose.Capabilities.Capability;
       Rights   : Rose.Capabilities.Capability;
+      System   : Rose.Capabilities.Capability;
       Auth     : Rose.Capabilities.Capability);
    --  The interfaces of the console (Terminal), the command registry
    --  (Commands), the timer (Timer), the clock (Clock, which petal gives

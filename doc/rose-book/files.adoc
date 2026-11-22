@@ -60,6 +60,12 @@ A file or directory comes in two forms, and the type of a cap says which right i
   A `Directory` is read-only all the way down, and gives only the reading side of a special file, through `Get_Special_Reader`.
 * *A fixed directory can't change, but its entries keep their rights* (ADR 0036).
   Nothing can be added, renamed or deleted through a `Fixed_Directory`, but a file in it can be written, a child directory comes back as a `Fixed_Directory`, and a special file is the `Stream` it was added as.
+* *A special file is a cap the directory holds* (ADR 0035).
+  `Add_Special_File` adds one, and the directory hands it out rather than serving it: a `Directory` gives its `Reader`, and a `Fixed_Directory` its `Stream`.
+  Deleting it removes the entry, but not the server, which the directory didn't launch.
+* *The system directory* is made at install, and holds `null`, the null stream: reading it gives end of file, and writing to it succeeds and keeps nothing.
+  Login gives it to petal as a `Fixed_Directory`, which petal names `system`, so `cat system/null` and `echo hi > system/null` work, and nobody can change what is in it.
+  A command gets it only as an argument the user names.
 * *A directory is a tree* (ADR 0042).
   Through `Tree`, a directory is a branch, an ordinary file a leaf, and a special file another kind of entry, so a program that reads its configuration through `Tree` can be given a directory.
   Only the `Get_Writable_*` operations, which only a `Writable_Directory` has, return the writable forms.

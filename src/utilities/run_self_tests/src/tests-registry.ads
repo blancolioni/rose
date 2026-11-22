@@ -137,4 +137,9 @@ package Tests.Registry is
    --  Launch a new file against Bank, as File_Endpoint does, and return
    --  its Writable_File, or the null cap if the launch failed.
 
+   function Launch_Null_Stream return Rose.Capabilities.Capability;
+   --  Launch the null stream command, Rose.Core.Null_Stream (ADR 0035),
+   --  against Run_Self_Tests' own bank, and return its Stream, or the
+   --  null cap if the launch failed.
+
 end Tests.Registry;

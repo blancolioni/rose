@@ -23,6 +23,13 @@ package Petal.Session is
    --  typed, but without echoing it or showing a prompt. Do nothing if
    --  there is no home directory, or no .petalrc in it.
 
+   procedure Set_System (Directory : Rose.Capabilities.Capability);
+   --  Name Directory, the cap of a Fixed_Directory interface, system
+   --  (ADR 0035, section 2; ADR 0036, section 3), unless it is null. A
+   --  command gets it as a read-only Directory, and never writable, and a
+   --  path system/NAME that names a special file gives its Stream's
+   --  reader or writer (ADR 0035, section 5).
+
    procedure Add_Directory
      (Name      : String;
       Directory : Rose.Capabilities.Capability);
