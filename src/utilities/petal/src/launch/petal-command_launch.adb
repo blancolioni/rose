@@ -1019,6 +1019,15 @@ package body Petal.Command_Launch is
                     Rose.System_Calls.Create_Signal_Capability;
                when Storage_Service_Cap =>
                   Caps (Role.Cap_Index + 1) := New_Command_Bank;
+               when Package_State_Cap =>
+                  Caps (Role.Cap_Index + 1) :=
+                    Petal.Session.Package_State
+                      (Value (Item, Item.Package_Name));
+                  if Caps (Role.Cap_Index + 1)
+                    = Rose.Capabilities.Null_Capability
+                  then
+                     Fail ("petal has no package state to give the command");
+                  end if;
                when Screen_Service_Cap | Cap_Set_Service_Cap
                   | Replace_Process_Cap
                =>

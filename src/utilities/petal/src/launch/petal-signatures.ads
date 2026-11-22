@@ -73,6 +73,7 @@ package Petal.Signatures is
      (Create_Endpoint_Cap, Delete_Cap, Rescind_Cap, Find_Command_Cap,
       Console_Cap, Clock_Service_Cap, Storage_Service_Cap,
       Screen_Service_Cap, Create_Signal_Cap, Cap_Set_Service_Cap,
+      Package_State_Cap,
       Replace_Process_Cap, Other_Role_Cap);
    --  A cap that one of the command's roles needs, other than a stream:
    --  a system cap, a bank for the Storage_Service role, which petal

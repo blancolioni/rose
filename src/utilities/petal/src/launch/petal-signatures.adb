@@ -159,6 +159,9 @@ package body Petal.Signatures is
                            elsif Key = "cap"
                              and then Name = "Replace_Process"
                            then Replace_Process_Cap
+                           elsif Key = "cap"
+                             and then Name = "Package_State"
+                           then Package_State_Cap
                            else Other_Role_Cap);
                      end;
                   end;
