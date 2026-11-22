@@ -555,7 +555,7 @@ def check_mem_tables(log, first, last, regions, verbose, info):
                                "region %x..%x, which the storage server "
                                "doesn't have"
                                % (mem_pid, base, bound, r_base, r_bound)), \
-                    0, processes
+                    0, processes, False
             if verbose:
                 print("      %05x..%05x %s region %s"
                       % (base, bound,
