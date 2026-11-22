@@ -65,6 +65,7 @@ run_self_tests:
 	    -o build/generated \
 	    ../../drivers/file/rose-core-file.idl \
 	    ../../drivers/directory/rose-core-directory.idl \
+	    ../../drivers/null_stream/rose-core-null_stream.idl \
 	    $(INTERFACES)/rose-core.idl
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \

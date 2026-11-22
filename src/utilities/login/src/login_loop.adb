@@ -41,6 +41,11 @@ package body Login_Loop is
                             Rose.Capabilities.Null_Capability;
    --  The rights broker's Rights interface, for petal.
 
+   System_Interface_Cap : Rose.Capabilities.Capability :=
+                            Rose.Capabilities.Null_Capability;
+   --  The system directory's Fixed_Directory interface, for petal (ADR
+   --  0035, section 2).
+
    Pending      : Stream_Element_Array (1 .. 4096);
    Pending_Last : Stream_Element_Offset := 0;
    --  What the console has given that Get_Line hasn't returned yet.
@@ -248,6 +253,7 @@ package body Login_Loop is
           Console.Terminal_Cap,
           Clock_Interface_Cap,
           Rights_Interface_Cap,
+          System_Interface_Cap,
           User.User_Cap));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
@@ -270,11 +276,13 @@ package body Login_Loop is
       Timer    : Rose.Capabilities.Capability;
       Clock    : Rose.Capabilities.Capability;
       Rights   : Rose.Capabilities.Capability;
+      System   : Rose.Capabilities.Capability;
       Auth     : Rose.Capabilities.Capability)
    is
    begin
       Clock_Interface_Cap := Clock;
       Rights_Interface_Cap := Rights;
+      System_Interface_Cap := System;
       Rose.Interfaces.Screens.Terminal.Client.Open (Login_Loop
         .Console, Console);
       Rose.Interfaces.Commands.Lookup.Client.Open (Login_Loop

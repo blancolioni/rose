@@ -104,6 +104,7 @@
 16#CB31_0C44_0102_98F9#  rose.interfaces.files.writable_directory.rename(in string; in string)
 16#12ED_2CEF_70E8_4E05#  rose.interfaces.files.writable_directory.delete_file(in string)
 16#B8F0_49AA_03B0_F423#  rose.interfaces.files.writable_directory.delete_directory(in string)
+16#74F6_8DA2_3D7A_E0E1#  rose.interfaces.files.writable_directory.add_special_file(in string; in interface rose.interfaces.streams.stream)
 16#4ACC_E8F3_FBF5_47EF#  interface rose.interfaces.files.writable_file
 16#0E8F_C5A1_CD83_6C0D#  rose.interfaces.files.writable_file.append return interface rose.interfaces.streams.releasable_writer
 16#002F_05A1_84F7_BB94#  rose.interfaces.files.writable_file.rewrite return interface rose.interfaces.streams.releasable_writer

@@ -72,6 +72,12 @@ package body Restore.Installer.Default is
       Process ("file", "drivers", Save, Default_Flags);
       Process ("directory", "drivers", Save, Default_Flags);
 
+      --  Saved, not launched: init launches it once, for the system
+      --  directory's null (ADR 0035), and the self tests launch their
+      --  own.
+
+      Process ("null_stream", "drivers", Save, Default_Flags);
+
       --  Saved, not launched: run_self_tests' End_Process_Test launches
       --  it with Launch, for its Process cap (#320, #831).
 

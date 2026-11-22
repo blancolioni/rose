@@ -1,0 +1,8 @@
+--  The system directory (ADR 0035), which init creates at install and
+--  gives login, and login gives petal. It is the same for every user, and
+--  holds special files such as null. Petal has it as a Fixed_Directory
+--  (ADR 0036, section 3): nobody can change what is in it, but its
+--  special files are their Streams. A command never gets it by default,
+--  only as an argument the user names.
+
+role Files.System_Directory : Files.Fixed_Directory;

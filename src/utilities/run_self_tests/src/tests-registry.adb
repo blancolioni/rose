@@ -4,6 +4,7 @@ with Rose.System_Calls;
 
 with Rose.Core.Directory_Client;
 with Rose.Core.File_Client;
+with Rose.Core.Null_Stream_Client;
 
 with Rose.Interfaces.Commands.Lookup.Client;
 with Rose.Interfaces.Objects;
@@ -198,6 +199,32 @@ package body Tests.Registry is
       when Rose.Interfaces.Objects.Invocation_Error =>
          return Rose.Capabilities.Null_Capability;
    end Launch_File;
+
+   ------------------------
+   -- Launch_Null_Stream --
+   ------------------------
+
+   function Launch_Null_Stream return Rose.Capabilities.Capability is
+      use type Rose.Capabilities.Capability;
+      Program  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+        Launcher ("null_stream");
+      Endpoint : constant Rose.Capabilities.Capability :=
+        Program.Launch_Command (Rose.System_Calls.Own_Bank.Cap);
+      Served   : Rose.Capabilities.Capability;
+   begin
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      Rose.Core.Null_Stream_Client.Call
+        (Endpoint        => Endpoint,
+         Create_Endpoint => Create_Endpoint,
+         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
+         Served          => Served);
+      return Served;
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Launch_Null_Stream;
 
    --------------
    -- Launcher --

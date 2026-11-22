@@ -23,6 +23,17 @@ package Init.Users is
    --  Replaceable interfaces (#831), or null caps if the launch fails.
    --  Cap_Sets is the cap set server's Constructor, its Cap_Set_Service.
 
+   procedure Create_System_Directory
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Delete_Cap      : Rose.Capabilities.Capability;
+      Cap_Sets        : Rose.Capabilities.Capability;
+      System          : out Rose.Capabilities.Capability);
+   --  Launch a directory for the system directory, launch the null
+   --  stream, and add it to the directory as null (ADR 0035, sections 1
+   --  and 4). System is the directory's Fixed_Directory interface (ADR
+   --  0036, section 3), or the null cap if anything fails.
+
    Max_Name_Length     : constant := 64;
    Max_Password_Length : constant := 128;
 
@@ -76,6 +87,7 @@ package Init.Users is
       Timer           : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Rights          : Rose.Capabilities.Capability;
+      System          : Rose.Capabilities.Capability;
       Auth            : Rose.Capabilities.Capability)
       return Boolean;
    --  Launch login as a command on the console (#457). It completes its

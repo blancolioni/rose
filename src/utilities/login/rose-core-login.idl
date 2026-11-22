@@ -1,6 +1,7 @@
 command Rose.Core.Login
   : Screens.Console, Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Rescind_Cap, Commands.Find_Command,
-    Time.Timer_Service, Time.Clock_Service, Users.Rights_Service
+    Time.Timer_Service, Time.Clock_Service, Users.Rights_Service,
+    Files.System_Directory
   with Summary     => "Log users in at the console.",
        Description => """
           Login asks for a user name and a password at the console, and

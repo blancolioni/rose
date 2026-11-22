@@ -7,6 +7,9 @@ with Rose.System_Calls;
 
 with Rose.Interfaces.Files.Directory;
 with Rose.Interfaces.Files.File.Client;
+with Rose.Interfaces.Files.Fixed_Directory.Client;
+with Rose.Interfaces.Streams.Stream;
+with Rose.Interfaces.Streams.Stream.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Streams.Releasable_Reader.Client;
 with Rose.Interfaces.Streams.Releasable_Writer.Client;
@@ -94,6 +97,28 @@ package body Petal.Session is
    Output_Writer : Writer_Clients.Releasable_Writer_Client;
    Output_Name   : String (1 .. Max_File_Name_Length);
    Output_Last   : Natural := 0;
+
+   --  The system directory (ADR 0035), which petal has as a
+   --  Fixed_Directory, and the special files in it that are in use: a
+   --  reader for an argument, or the output of a redirection. A special
+   --  file isn't a version, so its output is never committed.
+
+   System_Name      : constant String := "system";
+   System_Directory : Rose.Interfaces.Files.Fixed_Directory.Client
+     .Fixed_Directory_Client;
+   Has_System       : Boolean := False;
+
+   Max_Special     : constant := 4;
+   Special_Streams : array (1 .. Max_Special)
+     of Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+   Special_Count   : Natural := 0;
+
+   Special_Output : Boolean := False;
+   Output_Stream  : Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+
+   function Find_Special (Name : String) return Rose.Capabilities.Capability;
+   --  The Stream of the special file that the path Name names, system/
+   --  then the name of an entry in it, or the null cap if it names none.
    --  The version that Redirect_Output made, which petal commits, the
    --  writer on it that the command is given, and the file's name.
 
@@ -488,6 +513,13 @@ package body Petal.Session is
          return;
       end if;
 
+      if Special_Output then
+         Rose.Interfaces.Streams.Stream.Client.Close (Output_Stream);
+         Special_Output := False;
+         Redirected := False;
+         return;
+      end if;
+
       --  Closing the writer releases it.
 
       begin
@@ -557,6 +589,18 @@ package body Petal.Session is
       Directory : constant Directory_Access := Find_Directory (Name);
    begin
       Grant := Rose.Capabilities.Null_Capability;
+
+      --  The system directory is never granted writable (ADR 0035,
+      --  section 2).
+
+      if Has_System and then Name = System_Name then
+         if not Writable then
+            Grant := System_Directory.Directory_Cap;
+         end if;
+         Found := Grant /= Rose.Capabilities.Null_Capability;
+         return;
+      end if;
+
       if Directory /= null then
          Grant :=
            (if Writable then Directory.Writable_Directory_Cap
@@ -568,6 +612,48 @@ package body Petal.Session is
          Grant := Rose.Capabilities.Null_Capability;
          Found := False;
    end Find_Grant;
+
+   ------------------
+   -- Find_Special --
+   ------------------
+
+   function Find_Special
+     (Name : String)
+      return Rose.Capabilities.Capability
+   is
+      Prefix : constant String := System_Name & "/";
+   begin
+      if not Has_System
+        or else Name'Length <= Prefix'Length
+        or else Name (Name'First .. Name'First + Prefix'Length - 1) /= Prefix
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      declare
+         Entry_Name : constant String :=
+           Name (Name'First + Prefix'Length .. Name'Last);
+         Index      : constant Natural :=
+           System_Directory.Find_Entry (Entry_Name);
+      begin
+         if Index = 0
+           or else System_Directory.Entry_File_Kind (Index)
+             /= Rose.Interfaces.Files.Directory.Special_File
+         then
+            return Rose.Capabilities.Null_Capability;
+         end if;
+
+         declare
+            Special : Rose.Interfaces.Streams.Stream.Stream_Object'Class :=
+              System_Directory.Get_Special_File (Index);
+         begin
+            return Special.Stream_Cap;
+         end;
+      end;
+   exception
+      when Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Find_Special;
 
    -----------------
    -- Lookup_File --
@@ -770,6 +856,29 @@ package body Petal.Session is
          return;
       end if;
 
+      --  A special file gives the reader of its Stream, which isn't
+      --  released afterwards, since petal didn't open it (ADR 0035,
+      --  section 5).
+
+      declare
+         Special : constant Rose.Capabilities.Capability :=
+           Find_Special (Name);
+      begin
+         if Special /= Rose.Capabilities.Null_Capability then
+            if Special_Count = Max_Special then
+               Rose.System_Calls.Delete_Cap (Special);
+               Result := No_Such_File;
+               return;
+            end if;
+            Special_Count := Special_Count + 1;
+            Rose.Interfaces.Streams.Stream.Client.Open
+              (Special_Streams (Special_Count), Special);
+            Reader := Special_Streams (Special_Count).Get_Read_Cap;
+            Result := File_Found;
+            return;
+         end if;
+      end;
+
       Lookup_File (Name, False, File_Cap, Result);
       if Result /= File_Found then
          return;
@@ -818,6 +927,26 @@ package body Petal.Session is
          Result := No_Version;
          return;
       end if;
+
+      --  A redirection to a special file writes to its Stream, and never
+      --  replaces it (ADR 0035, section 5).
+
+      declare
+         Special : constant Rose.Capabilities.Capability :=
+           Find_Special (Name);
+      begin
+         if Special /= Rose.Capabilities.Null_Capability then
+            Rose.Interfaces.Streams.Stream.Client.Open
+              (Output_Stream, Special);
+            Output_Last := Name'Length;
+            Output_Name (1 .. Output_Last) := Name;
+            Special_Output := True;
+            Redirected := True;
+            Output := Output_Stream.Get_Write_Cap;
+            Result := Version_Made;
+            return;
+         end if;
+      end;
 
       Make_Version (Name, Output_File, Result);
       if Result /= Version_Made then
@@ -888,6 +1017,14 @@ package body Petal.Session is
          end;
       end loop;
       Reader_Count := 0;
+
+      --  Closing a special file's client deletes petal's caps for it,
+      --  and leaves the stream as it is.
+
+      for Special of Special_Streams (1 .. Special_Count) loop
+         Rose.Interfaces.Streams.Stream.Client.Close (Special);
+      end loop;
+      Special_Count := 0;
    end Release_Files;
 
    ----------------------
@@ -990,6 +1127,19 @@ package body Petal.Session is
          Ada_Text_IO.Put_Line
            ("petal: cannot read " & Startup_File_Name);
    end Run_Startup_File;
+
+   ----------------
+   -- Set_System --
+   ----------------
+
+   procedure Set_System (Directory : Rose.Capabilities.Capability) is
+   begin
+      if Directory /= Rose.Capabilities.Null_Capability then
+         Rose.Interfaces.Files.Fixed_Directory.Client.Open
+           (System_Directory, Directory);
+         Has_System := True;
+      end if;
+   end Set_System;
 
    -----------
    -- Start --

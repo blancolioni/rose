@@ -22,7 +22,8 @@ import sys
 import time
 
 NAMES = {" ": "spc", "\n": "ret", "-": "minus", ".": "dot", ",": "comma",
-         "_": "shift-minus", ":": "shift-semicolon", "/": "slash"}
+         "_": "shift-minus", ":": "shift-semicolon", "/": "slash",
+         ">": "shift-dot", "<": "shift-comma"}
 
 ENTERING = b"Entering checkpoint"
 LEAVING = b"Leaving checkpoint"

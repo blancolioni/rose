@@ -48,7 +48,7 @@ package body Directory_Server is
    subtype Fixed_Directory_Class is
      Rose.Interfaces.Files.Fixed_Directory.Fixed_Directory_Object'Class;
 
-   Format : constant Rose.Words.Word_32 := 1;
+   Format : constant Rose.Words.Word_32 := 2;
    --  The version of this server's part of the state (#831):
    --
    --    the directory's identifier
@@ -62,6 +62,10 @@ package body Directory_Server is
    --    Entry.I.Control    its Replaceable
    --    Entry.I.Bank       its bank
    --    Entry.I.Read_Only  its File or Directory, if one was given out
+   --
+   --  A special file (ADR 0035, section 3) names only Entry.I.Served,
+   --  its Stream. Format 1 is format 2 without special files, so a state
+   --  in either is read.
    --
    --  The launch caps and Cap_Set_Service are its command's arguments,
    --  which Rose.Replacement hands over (#901).
@@ -102,6 +106,10 @@ package body Directory_Server is
          --  Read_Only came from the state of the version that this one
          --  took over from, so the client that File or Child is didn't
          --  fetch it, and closing it doesn't delete it.
+         Special   : Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+         --  A special file's Stream, whose cap is Served. A special file
+         --  has no process, bank or Control of the directory's: it holds
+         --  a cap that it was given, and hands it out (ADR 0035).
       end record;
 
    --  The directory is one object, served through Writable_Directory
@@ -202,8 +210,8 @@ package body Directory_Server is
      (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Streams.Stream.Stream_Object'Class;
-   --  Both raise if the entry isn't a special file. Nothing makes one
-   --  yet (#929).
+   --  Both raise if the entry isn't a special file. A Directory gives
+   --  only the Reader, and a Fixed_Directory the Stream (ADR 0036).
 
    overriding function Get_Writable_Directory
      (Item  : in out Directory_Object;
@@ -232,6 +240,13 @@ package body Directory_Server is
    overriding procedure Delete_Directory
      (Item : in out Directory_Object;
       Name : String);
+
+   overriding procedure Add_Special_File
+     (Item : in out Directory_Object;
+      Name : String;
+      File : in out Rose.Interfaces.Streams.Stream.Stream_Object'Class);
+   --  Add Name as a special file that holds File. Raises if Name is
+   --  already an entry, or is empty or too long.
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
@@ -350,6 +365,46 @@ package body Directory_Server is
       return Entries.Last_Element.Served;
    end Add_Entry;
 
+   ----------------------
+   -- Add_Special_File --
+   ----------------------
+
+   overriding procedure Add_Special_File
+     (Item : in out Directory_Object;
+      Name : String;
+      File : in out Rose.Interfaces.Streams.Stream.Stream_Object'Class)
+   is
+      pragma Unreferenced (Item);
+      Cap        : constant Rose.Capabilities.Capability := File.Stream_Cap;
+      Saved_Name : String (1 .. Max_Name_Length);
+      Saved_Last : Natural;
+   begin
+      if Name'Length = 0 or else Name'Length > Max_Name_Length then
+         raise Constraint_Error with "add special file: bad name";
+      elsif Find (Name) > 0 then
+         raise Constraint_Error with "add special file: already an entry";
+      elsif Cap = Rose.Capabilities.Null_Capability then
+         raise Constraint_Error with "add special file: no stream";
+      end if;
+
+      --  Name is in the invoke buffer, which opening the client below
+      --  can overwrite.
+
+      Saved_Name (1 .. Name'Length) := Name;
+      Saved_Last := Name'Length;
+
+      declare
+         Added : constant Entry_Access := new Entry_Record;
+      begin
+         Added.Name (1 .. Saved_Last) := Saved_Name (1 .. Saved_Last);
+         Added.Name_Last := Saved_Last;
+         Added.Kind := Rose.Interfaces.Files.Directory.Special_File;
+         Added.Served := Cap;
+         Added.Special.Open (Cap);
+         Entries.Append (Added);
+      end;
+   end Add_Special_File;
+
    --------------
    -- Cap_Name --
    --------------
@@ -416,12 +471,16 @@ package body Directory_Server is
       Cap_Set_Service_Cap := Cap_Set_Service;
 
       for Item of Entries loop
-         Item.Bank.Open (Item.Bank_Ref);
-         if Item.Kind = Rose.Interfaces.Files.Directory.Ordinary_File then
-            Item.File.Open (Item.Served);
-         else
-            Item.Child.Open (Item.Served);
-         end if;
+         case Item.Kind is
+            when Rose.Interfaces.Files.Directory.Special_File =>
+               Item.Special.Open (Item.Served);
+            when Rose.Interfaces.Files.Directory.Ordinary_File =>
+               Item.Bank.Open (Item.Bank_Ref);
+               Item.File.Open (Item.Served);
+            when Rose.Interfaces.Files.Directory.Directory =>
+               Item.Bank.Open (Item.Bank_Ref);
+               Item.Child.Open (Item.Served);
+         end case;
       end loop;
 
       Rose.Interfaces.Files.Writable_Directory.Server.Attach
@@ -470,8 +529,7 @@ package body Directory_Server is
    begin
       if Index = 0 then
          raise Constraint_Error with "delete: no such entry";
-      elsif Entries (Index).Kind
-        /= Rose.Interfaces.Files.Directory.Ordinary_File
+      elsif Entries (Index).Kind = Rose.Interfaces.Files.Directory.Directory
       then
          raise Constraint_Error with "delete: not a file";
       end if;
@@ -760,7 +818,7 @@ package body Directory_Server is
       end if;
 
       return Rose.Interfaces.Streams.Stream.Client.From_Cap
-        (Rose.Capabilities.Null_Capability);
+        (Entries (Index).Served);
    end Get_Special_File;
 
    ------------------------
@@ -780,7 +838,7 @@ package body Directory_Server is
       end if;
 
       return Rose.Interfaces.Streams.Reader.Client.From_Cap
-        (Rose.Capabilities.Null_Capability);
+        (Entries (Index).Special.Reader_Cap);
    end Get_Special_Reader;
 
    ----------------------------
@@ -925,7 +983,7 @@ package body Directory_Server is
       Count   : Natural;
    begin
       Rose.Words.Word_32'Read (Stream, Version);
-      if Version /= Format then
+      if Version /= 1 and then Version /= Format then
          raise Rose.Replacement.Bad_State with "directory: unknown format";
       end if;
 
@@ -954,8 +1012,11 @@ package body Directory_Server is
             Item.Kept := Item.Read_Only /= Rose.Capabilities.Null_Capability;
 
             if Item.Served = Rose.Capabilities.Null_Capability
-              or else Item.Control = Rose.Capabilities.Null_Capability
-              or else Item.Bank_Ref = Rose.Capabilities.Null_Capability
+              or else
+                (Item.Kind /= Rose.Interfaces.Files.Directory.Special_File
+                 and then
+                   (Item.Control = Rose.Capabilities.Null_Capability
+                    or else Item.Bank_Ref = Rose.Capabilities.Null_Capability))
             then
                raise Rose.Replacement.Bad_State
                  with "directory: no caps for " & Item.Name (1 .. Length);
@@ -974,6 +1035,18 @@ package body Directory_Server is
       Removed : Entry_Access := Entries (Index);
       Item    : Entry_Record renames Removed.all;
    begin
+      if Item.Kind = Rose.Interfaces.Files.Directory.Special_File then
+
+         --  The directory didn't launch the server, so it doesn't end
+         --  it: closing the client deletes the directory's caps for the
+         --  stream, Served among them (ADR 0035, section 3).
+
+         Item.Special.Close;
+         Entries.Delete (Index);
+         Free (Removed);
+         return;
+      end if;
+
       Item.Bank.Destroy;
 
       --  Closing the clients deletes their caps, including the read-only
@@ -1084,8 +1157,11 @@ package body Directory_Server is
               .Kind);
 
             Named.Add (Cap_Name (Index, "Served"), Item.Served);
-            Named.Add (Cap_Name (Index, "Control"), Item.Control);
-            Named.Add (Cap_Name (Index, "Bank"), Item.Bank_Ref);
+            if Item.Kind /= Rose.Interfaces.Files.Directory.Special_File
+            then
+               Named.Add (Cap_Name (Index, "Control"), Item.Control);
+               Named.Add (Cap_Name (Index, "Bank"), Item.Bank_Ref);
+            end if;
             if Item.Read_Only /= Rose.Capabilities.Null_Capability then
                Named.Add (Cap_Name (Index, "Read_Only"), Item.Read_Only);
             end if;
