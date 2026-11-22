@@ -78,6 +78,8 @@ A `Writable_Directory` with nothing in it, which refuses every change:
 
 A program's settings can be kept in its package state. When `Directory` inherits `Tree` (#729, #730), a program reads them through `Tree`, so configuration that isn't a file system can stand in for the directory.
 
+**`settings` is reserved** (ADR 0042, section 7). In every package's state directory, the `settings` directory belongs to the `Rose.Configuration` library, which keeps the user's overrides of the package's installed defaults there, one value to a file. The rest of the package's state directory is the program's own.
+
 ### 7. Uninstalling
 
 The uninstaller asks whether to keep each user's package state or remove it. It keeps it by default, so that reinstalling the package finds it again.
