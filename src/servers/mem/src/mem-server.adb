@@ -1699,21 +1699,27 @@ package body Mem.Server is
       Amount :    out Rose.Words.Word)
    is
       pragma Unreferenced (Id);
-      use type Rose.Words.Word;
+      Taken_Start  : Rose.Addresses.Physical_Address;
+      Taken_Amount : Rose.Addresses.Physical_Bytes;
    begin
-      Start := Rose.Words.Word
-        (Mem.Physical_Map.Take_Memory
-           (Rose.Addresses.Physical_Bytes (Size)));
 
-      --  The kernel adds nothing to its heap for an amount of zero.
+      --  The free pages are what the kernel's heap can have, so first make
+      --  sure there are some, as a page fault would (#973). They may be
+      --  scattered, so the kernel is given the longest run there is, if
+      --  there is none as long as it asked for (#1051). It asks again
+      --  when it needs more.
 
-      if Start = 0 then
-         Rose.Console_IO.Put_Line
-           ("mem: no free memory for the kernel heap");
-         Amount := 0;
-      else
-         Amount := Size;
-      end if;
+      Mem.Virtual_Map.Keep_Reserve;
+      Mem.Physical_Map.Take_Memory
+        (Rose.Addresses.Physical_Bytes (Size), Taken_Start, Taken_Amount);
+
+      --  The kernel adds nothing to its heap for an amount of zero, and
+      --  asks no more until a checkpoint has ended. Nothing is written
+      --  to the console here: this can happen while mem is paging, and
+      --  the console can wait on mem (#971).
+
+      Start := Rose.Words.Word (Taken_Start);
+      Amount := Rose.Words.Word (Taken_Amount);
    end Take_Physical_Memory;
 
 end Mem.Server;

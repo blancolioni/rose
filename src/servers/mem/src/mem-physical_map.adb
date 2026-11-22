@@ -210,9 +210,10 @@ package body Mem.Physical_Map is
    --  given pages of the kernel's heap later, and the kernel's writes to
    --  them overwrote the processes' memory.
 
-   function Take_Memory
-     (Size : Rose.Addresses.Physical_Bytes)
-      return Rose.Addresses.Physical_Address
+   procedure Take_Memory
+     (Size   : Rose.Addresses.Physical_Bytes;
+      Start  : out Rose.Addresses.Physical_Address;
+      Amount : out Rose.Addresses.Physical_Bytes)
    is
       use type Rose.Words.Word;
       Region     : Physical_Region renames Region_Table (1);
@@ -229,34 +230,50 @@ package body Mem.Physical_Map is
          return Allocated_Block
       is (2 ** Natural ((Page - Region.Base) mod Allocated_Block'Size));
 
-      Page : Physical_Page_Address := Region.Bound;
-      Run  : Physical_Page_Address := 0;
+      Page       : Physical_Page_Address := Region.Bound;
+      Run        : Physical_Page_Address := 0;
       --  The free pages from Page up, below the last allocated page that
       --  was seen.
+      Best_Start : Physical_Page_Address := 0;
+      Best_Count : Physical_Page_Address := 0;
+      --  The longest run seen so far, which is taken if there is none of
+      --  Page_Count pages.
    begin
+      Start := 0;
+      Amount := 0;
+
       if Number_Of_Regions = 0 or else Page_Count = 0 then
-         return 0;
+         return;
       end if;
 
       while Page > Region.Base loop
          Page := Page - 1;
          if (Allocation_Map (Block (Page)) and Bit (Page)) = 0 then
             Run := Run + 1;
-            if Run = Page_Count then
-               for Taken in Page .. Page + Page_Count - 1 loop
-                  Allocation_Map (Block (Taken)) :=
-                    Allocation_Map (Block (Taken)) or Bit (Taken);
-               end loop;
-               Current_Allocated_Pages :=
-                 Current_Allocated_Pages + Rose.Words.Word (Page_Count);
-               return Physical_Page_To_Address (Page);
+            if Run > Best_Count then
+               Best_Start := Page;
+               Best_Count := Run;
             end if;
+            exit when Run = Page_Count;
          else
             Run := 0;
          end if;
       end loop;
 
-      return 0;
+      if Best_Count = 0 then
+         return;
+      end if;
+
+      for Taken in Best_Start .. Best_Start + Best_Count - 1 loop
+         Allocation_Map (Block (Taken)) :=
+           Allocation_Map (Block (Taken)) or Bit (Taken);
+      end loop;
+      Current_Allocated_Pages :=
+        Current_Allocated_Pages + Rose.Words.Word (Best_Count);
+
+      Start := Physical_Page_To_Address (Best_Start);
+      Amount :=
+        Rose.Addresses.Physical_Bytes (Best_Count) * Rose.Limits.Page_Size;
    end Take_Memory;
 
 end Mem.Physical_Map;

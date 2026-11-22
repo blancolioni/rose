@@ -65,11 +65,6 @@ package body Mem.Virtual_Map is
    --  The page at Position is of a persistent, writable segment, and is
    --  not shared: one that mem can page out, if it is clean or changed.
 
-   procedure Keep_Reserve;
-   --  If fewer than Reserve_Low_Pages are free, free cached pages that
-   --  nothing maps, and then clean pages, and then changed pages, until
-   --  Reserve_High_Pages are free, or there are no more.
-
    procedure Write_Changed_Pages (Success : out Boolean);
    --  Page out a batch of changed pages: unmap them, append them to the
    --  open entry in one call, add them to the table of changes, and free
