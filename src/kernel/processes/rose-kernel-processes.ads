@@ -469,6 +469,12 @@ package Rose.Kernel.Processes is
 
    procedure Expand_Heap
      (Amount : Rose.Addresses.Physical_Bytes);
+   --  Ask mem for Amount more of the kernel's heap, unless a request is
+   --  already pending, or mem has refused one since the last checkpoint.
+
+   procedure Refuse_Heap_Requests;
+   --  mem had no memory for the kernel's heap: ask it for none until the
+   --  next checkpoint ends, when more pages are clean (#1051).
 
    procedure Report_Current_Process;
 

@@ -14,6 +14,12 @@ package Mem.Virtual_Map is
    --  are free, free pages until Rose.Limits.Reserve_High_Pages are
    --  (#973). Success is False if there is no page.
 
+   procedure Keep_Reserve;
+   --  If fewer than Rose.Limits.Reserve_Low_Pages are free, free cached
+   --  pages that nothing maps, and then clean pages, and then changed
+   --  pages, until Rose.Limits.Reserve_High_Pages are free, or there are
+   --  no more (#973). It writes nothing to the console.
+
    procedure Reclaim
      (Physical_Page : out Rose.Addresses.Physical_Page_Address;
       Success       : out Boolean);
