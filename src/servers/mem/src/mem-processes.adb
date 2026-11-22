@@ -1354,7 +1354,11 @@ package body Mem.Processes is
             Next_Pid := Next_Pid + 1;
          end if;
          if Next_Pid = Start then
-            Rose.Console_IO.Put_Line ("out of processes");
+            --  Out of processes. The caller fails the launch.  Mem never
+            --  writes to the console while it serves a launch: the
+            --  console may be waiting on mem, for a page or for a
+            --  checkpoint, and the system would stop (#915).
+            Rose.System_Calls.Delete_Cap (Process_Cap);
             return 0;
          end if;
       end loop;
@@ -1374,7 +1378,6 @@ package body Mem.Processes is
                    .Get_Object_Id (Client);
       begin
          if Find_Process (Identifier_Of (Oid)) /= 0 then
-            Rose.Console_IO.Put_Line ("mem: process identifier in use");
             Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
             return 0;
          end if;
