@@ -101,6 +101,9 @@ package Mem.Page_Table is
 
    function Dirty_Page_Count return Natural;
 
+   function Free_Entries return Natural;
+   --  How many more pages Insert can track (#591).
+
 private
 
    type Cursor is new Natural;

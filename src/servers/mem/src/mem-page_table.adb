@@ -1,4 +1,3 @@
-with Rose.Console_IO;
 with Rose.Limits;
 with Rose.Trace;
 
@@ -175,6 +174,15 @@ package body Mem.Page_Table is
       return 0;
    end Find;
 
+   ------------------
+   -- Free_Entries --
+   ------------------
+
+   function Free_Entries return Natural is
+   begin
+      return Natural (Mapped_Pages'Last - Mapped_Page_Last) + Free_Count;
+   end Free_Entries;
+
    ------------
    -- Insert --
    ------------
@@ -204,12 +212,15 @@ package body Mem.Page_Table is
 
       if Position = 0 then
          if Mapped_Page_Last = Mapped_Pages'Last then
-            Rose.Console_IO.Put_Line ("mem: too many mapped pages");
 
             --  The page is mapped already, so it is now one that mem
             --  doesn't track, and a later fault on it will fail its
-            --  process. Say so in the kernel's log, which the console
-            --  messages of a restored system don't reach.
+            --  process. Mem.Virtual_Map.Map frees pages before the table
+            --  fills, so this is only when none could be freed. It goes
+            --  to the kernel's log and not the console: Insert is on the
+            --  path of a page fault, and the console calls a driver that
+            --  may itself wait on a fault that only mem can handle
+            --  (#591, as in #914).
 
             Rose.Trace.Event
               ("mem: too many mapped pages, process", Natural (Process));
