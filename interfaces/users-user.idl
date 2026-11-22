@@ -8,4 +8,10 @@ interface Users.User : Common.Named is
    --  session destroys it, which ends what the session launched and
    --  releases what it reserved.
 
+   function First_Process return interface Processes.Launch;
+   --  The program the user starts with, as a Unix user's shell is (#525):
+   --  the console supervisor launches it after a login (#512). For now
+   --  it is always petal. Raises Invocation_Error if the user server has
+   --  none, as one that took over from a version before #525 hasn't.
+
 end Users.User;

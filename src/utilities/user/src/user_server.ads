@@ -6,9 +6,10 @@ with Rose.Replacement;
 package User_Server is
 
    --  One process serves one user through User (ADR 0003): the user's
-   --  name, the user's home directory, a Writable_Directory, and a bank
-   --  for each session, from the user's bank (ADR 0014, #450). The
-   --  command Rose.Core.User is given all three in its launch call, sets
+   --  name, the user's home directory, a Writable_Directory, a bank for
+   --  each session, from the user's bank (ADR 0014, #450), and the
+   --  Launch of the program the user starts with (#525). The command
+   --  Rose.Core.User is given them in its launch call, sets
    --  up the server, and returns its User interface; its generated main
    --  then calls Start_Server.
    --
@@ -36,6 +37,7 @@ package User_Server is
      (User_Name       : String;
       Home            : Rose.Capabilities.Capability;
       Bank            : Rose.Capabilities.Capability;
+      First_Process   : Rose.Capabilities.Capability;
       Cap_Set_Service : Rose.Capabilities.Capability;
       Control         : out Rose.Capabilities.Capability);
    --  Attach the User interface, with the identifier that the state had,

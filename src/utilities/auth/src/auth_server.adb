@@ -255,6 +255,9 @@ package body Auth_Server is
    is
       Launcher : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
                    Programs.Find ("user");
+      Shell    : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+                   Programs.Find ("petal");
+      --  The program every user starts with, for now (#525).
       Endpoint : constant Rose.Capabilities.Capability :=
                    Launcher.Launch_Command (Bank);
    begin
@@ -271,6 +274,7 @@ package body Auth_Server is
          Name            => Name,
          Home            => Home,
          Bank            => Bank,
+         First_Process   => Shell.Launch_Cap,
          User            => User,
          Control         => Control);
    exception

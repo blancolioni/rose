@@ -92,6 +92,9 @@ package body Home_Holder is
          User_Launch      : Rose.Interfaces.Processes.Launch
            .Launch_Object'Class :=
            Programs.Find ("user");
+         Shell_Launch     : Rose.Interfaces.Processes.Launch
+           .Launch_Object'Class :=
+           Programs.Find ("petal");
          Endpoint         : Rose.Capabilities.Capability :=
            Directory_Launch.Launch_Command (User_Bank.Bank_Cap);
          Served_Home      : Rose.Capabilities.Capability;
@@ -133,6 +136,7 @@ package body Home_Holder is
             Name            => User_Name,
             Home            => Home.Get_Interface_Cap,
             Bank            => User_Bank.Bank_Cap,
+            First_Process   => Shell_Launch.Launch_Cap,
             User            => Served,
             Control         => User_Control);
          User.Open (Served);
