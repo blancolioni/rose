@@ -573,12 +573,12 @@ package body Tests.Replacement is
                --  work.
 
                Check ("the entries are not the old version's",
-                      Top.Directory_Entry_Count = 2
-                      and then Top.Directory_Entry_Name (1) = "a"
-                      and then Top.Directory_Entry_Name (2) = "sub"
+                      Top.Entry_Count = 2
+                      and then Top.Entry_Name (1) = "a"
+                      and then Top.Entry_Name (2) = "sub"
                       and then Top.Find_Entry ("sub") = 2);
                Check ("the file's size is wrong",
-                      Top.Directory_Entry_Size (1) = Hello'Length);
+                      Top.Entry_Size (1) = Hello'Length);
                declare
                   Again     : Rose.Interfaces.Files.Writable_File
                     .Writable_File_Object'Class := Top.Get_Writable_File (1);
@@ -589,7 +589,7 @@ package body Tests.Replacement is
                   Check ("the file through the directory is wrong",
                          Again.Size = Hello'Length);
                   Check ("the subdirectory through the directory is wrong",
-                         Sub_Again.Directory_Entry_Count = 0);
+                         Sub_Again.Entry_Count = 0);
                end;
 
                --  The caps from before the handover work, and so do the
@@ -598,7 +598,7 @@ package body Tests.Replacement is
                Check ("the read-only file from before is wrong",
                       Read_File.Size = Hello'Length);
                Check ("the read-only directory from before is wrong",
-                      Read_Sub.Directory_Entry_Count = 0);
+                      Read_Sub.Entry_Count = 0);
                declare
                   Read_Again : Rose.Interfaces.Files.File.File_Object'Class :=
                     Top.Get_Ordinary_File (1);
@@ -630,7 +630,7 @@ package body Tests.Replacement is
                begin
                   Check ("cannot create a file",
                          Made.Writable_File_Cap /= Null_Cap
-                         and then Top.Directory_Entry_Count = 2);
+                         and then Top.Entry_Count = 2);
                   Top.Rename ("b", "c");
                   Check ("the rename was lost", Top.Find_Entry ("c") = 2);
                   Top.Delete_File ("c");
@@ -638,10 +638,10 @@ package body Tests.Replacement is
 
                Top.Delete_Directory ("sub");
                Check ("the entries were not deleted",
-                      Top.Directory_Entry_Count = 0);
+                      Top.Entry_Count = 0);
                begin
                   Ada.Text_IO.Put
-                    (Natural'Image (Read_Sub.Directory_Entry_Count));
+                    (Natural'Image (Read_Sub.Entry_Count));
                   Check ("the deleted directory still answers", False);
                exception
                   when Rose.Interfaces.Objects.Invocation_Error =>

@@ -259,7 +259,7 @@ package body Tests.Users is
          end if;
       end;
 
-      if Home.Directory_Entry_Count /= 1
+      if Home.Entry_Count /= 1
         or else Home.Find_Entry (".petalrc") /= 1
       then
          return Fail ("the home directory is not the one given");

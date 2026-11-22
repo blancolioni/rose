@@ -34,7 +34,7 @@ begin
 
    if Index = 0 then
       Fail (": there is no such entry");
-   elsif Directory.Directory_Entry_Kind (Index)
+   elsif Directory.Entry_File_Kind (Index)
      /= Rose.Interfaces.Files.Directory.Directory
    then
       Fail (": it is not a directory");
@@ -44,7 +44,7 @@ begin
       Listing : Rose.Interfaces.Files.Directory.Directory_Object'Class :=
         Directory.Get_Directory (Index);
    begin
-      if Listing.Directory_Entry_Count > 0 then
+      if Listing.Entry_Count > 0 then
          Fail (": it is not empty");
       end if;
    end;

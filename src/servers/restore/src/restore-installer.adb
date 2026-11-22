@@ -203,7 +203,7 @@ package body Restore.Installer is
       Index : constant Natural := Find_Entry (Directory, Name);
    begin
       if Index /= 0
-        and then Directory_Entry_Kind (Directory, Index)
+        and then Entry_File_Kind (Directory, Index)
         = Rose.Interfaces.Files.Directory.Ordinary_File
       then
          return Index;
@@ -543,7 +543,7 @@ package body Restore.Installer is
               (Conversions.To_Reader (Binary_Reader)));
          Rose.System_Calls.Send_Word
            (Params,
-            Natural (Directory_Entry_Size (Directory, Exec_Index)));
+            Natural (Entry_Size (Directory, Exec_Index)));
          Rose.System_Calls.Send_Word
            (Params, Rose.Words.Word'(Install_Action'Pos (Action)));
          Rose.System_Calls.Send_Word
@@ -681,7 +681,7 @@ package body Restore.Installer is
       Index : constant Natural := Find_Entry (Parent, Name);
    begin
       Found := Index /= 0
-        and then Directory_Entry_Kind (Parent, Index)
+        and then Entry_File_Kind (Parent, Index)
         = Rose.Interfaces.Files.Directory.Directory;
       if Found then
          Directory := Get_Directory (Parent, Index);
@@ -784,7 +784,7 @@ package body Restore.Installer is
          Rose.Interfaces.Streams.Reader.Client.Get_Interface_Cap
            (Conversions.To_Reader (Binary_Reader)));
       Rose.System_Calls.Send_Word
-        (Params, Natural (Directory_Entry_Size (Directory, Exec_Index)));
+        (Params, Natural (Entry_Size (Directory, Exec_Index)));
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(94));
       Rose.System_Calls.Invoke_Capability (Params);
 

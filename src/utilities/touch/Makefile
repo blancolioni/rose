@@ -17,10 +17,12 @@ touch:
 	    rose-core-touch.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
 	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-writable_file.idl \
 	    $(INTERFACES)/files-transactional_writable_file.idl \
 	    $(INTERFACES)/common-transactional.idl \
 	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-readable.idl \
 	    $(INTERFACES)/streams-releasable_reader.idl \
 	    $(INTERFACES)/streams-releasable_writer.idl \
 	    $(INTERFACES)/streams-seekable_reader.idl \

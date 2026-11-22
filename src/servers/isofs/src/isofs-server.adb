@@ -5,6 +5,7 @@ with Rose.Words;
 
 with Rose.System_Calls.Client;
 
+with Rose.Interfaces.Common.Tree;
 with Rose.Interfaces.Storage.Block_Array.Client;
 with Rose.Interfaces.Files.Directory.Server;
 with Rose.Interfaces.Files.File;
@@ -29,22 +30,22 @@ package body IsoFS.Server is
      (Id : Rose.Objects.Capability_Identifier)
      return Rose.Capabilities.Capability;
 
-   function Directory_Entry_Count
+   function Entry_Count
      (Id : Rose.Objects.Capability_Identifier)
       return Natural;
 
-   procedure Directory_Entry_Name
+   procedure Entry_Name
      (Id     : in     Rose.Objects.Capability_Identifier;
       Index  : in     Positive;
       Result :    out String;
       Last   :    out Natural);
 
-   function Directory_Entry_Kind
+   function Entry_File_Kind
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
       return Rose.Interfaces.Files.Directory.File_Kind;
 
-   function Directory_Entry_Size
+   function Entry_Size
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
       return System.Storage_Elements.Storage_Count;
@@ -60,6 +61,25 @@ package body IsoFS.Server is
       return Rose.Capabilities.Capability;
 
    function Get_Directory
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+
+   --  Common.Tree (ADR 0042): a directory is a branch, and a file a leaf.
+   --  A server of the kernel target can't fail a call by raising, so the
+   --  getters give a null cap for an entry of the wrong kind.
+
+   function Entry_Kind_Of
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Interfaces.Common.Tree.Entry_Kind;
+
+   function Get_Branch
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability;
+
+   function Get_Leaf
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
       return Rose.Capabilities.Capability;
@@ -122,11 +142,11 @@ package body IsoFS.Server is
       return Directory;
    end Check_Directory;
 
-   ---------------------------
-   -- Directory_Entry_Count --
-   ---------------------------
+   -----------------
+   -- Entry_Count --
+   -----------------
 
-   function Directory_Entry_Count
+   function Entry_Count
      (Id : Rose.Objects.Capability_Identifier)
       return Natural
    is
@@ -138,13 +158,13 @@ package body IsoFS.Server is
       else
          return Get_Entry_Count (Directory);
       end if;
-   end Directory_Entry_Count;
+   end Entry_Count;
 
-   --------------------------
-   -- Directory_Entry_Kind --
-   --------------------------
+   ---------------------
+   -- Entry_File_Kind --
+   ---------------------
 
-   function Directory_Entry_Kind
+   function Entry_File_Kind
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
       return Rose.Interfaces.Files.Directory.File_Kind
@@ -157,13 +177,33 @@ package body IsoFS.Server is
       else
          return Get_Entry_Kind (Directory, Index);
       end if;
-   end Directory_Entry_Kind;
+   end Entry_File_Kind;
 
-   --------------------------
-   -- Directory_Entry_Name --
-   --------------------------
+   -------------------
+   -- Entry_Kind_Of --
+   -------------------
 
-   procedure Directory_Entry_Name
+   function Entry_Kind_Of
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Interfaces.Common.Tree.Entry_Kind
+   is
+   begin
+      case Entry_File_Kind (Id, Index) is
+         when Rose.Interfaces.Files.Directory.Directory =>
+            return Rose.Interfaces.Common.Tree.Branch;
+         when Rose.Interfaces.Files.Directory.Ordinary_File =>
+            return Rose.Interfaces.Common.Tree.Leaf;
+         when Rose.Interfaces.Files.Directory.Special_File =>
+            return Rose.Interfaces.Common.Tree.Other;
+      end case;
+   end Entry_Kind_Of;
+
+   ----------------
+   -- Entry_Name --
+   ----------------
+
+   procedure Entry_Name
      (Id     : in     Rose.Objects.Capability_Identifier;
       Index  : in     Positive;
       Result :    out String;
@@ -175,13 +215,13 @@ package body IsoFS.Server is
       if Directory /= No_Directory then
          Get_Entry_Name (Directory, Index, Result, Last);
       end if;
-   end Directory_Entry_Name;
+   end Entry_Name;
 
-   --------------------------
-   -- Directory_Entry_Size --
-   --------------------------
+   ----------------
+   -- Entry_Size --
+   ----------------
 
-   function Directory_Entry_Size
+   function Entry_Size
      (Id    : in     Rose.Objects.Capability_Identifier;
       Index : in     Positive)
       return System.Storage_Elements.Storage_Count
@@ -194,7 +234,7 @@ package body IsoFS.Server is
       else
          return Get_Entry_Size (Directory, Index);
       end if;
-   end Directory_Entry_Size;
+   end Entry_Size;
 
    ---------------
    -- File_Size --
@@ -231,6 +271,28 @@ package body IsoFS.Server is
       end if;
    end Find_Entry;
 
+   ----------------
+   -- Get_Branch --
+   ----------------
+
+   function Get_Branch
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+      Child     : constant Directory_Type :=
+                    (if Directory = No_Directory then No_Directory
+                     else Get_Child_Directory (Directory, Index));
+   begin
+      if Child = No_Directory then
+         return Rose.Capabilities.Null_Capability;
+      else
+         return Get_Tree_Interface (Child);
+      end if;
+   end Get_Branch;
+
    -------------------
    -- Get_Directory --
    -------------------
@@ -254,6 +316,30 @@ package body IsoFS.Server is
          return Get_Directory_Interface (Child);
       end if;
    end Get_Directory;
+
+   --------------
+   -- Get_Leaf --
+   --------------
+
+   function Get_Leaf
+     (Id    : in     Rose.Objects.Capability_Identifier;
+      Index : in     Positive)
+      return Rose.Capabilities.Capability
+   is
+      use IsoFS.Directories;
+      Directory : constant Directory_Type := Check_Directory (Id);
+      File      : constant Natural :=
+                    (if Directory = No_Directory then 0
+                     else Get_File (Directory, Index));
+   begin
+      if File = 0 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+      return Rose.System_Calls.Server.Create_Endpoint
+        (Create_Cap  => Create_Endpoint_Cap,
+         Endpoint_Id => Rose.Interfaces.Files.File.Readable_Interface,
+         Identifier  => Rose.Objects.Capability_Identifier (File));
+   end Get_Leaf;
 
    -----------------------
    -- Get_Ordinary_File --
@@ -424,11 +510,14 @@ package body IsoFS.Server is
 
       Rose.Interfaces.Files.Directory.Server.Attach_Interface
         (Server_Context        => Context,
-         Directory_Entry_Count => Directory_Entry_Count'Access,
-         Directory_Entry_Name  => Directory_Entry_Name'Access,
-         Directory_Entry_Kind  => Directory_Entry_Kind'Access,
-         Directory_Entry_Size  => Directory_Entry_Size'Access,
+         Entry_Count           => Entry_Count'Access,
+         Entry_Name            => Entry_Name'Access,
+         Entry_Kind_Of         => Entry_Kind_Of'Access,
          Find_Entry            => Find_Entry'Access,
+         Get_Branch            => Get_Branch'Access,
+         Get_Leaf              => Get_Leaf'Access,
+         Entry_File_Kind       => Entry_File_Kind'Access,
+         Entry_Size            => Entry_Size'Access,
          Get_Ordinary_File     => Get_Ordinary_File'Access,
          Get_Directory         => Get_Directory'Access,
          Instanced             => True);

@@ -1,0 +1,10 @@
+--  Something that readers can be opened on, each with its own position
+--  (ADR 0042, section 1). A file is one (ADR 0009), and so is a leaf of a
+--  configuration. It is not a stream itself.
+
+interface Streams.Readable is
+
+   function Open_Reader return interface Streams.Releasable_Reader;
+   --  A new reader, which starts at the beginning.
+
+end Streams.Readable;

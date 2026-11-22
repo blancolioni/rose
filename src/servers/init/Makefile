@@ -31,6 +31,10 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
 	$(BUILDDIR)/rose-interfaces-files-directory-client.o \
+	$(BUILDDIR)/rose-interfaces-common-tree.o \
+	$(BUILDDIR)/rose-interfaces-common-tree-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable-client.o \
 	$(BUILDDIR)/rose-interfaces-files-file-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \

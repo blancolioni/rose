@@ -172,7 +172,7 @@ package body Home_Holder is
            Home.Get_Writable_File (1);
          Kept : constant Boolean :=
            Home.Find_Entry (File_Name) = 1
-           and then Home.Directory_Entry_Name (1) = File_Name
+           and then Home.Entry_Name (1) = File_Name
            and then File.Size = 0;
          --  The replaced directory has its entry, and its cap to the
          --  entry's file still works.

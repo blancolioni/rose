@@ -34,7 +34,7 @@ begin
 
    if Index = 0 then
       Fail (": there is no such entry");
-   elsif Directory.Directory_Entry_Kind (Index)
+   elsif Directory.Entry_File_Kind (Index)
      /= Rose.Interfaces.Files.Directory.Ordinary_File
    then
       Fail (": it is not a file");
