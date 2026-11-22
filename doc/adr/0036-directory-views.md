@@ -97,6 +97,23 @@ This replaces ADR 0035, section 3's bullet "A directory's rights are over the di
 2. The IDL: `Fixed_Directory`, `Get_Special_Reader`, and the directory server and isofs.
 3. #929 continues from its step 2, against these interfaces.
 
+### 7. Linking a directory in (#1045)
+
+A directory can hold a directory that it didn't make, as a special file holds a stream it was given. The system directory holds the null directory this way (ADR 0040, section 5).
+
+```ada
+interface Linking_Directory : Writable_Directory is
+   procedure Add_Directory
+     (Name : String; Directory : interface Writable_Directory);
+end Linking_Directory;
+```
+
+- **It is a right of its own,** and so a type of its own (ADR 0012). A link makes a second name for a directory, and can make a cycle. A program walking a `Tree` can't see a cycle, because a cap carries no identity that it could compare.
+- **Only whoever launches a directory has it.** The directory server serves `Linking_Directory` for every directory, but gives it out only as the directory command's `Linking` result. Auth, a directory's parent and the self tests delete it. Init keeps it for the system directory. Everyone else has a directory as a `Writable_Directory` or narrower, so their trees have no links and no cycles.
+- **A linked entry is a directory,** and is handed out at the rights of the view it is reached through: through petal's fixed `system`, `null-directory` is a `Fixed_Directory`.
+- **Deleting it removes the entry and the directory's caps,** but doesn't end the directory, which this one didn't launch. `Delete_Directory` still needs it to be empty.
+- **`Add_Special_File` stays on `Writable_Directory`.** A stream can't make a cycle, so planting one in a home is ordinary writing.
+
 ## Consequences
 
 - **Rights stay types.** The type of a directory cap says whether its entries can be written, with no exception for special files.
@@ -105,6 +122,8 @@ This replaces ADR 0035, section 3's bullet "A directory's rights are over the di
 - **No subprogram is pinned,** since nothing from before the move has to be restored (section 4).
 
 ## Alternatives considered
+
+- **`Add_Directory` on `Writable_Directory`** (section 7). Every holder of a writable directory could then link, and make cycles that no walker of a `Tree` could detect.
 
 - **Rights over the directory only** (ADR 0035, section 3, as merged). It is simpler, but a read-only directory can't then be read-only all the way down, and the type doesn't say which view a cap is.
 - **A flag in a derived cap** (#116) for "read-only all the way down". The kernel would have to know about directories, and a command couldn't ask for the view in its signature. This is the kind of flag probing that Rose avoids: features are interfaces.

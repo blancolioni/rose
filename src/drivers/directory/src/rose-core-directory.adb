@@ -9,7 +9,8 @@ procedure Rose.Core.Directory
    Directory_Launch : in out Rose.Interfaces.Processes.Launch
      .Launch_Object'Class;
    Served           : out Rose.Capabilities.Capability;
-   Control          : out Rose.Capabilities.Capability)
+   Control          : out Rose.Capabilities.Capability;
+   Linking          : out Rose.Capabilities.Capability)
 is
 begin
    Directory_Server.Create_Server
@@ -17,5 +18,6 @@ begin
       Directory_Launch => Directory_Launch.Launch_Cap,
       Cap_Set_Service  => Cap_Set_Service.Bank_Constructor_Cap,
       Served           => Served,
-      Control          => Control);
+      Control          => Control,
+      Linking          => Linking);
 end Rose.Core.Directory;

@@ -1,0 +1,20 @@
+--  A directory, with the right to link into it a directory that it didn't
+--  make (ADR 0036, section 7). The directory server serves it for every
+--  directory, but only whoever launches a directory gets it: the
+--  directory command's Linking result. Everyone else has the directory as
+--  a Writable_Directory or narrower, so their trees have no links, and no
+--  cycles, which a walker of a Tree couldn't see.
+
+interface Files.Linking_Directory : Files.Writable_Directory is
+
+   procedure Add_Directory
+     (Name      : String;
+      Directory : interface Files.Writable_Directory);
+   --  Add an entry Name for Directory, which the directory holds, and
+   --  hands out at the rights of the view it is reached through, as for
+   --  a directory it made. Deleting the entry deletes the directory's
+   --  caps, but doesn't end Directory, which this directory didn't
+   --  launch. It fails if Name is already an entry, or is empty or too
+   --  long.
+
+end Files.Linking_Directory;

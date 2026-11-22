@@ -62,6 +62,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-files-writable_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-files-fixed_directory.o \
 	$(BUILDDIR)/rose-interfaces-files-fixed_directory-client.o \
+	$(BUILDDIR)/rose-interfaces-files-linking_directory.o \
+	$(BUILDDIR)/rose-interfaces-files-linking_directory-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-stream.o \
 	$(BUILDDIR)/rose-interfaces-streams-stream-client.o \
 	$(BUILDDIR)/rose-interfaces-files-writable_file-client.o \

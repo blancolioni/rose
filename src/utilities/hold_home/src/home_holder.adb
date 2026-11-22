@@ -69,6 +69,7 @@ package body Home_Holder is
       Home     : Rose.Interfaces.Files.Writable_Directory.Client
         .Writable_Directory_Client;
       Served   : Rose.Capabilities.Capability;
+      Home_Linking : Rose.Capabilities.Capability;
    begin
       User_Control := Rose.Capabilities.Null_Capability;
       Home_Control := Rose.Capabilities.Null_Capability;
@@ -107,7 +108,9 @@ package body Home_Holder is
             File_Launch      => File_Launch.Launch_Cap,
             Directory_Launch => Directory_Launch.Launch_Cap,
             Served           => Served_Home,
-            Control          => Home_Control);
+            Control          => Home_Control,
+            Linking          => Home_Linking);
+         Rose.System_Calls.Delete_Cap (Home_Linking);
          Home.Open (Served_Home);
 
          declare

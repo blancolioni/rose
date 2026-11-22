@@ -149,6 +149,8 @@ type_text "list system
 "
 wait_for_console "null  (special file)" 20 "$mark" \
     || fail "list system does not show null as a special file"
+wait_for_console "null-directory  (directory)" 20 "$mark" \
+    || fail "list system does not show the null directory"
 type_text "echo discarded > system/null
 "
 type_text "cat system/null

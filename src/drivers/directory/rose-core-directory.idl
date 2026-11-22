@@ -31,4 +31,6 @@ is
      with Help => "the directory";
    Control : out Processes.Replaceable
      with Help => "its Replaceable interface, which its parent keeps";
+   Linking : out Files.Linking_Directory
+     with Help => "the directory, with the right to link directories into it";
 end Rose.Core.Directory;

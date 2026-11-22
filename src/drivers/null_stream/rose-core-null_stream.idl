@@ -3,12 +3,16 @@ command Rose.Core.Null_Stream : Caps.Create_Endpoint, Caps.Delete_Cap
        Description => """
           Null_Stream serves the Stream that the system directory holds as
           null (ADR 0035, section 4). A read always gives end of file, and
-          a write succeeds and has no other effect. It has no state, so
-          restoring it needs nothing, and one process serves every reader
-          and writer.
+          a write succeeds and has no other effect. It serves the null
+          directory too (ADR 0040, section 5), which the system directory
+          holds as null-directory: it has no entries, and refuses every
+          change. It has no state, so restoring it needs nothing, and one
+          process serves every client.
           """,
        Server      => Null_Stream_Server.Start_Server
 is
    Served : out Streams.Stream
      with Help => "the null stream";
+   Null_Directory : out Files.Writable_Directory
+     with Help => "the null directory: empty, and refuses every change";
 end Rose.Core.Null_Stream;

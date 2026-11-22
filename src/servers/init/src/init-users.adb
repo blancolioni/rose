@@ -14,6 +14,7 @@ with Rose.Interfaces.Users.User.Client;
 with Rose.Interfaces.Files.Writable_Directory.Client;
 with Rose.Interfaces.Files.Writable_File.Client;
 with Rose.Interfaces.Streams.Stream.Client;
+with Rose.Interfaces.Files.Linking_Directory.Client;
 
 with Init.Calls;
 
@@ -336,6 +337,12 @@ package body Init.Users is
       Directory   : Rose.Interfaces.Files.Writable_Directory.Client
         .Writable_Directory_Client;
       Null_Stream : Rose.Interfaces.Streams.Stream.Client.Stream_Client;
+      Linking        : Rose.Capabilities.Capability;
+      Null_Dir_Cap   : Rose.Capabilities.Capability;
+      Linker         : Rose.Interfaces.Files.Linking_Directory.Client
+        .Linking_Directory_Client;
+      Null_Directory : Rose.Interfaces.Files.Writable_Directory.Client
+        .Writable_Directory_Client;
    begin
       System := Rose.Capabilities.Null_Capability;
 
@@ -368,7 +375,7 @@ package body Init.Users is
           Directory_Launch,
           Rose.Capabilities.Null_Capability));
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 2);
+      Rose.System_Calls.Receive_Caps (Params, 3);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -381,6 +388,7 @@ package body Init.Users is
 
       Served := Params.Caps (0);
       Rose.System_Calls.Delete_Cap (Params.Caps (1));
+      Linking := Params.Caps (2);
 
       --  The null stream command's: Create_Endpoint and Delete_Cap; and
       --  its result Served (src/drivers/null_stream/
@@ -394,7 +402,7 @@ package body Init.Users is
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Caps (Params, (Create_Endpoint, Delete_Cap));
       Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 2);
       Rose.System_Calls.Invoke_Capability (Params);
 
       if Params.Control.Flags (Rose.Invocation.Error)
@@ -406,6 +414,7 @@ package body Init.Users is
       end if;
 
       Null_Cap := Params.Caps (0);
+      Null_Dir_Cap := Params.Caps (1);
 
       Rose.Interfaces.Files.Writable_Directory.Client.Open
         (Directory, Served);
@@ -418,6 +427,15 @@ package body Init.Users is
       then
          return;
       end if;
+
+      --  The null directory, as null-directory, through the right to
+      --  link into the system directory that only init has (#1045).
+
+      Rose.Interfaces.Files.Writable_Directory.Client.Open
+        (Null_Directory, Null_Dir_Cap);
+      Rose.Interfaces.Files.Linking_Directory.Client.Open (Linker, Linking);
+      Rose.Interfaces.Files.Linking_Directory.Client.Add_Directory
+        (Linker, "null-directory", Null_Directory);
 
       Rose.System_Calls.Initialize_Send (Params, Served);
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Fixed_Ancestor));

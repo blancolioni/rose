@@ -96,6 +96,8 @@
 16#44DE_9D6C_CB1E_8028#  rose.interfaces.files.fixed_directory.get_writable_file(in positive) return interface rose.interfaces.files.writable_file
 16#D5EC_4E6C_0EF1_968E#  rose.interfaces.files.fixed_directory.get_fixed_directory(in positive) return interface rose.interfaces.files.fixed_directory
 16#9CB6_DCD9_A7BD_908B#  rose.interfaces.files.fixed_directory.get_special_file(in positive) return interface rose.interfaces.streams.stream
+16#2B75_02EB_CB4F_1BB6#  interface rose.interfaces.files.linking_directory
+16#E5D4_3E03_A4F5_AA95#  rose.interfaces.files.linking_directory.add_directory(in string; in interface rose.interfaces.files.writable_directory)
 16#0861_E01B_E970_BC14#  interface rose.interfaces.files.transactional_writable_file
 16#3931_F38F_6323_5EEF#  interface rose.interfaces.files.writable_directory
 16#60A5_01F4_CA1B_CB23#  rose.interfaces.files.writable_directory.get_writable_directory(in positive) return interface rose.interfaces.files.writable_directory

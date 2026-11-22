@@ -525,6 +525,78 @@ package body Tests.Directories is
       return False;
    end Fail;
 
+   -------------------------
+   -- Null_Directory_Test --
+   -------------------------
+
+   function Null_Directory_Test return Boolean is
+      Null_Dir : Rose.Interfaces.Files.Writable_Directory.Client
+        .Writable_Directory_Client;
+
+      function Refused (Operation : Positive) return Boolean;
+      --  True if the directory refuses the change numbered Operation.
+
+      function Refused (Operation : Positive) return Boolean is
+      begin
+         case Operation is
+            when 1 =>
+               declare
+                  Created : Writable_File_Class :=
+                    Null_Dir.Create_File ("notes");
+                  pragma Unreferenced (Created);
+               begin
+                  null;
+               end;
+            when 2 =>
+               declare
+                  Created : Rose.Interfaces.Files.Writable_Directory
+                    .Writable_Directory_Object'Class :=
+                      Null_Dir.Create_Directory ("sub");
+                  pragma Unreferenced (Created);
+               begin
+                  null;
+               end;
+            when 3 =>
+               Null_Dir.Delete_File ("notes");
+            when 4 =>
+               Null_Dir.Rename ("notes", "memo");
+            when others =>
+               Null_Dir.Delete_Directory ("sub");
+         end case;
+         return False;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return True;
+      end Refused;
+
+   begin
+      Ada.Text_IO.Put ("Null directory test");
+
+      Null_Dir.Open (Tests.Registry.Launch_Null_Directory);
+      if Null_Dir.Writable_Directory_Cap = Rose.Capabilities.Null_Capability
+      then
+         return Fail ("no null directory");
+      end if;
+
+      if Null_Dir.Entry_Count /= 0
+        or else Null_Dir.Find_Entry ("notes") /= 0
+      then
+         return Fail ("the null directory has entries");
+      end if;
+
+      for Operation in 1 .. 5 loop
+         if not Refused (Operation) then
+            return Fail ("the null directory took a change");
+         end if;
+      end loop;
+
+      if Null_Dir.Entry_Count /= 0 then
+         return Fail ("the null directory changed");
+      end if;
+
+      return True;
+   end Null_Directory_Test;
+
    ------------------
    -- Version_Test --
    ------------------

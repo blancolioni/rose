@@ -71,7 +71,7 @@ A `Writable_Directory` with nothing in it, which refuses every change:
 - **It lists as empty.** `Entry_Count` is 0, and every lookup fails as it does for a name that isn't there.
 - **Every change fails by raising:** `Create_File`, `Create_Directory`, `Rename`, `Delete_File`, `Delete_Directory` and `Add_Special_File`.
 - **A program can tell.** A Z-code `save` given the null directory fails, and the interpreter says that there is nowhere to save. It doesn't appear to work and then lose the save.
-- **It is served by the same server as the null stream** (#929), and is in the system directory beside it, as `null-directory`.
+- **It is served by the same server as the null stream** (#929), and is in the system directory beside it, as `null-directory`. Init links it in, with the right to link that only it has for the system directory (ADR 0036, section 7; #1045).
 - **It is the standard thing to give for any directory argument with nothing behind it,** not only this role.
 
 ### 6. Configuration
