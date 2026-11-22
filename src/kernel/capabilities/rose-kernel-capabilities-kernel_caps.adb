@@ -268,9 +268,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             end;
 
          when Add_Heap_Memory =>
-            Rose.Kernel.Heap.Increase_Heap_Bound
-              (Start  => Physical_Address (Params.Data (0)),
-               Amount => Physical_Bytes (Params.Data (1)));
+
+            --  mem gives nothing when it has no free page. The kernel asks
+            --  no more until a checkpoint ends, rather than on every pass
+            --  through the scheduler (#1051).
+
+            if Natural (Params.Data (1)) = 0 then
+               Rose.Kernel.Processes.Refuse_Heap_Requests;
+            else
+               Rose.Kernel.Heap.Increase_Heap_Bound
+                 (Start  => Physical_Address (Params.Data (0)),
+                  Amount => Physical_Bytes (Params.Data (1)));
+            end if;
 
          when Set_Timeout_Endpoint =>
             if not Params.Control.Flags (Rose.Invocation.Send_Words)

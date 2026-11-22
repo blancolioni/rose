@@ -331,6 +331,13 @@ package body Rose.Kernel.Heap is
             Virtual_Page_To_Address (Bound_Virtual_Page));
       end if;
 
+      --  The index is modular, so a full table would start again at 0 and
+      --  lose the first regions (#1051).
+
+      if Next_Region = Heap_Region_Index'Last then
+         Kernel.Panic.Panic ("kernel heap: too many regions");
+      end if;
+
       Next_Region := Next_Region + 1;
 
       Heap_Regions (Region_Index) :=

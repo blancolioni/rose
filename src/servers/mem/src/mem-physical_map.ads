@@ -16,12 +16,14 @@ package Mem.Physical_Map is
 
    procedure Deallocate_Page (Page : Rose.Addresses.Physical_Page_Address);
 
-   function Take_Memory
-     (Size : Rose.Addresses.Physical_Bytes)
-      return Rose.Addresses.Physical_Address;
-   --  Give Size bytes of contiguous physical memory to the kernel's heap,
-   --  from the free pages, which are no longer given to processes. Zero if
-   --  there is no free run that large.
+   procedure Take_Memory
+     (Size   : Rose.Addresses.Physical_Bytes;
+      Start  : out Rose.Addresses.Physical_Address;
+      Amount : out Rose.Addresses.Physical_Bytes);
+   --  Give contiguous physical memory to the kernel's heap, from the free
+   --  pages, which are no longer given to processes: a run of Size bytes,
+   --  or else the longest free run there is (#1051). Amount is zero if no
+   --  page is free.
 
    function Region_Map_Page_Cap
      (Page : Rose.Addresses.Physical_Page_Address)

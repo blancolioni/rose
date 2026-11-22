@@ -115,6 +115,9 @@ package body Rose.Kernel.Processes is
    Page_Fault_Params         : aliased Rose.Invocation.Invocation_Record;
 
    Heap_Request_Pending : Boolean := False;
+   Heap_Refused         : Boolean := False;
+   --  mem had nothing for the last request; asking again before a
+   --  checkpoint ends would only flood it (#1051).
    Heap_Request_Amount  : Rose.Addresses.Physical_Bytes := 0;
    Last_Fault_Pid       : Process_Id := Null_Process_Id;
    --  Page faults and requests for heap memory go to mem only while it
@@ -860,7 +863,7 @@ package body Rose.Kernel.Processes is
      (Amount : Rose.Addresses.Physical_Bytes)
    is
    begin
-      if Heap_Request_Pending then
+      if Heap_Request_Pending or else Heap_Refused then
          return;
       end if;
 
@@ -1649,6 +1652,7 @@ package body Rose.Kernel.Processes is
    procedure Leave_Checkpoint is
    begin
       Active_Checkpoint := False;
+      Heap_Refused := False;
       for P of Process_Table.all loop
          if P.State /= Available
            and then P.Flags (Persistent)
@@ -1955,6 +1959,15 @@ package body Rose.Kernel.Processes is
       Receive (Receiver_Id, Params);
       Process_Table (Receiver_Id).Flags (Receive_Any) := True;
    end Receive_Any;
+
+   --------------------------
+   -- Refuse_Heap_Requests --
+   --------------------------
+
+   procedure Refuse_Heap_Requests is
+   begin
+      Heap_Refused := True;
+   end Refuse_Heap_Requests;
 
    -------------------
    -- Release_Calls --
