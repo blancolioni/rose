@@ -31,7 +31,8 @@ package Directory_Server is
       Directory_Launch : Rose.Capabilities.Capability;
       Cap_Set_Service  : Rose.Capabilities.Capability;
       Served           : out Rose.Capabilities.Capability;
-      Control          : out Rose.Capabilities.Capability);
+      Control          : out Rose.Capabilities.Capability;
+      Linking          : out Rose.Capabilities.Capability);
    --  Attach the directory, with the identifier that the state had, and
    --  the Replaceable interface, and return their caps. The entries that
    --  the state had are the directory's. File_Launch and Directory_Launch

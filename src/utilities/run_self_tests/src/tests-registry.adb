@@ -12,6 +12,13 @@ with Rose.Interfaces.Processes.Process_Control;
 
 package body Tests.Registry is
 
+   procedure Start_Null_Stream
+     (Served   : out Rose.Capabilities.Capability;
+      Null_Dir : out Rose.Capabilities.Capability);
+   --  Launch the null stream command, against Run_Self_Tests' own bank,
+   --  and return its Stream and its null directory, or null caps if the
+   --  launch failed.
+
    Registry : Rose.Interfaces.Commands.Lookup.Client.Lookup_Client;
    Clock_Interface_Cap : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
@@ -200,30 +207,30 @@ package body Tests.Registry is
          return Rose.Capabilities.Null_Capability;
    end Launch_File;
 
+   ---------------------------
+   -- Launch_Null_Directory --
+   ---------------------------
+
+   function Launch_Null_Directory return Rose.Capabilities.Capability is
+      Served   : Rose.Capabilities.Capability;
+      Null_Dir : Rose.Capabilities.Capability;
+   begin
+      Start_Null_Stream (Served, Null_Dir);
+      Rose.System_Calls.Delete_Cap (Served);
+      return Null_Dir;
+   end Launch_Null_Directory;
+
    ------------------------
    -- Launch_Null_Stream --
    ------------------------
 
    function Launch_Null_Stream return Rose.Capabilities.Capability is
-      use type Rose.Capabilities.Capability;
-      Program  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
-        Launcher ("null_stream");
-      Endpoint : constant Rose.Capabilities.Capability :=
-        Program.Launch_Command (Rose.System_Calls.Own_Bank.Cap);
       Served   : Rose.Capabilities.Capability;
+      Null_Dir : Rose.Capabilities.Capability;
    begin
-      if Endpoint = Rose.Capabilities.Null_Capability then
-         return Rose.Capabilities.Null_Capability;
-      end if;
-      Rose.Core.Null_Stream_Client.Call
-        (Endpoint        => Endpoint,
-         Create_Endpoint => Create_Endpoint,
-         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
-         Served          => Served);
+      Start_Null_Stream (Served, Null_Dir);
+      Rose.System_Calls.Delete_Cap (Null_Dir);
       return Served;
-   exception
-      when Rose.Interfaces.Objects.Invocation_Error =>
-         return Rose.Capabilities.Null_Capability;
    end Launch_Null_Stream;
 
    --------------
@@ -357,6 +364,9 @@ package body Tests.Registry is
       is (if Fresh then Cap else Rose.Capabilities.Null_Capability);
       --  A new version takes its caps from the old one (#901).
 
+      Linking : Rose.Capabilities.Capability;
+      --  The directory's Linking_Directory, which no test links into.
+
    begin
       Rose.Core.Directory_Client.Call
         (Endpoint         => Endpoint,
@@ -371,7 +381,9 @@ package body Tests.Registry is
             else Rose.Capabilities.Null_Capability),
          Served           => Served,
          Control          => Control,
+         Linking          => Linking,
          Previous         => Previous);
+      Rose.System_Calls.Delete_Cap (Linking);
    end Start_Directory;
 
    ----------------
@@ -406,5 +418,36 @@ package body Tests.Registry is
          Control         => Control,
          Previous        => Previous);
    end Start_File;
+
+   -----------------------
+   -- Start_Null_Stream --
+   -----------------------
+
+   procedure Start_Null_Stream
+     (Served   : out Rose.Capabilities.Capability;
+      Null_Dir : out Rose.Capabilities.Capability)
+   is
+      use type Rose.Capabilities.Capability;
+      Program  : Rose.Interfaces.Processes.Launch.Launch_Object'Class :=
+        Launcher ("null_stream");
+      Endpoint : constant Rose.Capabilities.Capability :=
+        Program.Launch_Command (Rose.System_Calls.Own_Bank.Cap);
+   begin
+      Served := Rose.Capabilities.Null_Capability;
+      Null_Dir := Rose.Capabilities.Null_Capability;
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+      Rose.Core.Null_Stream_Client.Call
+        (Endpoint        => Endpoint,
+         Create_Endpoint => Create_Endpoint,
+         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
+         Served          => Served,
+         Null_Directory  => Null_Dir);
+   exception
+      when Rose.Interfaces.Objects.Invocation_Error =>
+         Served := Rose.Capabilities.Null_Capability;
+         Null_Dir := Rose.Capabilities.Null_Capability;
+   end Start_Null_Stream;
 
 end Tests.Registry;

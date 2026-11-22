@@ -1,6 +1,10 @@
 package Tests.Directories is
 
    function Directory_Test return Boolean;
+
+   function Null_Directory_Test return Boolean;
+   --  The null directory (ADR 0040, section 5): it has no entries, and
+   --  refuses every change.
    --  Launch a directory server, create a file and a subdirectory in
    --  it, and look them up through the writable and read-only
    --  interfaces.

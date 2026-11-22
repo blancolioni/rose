@@ -52,6 +52,7 @@ package Tests.Suite is
                    Tests.Processes.End_Process_Test'Access,
                    Tests.Processes.Bank_End_Test'Access,
                    Tests.Directories.Directory_Test'Access,
+                   Tests.Directories.Null_Directory_Test'Access,
                    Tests.Directories.Version_Test'Access,
                    Tests.Users.User_Test'Access,
                    Tests.Users.Session_Test'Access,

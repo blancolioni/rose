@@ -335,6 +335,7 @@ package body Auth_Server is
       User      : Rose.Capabilities.Capability;
       Control   : Rose.Capabilities.Capability;
       Home_Ctl  : Rose.Capabilities.Capability;
+      Home_Linking : Rose.Capabilities.Capability;
       User_Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
 
       function Give_Up return User_Class;
@@ -425,7 +426,12 @@ package body Auth_Server is
                File_Launch      => File_Launch.Launch_Cap,
                Directory_Launch => Directory_Launch.Launch_Cap,
                Served           => Home,
-               Control          => Home_Ctl);
+               Control          => Home_Ctl,
+               Linking          => Home_Linking);
+
+            --  Nothing is linked into a home (#1045).
+
+            Rose.System_Calls.Delete_Cap (Home_Linking);
          end;
       exception
          when Rose.Interfaces.Objects.Invocation_Error =>
