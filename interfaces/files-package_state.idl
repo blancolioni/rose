@@ -1,0 +1,9 @@
+--  A private directory for the command's package, in the user's home, for
+--  what it keeps between runs: saved games, settings, history (ADR 0040).
+--  Petal binds it to home/package-state/<package>, the package's name in
+--  lower case with "-" for ".", which it makes the first time it is
+--  needed. Every command of the package gets the same directory. A
+--  launcher with no home to give gives the null directory, never a null
+--  cap.
+
+role Files.Package_State : Files.Writable_Directory;

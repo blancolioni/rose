@@ -103,6 +103,9 @@ package body Petal.Session is
    --  reader for an argument, or the output of a redirection. A special
    --  file isn't a version, so its output is never committed.
 
+   Package_State_Name : constant String := "package-state";
+   --  The directory in home that holds each package's state (ADR 0040).
+
    System_Name      : constant String := "system";
    System_Directory : Rose.Interfaces.Files.Fixed_Directory.Client
      .Fixed_Directory_Client;
@@ -909,6 +912,64 @@ package body Petal.Session is
 
       Reader := Readers (Reader_Count).Get_Read_Cap;
    end Open_Reader;
+
+   -------------------
+   -- Package_State --
+   -------------------
+
+   function Package_State
+     (Package_Name : String)
+      return Rose.Capabilities.Capability
+   is
+      Home      : constant Directory_Access := Find_Directory (Home_Name);
+      Directory : String (1 .. Package_Name'Length);
+   begin
+      if Home = null or else Package_Name'Length = 0
+        or else Found_Count = Max_Found_Files
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      for I in Package_Name'Range loop
+         declare
+            Ch : constant Character := Package_Name (I);
+         begin
+            Directory (I - Package_Name'First + 1) :=
+              (if Ch = '.' then '-'
+               elsif Ch in 'A' .. 'Z'
+               then Character'Val (Character'Pos (Ch) + 32)
+               else Ch);
+         end;
+      end loop;
+
+      --  Create_Directory gives the directory that is there already, so
+      --  the first launch makes both, and later ones find them. Making a
+      --  directory needs no commit.
+
+      declare
+         Parent : Rose.Interfaces.Files.Writable_Directory
+           .Writable_Directory_Object'Class :=
+             Home.Create_Directory (Package_State_Name);
+      begin
+         declare
+            Child : Rose.Interfaces.Files.Writable_Directory
+              .Writable_Directory_Object'Class :=
+                Parent.Create_Directory (Directory);
+            Cap   : constant Rose.Capabilities.Capability :=
+              Child.Writable_Directory_Cap;
+         begin
+            Rose.System_Calls.Delete_Cap (Parent.Writable_Directory_Cap);
+            if Cap /= Rose.Capabilities.Null_Capability then
+               Found_Count := Found_Count + 1;
+               Found_Files (Found_Count) := Cap;
+            end if;
+            return Cap;
+         end;
+      end;
+   exception
+      when Invocation_Error =>
+         return Rose.Capabilities.Null_Capability;
+   end Package_State;
 
    ---------------------
    -- Redirect_Output --

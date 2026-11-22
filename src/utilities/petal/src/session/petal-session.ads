@@ -36,6 +36,14 @@ package Petal.Session is
    --  Name Directory, the cap of a Writable_Directory interface, in the
    --  table, or report that the table is full. The table keeps the cap.
 
+   function Package_State
+     (Package_Name : String)
+      return Rose.Capabilities.Capability;
+   --  The Writable_Directory of home/package-state/<package> (ADR 0040),
+   --  where <package> is Package_Name in lower case with "-" for ".",
+   --  made if it isn't there, or the null cap if there is no home or it
+   --  can't be made. Release_Files deletes the cap.
+
    procedure Find_Grant
      (Name     : String;
       Writable : Boolean;
