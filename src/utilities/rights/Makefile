@@ -23,6 +23,8 @@ rights:
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
+	    $(INTERFACES)/files-fixed_directory.idl \
+	    $(INTERFACES)/streams-stream.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-writable_file.idl \

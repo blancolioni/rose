@@ -11,7 +11,10 @@ with Rose.Interfaces.Storage.Bank;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Files.Directory;
 with Rose.Interfaces.Files.File;
+with Rose.Interfaces.Files.Fixed_Directory;
 with Rose.Interfaces.Streams.Readable;
+with Rose.Interfaces.Streams.Reader;
+with Rose.Interfaces.Streams.Stream;
 with Rose.Interfaces.Streams.Releasable_Reader;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Transactional_Writable_File;
@@ -79,9 +82,6 @@ package body Tests.Directories is
             return True;
       end Delete_Refused;
 
-      function Refused (From, To : String) return Boolean;
-      --  True if Top refuses to rename From to To.
-
       function Getter_Refused
         (Index : Positive;
          Leaf  : Boolean)
@@ -117,6 +117,9 @@ package body Tests.Directories is
             return True;
       end Getter_Refused;
 
+      function Refused (From, To : String) return Boolean;
+      --  True if Top refuses to rename From to To.
+
       function Refused (From, To : String) return Boolean is
       begin
          Top.Rename (From, To);
@@ -125,6 +128,47 @@ package body Tests.Directories is
          when Rose.Interfaces.Objects.Invocation_Error =>
             return True;
       end Refused;
+
+      function Special_Refused (Index : Positive) return Boolean;
+      --  True if Top refuses both Get_Special_Reader (Index) and
+      --  Get_Special_File (Index).
+
+      function Special_Refused (Index : Positive) return Boolean is
+
+         function File_Refused return Boolean;
+         function Reader_Refused return Boolean;
+
+         function File_Refused return Boolean is
+         begin
+            declare
+               Item : constant Rose.Interfaces.Streams.Stream
+                 .Stream_Object'Class := Top.Get_Special_File (Index);
+               pragma Unreferenced (Item);
+            begin
+               return False;
+            end;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return True;
+         end File_Refused;
+
+         function Reader_Refused return Boolean is
+         begin
+            declare
+               Item : constant Rose.Interfaces.Streams.Reader
+                 .Reader_Object'Class := Top.Get_Special_Reader (Index);
+               pragma Unreferenced (Item);
+            begin
+               return False;
+            end;
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               return True;
+         end Reader_Refused;
+
+      begin
+         return Reader_Refused and then File_Refused;
+      end Special_Refused;
 
    begin
       Ada.Text_IO.Put ("Directory test");
@@ -255,6 +299,26 @@ package body Tests.Directories is
         or else not Getter_Refused (2, Leaf => True)
       then
          return Fail ("a getter of the wrong kind was not refused");
+      end if;
+
+      --  A Fixed_Directory can't change the directory, but its entries
+      --  keep their rights (ADR 0036): the file in the subdirectory can
+      --  still be written through it. Neither entry is a special file.
+
+      declare
+         Fixed : Rose.Interfaces.Files.Fixed_Directory
+           .Fixed_Directory_Object'Class :=
+           Top.Get_Fixed_Directory (2);
+         Inner : Writable_File_Class := Fixed.Get_Writable_File (1);
+      begin
+         Tests.Files.Append (Inner, Hello);
+         if Fixed.Entry_Size (1) /= Hello'Length then
+            return Fail ("cannot write through a fixed directory");
+         end if;
+      end;
+
+      if not Special_Refused (1) or else not Special_Refused (2) then
+         return Fail ("an entry that isn't special was given as one");
       end if;
 
       --  Renaming changes only the entry. The file is the same, so a

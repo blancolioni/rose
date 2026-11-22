@@ -48,7 +48,8 @@ A file or directory comes in two forms, and the type of a cap says which right i
 | `File` | `Readable` | `Size`, and `Open_Seekable_Reader`
 | `Writable_File` | `File` | Writers: `Append`, `Rewrite`; and `New_Version`
 | `Directory` | `Tree` | Kinds and sizes of entries, `Entry_File_Kind` and `Entry_Size`, and `Get_Ordinary_File`, `Get_Directory`
-| `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory`, `Rename`, `Delete_File`, `Delete_Directory`
+| `Fixed_Directory` | `Directory` | Entries at their own rights, but no changes to the directory: `Get_Writable_File`, `Get_Fixed_Directory`, `Get_Special_File`
+| `Writable_Directory` | `Fixed_Directory` | `Get_Writable_Directory`, `Create_File`, `Create_Directory`, `Rename`, `Delete_File`, `Delete_Directory`
 |===
 
 * *Narrowing is free.*
@@ -56,6 +57,9 @@ A file or directory comes in two forms, and the type of a cap says which right i
   Petal passes `in File` from a writable file that it holds in this way.
 * *A directory hands out read-only children.*
   `Get_Ordinary_File` and `Get_Directory` return `File` and `Directory`, even on a `Writable_Directory`.
+  A `Directory` is read-only all the way down, and gives only the reading side of a special file, through `Get_Special_Reader`.
+* *A fixed directory can't change, but its entries keep their rights* (ADR 0036).
+  Nothing can be added, renamed or deleted through a `Fixed_Directory`, but a file in it can be written, a child directory comes back as a `Fixed_Directory`, and a special file is the `Stream` it was added as.
 * *A directory is a tree* (ADR 0042).
   Through `Tree`, a directory is a branch, an ordinary file a leaf, and a special file another kind of entry, so a program that reads its configuration through `Tree` can be given a directory.
   Only the `Get_Writable_*` operations, which only a `Writable_Directory` has, return the writable forms.
