@@ -134,6 +134,7 @@ package body IsoFS.Directories is
          Sector_Address        : Block_Address_Type;
          Entry_Record          : Directory_Entry;
          Directory_Interface   : Rose.Capabilities.Capability := 0;
+         Tree_Interface        : Rose.Capabilities.Capability := 0;
       end record;
 
    type Directory_Caps_Array is
@@ -319,7 +320,9 @@ package body IsoFS.Directories is
            Child_Count           => 0,
            Sector_Address        => Sector,
            Directory_Interface   =>
-              New_Cap (Directory_Interface));
+              New_Cap (Directory_Interface),
+           Tree_Interface        =>
+              New_Cap (Rose.Interfaces.Files.Directory.Tree_Interface));
 
       Scan_Directory_Entries (Directory, Add_Child_Entry'Access);
 
@@ -831,6 +834,19 @@ package body IsoFS.Directories is
          return No_Directory;
       end if;
    end Get_Root_Directory;
+
+   ------------------------
+   -- Get_Tree_Interface --
+   ------------------------
+
+   function Get_Tree_Interface
+     (Directory : Directory_Type)
+      return Rose.Capabilities.Capability
+   is
+      Caps : Directory_Caps_Record renames Directory_Caps (Directory);
+   begin
+      return Caps.Tree_Interface;
+   end Get_Tree_Interface;
 
    -----------------
    -- Open_Reader --

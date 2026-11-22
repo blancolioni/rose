@@ -43,9 +43,11 @@ A file or directory comes in two forms, and the type of a cap says which right i
 [cols="2,2,4",options="header"]
 |===
 | Interface | Parent | Adds
-| `File` | | `Size`, and readers: `Open_Reader`, `Open_Seekable_Reader`
+| `Readable` | | `Open_Reader`
+| `Tree` | | Named entries, each a branch or a leaf: `Entry_Count`, `Entry_Name`, `Entry_Kind_Of`, `Find_Entry`, `Get_Branch`, `Get_Leaf`
+| `File` | `Readable` | `Size`, and `Open_Seekable_Reader`
 | `Writable_File` | `File` | Writers: `Append`, `Rewrite`; and `New_Version`
-| `Directory` | | Looking up entries: `Find_Entry`, `Directory_Entry_Name`, `Get_Ordinary_File`, `Get_Directory`, and the rest
+| `Directory` | `Tree` | Kinds and sizes of entries, `Entry_File_Kind` and `Entry_Size`, and `Get_Ordinary_File`, `Get_Directory`
 | `Writable_Directory` | `Directory` | `Get_Writable_File`, `Get_Writable_Directory`, `Create_File`, `Create_Directory`, `Rename`, `Delete_File`, `Delete_Directory`
 |===
 
@@ -54,6 +56,8 @@ A file or directory comes in two forms, and the type of a cap says which right i
   Petal passes `in File` from a writable file that it holds in this way.
 * *A directory hands out read-only children.*
   `Get_Ordinary_File` and `Get_Directory` return `File` and `Directory`, even on a `Writable_Directory`.
+* *A directory is a tree* (ADR 0042).
+  Through `Tree`, a directory is a branch, an ordinary file a leaf, and a special file another kind of entry, so a program that reads its configuration through `Tree` can be given a directory.
   Only the `Get_Writable_*` operations, which only a `Writable_Directory` has, return the writable forms.
 * *A file is not a stream.*
   It opens readers and writers, each a `Resource` that its client releases when it is done (ADR 0009, ADR 0010).

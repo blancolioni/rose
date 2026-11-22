@@ -6,10 +6,12 @@ with System.Storage_Elements;
 
 with Rose.Capabilities;
 
+with Rose.Interfaces.Common.Tree;
 with Rose.Interfaces.Storage.Bank;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Files.Directory;
 with Rose.Interfaces.Files.File;
+with Rose.Interfaces.Streams.Readable;
 with Rose.Interfaces.Streams.Releasable_Reader;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Transactional_Writable_File;
@@ -24,6 +26,7 @@ package body Tests.Directories is
    use Ada.Streams;
    use type System.Storage_Elements.Storage_Count;
    use type Rose.Capabilities.Capability;
+   use type Rose.Interfaces.Common.Tree.Entry_Kind;
    use type Rose.Interfaces.Files.Directory.File_Kind;
 
    Hello : constant Stream_Element_Array (1 .. 5) :=
@@ -79,6 +82,41 @@ package body Tests.Directories is
       function Refused (From, To : String) return Boolean;
       --  True if Top refuses to rename From to To.
 
+      function Getter_Refused
+        (Index : Positive;
+         Leaf  : Boolean)
+         return Boolean;
+      --  True if Top refuses Get_Leaf (Index), if Leaf is True, or
+      --  Get_Branch (Index) if not.
+
+      function Getter_Refused
+        (Index : Positive;
+         Leaf  : Boolean)
+         return Boolean
+      is
+      begin
+         if Leaf then
+            declare
+               Item : constant Rose.Interfaces.Streams.Readable
+                 .Readable_Object'Class := Top.Get_Leaf (Index);
+               pragma Unreferenced (Item);
+            begin
+               return False;
+            end;
+         else
+            declare
+               Item : constant Rose.Interfaces.Common.Tree
+                 .Tree_Object'Class := Top.Get_Branch (Index);
+               pragma Unreferenced (Item);
+            begin
+               return False;
+            end;
+         end if;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            return True;
+      end Getter_Refused;
+
       function Refused (From, To : String) return Boolean is
       begin
          Top.Rename (From, To);
@@ -112,17 +150,17 @@ package body Tests.Directories is
          Notes_Cap := Notes.Writable_File_Cap;
       end;
 
-      if Top.Directory_Entry_Count /= 1
+      if Top.Entry_Count /= 1
         or else Top.Find_Entry ("notes") /= 1
         or else Top.Find_Entry ("other") /= 0
-        or else Top.Directory_Entry_Kind (1)
+        or else Top.Entry_File_Kind (1)
           /= Rose.Interfaces.Files.Directory.Ordinary_File
-        or else Top.Directory_Entry_Size (1) /= Hello'Length
+        or else Top.Entry_Size (1) /= Hello'Length
       then
          return Fail ("wrong entry for the file");
       end if;
 
-      if Top.Directory_Entry_Name (1) /= "notes" then
+      if Top.Entry_Name (1) /= "notes" then
          return Fail ("wrong name");
       end if;
 
@@ -163,17 +201,60 @@ package body Tests.Directories is
            .Directory_Object'Class :=
            Top.Get_Directory (2);
       begin
-         if Sub_Listing.Directory_Entry_Count /= 1
+         if Sub_Listing.Entry_Count /= 1
            or else Sub_Listing.Find_Entry ("inner") /= 1
          then
             return Fail ("wrong entries in the subdirectory");
          end if;
       end;
 
-      if Top.Directory_Entry_Kind (2)
+      if Top.Entry_File_Kind (2)
         /= Rose.Interfaces.Files.Directory.Directory
       then
          return Fail ("the subdirectory is not a directory");
+      end if;
+
+      --  The same entries through Common.Tree (ADR 0042): the file is a
+      --  leaf, the subdirectory a branch, and a getter of the wrong kind
+      --  fails.
+
+      if Top.Entry_Kind_Of (1) /= Rose.Interfaces.Common.Tree.Leaf
+        or else Top.Entry_Kind_Of (2) /= Rose.Interfaces.Common.Tree.Branch
+      then
+         return Fail ("wrong kinds through Tree");
+      end if;
+
+      declare
+         Leaf   : Rose.Interfaces.Streams.Readable.Readable_Object'Class :=
+           Top.Get_Leaf (1);
+         Reader : Rose.Interfaces.Streams.Releasable_Reader
+           .Releasable_Reader_Object'Class :=
+           Leaf.Open_Reader;
+      begin
+         Reader.Read (Buffer, Last);
+         if Last /= Hello'Length or else Buffer (1 .. Last) /= Hello then
+            return Fail ("wrong contents through Get_Leaf");
+         end if;
+         Reader.Release;
+      end;
+
+      declare
+         Branch : Rose.Interfaces.Common.Tree.Tree_Object'Class :=
+           Top.Get_Branch (2);
+      begin
+         if Branch.Entry_Count /= 1
+           or else Branch.Entry_Name (1) /= "inner"
+           or else Branch.Entry_Kind_Of (1)
+             /= Rose.Interfaces.Common.Tree.Leaf
+         then
+            return Fail ("wrong entries through Get_Branch");
+         end if;
+      end;
+
+      if not Getter_Refused (1, Leaf => False)
+        or else not Getter_Refused (2, Leaf => True)
+      then
+         return Fail ("a getter of the wrong kind was not refused");
       end if;
 
       --  Renaming changes only the entry. The file is the same, so a
@@ -186,10 +267,10 @@ package body Tests.Directories is
             return Fail ("cannot rename");
       end;
 
-      if Top.Directory_Entry_Count /= 2
+      if Top.Entry_Count /= 2
         or else Top.Find_Entry ("memo") /= 1
         or else Top.Find_Entry ("notes") /= 0
-        or else Top.Directory_Entry_Name (1) /= "memo"
+        or else Top.Entry_Name (1) /= "memo"
       then
          return Fail ("wrong entries after a rename");
       end if;
@@ -201,7 +282,7 @@ package body Tests.Directories is
          when Rose.Interfaces.Objects.Invocation_Error =>
             return Fail ("cannot write through a held cap");
       end;
-      if Top.Directory_Entry_Size (1) /= 2 * Hello'Length then
+      if Top.Entry_Size (1) /= 2 * Hello'Length then
          return Fail ("a held cap does not reach the renamed file");
       end if;
 
@@ -233,7 +314,7 @@ package body Tests.Directories is
          return Fail ("a bad delete was not refused");
       end if;
 
-      if Top.Directory_Entry_Count /= 2 then
+      if Top.Entry_Count /= 2 then
          return Fail ("a refused delete changed the entries");
       end if;
 
@@ -247,7 +328,7 @@ package body Tests.Directories is
             return Fail ("cannot delete a file");
       end;
 
-      if Top.Directory_Entry_Count /= 1
+      if Top.Entry_Count /= 1
         or else Top.Find_Entry ("memo") /= 0
         or else Top.Find_Entry ("sub") /= 1
       then
@@ -278,7 +359,7 @@ package body Tests.Directories is
             return Fail ("cannot empty and delete a directory");
       end;
 
-      if Top.Directory_Entry_Count /= 0 then
+      if Top.Entry_Count /= 0 then
          return Fail ("wrong entries after deleting a directory");
       end if;
 

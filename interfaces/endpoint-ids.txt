@@ -66,6 +66,13 @@
 16#689F_E182_B5E2_49AD#  interface rose.interfaces.common.transactional
 16#329C_81C2_15F4_B504#  rose.interfaces.common.transactional.commit
 16#9774_C29B_7695_BD13#  rose.interfaces.common.transactional.rollback
+16#8F11_A38C_E5E7_C5D0#  interface rose.interfaces.common.tree
+16#B5C6_A8A2_4427_33B2#  rose.interfaces.common.tree.entry_count return natural
+16#E13D_CA3F_54EB_0B08#  rose.interfaces.common.tree.entry_name(in positive) return string
+16#4B1B_4B91_B910_8C8E#  rose.interfaces.common.tree.entry_kind_of(in positive) return rose.interfaces.common.tree.entry_kind
+16#22AE_DB6F_D66B_F560#  rose.interfaces.common.tree.find_entry(in string) return natural
+16#9E2C_C526_09CE_429A#  rose.interfaces.common.tree.get_branch(in positive) return interface rose.interfaces.common.tree
+16#3EE4_5241_3DE7_5141#  rose.interfaces.common.tree.get_leaf(in positive) return interface rose.interfaces.streams.readable
 16#031A_56C0_8635_63BF#  interface rose.interfaces.devices.ata
 16#D851_CBDE_A4DD_3515#  rose.interfaces.devices.ata.get_device return interface rose.interfaces.storage.block_array
 16#8EBE_14B1_86EA_92C2#  interface rose.interfaces.devices.event_listener
@@ -75,16 +82,12 @@
 16#4E3C_3D4A_E02C_7CEE#  interface rose.interfaces.devices.interrupt_handler
 16#5FDA_85C7_D446_CC09#  rose.interfaces.devices.interrupt_handler.handle_interrupt(in word)
 16#287F_188F_36A1_0F16#  interface rose.interfaces.files.directory
-16#C63F_DF72_E2DF_9C9D#  rose.interfaces.files.directory.directory_entry_count return natural
-16#B866_FA24_A20E_E60B#  rose.interfaces.files.directory.directory_entry_name(in positive) return string
-16#633E_8A3C_EF98_DC16#  rose.interfaces.files.directory.directory_entry_kind(in positive) return rose.interfaces.files.directory.file_kind
-16#FF6C_4CD2_623E_C6DD#  rose.interfaces.files.directory.directory_entry_size(in positive) return storage_count
-16#2DDC_33CB_77F8_496B#  rose.interfaces.files.directory.find_entry(in string) return natural
+16#73CC_523C_3838_6440#  rose.interfaces.files.directory.entry_file_kind(in positive) return rose.interfaces.files.directory.file_kind
+16#AC27_39EA_3493_1BEC#  rose.interfaces.files.directory.entry_size(in positive) return storage_count
 16#68DC_F411_9D2F_9BBA#  rose.interfaces.files.directory.get_ordinary_file(in positive) return interface rose.interfaces.files.file
 16#0626_346A_6D45_9717#  rose.interfaces.files.directory.get_directory(in positive) return interface rose.interfaces.files.directory
 16#159C_F386_7342_D811#  interface rose.interfaces.files.file
 16#E83F_FD09_82C9_A171#  rose.interfaces.files.file.size return storage_count
-16#B8DB_7C80_9C96_1BEE#  rose.interfaces.files.file.open_reader return interface rose.interfaces.streams.releasable_reader
 16#21CF_C43A_5CE7_89F1#  rose.interfaces.files.file.open_seekable_reader return interface rose.interfaces.streams.seekable_reader
 16#B060_3DCC_C9E9_9361#  interface rose.interfaces.files.file_system
 16#F114_9F1A_16BA_4445#  rose.interfaces.files.file_system.root_directory return interface rose.interfaces.files.directory
@@ -221,6 +224,8 @@
 16#C7A3_14EF_33E3_E84A#  rose.interfaces.storage.store.get_root_bank return interface rose.interfaces.storage.bank
 16#C917_1AFE_591E_DBD4#  interface rose.interfaces.streams.output_redirect
 16#EB20_394F_54D0_9E6F#  rose.interfaces.streams.output_redirect.redirect(in interface rose.interfaces.streams.writer)
+16#3F1C_BF1C_6CE8_E5DC#  interface rose.interfaces.streams.readable
+16#495B_9E2C_1D19_72FE#  rose.interfaces.streams.readable.open_reader return interface rose.interfaces.streams.releasable_reader
 16#3658_D702_10B3_514E#  interface rose.interfaces.streams.reader
 16#1012_B11D_3499_153D#  rose.interfaces.streams.reader.read(out stream_element_array; out stream_element_offset)
 16#13C2_EBB8_F40F_BE3C#  interface rose.interfaces.streams.releasable_reader

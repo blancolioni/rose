@@ -1,11 +1,10 @@
 --  A file opens readers, each with its own position (ADR 0009). It is
---  not a stream itself.
+--  not a stream itself. Open_Reader comes from Readable (ADR 0042).
 
-interface Files.File is
+interface Files.File : Streams.Readable is
 
    function Size return Storage_Count;
 
-   function Open_Reader return interface Streams.Releasable_Reader;
    function Open_Seekable_Reader return interface Streams.Seekable_Reader;
 
 end Files.File;

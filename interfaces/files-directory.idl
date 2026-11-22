@@ -1,14 +1,15 @@
-interface Files.Directory is
+--  A directory, read-only all the way down: everything it gives is
+--  read-only too (ADR 0003, section 1). Its entries are a Tree (ADR
+--  0042): a directory is a branch, an ordinary file a leaf, and a special
+--  file another kind of entry.
+
+interface Files.Directory : Common.Tree is
 
    type File_Kind is (Directory, Ordinary_File, Special_File);
-   
-   function Directory_Entry_Count return Natural;
-   function Directory_Entry_Name (Index : Positive) return String;
-   function Directory_Entry_Kind (Index : Positive) return File_Kind;
-   function Directory_Entry_Size (Index : Positive) return Storage_Count;
-   
-   function Find_Entry (Name : String) return Natural;
-   
+
+   function Entry_File_Kind (Index : Positive) return File_Kind;
+   function Entry_Size (Index : Positive) return Storage_Count;
+
    function Get_Ordinary_File (Index : Positive) return interface Files.File;
    function Get_Directory (Index : Positive) return interface Files.Directory;
 

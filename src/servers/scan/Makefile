@@ -8,7 +8,11 @@ READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-streams-reader-client.o
 DIRECTORY_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-files-directory.o \
-	$(BUILDDIR)/rose-interfaces-files-directory-client.o
+	$(BUILDDIR)/rose-interfaces-files-directory-client.o \
+	$(BUILDDIR)/rose-interfaces-common-tree.o \
+	$(BUILDDIR)/rose-interfaces-common-tree-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable-client.o
 FILE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-files-file.o \
 	$(BUILDDIR)/rose-interfaces-files-file-client.o \

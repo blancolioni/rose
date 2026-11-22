@@ -96,6 +96,11 @@ package IsoFS.Directories is
      (Directory             : Directory_Type)
       return Rose.Capabilities.Capability;
 
+   function Get_Tree_Interface
+     (Directory : Directory_Type)
+      return Rose.Capabilities.Capability;
+   --  The same directory, as a Common.Tree (ADR 0042).
+
 private
 
    type Directory_Type is new Natural;

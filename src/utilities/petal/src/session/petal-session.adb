@@ -328,7 +328,7 @@ package body Petal.Session is
                Index := Parent.Find_Entry (Name);
                if Index = 0 then
                   Error ("no directory named '" & Name & "'");
-               elsif Parent.Directory_Entry_Kind (Index)
+               elsif Parent.Entry_File_Kind (Index)
                  /= Rose.Interfaces.Files.Directory.Directory
                then
                   Error ("'" & Name & "' is not a directory");
@@ -593,7 +593,7 @@ package body Petal.Session is
       if Index = 0 then
          Result := No_Such_File;
          return;
-      elsif Directory.Directory_Entry_Kind (Index)
+      elsif Directory.Entry_File_Kind (Index)
         /= Rose.Interfaces.Files.Directory.Ordinary_File
       then
          Result := Not_A_File;
@@ -648,7 +648,7 @@ package body Petal.Session is
 
       Index := Directory.Find_Entry (Name);
       if Index /= 0
-        and then Directory.Directory_Entry_Kind (Index)
+        and then Directory.Entry_File_Kind (Index)
           /= Rose.Interfaces.Files.Directory.Ordinary_File
       then
          Result := Not_A_Version_File;
