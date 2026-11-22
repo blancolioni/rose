@@ -31,6 +31,10 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-dependent-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
 	$(BUILDDIR)/rose-interfaces-files-directory-client.o \
+	$(BUILDDIR)/rose-interfaces-common-tree.o \
+	$(BUILDDIR)/rose-interfaces-common-tree-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable.o \
+	$(BUILDDIR)/rose-interfaces-streams-readable-client.o \
 	$(BUILDDIR)/rose-interfaces-files-file-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-launch-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-process_banks-client.o \
@@ -56,6 +60,10 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-users-user.o \
 	$(BUILDDIR)/rose-interfaces-users-user-client.o \
 	$(BUILDDIR)/rose-interfaces-files-writable_directory-client.o \
+	$(BUILDDIR)/rose-interfaces-files-fixed_directory.o \
+	$(BUILDDIR)/rose-interfaces-files-fixed_directory-client.o \
+	$(BUILDDIR)/rose-interfaces-streams-stream.o \
+	$(BUILDDIR)/rose-interfaces-streams-stream-client.o \
 	$(BUILDDIR)/rose-interfaces-files-writable_file-client.o \
 	$(BUILDDIR)/rose-interfaces-files-transactional_writable_file-client.o \
 	$(BUILDDIR)/rose-interfaces-common-resource.o \

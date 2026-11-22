@@ -1,8 +1,8 @@
 ROOT=../../../..
 include $(ROOT)/mk/common.mk
 
-IDL=caps-cap storage-block_array files-file_system files-directory \
-    files-file common-transactional files-transactional_writable_file \
+IDL=caps-cap storage-block_array files-file_system files-directory common-tree files-fixed_directory \
+    files-file streams-readable common-transactional files-transactional_writable_file \
     files-writable_directory files-writable_file users-user \
     common-resource streams-releasable_reader \
     streams-releasable_writer streams-seekable_reader streams-reader \

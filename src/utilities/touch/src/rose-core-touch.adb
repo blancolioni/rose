@@ -34,7 +34,7 @@ begin
    --  Name is a directory, so that is checked first, for the message.
 
    if Index > 0
-     and then Directory.Directory_Entry_Kind (Index)
+     and then Directory.Entry_File_Kind (Index)
                 = Rose.Interfaces.Files.Directory.Directory
    then
       Fail (": it is a directory");

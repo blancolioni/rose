@@ -11,17 +11,27 @@ with Rose.System_Calls;
 with Rose.System_Calls.Own_Bank;
 with Rose.Words;
 
+with Rose.Interfaces.Common.Tree;
+with Rose.Interfaces.Common.Tree.Client;
 with Rose.Interfaces.Storage.Bank;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Files.Directory.Client;
 with Rose.Interfaces.Files.File;
 with Rose.Interfaces.Files.File.Client;
+with Rose.Interfaces.Files.Fixed_Directory;
+with Rose.Interfaces.Files.Fixed_Directory.Client;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Writable_Directory.Client;
 with Rose.Interfaces.Files.Writable_Directory.Server;
 with Rose.Interfaces.Files.Writable_File;
 with Rose.Interfaces.Files.Writable_File.Client;
+with Rose.Interfaces.Streams.Readable;
+with Rose.Interfaces.Streams.Readable.Client;
+with Rose.Interfaces.Streams.Reader;
+with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Streams.Stream;
+with Rose.Interfaces.Streams.Stream.Client;
 
 package body Directory_Server is
 
@@ -35,6 +45,8 @@ package body Directory_Server is
 
    subtype Writable_Directory_Class is
      Rose.Interfaces.Files.Writable_Directory.Writable_Directory_Object'Class;
+   subtype Fixed_Directory_Class is
+     Rose.Interfaces.Files.Fixed_Directory.Fixed_Directory_Object'Class;
 
    Format : constant Rose.Words.Word_32 := 1;
    --  The version of this server's part of the state (#831):
@@ -100,7 +112,15 @@ package body Directory_Server is
        .Writable_Directory_Interface
      with null record;
 
+   overriding function Tree_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
    overriding function Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding function Fixed_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability;
 
@@ -108,21 +128,21 @@ package body Directory_Server is
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability;
 
-   overriding function Directory_Entry_Count
+   overriding function Entry_Count
      (Item : in out Directory_Object)
       return Natural;
 
-   overriding function Directory_Entry_Name
+   overriding function Entry_Name
      (Item  : in out Directory_Object;
       Index : Positive)
       return String;
 
-   overriding function Directory_Entry_Kind
+   overriding function Entry_File_Kind
      (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Files.Directory.File_Kind;
 
-   overriding function Directory_Entry_Size
+   overriding function Entry_Size
      (Item  : in out Directory_Object;
       Index : Positive)
       return System.Storage_Elements.Storage_Count;
@@ -131,6 +151,25 @@ package body Directory_Server is
      (Item : in out Directory_Object;
       Name : String)
       return Natural;
+
+   overriding function Entry_Kind_Of
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Common.Tree.Entry_Kind;
+   --  A directory is a branch, an ordinary file a leaf, and a special
+   --  file another kind of entry (ADR 0042, section 2).
+
+   overriding function Get_Branch
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Common.Tree.Tree_Object'Class;
+   --  The Tree of the directory Index. Raises if it isn't a directory.
+
+   overriding function Get_Leaf
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Readable.Readable_Object'Class;
+   --  The Readable of the file Index. Raises if it isn't a file.
 
    overriding function Get_Ordinary_File
      (Item  : in out Directory_Object;
@@ -146,6 +185,25 @@ package body Directory_Server is
      (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Files.Writable_File.Writable_File_Object'Class;
+
+   overriding function Get_Fixed_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Fixed_Directory_Class;
+   --  The directory Index, which can't be changed through what this
+   --  returns, but whose entries keep their rights (ADR 0036).
+
+   overriding function Get_Special_Reader
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class;
+
+   overriding function Get_Special_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Stream.Stream_Object'Class;
+   --  Both raise if the entry isn't a special file. Nothing makes one
+   --  yet (#929).
 
    overriding function Get_Writable_Directory
      (Item  : in out Directory_Object;
@@ -392,7 +450,7 @@ package body Directory_Server is
         /= Rose.Interfaces.Files.Directory.Directory
       then
          raise Constraint_Error with "delete: not a directory";
-      elsif Entries (Index).Child.Directory_Entry_Count > 0 then
+      elsif Entries (Index).Child.Entry_Count > 0 then
          raise Constraint_Error with "delete: the directory has entries";
       end if;
 
@@ -432,24 +490,24 @@ package body Directory_Server is
          (Context, Item,
           Rose.Interfaces.Files.Writable_Directory.Directory_Interface));
 
-   ---------------------------
-   -- Directory_Entry_Count --
-   ---------------------------
+   -----------------
+   -- Entry_Count --
+   -----------------
 
-   overriding function Directory_Entry_Count
+   overriding function Entry_Count
      (Item : in out Directory_Object)
       return Natural
    is
       pragma Unreferenced (Item);
    begin
       return Entry_Count;
-   end Directory_Entry_Count;
+   end Entry_Count;
 
-   --------------------------
-   -- Directory_Entry_Kind --
-   --------------------------
+   ---------------------
+   -- Entry_File_Kind --
+   ---------------------
 
-   overriding function Directory_Entry_Kind
+   overriding function Entry_File_Kind
      (Item  : in out Directory_Object;
       Index : Positive)
       return Rose.Interfaces.Files.Directory.File_Kind
@@ -461,13 +519,38 @@ package body Directory_Server is
       else
          return Entries (Index).Kind;
       end if;
-   end Directory_Entry_Kind;
+   end Entry_File_Kind;
 
-   --------------------------
-   -- Directory_Entry_Name --
-   --------------------------
+   -------------------
+   -- Entry_Kind_Of --
+   -------------------
 
-   overriding function Directory_Entry_Name
+   overriding function Entry_Kind_Of
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Common.Tree.Entry_Kind
+   is
+      pragma Unreferenced (Item);
+   begin
+      if Index > Entry_Count then
+         return Rose.Interfaces.Common.Tree.Other;
+      end if;
+
+      case Entries (Index).Kind is
+         when Rose.Interfaces.Files.Directory.Directory =>
+            return Rose.Interfaces.Common.Tree.Branch;
+         when Rose.Interfaces.Files.Directory.Ordinary_File =>
+            return Rose.Interfaces.Common.Tree.Leaf;
+         when Rose.Interfaces.Files.Directory.Special_File =>
+            return Rose.Interfaces.Common.Tree.Other;
+      end case;
+   end Entry_Kind_Of;
+
+   ----------------
+   -- Entry_Name --
+   ----------------
+
+   overriding function Entry_Name
      (Item  : in out Directory_Object;
       Index : Positive)
       return String
@@ -483,13 +566,13 @@ package body Directory_Server is
             return Named.Name (1 .. Named.Name_Last);
          end;
       end if;
-   end Directory_Entry_Name;
+   end Entry_Name;
 
-   --------------------------
-   -- Directory_Entry_Size --
-   --------------------------
+   ----------------
+   -- Entry_Size --
+   ----------------
 
-   overriding function Directory_Entry_Size
+   overriding function Entry_Size
      (Item  : in out Directory_Object;
       Index : Positive)
       return System.Storage_Elements.Storage_Count
@@ -501,7 +584,7 @@ package body Directory_Server is
       else
          return 0;
       end if;
-   end Directory_Entry_Size;
+   end Entry_Size;
 
    ----------
    -- Find --
@@ -535,6 +618,36 @@ package body Directory_Server is
       return Find (Name);
    end Find_Entry;
 
+   -------------------------
+   -- Fixed_Directory_Cap --
+   -------------------------
+
+   overriding function Fixed_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of
+         (Context, Item,
+          Rose.Interfaces.Files.Writable_Directory.Fixed_Directory_Interface));
+
+   ----------------
+   -- Get_Branch --
+   ----------------
+
+   overriding function Get_Branch
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Common.Tree.Tree_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Directory) then
+         raise Constraint_Error with "get branch: not a directory";
+      end if;
+
+      return Rose.Interfaces.Common.Tree.Client.From_Cap
+        (Entries (Index).Child.Tree_Cap);
+   end Get_Branch;
+
    -------------------
    -- Get_Directory --
    -------------------
@@ -561,6 +674,46 @@ package body Directory_Server is
            .Read_Only);
       end;
    end Get_Directory;
+
+   -------------------------
+   -- Get_Fixed_Directory --
+   -------------------------
+
+   overriding function Get_Fixed_Directory
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Fixed_Directory_Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Directory) then
+         raise Constraint_Error with "get fixed directory: not a directory";
+      end if;
+
+      return Rose.Interfaces.Files.Fixed_Directory.Client.From_Cap
+        (Entries (Index).Child.Fixed_Directory_Cap);
+   end Get_Fixed_Directory;
+
+   --------------
+   -- Get_Leaf --
+   --------------
+
+   overriding function Get_Leaf
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Readable.Readable_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind
+               (Index, Rose.Interfaces.Files.Directory.Ordinary_File)
+      then
+         raise Constraint_Error with "get leaf: not a file";
+      end if;
+
+      return Rose.Interfaces.Streams.Readable.Client.From_Cap
+        (Entries (Index).File.Readable_Cap);
+   end Get_Leaf;
 
    -----------------------
    -- Get_Ordinary_File --
@@ -589,6 +742,46 @@ package body Directory_Server is
          return Rose.Interfaces.Files.File.Client.From_Cap (Listed.Read_Only);
       end;
    end Get_Ordinary_File;
+
+   ----------------------
+   -- Get_Special_File --
+   ----------------------
+
+   overriding function Get_Special_File
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Stream.Stream_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Special_File)
+      then
+         raise Constraint_Error with "get special file: not a special file";
+      end if;
+
+      return Rose.Interfaces.Streams.Stream.Client.From_Cap
+        (Rose.Capabilities.Null_Capability);
+   end Get_Special_File;
+
+   ------------------------
+   -- Get_Special_Reader --
+   ------------------------
+
+   overriding function Get_Special_Reader
+     (Item  : in out Directory_Object;
+      Index : Positive)
+      return Rose.Interfaces.Streams.Reader.Reader_Object'Class
+   is
+      pragma Unreferenced (Item);
+   begin
+      if not Is_Kind (Index, Rose.Interfaces.Files.Directory.Special_File)
+      then
+         raise Constraint_Error with "get special reader: not a special file";
+      end if;
+
+      return Rose.Interfaces.Streams.Reader.Client.From_Cap
+        (Rose.Capabilities.Null_Capability);
+   end Get_Special_Reader;
 
    ----------------------------
    -- Get_Writable_Directory --
@@ -842,6 +1035,17 @@ package body Directory_Server is
    begin
       Rose.Server.Start_Server (Context);
    end Start_Server;
+
+   --------------
+   -- Tree_Cap --
+   --------------
+
+   overriding function Tree_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Files.Writable_Directory.Server.Cap_Of
+         (Context, Item,
+          Rose.Interfaces.Files.Writable_Directory.Tree_Interface));
 
    ----------------------------
    -- Writable_Directory_Cap --

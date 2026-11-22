@@ -109,6 +109,13 @@ package body File_Server is
    type File_Object is
      limited new File_Interfaces.Writable_File_Interface with null record;
 
+   overriding function Readable_Cap
+     (Item : in out File_Object)
+      return Rose.Capabilities.Capability
+   is (File_Interfaces.Cap_Of
+         (Context, Item,
+          Rose.Interfaces.Files.Writable_File.Readable_Interface));
+
    overriding function File_Cap
      (Item : in out File_Object)
       return Rose.Capabilities.Capability
@@ -161,6 +168,11 @@ package body File_Server is
       record
          Open : Boolean := False;
       end record;
+
+   overriding function Readable_Cap
+     (Item : in out Version_Object)
+      return Rose.Capabilities.Capability
+   is (Version_Server.Cap_Of (Context, Item, Versions.Readable_Interface));
 
    overriding function File_Cap
      (Item : in out Version_Object)

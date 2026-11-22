@@ -35,6 +35,7 @@ hold_file:
 	    $(INTERFACES)/files-transactional_writable_file.idl \
 	    $(INTERFACES)/common-transactional.idl \
 	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-readable.idl \
 	    $(INTERFACES)/streams-releasable_reader.idl \
 	    $(INTERFACES)/streams-releasable_writer.idl \
 	    $(INTERFACES)/streams-seekable_reader.idl \

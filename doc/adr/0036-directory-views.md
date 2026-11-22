@@ -82,7 +82,7 @@ This replaces ADR 0035, section 3's bullet "A directory's rights are over the di
 ### 4. Ids
 
 - **Changing `Writable_Directory`'s parent keeps every id.** The ids of its own subprograms name `Writable_Directory`, and the inherited ones name `Directory`, as before.
-- **`Get_Writable_File` moves from `Writable_Directory` to `Fixed_Directory`.** That would change its id, so it is pinned with `Endpoint_Id` to the id it has now. `check-endpoint-ids` checks that.
+- **`Get_Writable_File` moves from `Writable_Directory` to `Fixed_Directory`,** which changes its id. It isn't pinned (amended by #938): this lands before the 0.4.0 tag, when no saved process has to keep working, and #730 (ADR 0042) changes the ids of `Directory` at the same time. A pin would stay in the IDL for good and protect nothing.
 - **The new subprograms get new ids.**
 - **All of this lands before the 0.4.0 tag.** After that, `Directory` can only be extended or retired.
 
@@ -94,7 +94,7 @@ This replaces ADR 0035, section 3's bullet "A directory's rights are over the di
 ### 6. Order of work
 
 1. This ADR, with ADR 0035 marked as amended.
-2. The IDL: `Fixed_Directory`, `Get_Special_Reader`, the pin on `Get_Writable_File`, and the directory server and isofs.
+2. The IDL: `Fixed_Directory`, `Get_Special_Reader`, and the directory server and isofs.
 3. #929 continues from its step 2, against these interfaces.
 
 ## Consequences
@@ -102,7 +102,7 @@ This replaces ADR 0035, section 3's bullet "A directory's rights are over the di
 - **Rights stay types.** The type of a directory cap says whether its entries can be written, with no exception for special files.
 - **There are three directory interfaces where there were two.** Petal, the book and every command signature that names a directory have to choose between them. Most commands want `Directory` or `Writable_Directory`, as now.
 - **A command can be given a log directory that it can append to but not change.**
-- **One subprogram is pinned** for as long as saved processes from before the move must be restored.
+- **No subprogram is pinned,** since nothing from before the move has to be restored (section 4).
 
 ## Alternatives considered
 

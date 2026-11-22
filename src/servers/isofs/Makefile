@@ -19,6 +19,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-storage-block_array.o \
 	$(BUILDDIR)/rose-interfaces-storage-block_array-client.o \
 	$(BUILDDIR)/rose-interfaces-files-directory-server.o \
+	$(BUILDDIR)/rose-interfaces-common-tree.o \
 	$(BUILDDIR)/rose-interfaces-files-file_system-server.o \
 	$(BUILDDIR)/rose-interfaces-files-file.o \
 	$(BUILDDIR)/rose-interfaces-files-file-server.o \

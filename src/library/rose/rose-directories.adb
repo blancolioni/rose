@@ -244,7 +244,7 @@ package body Rose.Directories is
                      return;
                   end if;
 
-                  case Directory_Entry_Kind
+                  case Entry_File_Kind
                     (Directory_Entry.Containing_Directory, Next_Index)
                   is
                      when Rose.Interfaces.Files.Directory.Ordinary_File =>
@@ -368,27 +368,27 @@ package body Rose.Directories is
       declare
          Dir : Directory_Client renames Search.Directory.Containing_Directory;
          Max : constant Natural :=
-                 Directory_Entry_Count (Dir);
+                 Entry_Count (Dir);
       begin
          while Index <= Max loop
             declare
                Kind : constant File_Kind :=
                         File_Kind'Val
                           (Rose.Interfaces.Files.Directory.File_Kind'Pos
-                             (Directory_Entry_Kind (Dir, Index)));
+                             (Entry_File_Kind (Dir, Index)));
             begin
                if Search.Filter (Kind) then
                   declare
-                     Entry_Name : Entry_Name_Type;
+                     Found_Name : Entry_Name_Type;
                      Name_Last  : Natural;
                   begin
-                     Directory_Entry_Name (Dir, Index, Entry_Name, Name_Last);
-                     if Match (Entry_Name (1 .. Name_Last),
+                     Entry_Name (Dir, Index, Found_Name, Name_Last);
+                     if Match (Found_Name (1 .. Name_Last),
                                Search.Pattern (1 .. Search.Pattern_Length))
                      then
                         Search.Directory.Entry_Index := Index;
                         Search.Directory.Simple_Name (1 .. Name_Last) :=
-                          Entry_Name (1 .. Name_Last);
+                          Found_Name (1 .. Name_Last);
                         Search.Directory.Simple_Name_Last := Name_Last;
                         Search.Finished := False;
                         return;
@@ -474,7 +474,7 @@ package body Rose.Directories is
    begin
       if Directory_Entry.Valid then
          return File_Size
-           (Directory_Entry_Size
+           (Entry_Size
               (Directory_Entry.Containing_Directory,
                Directory_Entry.Entry_Index));
       else

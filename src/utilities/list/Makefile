@@ -16,7 +16,9 @@ list:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-list.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-directory.idl \
+	    $(INTERFACES)/common-tree.idl \
 	    $(INTERFACES)/files-file.idl \
+	    $(INTERFACES)/streams-readable.idl \
 	    $(INTERFACES)/streams-releasable_reader.idl \
 	    $(INTERFACES)/streams-seekable_reader.idl \
 	    $(INTERFACES)/streams-reader.idl \

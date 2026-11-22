@@ -1,0 +1,27 @@
+--  Named entries, each a branch, which is a tree itself, or a leaf, which
+--  readers can be opened on (ADR 0042). A directory is a tree, and so is
+--  a configuration. Indexes count from 1, and stay valid while the tree
+--  doesn't change; a tree promises nothing about their order.
+
+interface Common.Tree is
+
+   type Entry_Kind is (Branch, Leaf, Other);
+   --  Other is an entry that a Tree can't give, such as a special file
+   --  in a directory. A descendant interface says what it is.
+
+   function Entry_Count return Natural;
+
+   function Entry_Name (Index : Positive) return String;
+
+   function Entry_Kind_Of (Index : Positive) return Entry_Kind;
+
+   function Find_Entry (Name : String) return Natural;
+   --  The index of the entry Name, or 0 if there is none.
+
+   function Get_Branch (Index : Positive) return interface Common.Tree;
+   --  Fails if the entry isn't a branch.
+
+   function Get_Leaf (Index : Positive) return interface Streams.Readable;
+   --  Fails if the entry isn't a leaf.
+
+end Common.Tree;
