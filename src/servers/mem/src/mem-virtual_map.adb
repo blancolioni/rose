@@ -72,6 +72,14 @@ package body Mem.Virtual_Map is
    --  pages are mapped again, still changed, and Stopped is set. Success
    --  is False if no page was freed.
 
+   procedure Keep_Entries;
+   --  If Mem.Page_Table can track fewer than Rose.Limits.Reserve_Low_Pages
+   --  more pages, free clean pages, and then changed pages, until it can
+   --  track Rose.Limits.Reserve_High_Pages, or there are no more (#591).
+   --  The table holds Rose.Limits.Max_Mapped_Pages, which is fewer than
+   --  a machine of more than 32 MB has, so it can fill while there are
+   --  free pages. Cached pages aren't evicted: they aren't in the table.
+
    -------------------
    -- Allocate_Page --
    -------------------
@@ -277,6 +285,32 @@ package body Mem.Virtual_Map is
    end Is_Candidate;
 
    ------------------
+   -- Keep_Entries --
+   ------------------
+
+   procedure Keep_Entries is
+      Page  : Rose.Addresses.Physical_Page_Address;
+      Freed : Boolean;
+   begin
+      --  Nothing here writes to the console, as for Keep_Reserve.
+
+      if Mem.Page_Table.Free_Entries >= Rose.Limits.Reserve_Low_Pages then
+         return;
+      end if;
+
+      while Mem.Page_Table.Free_Entries < Rose.Limits.Reserve_High_Pages
+      loop
+         Drop_Clean_Page (Page, Freed);
+         if Freed then
+            Mem.Physical_Map.Deallocate_Page (Page);
+         else
+            Write_Changed_Pages (Freed);
+            exit when not Freed;
+         end if;
+      end loop;
+   end Keep_Entries;
+
+   ------------------
    -- Keep_Reserve --
    ------------------
 
@@ -325,6 +359,11 @@ package body Mem.Virtual_Map is
    is
       pragma Unreferenced (Writable);
    begin
+      --  Room in the table first, so that the page is tracked. The page
+      --  being mapped isn't in the table yet, so it isn't freed (#591).
+
+      Keep_Entries;
+
       Mem.Calls.Map
         (Process    => Process,
          Physical   => Physical_Page,
