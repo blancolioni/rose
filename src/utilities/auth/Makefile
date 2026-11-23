@@ -59,4 +59,5 @@ auth:
 	    ../user/rose-core-user.idl \
 	    ../../drivers/directory/rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

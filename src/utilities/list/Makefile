@@ -24,4 +24,5 @@ list:
 	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

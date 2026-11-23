@@ -47,6 +47,7 @@ petal:
 	    $(INTERFACES)/streams-seekable_reader.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild petal.gpr $(GPRBUILD_CARGS)
 
 # The decisions of sudo are plain Ada, so they are tested on the host.

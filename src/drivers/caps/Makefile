@@ -20,4 +20,5 @@ caps:
 	    $(INTERFACES)/caps-constructor.idl $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/common-resource.idl $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/processes-restorable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

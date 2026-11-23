@@ -15,4 +15,5 @@ date:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-date.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/time-clock.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

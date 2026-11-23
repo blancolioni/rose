@@ -15,4 +15,5 @@ cat:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-cat.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/streams-reader.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

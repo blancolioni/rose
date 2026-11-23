@@ -22,4 +22,5 @@ screen:
 	    $(INTERFACES)/processes-process.idl $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

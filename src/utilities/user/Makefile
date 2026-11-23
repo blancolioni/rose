@@ -47,4 +47,5 @@ user:
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl \
 	    $(INTERFACES)/streams-seekable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

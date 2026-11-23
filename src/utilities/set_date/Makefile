@@ -14,4 +14,5 @@ set_date:
 	mkdir -p build/bin
 	mkdir -p build/generated
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated 	    rose-core-set_date.idl $(INTERFACES)/rose-core.idl 	    $(INTERFACES)/time-clock.idl $(INTERFACES)/time-clock_admin.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

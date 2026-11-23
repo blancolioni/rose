@@ -29,4 +29,5 @@ exec:
 	    $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/processes-starting_process.idl \
 	    $(INTERFACES)/processes-heap.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

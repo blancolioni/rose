@@ -32,4 +32,5 @@ page_probe:
 	    $(INTERFACES)/processes-restorable.idl \
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

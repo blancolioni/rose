@@ -1,0 +1,25 @@
+--  The userland run-time system's own units, as a project, which every
+--  program built with the RTS imports (#1080).
+--
+--  The RTS's adainclude has Rose's units (Rose, Rose.Words, the interface
+--  specs that the RTS generates for itself, and so on) beside GNAT's.
+--  gprbuild takes only GNAT's predefined file names for run-time sources.
+--  Any other source that a unit depends on has to be in a project, or
+--  gprbuild takes it for a configuration pragma file that it can't find,
+--  and compiles the unit again, on every build. This project lists those
+--  units (create-sources.sh writes the list), already built, in the RTS's
+--  adalib.
+--
+--  A program can't have its own copy of one of these units, since a unit
+--  belongs to only one project: DROP_RTS_UNITS in mk/common.mk deletes
+--  idle's copies from a program's build/generated.
+
+project Rose_RTS is
+
+   for Languages use ("Ada");
+   for Source_Dirs use ("build/i686-rose/adainclude");
+   for Source_List_File use "build/rose-units.lst";
+   for Object_Dir use "build/i686-rose/adalib";
+   for Externally_Built use "true";
+
+end Rose_RTS;

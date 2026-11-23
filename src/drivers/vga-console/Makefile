@@ -16,4 +16,5 @@ vga_console:
 	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl \
 	    $(INTERFACES)/processes-restorable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

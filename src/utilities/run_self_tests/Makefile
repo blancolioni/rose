@@ -71,4 +71,5 @@ run_self_tests:
 	    -o build/generated \
 	    ../user/rose-core-user.idl ../auth/rose-core-auth.idl \
 	    $(INTERFACES)/rose-core.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

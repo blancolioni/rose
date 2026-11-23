@@ -32,4 +32,5 @@ replaceable_test:
 	    $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/caps-constructor.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

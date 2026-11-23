@@ -23,4 +23,5 @@ surface_console:
 	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/processes-restorable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

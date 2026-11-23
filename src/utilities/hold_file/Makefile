@@ -46,4 +46,5 @@ hold_file:
 	$(IDLE) --target user --command-client -I $(INTERFACES) \
 	    -o build/generated \
 	    ../../drivers/file/rose-core-file.idl $(INTERFACES)/rose-core.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

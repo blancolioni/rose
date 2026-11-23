@@ -60,4 +60,5 @@ directory:
 	    -o build/generated \
 	    ../file/rose-core-file.idl rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

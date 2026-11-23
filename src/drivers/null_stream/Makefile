@@ -35,4 +35,5 @@ null_stream:
 	    $(INTERFACES)/streams-seekable_reader.idl \
 	    $(INTERFACES)/streams-seekable.idl \
 	    $(INTERFACES)/common-resource.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

@@ -31,4 +31,5 @@ remove:
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

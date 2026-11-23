@@ -15,4 +15,5 @@ uptime:
 	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
 	    rose-core-uptime.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/time-clock.idl
+	$(DROP_RTS_UNITS)
 	gprbuild

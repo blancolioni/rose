@@ -16,4 +16,5 @@ keyboard:
 	    $(INTERFACES)/devices-event_source.idl \
 	    $(INTERFACES)/devices-event_listener.idl \
 	    $(INTERFACES)/devices-interrupt_handler.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

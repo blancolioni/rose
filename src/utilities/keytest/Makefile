@@ -19,4 +19,5 @@ keytest:
 	    $(INTERFACES)/streams-stream.idl \
 	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/streams-writer.idl
+	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)
