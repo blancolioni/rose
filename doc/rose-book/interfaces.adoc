@@ -61,7 +61,7 @@ It is an interface of its own, rather than a change to `Cap_Set`, so that the bo
 [cols="2,2,4,2",options="header"]
 |===
 | Interface | Parents | Operations | Implemented by
-| `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault`, `Notify` | The kernel
+| `Kernel_Process` | `Named`, `Cap` | `Resume`, `Fault` | The kernel
 | `Process` | `Segment`, `Server`, `Cap` | `Heap_Interface`, `Bank`, `Control_Cap`, `Exit_Process`, `Publish_Interface` | `mem`
 | `Process_Control` | `Server`, `Cap` | | `mem`
 | `Segment` | | `Add_Segment`, `Add_Private_Segment`, `Add_Nonpersistent_Segment`, `Remove_Segment` |

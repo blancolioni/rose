@@ -124,7 +124,6 @@
 16#E588_E5AE_03DC_FFD0#  interface rose.interfaces.processes.kernel_process
 16#A8C4_B51D_8634_B5F0#  rose.interfaces.processes.kernel_process.resume
 16#FFA5_351D_B0E0_169C#  rose.interfaces.processes.kernel_process.fault
-16#4020_FF38_FC39_CE22#  rose.interfaces.processes.kernel_process.notify(in word_32)
 16#E6FB_FE14_8616_BA1A#  interface rose.interfaces.processes.launch
 16#1476_1949_6120_178C#  rose.interfaces.processes.launch.launch(in capability) return interface rose.interfaces.processes.process_control
 16#EAB4_B9B0_535F_2A88#  rose.interfaces.processes.launch.launch_command(in capability) return capability
