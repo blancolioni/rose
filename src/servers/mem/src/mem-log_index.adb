@@ -19,7 +19,7 @@ package body Mem.Log_Index is
    use type Rose.Checkpoints.Header_Page_Flags;
 
    subtype Real_Process_Id is
-     Process_Id range 1 .. Rose.Limits.Max_Processes;
+     Process_Id range 1 .. Rose.Limits.Mem_Process_Entries;
 
    type Directory_Array is array (Real_Process_Id) of Word_32;
 

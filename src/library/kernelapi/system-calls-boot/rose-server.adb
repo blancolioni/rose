@@ -1,3 +1,5 @@
+with System;
+
 with Rose.Capabilities.Standard;
 with Rose.Interfaces.Processes.Process;
 with Rose.System_Calls.Server;
@@ -7,6 +9,34 @@ package body Rose.Server is
    Failure : Rose.Invocation.Invocation_Error := Rose.Invocation.OK;
    --  Set by Fail while a handler runs. A boot server handles one request
    --  at a time, so one value is enough.
+
+   use type System.Address;
+
+   type Pool_Entry is
+      record
+         Owner      : System.Address;
+         Endpoint   : Rose.Objects.Endpoint_Id;
+         Identifier : Rose.Objects.Capability_Identifier;
+         Capability : Rose.Capabilities.Capability;
+      end record;
+
+   type Pool_Array is array (1 .. Max_Endpoint_Instances) of Pool_Entry;
+   pragma Suppress_Initialization (Pool_Array);
+   --  Entries past Pool_Count are never read, so the pool is not
+   --  initialized: under Normalize_Scalars that would write every page
+   --  of it in every server when it starts.
+
+   Pool       : Pool_Array;
+   Pool_Count : Natural := 0;
+   --  The caps of every instanced interface that this server serves, each
+   --  marked with its Server_Instance's address (#1090).
+
+   function Find
+     (Instance   : Server_Instance;
+      Endpoint   : Rose.Objects.Endpoint_Id;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Natural;
+   --  The pool entry of Instance for Endpoint and Identifier, or 0.
 
    procedure Call_Handler
      (Context : in out Server_Context;
@@ -98,6 +128,30 @@ package body Rose.Server is
       Failure := Error;
    end Fail;
 
+   ----------
+   -- Find --
+   ----------
+
+   function Find
+     (Instance   : Server_Instance;
+      Endpoint   : Rose.Objects.Endpoint_Id;
+      Identifier : Rose.Objects.Capability_Identifier)
+      return Natural
+   is
+      use type Rose.Objects.Endpoint_Id;
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      for I in 1 .. Pool_Count loop
+         if Pool (I).Owner = Instance'Address
+           and then Pool (I).Endpoint = Endpoint
+           and then Pool (I).Identifier = Identifier
+         then
+            return I;
+         end if;
+      end loop;
+      return 0;
+   end Find;
+
    ----------------------
    -- Get_Instance_Cap --
    ----------------------
@@ -108,20 +162,13 @@ package body Rose.Server is
       Identifier : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
+      Index : constant Natural := Find (Instance, Endpoint, Identifier);
    begin
-      for I in 1 .. Instance.Instance_Count loop
-         declare
-            use Rose.Objects;
-            Item : Instanced_Handler_Record renames Instance.Instances (I);
-         begin
-            if Item.Endpoint = Endpoint
-              and then Item.Identifier = Identifier
-            then
-               return Item.Capability;
-            end if;
-         end;
-      end loop;
-      return Rose.Capabilities.Null_Capability;
+      if Index = 0 then
+         return Rose.Capabilities.Null_Capability;
+      else
+         return Pool (Index).Capability;
+      end if;
    end Get_Instance_Cap;
 
    ------------------
@@ -135,20 +182,9 @@ package body Rose.Server is
       return Boolean
    is
    begin
-      for I in 1 .. Instance.Instance_Count loop
-         declare
-            use Rose.Objects;
-            Item : Instanced_Handler_Record renames Instance.Instances (I);
-         begin
-            if Item.Endpoint = Endpoint
-              and then Item.Identifier = Identifier
-            then
-               return True;
-            end if;
-         end;
-      end loop;
-      return False;
+      return Find (Instance, Endpoint, Identifier) /= 0;
    end Has_Instance;
+
 
    -----------------------
    -- Publish_Interface --
@@ -296,20 +332,21 @@ package body Rose.Server is
       use type Rose.Objects.Capability_Identifier;
       Kept : Natural := 0;
    begin
-      for I in 1 .. Instance.Instance_Count loop
+      for I in 1 .. Pool_Count loop
          declare
-            Item : constant Instanced_Handler_Record :=
-              Instance.Instances (I);
+            Item : constant Pool_Entry := Pool (I);
          begin
-            if Item.Identifier = Identifier then
+            if Item.Owner = Instance'Address
+              and then Item.Identifier = Identifier
+            then
                Rose.System_Calls.Delete_Cap (Item.Capability);
             else
                Kept := Kept + 1;
-               Instance.Instances (Kept) := Item;
+               Pool (Kept) := Item;
             end if;
          end;
       end loop;
-      Instance.Instance_Count := Kept;
+      Pool_Count := Kept;
    end Remove_Instance;
 
    ----------------------
@@ -323,12 +360,12 @@ package body Rose.Server is
       Cap        : Rose.Capabilities.Capability)
    is
    begin
-      if Instance.Instance_Count < Max_Endpoint_Instances then
-         Instance.Instance_Count :=
-           Instance.Instance_Count + 1;
-         Instance.Instances (Instance.Instance_Count) :=
-           Instanced_Handler_Record'
-             (Endpoint   => Endpoint,
+      if Pool_Count < Max_Endpoint_Instances then
+         Pool_Count := Pool_Count + 1;
+         Pool (Pool_Count) :=
+           Pool_Entry'
+             (Owner      => Instance'Address,
+              Endpoint   => Endpoint,
               Identifier => Identifier,
               Capability => Cap);
       end if;
