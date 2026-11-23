@@ -23,7 +23,7 @@ The two boots differ in their boot modules and in what they do when there is no 
 | No checkpoint on hd0 | A new system is installed from the install media, and GRUB is written to hd0 (see <<first-boot>>) | `init` says "no system on this disk; boot the install media", and the system stays idle
 |===
 
-Both menus are drawn over the rose splash, and each entry names the version it boots, from `Rose.Version`: "Install Rose 0.3.0 (phoebe)" on the install media, and "Rose 0.3.0 (phoebe)" on the boot disk.
+Both menus are drawn over the rose splash, and each entry names the version it boots, from `Rose.Version`: "Install Rose 0.4.0 (genki)" on the install media, and "Rose 0.4.0 (genki)" on the boot disk.
 The default entry keeps the framebuffer that GRUB sets up, so the console is on the screen's surface (see <<Servers>>).
 The "trace launches" entry and the last entry, "text mode", keep the VGA text mode, with `gfxpayload=text`: the boot tests choose the last one, since they read the VGA text page, and so can a machine whose framebuffer doesn't work.
 With a framebuffer, the screen is blank until the console starts, and then it shows the early messages (see <<handing-over-the-console>>).
@@ -221,7 +221,7 @@ Each is a tar file, `/boot/a.tar` and `/boot/b.tar`, of a fixed 3 MiB: the kerne
 The paths in `menu.cfg` are in the tar, so a set's entries load that set's own modules, whatever the other set has.
 
 The partition's menu, `/boot/grub/grub.cfg`, from `boot/hd0/grub.cfg`, opens the current set with GRUB's `loopback` and `tar`, and shows its entries.
-Its first line names the current set and its version, such as `# rose-boot-set b 0.4.1 (genki)`.
+Its first line names the current set and its version, such as `# rose-boot-set b 0.4.1 (tramp)`.
 After an update, it has one more entry, `Previous: Rose` and the version of the other set, which opens that set's menu.
 
 An update changes the boot partition without a FAT writer.
