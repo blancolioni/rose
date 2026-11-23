@@ -141,8 +141,8 @@ package body Init.Users is
               (Output,
                (if Password_Last < Password'First
                 then "The password is empty."
-                else "The passwords are not the same.")
-               & NL);
+                else "The passwords are not the same."));
+            Init.Calls.Send_String (Output, NL);
          end;
       end loop;
 

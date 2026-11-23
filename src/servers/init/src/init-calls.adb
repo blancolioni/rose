@@ -5,6 +5,9 @@ with Rose.System_Calls;
 
 package body Init.Calls is
 
+   Max_Interface_Caps : constant := 64;
+   --  The most caps an interface has: a process has at most 64 endpoints.
+
    Local_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
 
@@ -348,10 +351,16 @@ package body Init.Calls is
      (Cap            : Rose.Capabilities.Capability;
       Interface_Caps : out Array_Of_Capabilities)
    is
-      Caps : Rose.Capabilities.Capability_Array (Interface_Caps'Range);
+      Caps : Rose.Capabilities.Capability_Array (1 .. Max_Interface_Caps);
+      --  Bounded, so that the stack holds a frame of a known size (#1004).
+      Count : constant Natural :=
+                Natural'Min (Interface_Caps'Length, Caps'Length);
    begin
-      Rose.System_Calls.Get_Interface_Caps (Cap, Caps);
-      Interface_Caps := Array_Of_Capabilities (Caps);
+      Interface_Caps := (others => Rose.Capabilities.Null_Capability);
+      Rose.System_Calls.Get_Interface_Caps (Cap, Caps (1 .. Count));
+      for I in 1 .. Count loop
+         Interface_Caps (Interface_Caps'First + I - 1) := Caps (I);
+      end loop;
    end Open_Interface;
 
    -------------

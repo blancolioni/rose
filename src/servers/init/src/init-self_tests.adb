@@ -186,10 +186,11 @@ package body Init.Self_Tests is
 
       procedure Check (Name : String; Ok : Boolean) is
       begin
+         Init.Calls.Send_String (Standard_Output, "derive test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
          Init.Calls.Send_String
-           (Standard_Output,
-            "derive test: " & Name & (if Ok then ": ok" else ": FAIL")
-            & NL);
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
          Passed := Passed and then Ok;
       end Check;
 
@@ -469,10 +470,11 @@ package body Init.Self_Tests is
 
       procedure Check (Name : String; Ok : Boolean) is
       begin
+         Init.Calls.Send_String (Standard_Output, "hand over test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
          Init.Calls.Send_String
-           (Standard_Output,
-            "hand over test: " & Name & (if Ok then ": ok" else ": FAIL")
-            & NL);
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
          Passed := Passed and then Ok;
       end Check;
 
@@ -718,10 +720,11 @@ package body Init.Self_Tests is
 
       procedure Check (Name : String; Ok : Boolean) is
       begin
+         Init.Calls.Send_String (Standard_Output, "page test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
          Init.Calls.Send_String
-           (Standard_Output,
-            "page test: " & Name & (if Ok then ": ok" else ": FAIL")
-            & NL);
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
          Passed := Passed and then Ok;
       end Check;
 
@@ -954,11 +957,14 @@ package body Init.Self_Tests is
 
          Rose.System_Calls.Initialize_Send (Params, Endpoint);
          declare
-            Caps : Rose.Capabilities.Capability_Array (1 .. Null_Caps + 1) :=
+            Caps : Rose.Capabilities.Capability_Array (1 .. 16) :=
               (others => Rose.Capabilities.Null_Capability);
+            --  Bounded, so that the frame has a known size (#1004).
+            --  Send_Caps sends more than an invocation holds as
+            --  continued messages, which Send_Cap can't.
          begin
-            Caps (Caps'Last) := Control;
-            Rose.System_Calls.Send_Caps (Params, Caps);
+            Caps (Null_Caps + 1) := Control;
+            Rose.System_Calls.Send_Caps (Params, Caps (1 .. Null_Caps + 1));
          end;
          if Empty_Strings > 0 then
             Rose.System_Calls.Start_Items (Params);
@@ -1502,10 +1508,11 @@ package body Init.Self_Tests is
 
       procedure Check (Name : String; Ok : Boolean) is
       begin
+         Init.Calls.Send_String (Standard_Output, "swap test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
          Init.Calls.Send_String
-           (Standard_Output,
-            "swap test: " & Name & (if Ok then ": ok" else ": FAIL")
-            & NL);
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
          Passed := Passed and then Ok;
       end Check;
 

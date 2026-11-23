@@ -51,6 +51,13 @@ is
       return Element_Type
    with Pre => Is_Valid (Container, Position);
 
+   procedure Get_Element
+     (Container : Map;
+      Position  : Cursor;
+      Item      : out Element_Type)
+   with Pre => Is_Valid (Container, Position);
+   --  As Element, without a copy on the stack of a large element.
+
    procedure Replace_Element
      (Container : in out Map;
       Position  : Cursor;

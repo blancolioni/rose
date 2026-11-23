@@ -154,6 +154,19 @@ is
       return Home;
    end Find_Bucket;
 
+   -----------------
+   -- Get_Element --
+   -----------------
+
+   procedure Get_Element
+     (Container : Map;
+      Position  : Cursor;
+      Item      : out Element_Type)
+   is
+   begin
+      Item := Container.Elements (Count_Type (Position)).Element;
+   end Get_Element;
+
    ------------
    -- Insert --
    ------------
@@ -185,10 +198,8 @@ is
 
          if Container.Buckets (H) = 0 then
             Container.Length := Container.Length + 1;
-            Container.Elements (Container.Length) :=
-              Element_Record'
-                (Key     => Key,
-                 Element => New_Item);
+            Container.Elements (Container.Length).Key := Key;
+            Container.Elements (Container.Length).Element := New_Item;
             Container.Buckets (H) := Container.Length;
             Position := Cursor (Container.Length);
             Inserted := True;

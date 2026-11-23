@@ -327,30 +327,6 @@ package body Rose.Directories is
       Current := Root;
    end Open_Root_File_System;
 
-   ------------
-   -- Search --
-   ------------
-
-   procedure Search
-     (Directory : String;
-      Pattern   : String;
-      Filter    : Filter_Type := (others => True);
-      Process   : not null access procedure
-        (Directory_Entry : Directory_Entry_Type))
-   is
-      Search_State : Search_Type;
-   begin
-      Start_Search (Search_State, Directory, Pattern, Filter);
-      while More_Entries (Search_State) loop
-         declare
-            Item : Directory_Entry_Type;
-         begin
-            Get_Next_Entry (Search_State, Item);
-            Process (Item);
-         end;
-      end loop;
-   end Search;
-
    -----------------
    -- Search_Next --
    -----------------

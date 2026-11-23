@@ -112,6 +112,17 @@ package body Mem.Processes is
    --  Bank_Cap is the cap for the process's own bank (#750), which mem
    --  asks the store for when it is first needed, and keeps.
 
+   No_Process : constant Memory_Process_Record :=
+                  (State        => Available,
+                   Oid          => 0,
+                   Num_Segments => 0,
+                   Heap         => 0,
+                   Server       => 0,
+                   others       => <>);
+   --  An entry with no process, which a new one starts from: a copy, not
+   --  an aggregate, which would be built on mem's one-page stack (#974,
+   --  #1004).
+
    subtype Real_Process_Id is
      Process_Id range 1 .. Rose.Limits.Max_Processes;
 
@@ -542,8 +553,7 @@ package body Mem.Processes is
       P : Memory_Process_Record renames Process_Table (Process);
    begin
       Rose.Console_IO.Put_Line (Message);
-      Rose.Trace.Event
-        ("mem: fault, " & Message & ", process", Natural (Process));
+      Rose.Trace.Event ("mem: fault, process", Natural (Process));
       Fault (P.Process);
       P.State := Faulted;
    end Fault_Process;
@@ -1412,20 +1422,11 @@ package body Mem.Processes is
                            Rose.Interfaces.Processes.Heap.Heap_Interface,
                          Identifier   => Identifier_Of (Oid));
       begin
-         Process_Table (Next_Pid) :=
-           Memory_Process_Record'
-             (State        => Active,
-              Oid          => Oid,
-              Segments     => <>,
-              Num_Segments => 0,
-              Heap         => Heap_Cap,
-              Server       => 0,
-              Process      => Client,
-              Interface_Cap => 0,
-              Control_Cap   => 0,
-              Bank_Cap      => 0,
-              Faults        => <>,
-              Transient     => False);
+         Process_Table (Next_Pid) := No_Process;
+         Process_Table (Next_Pid).State := Active;
+         Process_Table (Next_Pid).Oid := Oid;
+         Process_Table (Next_Pid).Heap := Heap_Cap;
+         Process_Table (Next_Pid).Process := Client;
       end;
 
       Mem.Log_Index.Forget (Next_Pid);
@@ -1704,39 +1705,28 @@ package body Mem.Processes is
       --  which comes from its object id, so they are made again in the
       --  same way as when it was created.
 
-      Process_Table (Pid) :=
-        Memory_Process_Record'
-          (State         => Active,
-           Oid           =>
-             Rose.Interfaces.Processes.Kernel_Process.Client
-               .Get_Object_Id (Client),
-           Segments      => <>,
-           Num_Segments  => 0,
-           Heap          =>
-             Rose.System_Calls.Server.Create_Endpoint
-               (Create_Cap   => Create_Endpoint_Cap,
-                Endpoint_Id  => Rose.Interfaces.Processes.Heap.Heap_Interface,
-                Identifier   =>
-                  Identifier_Of
-                    (Rose.Interfaces.Processes.Kernel_Process.Client
-                      .Get_Object_Id
-                       (Client))),
-           Server        => 0,
-           Process       => Client,
-           Interface_Cap =>
-             Rose.System_Calls.Server.Create_Endpoint
-               (Create_Cap   => Create_Endpoint_Cap,
-                Endpoint_Id  => Rose.Interfaces.Processes.Process
-                  .Process_Interface,
-                Identifier   =>
-                  Identifier_Of
-                    (Rose.Interfaces.Processes.Kernel_Process.Client
-                      .Get_Object_Id
-                       (Client))),
-           Control_Cap   => 0,
-           Bank_Cap      => 0,
-           Faults        => <>,
-           Transient     => False);
+      declare
+         P   : Memory_Process_Record renames Process_Table (Pid);
+         Oid : constant Rose.Objects.Object_Id :=
+                 Rose.Interfaces.Processes.Kernel_Process.Client
+                   .Get_Object_Id (Client);
+      begin
+         P := No_Process;
+         P.State := Active;
+         P.Oid := Oid;
+         P.Heap :=
+           Rose.System_Calls.Server.Create_Endpoint
+             (Create_Cap   => Create_Endpoint_Cap,
+              Endpoint_Id  => Rose.Interfaces.Processes.Heap.Heap_Interface,
+              Identifier   => Identifier_Of (Oid));
+         P.Process := Client;
+         P.Interface_Cap :=
+           Rose.System_Calls.Server.Create_Endpoint
+             (Create_Cap   => Create_Endpoint_Cap,
+              Endpoint_Id  =>
+                Rose.Interfaces.Processes.Process.Process_Interface,
+              Identifier   => Identifier_Of (Oid));
+      end;
 
       --  Its pages are read from the log through its index when it faults
       --  on them (ADR 0028, section 9). A checkpoint without an index
