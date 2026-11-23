@@ -323,6 +323,7 @@ stages:
       oid: 15
       priority: checkpoint
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
-             delete, memory_checkpoint, append_to_log, store_checkpoint]
+             delete, memory_checkpoint, append_to_log, store_checkpoint,
+             checkpoint_hold]
       exports:
         checkpointer: Checkpoints.Checkpointer.Take_Checkpoint_Endpoint

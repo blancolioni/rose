@@ -533,6 +533,17 @@ package Rose.Kernel.Processes is
    --  and nothing changes, during a checkpoint, which would save Pid
    --  half handed over (ADR 0032, section 5).
 
+   procedure Hold_Calls_For_Checkpoint
+     (Pid     : Process_Id;
+      Except  : Rose.Objects.Endpoint_Id;
+      Caller  : Process_Id;
+      Success : out Boolean);
+   --  Hold the calls to Pid as Hold_Calls does, but only during a
+   --  checkpoint, and until Leave_Checkpoint (#1061). The kernel's
+   --  tables were saved when the checkpoint started, so the hold is not
+   --  in them. Success is False, and nothing changes, outside a
+   --  checkpoint, or if Pid's calls are held already.
+
    procedure Release_Calls
      (Pid : Process_Id);
    --  End the hold on Pid's calls, and give Pid the first that waits if

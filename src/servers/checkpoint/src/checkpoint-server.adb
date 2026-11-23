@@ -9,6 +9,7 @@ with Rose.Console_IO;
 with Rose.System_Calls.Client;
 
 with Rose.Interfaces.Checkpoints.Checkpointer.Server;
+with Rose.Interfaces.Checkpoints.Storage_Checkpoint;
 with Rose.Interfaces.Time.Timeout.Server;
 
 with Rose.Interfaces.Caps.Cap.Client;
@@ -26,6 +27,7 @@ package body Checkpoint.Server is
    Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
    Append_Log_Cap        : Rose.Capabilities.Capability;
    Store_Checkpoint_Cap  : Rose.Capabilities.Capability;
+   Hold_Cap              : Rose.Capabilities.Capability;
 
    Max_Table_Pages : constant := 1 + 2 * Rose.Limits.Max_Processes;
    --  The header page, and for each process its record and one page of
@@ -71,6 +73,13 @@ package body Checkpoint.Server is
    procedure Store_Checkpoint;
    --  Have the storage server append its region table to the log.
 
+   procedure Hold_Store;
+   --  Hold the calls to the store until the checkpoint ends, but for
+   --  Store_Checkpoint and mem's own calls, so that no region is made or
+   --  destroyed between the store's part and mem's (#1061). Without
+   --  the hold, a launch could reserve a region after the store saved
+   --  its table, and add the segment to mem before mem saved its own.
+
    --------------------------
    -- Append_Kernel_Tables --
    --------------------------
@@ -111,6 +120,12 @@ package body Checkpoint.Server is
 
       if Enter_Checkpoint (Page_Count) then
          Append_Kernel_Tables (Page_Count);
+
+         --  Only now: the log, which the kernel's tables have just been
+         --  appended to, has finished telling the store of the last
+         --  commit, so it does not wait on the hold.
+
+         Hold_Store;
          Store_Checkpoint;
          Execute_Checkpoint;
          Leave_Checkpoint;
@@ -141,6 +156,7 @@ package body Checkpoint.Server is
       Memory_Checkpoint_Cap := Get_Cap (6);
       Append_Log_Cap := Get_Cap (7);
       Store_Checkpoint_Cap := Get_Cap (8);
+      Hold_Cap := Get_Cap (9);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
@@ -216,6 +232,32 @@ package body Checkpoint.Server is
            .Get_Request_Checkpoint_Cap);
       Rose.System_Calls.Invoke_Capability (Params);
    end Execute_Checkpoint;
+
+   ----------------
+   -- Hold_Store --
+   ----------------
+
+   procedure Hold_Store is
+      use type Rose.Objects.Endpoint_Id;
+      Params : aliased Rose.Invocation.Invocation_Record;
+      Except : constant Rose.Objects.Endpoint_Id :=
+                 Rose.Interfaces.Checkpoints.Storage_Checkpoint
+                   .Checkpoint_Endpoint;
+   begin
+      --  The store is named by its Checkpoint endpoint, which is the
+      --  endpoint that gets through, and mem by the cap of its own
+      --  checkpoint endpoint. If the hold is refused, the checkpoint
+      --  goes on without it, as before.
+
+      Rose.System_Calls.Initialize_Send (Params, Hold_Cap);
+      Rose.System_Calls.Send_Cap (Params, Store_Checkpoint_Cap);
+      Rose.System_Calls.Send_Cap (Params, Memory_Checkpoint_Cap);
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word (Except mod 2 ** 32));
+      Rose.System_Calls.Send_Word
+        (Params, Rose.Words.Word (Except / 2 ** 32));
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Hold_Store;
 
    ----------------------
    -- Leave_Checkpoint --
