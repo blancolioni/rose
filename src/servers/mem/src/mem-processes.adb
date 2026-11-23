@@ -124,7 +124,7 @@ package body Mem.Processes is
    --  #1004).
 
    subtype Real_Process_Id is
-     Process_Id range 1 .. Rose.Limits.Max_Processes;
+     Process_Id range 1 .. Rose.Limits.Mem_Process_Entries;
 
    type Memory_Process_Table is
      array (Real_Process_Id) of aliased Memory_Process_Record;
@@ -144,10 +144,11 @@ package body Mem.Processes is
    --  The identifier of the caps for the process with object id Oid. The
    --  kernel uses it too, when the process exits (#697).
 
-   Last_Boot_Pid : constant Real_Process_Id := 24;
-   --  Slots 1 to 24 are for boot modules, and the rest for launched
-   --  processes (Register_Process, #873). The install media boots about
-   --  19 modules.
+   Last_Boot_Pid : constant Real_Process_Id :=
+                     Rose.Limits.Mem_Boot_Entries;
+   --  Entries 1 to Last_Boot_Pid are for boot modules, and the rest for
+   --  launched processes (Register_Process, #873), as many as the kernel
+   --  can run (#1090).
 
    Next_Boot_Pid     : Real_Process_Id := 1;
    Next_Launched_Pid : Real_Process_Id := Last_Boot_Pid + 1;
