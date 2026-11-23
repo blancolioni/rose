@@ -54,6 +54,10 @@ package body Rose.Kernel.Processes is
       end record;
 
    Handovers : array (Kernel_Process_Table'Range) of Handover_Record;
+
+   Checkpoint_Held : Process_Id := Null_Process_Id;
+   --  The process whose calls Hold_Calls_For_Checkpoint holds until the
+   --  checkpoint ends (#1061).
    --  Each process's part in a handover (Hold_Calls, Swap_Processes). It
    --  is kept out of the process table, as Checked_Records is: a
    --  checkpoint never starts while a handover is in progress.
@@ -1347,6 +1351,35 @@ package body Rose.Kernel.Processes is
       Success := True;
    end Hold_Calls;
 
+   -------------------------------
+   -- Hold_Calls_For_Checkpoint --
+   -------------------------------
+
+   procedure Hold_Calls_For_Checkpoint
+     (Pid     : Process_Id;
+      Except  : Rose.Objects.Endpoint_Id;
+      Caller  : Process_Id;
+      Success : out Boolean)
+   is
+      use type Rose.Objects.Endpoint_Id;
+   begin
+      if not Active_Checkpoint
+        or else Checkpoint_Held /= Null_Process_Id
+        or else Handovers (Pid).Held
+      then
+         Success := False;
+         return;
+      end if;
+
+      Handovers (Pid).Held := True;
+      Handovers (Pid).Except :=
+        (if Except = Rose.Objects.Null_Endpoint_Id then 0
+         else Find_Endpoint (Pid, Except));
+      Handovers (Pid).Caller := Caller;
+      Checkpoint_Held := Pid;
+      Success := True;
+   end Hold_Calls_For_Checkpoint;
+
    ----------------------------
    -- Is_Blocked_On_Endpoint --
    ----------------------------
@@ -1655,6 +1688,14 @@ package body Rose.Kernel.Processes is
    begin
       Active_Checkpoint := False;
       Heap_Refused := False;
+
+      --  The calls held while the store and mem saved their parts go
+      --  through now (#1061).
+
+      if Checkpoint_Held /= Null_Process_Id then
+         Release_Calls (Checkpoint_Held);
+         Checkpoint_Held := Null_Process_Id;
+      end if;
       for P of Process_Table.all loop
          if P.State /= Available
            and then P.Flags (Persistent)

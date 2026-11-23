@@ -3,7 +3,9 @@ package Rose.Kernel.Capabilities.Processes is
    Process_Interface_Endpoint : constant Rose.Objects.Endpoint_Index := 1;
    Resume_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 2;
    Faulted_Process_Endpoint   : constant Rose.Objects.Endpoint_Index := 3;
-   Notify_Process_Endpoint    : constant Rose.Objects.Endpoint_Index := 4;
+   --  Endpoint 4 was Kernel_Process.Notify, removed in #1078: signal
+   --  caps replace it (ADR 0006). It isn't reused, so a cap to it is
+   --  refused as an invalid endpoint.
    Start_Process_Endpoint     : constant Rose.Objects.Endpoint_Index := 5;
    Initial_Cap_Endpoint       : constant Rose.Objects.Endpoint_Index := 6;
    Kill_Process_Endpoint      : constant Rose.Objects.Endpoint_Index := 7;

@@ -87,7 +87,12 @@ package Rose.Init_Capabilities is
    --  Makes an endpoint cap to a restored process (#829).  Only the
    --  install media's restore server has it, for the update boot.
 
-   Last_Cap               : constant := 34;
+   Checkpoint_Hold_Cap    : constant := 35;
+   --  Holds the calls to a process until the checkpoint ends, so that the
+   --  checkpoint server takes the store's part and mem's as one snapshot
+   --  (#1061).  Only the checkpoint server has it.
+
+   Last_Cap               : constant := 35;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
