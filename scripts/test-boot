@@ -23,7 +23,9 @@
 #      which ends the first session's bank and makes another (#450);
 #   3. waits for a checkpoint, checks that it lists no self-test probe
 #      left starting (#915), stops the machine, and runs check-log.py on
-#      the disk, which has to find the checkpoint log consistent.
+#      the disk, which has to find the checkpoint log consistent; and
+#      checks that the marker of hold_transient, a transient process
+#      (#524), is nowhere on the disk.
 #
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
@@ -50,6 +52,12 @@ grep "hold_pages:" "$CONSOLE" | tail -1
 grep -q "hold_pages: filled 12288 pages: ok" "$CONSOLE" \
     || fail "hold_pages did not fill its pages at the install"
 
+# Hold_transient is transient (#524): it holds a marker in pages that no
+# checkpoint may save.
+grep "hold_transient:" "$CONSOLE" | tail -1
+grep -q "hold_transient: holding its marker" "$CONSOLE" \
+    || fail "hold_transient did not start at the install"
+
 echo "Booting from the disk, which restores the install's checkpoint"
 start_qemu
 choose_last_entry
@@ -67,6 +75,18 @@ named=$(echo "$records" | sed -n 's/.*capabilities: \([0-9][0-9]*\).*/\1/p')
     || fail "the kernel did not restore the derivation records"
 [ -n "$named" ] && [ "$named" -ge 2 ] \
     || fail "no restored process names the derivation records"
+
+# The transient hold_transient was not saved, so it isn't restored, and
+# the store destroyed its bank (#524). The restored processes are named,
+# so hold_pages, which is persistent, must be among them.
+grep -q "restored process [0-9]*/hold_pages\[" "$WORK/serial" \
+    || fail "the kernel did not name the restored hold_pages"
+if grep -q "restored process [0-9]*/hold_transient" "$WORK/serial"; then
+    fail "the transient hold_transient was restored"
+fi
+grep "storage: restore: transient banks:" "$CONSOLE" | tail -1
+grep -q "storage: restore: transient banks: [1-9]" "$CONSOLE" \
+    || fail "the store did not destroy the transient bank at the restore"
 
 # Hold_derived checks its capabilities the first time it is restored,
 # and writes the result to the console.
@@ -211,6 +231,15 @@ grep -q "paged out before the checkpoint" "$WORK/check-log.out" || {
          "the disk image is in $WORK"
     exit 1
 }
+
+# Hold_transient wrote its marker through 16 pages, which no checkpoint
+# and no paging may write to the disk (#524).
+echo "Looking for hold_transient's marker on the disk"
+if grep -q -a "rose-524-transient-marker" "$DISK"; then
+    echo "FAIL: hold_transient's marker is on the disk;" \
+         "the disk image is in $WORK"
+    exit 1
+fi
 
 rm -rf "$WORK"
 echo "PASS"

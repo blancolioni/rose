@@ -6,11 +6,18 @@ interface Processes.Executable is
    --  Launch makes the process and loads Image into it, but does not
    --  start it. The caller gives it its caps through the result, one at
    --  a time, and then starts it (#234).
+   --
+   --  A Transient process is never saved in a checkpoint (#524): exec
+   --  launches a program as transient when its command metadata says so
+   --  (idle#127). The kernel doesn't mark it persistent, mem keeps its
+   --  writable pages out of the log, and the store destroys its bank at
+   --  the next restore, which ends whatever it launched.
 
    function Launch
      (Name  : String;
       Image : interface Storage.Region_Access;
-      Bank  : interface Storage.Bank)
+      Bank  : interface Storage.Bank;
+      Transient : Boolean)
      return interface Processes.Starting_Process;
 
    --  As Launch, but the process also starts with the receive cap of a
@@ -19,7 +26,8 @@ interface Processes.Executable is
    function Launch_Command
      (Name  : String;
       Image : interface Storage.Region_Access;
-      Bank  : interface Storage.Bank)
+      Bank  : interface Storage.Bank;
+      Transient : Boolean)
      return interface Processes.Starting_Process;
 
 end Processes.Executable;

@@ -27,6 +27,20 @@ They save the state that persistent processes depend on as data, and are given i
 
 Their own memory is never part of a checkpoint.
 
+=== Transient Processes
+
+A program can say that its processes are never saved, with the `Transient` aspect of its command (idle#127, #524).
+`login` needs this, so that the password it reads never reaches the disk.
+
+* *`exec` reads it* from the program's metadata, `transient true`, and passes it to `elf` with each launch.
+* *The kernel* doesn't mark the process persistent, as it doesn't a boot module, so a checkpoint skips it.
+* *`mem` leaves it out of its tables,* and maps the pages of its writable segments as not persistent: they are still read from their regions, but are never written to the log, by a checkpoint or to free memory. They stay in memory for as long as the process runs.
+* *Its own bank is transient.* `store` saves the flag with the bank, and destroys the bank when it restores a checkpoint. Whatever was launched against it ends too, as when any bank is destroyed.
+
+After a restore, capabilities for the process fail, as for a process that has ended, and a call that a saved process was making to it is made again, and fails.
+
+The process's own pages are all this covers: a password that it sends to another process is in that process's memory too (#1059).
+
 === Page Objects
 
 A page object is a page of storage, named by a 64-bit page object id from `FF00_0000_0000_0000` to `FFFF_FFFF_FFFF_FFFF`.

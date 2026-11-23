@@ -224,9 +224,12 @@ package body Store.Devices is
          Pages        : Rose.Words.Word_64 := 0;
          Regions      : Rose.Words.Word := 0;
          Owner        : Rose.Objects.Object_Id := 0;
+         Transient    : Boolean := False;
       end record;
    --  A bank (ADR 0014).  Owner is the process whose own bank it is (ADR
-   --  0015, #750), or zero.  Parent is zero for the root bank.  A limit of
+   --  0015, #750), or zero.  A Transient bank is a transient process's
+   --  own (#524), which a restore destroys, since the process wasn't
+   --  saved.  Parent is zero for the root bank.  A limit of
    --  zero is no limit.  Pages and Regions are what has been reserved
    --  from the bank and the banks below it: its pages are the blocks that
    --  have space on a device, and a subregion counts as a region.
@@ -721,7 +724,11 @@ package body Store.Devices is
                  Page_Limit   => Banks (Index).Page_Limit,
                  Region_Limit =>
                    Rose.Words.Word_32 (Banks (Index).Region_Limit),
-                 Owner        => Rose.Words.Word_32 (Banks (Index).Owner));
+                 Owner        => Rose.Words.Word_32 (Banks (Index).Owner),
+                 Flags        =>
+                   (if Banks (Index).Transient
+                    then Rose.Checkpoints.Bank_Transient else 0),
+                 Reserved     => 0);
             if Bank_Slot = Banks_Per_Page then
                Append;
                Bank_Slot := 0;
@@ -762,9 +769,10 @@ package body Store.Devices is
    -------------------------
 
    function Create_Process_Bank
-     (Id      : Rose.Objects.Capability_Identifier;
-      Parent  : Rose.Words.Word;
-      Process : Rose.Objects.Object_Id)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Parent    : Rose.Words.Word;
+      Process   : Rose.Objects.Object_Id;
+      Transient : Boolean)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
@@ -777,6 +785,7 @@ package body Store.Devices is
          for Bank of Banks loop
             if Bank.In_Use and then Bank.Access_Cap = Cap then
                Bank.Owner := Process;
+               Bank.Transient := Transient;
                exit;
             end if;
          end loop;
@@ -1211,6 +1220,27 @@ package body Store.Devices is
       Rose.Console_IO.Put ("storage: restore: banks: ");
       Rose.Console_IO.Put (Bank_Total);
       Rose.Console_IO.New_Line;
+
+      --  A transient process wasn't saved, so its bank goes, with what
+      --  is below it (#524). The processes whose banks are among them
+      --  are queued to end, which mem does once it gives the store its
+      --  Set_Ended cap, at every boot. The transient process itself is
+      --  gone already.
+
+      declare
+         Destroyed : Natural := 0;
+      begin
+         for Index in Banks'Range loop
+            if Banks (Index).In_Use and then Banks (Index).Transient then
+               Destroy_Bank_Tree (Index, Ending => Banks (Index).Owner);
+               Destroyed := Destroyed + 1;
+            end if;
+         end loop;
+
+         Rose.Console_IO.Put ("storage: restore: transient banks: ");
+         Rose.Console_IO.Put (Destroyed);
+         Rose.Console_IO.New_Line;
+      end;
    end Finish_Bank_Restore;
 
    --------------------
@@ -2109,6 +2139,8 @@ package body Store.Devices is
                   Page_Limit   => Saved.Page_Limit,
                   Region_Limit => Rose.Words.Word (Saved.Region_Limit),
                   Owner        => Rose.Objects.Object_Id (Saved.Owner),
+                  Transient    =>
+                    (Saved.Flags and Bank_Transient) /= 0,
                   others       => <>);
             end if;
          end;
