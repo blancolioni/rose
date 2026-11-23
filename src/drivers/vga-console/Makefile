@@ -11,7 +11,7 @@ vga_console:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/streams-reader.idl $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl \

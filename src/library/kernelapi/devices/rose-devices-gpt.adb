@@ -42,6 +42,16 @@ package body Rose.Devices.GPT is
 
    GPT_Data          : GPT_Record;
 
+   No_GPT_Data : constant GPT_Record := (others => <>);
+   --  What GPT_Data is cleared to, by a copy rather than an aggregate,
+   --  which would be built on the stack first (#1004).
+
+   Block_Buffer : Storage_Array (0 .. Format.Max_Block_Size - 1);
+   Chunk_Buffer : Storage_Array (0 .. Chunk_Bytes - 1);
+   --  A block and a chunk of the entries, for reading and writing. They
+   --  are here, not on the stack, which is a page in the boot servers
+   --  (#1004); each is used by one subprogram at a time.
+
    Random_State : Word_64 := 0;
 
    function Geometry_Valid return Boolean
@@ -200,7 +210,7 @@ package body Rose.Devices.GPT is
          return;
       end if;
 
-      GPT_Data := (others => <>);
+      GPT_Data := No_GPT_Data;
       Client.Get_Parameters
         (Device, GPT_Data.Block_Count, GPT_Data.Block_Size);
 
@@ -430,7 +440,9 @@ package body Rose.Devices.GPT is
       GPT_Data.Table.Count := 0;
 
       declare
-         Block : Storage_Array (0 .. Storage_Count (GPT_Data.Block_Size) - 1);
+         Block : Storage_Array renames
+                   Block_Buffer
+                     (0 .. Storage_Count (GPT_Data.Block_Size) - 1);
       begin
          Client.Read_Blocks (Device, Header_LBA, 1, Block);
          Header := Format.Decode_Header (Block);
@@ -448,7 +460,7 @@ package body Rose.Devices.GPT is
       declare
          Entry_Count : constant Natural :=
                          Natural (Header.Partition_Entry_Count);
-         Chunk       : Storage_Array (0 .. Chunk_Bytes - 1);
+         Chunk       : Storage_Array renames Chunk_Buffer;
          CRC         : Word_32 := 16#FFFF_FFFF#;
          Index       : Natural := 0;
          Start       : Block_Address_Type :=
@@ -669,9 +681,10 @@ package body Rose.Devices.GPT is
      (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Start  : Block_Address_Type)
    is
-      Chunk   : Storage_Array (0 .. Chunk_Bytes - 1) := (others => 0);
+      Chunk   : Storage_Array renames Chunk_Buffer;
       Address : Block_Address_Type := Start;
    begin
+      Chunk := (others => 0);
       for First in 0 .. Array_Entries / Chunk_Entries - 1 loop
          for K in 0 .. Chunk_Entries - 1 loop
             Format.Encode_Entry
@@ -691,9 +704,10 @@ package body Rose.Devices.GPT is
      (Device : Rose.Interfaces.Storage.Block_Array.Client.Block_Array_Client;
       Header : Format.Header)
    is
-      Block : Storage_Array (0 .. Storage_Count (GPT_Data.Block_Size) - 1) :=
-                (others => 0);
+      Block : Storage_Array renames
+                Block_Buffer (0 .. Storage_Count (GPT_Data.Block_Size) - 1);
    begin
+      Block := (others => 0);
       Format.Encode_Header (Header, Block);
       Client.Write_Blocks
         (Device, Block_Address_Type (Header.Current_LBA), 1, Block);
@@ -712,8 +726,15 @@ package body Rose.Devices.GPT is
    begin
       Client.Get_Parameters (Block_Device, Block_Count, Block_Size);
 
+      if Natural (Block_Size) > Format.Max_Block_Size then
+         Rose.Console_IO.Put_Line
+           ("gpt: the block is too big for a protective MBR");
+         return;
+      end if;
+
       declare
-         MBR   : Storage_Array (0 .. Storage_Offset (Block_Size) - 1);
+         MBR   : Storage_Array renames
+                   Block_Buffer (0 .. Storage_Offset (Block_Size) - 1);
          Size  : constant Block_Address_Type :=
                    Block_Address_Type'Min (Block_Count - 1, 16#FFFF_FFFF#);
          Entry_Start : constant := 446;

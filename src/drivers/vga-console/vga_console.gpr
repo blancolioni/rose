@@ -1,4 +1,5 @@
 with "../../../projects/checks.gpr";
+with "../../../rts/user/rose_rts.gpr";
 
 project vga_console is
 
@@ -7,12 +8,11 @@ project vga_console is
    --  build/generated. The run-time system has Rose's base, capability
    --  and system call packages.
 
-   --  The RTS's own interface specs come first, so that the program
-   --  uses them and not the other copies on its path (#538).
+   --  The RTS's own units, its interface specs among them, come from
+   --  rose_rts.gpr (#1080).
 
    for Source_Dirs use
-      ("../../../rts/user/build/interfaces",
-       "src",
+      ("src",
        "build/generated",
        "../text-console",
        "../../library/rose",
@@ -43,14 +43,10 @@ project vga_console is
        "rose-interfaces-devices-event_source.ads",
        "rose-interfaces-devices-event_source-client.ads",
        "rose-interfaces-devices-event_source-client.adb",
-       "rose-interfaces-processes.ads",
        "rose-interfaces-processes-restorable.ads",
        "rose-interfaces-processes-restorable-server.ads",
        "rose-interfaces-processes-restorable-server.adb",
-       "rose-interfaces-streams.ads",
        "rose-interfaces-streams-stream.ads",
-       "rose-interfaces-streams-reader.ads",
-       "rose-interfaces-streams-writer.ads",
        "rose-interfaces-screens.ads",
        "rose-interfaces-screens-terminal.ads",
        "rose-interfaces-screens-terminal-server.ads",

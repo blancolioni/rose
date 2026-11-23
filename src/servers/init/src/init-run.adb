@@ -44,6 +44,12 @@ package body Init.Run is
    -- Run_Init --
    --------------
 
+   First_User_Buffer     : String (1 .. Init.Users.Max_Name_Length);
+   First_Password_Buffer : String (1 .. Init.Users.Max_Password_Length);
+   --  Run_Init's first user, here rather than on the stack, which is a
+   --  page before mem runs (#1004). Init isn't persistent, so the password
+   --  never reaches the disk from here.
+
    procedure Run_Init (Install : Boolean) is
       use Rose.Capabilities, Rose.Words;
       package Init_Caps renames Rose.Init_Capabilities;
@@ -139,9 +145,9 @@ package body Init.Run is
                        Rose.Capabilities.Null_Capability;
       --  The command registry's Commands interface (#460).
 
-      First_User     : String (1 .. Init.Users.Max_Name_Length);
+      First_User     : String renames First_User_Buffer;
       First_Last     : Natural := 0;
-      First_Password : String (1 .. Init.Users.Max_Password_Length);
+      First_Password : String renames First_Password_Buffer;
       Password_Last  : Natural := 0;
       --  The first user's name and password, which the person installing
       --  types (#456).

@@ -128,14 +128,9 @@ package body Rose.Console_IO is
          end;
       end if;
 
-      if Index < Width then
-         declare
-            Padding : constant String (1 .. Width - Index) :=
-                        (others => Pad);
-         begin
-            Put (Padding);
-         end;
-      end if;
+      for I in Index + 1 .. Width loop
+         Put (Pad);
+      end loop;
 
       for I in reverse 1 .. Index loop
          Put (Buffer (I));

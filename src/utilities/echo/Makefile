@@ -12,6 +12,6 @@ echo:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-echo.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

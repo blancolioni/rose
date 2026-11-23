@@ -252,11 +252,18 @@ package body Restore.Replacing is
 
          Rose.System_Calls.Initialize_Send (Params, Endpoint);
          declare
-            Caps : Rose.Capabilities.Capability_Array (1 .. Index + 1) :=
+            Caps : Rose.Capabilities.Capability_Array (1 .. 16) :=
               (others => Rose.Capabilities.Null_Capability);
+            --  Bounded, so that the frame has a known size (#1004).
+            --  Send_Caps sends more than an invocation holds as
+            --  continued messages, which Send_Cap can't.
          begin
-            Caps (Caps'Last) := Control;
-            Rose.System_Calls.Send_Caps (Params, Caps);
+            if Index + 1 > Caps'Length then
+               Replacements.Release (Replacement);
+               return Launch_Failed;
+            end if;
+            Caps (Index + 1) := Control;
+            Rose.System_Calls.Send_Caps (Params, Caps (1 .. Index + 1));
          end;
          Rose.System_Calls.Receive_Words (Params, 1);
          Rose.System_Calls.Receive_Caps (Params, 4);
@@ -307,9 +314,10 @@ package body Restore.Replacing is
                New_Launch := Launch_Of (Name (1 .. Last));
 
                if New_Launch = Rose.Capabilities.Null_Capability then
+                  Rose.Console_IO.Put ("restore: ");
+                  Rose.Console_IO.Put (Name (1 .. Last));
                   Rose.Console_IO.Put_Line
-                    ("restore: " & Name (1 .. Last)
-                     & " was not installed again, so it is unchanged");
+                    (" was not installed again, so it is unchanged");
                else
                   declare
                      Result : constant Outcome :=
@@ -317,13 +325,13 @@ package body Restore.Replacing is
                   begin
                      if Result = Replaced then
                         Replaced_Count := Replaced_Count + 1;
-                        Rose.Console_IO.Put_Line
-                          ("restore: replaced " & Name (1 .. Last));
+                        Rose.Console_IO.Put ("restore: replaced ");
+                        Rose.Console_IO.Put_Line (Name (1 .. Last));
                      else
                         Failed_Count := Failed_Count + 1;
-                        Rose.Console_IO.Put
-                          ("restore: " & Name (1 .. Last)
-                           & " is unchanged: ");
+                        Rose.Console_IO.Put ("restore: ");
+                        Rose.Console_IO.Put (Name (1 .. Last));
+                        Rose.Console_IO.Put (" is unchanged: ");
                         case Result is
                            when No_Metadata =>
                               Rose.Console_IO.Put_Line

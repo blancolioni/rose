@@ -12,7 +12,7 @@ hold_transient:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-hold_transient.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/processes-launch.idl \

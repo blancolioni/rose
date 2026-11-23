@@ -65,7 +65,8 @@ package body Rose.Interfaces.Storage.Block_Array.Client.Table is
    begin
       if Table_Count < Size then
          Table_Count := Table_Count + 1;
-         Table_Array (Table_Count) := (Device.Get_Parameters, Element);
+         Table_Array (Table_Count).Parameters_Cap := Device.Get_Parameters;
+         Table_Array (Table_Count).Element := Element;
       end if;
    end Insert;
 

@@ -125,6 +125,9 @@ is
    with Pre => Block_Size in 1 .. Array_Bytes;
    --  The blocks each copy of the partition array takes.
 
+   Max_Block_Size : constant := 4096;
+   --  The largest block size that Geometry_Valid allows.
+
    function Geometry_Valid
      (Block_Size  : Natural;
       Block_Count : Rose.Words.Word_64)

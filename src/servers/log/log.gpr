@@ -1,3 +1,5 @@
+with "../../../projects/boot_server.gpr";
+
 project Log is
 
    for Source_Dirs use
@@ -20,7 +22,8 @@ project Log is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-O3");
+      for Default_Switches ("ada") use ("-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst", "-g", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing", "-O3")
+        & Boot_Server.Stack_Switches;
    end Compiler;
 
    package Binder is

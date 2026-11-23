@@ -565,17 +565,22 @@ package body Restore.Checkpoint_Log is
             Matched := Matched + 1;
          end if;
 
-         for Segment of
-           Mem_Process.Segments (1 .. Natural (Mem_Process.Segment_Count))
-         loop
-            if (Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0)
-              and then not Is_Region
-                (Segment.Region_Base, Segment.Region_Bound)
-            then
-               Report_Bad_Entry
-                 (Location, "a segment's region is not in the storage tables");
-               return False;
-            end if;
+         for S in 1 .. Natural (Mem_Process.Segment_Count) loop
+            declare
+               Segment : Rose.Checkpoints.Saved_Segment renames
+                           Mem_Process.Segments (S);
+            begin
+               if (Segment.Region_Base /= 0
+                   or else Segment.Region_Bound /= 0)
+                 and then not Is_Region
+                   (Segment.Region_Base, Segment.Region_Bound)
+               then
+                  Report_Bad_Entry
+                    (Location,
+                     "a segment's region is not in the storage tables");
+                  return False;
+               end if;
+            end;
          end loop;
 
          Mem_Pid_Count := Mem_Pid_Count + 1;

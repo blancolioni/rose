@@ -13,7 +13,7 @@ screen:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl $(INTERFACES)/streams-reader.idl \

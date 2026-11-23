@@ -4,6 +4,34 @@ with Rose.Words;
 
 package body Rose.Trace is
 
+   Max_Text : constant := 64;
+   --  The kernel keeps only the first 64 characters of an event.
+
+   procedure Append
+     (Line : in out String;
+      Last : in out Natural;
+      Text : String);
+   --  Add as much of Text to Line (1 .. Last) as fits. Events are built
+   --  in a String of Max_Text, not by "&", whose result the stack would
+   --  hold at a size that is not known until it runs (#1004).
+
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (Line : in out String;
+      Last : in out Natural;
+      Text : String)
+   is
+   begin
+      for Ch of Text loop
+         exit when Last = Line'Last;
+         Last := Last + 1;
+         Line (Last) := Ch;
+      end loop;
+   end Append;
+
    Trace_Cap : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
 
@@ -61,9 +89,13 @@ package body Rose.Trace is
    is
       Digits_Text : String (1 .. 10);
       First       : Positive;
+      Line        : String (1 .. Max_Text);
+      Last        : Natural := 0;
    begin
       Put_Image (Value, Digits_Text, First);
-      Event (Text & Digits_Text (First .. Digits_Text'Last));
+      Append (Line, Last, Text);
+      Append (Line, Last, Digits_Text (First .. Digits_Text'Last));
+      Event (Line (1 .. Last));
    end Event;
 
    -----------
@@ -80,11 +112,32 @@ package body Rose.Trace is
       Digits_2 : String (1 .. 10);
       First_1  : Positive;
       First_2  : Positive;
+      Line     : String (1 .. Max_Text);
+      Last     : Natural := 0;
    begin
       Put_Image (Value, Digits_1, First_1);
       Put_Image (Value_2, Digits_2, First_2);
-      Event (Text & Digits_1 (First_1 .. Digits_1'Last)
-             & Text_2 & Digits_2 (First_2 .. Digits_2'Last));
+      Append (Line, Last, Text);
+      Append (Line, Last, Digits_1 (First_1 .. Digits_1'Last));
+      Append (Line, Last, Text_2);
+      Append (Line, Last, Digits_2 (First_2 .. Digits_2'Last));
+      Event (Line (1 .. Last));
+   end Event;
+
+   -----------
+   -- Event --
+   -----------
+
+   procedure Event
+     (Text   : String;
+      Text_2 : String)
+   is
+      Line : String (1 .. Max_Text);
+      Last : Natural := 0;
+   begin
+      Append (Line, Last, Text);
+      Append (Line, Last, Text_2);
+      Event (Line (1 .. Last));
    end Event;
 
    ---------------

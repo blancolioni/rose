@@ -12,7 +12,7 @@ cat:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-cat.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/streams-reader.idl
 	gprbuild $(GPRBUILD_CARGS)

@@ -11,7 +11,7 @@ clock:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/time-clock.idl $(INTERFACES)/time-clock_admin.idl \
 	    $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)

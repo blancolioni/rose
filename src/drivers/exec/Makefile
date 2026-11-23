@@ -13,7 +13,7 @@ exec:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/processes-exec.idl \
 	    $(INTERFACES)/processes-launch.idl \
 	    $(INTERFACES)/streams-reader.idl \
