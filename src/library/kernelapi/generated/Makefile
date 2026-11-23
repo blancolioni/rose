@@ -26,6 +26,7 @@ IDL=caps-cap storage-block_array files-file_system files-directory common-tree f
     processes-restorable processes-signalled streams-output_redirect \
     users-auth users-auth_admin checkpoints-checkpointer time-clock \
     time-clock_admin users-rights users-rights_admin screens-surface \
+    screens-supervisor \
     processes-replacer processes-replacement processes-saveable \
     processes-replaceable
 

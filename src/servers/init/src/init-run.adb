@@ -152,6 +152,9 @@ package body Init.Run is
       Auth_Control   : Rose.Capabilities.Capability;
       --  Auth's Replaceable interface, which init replaces it through
       --  once the first user is made (#831), and then deletes.
+      Supervisor_Control : Rose.Capabilities.Capability :=
+        Rose.Capabilities.Null_Capability;
+      --  The console supervisor's Supervisor interface (#526).
       User_Cap       : Rose.Capabilities.Capability;
       Home_Cap   : Rose.Capabilities.Capability;
       --  The first user, and its home directory, created on first boot.
@@ -1067,32 +1070,35 @@ package body Init.Run is
          Message => NL & "The system is installed. Press enter to reboot."
                     & NL);
 
-      --  The console runs login, which asks for a user name and password
-      --  and runs petal for the user (#457, #458).
+      --  The console supervisor runs login, which asks for a user name
+      --  and password, and then the user's session (#457, #526). It
+      --  launches nothing until it is restored, so nothing reads the
+      --  console before the restart (#512).
 
       Init.Calls.Send_String
-        (Console_Stream_Cap, "launching login" & NL);
-      if not Init.Users.Start_Login
+        (Console_Stream_Cap, "launching the console supervisor" & NL);
+      if not Init.Users.Start_Supervisor
         (Find_Cap        => Find_Cap,
          Console         => Console_Terminal_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Delete_Cap,
          Rescind_Cap     => Rescind_Cap,
          Commands        => Commands_Cap,
          Timer           => Init.Boot.Timer_Interface_Cap,
          Clock           => Clock_Cap,
          Rights          => Rights_Cap,
          System          => System_Directory_Cap,
-         Auth            => Auth_Cap)
+         Auth            => Auth_Cap,
+         Control         => Supervisor_Control)
       then
          Init.Calls.Send_String
-           (Console_Stream_Cap, "init: unable to launch login" & NL);
+           (Console_Stream_Cap,
+            "init: unable to launch the console supervisor" & NL);
       end if;
 
-      --  Login is the last launch. Init's derived capabilities are with
-      --  hold_derived (#691), and its test set with the userland cap set
-      --  server (#825), which are persistent, so the first checkpoint has
-      --  them.
+      --  The supervisor is the last launch. Init's derived capabilities
+      --  are with hold_derived (#691), and its test set with the userland
+      --  cap set server (#825), which are persistent, so the first
+      --  checkpoint has them.
 
       Init.Boot_Steps.End_Boot_Cap_Sets;
 
@@ -1105,6 +1111,13 @@ package body Init.Run is
       if Take_Checkpoint then
          Wait (3000);
          Init.Calls.Send (Restart_Cap);
+      end if;
+
+      --  Without a checkpoint there is no restart, and no restore to
+      --  start the supervisor, so init starts it (#526).
+
+      if Supervisor_Control /= Null_Capability then
+         Init.Users.Start_Console (Supervisor_Control);
       end if;
 
       Init.Calls.Send_String

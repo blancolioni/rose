@@ -46,6 +46,12 @@ install_rose "$ISO"
 cp "$CONSOLE" "$WORK/install-console"
 cp "$WORK/serial" "$WORK/install-serial"
 
+# The console supervisor launches nothing before the restart, so nothing
+# asks for a login once the install has finished (#512, #526).
+if sed -n '/The system is installed/,$p' "$CONSOLE" | grep -q "login:"; then
+    fail "login asked for a user before the restart"
+fi
+
 # Hold_pages fills 48 MiB, more than the machine has, during the install
 # (#975).
 grep "hold_pages:" "$CONSOLE" | tail -1

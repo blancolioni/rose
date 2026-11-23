@@ -1,0 +1,11 @@
+--  The console supervisor's control (#526): it launches nothing until
+--  it is restored, or until Start is called, as init does when an
+--  install ends without the restart that would restore it.
+
+interface Screens.Supervisor is
+
+   procedure Start;
+   --  Start launching login at the console, if the supervisor hasn't
+   --  started already.
+
+end Screens.Supervisor;
