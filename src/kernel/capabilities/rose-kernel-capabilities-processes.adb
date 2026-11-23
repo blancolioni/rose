@@ -49,15 +49,14 @@ package body Rose.Kernel.Capabilities.Processes is
                      Endpoint : Rose.Objects.Endpoint_Index;
                   end record;
 
-               Endpoints : constant array (Natural range 0 .. 5)
+               Endpoints : constant array (Natural range 0 .. 4)
                  of Subprogram_Endpoint :=
                    [(Process_Cap, Get_Name_Endpoint),
                     (Process_Cap, Kill_Process_Endpoint),
                     (Meta_Cap, Meta.Get_Object_Id_Endpoint),
                     (Process_Cap, Resume_Process_Endpoint),
-                    (Process_Cap, Faulted_Process_Endpoint),
-                    (Process_Cap, Notify_Process_Endpoint)];
-               --  Name, Destroy, Get_Object_Id, Resume, Fault, Notify.
+                    (Process_Cap, Faulted_Process_Endpoint)];
+               --  Name, Destroy, Get_Object_Id, Resume, Fault.
 
                Sent  : constant Natural := Sent_Word_Count (Params.all);
                First : Natural := 0;
