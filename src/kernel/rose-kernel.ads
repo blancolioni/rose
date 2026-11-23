@@ -4,7 +4,6 @@ with Rose.Objects;
 
 package Rose.Kernel is
 
-   Max_Processes         : constant := 64;
    Max_Virtual_Pages     : constant := 2_000_000;
 
    Kernel_Object_Id    : constant Rose.Objects.Object_Id :=
@@ -81,7 +80,8 @@ private
    Trace_Object_Id : Rose.Objects.Object_Id := Rose.Objects.Null_Object_Id;
 
    Boot_Module_Pages : Natural :=
-     18 + 40 + 4 + 8 + 8 + 4
+     18 + (40 * Rose.Limits.Mem_Process_Entries + 63) / 64 + 4 + 8 + 8 + 4
+     + 64
      + (Rose.Limits.Mapped_Page_Table_Bytes + Rose.Limits.Page_Size - 1)
      / Rose.Limits.Page_Size
      + (Rose.Limits.Change_Table_Bytes + Rose.Limits.Page_Size - 1)
@@ -90,14 +90,17 @@ private
    --  Pages of kernel heap kept for boot modules, which are loaded before
    --  the memory server can add to the heap (#309): 18 for what they
    --  needed before the memory server's page table was sized from
-   --  Rose.Limits.Max_Mapped_Pages, 40 for the memory server's tables of
-   --  32 segments a process and of shared pages (ADR 0025), 4 for the
+   --  Rose.Limits.Max_Mapped_Pages, 40 for every 64 entries of the memory
+   --  server's table of processes, with 32 segments each, and its table
+   --  of shared pages (ADR 0025, Rose.Limits.Mem_Process_Entries), 4 for the
    --  boot console's copy of its output (#654), 8 for the memory server's
    --  Replacer and Replacement interfaces (#866), which took 3 of them,
    --  8 for its Process_Control interface (#99), whose table of instances
    --  takes 5, 4 for its index buffers and cache (#949), which take 2,
    --  the pages of the page table, and of its table of changes and the
-   --  window it pages out through (#974). Set by boot-module-pages on
+   --  window it pages out through (#974), and 64 for the boot servers'
+   --  pools of instance caps, which replace a table for each interface
+   --  (Rose.Server, #1090). Set by boot-module-pages on
    --  the command line.
 
 end Rose.Kernel;

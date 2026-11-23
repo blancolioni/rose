@@ -108,7 +108,8 @@ start_qemu
 # "Previous" is the last entry now, and the new set's serial-console
 # entry is the one before it.
 choose_entry_from_bottom 1
-wait_for "caps: restored" 200 || fail "the new set did not restore the checkpoint"
+wait_for_console "caps: restored" 200 \
+    || fail "the new set did not restore the checkpoint"
 # Login is still reading the name it was reading when the fixture was
 # made, and what the update wrote to the console has scrolled its prompt
 # away: an empty name brings the prompt back.

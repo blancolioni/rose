@@ -1,6 +1,23 @@
 package Rose.Limits is
 
    Max_Processes : constant := 64;
+   --  The kernel's limit: the most processes it runs at once, boot
+   --  modules included. It bounds everything that counts processes, such
+   --  as the processes in a checkpoint (checkpoint, restore).
+
+   Mem_Boot_Entries : constant := 24;
+   --  The memory server's table keeps entries 1 to Mem_Boot_Entries for
+   --  boot modules, and gives launched processes the rest, so that a boot
+   --  module never takes the entry of a process that a restore brings
+   --  back (#873). The install media boots about 19 modules.
+
+   Mem_Process_Entries : constant := Mem_Boot_Entries + Max_Processes;
+   --  The memory server's table of processes, which it numbers by entry
+   --  (Mem.Processes). With Max_Processes entries for launched processes,
+   --  it always has room for every process the kernel can run, so only
+   --  the kernel's limit is reached (#1090). A checkpoint keeps each
+   --  process's entry number as a word, so the table can grow without a
+   --  change to the format.
 
    Max_Physical_Pages : constant := 2 ** 20 - 1;
    Max_Virtual_Pages : constant := 2 ** 20 - 1;
