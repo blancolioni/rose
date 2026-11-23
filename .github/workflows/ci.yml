@@ -140,5 +140,6 @@ jobs:
           path: |
             logs
             /tmp/rose-test.*/serial
+            /tmp/rose-test.*/install-serial
             /tmp/rose-test.*/qemu.log
           if-no-files-found: ignore
