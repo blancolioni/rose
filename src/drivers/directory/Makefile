@@ -18,7 +18,7 @@ directory:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/processes-replaceable.idl \
@@ -56,8 +56,7 @@ directory:
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl
-	$(IDLE) --target user --command-client -I $(INTERFACES) \
-	    -o build/generated \
+	$(USER_IDLE) --command-client \
 	    ../file/rose-core-file.idl rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)

@@ -12,7 +12,7 @@ copy:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-copy.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-writable_file.idl \
 	    $(INTERFACES)/files-transactional_writable_file.idl \

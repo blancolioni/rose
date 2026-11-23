@@ -12,7 +12,7 @@ rename:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-rename.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-writable_directory.idl \
 	    $(INTERFACES)/files-fixed_directory.idl \

@@ -12,7 +12,7 @@ rights:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-rights.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-rights.idl \
 	    $(INTERFACES)/users-rights_admin.idl \
