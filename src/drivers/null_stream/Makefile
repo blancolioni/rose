@@ -15,7 +15,7 @@ null_stream:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-null_stream.idl \
 	    $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/streams-stream.idl \

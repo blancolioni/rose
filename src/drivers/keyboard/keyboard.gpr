@@ -1,4 +1,5 @@
 with "../../../projects/checks.gpr";
+with "../../../rts/user/rose_rts.gpr";
 
 project Keyboard is
 
@@ -8,12 +9,11 @@ project Keyboard is
    --  The kernel target's packages, in kernelapi/generated, must not be
    --  on the path: the two targets have units with the same names.
 
-   --  The RTS's own interface specs come first, so that the program
-   --  uses them and not the other copies on its path (#538).
+   --  The RTS's own units, its interface specs among them, come from
+   --  rose_rts.gpr (#1080).
 
    for Source_Dirs use
-      ("../../../rts/user/build/interfaces",
-       "src",
+      ("src",
        "build/generated",
        "../../library/rose",
        "../../library/kernelapi/devices");

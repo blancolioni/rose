@@ -13,7 +13,7 @@ login:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-login.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-auth.idl \
 	    $(INTERFACES)/users-user.idl \

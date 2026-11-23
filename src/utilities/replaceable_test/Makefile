@@ -15,7 +15,7 @@ replaceable_test:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-replaceable_test.idl held_call.idl \
 	    $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/common-named.idl \
