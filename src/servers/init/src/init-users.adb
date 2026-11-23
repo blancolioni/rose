@@ -9,6 +9,7 @@ with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Users.Rights.Client;
 with Rose.Interfaces.Streams.Releasable_Writer.Client;
 with Rose.Interfaces.Users.Rights_Admin.Client;
+with Rose.Interfaces.Screens.Supervisor.Client;
 with Rose.Interfaces.Screens.Terminal.Client;
 with Rose.Interfaces.Users.User.Client;
 with Rose.Interfaces.Files.Writable_Directory.Client;
@@ -560,66 +561,17 @@ package body Init.Users is
       Control := Params.Caps (2);
    end Start_Auth;
 
-   -----------------
-   -- Start_Login --
-   -----------------
+   -------------------
+   -- Start_Console --
+   -------------------
 
-   function Start_Login
-     (Find_Cap        : Rose.Capabilities.Capability;
-      Console         : Rose.Capabilities.Capability;
-      Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
-      Rescind_Cap     : Rose.Capabilities.Capability;
-      Commands        : Rose.Capabilities.Capability;
-      Timer           : Rose.Capabilities.Capability;
-      Clock           : Rose.Capabilities.Capability;
-      Rights          : Rose.Capabilities.Capability;
-      System          : Rose.Capabilities.Capability;
-      Auth            : Rose.Capabilities.Capability)
-      return Boolean
-   is
-      use type Rose.Words.Word;
-      Launch_Cap : constant Rose.Capabilities.Capability :=
-        Init.Calls.Find_In_Map (Find_Cap, "login");
-      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
-      Endpoint   : Rose.Capabilities.Capability;
-      Params     : aliased Rose.Invocation.Invocation_Record;
+   procedure Start_Console (Control : Rose.Capabilities.Capability) is
+      Supervisor : Rose.Interfaces.Screens.Supervisor.Client
+        .Supervisor_Client;
    begin
-      if Launch_Cap = Rose.Capabilities.Null_Capability then
-         return False;
-      end if;
-
-      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
-      Endpoint :=
-        Rose.Interfaces.Processes.Launch.Client.Launch_Command
-          (Launcher, Rose.Capabilities.Null_Capability);
-      if Endpoint = Rose.Capabilities.Null_Capability then
-         return False;
-      end if;
-
-      --  Its roles' caps and its Auth argument, as
-      --  src/utilities/login/rose-core-login.idl declares them.
-
-      Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Caps
-        (Params,
-         (Console,
-          Create_Endpoint,
-          Delete_Cap,
-          Rescind_Cap,
-          Commands,
-          Timer,
-          Clock,
-          Rights,
-          System,
-          Auth));
-      Rose.System_Calls.Receive_Words (Params, 1);
-      Rose.System_Calls.Invoke_Capability (Params);
-
-      return not Params.Control.Flags (Rose.Invocation.Error)
-        and then Params.Control.Flags (Rose.Invocation.Send_Words)
-        and then Params.Data (0) = Completed;
-   end Start_Login;
+      Rose.Interfaces.Screens.Supervisor.Client.Open (Supervisor, Control);
+      Rose.Interfaces.Screens.Supervisor.Client.Start (Supervisor);
+   end Start_Console;
 
    ------------------
    -- Start_Rights --
@@ -680,6 +632,76 @@ package body Init.Users is
       Rights := Params.Caps (0);
       Admin := Params.Caps (1);
    end Start_Rights;
+
+   ----------------------
+   -- Start_Supervisor --
+   ----------------------
+
+   function Start_Supervisor
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Console         : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Rescind_Cap     : Rose.Capabilities.Capability;
+      Commands        : Rose.Capabilities.Capability;
+      Timer           : Rose.Capabilities.Capability;
+      Clock           : Rose.Capabilities.Capability;
+      Rights          : Rose.Capabilities.Capability;
+      System          : Rose.Capabilities.Capability;
+      Auth            : Rose.Capabilities.Capability;
+      Control         : out Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "supervisor");
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Control := Rose.Capabilities.Null_Capability;
+      if Launch_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
+          (Launcher, Rose.Capabilities.Null_Capability);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps and its Auth argument, as src/utilities/
+      --  supervisor/rose-core-supervisor.idl declares them; and its
+      --  result, Control.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Caps
+        (Params,
+         (Console,
+          Create_Endpoint,
+          Rescind_Cap,
+          Commands,
+          Timer,
+          Clock,
+          Rights,
+          System,
+          Auth));
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Receive_Caps (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        or else not Params.Control.Flags (Rose.Invocation.Send_Words)
+        or else Params.Data (0) /= Completed
+        or else not Params.Control.Flags (Rose.Invocation.Send_Caps)
+      then
+         return False;
+      end if;
+
+      Control := Params.Caps (0);
+      return True;
+   end Start_Supervisor;
 
    --------------------
    -- Wait_For_Enter --

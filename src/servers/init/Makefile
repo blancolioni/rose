@@ -21,6 +21,8 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-users-auth-client.o \
 	$(BUILDDIR)/rose-interfaces-users-auth_admin.o \
 	$(BUILDDIR)/rose-interfaces-users-auth_admin-client.o \
+	$(BUILDDIR)/rose-interfaces-screens-supervisor.o \
+	$(BUILDDIR)/rose-interfaces-screens-supervisor-client.o \
 	$(BUILDDIR)/rose-interfaces-storage-bank-client.o \
 	$(BUILDDIR)/rose-interfaces-caps-constructor-client.o \
 	$(BUILDDIR)/rose-interfaces-caps-releasable_cap_set.o \
