@@ -92,6 +92,15 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  one, so that the update boot can call the restored exec and command
    --  registry (#829, ADR 0031).  Only restore-install has this cap.
 
+   Checkpoint_Hold_Endpoint   : constant Rose.Objects.Endpoint_Index := 24;
+   --  Hold the calls to the process of cap 0, as Hold_Calls does, but
+   --  only during a checkpoint, and until it ends: Leave_Checkpoint
+   --  releases them. Only the checkpoint server has this cap. It holds
+   --  the store's calls while the store and mem save their parts, so
+   --  that no region is made or destroyed between the two (#1061). An
+   --  error, and nothing held, outside a checkpoint, or if the process's
+   --  calls are held already.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

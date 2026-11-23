@@ -20,6 +20,7 @@ OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-time-timer-client.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-checkpointer.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-checkpointer-server.o \
+	$(BUILDDIR)/rose-interfaces-checkpoints-storage_checkpoint.o \
 	$(BUILDDIR)/rose-interfaces-time-timeout.o \
 	$(BUILDDIR)/rose-interfaces-time-timeout-server.o \
 	$(BUILDDIR)/rose-server.o \
