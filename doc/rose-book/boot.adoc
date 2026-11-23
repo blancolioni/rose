@@ -221,7 +221,7 @@ Each is a tar file, `/boot/a.tar` and `/boot/b.tar`, of a fixed 3 MiB: the kerne
 The paths in `menu.cfg` are in the tar, so a set's entries load that set's own modules, whatever the other set has.
 
 The partition's menu, `/boot/grub/grub.cfg`, from `boot/hd0/grub.cfg`, opens the current set with GRUB's `loopback` and `tar`, and shows its entries.
-Its first line names the current set and its version, such as `# rose-boot-set b 0.4.1 (tramp)`.
+Its first line names the current set and its version, such as `# rose-boot-set b 0.4.1 (genki)`.
 After an update, it has one more entry, `Previous: Rose` and the version of the other set, which opens that set's menu.
 
 An update changes the boot partition without a FAT writer.
