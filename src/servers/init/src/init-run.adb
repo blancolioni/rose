@@ -15,6 +15,7 @@ with Rose.System_Calls;
 with Init.Boot;
 with Init.Boot_Steps;
 with Init.Calls;
+with Init.Command_Line;
 with Init.Grants;
 with Init.Installer;
 with Init.Self_Tests;
@@ -176,6 +177,17 @@ package body Init.Run is
       procedure Wait (Milliseconds : Natural)
                       renames Init.Boot_Steps.Wait;
 
+      Test_Install : constant Boolean :=
+                       Install
+                       and then Init.Command_Line.Has_Argument ("self-tests");
+      --  A test install, which runs the tests and starts the persistent
+      --  holders (#1009).
+
+      procedure Run_Install_Tests;
+      --  Init's own tests, and the self tests' command, and the persistent
+      --  holders that the boot tests check after a restore, on a test
+      --  install.
+
       function Take_Checkpoint return Boolean;
       --  Take the new system's first checkpoint, through the checkpoint
       --  server (#413), trying again if the kernel can't take its
@@ -213,6 +225,184 @@ package body Init.Run is
 
          return Interface_Cap;
       end Get_Public_Interface_From_Process;
+
+      -----------------------
+      -- Run_Install_Tests --
+      -----------------------
+
+      procedure Run_Install_Tests is
+      begin
+         --  The self tests run as a command, and init waits for them to
+         --  finish before it goes on (#460).
+
+         Init.Calls.Send_String
+           (Console_Stream_Cap, "running self tests" & NL);
+         if not Init.Self_Tests.Derive_Test
+           (Find_Cap        => Find_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Derive_Cap      => Derive_Cap,
+            Rescind_Cap     => Rescind_Cap,
+            Delete_Cap      => Delete_Cap,
+            Cap_Sets        => Cap_Sets_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: derive test failed" & NL);
+         end if;
+
+         --  The kernel's part of replacing a running process (ADR 0032,
+         --  #862). It ends its probes before the first checkpoint.
+
+         if not Init.Self_Tests.Swap_Test
+           (Find_Cap        => Find_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Derive_Cap      => Derive_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: swap test failed" & NL);
+         end if;
+
+         --  The store's part: a replaced process's sub-banks move to its
+         --  successor (ADR 0032, #863).
+
+         if not Init.Self_Tests.Hand_Over_Test
+           (Find_Cap        => Find_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Process_Banks   => Init.Boot.Process_Banks_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: hand over test failed" & NL);
+         end if;
+
+         --  Mem drops clean pages to keep a reserve of free pages, but not
+         --  the pages of a buffer lent for a call in progress (ADR 0028,
+         --  section 5; #972, #973). It ends its probes before the first
+         --  checkpoint that init takes.
+
+         if not Init.Self_Tests.Page_Out_Test
+           (Find_Cap        => Find_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Checkpointer    => Init.Boot.Checkpointer_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: page test failed" & NL);
+         end if;
+
+         --  A persistent holder of 48 MiB, which checks every page after
+         --  each restore (#975).
+
+         if not Init.Self_Tests.Start_Page_Holder
+           (Find_Cap        => Find_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Standard_Output => Console_Stream_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: hold_pages did not start" & NL);
+         end if;
+
+         --  A transient holder of a marker, which no checkpoint may save,
+         --  and the restored system mustn't have (#524).
+
+         if not Init.Self_Tests.Start_Transient_Holder
+           (Find_Cap        => Find_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Standard_Output => Console_Stream_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: hold_transient did not start" & NL);
+         end if;
+
+         --  A persistent holder of derived caps, which checks them after a
+         --  restore (#691).
+
+         if not Init.Self_Tests.Start_Derived_Holder
+           (Find_Cap        => Find_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Commands        => Commands_Cap,
+            Derive_Cap      => Derive_Cap,
+            Rescind_Cap     => Rescind_Cap,
+            Delete_Cap      => Delete_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: hold_derived did not start" & NL);
+         end if;
+
+         --  A persistent holder of a file that init replaces, which checks
+         --  the file and its streams after a restore (#867).
+
+         if Init.Self_Tests.Replace_Held_File
+           (Find_Cap        => Find_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Delete_Cap      => Delete_Cap,
+            Commands        => Commands_Cap,
+            Cap_Sets        => Cap_Sets_Cap,
+            Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: file replace test: PASS" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: file replace test: FAIL" & NL);
+         end if;
+
+         if not Init.Self_Tests.Run
+           (Find_Cap        => Find_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Delete_Cap      => Delete_Cap,
+            Commands        => Commands_Cap,
+            Clock           => Clock_Cap,
+            Screen          => Screen_Cap,
+            Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap,
+            Cap_Sets        => Cap_Sets_Cap,
+            Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: self tests failed" & NL);
+         end if;
+
+         --  A persistent holder of a user server that init replaces, which
+         --  checks the user after a restore (#831). It comes after the self
+         --  tests, which come close to the kernel's 64 processes, since it
+         --  keeps four: itself, the home directory, its file and the user
+         --  server.
+
+         if Init.Self_Tests.Replace_Held_User
+           (Find_Cap        => Find_Cap,
+            Create_Endpoint => Create_Endpoint_Cap,
+            Standard_Output => Console_Stream_Cap,
+            Commands        => Commands_Cap,
+            Cap_Sets        => Cap_Sets_Cap,
+            Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+         then
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: user replace test: PASS" & NL);
+         else
+            Init.Calls.Send_String
+              (Console_Stream_Cap, "init: user replace test: FAIL" & NL);
+         end if;
+
+         --  A cap set that the checkpoint keeps, so that the boot test can
+         --  see that a set made before a checkpoint is there after a restore:
+         --  the cap set server reports its sets when it is restored (#825).
+         --  It holds the registry's Commands interface and the clock, which
+         --  are persistent too.
+
+         if Create_Cap_Set_Cap /= Null_Capability then
+            if Init.Calls.Create_Cap_Set_With
+              (Create_Cap_Set_Cap, (Commands_Cap, Clock_Cap))
+              = Null_Capability
+            then
+               Init.Calls.Send_String
+                 (Console_Stream_Cap, "init: no cap set for the restore test"
+                  & NL);
+            end if;
+         end if;
+      end Run_Install_Tests;
 
       ---------------------
       -- Take_Checkpoint --
@@ -744,175 +934,15 @@ package body Init.Run is
            (Console_Stream_Cap, "init: no clock" & NL);
       end if;
 
-      --  The self tests run as a command, and init waits for them to
-      --  finish before it goes on (#460).
+      --  A test install, with self-tests on the kernel's command line,
+      --  runs the tests and starts the persistent holders that the boot
+      --  tests check after a restore. Any other install leaves them out,
+      --  and restore-install hasn't installed their programs (#1009).
 
-      Init.Calls.Send_String
-        (Console_Stream_Cap, "running self tests" & NL);
-      if not Init.Self_Tests.Derive_Test
-        (Find_Cap        => Find_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Derive_Cap      => Derive_Cap,
-         Rescind_Cap     => Rescind_Cap,
-         Delete_Cap      => Delete_Cap,
-         Cap_Sets        => Cap_Sets_Cap)
-      then
+      if Test_Install then
          Init.Calls.Send_String
-           (Console_Stream_Cap, "init: derive test failed" & NL);
-      end if;
-
-      --  The kernel's part of replacing a running process (ADR 0032,
-      --  #862). It ends its probes before the first checkpoint.
-
-      if not Init.Self_Tests.Swap_Test
-        (Find_Cap        => Find_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Derive_Cap      => Derive_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: swap test failed" & NL);
-      end if;
-
-      --  The store's part: a replaced process's sub-banks move to its
-      --  successor (ADR 0032, #863).
-
-      if not Init.Self_Tests.Hand_Over_Test
-        (Find_Cap        => Find_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Process_Banks   => Init.Boot.Process_Banks_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: hand over test failed" & NL);
-      end if;
-
-      --  Mem drops clean pages to keep a reserve of free pages, but not
-      --  the pages of a buffer lent for a call in progress (ADR 0028,
-      --  section 5; #972, #973). It ends its probes before the first
-      --  checkpoint that init takes.
-
-      if not Init.Self_Tests.Page_Out_Test
-        (Find_Cap        => Find_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Checkpointer    => Init.Boot.Checkpointer_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: page test failed" & NL);
-      end if;
-
-      --  A persistent holder of 48 MiB, which checks every page after
-      --  each restore (#975).
-
-      if not Init.Self_Tests.Start_Page_Holder
-        (Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Standard_Output => Console_Stream_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: hold_pages did not start" & NL);
-      end if;
-
-      --  A transient holder of a marker, which no checkpoint may save,
-      --  and the restored system mustn't have (#524).
-
-      if not Init.Self_Tests.Start_Transient_Holder
-        (Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Standard_Output => Console_Stream_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: hold_transient did not start" & NL);
-      end if;
-
-      --  A persistent holder of derived caps, which checks them after a
-      --  restore (#691).
-
-      if not Init.Self_Tests.Start_Derived_Holder
-        (Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Commands        => Commands_Cap,
-         Derive_Cap      => Derive_Cap,
-         Rescind_Cap     => Rescind_Cap,
-         Delete_Cap      => Delete_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: hold_derived did not start" & NL);
-      end if;
-
-      --  A persistent holder of a file that init replaces, which checks
-      --  the file and its streams after a restore (#867).
-
-      if Init.Self_Tests.Replace_Held_File
-        (Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Delete_Cap      => Delete_Cap,
-         Commands        => Commands_Cap,
-         Cap_Sets        => Cap_Sets_Cap,
-         Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: file replace test: PASS" & NL);
-      else
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: file replace test: FAIL" & NL);
-      end if;
-
-      if not Init.Self_Tests.Run
-        (Find_Cap        => Find_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Delete_Cap,
-         Commands        => Commands_Cap,
-         Clock           => Clock_Cap,
-         Screen          => Screen_Cap,
-         Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap,
-         Cap_Sets        => Cap_Sets_Cap,
-         Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: self tests failed" & NL);
-      end if;
-
-      --  A persistent holder of a user server that init replaces, which
-      --  checks the user after a restore (#831). It comes after the self
-      --  tests, which come close to the kernel's 64 processes, since it
-      --  keeps four: itself, the home directory, its file and the user
-      --  server.
-
-      if Init.Self_Tests.Replace_Held_User
-        (Find_Cap        => Find_Cap,
-         Create_Endpoint => Create_Endpoint_Cap,
-         Standard_Output => Console_Stream_Cap,
-         Commands        => Commands_Cap,
-         Cap_Sets        => Cap_Sets_Cap,
-         Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
-      then
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: user replace test: PASS" & NL);
-      else
-         Init.Calls.Send_String
-           (Console_Stream_Cap, "init: user replace test: FAIL" & NL);
-      end if;
-
-      --  A cap set that the checkpoint keeps, so that the boot test can
-      --  see that a set made before a checkpoint is there after a restore:
-      --  the cap set server reports its sets when it is restored (#825).
-      --  It holds the registry's Commands interface and the clock, which
-      --  are persistent too.
-
-      if Create_Cap_Set_Cap /= Null_Capability then
-         if Init.Calls.Create_Cap_Set_With
-           (Create_Cap_Set_Cap, (Commands_Cap, Clock_Cap))
-           = Null_Capability
-         then
-            Init.Calls.Send_String
-              (Console_Stream_Cap, "init: no cap set for the restore test"
-               & NL);
-         end if;
+           (Console_Stream_Cap, "init: a test install" & NL);
+         Run_Install_Tests;
       end if;
 
       --  The auth server, which keeps the users and their passwords
@@ -1014,7 +1044,7 @@ package body Init.Run is
       --  through the same Auth cap, and the restored system's login,
       --  which the boot test makes, checks it after a restore.
 
-      if User_Cap /= Null_Capability then
+      if Test_Install and then User_Cap /= Null_Capability then
          if Init.Self_Tests.Replace_Auth
              (Find_Cap        => Find_Cap,
               Replace_Process => Init.Boot.Mem_Replace_Process_Cap,

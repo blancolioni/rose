@@ -8,6 +8,7 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/init-boot.o \
 	$(BUILDDIR)/init-boot_steps.o \
 	$(BUILDDIR)/init-calls.o \
+	$(BUILDDIR)/init-command_line.o \
 	$(BUILDDIR)/init-grants.o \
 	$(BUILDDIR)/init-installer.o \
 	$(BUILDDIR)/init-run.o \

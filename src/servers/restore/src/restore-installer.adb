@@ -18,9 +18,17 @@ with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Streams.Reader.Client;
 
 with Restore.Checkpoints;
+with Restore.Command_Line;
 with Restore.Replacing;
 
 package body Restore.Installer is
+
+   function Skip_Test_Program
+     (Name  : String;
+      Flags : Install_Flag_Array)
+      return Boolean;
+   --  True if Name is a program only for the tests, and this isn't a
+   --  test install (#1009), in which case it says so on the console.
 
    type Array_Of_Capabilities is
      array (Positive range <>) of Rose.Capabilities.Capability;
@@ -468,6 +476,9 @@ package body Restore.Installer is
       Flag_Word      : Natural := 0;
       Flag_Bit       : Positive := 1;
    begin
+      if Skip_Test_Program (Name, Flags) then
+         return;
+      end if;
 
       for Flag of Flags loop
          if Flag then
@@ -814,6 +825,39 @@ package body Restore.Installer is
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Screen;
 
+   -----------------------
+   -- Skip_Test_Program --
+   -----------------------
+
+   Test_Install_Known : Boolean := False;
+   Test_Install       : Boolean := False;
+   --  Whether the kernel's command line has self-tests, once it is read.
+
+   function Skip_Test_Program
+     (Name  : String;
+      Flags : Install_Flag_Array)
+      return Boolean
+   is
+   begin
+      if not Flags (Test_Only) then
+         return False;
+      end if;
+
+      if not Test_Install_Known then
+         Test_Install := Restore.Command_Line.Has_Argument ("self-tests");
+         Test_Install_Known := True;
+      end if;
+
+      if Test_Install then
+         return False;
+      end if;
+
+      Rose.Console_IO.Put ("restore: installing: ");
+      Rose.Console_IO.Put (Name);
+      Rose.Console_IO.Put_Line (": skipped: not a test install");
+      return True;
+   end Skip_Test_Program;
+
    ------------
    -- Update --
    ------------
@@ -875,14 +919,14 @@ package body Restore.Installer is
       Action    : Install_Action;
       Flags     : Install_Flag_Array)
    is
-      pragma Unreferenced (Root_Path, Category, Flags);
+      pragma Unreferenced (Root_Path, Category);
       use Rose.Interfaces.Files.Directory.Client;
       use Rose.Interfaces.Streams.Releasable_Reader.Client;
       use type Rose.Capabilities.Capability;
       Exec_Index : Natural;
       Reader     : Releasable_Reader_Client;
    begin
-      if Action /= Save then
+      if Action /= Save or else Skip_Test_Program (Name, Flags) then
          return;
       end if;
 
