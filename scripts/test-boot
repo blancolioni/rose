@@ -42,8 +42,9 @@ command -v qemu-system-i386 > /dev/null || {
 
 install_rose "$ISO"
 
-# The next boot writes over CONSOLE, so keep the install's.
+# The next boot writes over CONSOLE and the serial log, so keep the install's.
 cp "$CONSOLE" "$WORK/install-console"
+cp "$WORK/serial" "$WORK/install-serial"
 
 # Hold_pages fills 48 MiB, more than the machine has, during the install
 # (#975).
