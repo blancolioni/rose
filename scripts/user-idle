@@ -21,4 +21,4 @@ fi
 
 mkdir -p build/generated || exit 1
 $idle --target user -I "$root/interfaces" -o build/generated "$@" || exit 1
-(cd build/generated && xargs rm -f < "$units")
+(cd build/generated && xargs rm -f) < "$units"
