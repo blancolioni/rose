@@ -49,9 +49,15 @@ package Mem.Page_Log is
    procedure Get_Space
      (First : out Rose.Words.Word_32;
       Open  : out Rose.Words.Word_32;
-      Last  : out Rose.Words.Word_32);
-   --  The headers of the first committed entry and of the open one, and
-   --  the log's last page (Page_Log.Get_Space, #952).
+      Last  : out Rose.Words.Word_32;
+      Free  : out Rose.Words.Word_32);
+   --  The headers of the first committed entry and of the open one, the
+   --  log's last page, and how many pages can still be appended
+   --  (Page_Log.Get_Space, #952, #1029).
+
+   function Free_Pages return Rose.Words.Word_32;
+   --  How many pages can still be appended to the log, or 0 if it isn't
+   --  available.
 
    function Entry_Last
      (Header : Rose.Words.Word_32)

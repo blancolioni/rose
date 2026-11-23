@@ -1,0 +1,137 @@
+#!/bin/sh
+# The test of a checkpoint log that runs low (#1029), under QEMU.
+#
+#   scripts/test-log-full [ISO]
+#
+# ISO is the install image, images/rose.iso by default. Only a commit
+# frees space in the log, so a log too full for a checkpoint would stay
+# full. The memory server keeps a reserve for checkpoints and cleaning
+# (Rose.Limits.Log_Reserve_Pages), and pages nothing out into it. The
+# test:
+#
+#   1. installs Rose on a new disk;
+#   2. shrinks the log partition with set-log-size.py so that only
+#      MARGIN pages more than the reserve are free after the install,
+#      fewer than the first boot writes: hold_pages (#975) alone writes
+#      3,072 pages again after each restore;
+#   3. boots from the disk, at most ROUNDS times, each of which has to
+#      restore the checkpoint that check-log.py says and show the login
+#      prompt, leaves the system idle for MINUTES minutes, and stops the
+#      machine wherever it is; then runs check-log.py, which has to find
+#      the log consistent. The log must never fill up. The boots stop
+#      once the log has gone below the reserve, been cleaned, and wrapped
+#      around.
+#
+# At the end, the log has to have gone below the reserve at least once,
+# to start after location 1, which only cleaning makes happen, and to
+# have wrapped around.
+#
+# It takes about an hour, and needs qemu-system-i386, qemu-img and python3.
+# It exits with 0 if everything passed, and keeps the disk image and QEMU's
+# files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+MARGIN=${MARGIN:-1000}
+ROUNDS=${ROUNDS:-12}
+MINUTES=${MINUTES:-4}
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+# Rose.Limits.Log_Reserve_Pages, read from the source, so that the test
+# follows it.
+limits="$HERE/../src/base/rose-limits.ads"
+limit () {
+    sed -n "s/^ *$1 *: constant := \([0-9_]*\);.*/\1/p" "$limits" | tr -d _
+}
+mapped=$(limit Max_Mapped_Pages)
+margin=$(limit Log_Table_Margin)
+copies=$(limit Clean_Copy_Limit)
+[ -n "$mapped" ] && [ -n "$margin" ] && [ -n "$copies" ] \
+    || { echo "cannot read the reserve from $limits"; exit 2; }
+reserve=$((mapped + margin + copies))
+
+check_log () {
+    # check_log WHEN: run check-log.py on the disk, and fail if it finds
+    # the log inconsistent
+    python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" 2>&1 \
+        || { cat "$WORK/check-log.txt"; fail "check-log.py: $1"; }
+    grep -E "^log|entries|wrapped|full|restore reads" "$WORK/check-log.txt" \
+        | tail -4
+}
+
+install_rose "$ISO"
+
+check_log "after the install"
+used=$(sed -n 's/^.*next entry at location \([0-9]*\).*$/\1/p' \
+           "$WORK/check-log.txt")
+[ -n "$used" ] || fail "check-log.py did not say where the next entry goes"
+
+size=$((used + reserve + MARGIN))
+echo "Shrinking the log to $size pages: the install's $used, the reserve" \
+     "of $reserve, and $MARGIN more"
+python3 "$HERE/set-log-size.py" "$DISK" $size \
+    || fail "set-log-size.py could not shrink the log"
+
+: > "$WORK/all-boots.txt"
+
+done_yet () {
+    # done_yet: true if the log has gone below the reserve, and the last
+    # check_log found it both wrapped around and started after location 1
+    start=$(sed -n 's/^log starts at location \([0-9]*\),.*/\1/p' \
+                "$WORK/check-log.txt")
+    grep -q "less than the reserve" "$WORK/all-boots.txt" \
+        && [ -n "$start" ] && [ "$start" -gt 1 ] \
+        && grep -q "the log has wrapped around" "$WORK/check-log.txt"
+}
+
+round=1
+while [ $round -le $ROUNDS ] && ! done_yet; do
+    echo "Boot $round from the disk, which restores the last checkpoint"
+    checkpoint=$(sed -n 's/^restore reads the entry at \([0-9]*\).*/\1/p' \
+                     "$WORK/check-log.txt")
+    # QEMU may start CONSOLE again, so the mark is taken once it has.
+    start_qemu
+    mark=$(console_mark)
+    choose_last_entry
+    wait_for "login:" 300 || fail "boot $round: no login prompt"
+    console_since "$mark" > "$WORK/boot.txt"
+    grep -q "restore: restored processes are running" "$WORK/boot.txt" \
+        || fail "boot $round: the checkpoint was not restored"
+    grep -q -E "restore: log: checkpoint at $checkpoint([^0-9]|\$)" \
+         "$WORK/boot.txt" \
+        || { grep "restore: log:" "$WORK/boot.txt"
+             fail "boot $round: restore did not choose $checkpoint"; }
+
+    echo "Leaving it idle for $MINUTES minutes, then stopping it"
+    sleep $((MINUTES * 60))
+    console_since "$mark" > "$WORK/boot.txt"
+    cat "$WORK/boot.txt" >> "$WORK/all-boots.txt"
+    grep -E "log: .*(full|not committed|reserve|room again)" \
+         "$WORK/boot.txt" | head -4
+    stop_qemu
+    ! grep -q "log: log is full" "$WORK/boot.txt" \
+        || fail "boot $round: the log filled up (#1029)"
+    ! grep -q "log: checkpoint not committed" "$WORK/boot.txt" \
+        || fail "boot $round: a checkpoint was not committed"
+    check_log "after boot $round"
+    round=$((round + 1))
+done
+
+grep -q "less than the reserve" "$WORK/all-boots.txt" \
+    || fail "the log never went below the reserve: the test proved nothing"
+start=$(sed -n 's/^log starts at location \([0-9]*\),.*/\1/p' \
+            "$WORK/check-log.txt")
+[ -n "$start" ] && [ "$start" -gt 1 ] \
+    || fail "the log still starts at location 1: nothing was freed"
+grep -q "the log has wrapped around" "$WORK/check-log.txt" \
+    || fail "the log did not wrap around"
+
+echo "PASS: the log went below its reserve, was cleaned and wrapped" \
+     "around, and every checkpoint committed"
+rm -rf "$WORK"
+exit 0

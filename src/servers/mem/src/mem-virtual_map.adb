@@ -137,6 +137,15 @@ package body Mem.Virtual_Map is
          return;
       end if;
 
+      --  Copies may go into the log's reserve, but leave room for a
+      --  checkpoint's tables (#1029).
+
+      if Mem.Page_Log.Free_Pages
+        < Rose.Words.Word_32 (Rose.Limits.Log_Table_Margin + Count + 1)
+      then
+         return;
+      end if;
+
       --  Field by field: a whole-page aggregate would be built on mem's
       --  one-page stack.
 
@@ -497,6 +506,18 @@ package body Mem.Virtual_Map is
       --  Nothing here writes to the console, as for Keep_Reserve.
 
       if not Has_Room then
+         return;
+      end if;
+
+      --  Nothing is paged out into the log's reserve, which is kept for
+      --  checkpoints and cleaning: once the log is that low, changed
+      --  pages stay in memory until a checkpoint saves them, so that one
+      --  always fits, and commits, and the log can be freed (#1029).
+
+      if Mem.Page_Log.Free_Pages
+        < Rose.Words.Word_32 (Rose.Limits.Log_Reserve_Pages + Batch_Pages + 1)
+      then
+         Stopped := True;
          return;
       end if;
 

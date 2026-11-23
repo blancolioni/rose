@@ -41,7 +41,7 @@
 16#FE81_2E1E_398E_CB4D#  rose.interfaces.checkpoints.page_log.fail_checkpoint
 16#3BB1_4721_85A0_CA1E#  rose.interfaces.checkpoints.page_log.discard_pages(in word)
 16#C3CC_47F7_9676_7CAC#  rose.interfaces.checkpoints.page_log.free_before(in word)
-16#9122_716E_974B_4D93#  rose.interfaces.checkpoints.page_log.get_space(out word; out word; out word)
+16#5BF5_3B0E_9A3E_FD08#  rose.interfaces.checkpoints.page_log.get_space(out word; out word; out word; out word)
 16#2D66_162D_5EF1_167C#  rose.interfaces.checkpoints.page_log.entry_last(in word) return word
 16#0785_107B_F439_F895#  interface rose.interfaces.checkpoints.state
 16#4B1A_DE53_6031_BAE6#  rose.interfaces.checkpoints.state.reset

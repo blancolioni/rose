@@ -116,18 +116,38 @@ package body Mem.Page_Log is
    -- Get_Space --
    ---------------
 
+   ----------------
+   -- Free_Pages --
+   ----------------
+
+   function Free_Pages return Rose.Words.Word_32 is
+      First, Open, Last, Free : Rose.Words.Word_32;
+   begin
+      if not Is_Available then
+         return 0;
+      end if;
+      Get_Space (First, Open, Last, Free);
+      return Free;
+   end Free_Pages;
+
+   ---------------
+   -- Get_Space --
+   ---------------
+
    procedure Get_Space
      (First : out Rose.Words.Word_32;
       Open  : out Rose.Words.Word_32;
-      Last  : out Rose.Words.Word_32)
+      Last  : out Rose.Words.Word_32;
+      Free  : out Rose.Words.Word_32)
    is
-      First_Word, Open_Word, Last_Word : Rose.Words.Word;
+      First_Word, Open_Word, Last_Word, Free_Word : Rose.Words.Word;
    begin
       Rose.Interfaces.Checkpoints.Page_Log.Client.Get_Space
-        (Client, First_Word, Open_Word, Last_Word);
+        (Client, First_Word, Open_Word, Last_Word, Free_Word);
       First := Rose.Words.Word_32 (First_Word);
       Open := Rose.Words.Word_32 (Open_Word);
       Last := Rose.Words.Word_32 (Last_Word);
+      Free := Rose.Words.Word_32 (Free_Word);
    end Get_Space;
 
    ------------------
