@@ -77,21 +77,27 @@ package Init.Users is
       return Boolean;
    --  True if Auth.Login gives a user for Name and Password.
 
-   function Start_Login
+   function Start_Supervisor
      (Find_Cap        : Rose.Capabilities.Capability;
       Console         : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Rescind_Cap     : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Timer           : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Rights          : Rose.Capabilities.Capability;
       System          : Rose.Capabilities.Capability;
-      Auth            : Rose.Capabilities.Capability)
+      Auth            : Rose.Capabilities.Capability;
+      Control         : out Rose.Capabilities.Capability)
       return Boolean;
-   --  Launch login as a command on the console (#457). It completes its
-   --  launch call and then keeps running. False if it can't be launched.
+   --  Launch the console supervisor as a command (#526). It completes its
+   --  launch call with its Supervisor interface, Control, and launches
+   --  login once it is restored, or once Control's Start is called.
+   --  False if it can't be launched.
+
+   procedure Start_Console (Control : Rose.Capabilities.Capability);
+   --  Call Start on the supervisor whose Supervisor interface is
+   --  Control, for an install that doesn't restart.
 
    procedure Start_Rights
      (Find_Cap        : Rose.Capabilities.Capability;

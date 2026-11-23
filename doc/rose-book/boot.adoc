@@ -6,7 +6,7 @@ Rose boots in one of two ways: from the install media, or from the boot disk, hd
 In both, GRUB loads the kernel and the boot modules, and the kernel starts the first boot module, `init`, which starts the others in a fixed order.
 The `restore` server then restores the system from its last checkpoint, if there is one.
 `init` starts the checkpoint server.
-If this boot installed a new system, it launches `login`, takes the new system's first checkpoint, and restarts the machine, which then boots from hd0 (#413).
+If this boot installed a new system, it launches the console supervisor, takes the new system's first checkpoint, and restarts the machine, which then boots from hd0 (#413).
 Otherwise it exits.
 
 The two boots differ in their boot modules and in what they do when there is no checkpoint to restore (#373):
@@ -81,7 +81,7 @@ Every later module, the console included, receives a single cap set, reads its c
 `bootcaps` starts before the console, so it has no console to write to.
 
 Once boot is done, after its last launch, `init` releases `bootcaps` through its `Resource` interface, and `bootcaps` exits, taking every set with it.
-On a boot from the disk, that is after `checkpoint`; on the install media, after `login`.
+On a boot from the disk, that is after `checkpoint`; on the install media, after `supervisor`.
 A set holds at most 30 capabilities, and takes no more; there are 100 sets, and `init` gets the null capability when they run out.
 Persistent processes have their own cap set server (#825).
 
@@ -303,14 +303,21 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 == Starting the Shell
 
 When a new system has been installed, `init` launches `checkpoint`.
-It then runs the self tests, launches `auth`, asks the person installing for the first user's name and password (#456), creates that user, with a home directory (ADR 0003), through `auth`, and checks that the user can log in. It then says that the system is installed, waits for enter, launches `login`, and restarts from the disk once the install's checkpoint is written (#413).
+It then runs the self tests, launches `auth`, asks the person installing for the first user's name and password (#456), creates that user, with a home directory (ADR 0003), through `auth`, and checks that the user can log in. It then says that the system is installed, waits for enter, launches the console supervisor, `supervisor`, and restarts from the disk once the install's checkpoint is written (#413).
 
-`login` is a command (#457).
-Its roles give it the console, the system caps, the command registry and the timer, and its argument is `auth`.
-It completes its launch call, so that `init` can go on, and then keeps running: it asks for a user name and a password at the console, and checks them with `auth`.
-For the right password, it runs `petal`, which is also a command, with the console's streams, the system caps, the command registry, the console's `Terminal`, and the user, whose home directory is `petal`'s.
-The call to `petal` returns when `petal` logs out, at the end of its input (#458), and `login` asks again.
-For a wrong name or password, `login` waits three seconds, says `Login failed`, and asks again.
+`supervisor` is a persistent command (#526).
+Its roles give it the console, the system caps, the command registry, the timer, the clock, the rights broker and the system directory, and its argument is `auth`.
+It completes its launch call, with its `Supervisor` interface, so that `init` can go on, and then launches nothing until it is restored, so that nothing reads the console before the restart (#512).
+After that, it runs `login` and the users' sessions, one after the other, for as long as the system runs:
+
+* it launches `login`, a transient command (#524), with the console, the timer and `auth`, and waits in the launch call;
+* `login` asks for a user name and a password, checks them with `auth`, and completes with the user's `User` interface. For a wrong name or password, it waits three seconds, says `Login failed`, and asks again;
+* `supervisor` launches the user's first program, `User.First_Process` (#525), which is `petal`, as a command, against a new session bank, with the console's streams, the system caps, the command registry, the console's `Terminal`, and the user, whose home directory is `petal`'s. A user with no first program is refused;
+* the call to `petal` returns when `petal` logs out, at the end of its input (#458). `supervisor` destroys the session's bank, and launches `login` again.
+
+`login` is never in a checkpoint, so the password it reads doesn't reach the disk from its memory.
+A restore while it is asking makes `supervisor`'s call to it fail, since it is gone, and `supervisor` launches it again.
+A restore during a session finds `supervisor` still waiting in its call to `petal` (#519).
 
 The new system is then complete, and `init` restarts the machine so that it boots from hd0 (#413):
 
@@ -319,8 +326,8 @@ The new system is then complete, and `init` restarts the machine so that it boot
   The call returns when the log entry is committed, and `init` tries again, up to five times, if the kernel couldn't take its snapshot;
 * after three seconds, it invokes its restart cap, and the kernel resets the machine: through the keyboard controller, the reset control register, or a triple fault.
 
-The install media's GRUB menu then boots hd0, which restores the checkpoint, with `login` asking for a user.
-If there is no checkpoint after five tries, `init` says so and exits, without restarting.
+The install media's GRUB menu then boots hd0, which restores the checkpoint. The restored `supervisor` is told it has been restored, and launches `login`.
+If there is no checkpoint after five tries, `init` says so, calls the supervisor's `Start`, so that `login` asks for a user on this boot, and exits, without restarting.
 
 [NOTE]
 ====
@@ -348,7 +355,7 @@ An arrow goes from a process to a process it holds a capability for and calls.
 image::processes-install.svg[Processes after an install boot,pdfwidth=100%]
 
 After an install, `restore-install` has read the programs from `isofs`, sent them to `init` to install, and written the boot loader through partition servers 18 to 20 (see <<writing-the-boot-loader>>).
-`init` has installed `exec` and the command registry through `store` and `elf`, created the first user through `auth`, and launched the self tests and `login` through `exec`.
+`init` has installed `exec` and the command registry through `store` and `elf`, created the first user through `auth`, and launched the self tests and `supervisor` through `exec`.
 `tests` has run its tests and exited.
 The boot console sends its output on to `vga-console` (see <<handing-over-the-console>>).
 

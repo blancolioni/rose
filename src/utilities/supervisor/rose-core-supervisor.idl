@@ -1,0 +1,25 @@
+command Rose.Core.Supervisor
+  : Screens.Console, Caps.Create_Endpoint, Caps.Rescind_Cap,
+    Commands.Find_Command, Time.Timer_Service, Time.Clock_Service,
+    Users.Rights_Service, Files.System_Directory
+  with Summary     => "Run login and sessions at the console.",
+       Description => """
+          The supervisor owns the console's sign-in (#512, #526). It is
+          persistent, and launches nothing until it is restored, or
+          until init calls Start on an install that doesn't restart.
+          Then it launches login, which is transient, and waits for the
+          user it gives; launches the user's first program as the
+          session, against a new session bank, and waits for it; and
+          then launches login again. A restore while login is asking
+          makes its call to login fail, and it launches login again; a
+          restore during a session finds it still waiting for the
+          session.
+          """,
+       Server      => Supervisor_Loop.Start_Server,
+       Live
+is
+   Auth : in Users.Auth
+     with Help => "the Auth interface, which login checks passwords with";
+   Control : out Screens.Supervisor
+     with Help => "its Supervisor interface, whose Start init calls";
+end Rose.Core.Supervisor;

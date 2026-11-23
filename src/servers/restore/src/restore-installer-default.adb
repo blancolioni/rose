@@ -99,6 +99,7 @@ package body Restore.Installer.Default is
       Process ("auth", "bin", Save, Default_Flags);
       Process ("rights", "bin", Save, Default_Flags);
       Process ("login", "bin", Save, Default_Flags);
+      Process ("supervisor", "bin", Save, Default_Flags);
       Process ("run_self_tests", "bin", Save, Default_Flags);
       Process ("hold_derived", "bin", Save, Default_Flags);
       Process ("hold_file", "bin", Save, Default_Flags);

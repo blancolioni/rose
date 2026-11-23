@@ -1,0 +1,101 @@
+#!/bin/sh
+# A session across a restore, and login across a restore (#526).
+#
+#   scripts/test-session-restore [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test installs
+# Rose on a new disk, and then boots from it three times:
+#
+#   1. logs in, waits for a checkpoint, and stops the machine;
+#   2. finds the session restored: petal runs a command, and nothing
+#      launched petal or login. It logs out, which brings back login:
+#      the console supervisor launches it. It waits for a checkpoint at
+#      the login prompt, and stops the machine;
+#   3. finds login: again, from a new login, since login is transient
+#      and the supervisor's call to the old one failed at the restore;
+#      and logs in.
+#
+# It isn't part of "make test", or of CI. It takes about fifteen minutes,
+# exits with 0 if everything passed, and keeps the disk image and QEMU's
+# files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+count_serial () {
+    # count_serial PATTERN: the lines of the serial log that match PATTERN
+    grep -a -c -- "$1" "$WORK/serial" 2> /dev/null || true
+}
+
+wait_for_checkpoint () {
+    # wait_for_checkpoint WHAT: wait for a checkpoint that begins after now
+    # to end
+    entered=$(count_serial "Entering checkpoint")
+    waited=0
+    while [ "$(count_serial "Leaving checkpoint")" -le "$entered" ]; do
+        [ $waited -lt 180 ] || fail "no checkpoint $1"
+        sleep 5
+        waited=$((waited + 5))
+    done
+}
+
+install_rose "$ISO"
+
+echo "Boot 1: log in, and wait for a checkpoint"
+start_qemu
+choose_last_entry
+log_in
+type_text "echo first boot
+"
+wait_for "^first boot" 20 || fail "the session does not run commands"
+wait_for_checkpoint "with the session"
+stop_qemu
+mv "$WORK/serial" "$WORK/boot1-serial"
+
+echo "Boot 2: the session is restored"
+start_qemu
+choose_last_entry
+sleep 60
+type_text "echo second boot
+"
+wait_for "^second boot" 60 || fail "the restored session does not run commands"
+[ "$(count_serial "create process [0-9]*/petal")" -eq 0 ] \
+    || fail "petal was launched again, not restored"
+[ "$(count_serial "create process [0-9]*/login")" -eq 0 ] \
+    || fail "login was launched during the restored session"
+
+echo "Logging out"
+type_text "clear
+"
+sleep 3
+press ctrl-d
+wait_for "login:" 60 || fail "logging out did not bring back the login prompt"
+[ "$(count_serial "create process [0-9]*/login")" -eq 1 ] \
+    || fail "the supervisor did not launch login once after the session"
+wait_for_checkpoint "at the login prompt"
+stop_qemu
+mv "$WORK/serial" "$WORK/boot2-serial"
+
+echo "Boot 3: login is launched again"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 || fail "no login prompt after a restore at the prompt"
+if grep -a -q "restored process [0-9]*/login" "$WORK/serial"; then
+    fail "the transient login was restored"
+fi
+[ "$(count_serial "create process [0-9]*/login")" -ge 1 ] \
+    || fail "the supervisor did not launch a new login"
+log_in
+type_text "echo third boot
+"
+wait_for "^third boot" 20 || fail "the new session does not run commands"
+stop_qemu
+
+rm -rf "$WORK"
+echo "PASS"

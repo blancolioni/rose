@@ -9,7 +9,7 @@ A restart therefore goes back to the last checkpoint, and what was done since is
 
 === Persistent Processes
 
-A checkpoint saves the _persistent_ processes: the installed programs, such as `exec`, the console, `login` and `petal`, and the processes they start.
+A checkpoint saves the _persistent_ processes: the installed programs, such as `exec`, the console, `supervisor` and `petal`, and the processes they start, except the transient ones (below).
 For each one, it saves the kernel's record of the process, with its capabilities, and the pages of its memory that have changed.
 
 A persistent process is saved unless the kernel can't restore it:
@@ -30,7 +30,7 @@ Their own memory is never part of a checkpoint.
 === Transient Processes
 
 A program can say that its processes are never saved, with the `Transient` aspect of its command (idle#127, #524).
-`login` needs this, so that the password it reads never reaches the disk.
+`login` is transient (#526), so that the password it reads never reaches the disk.
 
 * *`exec` reads it* from the program's metadata, `transient true`, and passes it to `elf` with each launch.
 * *The kernel* doesn't mark the process persistent, as it doesn't a boot module, so a checkpoint skips it.

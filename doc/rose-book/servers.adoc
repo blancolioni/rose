@@ -363,17 +363,31 @@ Its state is the user's name; the caps it holds are its arguments, which the han
 
 === `login`
 
-Logs users in at the console (#457).
+Logs a user in at the console (#457).
 
-Requests:: `Console`, `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap`, `Find_Command` and `Timer_Service`, as roles of its command declaration, and `Auth`, as its argument.
-Used by:: `init`, which launches it on a first boot, after it creates the first user.
+Requests:: `Console`, `Create_Endpoint` and `Timer_Service`, as roles of its command declaration, and `Auth`, as its argument.
+Provides:: `User`, the user who logged in, as its result.
+Used by:: `supervisor`, which launches it whenever nobody is logged in at the console.
 
+* *It is transient* (#524): no checkpoint saves it, so the password it reads never reaches the disk from its memory, and a restore never brings back a login that was half done.
 * *It asks for a user name, and then a password with echo off* (#454).
-* *For the right password, it runs `petal` for the user,* as a command, and waits for the call to return, which it does when `petal` logs out at the end of its input (#458).
-  It then clears the screen and asks again.
+* *For the right password, it completes,* with the user's `User` interface, and exits. `supervisor` runs the session.
 * *For a wrong one, it waits three seconds,* through the timer, says `Login failed`, and asks again.
-* *It never completes,* so that the console always has something reading it.
-  An exception is reported on the console, and `login` carries on.
+  An exception is reported on the console, and `login` asks again.
+
+=== `supervisor`
+
+Runs `login` and the users' sessions at the console (#512, #526).
+
+Provides:: `Supervisor`, whose `Start` makes it start, which only `init` holds; and `Restorable`.
+Requests:: `Console`, `Create_Endpoint`, `Rescind_Cap`, `Find_Command`, `Timer_Service`, `Clock_Service`, `Rights_Service` and `System_Directory`, as roles of its command declaration, and `Auth`, as its argument.
+Used by:: `init`, which launches it at the end of an install.
+
+* *It launches nothing until it is restored,* or until `init` calls `Start` on an install that doesn't restart, so that nothing reads the console before the restart (#512).
+* *It launches `login`, and waits for the user it gives.* If the call fails, as it does when a restore has ended the transient `login`, it launches `login` again.
+* *It launches the user's first program* (`User.First_Process`, #525), against a new sub-bank of the user's bank, with `petal`'s caps, and waits for it to log out. It then destroys the session's bank, resets the console's line editing, echo and attributes, and launches `login` again.
+* *A user with no first program is refused.*
+* *It is always in one of its two calls,* and never receives again once it has started. A restore during a session finds it waiting for `petal` (#519).
 
 === `auth`
 
