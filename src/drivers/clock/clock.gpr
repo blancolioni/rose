@@ -1,4 +1,5 @@
 with "../../../projects/checks.gpr";
+with "../../../rts/user/rose_rts.gpr";
 
 project Clock is
 
@@ -30,7 +31,6 @@ project Clock is
        "rose-interfaces-time-clock_admin.ads",
        "rose-interfaces-time-clock_admin-server.ads",
        "rose-interfaces-time-clock_admin-server.adb",
-       "rose-interfaces-processes.ads",
        "rose-interfaces-processes-restorable.ads",
        "rose-interfaces-processes-restorable-server.ads",
        "rose-interfaces-processes-restorable-server.adb");

@@ -45,6 +45,15 @@ package body IsoFS.Directories is
         Element_Type => Cache_Element,
         Hash         => To_Hash_Type);
 
+   Cache_Item   : Cache_Element;
+   Read_Data    : ISO_Sector;
+   Root_Data    : ISO_Sector;
+   Scan_Data    : ISO_Sector;
+   --  Sectors, here rather than on the stack, which is a page in the boot
+   --  servers (#1004). Each is used by one subprogram, which can't call
+   --  itself (No_Recursion): Read_Sector, Read, Read_Root_Directory and
+   --  Scan_Directory_Entries.
+
    package Sector_Cache_Queues is
      new Rose.Containers.Queues
        (Rose.Words.Word_32,
@@ -890,7 +899,7 @@ package body IsoFS.Directories is
       Start_Sector   : Word;
       Current_Sector : Word;
       Current_Offset : Storage_Offset;
-      Sector_Data    : ISO_Sector;
+      Sector_Data    : ISO_Sector renames Read_Data;
    begin
       Last := Buffer'First - 1;
       if Slot = 0 then
@@ -945,7 +954,7 @@ package body IsoFS.Directories is
       Sector_Count : Block_Address_Type;
       Sector_Size  : Block_Size_Type;
       Found        : Boolean := False;
-      Buffer       : ISO_Sector;
+      Buffer       : ISO_Sector renames Root_Data;
    begin
 
       Get_Parameters (Device, Sector_Count, Sector_Size);
@@ -996,7 +1005,7 @@ package body IsoFS.Directories is
       Key : constant Rose.Words.Word_32 := Rose.Words.Word_32 (Address);
       Position : Sector_Cache.Cursor :=
                    Sector_Cache.Find (Sector_Map, Key);
-      Item     : Cache_Element;
+      Item     : Cache_Element renames Cache_Item;
 
    begin
 
@@ -1017,7 +1026,8 @@ package body IsoFS.Directories is
          Rose.Interfaces.Storage.Block_Array.Client.Read_Blocks
            (Block_Device, Address, 1, Sector);
 
-         Item := (Next_Tick, Sector);
+         Item.Tick := Next_Tick;
+         Item.Sector := Sector;
 
          declare
             Inserted : Boolean;
@@ -1031,7 +1041,7 @@ package body IsoFS.Directories is
          end;
       else
 
-         Item := Sector_Cache.Element (Sector_Map, Position);
+         Sector_Cache.Get_Element (Sector_Map, Position, Item);
          Delete (Sector_Queue, Item.Tick);
          Item.Tick := Next_Tick;
          Sector_Cache.Replace_Element (Sector_Map, Position, Item);
@@ -1072,7 +1082,7 @@ package body IsoFS.Directories is
       Dir          : Directory_Entry renames Rec.Entry_Record;
       Location     : Word_32 := Dir.Extent_Location_LSB;
       Length       : constant Word_32 := Dir.Extent_Size_LSB;
-      Sector       : ISO_Sector;
+      Sector       : ISO_Sector renames Scan_Data;
       Have_Sector  : Boolean := False;
       Position     : Storage_Offset := 1;
       Sector_Start : Storage_Offset;
@@ -1103,8 +1113,11 @@ package body IsoFS.Directories is
                pragma Import (Ada, Rec);
                for Rec'Address use Sector (Start)'Address;
 
-               Name : String (1 .. Natural (Rec.File_Identifier_Length));
-               Last : Natural := Name'Last;
+               Name_Length : constant Natural :=
+                               Natural (Rec.File_Identifier_Length);
+               Name_Buffer : String (1 .. 255);
+               Name        : String renames Name_Buffer (1 .. Name_Length);
+               Last        : Natural := Name'Last;
 
                RR_Name : String (1 .. 255);
                RR_Last : Natural;

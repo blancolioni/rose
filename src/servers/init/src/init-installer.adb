@@ -16,6 +16,10 @@ with Init.Grants;
 
 package body Init.Installer is
 
+   Grant_Text : String (1 .. 1024);
+   --  A program's cap requests, which Grant_Caps reads here rather than on
+   --  the stack, which is a page before mem runs (#1004).
+
    Exec_Region_Length : constant := 64 * 2 ** 20;
    --  The storage for the images of the programs that exec installs.
    --  They came to more than 8 MB, with debugging information, once the
@@ -166,7 +170,7 @@ package body Init.Installer is
       package Init_Caps renames Rose.Init_Capabilities;
 
       Owner : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
-      Text  : String (1 .. 1024);
+      Text  : String renames Grant_Text;
       Last  : Natural := 0;
       Index : Positive := 1;
 
@@ -303,9 +307,9 @@ package body Init.Installer is
             if Cap = Rose.Capabilities.Null_Capability
               or else To.Count = Max_Granted_Caps
             then
-               Init.Calls.Send_String
-                 ("init: refused cap request: " & Line
-                  & Character'Val (10));
+               Init.Calls.Send_String ("init: refused cap request: ");
+               Init.Calls.Send_String (Line);
+               Init.Calls.Send_String ((1 => Character'Val (10)));
             else
                Add (To, Cap);
             end if;

@@ -525,6 +525,10 @@ package body Restore.Checkpoints is
    -- Restore --
    -------------
 
+   Saved_Interrupts : Rose.Checkpoints.Saved_Interrupt_Array;
+   --  Restore's copy of the saved interrupts, here rather than on the
+   --  stack, which is a page in the boot servers (#1004).
+
    procedure Restore
      (Reader_Cap : Rose.Capabilities.Capability;
       Checkpoint : Rose.Words.Word_64;
@@ -543,7 +547,8 @@ package body Restore.Checkpoints is
       Base            : Natural;
       --  The page before the kernel's tables: batches paged out between
       --  checkpoints come first (ADR 0028).
-      Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array;
+      Interrupts      : Rose.Checkpoints.Saved_Interrupt_Array
+        renames Saved_Interrupts;
       Interrupt_Count : Natural;
       Process_Count   : Natural;
       Record_Pages    : Natural;
@@ -794,10 +799,11 @@ package body Restore.Checkpoints is
                    then Rose.Words.Word (Mem_Process.Index_Directory)
                    else 0));
 
-               for Segment of
-                 Mem_Process.Segments
-                   (1 .. Natural (Mem_Process.Segment_Count))
-               loop
+               for S in 1 .. Natural (Mem_Process.Segment_Count) loop
+                declare
+                  Segment : Rose.Checkpoints.Saved_Segment renames
+                              Mem_Process.Segments (S);
+                begin
                   if Segment.Region_Base /= 0 or else Segment.Region_Bound /= 0
                   then
                      declare
@@ -853,6 +859,7 @@ package body Restore.Checkpoints is
                      Fail ("mem refused a saved segment");
                      return;
                   end if;
+                end;
                end loop;
             end if;
          end;

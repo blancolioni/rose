@@ -25,6 +25,11 @@ package Rose.Trace is
       Value_2 : Natural);
    --  Log Text, Value, Text_2 and Value_2.
 
+   procedure Event
+     (Text   : String;
+      Text_2 : String);
+   --  Log Text followed by Text_2.
+
    function Ticks return Natural;
    --  The kernel's tick count, or zero without a trace cap: a clock for
    --  timing the work a server does (see blancolioni/rose#193).

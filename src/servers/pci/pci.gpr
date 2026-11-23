@@ -1,3 +1,5 @@
+with "../../../projects/boot_server.gpr";
+
 project pci is
 
    for Source_Dirs use
@@ -20,7 +22,8 @@ project pci is
    end Builder;
 
    package Compiler is
-      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing");
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-gnata", "-gnato", "-gnatp", "-m32", "-gnat12", "-fno-strict-aliasing")
+        & Boot_Server.Stack_Switches;
    end Compiler;
 
    package Binder is

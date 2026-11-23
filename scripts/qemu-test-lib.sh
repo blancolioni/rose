@@ -59,7 +59,9 @@ EOF
 
 choose_last_entry () {
     # Choose the last entry of the GRUB menu, which is text mode on the
-    # install media and the boot disk: the first is the framebuffer. End
+    # install media and the boot disk: the first is the framebuffer. On
+    # the install media, it is the test install, with self-tests on the
+    # kernel's command line (#1009). End
     # is pressed for twelve seconds, which is long enough for the menu to
     # appear and stop its countdown, and does nothing more however often
     # it is pressed.

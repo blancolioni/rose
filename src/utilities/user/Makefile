@@ -14,7 +14,7 @@ user:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-user.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-user.idl \
 	    $(INTERFACES)/processes-launch.idl \

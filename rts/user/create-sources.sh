@@ -21,8 +21,8 @@ DIRS="$DIRS build/gnat-src"
 # source directories goes into the library. Process needs the specs of
 # its parents, and of the interfaces that its operations name, and
 # Rose.Streams those of Reader and Writer (#727). Programs
-# built with the RTS put build/interfaces first in their source
-# directories, so that they use these specs and not other copies.
+# built with the RTS get these specs from rose_rts.gpr, and don't keep
+# copies of their own (#1080).
 
 IDLE=${IDLE:-idle}
 INTERFACES="processes-process processes-heap caps-cap_set processes-segment
@@ -54,3 +54,10 @@ do
 	ln -s `pwd`/$file build/$TARGET/adainclude/$(basename $file)
     done
 done
+
+# The RTS's own units: every source in adainclude that is not one of GNAT's
+# predefined units, whose file names gprbuild knows. rose_rts.gpr lists
+# them, so that the programs' builds find them in a project (#1080).
+
+GNAT_NAMES='^[agis]-|^(ada|gnat|interfac|system)\.ads$'
+ls build/$TARGET/adainclude | grep -vE "$GNAT_NAMES" > build/rose-units.lst

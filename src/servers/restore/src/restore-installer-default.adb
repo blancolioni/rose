@@ -12,6 +12,10 @@ package body Restore.Installer.Default is
                    Flags    : Install_Flag_Array))
    is
       Default_Flags : constant Install_Flag_Array := (others => False);
+      Test_Flags    : constant Install_Flag_Array :=
+                        (Test_Only => True, others => False);
+      --  A program that only the tests use, which only a test install
+      --  installs (#1009).
    begin
       Process ("exec", "drivers", Launch, Default_Flags);
 
@@ -81,7 +85,7 @@ package body Restore.Installer.Default is
       --  Saved, not launched: run_self_tests' End_Process_Test launches
       --  it with Launch, for its Process cap (#320, #831).
 
-      Process ("process_probe", "drivers", Save, Default_Flags);
+      Process ("process_probe", "drivers", Save, Test_Flags);
       Process ("echo", "bin", Save, Default_Flags);
       Process ("list", "bin", Save, Default_Flags);
       Process ("cat", "bin", Save, Default_Flags);
@@ -100,19 +104,19 @@ package body Restore.Installer.Default is
       Process ("rights", "bin", Save, Default_Flags);
       Process ("login", "bin", Save, Default_Flags);
       Process ("supervisor", "bin", Save, Default_Flags);
-      Process ("run_self_tests", "bin", Save, Default_Flags);
-      Process ("hold_derived", "bin", Save, Default_Flags);
-      Process ("hold_file", "bin", Save, Default_Flags);
-      Process ("hold_home", "bin", Save, Default_Flags);
-      Process ("swap_probe", "bin", Save, Default_Flags);
-      Process ("page_probe", "bin", Save, Default_Flags);
-      Process ("hold_pages", "bin", Save, Default_Flags);
-      Process ("hold_transient", "bin", Save, Default_Flags);
+      Process ("run_self_tests", "bin", Save, Test_Flags);
+      Process ("hold_derived", "bin", Save, Test_Flags);
+      Process ("hold_file", "bin", Save, Test_Flags);
+      Process ("hold_home", "bin", Save, Test_Flags);
+      Process ("swap_probe", "bin", Save, Test_Flags);
+      Process ("page_probe", "bin", Save, Test_Flags);
+      Process ("hold_pages", "bin", Save, Test_Flags);
+      Process ("hold_transient", "bin", Save, Test_Flags);
 
       --  The test server of the Replaceable interface, which
       --  run_self_tests launches (#865).
 
-      Process ("replaceable_test", "bin", Save, Default_Flags);
+      Process ("replaceable_test", "bin", Save, Test_Flags);
       Process ("argv", "bin", Save, Default_Flags);
       Process ("keytest", "bin", Save, Default_Flags);
       Process ("kilo", "bin", Save, Default_Flags);

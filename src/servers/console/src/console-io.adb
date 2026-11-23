@@ -5,6 +5,10 @@ with Console.Calls;
 
 package body Console.IO is
 
+   Replay_Piece : System.Storage_Elements.Storage_Array (1 .. 1024);
+   --  A piece of the copied output that Replay sends, here rather than on
+   --  the stack, which is a page in the boot servers (#1004).
+
    Current_Line, Current_Column : Natural := 0;
    Current_Colour               : constant Word_16 := 16#700#;
 
@@ -226,8 +230,8 @@ package body Console.IO is
             declare
                Last  : constant Natural :=
                  Natural'Min (Start + Piece_Size - 1, Text'Last);
-               Piece : Storage_Array
-                 (1 .. Storage_Offset (Last - Start + 1));
+               Piece : Storage_Array renames
+                 Replay_Piece (1 .. Storage_Offset (Last - Start + 1));
             begin
                for I in Piece'Range loop
                   Piece (I) :=

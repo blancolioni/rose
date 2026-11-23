@@ -430,11 +430,11 @@ package body Elf.Server is
          end if;
       end loop;
 
-      Rose.Trace.Event ("load " & Name);
+      Rose.Trace.Event ("load ", Name);
 
       if not Found then
-         Rose.Console_IO.Put_Line
-           ("elf: too many processes starting: " & Name);
+         Rose.Console_IO.Put ("elf: too many processes starting: ");
+         Rose.Console_IO.Put_Line (Name);
          return 0;
       end if;
 
@@ -453,7 +453,8 @@ package body Elf.Server is
          --  launch fails, and nothing else has been opened yet.
 
          if Kernel_Process = 0 then
-            Rose.Console_IO.Put_Line ("elf: cannot create process " & Name);
+            Rose.Console_IO.Put ("elf: cannot create process ");
+            Rose.Console_IO.Put_Line (Name);
             Rose.Interfaces.Storage.Region_Access.Client.Close (Region);
             Rose.Interfaces.Storage.Bank.Client.Close (Bank_Store);
             Item := (others => <>);
@@ -479,7 +480,8 @@ package body Elf.Server is
          if Rose.Interfaces.Processes.Process.Client.Get_Interface_Cap
            (Item.Process_Client) = 0
          then
-            Rose.Console_IO.Put_Line ("elf: no room in mem for " & Name);
+            Rose.Console_IO.Put ("elf: no room in mem for ");
+            Rose.Console_IO.Put_Line (Name);
             Fail;
             return 0;
          end if;
