@@ -55,9 +55,10 @@ package Store.Devices is
    --  Bank Id's index, which names it to Process_Banks (#750).
 
    function Create_Process_Bank
-     (Id      : Rose.Objects.Capability_Identifier;
-      Parent  : Rose.Words.Word;
-      Process : Rose.Objects.Object_Id)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Parent    : Rose.Words.Word;
+      Process   : Rose.Objects.Object_Id;
+      Transient : Boolean)
       return Rose.Capabilities.Capability;
    --  A new sub-bank of bank Parent that is Process's own (ADR 0015), or
    --  the null cap.

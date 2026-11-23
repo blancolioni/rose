@@ -57,9 +57,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       Complete : out Boolean);
 
    procedure Decode_Name
-     (From : Rose.Invocation.Invocation_Access;
-      Name : out String;
-      Last : out Natural);
+     (From  : Rose.Invocation.Invocation_Access;
+      Name  : out String;
+      Last  : out Natural;
+      First : Rose.Invocation.Parameter_Word_Index := 0);
+   --  The name in the words that From sends, from word First.
 
    procedure Handover
      (Endpoint : Rose.Objects.Endpoint_Index;
@@ -80,16 +82,20 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
    -----------------
 
    procedure Decode_Name
-     (From : Rose.Invocation.Invocation_Access;
-      Name : out String;
-      Last : out Natural)
+     (From  : Rose.Invocation.Invocation_Access;
+      Name  : out String;
+      Last  : out Natural;
+      First : Rose.Invocation.Parameter_Word_Index := 0)
    is
+      use type Rose.Invocation.Parameter_Word_Index;
    begin
       Last := 0;
-      if not From.Control.Flags (Rose.Invocation.Send_Words) then
+      if not From.Control.Flags (Rose.Invocation.Send_Words)
+        or else From.Control.Last_Sent_Word < First
+      then
          return;
       end if;
-      for Sent_Word_Index in 0 .. From.Control.Last_Sent_Word loop
+      for Sent_Word_Index in First .. From.Control.Last_Sent_Word loop
          declare
             use type Rose.Words.Word;
             Word : Rose.Words.Word :=
@@ -186,25 +192,36 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             end;
 
          when Create_Process_Endpoint =>
+
+            --  Word 0 is the flags: bit 0 makes the process transient,
+            --  never saved in a checkpoint (#524). The name is in the
+            --  words after it.
+
             declare
-               use type Rose.Invocation.Parameter_Word_Index;
+               use type Rose.Words.Word;
+               Have_Words : constant Boolean :=
+                              Params.Control.Flags
+                                (Rose.Invocation.Send_Words);
+               Flags : constant Rose.Words.Word :=
+                         (if Have_Words then Params.Data (0) else 0);
                Max_Name_Length : constant Natural :=
-                                   (if Params.Control.Flags
-                                      (Rose.Invocation.Send_Words)
+                                   (if Have_Words
                                     then Natural
-                                      (Params.Control.Last_Sent_Word + 1) * 4
+                                      (Params.Control.Last_Sent_Word) * 4
                                     else 0);
                Name : String (1 .. Max_Name_Length);
                Name_Last : Natural := 0;
             begin
                if Max_Name_Length > 0 then
-                  Decode_Name (Params, Name, Name_Last);
+                  Decode_Name (Params, Name, Name_Last, First => 1);
                end if;
 
                declare
                   use Rose.Kernel.Processes;
                   Pid : constant Process_Id :=
-                            New_Process (Name (1 .. Name_Last));
+                            New_Process
+                              (Name (1 .. Name_Last),
+                               Transient => Flags mod 2 = 1);
                begin
                   if Pid = Null_Process_Id then
                      Rose.Boot.Console.Put_Line ("kernel: out of processes");

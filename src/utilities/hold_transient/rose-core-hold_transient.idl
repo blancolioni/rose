@@ -1,0 +1,16 @@
+command Rose.Core.Hold_Transient : Caps.Create_Endpoint, Streams.Standard_Output
+  with Summary     => "Hold a marker in pages that are never saved.",
+       Description => """
+          Hold_Transient is the test of transient processes (#524).
+          Init launches it on a new install. It is transient, so no
+          checkpoint saves it: it writes a marker into its own pages,
+          says so on standard output, and then waits. The boot test
+          checks that the restored system doesn't have it, that the
+          store destroyed its bank, and that the marker is nowhere on
+          the disk. If it is ever restored, it says so.
+          """,
+       Server      => Transient_Holder.Start_Server,
+       Live,
+       Transient
+is
+end Rose.Core.Hold_Transient;

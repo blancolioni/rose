@@ -167,7 +167,8 @@ package body Mem.Server is
    function New_Process
      (Id          : Rose.Objects.Capability_Identifier;
       Process     : Rose.Capabilities.Capability;
-      Bank        : Rose.Capabilities.Capability)
+      Bank        : Rose.Capabilities.Capability;
+      Transient   : Boolean)
       return Rose.Capabilities.Capability;
 
    procedure Set_Process_Banks
@@ -1171,12 +1172,13 @@ package body Mem.Server is
    function New_Process
      (Id          : Rose.Objects.Capability_Identifier;
       Process     : Rose.Capabilities.Capability;
-      Bank        : Rose.Capabilities.Capability)
+      Bank        : Rose.Capabilities.Capability;
+      Transient   : Boolean)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Mem.Processes.New_Process (Process, Bank);
+      return Mem.Processes.New_Process (Process, Bank, Transient);
    end New_Process;
 
    ----------------

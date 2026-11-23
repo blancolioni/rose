@@ -11,12 +11,16 @@
 interface Storage.Process_Banks is
 
    function Create_Process_Bank
-     (Parent  : Word;
-      Process : Object_Id)
+     (Parent    : Word;
+      Process   : Object_Id;
+      Transient : Boolean)
      return interface Storage.Bank;
    --  A new sub-bank of the bank whose index is Parent (Bank.Index),
    --  which is Process's own. A null cap if Parent doesn't exist, or the
-   --  store has no room for another bank.
+   --  store has no room for another bank. The bank of a Transient
+   --  process (#524) is destroyed when a checkpoint is restored, since
+   --  the process wasn't saved: what is below it ends, as when any
+   --  bank is destroyed.
 
    function Process_Bank
      (Process : Object_Id)

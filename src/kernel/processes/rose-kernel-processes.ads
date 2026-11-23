@@ -34,8 +34,11 @@ package Rose.Kernel.Processes is
       return Rose.Objects.Object_Id;
 
    function New_Process
-     (Name : String)
+     (Name      : String;
+      Transient : Boolean := False)
      return Process_Id;
+   --  A Transient process is never saved in a checkpoint (#524): its
+   --  entry doesn't have the Persistent flag, as a boot module's doesn't.
 
    procedure Start_Process
      (Process : Process_Id;
@@ -772,8 +775,9 @@ private
    --  record, which Set_Cap, Delete_Cap and Release_Entry keep.
 
    procedure Create_Process_Table_Entry
-     (Pid : Rose.Kernel.Processes.Process_Id;
-      Name : String);
+     (Pid        : Rose.Kernel.Processes.Process_Id;
+      Name       : String;
+      Persistent : Boolean := True);
    --  Set up the entry for a new process Pid, with its page directory,
    --  invocation buffer page and standard page ranges, ready to start.
 

@@ -85,11 +85,11 @@ SHARED_PAGE_SAVED = 1
 SHARED_PAGE_RELEASED = 2
 
 STORE_TABLE_MAGIC = 0x53544F5245544231
-STORE_TABLE_VERSION = 6
+STORE_TABLE_VERSION = 7
 MAX_STORE_SLOTS = 255           # Rose.Checkpoints.Max_Store_Slots (#967)
 RETIRED_GENERATION = 255
 REGIONS_PER_PAGE = PAGE_SIZE // 32
-BANKS_PER_PAGE = PAGE_SIZE // 24
+BANKS_PER_PAGE = PAGE_SIZE // 32
 MAX_TREE_HEIGHT = 7
 MAX_STORE_PAGES = 2 ** 20
 
@@ -427,8 +427,9 @@ def check_store_tables(log, first, last, verbose):
     for i in range(bank_count):
         record = log.page(first + 1 + region_pages
                           + i // BANKS_PER_PAGE)
-        index, parent, page_limit, region_limit, _ = struct.unpack_from(
-            "<IIQII", record, (i % BANKS_PER_PAGE) * 24)
+        index, parent, page_limit, region_limit, _, flags, _ = \
+            struct.unpack_from("<IIQIIII", record,
+                               (i % BANKS_PER_PAGE) * 32)
         if index == 0 or index in banks or index > MAX_STORE_SLOTS:
             return False, ("storage bank %d of %d: index %d"
                            % (i + 1, bank_count, index)), 0, regions
@@ -437,8 +438,9 @@ def check_store_tables(log, first, last, verbose):
                            % index), 0, regions
         banks[index] = parent
         if verbose:
-            print("    bank %3d: parent %d, limits %d pages, %d regions"
-                  % (index, parent, page_limit, region_limit))
+            print("    bank %3d: parent %d, limits %d pages, %d regions%s"
+                  % (index, parent, page_limit, region_limit,
+                     ", transient" if flags & 1 else ""))
     if banks.get(1, None) != 0:
         return False, "storage banks: no root bank", 0, regions
     for index, parent in banks.items():

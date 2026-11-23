@@ -4,11 +4,15 @@ interface Processes.Memory is
    
    function New_Process
      (Process     : interface Processes.Kernel_Process;
-      Bank        : interface Storage.Bank)
+      Bank        : interface Storage.Bank;
+      Transient   : Boolean)
      return interface Processes.Process;
    --  Bank is the bank that the process is launched against. Its own
    --  bank is a new sub-bank of it (ADR 0015, #750), which
-   --  Process.Bank returns.
+   --  Process.Bank returns. A Transient process is never saved (#524):
+   --  mem leaves it out of every checkpoint and maps its writable pages
+   --  so that they are never written to the log, and its bank is a
+   --  transient one.
    
    procedure Register_Process
      (Process     : interface Processes.Process;

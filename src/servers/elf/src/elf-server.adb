@@ -66,26 +66,30 @@ package body Elf.Server is
    --  The identifier of a Starting_Process cap is its index here.
 
    function Launch
-     (Id    : Rose.Objects.Capability_Identifier;
-      Name  : String;
-      Image : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Transient : Boolean)
       return Rose.Capabilities.Capability;
 
    function Launch_Command
-     (Id    : Rose.Objects.Capability_Identifier;
-      Name  : String;
-      Image : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Transient : Boolean)
       return Rose.Capabilities.Capability;
 
    function Launch_Process
-     (Name    : String;
-      Image   : Rose.Capabilities.Capability;
-      Bank   : Rose.Capabilities.Capability;
-      Command : Boolean)
+     (Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Command   : Boolean;
+      Transient : Boolean)
       return Rose.Capabilities.Capability;
-   --  Create a process and load it, but do not start it. The result is a
+   --  Create a process and load it, but do not start it. If Transient is
+   --  True, it is never saved in a checkpoint (#524). The result is a
    --  Starting_Process cap, through which the caller gives it its caps
    --  and starts it. If Command is True, it is a command (ADR 0002): the
    --  process gets the receive cap of a command endpoint in its second
@@ -108,6 +112,7 @@ package body Elf.Server is
 
    procedure Create_Process
      (Name         : String;
+      Transient    : Boolean;
       Process      : out Rose.Capabilities.Capability;
       Start_Cap    : out Rose.Capabilities.Capability;
       Initial_Cap  : out Rose.Capabilities.Capability;
@@ -119,7 +124,8 @@ package body Elf.Server is
 
    procedure Encode_Name
      (Params : in out Rose.Invocation.Invocation_Record;
-      Name   : String);
+      Name   : String;
+      Flags  : Rose.Words.Word_32);
 
    -------------
    -- Add_Cap --
@@ -153,6 +159,7 @@ package body Elf.Server is
 
    procedure Create_Process
      (Name         : String;
+      Transient    : Boolean;
       Process      : out Rose.Capabilities.Capability;
       Start_Cap    : out Rose.Capabilities.Capability;
       Initial_Cap  : out Rose.Capabilities.Capability;
@@ -162,7 +169,7 @@ package body Elf.Server is
 
    begin
       Rose.System_Calls.Initialize_Send (Params, Create_Process_Cap);
-      Encode_Name (Params, Name);
+      Encode_Name (Params, Name, Flags => Boolean'Pos (Transient));
       Rose.System_Calls.Receive_Caps (Params, 4);
       Rose.System_Calls.Invoke_Capability (Params);
       if not Params.Control.Flags (Rose.Invocation.Error) then
@@ -264,17 +271,23 @@ package body Elf.Server is
 
    procedure Encode_Name
      (Params : in out Rose.Invocation.Invocation_Record;
-      Name   : String)
+      Name   : String;
+      Flags  : Rose.Words.Word_32)
    is
       use type Rose.Invocation.Parameter_Word_Index;
       use type Rose.Words.Word;
-      Have_Words : constant Boolean := Name'Length > 0;
       W          : Rose.Words.Word_32 := 0;
       Shift      : Natural := 0;
    begin
-      Params.Control.Flags (Rose.Invocation.Send_Words) := Have_Words;
-      if Have_Words then
-         Params.Control.Last_Sent_Word := 0;
+
+      --  The kernel's Create_Process takes the flags in word 0, and the
+      --  name in the words after it (#524).
+
+      Params.Control.Flags (Rose.Invocation.Send_Words) := True;
+      Params.Data (0) := Flags;
+      Params.Control.Last_Sent_Word := 0;
+      if Name'Length > 0 then
+         Params.Control.Last_Sent_Word := 1;
          for Ch of Name loop
             W := W + Character'Pos (Ch) * 2 ** Shift;
             Shift := Shift + 8;
@@ -301,15 +314,17 @@ package body Elf.Server is
    ------------
 
    function Launch
-     (Id    : Rose.Objects.Capability_Identifier;
-      Name  : String;
-      Image : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Transient : Boolean)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Launch_Process (Name, Image, Bank, Command => False);
+      return Launch_Process
+        (Name, Image, Bank, Command => False, Transient => Transient);
    end Launch;
 
    --------------------
@@ -317,15 +332,17 @@ package body Elf.Server is
    --------------------
 
    function Launch_Command
-     (Id    : Rose.Objects.Capability_Identifier;
-      Name  : String;
-      Image : Rose.Capabilities.Capability;
-      Bank : Rose.Capabilities.Capability)
+     (Id        : Rose.Objects.Capability_Identifier;
+      Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Transient : Boolean)
       return Rose.Capabilities.Capability
    is
       pragma Unreferenced (Id);
    begin
-      return Launch_Process (Name, Image, Bank, Command => True);
+      return Launch_Process
+        (Name, Image, Bank, Command => True, Transient => Transient);
    end Launch_Command;
 
    --------------------
@@ -333,10 +350,11 @@ package body Elf.Server is
    --------------------
 
    function Launch_Process
-     (Name    : String;
-      Image   : Rose.Capabilities.Capability;
-      Bank   : Rose.Capabilities.Capability;
-      Command : Boolean)
+     (Name      : String;
+      Image     : Rose.Capabilities.Capability;
+      Bank      : Rose.Capabilities.Capability;
+      Command   : Boolean;
+      Transient : Boolean)
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
@@ -428,8 +446,8 @@ package body Elf.Server is
          Item : Starting_Record renames Starting (Index);
       begin
          Create_Process
-           (Name, Kernel_Process, Item.Start_Cap, Item.Initial_Cap,
-            Endpoint_Cap);
+           (Name, Transient, Kernel_Process, Item.Start_Cap,
+            Item.Initial_Cap, Endpoint_Cap);
 
          --  The kernel refuses when its process table is full (#724). The
          --  launch fails, and nothing else has been opened yet.
@@ -450,9 +468,10 @@ package body Elf.Server is
          Rose.Trace.Event ("process created");
          Item.Process_Client :=
            Rose.Interfaces.Processes.Memory.Client.New_Process
-             (Item    => Memory_Client,
-              Process => Kernel_Client,
-              Bank    => Bank_Store);
+             (Item      => Memory_Client,
+              Process   => Kernel_Client,
+              Bank      => Bank_Store,
+              Transient => Transient);
 
          --  Mem gives a null cap when it has no room for another process
          --  (#915).
