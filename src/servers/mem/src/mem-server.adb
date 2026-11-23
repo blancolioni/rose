@@ -508,6 +508,14 @@ package body Mem.Server is
          Request_Checkpoint_Cap := Request_Checkpoint;
       end if;
 
+      --  The processes whose banks the store has destroyed end first, so
+      --  that mem's part doesn't keep segments whose regions are gone
+      --  from the store's. The checkpoint server holds the store's other
+      --  callers until the checkpoint ends, so no more can be destroyed
+      --  meanwhile (#1061).
+
+      Drain_Ended;
+
       Mem.Cleaning.Prepare_Checkpoint;
       Mem.Checkpoints.Checkpoint;
 

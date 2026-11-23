@@ -697,6 +697,7 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
 
          when Hold_Calls_Endpoint | Release_Calls_Endpoint
             | Swap_Processes_Endpoint | Process_State_Endpoint
+            | Checkpoint_Hold_Endpoint
          =>
             Handover (Cap.Header.Endpoint, Params);
 
@@ -752,6 +753,9 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
       use type Rose.Objects.Endpoint_Id;
       use type Rose.Objects.Endpoint_Index;
       Swap   : constant Boolean := Endpoint = Swap_Processes_Endpoint;
+      Hold   : constant Boolean :=
+                 Endpoint = Hold_Calls_Endpoint
+                   or else Endpoint = Checkpoint_Hold_Endpoint;
       First  : constant Process_Id := Sent_Process (Params, 0);
       Second : constant Process_Id :=
                  (if Swap then Sent_Process (Params, 1) else Null_Process_Id);
@@ -759,17 +763,18 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
    begin
       if First = Null_Process_Id
         or else (Swap and then Second = Null_Process_Id)
-        or else (Endpoint = Hold_Calls_Endpoint and then Is_Retired (First))
+        or else (Hold and then Is_Retired (First))
       then
          Return_Error (Params, Rose.Invocation.Request_Error);
          return;
       end if;
 
       case Endpoint is
-         when Hold_Calls_Endpoint =>
+         when Hold_Calls_Endpoint | Checkpoint_Hold_Endpoint =>
 
             --  An optional second cap names the one process whose calls
-            --  get through the hold: the new version (#866).
+            --  get through the hold: the new version (#866), or mem
+            --  (#1061).
 
             declare
                use type Rose.Invocation.Capability_Index;
@@ -791,7 +796,11 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                      return;
                   end if;
                end if;
-               Hold_Calls (First, Except, Caller, Success);
+               if Endpoint = Checkpoint_Hold_Endpoint then
+                  Hold_Calls_For_Checkpoint (First, Except, Caller, Success);
+               else
+                  Hold_Calls (First, Except, Caller, Success);
+               end if;
                if not Success then
                   Return_Error (Params, Rose.Invocation.Request_Error);
                   return;

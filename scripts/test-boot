@@ -25,7 +25,8 @@
 #      left starting (#915), stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent; and
 #      checks that the marker of hold_transient, a transient process
-#      (#524), is nowhere on the disk.
+#      (#524), and the first user's password (#1059) are nowhere on the
+#      disk.
 #
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
@@ -39,6 +40,10 @@ command -v qemu-system-i386 > /dev/null || {
     exit 2
 }
 . "$HERE/qemu-test-lib.sh"
+
+# A password that is nowhere else on the disk, so that the end of the
+# test can look for it there (#1059).
+first_password=k9ojx3wq
 
 install_rose "$ISO"
 
@@ -237,6 +242,24 @@ grep -q "paged out before the checkpoint" "$WORK/check-log.out" || {
          "the disk image is in $WORK"
     exit 1
 }
+
+# The first user's password went through the console and auth, which
+# are persistent, at the install and at each login, and must not reach
+# the disk (#1059).
+# Any six characters of it in a row count: a line that was read stays
+# in the console's buffer until later lines are typed over it, and the
+# next one may cover only its start.
+echo "Looking for the first user's password on the disk"
+windows=$(echo "$first_password" | awk '{
+    for (i = 1; i + 5 <= length($0); i++) {
+        printf "%s%s", sep, substr($0, i, 6); sep = "|"
+    }
+}')
+if grep -q -a -E "$windows" "$DISK"; then
+    echo "FAIL: the first user's password is on the disk;" \
+         "the disk image is in $WORK"
+    exit 1
+fi
 
 # Hold_transient wrote its marker through 16 pages, which no checkpoint
 # and no paging may write to the disk (#524).
