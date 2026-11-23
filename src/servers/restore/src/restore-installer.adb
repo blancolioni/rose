@@ -888,7 +888,8 @@ package body Restore.Installer is
 
       Exec_Index := Find_File (Directory, Name);
       if Exec_Index = 0 then
-         Rose.Console_IO.Put_Line ("restore: cannot find " & Name);
+         Rose.Console_IO.Put ("restore: cannot find ");
+         Rose.Console_IO.Put_Line (Name);
          return;
       end if;
 
@@ -908,13 +909,15 @@ package body Restore.Installer is
              .Get_Interface_Cap (Launch)
            = Rose.Capabilities.Null_Capability
          then
-            Rose.Console_IO.Put_Line
-              ("restore: cannot install " & Name & " again");
+            Rose.Console_IO.Put ("restore: cannot install ");
+            Rose.Console_IO.Put (Name);
+            Rose.Console_IO.Put_Line (" again");
          else
             Rose.Interfaces.Commands.Map.Client.Add (Map_Client, Name, Launch);
             if Rose.Interfaces.Commands.Map.Client.Has_Error then
-               Rose.Console_IO.Put_Line
-                 ("restore: cannot add " & Name & " to the registry");
+               Rose.Console_IO.Put ("restore: cannot add ");
+               Rose.Console_IO.Put (Name);
+               Rose.Console_IO.Put_Line (" to the registry");
             end if;
             Restore.Replacing.Add_Program
               (Name, Rose.Interfaces.Processes.Launch.Client

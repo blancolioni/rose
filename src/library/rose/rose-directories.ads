@@ -47,13 +47,6 @@ package Rose.Directories is
      (Search          : in out Search_Type;
       Directory_Entry : out Directory_Entry_Type);
 
-   procedure Search
-     (Directory : String;
-      Pattern   : String;
-      Filter    : Filter_Type := (others => True);
-      Process   : not null access procedure
-        (Directory_Entry : Directory_Entry_Type));
-
    procedure Simple_Name
      (Directory_Entry : Directory_Entry_Type;
       Name            : out String;

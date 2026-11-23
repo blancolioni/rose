@@ -13,6 +13,17 @@ with Elf.Segments;
 
 package body Elf.Loader is
 
+   Read_Buffer    : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size);
+   Header_Buffer  : Elf.Segments.Program_Header_Array
+     (1 .. Elf.Segments.Max_Program_Headers);
+   Segment_Buffer : Elf.Segments.Segment_List;
+   Copy_Buffer    : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size);
+   --  A page of the image, its program headers, and the segments they
+   --  describe, here rather than on the stack, which is a page in the
+   --  boot servers (#1004). Elf loads one program at a time.
+
    use Rose.Interfaces.Storage.Region.Client;
    use Rose.Interfaces.Storage.Region_Access.Client;
    use Rose.Interfaces.Processes.Process.Client;
@@ -291,7 +302,7 @@ package body Elf.Loader is
                                     (File_Offset / Rose.Limits.Page_Size);
                   Page_Offset : Rose.Objects.Object_Id;
                   Page        : System.Storage_Elements.Storage_Array
-                    (1 .. Rose.Limits.Page_Size);
+                    renames Copy_Buffer;
                begin
                   Rose.Trace.Event ("storage reserved, bytes ",
                                     Natural (Memory_Size));
@@ -356,7 +367,7 @@ package body Elf.Loader is
       Storage    : Storage_Array (1 .. Size);
       pragma Import (Ada, Storage);
       for Storage'Address use Item;
-      Buffer     : Storage_Array (1 .. Rose.Limits.Page_Size);
+      Buffer     : Storage_Array renames Read_Buffer;
       Buf_Offset : Storage_Count := Offset mod Rose.Limits.Page_Size + 1;
    begin
 
@@ -409,8 +420,9 @@ package body Elf.Loader is
       use System.Storage_Elements;
       PH_Count : constant Natural := Natural (Header.E_Phnum);
       --  At most Elf.Segments.Max_Program_Headers, by Table_Fits.
-      PHs      : Elf.Segments.Program_Header_Array (1 .. PH_Count);
-      List     : Elf.Segments.Segment_List;
+      PHs      : Elf.Segments.Program_Header_Array renames
+                   Header_Buffer (1 .. PH_Count);
+      List     : Elf.Segments.Segment_List renames Segment_Buffer;
    begin
       Read
         (Region => Region,

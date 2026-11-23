@@ -4,6 +4,10 @@ with Rose.Console_IO;
 
 package body ATA.Commands is
 
+   ATAPI_Data : Rose.Devices.Port_IO.Word_16_Array (1 .. 2048);
+   --  An ATAPI sector, read here rather than on the stack, which is a
+   --  page in the boot servers (#1004). ATAPI sectors are 2048 bytes.
+
    Max_Status_Wait  : constant := 400;
    Warn_Status_Wait : constant := 100;
 
@@ -424,9 +428,14 @@ package body ATA.Commands is
          end if;
       end;
 
+      if Natural (Block_Size / 2) > ATAPI_Data'Length then
+         ATA.Drives.Log (Drive, "ATAPI block is too big");
+         return;
+      end if;
+
       declare
-         Data : Rose.Devices.Port_IO.Word_16_Array
-                  (1 .. Natural (Block_Size / 2));
+         Data : Rose.Devices.Port_IO.Word_16_Array renames
+                  ATAPI_Data (1 .. Natural (Block_Size / 2));
       begin
          Rose.Devices.Port_IO.Port_In_16 (Data_In, Data);
          for D of Data loop

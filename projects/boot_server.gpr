@@ -1,0 +1,26 @@
+--  What the boot servers have in common in their builds (#1004).
+--
+--  A boot server's stack is a 64 KiB range with only its top page mapped
+--  at the start; mem maps the rest when they are first touched. For mem
+--  itself, and for init, console and bootcaps, which run before it, a
+--  fault on the stack can't be served: mem's is the kernel panic "page
+--  fault in page fault handler process" (#974). For the servers on the
+--  pager path (store, partition, ata, log, checkpoint, restore), a first
+--  touch while mem waits on them would stop the system. So every boot
+--  server keeps each subprogram's frame within Stack_Limit bytes, well
+--  under a page, since calls nest, and the build fails if one doesn't.
+--
+--  Large buffers belong at package level: the boot servers are single
+--  threaded and built with No_Recursion. An "others" aggregate of records,
+--  or one with "<>", is built in a temporary on the stack, even when its
+--  components are zero; clear such an object with a loop (#974).
+
+abstract project Boot_Server is
+
+   Stack_Limit := "1024";
+
+   Stack_Switches := ("-Werror=stack-usage=" & Stack_Limit);
+   --  GCC's stack usage of each subprogram, which counts dynamic frames
+   --  and reports one it can't bound.
+
+end Boot_Server;

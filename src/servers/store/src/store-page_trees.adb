@@ -34,6 +34,10 @@ package body Store.Page_Trees is
    type Page_Array is array (Slot_Index) of Page_Words;
 
    Slots     : Slot_Array;
+
+   No_Slots  : constant Slot_Array := (others => (others => <>));
+   --  What Slots is cleared to: a copy, not an aggregate, which would be
+   --  built on the stack (#1004).
    Pages     : Page_Array;
    Root_Slot : Slot_Index := 1;
    Levels    : Positive := 1;
@@ -182,7 +186,7 @@ package body Store.Page_Trees is
 
    procedure Create is
    begin
-      Slots := (others => (others => <>));
+      Slots := No_Slots;
       Pages (1) := (others => 0);
       Slots (1) :=
         (In_Use   => True,
@@ -667,7 +671,7 @@ package body Store.Page_Trees is
          return;
       end if;
 
-      Slots := (others => (others => <>));
+      Slots := No_Slots;
       Read (Root, Pages (1));
       Slots (1) :=
         (In_Use   => True,

@@ -823,9 +823,9 @@ package body Restore.Boot_Sets is
       Write_Set
         (Boot_Directory & "boot-set.tar", Partition.Slots (Other), Done);
       if not Done then
-         Rose.Console_IO.Put_Line
-           ("restore: the boot set was not written; hd0 still boots Rose "
-            & Old);
+         Rose.Console_IO.Put
+           ("restore: the boot set was not written; hd0 still boots Rose ");
+         Rose.Console_IO.Put_Line (Old);
          return;
       end if;
 
@@ -839,9 +839,10 @@ package body Restore.Boot_Sets is
          return;
       end if;
 
-      Rose.Console_IO.Put_Line
+      Rose.Console_IO.Put
         ("restore: hd0 boots Rose " & Rose.Version.Version_String
-         & ", and its menu has Previous: Rose " & Old);
+         & ", and its menu has Previous: Rose ");
+      Rose.Console_IO.Put_Line (Old);
       Written := True;
    end Write_Steps;
 
