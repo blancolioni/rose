@@ -11,6 +11,10 @@ package Text_Console.Line_Discipline is
    --  on, it echoes what is typed, acts on control characters, and a Read
    --  returns only whole lines. With line editing off, it keeps the keys
    --  for Read_Key, and nothing is echoed.
+   --
+   --  What is typed stays in the console's memory only until it is read
+   --  or dropped: the console is persistent, and what is typed may be a
+   --  password, which a checkpoint would save (#1059).
 
    procedure On_Key
      (Key       : Rose.Keys.Key_Code;
