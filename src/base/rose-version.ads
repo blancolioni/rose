@@ -4,9 +4,9 @@ package Rose.Version is
 
    Version_Major   : constant := 0;
    Version_Minor   : constant := 4;
-   Version_Release : constant := 0;
+   Version_Release : constant := 1;
 
-   Version_String  : constant String := "0.4.0";
+   Version_String  : constant String := "0.4.1-dev";
    Version_Name    : constant String := "genki";
 
    Full_Name       : constant String :=
