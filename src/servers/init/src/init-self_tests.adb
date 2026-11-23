@@ -520,9 +520,11 @@ package body Init.Self_Tests is
       Bank_Client.Open (Test, Bank_Cap);
 
       Old_Bank :=
-        PB.Create_Process_Bank (Banks, Bank_Client.Index (Test), Old_Process);
+        PB.Create_Process_Bank
+          (Banks, Bank_Client.Index (Test), Old_Process, Transient => False);
       New_Bank :=
-        PB.Create_Process_Bank (Banks, Bank_Client.Index (Test), New_Process);
+        PB.Create_Process_Bank
+          (Banks, Bank_Client.Index (Test), New_Process, Transient => False);
 
       if Bank_Client.Get_Interface_Cap (Old_Bank)
         = Rose.Capabilities.Null_Capability
@@ -1373,6 +1375,61 @@ package body Init.Self_Tests is
         and then Params.Control.Flags (Rose.Invocation.Send_Words)
         and then Params.Data (0) = Completed;
    end Start_Page_Holder;
+
+   ----------------------------
+   -- Start_Transient_Holder --
+   ----------------------------
+
+   function Start_Transient_Holder
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word;
+      Launch_Cap : constant Rose.Capabilities.Capability :=
+        Init.Calls.Find_In_Map (Find_Cap, "hold_transient");
+      Launcher   : Rose.Interfaces.Processes.Launch.Client.Launch_Client;
+      Bank_Cap   : Rose.Capabilities.Capability;
+      Endpoint   : Rose.Capabilities.Capability;
+      Params     : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Launch_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  The bank is never destroyed by init: the process's own bank, a
+      --  sub-bank of this one, is transient, and the restore destroys
+      --  it (#524).
+
+      Bank_Cap := Init.Grants.Bank (Probe_Page_Limit, Probe_Region_Limit);
+      if Bank_Cap = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      Rose.Interfaces.Processes.Launch.Client.Open (Launcher, Launch_Cap);
+      Endpoint :=
+        Rose.Interfaces.Processes.Launch.Client.Launch_Command
+          (Launcher, Bank_Cap);
+      if Endpoint = Rose.Capabilities.Null_Capability then
+         return False;
+      end if;
+
+      --  Its roles' caps, as src/utilities/hold_transient/
+      --  rose-core-hold_transient.idl declares them: Create_Endpoint and
+      --  Standard_Output. The command replies once its marker is
+      --  written.
+
+      Rose.System_Calls.Initialize_Send (Params, Endpoint);
+      Rose.System_Calls.Send_Caps
+        (Params, (Create_Endpoint, Standard_Output));
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      return not Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Flags (Rose.Invocation.Send_Words)
+        and then Params.Data (0) = Completed;
+   end Start_Transient_Holder;
 
    ---------------
    -- Swap_Test --

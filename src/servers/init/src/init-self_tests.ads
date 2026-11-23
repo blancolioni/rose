@@ -150,6 +150,17 @@ package Init.Self_Tests is
    --  it is persistent, and checks every page again each time it is
    --  restored. True if it was launched and its pages were filled.
 
+   function Start_Transient_Holder
+     (Find_Cap        : Rose.Capabilities.Capability;
+      Create_Endpoint : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Launch the hold_transient command, found through Find_Cap, in a
+   --  bank of its own, with Create_Endpoint and Standard_Output for its
+   --  roles (#524). It is transient: it writes a marker into its pages,
+   --  which no checkpoint may save, and the restored system mustn't have
+   --  it. True if it was launched and wrote its marker.
+
    function Replace_Held_File
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;

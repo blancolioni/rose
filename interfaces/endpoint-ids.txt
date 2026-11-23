@@ -116,8 +116,8 @@
 16#E01C_44C1_0774_98B2#  rose.interfaces.processes.exec.set_standard_output(in interface rose.interfaces.streams.writer)
 16#AEF8_354C_CACE_4387#  rose.interfaces.processes.exec.update(in interface rose.interfaces.streams.reader; in string; in capability) return interface rose.interfaces.processes.launch
 16#6C9E_B934_8DF2_AEF4#  interface rose.interfaces.processes.executable
-16#5CE6_584E_AB0C_44E0#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.starting_process
-16#8514_3AB6_4C31_F989#  rose.interfaces.processes.executable.launch_command(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.starting_process
+16#10C1_D0D4_8A4B_6FEE#  rose.interfaces.processes.executable.launch(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank; in boolean) return interface rose.interfaces.processes.starting_process
+16#994F_9CAF_E1EC_2FEE#  rose.interfaces.processes.executable.launch_command(in string; in interface rose.interfaces.storage.region_access; in interface rose.interfaces.storage.bank; in boolean) return interface rose.interfaces.processes.starting_process
 16#7F9B_F7DF_57D0_313D#  interface rose.interfaces.processes.heap
 16#BF6F_403E_B61F_E95C#  rose.interfaces.processes.heap.current_bound return word
 16#620F_1859_1E1A_E309#  rose.interfaces.processes.heap.request_new_bound(in word)
@@ -130,7 +130,7 @@
 16#EAB4_B9B0_535F_2A88#  rose.interfaces.processes.launch.launch_command(in capability) return capability
 16#BB1B_7FDF_38D4_76A7#  rose.interfaces.processes.launch.metadata return string
 16#6677_ED47_797E_0AE8#  interface rose.interfaces.processes.memory
-16#D91B_1555_C4AE_6FA3#  rose.interfaces.processes.memory.new_process(in interface rose.interfaces.processes.kernel_process; in interface rose.interfaces.storage.bank) return interface rose.interfaces.processes.process
+16#8F68_7223_1F2E_9696#  rose.interfaces.processes.memory.new_process(in interface rose.interfaces.processes.kernel_process; in interface rose.interfaces.storage.bank; in boolean) return interface rose.interfaces.processes.process
 16#EB00_31EE_EC68_A6E4#  rose.interfaces.processes.memory.register_process(in interface rose.interfaces.processes.process; in word; in word; in word; in word; in word; in word; in word; in word)
 16#91F9_6366_078D_FE48#  rose.interfaces.processes.memory.page_fault(in object_id; in word; in word; in rose.interfaces.processes.memory.page_access_type)
 16#1FB4_3D64_5CE7_6CA9#  rose.interfaces.processes.memory.take_physical_memory(in word; out word; out word)
@@ -212,7 +212,7 @@
 16#3DA1_3F2D_90DB_EFAA#  rose.interfaces.storage.partitions.partition_count return natural
 16#1E1B_6A21_AA16_F0BA#  rose.interfaces.storage.partitions.get_partition(in positive; out word_64; out word_64; out word_64; out word_64)
 16#9BC9_6546_EAF3_D521#  interface rose.interfaces.storage.process_banks
-16#DFF6_463D_0BED_A2B8#  rose.interfaces.storage.process_banks.create_process_bank(in word; in object_id) return interface rose.interfaces.storage.bank
+16#E796_0701_5660_80A3#  rose.interfaces.storage.process_banks.create_process_bank(in word; in object_id; in boolean) return interface rose.interfaces.storage.bank
 16#307F_F96C_BDAA_2182#  rose.interfaces.storage.process_banks.process_bank(in object_id) return interface rose.interfaces.storage.bank
 16#787C_7007_D303_5C8C#  rose.interfaces.storage.process_banks.end_process(in object_id)
 16#8195_6C1C_6961_EA26#  rose.interfaces.storage.process_banks.set_ended(in capability)

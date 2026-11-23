@@ -123,8 +123,15 @@ package body Exec.Server is
       Bank   : Rose.Capabilities.Capability);
    --  Send what the ELF server's Launch and Launch_Command take: the name
    --  of program Id, which becomes the process's name (#1005), its
-   --  image, and the bank to launch it against: Bank, or exec's own if
-   --  Bank is null (ADR 0015, #750).
+   --  image, the bank to launch it against: Bank, or exec's own if Bank
+   --  is null (ADR 0015, #750), and whether it is transient (#524).
+
+   function Is_Transient
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean;
+   --  True if program Id's command metadata has the line "transient
+   --  true", which idle writes for a command with the Transient aspect
+   --  (idle#127): its processes are never saved in a checkpoint.
 
    function Start_Launched
      (Params : Rose.Invocation.Invocation_Record;
@@ -213,6 +220,35 @@ package body Exec.Server is
    begin
       return Launch_Of (Id);
    end Install;
+
+   ------------------
+   -- Is_Transient --
+   ------------------
+
+   function Is_Transient
+     (Id : Rose.Objects.Capability_Identifier)
+      return Boolean
+   is
+      Key  : constant String := "transient true";
+      Text : String (1 .. 4096);
+      Last : Natural;
+      Line : Positive := 1;
+   begin
+      Exec.Library.Get_Metadata (Id, Text, Last);
+
+      --  The metadata is lines of a key and a value, separated by line
+      --  feeds.
+
+      for Index in 1 .. Last + 1 loop
+         if Index > Last or else Text (Index) = Character'Val (10) then
+            if Text (Line .. Index - 1) = Key then
+               return True;
+            end if;
+            Line := Index + 1;
+         end if;
+      end loop;
+      return False;
+   end Is_Transient;
 
    ------------
    -- Launch --
@@ -447,6 +483,9 @@ package body Exec.Server is
       Bank   : Rose.Capabilities.Capability)
    is
       use type Rose.Capabilities.Capability;
+      Transient : constant Boolean := Is_Transient (Id);
+      --  Read first: reading the metadata uses the invocation buffer,
+      --  which Send_Text fills with the name.
       Name : String (1 .. Exec.Library.Max_Name_Length);
       Last : Natural;
    begin
@@ -457,6 +496,7 @@ package body Exec.Server is
         (Params,
          (if Bank /= Rose.Capabilities.Null_Capability
           then Bank else Bank_Cap));
+      Rose.System_Calls.Send_Word (Params, Natural (Boolean'Pos (Transient)));
    end Send_Launch_Arguments;
 
    -------------------------

@@ -486,8 +486,9 @@ package body Rose.Kernel.Processes is
    --------------------------------
 
    procedure Create_Process_Table_Entry
-     (Pid : Rose.Kernel.Processes.Process_Id;
-      Name : String)
+     (Pid        : Rose.Kernel.Processes.Process_Id;
+      Name       : String;
+      Persistent : Boolean := True)
    is
       use Rose.Kernel.Page_Table;
       Proc : Kernel_Process_Entry renames Process_Table (Pid);
@@ -583,7 +584,8 @@ package body Rose.Kernel.Processes is
          Executable     => True,
          User           => True);
 
-      Proc.Flags := (Persistent => True, others => False);
+      Proc.Flags := (others => False);
+      Proc.Flags (Rose.Kernel.Processes.Persistent) := Persistent;
 
       declare
          use type Rose.Objects.Object_Id;
@@ -1796,7 +1798,8 @@ package body Rose.Kernel.Processes is
    -----------------
 
    function New_Process
-     (Name : String)
+     (Name      : String;
+      Transient : Boolean := False)
      return Process_Id
    is
       function Next (Pid : Process_Id) return Process_Id
@@ -1816,7 +1819,7 @@ package body Rose.Kernel.Processes is
          end if;
       end loop;
 
-      Create_Process_Table_Entry (Pid, Name);
+      Create_Process_Table_Entry (Pid, Name, Persistent => not Transient);
 
       Next_Pid := Next (Pid);
       return Pid;

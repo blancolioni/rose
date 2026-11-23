@@ -103,11 +103,15 @@ package Mem.Processes is
 
    function New_Process
      (Process_Cap : Rose.Capabilities.Capability;
-      Bank_Cap    : Rose.Capabilities.Capability)
+      Bank_Cap    : Rose.Capabilities.Capability;
+      Transient   : Boolean)
       return Rose.Capabilities.Capability;
    --  Bank_Cap is the bank that the process is launched against: its own
    --  bank is a new sub-bank of it (ADR 0015, #750).  Mem deletes
-   --  Bank_Cap.
+   --  Bank_Cap.  A Transient process is never saved (#524): no checkpoint
+   --  includes it, its writable pages are never written to the log, and
+   --  its bank is a transient one, which the store destroys at a
+   --  restore.
 
    procedure Set_Process_Banks (Banks_Cap : Rose.Capabilities.Capability);
    --  The storage server's Process_Banks, which init gives mem at every

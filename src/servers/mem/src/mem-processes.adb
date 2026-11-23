@@ -106,7 +106,9 @@ package body Mem.Processes is
          Control_Cap   : Rose.Capabilities.Capability := 0;
          Bank_Cap      : Rose.Capabilities.Capability := 0;
          Faults        : Fault_Count_Array;
+         Transient     : Boolean := False;
       end record;
+   --  A Transient process is never saved (#524).
    --  Bank_Cap is the cap for the process's own bank (#750), which mem
    --  asks the store for when it is first needed, and keeps.
 
@@ -754,6 +756,16 @@ package body Mem.Processes is
             Writable := Segment.Flags (Write);
             Executable := Segment.Flags (Execute);
             Persistent := Segment.Flags (Mem.Processes.Persistent);
+
+            --  The pages of a transient process's writable segments are
+            --  mapped as not persistent, so that they are never written
+            --  to the log, by a checkpoint or to free memory (#524). They
+            --  are still read from their regions (Initialize_Page).
+
+            if P.Transient and then Segment.Flags (Write) then
+               Persistent := False;
+            end if;
+
             if Segment.Region_Base /= 0 then
                Page_Object := Segment.Region_Base
                  + Rose.Objects.Object_Id (Virtual_Page - Segment.Base);
@@ -947,9 +959,11 @@ package body Mem.Processes is
    begin
       --  The boot modules are here too, but none of their segments are
       --  persistent; the processes with a persistent segment are the ones
-      --  the kernel marks as persistent.
+      --  the kernel marks as persistent, except the transient ones
+      --  (#524).
       for Pid in Process_Table'Range loop
          if Process_Table (Pid).State /= Available
+           and then not Process_Table (Pid).Transient
            and then Is_Persistent (Process_Table (Pid))
          then
             Process (Pid);
@@ -1113,7 +1127,8 @@ package body Mem.Processes is
 
    function New_Process
      (Process_Cap : Rose.Capabilities.Capability;
-      Bank_Cap    : Rose.Capabilities.Capability)
+      Bank_Cap    : Rose.Capabilities.Capability;
+      Transient   : Boolean)
       return Rose.Capabilities.Capability
    is
       use type Rose.Capabilities.Capability;
@@ -1127,6 +1142,8 @@ package body Mem.Processes is
          return 0;
       end if;
 
+      Process_Table (Pid).Transient := Transient;
+
       --  The process's own bank, a sub-bank of the one it is launched
       --  against (ADR 0015).  The store records that it is the process's,
       --  so mem need not keep the cap across a restore.
@@ -1138,7 +1155,8 @@ package body Mem.Processes is
              (Rose.Interfaces.Storage.Process_Banks.Client.Create_Process_Bank
                 (Process_Banks,
                  Parent  => Rose.Interfaces.Storage.Bank.Client.Index (Launch),
-                 Process => Process_Table (Pid).Oid));
+                 Process   => Process_Table (Pid).Oid,
+                 Transient => Transient));
          Rose.Interfaces.Storage.Bank.Client.Close (Launch);
       else
          Rose.System_Calls.Delete_Cap (Bank_Cap);
@@ -1406,7 +1424,8 @@ package body Mem.Processes is
               Interface_Cap => 0,
               Control_Cap   => 0,
               Bank_Cap      => 0,
-              Faults        => <>);
+              Faults        => <>,
+              Transient     => False);
       end;
 
       Mem.Log_Index.Forget (Next_Pid);
@@ -1716,7 +1735,8 @@ package body Mem.Processes is
                        (Client))),
            Control_Cap   => 0,
            Bank_Cap      => 0,
-           Faults        => <>);
+           Faults        => <>,
+           Transient     => False);
 
       --  Its pages are read from the log through its index when it faults
       --  on them (ADR 0028, section 9). A checkpoint without an index

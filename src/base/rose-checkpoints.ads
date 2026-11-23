@@ -319,7 +319,7 @@ package Rose.Checkpoints is
    --  written, which can't be restored.
 
    Store_Table_Magic   : constant := 16#5354_4F52_4554_4231#;
-   Store_Table_Version : constant := 6;
+   Store_Table_Version : constant := 7;
 
    Max_Store_Slots    : constant := 255;
    Retired_Generation : constant := 255;
@@ -383,20 +383,26 @@ package Rose.Checkpoints is
          Owner        : Rose.Words.Word_32 := 0;
          --  The object id of the process whose own bank it is (ADR 0015,
          --  #750), or zero.  Process object ids fit in 32 bits.
+         Flags        : Rose.Words.Word_32 := 0;
+         --  Bank_Transient (#524).
+         Reserved     : Rose.Words.Word_32 := 0;
       end record
-     with Pack, Size => 192;
+     with Pack, Size => 256;
 
-   Banks_Per_Page : constant := Rose.Limits.Page_Size / 24;
+   Bank_Transient : constant := 1;
+   --  The bank of a transient process, which a restore destroys (#524).
+
+   Banks_Per_Page : constant := Rose.Limits.Page_Size / 32;
 
    type Saved_Bank_Array is
      array (1 .. Banks_Per_Page) of Saved_Bank
-     with Pack, Size => Banks_Per_Page * 192;
+     with Pack, Size => Banks_Per_Page * 256;
 
    type Bank_Page is
       record
          Banks    : Saved_Bank_Array;
          Reserved : System.Storage_Elements.Storage_Array
-                      (1 .. Rose.Limits.Page_Size - Banks_Per_Page * 24) :=
+                      (1 .. Rose.Limits.Page_Size - Banks_Per_Page * 32) :=
                         (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;
