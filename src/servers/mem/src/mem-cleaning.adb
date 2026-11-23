@@ -101,6 +101,12 @@ package body Mem.Cleaning is
 
       First, Open : Word_32;
 
+      Free : Word_32 := 0;
+      Low  : Boolean := False;
+      --  Below the log's reserve, a round reads as many header pages as
+      --  it needs to: freeing the oldest entry is what gives space back
+      --  (#1029).
+
       Batch : Mem.Virtual_Map.Copied_Pages
         (1 .. Rose.Limits.Page_Out_Batch_Pages);
       Count : Natural := 0;
@@ -113,7 +119,7 @@ package body Mem.Cleaning is
       --  were none, and then the pages up to Scan are done.
 
       function Over_Limit return Boolean
-      is (Reads >= Rose.Limits.Clean_Read_Limit
+      is ((not Low and then Reads >= Rose.Limits.Clean_Read_Limit)
           or else Copies >= Rose.Limits.Clean_Copy_Limit
           or else not Mem.Virtual_Map.Can_Copy);
       --  The round has done enough, or copies would leave too little room
@@ -146,7 +152,8 @@ package body Mem.Cleaning is
          return;
       end if;
 
-      Mem.Page_Log.Get_Space (First, Open, Log_Last);
+      Mem.Page_Log.Get_Space (First, Open, Log_Last, Free);
+      Low := Free < Rose.Limits.Log_Reserve_Pages;
 
       if Open = 0 or else Log_Last = 0 then
          return;

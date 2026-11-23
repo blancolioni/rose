@@ -73,12 +73,15 @@ interface Checkpoints.Page_Log is
    procedure Get_Space
      (First : out Word;
       Open  : out Word;
-      Last  : out Word);
+      Last  : out Word;
+      Free  : out Word);
    --  Where the log's entries are, for the memory server's cleaning
    --  (#952). First is the log page of the first committed entry's
    --  header, and Open that of the open entry's header, or 0 if no
    --  entry is open. First is Open if no entry is committed. Last is
    --  the log's last page, after which it wraps round to log page 1.
+   --  Free is how many pages can be appended before the log is full,
+   --  so that the memory server can keep a reserve (#1029).
 
    function Entry_Last (Header : Word) return Word;
    --  The log page of the last page of the committed entry whose

@@ -2,6 +2,7 @@ with System.Storage_Elements;
 
 with Rose.Console_IO;
 with Rose.Invocation;
+with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
@@ -60,6 +61,13 @@ package body Log.Server is
    --  rolls the entry back to Checkpoint_Mark, and between checkpoints
    --  the memory server drops its batch with Page_Log.Discard_Pages.
    --  Appends fail until then.
+
+   Full_Reported      : Boolean := False;
+   Below_Reserve      : Boolean := False;
+   --  Commit has said that the log is full, or that fewer pages than
+   --  Rose.Limits.Log_Reserve_Pages are free, and hasn't said yet that
+   --  this is over. Each is said once, and not at every checkpoint
+   --  (#1029).
 
    Checkpoint_Mark    : Log_Location_Id := 0;
    --  The open entry's last location when the checkpoint being written
@@ -267,8 +275,17 @@ package body Log.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       First : out Rose.Words.Word;
       Open  : out Rose.Words.Word;
-      Last  : out Rose.Words.Word);
+      Last  : out Rose.Words.Word;
+      Free  : out Rose.Words.Word);
    --  Page_Log.Get_Space.
+
+   function Free_Pages return Log_Location_Id;
+   --  How many pages can be appended before the log is full.
+
+   procedure Report_Space;
+   --  After a commit: say once that the log has room again after it was
+   --  full, and once when the free pages go below the reserve or back
+   --  above it (#1029).
 
    function Entry_Last
      (Id     : Rose.Objects.Capability_Identifier;
@@ -750,17 +767,26 @@ package body Log.Server is
          if Checkpoint_Mark = 0 then
             Fail_Entry (No_Checkpoint_Started);
          else
-            Discard_After (Checkpoint_Mark);
-            Append_Failed := False;
-            Checkpoint_Mark := 0;
-            New_First_Entry := 0;
-            Report_Problems;
-            Rose.Console_IO.Put
-              ("log: checkpoint not committed; the open entry keeps ");
-            Rose.Console_IO.Put
-              (Natural (Current_Log_Header.Log_Last
-               - Current_Log_Header.Log_First + 1));
-            Rose.Console_IO.Put_Line (" pages");
+            declare
+               Repeated : constant Boolean :=
+                            Failure = Log_Full and then Full_Reported;
+               --  A full log is said once, not at each checkpoint that
+               --  it fails (#1029).
+            begin
+               Discard_After (Checkpoint_Mark);
+               Append_Failed := False;
+               Checkpoint_Mark := 0;
+               New_First_Entry := 0;
+               Report_Problems;
+               if not Repeated then
+                  Rose.Console_IO.Put
+                    ("log: checkpoint not committed; the open entry keeps ");
+                  Rose.Console_IO.Put
+                    (Natural (Current_Log_Header.Log_Last
+                     - Current_Log_Header.Log_First + 1));
+                  Rose.Console_IO.Put_Line (" pages");
+               end if;
+            end;
             return;
          end if;
       end if;
@@ -830,6 +856,8 @@ package body Log.Server is
 
       if Entry_Failed then
          Rose.Console_IO.Put_Line ("log: checkpoint not committed");
+      else
+         Report_Space;
       end if;
 
       Page_Buffer_Last := 0;
@@ -1308,6 +1336,41 @@ package body Log.Server is
       end if;
    end Free_Before;
 
+   ----------------
+   -- Free_Pages --
+   ----------------
+
+   function Free_Pages return Log_Location_Id is
+      Last_Used : constant Log_Location_Id :=
+                    (if Writing then Current_Log_Header.Log_Last
+                     else Previous_Location (Next_Log_Location));
+      --  The open entry's last page, or before where the next entry's
+      --  header goes.
+   begin
+      if Last_Log_Device = 0 then
+         return 0;
+      elsif First_Committed = 0 then
+
+         --  Nothing is committed: only the open entry is in use.
+
+         return (if Writing
+                 then Last_Location - 1
+                   - Distance (Next_Log_Location, Last_Used)
+                 else Last_Location);
+      else
+
+         --  From the page after the last one in use up to the log's
+         --  first entry, which an append never reaches.
+
+         declare
+            Gap : constant Log_Location_Id :=
+                    Distance (Last_Used, Header.First_Entry);
+         begin
+            return (if Gap = 0 then 0 else Gap - 1);
+         end;
+      end if;
+   end Free_Pages;
+
    ----------------------
    -- Get_Device_Index --
    ----------------------
@@ -1337,7 +1400,8 @@ package body Log.Server is
      (Id    : Rose.Objects.Capability_Identifier;
       First : out Rose.Words.Word;
       Open  : out Rose.Words.Word;
-      Last  : out Rose.Words.Word)
+      Last  : out Rose.Words.Word;
+      Free  : out Rose.Words.Word)
    is
       pragma Unreferenced (Id);
    begin
@@ -1346,6 +1410,7 @@ package body Log.Server is
         (if First_Committed = 0 then Open
          else Rose.Words.Word (First_Committed));
       Last := Rose.Words.Word (Last_Location);
+      Free := Rose.Words.Word (Free_Pages);
    end Get_Space;
 
    ------------------
@@ -1779,10 +1844,15 @@ package body Log.Server is
 
    procedure Report_Problems is
    begin
-      if Failure /= No_Problem then
+      if Failure = Log_Full and then Full_Reported then
+         null;
+      elsif Failure /= No_Problem then
          Rose.Console_IO.Put ("log: ");
          Put_Problem (Failure);
          Rose.Console_IO.New_Line;
+         if Failure = Log_Full then
+            Full_Reported := True;
+         end if;
       end if;
 
       if Other_Problem /= No_Problem then
@@ -1799,6 +1869,37 @@ package body Log.Server is
       Other_Problem := No_Problem;
       Problem_Page := 0;
    end Report_Problems;
+
+   ------------------
+   -- Report_Space --
+   ------------------
+
+   procedure Report_Space is
+      Free : constant Log_Location_Id := Free_Pages;
+   begin
+      if Full_Reported then
+         Rose.Console_IO.Put_Line ("log: the log has room again");
+         Full_Reported := False;
+      end if;
+
+      if not Below_Reserve
+        and then Free < Rose.Limits.Log_Reserve_Pages
+      then
+         Rose.Console_IO.Put ("log: ");
+         Rose.Console_IO.Put (Natural (Free));
+         Rose.Console_IO.Put (" pages free, less than the reserve of ");
+         Rose.Console_IO.Put (Natural (Rose.Limits.Log_Reserve_Pages));
+         Rose.Console_IO.New_Line;
+         Below_Reserve := True;
+      elsif Below_Reserve
+        and then Free >= Rose.Limits.Log_Reserve_Pages
+      then
+         Rose.Console_IO.Put ("log: ");
+         Rose.Console_IO.Put (Natural (Free));
+         Rose.Console_IO.Put_Line (" pages free, the reserve is whole again");
+         Below_Reserve := False;
+      end if;
+   end Report_Space;
 
    -----------
    -- Reset --

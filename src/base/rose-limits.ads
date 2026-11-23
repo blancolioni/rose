@@ -58,6 +58,20 @@ package Rose.Limits is
    --  install's entries has 456, which 64 a commit didn't manage in a
    --  four-minute run.
 
+   Log_Table_Margin  : constant := 512;
+   Log_Reserve_Pages : constant :=
+                         Max_Mapped_Pages + Log_Table_Margin
+                         + Clean_Copy_Limit;
+   --  The checkpoint log keeps Log_Reserve_Pages free for checkpoints and
+   --  cleaning (#1029). Only a commit frees space in the log, so a log
+   --  too full for a checkpoint would stay full. The memory server pages
+   --  nothing out that would leave less than the reserve, so once the
+   --  log is that low, a checkpoint's pages are only the changed pages
+   --  in memory, at most Max_Mapped_Pages, and its tables, which take
+   --  less than Log_Table_Margin. Cleaning copies into the reserve, but
+   --  leaves Log_Table_Margin. If Max_Mapped_Pages comes to grow with the
+   --  machine's memory (#591), so must this.
+
    Page_Size : constant := 2 ** 12;
 
 end Rose.Limits;
