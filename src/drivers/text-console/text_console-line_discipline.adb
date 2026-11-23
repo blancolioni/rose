@@ -50,6 +50,13 @@ package body Text_Console.Line_Discipline is
    procedure Append (Element : Storage_Element);
    --  Add Element to the line being typed, and echo it.
 
+   procedure Truncate (Last : Storage_Count);
+   --  Drop the input after Input_Buffer (Last), and clear it, so that
+   --  nothing past Input_Last is ever kept (#1059).
+
+   procedure Forget_First_Key;
+   --  Drop the first key typed with line editing off, and clear it.
+
    procedure Echo (Text : String);
 
    procedure Rub_Out;
@@ -108,6 +115,17 @@ package body Text_Console.Line_Discipline is
    -------------
 
    function Editing return Boolean is (Line_Editing);
+
+   ----------------------
+   -- Forget_First_Key --
+   ----------------------
+
+   procedure Forget_First_Key is
+   begin
+      Keys (First_Key) := (others => <>);
+      First_Key := First_Key + 1;
+      Key_Count := Key_Count - 1;
+   end Forget_First_Key;
 
    ---------------
    -- Key_Ready --
@@ -177,7 +195,7 @@ package body Text_Console.Line_Discipline is
                --  Discard the line. Once ADR 0006 is implemented, this
                --  also sends Interrupt to the job that is reading.
 
-               Input_Last := Line_Start;
+               Truncate (Line_Start);
                Echo ("^C" & Character'Val (10));
 
             when EOT =>
@@ -226,7 +244,7 @@ package body Text_Console.Line_Discipline is
    procedure Rub_Out is
    begin
       if Input_Last > Line_Start then
-         Input_Last := Input_Last - 1;
+         Truncate (Input_Last - 1);
          Echo ((Character'Val (BS), ' ', Character'Val (BS)));
       end if;
    end Rub_Out;
@@ -247,9 +265,11 @@ package body Text_Console.Line_Discipline is
    procedure Set_Editing (Enabled : Boolean) is
    begin
       if Enabled and then not Line_Editing then
-         Key_Count := 0;
+         while Key_Count > 0 loop
+            Forget_First_Key;
+         end loop;
       elsif not Enabled and then Line_Editing then
-         Input_Last := Line_Start;
+         Truncate (Line_Start);
       end if;
       Line_Editing := Enabled;
    end Set_Editing;
@@ -271,8 +291,7 @@ package body Text_Console.Line_Discipline is
             declare
                Key : constant Rose.Keys.Key_Code := Keys (First_Key).Key;
             begin
-               First_Key := First_Key + 1;
-               Key_Count := Key_Count - 1;
+               Forget_First_Key;
                if Is_ASCII (Key) then
                   Last := Last + 1;
                   Buffer (Last) := Ada.Streams.Stream_Element (Key);
@@ -292,8 +311,8 @@ package body Text_Console.Line_Discipline is
             Target := Input_Buffer (1 .. Count);
             Input_Buffer (1 .. Input_Last - Count) :=
               Input_Buffer (Count + 1 .. Input_Last);
-            Input_Last := Input_Last - Count;
             Line_Start := Line_Start - Count;
+            Truncate (Input_Last - Count);
          end;
       else
 
@@ -314,8 +333,17 @@ package body Text_Console.Line_Discipline is
    begin
       Key := Keys (First_Key).Key;
       Modifiers := Keys (First_Key).Modifiers;
-      First_Key := First_Key + 1;
-      Key_Count := Key_Count - 1;
+      Forget_First_Key;
    end Take_Key;
+
+   --------------
+   -- Truncate --
+   --------------
+
+   procedure Truncate (Last : Storage_Count) is
+   begin
+      Input_Buffer (Last + 1 .. Input_Last) := (others => 0);
+      Input_Last := Last;
+   end Truncate;
 
 end Text_Console.Line_Discipline;

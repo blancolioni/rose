@@ -148,6 +148,16 @@ package body Auth_Server is
       Salt       : Storage_Array;
       Iterations : Positive;
       Hash       : out Storage_Array);
+   --  Hash Password, and then clear the stack that the hashing used.
+
+   procedure Scrub_Stack
+     with No_Inline;
+   --  Zero the stack below the caller, where the frames of what it called
+   --  last were. Hashing a password leaves copies of it there: the HMAC
+   --  key block and its pads, and the SHA-256 message schedule. Auth is
+   --  persistent, so a checkpoint would save them (#1059). The password
+   --  itself comes in the request's buffer, which is the caller's page,
+   --  read in place.
 
    procedure Launch_User
      (Name    : String;
@@ -240,6 +250,7 @@ package body Auth_Server is
    begin
       Rose.Crypto.PBKDF2_HMAC_SHA_256.Derive
         (Password_Bytes, Salt, Iterations, Hash);
+      Scrub_Stack;
    end Hash_Password;
 
    -----------------
@@ -522,6 +533,18 @@ package body Auth_Server is
          end;
       end loop;
    end Read_State;
+
+   -----------------
+   -- Scrub_Stack --
+   -----------------
+
+   procedure Scrub_Stack is
+      Scratch : Storage_Array (1 .. 8192)
+        with Volatile;
+      --  More than the hashing uses; the stack is 256 KiB.
+   begin
+      Scratch := (others => 0);
+   end Scrub_Stack;
 
    ------------------
    -- Start_Server --
