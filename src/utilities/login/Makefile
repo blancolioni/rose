@@ -13,7 +13,7 @@ login:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-login.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-auth.idl \
 	    $(INTERFACES)/users-user.idl \
@@ -51,5 +51,4 @@ login:
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

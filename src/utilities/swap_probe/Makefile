@@ -12,7 +12,7 @@ swap_probe:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-swap_probe.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/common-named.idl \
 	    $(INTERFACES)/commands-lookup.idl \
@@ -32,5 +32,4 @@ swap_probe:
 	    $(INTERFACES)/processes-restorable.idl \
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

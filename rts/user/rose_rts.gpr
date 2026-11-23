@@ -11,8 +11,8 @@
 --  adalib.
 --
 --  A program can't have its own copy of one of these units, since a unit
---  belongs to only one project: DROP_RTS_UNITS in mk/common.mk deletes
---  idle's copies from a program's build/generated.
+--  belongs to only one project: programs run idle through USER_IDLE in
+--  mk/common.mk, which deletes idle's copies from build/generated.
 
 project Rose_RTS is
 

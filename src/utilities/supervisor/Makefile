@@ -13,7 +13,7 @@ supervisor:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-supervisor.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-auth.idl \
 	    $(INTERFACES)/screens-supervisor.idl \
@@ -53,5 +53,4 @@ supervisor:
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

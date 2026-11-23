@@ -12,9 +12,8 @@ keyboard:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/devices-event_source.idl \
 	    $(INTERFACES)/devices-event_listener.idl \
 	    $(INTERFACES)/devices-interrupt_handler.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

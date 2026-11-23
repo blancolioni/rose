@@ -14,7 +14,7 @@ surface_console:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/streams-reader.idl $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
@@ -23,5 +23,4 @@ surface_console:
 	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
 	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/processes-restorable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

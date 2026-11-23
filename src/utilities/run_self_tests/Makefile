@@ -13,7 +13,7 @@ run_self_tests:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-run_self_tests.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/users-auth.idl \
@@ -61,15 +61,12 @@ run_self_tests:
 	    $(INTERFACES)/processes-replacer.idl \
 	    $(INTERFACES)/processes-replacement.idl \
 	    ../replaceable_test/held_call.idl
-	$(IDLE) --target user --command-client -I $(INTERFACES) \
-	    -o build/generated \
+	$(USER_IDLE) --command-client \
 	    ../../drivers/file/rose-core-file.idl \
 	    ../../drivers/directory/rose-core-directory.idl \
 	    ../../drivers/null_stream/rose-core-null_stream.idl \
 	    $(INTERFACES)/rose-core.idl
-	$(IDLE) --target user --command-client -I $(INTERFACES) \
-	    -o build/generated \
+	$(USER_IDLE) --command-client \
 	    ../user/rose-core-user.idl ../auth/rose-core-auth.idl \
 	    $(INTERFACES)/rose-core.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

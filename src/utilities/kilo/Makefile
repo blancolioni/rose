@@ -14,7 +14,7 @@ kilo:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-editors-kilo.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/rose-core-editors.idl \
 	    $(INTERFACES)/screens-terminal.idl \
@@ -31,5 +31,4 @@ kilo:
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

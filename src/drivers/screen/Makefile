@@ -13,7 +13,7 @@ screen:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl $(INTERFACES)/streams-reader.idl \
@@ -22,5 +22,4 @@ screen:
 	    $(INTERFACES)/processes-process.idl $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/processes-process_control.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

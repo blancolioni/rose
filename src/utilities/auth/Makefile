@@ -14,7 +14,7 @@ auth:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-auth.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/users-auth.idl \
 	    $(INTERFACES)/processes-replaceable.idl \
@@ -54,10 +54,8 @@ auth:
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
-	$(IDLE) --target user --command-client -I $(INTERFACES) \
-	    -o build/generated \
+	$(USER_IDLE) --command-client \
 	    ../user/rose-core-user.idl \
 	    ../../drivers/directory/rose-core-directory.idl \
 	    $(INTERFACES)/rose-core.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

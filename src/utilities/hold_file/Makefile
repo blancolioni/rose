@@ -13,7 +13,7 @@ hold_file:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-hold_file.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/caps-bank_constructor.idl \
@@ -43,8 +43,6 @@ hold_file:
 	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl
-	$(IDLE) --target user --command-client -I $(INTERFACES) \
-	    -o build/generated \
+	$(USER_IDLE) --command-client \
 	    ../../drivers/file/rose-core-file.idl $(INTERFACES)/rose-core.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

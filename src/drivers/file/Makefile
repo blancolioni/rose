@@ -17,7 +17,7 @@ file:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-file.idl \
 	    $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/processes-replaceable.idl \
@@ -41,5 +41,4 @@ file:
 	    $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

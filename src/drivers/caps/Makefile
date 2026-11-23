@@ -11,7 +11,7 @@ caps:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/caps-bank_constructor.idl \
 	    $(INTERFACES)/storage-bank.idl \
 	    $(INTERFACES)/storage-dependent.idl \
@@ -20,5 +20,4 @@ caps:
 	    $(INTERFACES)/caps-constructor.idl $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/common-resource.idl $(INTERFACES)/caps-releasable_cap_set.idl \
 	    $(INTERFACES)/processes-restorable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

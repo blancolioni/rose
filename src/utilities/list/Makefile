@@ -13,7 +13,7 @@ list:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-list.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/files-directory.idl \
 	    $(INTERFACES)/common-tree.idl \
@@ -24,5 +24,4 @@ list:
 	    $(INTERFACES)/streams-reader.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

@@ -15,7 +15,7 @@ null_stream:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-null_stream.idl \
 	    $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/streams-stream.idl \
@@ -35,5 +35,4 @@ null_stream:
 	    $(INTERFACES)/streams-seekable_reader.idl \
 	    $(INTERFACES)/streams-seekable.idl \
 	    $(INTERFACES)/common-resource.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

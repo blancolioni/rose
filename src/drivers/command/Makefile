@@ -12,7 +12,7 @@ command:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    $(INTERFACES)/commands-map.idl \
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/processes-launch.idl \
@@ -25,5 +25,4 @@ command:
 	    $(INTERFACES)/processes-heap.idl \
 	    $(INTERFACES)/storage-region.idl \
 	    $(INTERFACES)/storage-region_access.idl
-	$(DROP_RTS_UNITS)
 	gprbuild $(GPRBUILD_CARGS)

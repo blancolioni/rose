@@ -12,7 +12,7 @@ petal:
 	mkdir -p build/obj
 	mkdir -p build/bin
 	mkdir -p build/generated
-	$(IDLE) --target user -I $(INTERFACES) -o build/generated \
+	$(USER_IDLE) \
 	    rose-core-petal.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/commands-lookup.idl \
 	    $(INTERFACES)/processes-launch.idl \
@@ -47,7 +47,6 @@ petal:
 	    $(INTERFACES)/streams-seekable_reader.idl \
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
-	$(DROP_RTS_UNITS)
 	gprbuild petal.gpr $(GPRBUILD_CARGS)
 
 # The decisions of sudo are plain Ada, so they are tested on the host.

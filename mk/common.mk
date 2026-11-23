@@ -55,9 +55,8 @@ GPRBUILD_CARGS=-cargs -gno-record-gcc-switches
 KERNEL_RTS=$(ROOT)/rts/kernel/build/$(ARCH)
 USER_RTS=$(ROOT)/rts/user/build/$(ARCH)-rose
 
-# The userland RTS's own units, which rts/user/rose_rts.gpr provides to the
-# programs built with it (#1080). A program can't have its own copy of one,
-# so after each run of idle its Makefile deletes the RTS's interface specs
-# that idle wrote to build/generated.
-USER_RTS_UNITS=$(ROOT)/rts/user/build/rose-units.lst
-DROP_RTS_UNITS=rm -f $(addprefix build/generated/,$(shell cat $(USER_RTS_UNITS) 2>/dev/null))
+# How a userland program runs idle: the user target, into build/generated,
+# without the units that the userland RTS provides through
+# rts/user/rose_rts.gpr, since a unit can belong to only one project
+# (#1080). Give it any other options and the IDL files.
+USER_IDLE=$(ROOT)/scripts/user-idle $(IDLE) $(ROOT)
