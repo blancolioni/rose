@@ -17,7 +17,8 @@ package Restore.Installer is
       Requires_No_Framebuffer,
       Requires_Screen,
       Provides_Cap_Sets,
-      Requires_Console);
+      Requires_Console,
+      Test_Only);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
@@ -41,6 +42,10 @@ package Restore.Installer is
    --  is given the persistent console's Writer after its own caps, in
    --  place of the keyboard or the surface, so that it can write to the
    --  console; it has neither of the other two.
+   --  Test_Only: the program is only for the tests, and is installed, or
+   --  updated, only by a test install, with self-tests on the kernel's
+   --  command line (#1009). It is the last flag, so init's bits don't
+   --  move.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 

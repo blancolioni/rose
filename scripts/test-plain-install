@@ -1,0 +1,77 @@
+#!/bin/sh
+# A plain install, without self-tests on the kernel's command line (#1009).
+#
+#   scripts/test-plain-install [ISO]
+#
+# ISO is the install image, images/rose.iso by default. The test installs
+# Rose with the install media's text mode entry with the serial console,
+# the one before the test install, and checks that:
+#
+#   1. restore-install skips the programs that only the tests use, and
+#      init runs none of its tests and starts no holder;
+#   2. the disk boots, restores no holder, and the first user can log in
+#      and run a command.
+#
+# It isn't part of "make test", or of CI. It takes about five minutes,
+# exits with 0 if everything passed, and keeps the disk image and QEMU's
+# files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+TEST_PROGRAMS="process_probe run_self_tests hold_derived hold_file hold_home
+swap_probe page_probe hold_pages hold_transient replaceable_test"
+
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+qemu-img create -f raw "$DISK" "${ROSE_TEST_DISK_SIZE:-6G}" > /dev/null
+
+echo "Installing, without the tests"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+choose_entry_from_bottom 1
+wait_for_install 400 || fail "the install did not finish"
+sleep 15
+stop_qemu
+cp "$CONSOLE" "$WORK/install-console"
+
+for program in $TEST_PROGRAMS; do
+    grep -q "restore: installing: $program: skipped: not a test install" \
+        "$CONSOLE" || fail "$program was installed"
+done
+echo "restore-install skipped the test programs"
+
+for text in "init: a test install" "running self tests" "^hold_" \
+            "replace test" "exec forward test"; do
+    if grep -q -- "$text" "$CONSOLE"; then
+        grep -- "$text" "$CONSOLE" | head -3
+        fail "the plain install ran the tests: $text"
+    fi
+done
+echo "init ran no tests and started no holder"
+
+echo "Booting from the disk"
+start_qemu
+choose_last_entry
+wait_for "login:" 200 || fail "no login prompt"
+if grep -a -q "restored process [0-9]*/hold_" "$WORK/serial"; then
+    fail "a holder was restored"
+fi
+sleep 45
+type_text "$first_user
+"
+wait_for "password:" 20 || fail "no password prompt"
+type_text "$first_password
+"
+wait_for "petal>" 60 || fail "could not log in"
+type_text "echo plain install
+"
+wait_for "^plain install" 20 || fail "the session does not run commands"
+stop_qemu
+
+rm -rf "$WORK"
+echo "PASS"
