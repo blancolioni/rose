@@ -64,7 +64,7 @@ A file or directory comes in two forms, and the type of a cap says which right i
   `Add_Special_File` adds one, and the directory hands it out rather than serving it: a `Directory` gives its `Reader`, and a `Fixed_Directory` its `Stream`.
   Deleting it removes the entry, but not the server, which the directory didn't launch.
 * *The system directory* is made at install, and holds `null`, the null stream: reading it gives end of file, and writing to it succeeds and keeps nothing.
-  Login gives it to petal as a `Fixed_Directory`, which petal names `system`, so `cat system/null` and `echo hi > system/null` work, and nobody can change what is in it.
+  Login gives it to petal as a `Fixed_Directory`, which petal names `system`, so `cat //system/null` and `echo hi > //system/null` work, and nobody can change what is in it.
   A command gets it only as an argument the user names.
 * *A directory is a tree* (ADR 0042).
   Through `Tree`, a directory is a branch, an ordinary file a leaf, and a special file another kind of entry, so a program that reads its configuration through `Tree` can be given a directory.
@@ -80,16 +80,30 @@ There is no root directory, and no path that every process shares.
 A directory doesn't know its parent, and has no `..` entry.
 A process can reach only the directories it holds caps to, and what is below them.
 
-Petal keeps a table of named directory caps, such as `home`, instead of a root and a working directory (ADR 0002, section 5).
-A path starts from one of them, written `[home]`, or from petal's current directory:
+Petal keeps a table of named directory caps, `home` and `system`, instead of a root and a working directory (ADR 0002, section 5).
+Every path petal reads is a URI reference (ADR 0044), and the same rule holds for `cd`, for directory and file arguments, and for redirections:
+
+* `//name/path` starts from the named directory `name`, which is the reference's authority: `//home/src/rose`, `//system/null`;
+* `/path` starts from the root of the named directory that the current directory is in;
+* any other path starts from petal's current directory.
 
 ----
-cd [home]/src/rose
+cd //home/src/rose
+cat notes
 cd ..
+pwd
 ----
+
+`pwd` writes `//home/src`, which petal accepts anywhere a path is, and `cd` with no argument goes to `//home`.
 
 Petal resolves each name with `Find_Entry`, one directory at a time.
-It handles `..` itself, from its own record of the names it walked down: `..` above the named directory it started from is an error, because there is nothing above it.
+It handles `.` and `..` itself, from its own record of the names it walked down.
+Some paths are errors, where RFC 3986 would guess:
+
+* `..` above a named directory, because there is nothing above it;
+* an empty name between two `/`, as in `docs//notes`;
+* a name after `//` that isn't in the table;
+* a `:` before the first `/`, which would be a scheme, and petal knows none yet.
 
 == Commit and Rollback
 

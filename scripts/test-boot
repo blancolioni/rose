@@ -172,29 +172,69 @@ check_keytest
 echo "Editing a file with kilo"
 check_kilo
 
-# The system directory and its null (ADR 0035): list shows null as a
-# special file, writing to it succeeds and keeps nothing, and reading it
-# gives nothing.
-echo "Using system/null"
+# The system directory and its null (ADR 0035), which petal names
+# //system (ADR 0044): list shows null as a special file, writing to it
+# succeeds and keeps nothing, and reading it gives nothing.
+echo "Using //system/null"
 mark=$(console_mark)
-type_text "list system
+type_text "list //system
 "
 wait_for_console "null  (special file)" 20 "$mark" \
-    || fail "list system does not show null as a special file"
+    || fail "list //system does not show null as a special file"
 wait_for_console "null-directory  (directory)" 20 "$mark" \
-    || fail "list system does not show the null directory"
-type_text "echo discarded > system/null
+    || fail "list //system does not show the null directory"
+type_text "echo discarded > //system/null
 "
-type_text "cat system/null
+type_text "cat //system/null
 "
 type_text "echo null done
 "
 wait_for_console "^null done" 20 "$mark" \
-    || fail "petal stopped after using system/null"
+    || fail "petal stopped after using //system/null"
 if console_since "$mark" | grep -q "^discarded\|petal: "; then
     console_since "$mark"
-    fail "system/null kept what was written, or petal refused it"
+    fail "//system/null kept what was written, or petal refused it"
 fi
+
+# Petal's paths (ADR 0044): cd to a named directory, which pwd writes as
+# a path, a path from there, and cd with no argument back to //home.
+echo "Using paths"
+mark=$(console_mark)
+type_text "cd //system
+"
+type_text "pwd
+"
+wait_for_console "^//system" 20 "$mark" \
+    || fail "pwd did not write //system after cd //system"
+type_text "cat null
+"
+type_text "cd
+"
+type_text "pwd
+"
+wait_for_console "^//home" 20 "$mark" \
+    || fail "cd with no argument did not go back to //home"
+if console_since "$mark" | grep -q "petal: "; then
+    console_since "$mark"
+    fail "petal refused a path"
+fi
+
+# A path without // starts from the current directory, so system/null
+# in //home is not the special file; .. above a named directory, and a
+# scheme, are errors.
+mark=$(console_mark)
+type_text "cat system/null
+"
+wait_for_console "no directory named 'system'" 20 "$mark" \
+    || fail "system/null was not a path from //home"
+type_text "cd ..
+"
+wait_for_console "has no parent" 20 "$mark" \
+    || fail "cd .. went above //home"
+type_text "cat x:y
+"
+wait_for_console "knows no scheme" 20 "$mark" \
+    || fail "petal did not refuse a scheme"
 
 # An end of file logs out of petal (#458). Login then destroys the
 # session's bank, and makes a new one from the user's bank for the next
