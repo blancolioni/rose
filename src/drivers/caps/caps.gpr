@@ -22,7 +22,6 @@ project Caps is
        "rose-interfaces-caps-releasable_cap_set.ads",
        "rose-interfaces-caps-releasable_cap_set-server.ads",
        "rose-interfaces-caps-releasable_cap_set-server.adb",
-       "rose-interfaces-processes-restorable.ads",
        "rose-interfaces-processes-restorable-server.ads",
        "rose-interfaces-processes-restorable-server.adb",
        "rose-interfaces-storage-bank-client.ads",

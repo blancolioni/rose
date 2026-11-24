@@ -305,6 +305,12 @@ When `restore` resumes it, the kernel decides from what it was waiting for (ADR 
   The caller goes on waiting, and the server's reply resumes it, as before the restart.
   If the call carries a buffer, the kernel maps it into the server's shared slots again, where the server's request expects it.
   The checkpoint holds the slots, and `restore` has mapped the caller's pages before it resumes anything.
+* *A call that a restored server had received from a process that wasn't restored*, such as a transient one (#524).
+  Nothing waits for the reply, and the caller's buffer is gone.
+  The kernel deletes the server's reply cap for it, and names that cap in the server's restore notice, which comes before any other message.
+  `Rose.Server` then forgets the request it was holding, before a new call could be given the same cap number (#1114).
+  As a backstop, a shared slot that no caller has lent maps the server's own invocation page, not nothing.
+  A server whose code is older than this, which still answers the held request, writes into its own page instead of faulting, and its reply goes nowhere.
 
 So a call is handled once: a launch isn't sent twice, and a server's held request is still the caller's call.
 Each decision is in the kernel log, as `restore: waits for reply from` or `restore: makes its call again`.
