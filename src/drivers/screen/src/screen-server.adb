@@ -384,10 +384,12 @@ package body Screen.Server is
       pragma Unreferenced (Item);
    begin
       --  The buffer came back with the checkpoint (ADR 0025), and the
-      --  framebuffer's pages didn't.
+      --  framebuffer's pages didn't. A boot without the framebuffer, such
+      --  as the install media's update entry in text mode (#1092), keeps
+      --  the buffer, and Redraw draws nothing.
 
       if Buffer_Address /= System.Null_Address then
-         Screen.Framebuffer.Map;
+         Screen.Framebuffer.Restore;
          Redraw;
       end if;
    end Restored;
