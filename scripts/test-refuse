@@ -41,8 +41,9 @@ REFUSED="this boot set can't read the checkpoint"
 ASKED="type erase and press enter"
 
 # The install media's entries, with a disk that has Rose: the disk, the
-# install, and the install that erases the disk.
-ERASE_ENTRY=2
+# update with the framebuffer and in text mode, the install, and the
+# install that erases the disk.
+ERASE_ENTRY=4
 
 boot_erase_entry () {
     # boot_erase_entry ANSWER: boot the erasing entry, wait for its

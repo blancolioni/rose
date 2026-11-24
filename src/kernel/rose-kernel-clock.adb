@@ -120,7 +120,8 @@ package body Rose.Kernel.Clock is
                      Sender_Cap      => Params.Cap,
                      Endpoint        => Layout.Header.Endpoint,
                      Identifier      => Layout.Header.Identifier,
-                     Params          => Params);
+                     Params          => Params,
+                     Kind            => Rose.Kernel.Processes.Timeout);
                end if;
             end;
          end if;

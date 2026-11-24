@@ -219,13 +219,21 @@ package Rose.Kernel.Processes is
       Receiver_Cap    : Rose.Capabilities.Capability;
       Params          : Rose.Invocation.Invocation_Record);
 
+   type Message_Kind is
+     (Call, Restore_Notice, Signals, Interrupt, Timeout, Unknown);
+   --  What a message sent with Send_To_Endpoint is: a call from a
+   --  process, or one of the messages the kernel sends itself. It is
+   --  kept with a queued message, so that a message lost from the queue
+   --  can be named (#1014). Unknown is a message queued before a restore.
+
    procedure Send_To_Endpoint
      (From_Process_Id : Process_Id;
       To_Process_Id   : Process_Id;
       Sender_Cap      : Rose.Capabilities.Capability;
       Endpoint        : Rose.Objects.Endpoint_Index;
       Identifier      : Rose.Objects.Capability_Identifier;
-      Params          : Rose.Invocation.Invocation_Record);
+      Params          : Rose.Invocation.Invocation_Record;
+      Kind            : Message_Kind := Call);
 
    procedure Send_Reply
      (From_Process_Id : Process_Id;
@@ -735,7 +743,11 @@ private
          Queued_Params     : Rose.Invocation.Invocation_Record;
          Queued_Endpoint   : Rose.Objects.Endpoint_Index;
          Queued_Cap_Id     : Rose.Objects.Capability_Identifier;
-         Code_Page         : Rose.Addresses.Physical_Page_Address;
+         Queued_Kind       : Message_Kind := Unknown;
+         Queued_From       : Process_Id := Null_Process_Id;
+         --  What the queued message is, and who sent it: kept only to
+         --  report a lost message, and not saved in a checkpoint.
+         Code_Page        : Rose.Addresses.Physical_Page_Address;
          Data_Page         : Rose.Addresses.Physical_Page_Address;
          Stack_Page        : Rose.Addresses.Physical_Page_Address;
          Invocation_Page   : Rose.Addresses.Physical_Page_Address;
