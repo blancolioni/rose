@@ -233,7 +233,9 @@ An update reads the FAT only to find the three files (`Restore.Boot_Sets`), and 
 === Updating an installed system
 
 A new release reaches an installed disk from its install media, without losing the checkpoint (ADR 0031).
-When hd0 has Rose, the install media's menu has an entry `Update Rose on hd0` after its default entry, which puts `update-hd0` on the kernel's command line.
+When hd0 has Rose, the install media's menu has two entries `Update Rose on hd0` after its default entry, which put `update-hd0` on the kernel's command line.
+The update runs hd0's restored system until it restarts, with the console that system was installed with, so the first entry keeps the framebuffer and the second, `(text mode)`, keeps text mode: the one to choose is the one hd0 was installed with (#1092).
+GRUB can't tell which that is.
 It loads the install media's boot set, in the install variant, and `restore-install`:
 
 . finds the last checkpoint. One that this boot set can't read is refused, as in any boot (see <<restore-boot>>), and with no checkpoint there is nothing to update;
@@ -243,6 +245,7 @@ It loads the install media's boot set, in the install variant, and `restore-inst
 . tells `init`, which, as after an install, takes a checkpoint and restarts the machine, which then boots the new set from hd0.
 
 If any step before the menu fails, `restore-install` says why and exits, and hd0 still boots the set it had.
+In text mode, the reason is on the screen; with the framebuffer, no console has started yet, and it is only on the serial port.
 Each refusal leaves hd0 exactly as it was.
 The entry boots in text mode, so that a refusal is on the screen.
 
@@ -269,7 +272,7 @@ The update's last step replaces the persistent servers that can take over from t
 
 Both boots restore the system if hd0 has a checkpoint, so booting the install media on an installed disk restores the system rather than installing it again.
 The install media's GRUB menu goes further: when hd0's boot partition has a GRUB menu, its default entry loads that menu, so the machine boots hd0's own modules even with the install media still in (#413).
-Its next entry, `Update Rose on hd0`, puts the install media's boot set on hd0 and keeps the checkpoint (see <<updating>>), and installing again is the entry after that, `Install Rose`.
+Its next two entries, `Update Rose on hd0` with the framebuffer and in text mode, put the install media's boot set on hd0 and keep the checkpoint (see <<updating>>), and installing again is the entry after them, `Install Rose`.
 
 A checkpoint that the boot set can't read, because of a table version it doesn't know or interfaces it doesn't have, is neither restored nor installed over (#375): `restore` says why and stops, before it has written anything to hd0.
 To put a new system on such a disk, the install media has a third entry, `Install Rose, erasing hd0` (#836).

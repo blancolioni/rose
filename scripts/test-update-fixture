@@ -81,8 +81,10 @@ qemu-img convert -O raw "$FIXTURE" "$DISK" || fail "could not copy the fixture"
 
 echo "Updating $(basename "$FIXTURE") from the install media"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
-# The menu's first entry boots hd0, and the second updates it.
-choose_entry 1
+# The menu's first entry boots hd0, and the next two update it: with
+# the framebuffer, and in text mode with the serial console, which the
+# fixture was installed with.
+choose_entry 2
 wait_for_serial "kernel: restarting" 900 || fail "the update did not finish"
 stop_qemu
 
