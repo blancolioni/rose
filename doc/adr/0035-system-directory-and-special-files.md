@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-14
 - **Related:** #929 (this decision), [ADR 0002](0002-typed-commands-and-directory-caps.md) (directories as named caps, roles), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (rights are types), [ADR 0020](0020-clock.md) (the clock, a system service passed as a role), [ADR 0029](0029-installed-capabilities.md) (installed capabilities), [ADR 0031](0031-updating-an-installation.md) (the interfaces freeze with 0.4.0), [ADR 0036](0036-directory-views.md) (directory views, which amends sections 2 and 3)
+- **Amended by:** [ADR 0044](0044-petal-paths-as-uri-references.md), where `system` is an entry in petal's table and its special files are `//system/null` (sections 2 and 5)
 
 ## Context
 
