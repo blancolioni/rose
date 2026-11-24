@@ -1673,9 +1673,21 @@ package body Mem.Processes is
          Persistent    => Persistent);
 
       --  The page is in the log only in older entries, so it is dirty:
-      --  the next checkpoint saves it with the rest.
+      --  the next checkpoint saves it with the rest. Past the limit of
+      --  changed pages, some are paged out first; a restore can't wait
+      --  for a checkpoint, so if none can be, it goes past it (#998).
 
-      Mem.Page_Table.Set_Writable (Mem.Page_Table.Find (Pid, V_Page));
+      declare
+         Position : constant Mem.Page_Table.Cursor :=
+                      Mem.Page_Table.Find (Pid, V_Page);
+         Room     : Boolean;
+         pragma Warnings (Off, Room);
+      begin
+         if Mem.Page_Table.Would_Pass_Dirty_Limit (Position) then
+            Mem.Virtual_Map.Make_Room_For_Change (Room);
+         end if;
+         Mem.Page_Table.Set_Writable (Position);
+      end;
    end Restore_Page;
 
    ---------------------

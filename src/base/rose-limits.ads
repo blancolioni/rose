@@ -22,21 +22,28 @@ package Rose.Limits is
    Max_Physical_Pages : constant := 2 ** 20 - 1;
    Max_Virtual_Pages : constant := 2 ** 20 - 1;
 
-   Max_Mapped_Pages : constant := 8192;
-   --  The pages that are mapped at once, for all processes, which the
-   --  memory server keeps in a table (Mem.Page_Table). It is as many as a
-   --  32 MB machine has, which the system needs as a minimum. On a
-   --  machine with more, the memory server frees pages when the table is
-   --  nearly full, as it does when free pages run low (Reserve_Low_Pages
-   --  and Reserve_High_Pages), so it maps at most this many. A page that
+   Min_Mapped_Pages : constant := 8192;
+   --  The fewest pages the memory server's table of mapped pages
+   --  (Mem.Page_Table) has room for: as many as a 32 MB machine has, which
+   --  the system needs as a minimum. The memory server sizes the table
+   --  when it starts, at twice its physical pages, since processes can
+   --  map a shared or cached page more than once, and at least this many
+   --  (#998). It takes the table's pages from its own memory, not from
+   --  the kernel's reservation for boot modules. If the table still
+   --  fills, the memory server frees pages, as it does when free pages
+   --  run low (Reserve_Low_Pages and Reserve_High_Pages). A page that
    --  still doesn't fit is mapped and then not tracked, and a later fault
    --  on it fails the process (#591).
 
-   Mapped_Page_Table_Bytes : constant := Max_Mapped_Pages * 12;
-   --  The memory server's table, which is part of its writable data: a
-   --  64-bit entry and a 32-bit index of the dirty pages, for each page.
-   --  The kernel makes room for it when it loads the boot modules
-   --  (Rose.Kernel.Boot_Module_Pages).
+   Max_Dirty_Pages : constant := 8192;
+   --  The persistent pages that the memory server lets be changed since
+   --  the last checkpoint, and so the most that a checkpoint writes of
+   --  them. A write that would change one more pages out a batch of
+   --  changed pages first, or else waits for a checkpoint (#998). This
+   --  bounds the log's reserve (Log_Reserve_Pages), however large the
+   --  table of mapped pages is. A page that a restore or a replayed fault
+   --  changes, which can't wait, can take it past the limit, and the
+   --  memory server says so in the kernel's log.
 
    Reserve_Low_Pages  : constant := 64;
    Reserve_High_Pages : constant := 128;
@@ -77,17 +84,17 @@ package Rose.Limits is
 
    Log_Table_Margin  : constant := 512;
    Log_Reserve_Pages : constant :=
-                         Max_Mapped_Pages + Log_Table_Margin
+                         Max_Dirty_Pages + Log_Table_Margin
                          + Clean_Copy_Limit;
    --  The checkpoint log keeps Log_Reserve_Pages free for checkpoints and
    --  cleaning (#1029). Only a commit frees space in the log, so a log
    --  too full for a checkpoint would stay full. The memory server pages
    --  nothing out that would leave less than the reserve, so once the
    --  log is that low, a checkpoint's pages are only the changed pages
-   --  in memory, at most Max_Mapped_Pages, and its tables, which take
+   --  in memory, at most Max_Dirty_Pages, and its tables, which take
    --  less than Log_Table_Margin. Cleaning copies into the reserve, but
-   --  leaves Log_Table_Margin. If Max_Mapped_Pages comes to grow with the
-   --  machine's memory (#591), so must this.
+   --  leaves Log_Table_Margin. It doesn't grow with the machine's memory,
+   --  since the changed pages are limited, not the mapped ones (#998).
 
    Page_Size : constant := 2 ** 12;
 

@@ -364,7 +364,8 @@ If there is none, it says that there is no system on the disk, and the install m
 == Future Work
 
 * *Fixed tables in boot modules.*
-  `mem`'s table of mapped pages (8,192, #998) and its table of changes (4,096) are sized when it is built, and taken from the memory that the kernel sets aside for boot modules, as are the store's tables.
+  `mem`'s table of changes (4,096) is sized when it is built, and taken from the memory that the kernel sets aside for boot modules, as are the store's tables.
+  Its table of mapped pages is sized when it starts, at twice its physical pages, and taken from its own memory (#998).
   ADR 0039 (proposed) looks at moving such state out of the boot modules.
 * *Persistent servers* (ADR 0008, proposed).
   `elf`, `pci` and `timer` are still boot modules, so the state that persistent processes keep in them, such as pending timeouts, is lost at a restore.
