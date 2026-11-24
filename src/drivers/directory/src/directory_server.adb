@@ -1011,7 +1011,6 @@ package body Directory_Server is
               (Endpoint        => Endpoint,
                Create_Endpoint =>
                  Rose.System_Calls.Create_Endpoint_Capability,
-               Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
                Cap_Set_Service => Cap_Set_Service_Cap,
                Served          => Item.Served,
                Control         => Item.Control);
@@ -1024,8 +1023,6 @@ package body Directory_Server is
                  (Endpoint         => Endpoint,
                   Create_Endpoint  =>
                     Rose.System_Calls.Create_Endpoint_Capability,
-                  Delete_Cap       =>
-                    Rose.System_Calls.Delete_Cap_Capability,
                   Cap_Set_Service  => Cap_Set_Service_Cap,
                   File_Launch      => File_Launch_Cap,
                   Directory_Launch => Directory_Launch_Cap,

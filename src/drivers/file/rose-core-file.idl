@@ -1,4 +1,4 @@
-command Rose.Core.File : Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Cap_Set_Service
+command Rose.Core.File : Caps.Create_Endpoint, Caps.Cap_Set_Service
   with Summary     => "Serve a file.",
        Description => """
           File serves one file (ADR 0003): its contents, the readers and

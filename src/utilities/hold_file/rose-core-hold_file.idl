@@ -1,5 +1,5 @@
 command Rose.Core.Hold_File
-  : Caps.Create_Endpoint, Streams.Standard_Output, Caps.Delete_Cap, Commands.Find_Command,
+  : Caps.Create_Endpoint, Streams.Standard_Output, Commands.Find_Command,
     Caps.Cap_Set_Service
   with Summary     => "Hold a replaced file's streams across a restore.",
        Description => """

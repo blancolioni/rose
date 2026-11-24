@@ -280,7 +280,8 @@ package body Store.Devices is
    --  If processes are queued to be ended, tell mem, by a send that
    --  doesn't wait.
 
-   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability)
+     renames Rose.System_Calls.Delete_Cap;
    --  Delete one of the storage server's own caps, if it isn't null.
 
    procedure Free_Dependent (Index : Positive);
@@ -742,14 +743,7 @@ package body Store.Devices is
 
       --  A new cap comes with each checkpoint.
 
-      declare
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Append_Page);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end;
+      Delete_Cap (Append_Page);
    end Checkpoint;
 
    ---------------
@@ -968,22 +962,6 @@ package body Store.Devices is
 
    end Create_Subregion;
 
-   ----------------
-   -- Delete_Cap --
-   ----------------
-
-   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
-      use type Rose.Capabilities.Capability;
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      if Cap /= Rose.Capabilities.Null_Capability then
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end if;
-   end Delete_Cap;
-
    -------------------------
    -- Dependent_Destroyed --
    -------------------------
@@ -1093,10 +1071,7 @@ package body Store.Devices is
 
       for Index in Doomed'Range loop
          if Doomed (Index) then
-            Rose.System_Calls.Initialize_Send
-              (Params, Rose.System_Calls.Delete_Cap_Capability);
-            Rose.System_Calls.Send_Cap (Params, Banks (Index).Access_Cap);
-            Rose.System_Calls.Invoke_Capability (Params);
+            Delete_Cap (Banks (Index).Access_Cap);
 
             Rose.Interfaces.Storage.Bank.Server.Remove_Instance
               (Bank_Id (Index));
@@ -1939,7 +1914,6 @@ package body Store.Devices is
 
       declare
          Region : Region_Record renames Regions (Index);
-         Params : aliased Rose.Invocation.Invocation_Record;
          Freed  : Rose.Words.Word_64 := 0;
       begin
          Rose.Trace.Event
@@ -1976,10 +1950,7 @@ package body Store.Devices is
             end;
          end if;
 
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Region.Access_Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
+         Delete_Cap (Region.Access_Cap);
 
          Uncharge (Region.Bank, Freed, 1);
          Region := (others => <>);

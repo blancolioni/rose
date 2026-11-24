@@ -436,7 +436,6 @@ package body Auth_Server is
               (Endpoint         => Endpoint,
                Create_Endpoint  =>
                  Rose.System_Calls.Create_Endpoint_Capability,
-               Delete_Cap       => Rose.System_Calls.Delete_Cap_Capability,
                Cap_Set_Service  => Cap_Sets,
                File_Launch      => File_Launch.Launch_Cap,
                Directory_Launch => Directory_Launch.Launch_Cap,

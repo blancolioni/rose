@@ -96,7 +96,6 @@ package body File_Holder is
          Rose.Core.File_Client.Call
            (Endpoint        => Endpoint,
             Create_Endpoint => Rose.System_Calls.Create_Endpoint_Capability,
-            Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
             Cap_Set_Service => Cap_Set_Service,
             Served          => Served,
             Control         => Control);

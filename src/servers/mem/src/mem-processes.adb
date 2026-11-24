@@ -990,26 +990,11 @@ package body Mem.Processes is
       use Rose.Interfaces.Processes.Kernel_Process.Client;
       P : Memory_Process_Record renames Process_Table (Process);
 
-      procedure Delete (Cap : Rose.Capabilities.Capability);
+      procedure Delete (Cap : Rose.Capabilities.Capability)
+        renames Rose.System_Calls.Delete_Cap;
 
       procedure Report_Faults;
       --  Report the process's fault counts as trace events.
-
-      ------------
-      -- Delete --
-      ------------
-
-      procedure Delete (Cap : Rose.Capabilities.Capability) is
-         use type Rose.Capabilities.Capability;
-         Params : aliased Rose.Invocation.Invocation_Record;
-      begin
-         if Cap /= 0 then
-            Rose.System_Calls.Initialize_Send
-              (Params, Rose.System_Calls.Delete_Cap_Capability);
-            Rose.System_Calls.Send_Cap (Params, Cap);
-            Rose.System_Calls.Invoke_Capability (Params);
-         end if;
-      end Delete;
 
       -------------------
       -- Report_Faults --

@@ -292,7 +292,6 @@ package body Init.Users is
    procedure Create_System_Directory
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
       System          : out Rose.Capabilities.Capability)
    is
@@ -356,9 +355,9 @@ package body Init.Users is
 
       --  The directory command's roles' caps, as src/drivers/directory/
       --  rose-core-directory.idl declares them: Create_Endpoint,
-      --  Delete_Cap, Cap_Set_Service, File_Launch and Directory_Launch,
-      --  then Previous, which is null for a new directory; and its
-      --  results Served and Control. Nothing holds its Control yet, so
+      --  Cap_Set_Service, File_Launch and Directory_Launch, then
+      --  Previous, which is null for a new directory; and its results
+      --  Served and Control. Nothing holds its Control yet, so
       --  the system directory isn't replaced by an update.
 
       Endpoint := Launch_Command (Directory_Launch);
@@ -370,7 +369,6 @@ package body Init.Users is
       Rose.System_Calls.Send_Caps
         (Params,
          (Create_Endpoint,
-          Delete_Cap,
           Cap_Sets,
           File_Launch,
           Directory_Launch,
@@ -394,7 +392,7 @@ package body Init.Users is
       --  The null stream command's role, Create_Endpoint, and its results
       --  Served and Null_Directory (src/drivers/null_stream/
       --  rose-core-null_stream.idl). It deletes its own caps with the
-      --  Delete flag (#1022), so it has no Delete_Cap role (#1023).
+      --  Delete flag (#1022), as every program does (#1023).
 
       Endpoint := Launch_Command (Null_Launch);
       if Endpoint = Rose.Capabilities.Null_Capability then

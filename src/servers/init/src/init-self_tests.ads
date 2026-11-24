@@ -6,7 +6,6 @@ package Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
@@ -18,7 +17,6 @@ package Init.Self_Tests is
    --  registry's Find_Cap, and wait for it to finish (#460). It is called
    --  with the caps of its roles (src/utilities/run_self_tests/
    --  rose-core-run_self_tests.idl): Standard_Output, Create_Endpoint,
-   --  Delete_Cap, without which the tests' deletes do nothing (#895),
    --  Commands, the registry's Commands interface, Clock, the clock's
    --  Clock interface, a sub-bank of the system bank (Init.Grants), for
    --  its Storage_Service role,
@@ -47,8 +45,11 @@ package Init.Self_Tests is
    --  the userland cap set server, isn't null, also check that a parent
    --  passed through a cap set survives its holder's copy (ADR 0032,
    --  #864): deleting the holder's copy leaves its child working, and the
-   --  copy taken from the set still revokes the child.  It reports each
-   --  check on Standard_Output, and is True if they all passed.
+   --  copy taken from the set still revokes the child.  Delete_Cap is
+   --  the kernel's retired cap, which only init has, and the test checks
+   --  that it still deletes (#1023); the rest of the test deletes with
+   --  the Delete flag (#1022).  It reports each check on Standard_Output,
+   --  and is True if they all passed.
 
    function Swap_Test
      (Find_Cap        : Rose.Capabilities.Capability;
@@ -128,8 +129,7 @@ package Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
-      Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Rescind_Cap     : Rose.Capabilities.Capability)
       return Boolean;
    --  Derive Parent from Commands, the registry's Commands interface,
    --  and Child from Parent, and give them to the hold_derived command,
@@ -165,14 +165,13 @@ package Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
       Replace_Process : Rose.Capabilities.Capability)
       return Boolean;
    --  Launch the hold_file command, found through Find_Cap, with
-   --  Create_Endpoint, Standard_Output, Delete_Cap, Commands and Cap_Sets
-   --  for its roles. It launches a file, and holds a writer and a reader
+   --  Create_Endpoint, Standard_Output, Commands and Cap_Sets for its
+   --  roles. It launches a file, and holds a writer and a reader
    --  of it. Then replace the file's process with a new version, through
    --  Replace_Process, mem's Replacer (#867, ADR 0032). Hold_file is
    --  persistent, so the checkpoint saves it and the new version of the

@@ -323,8 +323,7 @@ package body Init.Run is
             Standard_Output => Console_Stream_Cap,
             Commands        => Commands_Cap,
             Derive_Cap      => Derive_Cap,
-            Rescind_Cap     => Rescind_Cap,
-            Delete_Cap      => Delete_Cap)
+            Rescind_Cap     => Rescind_Cap)
          then
             Init.Calls.Send_String
               (Console_Stream_Cap, "init: hold_derived did not start" & NL);
@@ -337,7 +336,6 @@ package body Init.Run is
            (Find_Cap        => Find_Cap,
             Create_Endpoint => Create_Endpoint_Cap,
             Standard_Output => Console_Stream_Cap,
-            Delete_Cap      => Delete_Cap,
             Commands        => Commands_Cap,
             Cap_Sets        => Cap_Sets_Cap,
             Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
@@ -353,7 +351,6 @@ package body Init.Run is
            (Find_Cap        => Find_Cap,
             Standard_Output => Console_Stream_Cap,
             Create_Endpoint => Create_Endpoint_Cap,
-            Delete_Cap      => Delete_Cap,
             Commands        => Commands_Cap,
             Clock           => Clock_Cap,
             Screen          => Screen_Cap,
@@ -989,7 +986,6 @@ package body Init.Run is
       Init.Users.Create_System_Directory
         (Find_Cap        => Find_Cap,
          Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Delete_Cap,
          Cap_Sets        => Cap_Sets_Cap,
          System          => System_Directory_Cap);
       if System_Directory_Cap = Null_Capability then
