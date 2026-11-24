@@ -84,6 +84,14 @@ package body Rose.Kernel.Processes.Snapshot is
       Caller : Rose.Objects.Object_Id);
    --  Delete the reply caps that Pid has for Caller.
 
+   procedure Delete_Orphan_Reply_Caps (Pid : Process_Id);
+   --  Delete the reply caps that Pid has for callers that weren't
+   --  restored, such as transient processes (#524), and keep the first
+   --  of them for Pid's restore notice. A call that Pid deferred for such
+   --  a caller would otherwise be answered into a buffer slot that
+   --  nothing maps any more (#1114). Every process must have been
+   --  restored, so that a caller that is missing now is gone.
+
    procedure Resume_Blocked_Call
      (Pid     : Process_Id;
       Waiting : out Boolean);
@@ -145,6 +153,54 @@ package body Rose.Kernel.Processes.Snapshot is
          end if;
       end;
    end Called_Server;
+
+   ------------------------------
+   -- Delete_Orphan_Reply_Caps --
+   ------------------------------
+
+   procedure Delete_Orphan_Reply_Caps (Pid : Process_Id) is
+      use Rose.Capabilities.Layout;
+      P       : Kernel_Process_Entry renames Process_Table (Pid);
+      Deleted : Natural := 0;
+   begin
+      P.Orphan_Reply_Count := 0;
+
+      for Cap in 1 .. Cap_Tables.Last_Cap (P.Caps) loop
+         if Cap_Tables.Is_Active (P.Caps, Cap) then
+            declare
+               Layout : constant Capability_Layout := Cap_Layout (Pid, Cap);
+            begin
+               if Layout.Header.Cap_Type = Reply_Cap
+                 and then To_Process_Id (Layout.Payload) = Null_Process_Id
+               then
+                  Delete_Cap (Pid, Cap);
+                  Deleted := Deleted + 1;
+                  if P.Orphan_Reply_Count < Max_Orphan_Replies then
+                     P.Orphan_Reply_Count := P.Orphan_Reply_Count + 1;
+                     P.Orphan_Replies (P.Orphan_Reply_Count) := Cap;
+                  end if;
+               end if;
+            end;
+         end if;
+      end loop;
+
+      if Deleted > 0 then
+         Debug.Put (Pid);
+         Rose.Boot.Console.Put (": restore: deleted ");
+         Rose.Boot.Console.Put (Rose.Words.Word_32 (Deleted));
+         Rose.Boot.Console.Put_Line
+           (" reply caps for callers that weren't restored");
+      end if;
+
+      --  A deferred call past the ones the notice names stays, and
+      --  would be answered into an unmapped slot: say so.
+
+      if Deleted > P.Orphan_Reply_Count then
+         Debug.Put (Pid);
+         Rose.Boot.Console.Put_Line
+           (": restore: too many to name in the restore notice");
+      end if;
+   end Delete_Orphan_Reply_Caps;
 
    -----------------------
    -- Delete_Reply_Caps --
@@ -476,6 +532,7 @@ package body Rose.Kernel.Processes.Snapshot is
          P.FPU_Valid := Item.FPU_Valid = 1;
          FPU_Bytes := Item.FPU_State;
          P.Signals := Item.Signals;
+         P.Orphan_Reply_Count := 0;
 
          for I in Page_Range_Index loop
             declare
@@ -869,6 +926,8 @@ package body Rose.Kernel.Processes.Snapshot is
                P.Flags (Restored_Blocked) := False;
                Resume_Blocked_Call (Pid, Waiting);
             end if;
+
+            Delete_Orphan_Reply_Caps (Pid);
 
             --  A process with a Restorable interface is told, the next
             --  time it receives, that it has been restored.

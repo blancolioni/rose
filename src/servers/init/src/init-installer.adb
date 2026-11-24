@@ -20,12 +20,15 @@ package body Init.Installer is
    --  A program's cap requests, which Grant_Caps reads here rather than on
    --  the stack, which is a page before mem runs (#1004).
 
-   Exec_Region_Length : constant := 64 * 2 ** 20;
-   --  The storage for the images of the programs that exec installs.
-   --  They came to more than 8 MB, with debugging information, once the
-   --  console became a terminal (#454), and to 15 MB of 16 with 26
-   --  programs (#669).  The store only gives a page space on a device
-   --  when it is written, so a larger region costs only page ids.
+   Exec_Region_Length : constant := 4 * 2 ** 30;
+   --  The storage for the images of the programs that exec installs,
+   --  and for every version an update installs, which exec keeps (#875).
+   --  The store only gives a page space on a device when it is written,
+   --  and charges a bank for a page only then, so the size costs only
+   --  page ids, of which there are 2 ** 56. A region can't grow once it
+   --  is reserved, so this is large enough never to be the limit: the
+   --  space in the store partition is (#1109). 64 MiB filled up after
+   --  two updates.
 
    Buffer : System.Storage_Elements.Storage_Array (1 .. Rose.Limits.Page_Size)
      with Alignment => 4096;

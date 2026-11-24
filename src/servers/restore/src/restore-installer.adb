@@ -16,6 +16,7 @@ with Rose.Interfaces.Commands.Map.Client;
 with Rose.Interfaces.Streams.Releasable_Reader.Client.Conversions;
 with Rose.Interfaces.Processes.Process_Control;
 with Rose.Interfaces.Streams.Reader.Client;
+with Rose.Interfaces.Screens.Terminal.Client;
 
 with Restore.Checkpoints;
 with Restore.Command_Line;
@@ -117,6 +118,15 @@ package body Restore.Installer is
    Exec_Client : Rose.Interfaces.Processes.Exec.Client.Exec_Client;
    Map_Client  : Rose.Interfaces.Commands.Map.Client.Map_Client;
    --  The restored exec and command registry, for Update.
+
+   Not_Updated : Natural := 0;
+   --  The programs that Update couldn't install again, which keep their
+   --  installed versions.
+
+   procedure Report_Not_Updated;
+   --  Say how many programs Update couldn't install again, on restore's
+   --  console and on the restored persistent console, which is the one
+   --  left on the screen (#1109).
 
    procedure Update_Executable
      (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client;
@@ -713,6 +723,60 @@ package body Restore.Installer is
       Interface_Caps := Array_Of_Capabilities (Caps);
    end Open_Interface;
 
+   ------------------------
+   -- Report_Not_Updated --
+   ------------------------
+
+   procedure Report_Not_Updated is
+      use System.Storage_Elements;
+      use type Rose.Capabilities.Capability;
+      Text     : String (1 .. 100);
+      Data     : Storage_Array (1 .. Text'Length);
+      Last     : Natural := 0;
+      Digits_N : String (1 .. 10);
+      First    : Positive := Digits_N'Last + 1;
+      N        : Natural := Not_Updated;
+      Terminal : Rose.Interfaces.Screens.Terminal.Client.Terminal_Client;
+      Cap      : Rose.Capabilities.Capability;
+   begin
+      if Not_Updated = 0 then
+         return;
+      end if;
+
+      loop
+         First := First - 1;
+         Digits_N (First) := Character'Val (Character'Pos ('0') + N mod 10);
+         N := N / 10;
+         exit when N = 0;
+      end loop;
+
+      Append (Text, Last, "restore: ");
+      Append (Text, Last, Digits_N (First .. Digits_N'Last));
+      Append (Text, Last,
+              (if Not_Updated = 1 then " program" else " programs"));
+      Append (Text, Last,
+              " not installed again; installed versions kept");
+
+      Rose.Console_IO.Put_Line (Text (1 .. Last));
+
+      Cap := Restore.Checkpoints.Find_Server
+        (Rose.Interfaces.Screens.Terminal.Terminal_Interface);
+      if Cap = Rose.Capabilities.Null_Capability then
+         return;
+      end if;
+
+      Last := Last + 1;
+      Text (Last) := Character'Val (10);
+
+      for I in 1 .. Last loop
+         Data (Storage_Offset (I)) := Character'Pos (Text (I));
+      end loop;
+      Rose.Interfaces.Screens.Terminal.Client.Open (Terminal, Cap);
+      Rose.Interfaces.Screens.Terminal.Client.Write
+        (Terminal, Data (1 .. Storage_Offset (Last)));
+      Rose.Interfaces.Screens.Terminal.Client.Close (Terminal);
+   end Report_Not_Updated;
+
    -------------------
    -- Send_Cap_Sets --
    -------------------
@@ -900,6 +964,7 @@ package body Restore.Installer is
       Rose.Console_IO.Put_Line ("restore: installing the commands again");
       For_Each_Program
         (File_System, Source, Update_Executable'Access, Found);
+      Report_Not_Updated;
 
       --  Then the restored servers that can take over from themselves,
       --  with the programs just installed (ADR 0031 section 5, #830).
@@ -956,6 +1021,7 @@ package body Restore.Installer is
             Rose.Console_IO.Put ("restore: cannot install ");
             Rose.Console_IO.Put (Name);
             Rose.Console_IO.Put_Line (" again");
+            Not_Updated := Not_Updated + 1;
          else
             Rose.Interfaces.Commands.Map.Client.Add (Map_Client, Name, Launch);
             if Rose.Interfaces.Commands.Map.Client.Has_Error then

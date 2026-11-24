@@ -112,9 +112,10 @@ start_qemu
 choose_entry_from_bottom 1
 wait_for_console "caps: restored" 200 \
     || fail "the new set did not restore the checkpoint"
-# Login is still reading the name it was reading when the fixture was
-# made, and what the update wrote to the console has scrolled its prompt
-# away: an empty name brings the prompt back.
+# Login is transient, so supervisor has started a new one, and what the
+# update wrote to the console may have scrolled its prompt away: an
+# empty name brings the prompt back. The old login's deferred read is
+# forgotten when the console is told it was restored (#1114).
 type_text "
 "
 log_in

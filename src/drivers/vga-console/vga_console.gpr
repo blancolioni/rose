@@ -43,7 +43,6 @@ project vga_console is
        "rose-interfaces-devices-event_source.ads",
        "rose-interfaces-devices-event_source-client.ads",
        "rose-interfaces-devices-event_source-client.adb",
-       "rose-interfaces-processes-restorable.ads",
        "rose-interfaces-processes-restorable-server.ads",
        "rose-interfaces-processes-restorable-server.adb",
        "rose-interfaces-streams-stream.ads",
