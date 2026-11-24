@@ -25,6 +25,8 @@ include::idl.adoc[leveloffset=+1]
 
 include::servers.adoc[leveloffset=+1]
 
+include::programs.adoc[leveloffset=+1]
+
 include::boot.adoc[leveloffset=+1]
 
 include::petal.adoc[leveloffset=+1]

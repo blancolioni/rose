@@ -1,0 +1,241 @@
+= Building Programs
+
+A Rose program is written in Ada, and declared in IDL as a _command_ (ADR 0002): a procedure whose parameters are typed, which petal binds by name when someone runs it.
+This chapter builds two real programs, `touch` and `null_stream`, says what is different from writing a program for a POSIX system or for Windows, and how a program reaches a Rose system.
+The IDL for commands is in <<commands>>, and this chapter doesn't repeat it.
+
+== A Command: `touch`
+
+`touch` creates an empty file.
+It is in `src/utilities/touch`:
+
+[cols="1,3"]
+|===
+| File | What it is
+
+| `rose-core-touch.idl`
+| The command's declaration: its name, its roles, its arguments, and its help.
+
+| `src/rose-core-touch.adb`
+| The command: the body of the procedure that the declaration declares.
+
+| `Makefile`
+| Runs idle, which generates the procedure's spec and the program's main from the declaration, then `gprbuild`.
+
+| `touch.gpr`
+| The project: the userland run-time system, the compiler's switches, and the linker script.
+
+| `touch-pragmas.config`
+| The configuration pragmas for the whole program.
+
+| `linker.ld`
+| The linker script, which keeps the command's metadata in the executable.
+
+| `touch.caps`
+| The caps that the program asks for when it is installed. A command's is usually empty.
+|===
+
+=== The declaration
+
+[source,ada]
+----
+include::../../src/utilities/touch/rose-core-touch.idl[]
+----
+
+* *The name is the procedure's name*, `Rose.Core.Touch`, and the program is installed as `touch`.
+  `Rose.Core` is a package declared in `interfaces/rose-core.idl`, which gives every core command its version, copyright and licence for `--version`.
+* *The roles come after the colon.*
+  `Streams.Standard_Error` gives the command a standard error stream, and nothing else: `touch` has no standard output, and can't read the clock or launch anything.
+  A command has only the authority its declaration names (ADR 0021).
+* *The arguments are typed.*
+  `Name` is a `String`, and `Directory` is an `in Files.Writable_Directory`: petal gives the command a cap for the directory, and the mode and type say which right (ADR 0012).
+  Petal reads the declaration from the program's metadata, so `touch notes` and `touch --name=notes --directory=//home/docs` both work, and `touch --help` is written from `Summary`, `Description` and `Help`.
+* *`Live` says that the command's changes take effect as it makes them*, rather than in a version that petal commits when it completes (ADR 0026).
+
+=== The body
+
+[source,ada]
+----
+include::../../src/utilities/touch/src/rose-core-touch.adb[]
+----
+
+The parameters are the declaration's arguments.
+The role `Standard_Error` is not a parameter: the generated main gives it to the run-time system, and `Ada.Text_IO` writes to it.
+
+The command fails by raising `Rose.Command_Line.Command_Failed` with a message.
+The launch call then fails, and petal shows the message.
+There is no exit code to set: a command that returns has completed.
+A call to another server that fails raises `Rose.Interfaces.Objects.Invocation_Error` (see <<user-mode-target>>).
+
+=== What idle generates
+
+The Makefile runs idle with `--target user` through `scripts/user-idle`, which writes into `build/generated`:
+
+* `rose-core-touch.ads`, the procedure's spec;
+* `rose-core-touch_main.adb`, the program's main: it receives the launch call, gives the run-time system the standard streams, opens a client for each interface argument, calls the procedure, and completes the call;
+* `rose-core-touch_metadata.ads`, the declaration as text in the `.rose_command` section, which is where petal and `--help` find it;
+* `rose-core-touch_client.ads`, for a program that launches `touch`;
+* the packages of every interface the command uses, with their clients and servers.
+
+`scripts/user-idle` then removes the units that the run-time system has already, since a unit can belong to only one project (#1080).
+
+=== The Makefile
+
+[source,makefile]
+----
+include::../../src/utilities/touch/Makefile[]
+----
+
+`mk/common.mk` sets the architecture, the paths of the interfaces and the run-time system, and `USER_IDLE`.
+Every interface that the command uses is given to idle by hand, with every interface it inherits from and every interface their operations return: `Writable_Directory` brings `Fixed_Directory`, `Directory`, `Tree`, and the file and stream interfaces.
+
+The `all` target also copies the executable to `build/i686/drivers`, which the top-level build doesn't use for a command.
+
+=== The project
+
+[source,ada]
+----
+include::../../src/utilities/touch/touch.gpr[]
+----
+
+* *`rose_rts.gpr` is the userland run-time system*, built in `rts/user`, and `--RTS` names its directory.
+* *`checks.gpr` gives the checks*, with `-gnata` and `-gnato`, and `-gnatp` too if the scenario variable `ROSE_CHECKS` is `unchecked`.
+* *`-m32`, `-nostdlib` and `-ffreestanding`:* the program is 32-bit x86 code with no C library, and starts at `rts/user/start/start.o`.
+* *The warnings are errors* (`-gnatwae`), and the style checks are Rose's.
+* *`../../library/rose`* is Rose's own library, such as `Rose.Command_Line` and `Rose.Server`.
+
+=== The other files
+
+* *`touch-pragmas.config`* has `pragma Restrictions (No_Tasking)`.
+  The run-time system has no tasking, and without the restriction a function that returns a limited class-wide object, as an interface's function that returns an interface does, needs tasking's activation support.
+* *`linker.ld`* is the same for every program, and keeps the `.rose_command` section, which nothing in the program refers to.
+* *`touch.caps`* is empty.
+  It lists the caps that the program is given when it is installed, one per line, which `init` grants or refuses (see <<first-boot>>).
+  A command may ask for `create-endpoint` and `create-signal`.
+  A program in `src/drivers` may also ask for hardware and system caps, such as `register-interrupt 33` or `port-in-8 96`, in a `.driver` file (see <<Drivers>>).
+  A command usually needs none of them: what it needs comes through its roles and arguments when it is run.
+
+== A Server: `null_stream`
+
+`null_stream` serves the null stream, which the system directory holds as `null`, and the null directory (ADR 0035, ADR 0040).
+It is a command that keeps running after it completes, and serves the objects it returned.
+
+[source,ada]
+----
+include::../../src/drivers/null_stream/rose-core-null_stream.idl[]
+----
+
+* *The roles are system caps:* `Create_Endpoint`, to make the endpoints it serves, and `Delete_Cap`.
+  The generated main gives them to `Rose.System_Calls.Use_Capabilities`.
+* *The arguments are `out` interfaces.*
+  They are results: the caller gets a cap for each when the command completes.
+* *`Server` names the procedure that serves them*, which the generated main calls after it has completed the launch call, and which doesn't return.
+
+The command itself only attaches its two objects and returns their caps:
+
+[source,ada]
+----
+include::../../src/drivers/null_stream/src/rose-core-null_stream.adb[]
+----
+
+`Null_Stream_Server` declares each object as a type that implements the generated server interface, such as `Rose.Interfaces.Streams.Stream.Server.Stream_Interface`, and overrides its operations: `Read` gives end of file, and `Write` does nothing.
+`Create_Server` gives the server an invocation buffer with `Rose.System_Calls.Use_Buffer`, attaches each object to a `Rose.Server.Server_Context`, and returns their caps.
+`Start_Server` calls `Rose.Server.Start_Server`, which receives each call and dispatches it to the object.
+An operation fails its call by raising, and the caller gets `Invocation_Error`.
+
+`null_stream` is installed and launched once, by the installer.
+A server can also be launched from petal, but petal keeps nothing that a command returns, so its results would be lost.
+
+== What Is Different
+
+A Rose program has no ambient authority: nothing that every process can reach, such as a file system, an environment or a clock.
+Everything it uses is given to it, through its roles and arguments.
+
+[cols="1,2"]
+|===
+| On POSIX or Windows | On Rose
+
+| `argv` and `Ada.Command_Line`
+| The procedure's typed parameters. `Ada.Command_Line` is there, but empty unless an argument is a `String_List` (ADR 0037).
+
+| The environment, `Ada.Environment_Variables`
+| None (ADR 0037). Settings are arguments, or package state (ADR 0040).
+
+| Standard input, output and error
+| Only those the command declares as roles. `Ada.Text_IO` uses them, and with none of them a program has nowhere to write.
+
+| `Ada.Text_IO.Open`, `Ada.Streams.Stream_IO`, `Ada.Directories`
+| None. A file or directory is an argument, such as `in Files.File` or `in Files.Writable_Directory`, and the program uses its interface (see <<Files and Directories>>).
+
+| The exit status
+| None. A command completes by returning, and fails by raising `Rose.Command_Line.Command_Failed`.
+
+| `Ada.Calendar.Clock`
+| Only with the `Time.Clock_Service` role. Without it, `Clock` raises `Program_Error`.
+
+| Tasks, protected objects and `delay`
+| Not yet: the run-time system has `No_Tasking`, and `delay` raises `Program_Error` (ADR 0043).
+
+| The heap and the stack
+| A 1 MiB heap and a 256 KiB stack, with no stack checking.
+|===
+
+What works as it does elsewhere: tagged types, allocators, finalization, exceptions with their messages, `Ada.Strings` and unbounded strings, the containers, `Ada.Numerics` with the random number generators, and `Ada.Text_IO` on the standard streams.
+
+The compiler is the host's GNAT, version 15, with `-m32`, not a cross compiler.
+The run-time system is built from that compiler's own sources (`rts/user/create-sources.sh`), so it must be the same version.
+
+A program is persistent like everything else: if it is still running at a checkpoint, it is restored with its memory, and an argument it was given is still a cap it holds (see <<Persistence>>).
+
+== Adding a Program to the Build
+
+A program is built and installed only as part of Rose.
+To add one:
+
+. Put it in `src/utilities/NAME`, with the files above, or in `src/drivers/NAME` with a `.driver` file in place of the `.caps`, if it needs hardware caps or is launched once at install.
+. Add `NAME` to `UTILITIES` (or `DRIVERS`) in the top-level `Makefile`.
+  A utility's executable is stripped into `build/install/bin`, with its `.caps`.
+. Add it to the installer's list, in `src/servers/restore/src/restore-installer-default.adb`:
++
+[source,ada]
+----
+      Process ("touch", "bin", Save, Default_Flags);
+----
++
+`Save` installs the program in `exec` and adds it to the command registry under that name, where petal finds it.
+`Launch` starts it once at install, as a persistent server.
+. Build with `./clean-build.sh` or `make`.
+  `scripts/check-targets` fails the build if the program isn't built for the user-mode target.
+
+The installer's list is compiled into `restore-install`, so an install image can't carry a program that Rose's source doesn't name (#1100).
+
+== Running It on Rose
+
+There is no network yet, and nothing in a running system installs a program, so a program reaches a Rose system on install media:
+
+* *A new system:* build the ISO (`images/rose.iso`) and install from it. The program is installed with the others.
+* *An existing system:* boot the ISO and choose `Update Rose on hd0` (see <<updating>>).
+  The update keeps the checkpoint, and installs the commands again: `exec` keeps a command whose image hasn't changed, retires one that has (`exec: new version of NAME`), and installs one it didn't have.
+  So an update also adds a new command.
+
+Then run it from petal by its name: `touch notes`.
+
+In QEMU, `scripts/test-boot` installs and boots the image, and the other `scripts/test-*` scripts show how to type at petal and read what it writes.
+
+== Testing on the Host
+
+A command can't be built for the host yet: its main and its arguments are Rose's (#1101).
+What can be tested on the host is code that doesn't use Rose's interfaces, so the pattern is to keep the logic in plain Ada packages, and the command thin:
+
+* `Rose.Drawing` and `Rose.Drawing.Text` are tested by `make test-drawing`, with a project of their own in `src/library/drawing/tests`.
+* The store's block and free maps are tested by `make test-store`.
+* Petal's `sudo` decisions are plain Ada, tested by `make -C src/utilities/petal test`.
+* `Rose.Crypto` is tested against its test vectors in `src/tests/crypto`.
+
+Each has a project that names the plain Ada sources and builds them with the host's own GNAT and run-time system.
+
+== Alire
+
+Rose isn't on Alire, and a program can't be built outside the Rose tree yet: its project names the run-time system, Rose's library and the start file by relative paths.
+idle, which generates the main, is built with `alr` (see the README).
+A Rose SDK crate, which a program's `alire.toml` would depend on, is #1102.

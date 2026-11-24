@@ -573,7 +573,7 @@ package body Petal.Command_Launch is
                        (Text, Is_Writable_Directory (Item, Argument),
                         Value.Cap, Found);
                      if not Found then
-                        Fail ("no directory named '" & Text & "'");
+                        Fail (Petal.Session.Path_Error);
                      end if;
                   end;
                elsif Is_Input_Stream (Item, Argument) then
@@ -589,8 +589,8 @@ package body Petal.Command_Launch is
                            Fail ("no file named '" & Text & "'");
                         when Not_A_File =>
                            Fail ("'" & Text & "' is not a file");
-                        when No_Directory =>
-                           Fail ("no directory to find '" & Text & "' in");
+                        when Bad_Path =>
+                           Fail (Petal.Session.Path_Error);
                      end case;
                   end;
                elsif Is_In_File (Item, Argument)
@@ -610,8 +610,8 @@ package body Petal.Command_Launch is
                            Fail ("no file named '" & Text & "'");
                         when Not_A_File =>
                            Fail ("'" & Text & "' is not a file");
-                        when No_Directory =>
-                           Fail ("no directory to find '" & Text & "' in");
+                        when Bad_Path =>
+                           Fail (Petal.Session.Path_Error);
                      end case;
                   end;
                elsif Is_Transactional_File (Item, Argument) then
@@ -627,8 +627,8 @@ package body Petal.Command_Launch is
                            Fail ("'" & Text & "' is not a file");
                         when No_Version =>
                            Fail ("cannot write '" & Text & "'");
-                        when No_Version_Directory =>
-                           Fail ("no directory to write '" & Text & "' in");
+                        when Bad_Path =>
+                           Fail (Petal.Session.Path_Error);
                      end case;
                   end;
                else
@@ -869,8 +869,8 @@ package body Petal.Command_Launch is
                      Fail ("'" & Name & "' is not a file");
                   when No_Version =>
                      Fail ("cannot write '" & Name & "'");
-                  when No_Version_Directory =>
-                     Fail ("no directory to write '" & Name & "' in");
+                  when Bad_Path =>
+                     Fail (Petal.Session.Path_Error);
                end case;
             end;
          end if;
@@ -1305,7 +1305,7 @@ package body Petal.Command_Launch is
               (Line (Words (2).First .. Words (2).Last));
          else
             Petal.Session.Change_Directory
-              ("[" & Petal.Session.Home_Name & "]");
+              ("//" & Petal.Session.Home_Name);
          end if;
 
       elsif Lower (Line (Words (1).First .. Words (1).Last)) = "pwd" then

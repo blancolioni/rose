@@ -7,11 +7,20 @@ package Petal.Session is
    --  The user and the directories that petal is given (ADR 0003): the
    --  user's User interface, and a table of named directories whose
    --  first entry is the user's home directory, home (ADR 0002,
-   --  section 5).
+   --  section 5), and which also has system (ADR 0035, ADR 0044).
 
    --  The current directory (#342) is one of the named directories, its
    --  root, and a path from it. A directory doesn't know its parent, so
    --  petal keeps the directories on the path. It starts as home.
+
+   --  Every path petal reads is a URI reference (ADR 0044): //name/path
+   --  starts from the named directory name, /path from the root of the
+   --  current directory, and any other path from the current directory.
+   --  "." is the directory itself, and ".." the one before it on the
+   --  path. ".." above a named directory, an empty name between two "/",
+   --  a name that isn't in the table, and a ":" before the first "/" (a
+   --  scheme, which petal doesn't know) are errors, which Path_Error
+   --  describes.
 
    procedure Start (User : in out Rose.Interfaces.Users.User
      .User_Object'Class);
@@ -24,11 +33,11 @@ package Petal.Session is
    --  there is no home directory, or no .petalrc in it.
 
    procedure Set_System (Directory : Rose.Capabilities.Capability);
-   --  Name Directory, the cap of a Fixed_Directory interface, system
-   --  (ADR 0035, section 2; ADR 0036, section 3), unless it is null. A
-   --  command gets it as a read-only Directory, and never writable, and a
-   --  path system/NAME that names a special file gives its Stream's
-   --  reader or writer (ADR 0035, section 5).
+   --  Name Directory, the cap of a Fixed_Directory interface, system in
+   --  the table (ADR 0035, section 2; ADR 0036, section 3; ADR 0044,
+   --  section 3), unless it is null. Nothing in it can be added, renamed
+   --  or deleted, and a command gets it, or a directory in it, only as a
+   --  read-only Directory.
 
    procedure Add_Directory
      (Name      : String;
@@ -44,67 +53,72 @@ package Petal.Session is
    --  made if it isn't there, or the null cap if there is no home or it
    --  can't be made. Release_Files deletes the cap.
 
+   function Path_Error return String;
+   --  Why the last path that couldn't be resolved couldn't be.
+
    procedure Find_Grant
-     (Name     : String;
+     (Path     : String;
       Writable : Boolean;
       Grant    : out Rose.Capabilities.Capability;
       Found    : out Boolean);
-   --  A grant of the directory called Name in the table. For an in
+   --  A grant of the directory at Path (ADR 0044, section 2). For an in
    --  Directory argument it is read-only: the interface cap of its
    --  Directory interface, which has only the lookup operations (ADR
-   --  0003, section 1), made the first time it is asked for and then
-   --  kept. If Writable, for an
-   --  in Writable_Directory argument, it is the cap of petal's own
-   --  Writable_Directory interface, so the command's changes take
-   --  effect as it makes them (ADR 0012, section 3).
+   --  0003, section 1). If Writable, for an in Writable_Directory
+   --  argument, it is the cap of the directory's Writable_Directory
+   --  interface, so the command's changes take effect as it makes them
+   --  (ADR 0012, section 3), and there is none in system. A grant of a
+   --  named directory itself is petal's own, and kept. A grant of a
+   --  directory below one is petal's until Release_Files deletes it.
+   --  Found is False, with Path_Error saying why, if there is no grant.
 
-   type File_Lookup is (File_Found, No_Such_File, Not_A_File, No_Directory);
+   type File_Lookup is (File_Found, No_Such_File, Not_A_File, Bad_Path);
+   --  Bad_Path: Path_Error says why the path couldn't be resolved.
 
    procedure Find_File
-     (Name     : String;
+     (Path     : String;
       Writable : Boolean;
       File     : out Rose.Capabilities.Capability;
       Result   : out File_Lookup);
    --  For an in File argument (#344): the interface cap of the read-only
-   --  File interface of the ordinary file called Name in the current
-   --  directory (#342). If Writable, for an in Writable_File argument,
-   --  it is the file's Writable_File interface, so the command's changes
-   --  take effect as it makes them (ADR 0026). Result says whether there
-   --  is such a file. The cap is petal's until
+   --  File interface of the ordinary file at Path. If Writable, for an in
+   --  Writable_File argument, it is the file's Writable_File interface,
+   --  so the command's changes take effect as it makes them (ADR 0026).
+   --  Result says whether there is such a file. The cap is petal's until
    --  Release_Files deletes it.
 
    procedure Open_Reader
-     (Name   : String;
+     (Path   : String;
       Reader : out Rose.Capabilities.Capability;
       Result : out File_Lookup);
    --  For an in Reader argument whose default is standard input (#395):
-   --  a reader of its own on the ordinary file called Name in the current
-   --  directory, from the start of the file (ADR 0009). Reader is the
-   --  reader's Read cap, which the command reads as it reads standard
-   --  input. Result is as for Find_File. The reader is petal's until
-   --  Release_Files releases it.
+   --  a reader of its own on the ordinary file at Path, from the start of
+   --  the file (ADR 0009), or the reader of the special file at Path (ADR
+   --  0035, section 5). Reader is the reader's Read cap, which the
+   --  command reads as it reads standard input. Result is as for
+   --  Find_File. The reader is petal's until Release_Files releases it.
 
    procedure Release_Files;
-   --  Delete the caps that Find_File has returned since the last call,
-   --  and release the readers that Open_Reader has opened, once the
-   --  command they were bound for has run.
+   --  Delete the caps that Find_File and Find_Grant have returned since
+   --  the last call, and release the readers that Open_Reader has
+   --  opened, once the command they were bound for has run.
 
    type Version_Lookup is
-     (Version_Made, Not_A_Version_File, No_Version, No_Version_Directory);
+     (Version_Made, Not_A_Version_File, No_Version, Bad_Path);
+   --  Bad_Path: Path_Error says why the path couldn't be resolved.
 
    procedure New_Version
-     (Name   : String;
+     (Path   : String;
       File   : out Rose.Capabilities.Capability;
       Result : out Version_Lookup);
    --  For an in Transactional_Writable_File argument (ADR 0026): a
-   --  version of the file called Name in the current directory, from the
-   --  file's own New_Version, which the command commits. If there is no
-   --  entry Name, the file is created first, so a command that fails
-   --  leaves it empty (ADR 0027). The version starts as a copy of the
-   --  file, and the command empties it if it replaces the file (ADR 0009,
-   --  section 4). File is the interface cap of the version. Result says
-   --  whether the version was made: not if Name is not a file, or the
-   --  directory or the file refuses, or there is no directory. The
+   --  version of the file at Path, from the file's own New_Version, which
+   --  the command commits. If there is no such entry, the file is created
+   --  first, so a command that fails leaves it empty (ADR 0027). The
+   --  version starts as a copy of the file, and the command empties it if
+   --  it replaces the file (ADR 0009, section 4). File is the interface
+   --  cap of the version. Result says whether the version was made: not
+   --  if Path is not a file, or the directory or the file refuses. The
    --  version is petal's until Release_Versions.
 
    procedure Release_Versions;
@@ -113,17 +127,18 @@ package Petal.Session is
    --  completed or failed. What the command didn't commit is dropped.
 
    procedure Redirect_Output
-     (Name   : String;
+     (Path   : String;
       Append : Boolean;
       Output : out Rose.Capabilities.Capability;
       Result : out Version_Lookup);
-   --  For "> Name" and ">> Name" (#338): a version of the file called
-   --  Name in the current directory, made as New_Version makes one, and
-   --  a writer on it: Rewrite, which empties the version, or Append if
-   --  Append (ADR 0009, section 4). Output is the writer's Write cap, for
-   --  the command's standard output. The command doesn't know about the
-   --  file, so the version is petal's to commit (ADR 0026), in
-   --  End_Redirection. Result is as for New_Version.
+   --  For "> Path" and ">> Path" (#338): a version of the file at Path,
+   --  made as New_Version makes one, and a writer on it: Rewrite, which
+   --  empties the version, or Append if Append (ADR 0009, section 4).
+   --  Output is the writer's Write cap, for the command's standard
+   --  output. The command doesn't know about the file, so the version is
+   --  petal's to commit (ADR 0026), in End_Redirection. If Path is a
+   --  special file, Output is its writer, and nothing is committed (ADR
+   --  0035, section 5). Result is as for New_Version.
 
    procedure End_Redirection (Completed : Boolean);
    --  The command whose output Redirect_Output redirected has ended:
@@ -138,19 +153,17 @@ package Petal.Session is
       Found    : out Boolean);
    --  A grant of the current directory, as Find_Grant gives, for an in
    --  Directory argument that is not given. Found is False if there is
-   --  no current directory.
+   --  no current directory, or Writable and it is in system.
 
    procedure Change_Directory (Path : String);
-   --  Make Path the current directory: names separated by "/", each a
-   --  subdirectory of the one before, or ".." for the one before that.
-   --  Path starts from the current directory, or from the named
-   --  directory root if it starts with "[root]". If Path is not a
-   --  directory, report it, and leave the current directory as it was.
+   --  Make the directory at Path the current directory. If there is no
+   --  directory at Path, report why, and leave the current directory as
+   --  it was.
 
    function Current_Directory_Name return String;
-   --  The current directory as pwd writes it (#343): the name of its
-   --  root in square brackets, then the path from the root, with "/"
-   --  before each name.
+   --  The current directory as pwd writes it (#343), as a path that
+   --  petal accepts anywhere: "//", the name of its root, then the path
+   --  from the root, with "/" before each name.
 
    Home_Name : constant String := "home";
    --  The user's home directory, the first entry in the table, and the

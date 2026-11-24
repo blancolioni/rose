@@ -19,13 +19,16 @@ check-layouts:
 BOOK := rose-book.adoc
 ADOC_ATTRS := -a imagesdir=build/layouts
 
+# lib/rose-links.rb makes each ADR and issue reference a link.
+ADOC_EXTENSIONS := -r ./lib/rose-links.rb
+
 # This only builds the book.  The website's copy is published from the
 # main branch by the rose-book timer in the rose-os.org repository.
 
 adoc: layouts
-	asciidoctor $(ADOC_ATTRS) -a data-uri -D build $(BOOK)
-	asciidoctor-pdf $(ADOC_ATTRS) -D build $(BOOK)
-	asciidoctor-epub3 $(ADOC_ATTRS) -D build $(BOOK)
+	asciidoctor $(ADOC_EXTENSIONS) $(ADOC_ATTRS) -a data-uri -D build $(BOOK)
+	asciidoctor-pdf $(ADOC_EXTENSIONS) $(ADOC_ATTRS) -D build $(BOOK)
+	asciidoctor-epub3 $(ADOC_EXTENSIONS) $(ADOC_ATTRS) -D build $(BOOK)
 
 .PHONY: layouts check-layouts adoc
 
