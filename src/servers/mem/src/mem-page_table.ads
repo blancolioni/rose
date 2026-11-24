@@ -28,11 +28,24 @@ package Mem.Page_Table is
      (Position : Cursor;
       Phys     : Rose.Addresses.Physical_Page_Address);
 
+   procedure Initialize;
+   --  Size the table from mem's physical pages, at twice as many and at
+   --  least Rose.Limits.Min_Mapped_Pages, and map it into mem from pages
+   --  of its own (#998). Mem calls it once it has its memory map, before
+   --  it tracks any page.
+
    procedure Set_Writable (Position : Cursor);
    --  Has_Element (Position) must be True.
    --  Is_Writable (Position) must be False.
    --  Makes the page writable, and dirty. A persistent page that wasn't
-   --  dirty is added to the dirty page list.
+   --  dirty is added to the dirty page list. The caller keeps the list
+   --  within Rose.Limits.Max_Dirty_Pages where it can wait
+   --  (Would_Pass_Dirty_Limit); past it, the page is still added, and
+   --  the kernel's log says so.
+
+   function Would_Pass_Dirty_Limit (Position : Cursor) return Boolean;
+   --  True if Set_Writable (Position) would add the page to a dirty page
+   --  list that already has Rose.Limits.Max_Dirty_Pages (#998).
 
    procedure Set_Read_Only (Position : Cursor);
    --  Has_Element (Position) must be True.
