@@ -31,13 +31,11 @@ package body Store.Server is
           (Get_Cap_From_Set, (1 => Rose.Words.Word (Index))));
    begin
 
-      Delete_Endpoint_Cap := Get_Cap (1);
       Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Delete_Endpoint_Cap);
+        (Create_Endpoint => Create_Endpoint_Cap);
 
-      Console_Cap := Get_Cap (2);
-      Rose.Trace.Set_Trace_Cap (Get_Cap (3));
+      Console_Cap := Get_Cap (1);
+      Rose.Trace.Set_Trace_Cap (Get_Cap (2));
 
       --  Nothing reads the cap set again (#826).
 

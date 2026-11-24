@@ -266,10 +266,10 @@ package Rose.System_Calls is
    function Create_Endpoint_Capability return Rose.Capabilities.Capability;
    function Delete_Cap_Capability return Rose.Capabilities.Capability;
    function Rescind_Cap_Capability return Rose.Capabilities.Capability;
-   --  The process's caps for creating endpoints, and for deleting and
-   --  rescinding caps: the ones given to Use_Capabilities, and a null cap
-   --  for the others. Delete_Cap_Capability is retired: Delete_Cap below
-   --  doesn't need it (#1022).
+   --  The process's caps for creating endpoints and for rescinding caps:
+   --  the ones given to Use_Capabilities, and a null cap for the others.
+   --  Delete_Cap_Capability is retired, and always null (#1023):
+   --  Delete_Cap below doesn't need it (#1022).
 
    procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
    --  Delete Cap from the process's table, by invoking it with the Delete
@@ -285,10 +285,12 @@ package Rose.System_Calls is
       := Rose.Capabilities.Null_Capability;
       Create_Signal : Rose.Capabilities.Capability
       := Rose.Capabilities.Null_Capability);
-   --  The process's caps for creating endpoints, for deleting and
-   --  rescinding caps, and for making signal caps. Only the caps that
-   --  are not null are recorded, so a process can give them in more than
-   --  one call. A local cap that has not been given is null (#399, #826).
+   --  The process's caps for creating endpoints, for rescinding caps,
+   --  and for making signal caps. Only the caps that are not null are
+   --  recorded, so a process can give them in more than one call. A local
+   --  cap that has not been given is null (#399, #826). Delete_Cap is
+   --  retired, and ignored (#1023): a program built for 0.4.0 may still
+   --  give it.
 
    function Create_Signal_Capability return Rose.Capabilities.Capability;
    --  The Create_Signal cap given to Use_Capabilities, or null.

@@ -135,13 +135,6 @@ package body Restore.Start is
       Next (Memory_Restore_Cap);
       Next (Restore_Derivations_Cap);
       Next (Exit_Cap);
-
-      declare
-         Delete_Cap : Rose.Capabilities.Capability;
-      begin
-         Next (Delete_Cap);
-         Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
-      end;
    end Get_Caps;
 
    ----------

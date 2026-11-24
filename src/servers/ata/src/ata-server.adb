@@ -95,13 +95,7 @@ package body ATA.Server is
 
       --  Nothing reads the cap set again (#826).
 
-      declare
-         Delete_Cap : Rose.Capabilities.Capability;
-      begin
-         Next (Delete_Cap);
-         Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
-         Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
-      end;
+      Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
       Device_Cap := Rose.Capabilities.Null_Capability;
 

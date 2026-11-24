@@ -626,19 +626,18 @@ package body Mem.Server is
    begin
 
       Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Get_Cap (5));
-      Rose.Trace.Set_Trace_Cap (Get_Cap (6));
+        (Create_Endpoint => Create_Endpoint_Cap);
+      Rose.Trace.Set_Trace_Cap (Get_Cap (5));
 
       Console_Cap      := Get_Cap (1);
       Region_Count_Cap := Get_Cap (2);
       Region_Range_Cap := Get_Cap (3);
       Start_Paging_Cap := Get_Cap (4);
 
-      Hold_Calls_Cap     := Get_Cap (7);
-      Release_Calls_Cap  := Get_Cap (8);
-      Swap_Processes_Cap := Get_Cap (9);
-      Process_State_Cap  := Get_Cap (10);
+      Hold_Calls_Cap     := Get_Cap (6);
+      Release_Calls_Cap  := Get_Cap (7);
+      Swap_Processes_Cap := Get_Cap (8);
+      Process_State_Cap  := Get_Cap (9);
 
       --  Nothing reads the cap set again (#826).
 

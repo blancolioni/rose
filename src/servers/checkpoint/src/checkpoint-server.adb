@@ -148,20 +148,18 @@ package body Checkpoint.Server is
 
       Console_Cap : constant Rose.Capabilities.Capability := Get_Cap (1);
       Timer_Cap   : constant Rose.Capabilities.Capability := Get_Cap (2);
-      Delete_Cap  : constant Rose.Capabilities.Capability := Get_Cap (5);
    begin
 
       Enter_Checkpoint_Cap := Get_Cap (3);
       Leave_Checkpoint_Cap := Get_Cap (4);
-      Memory_Checkpoint_Cap := Get_Cap (6);
-      Append_Log_Cap := Get_Cap (7);
-      Store_Checkpoint_Cap := Get_Cap (8);
-      Hold_Cap := Get_Cap (9);
+      Memory_Checkpoint_Cap := Get_Cap (5);
+      Append_Log_Cap := Get_Cap (6);
+      Store_Checkpoint_Cap := Get_Cap (7);
+      Hold_Cap := Get_Cap (8);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
-        (Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap => Delete_Cap);
+        (Create_Endpoint => Create_Endpoint_Cap);
 
       --  Nothing reads the cap set again (#826).
 

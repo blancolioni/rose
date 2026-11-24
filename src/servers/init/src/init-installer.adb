@@ -273,8 +273,6 @@ package body Init.Installer is
                Cap := Init_Caps.Create_Signal_Cap;
             elsif not Is_Driver then
                null;
-            elsif N = "delete-endpoint" and then Count = 0 then
-               Cap := Init_Caps.Delete_Cap;
             elsif N = "rescind-endpoint" and then Count = 0 then
                Cap := Init_Caps.Rescind_Cap;
             elsif N = "get-ticks" and then Count = 0 then
