@@ -3,7 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-10-23
 - **Related:** [ADR 0001](0001-capability-revocation.md) (capability revocation), #118 (membrane library), #119 (petal runs commands inside a membrane), Petal Shell project
-- **Amended by:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md), where the mode is the direction, the interface type is the right, and the command is the transaction (sections 1, 4 and 5)
+- **Amended by:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md), where the mode is the direction, the interface type is the right, and the command is the transaction (sections 1, 4 and 5); [ADR 0044](0044-petal-paths-as-uri-references.md), where a path names a directory in the table as `//name/path`, and a relative path starts from the current directory (section 5)
 
 ## Context
 

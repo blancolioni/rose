@@ -16,9 +16,13 @@ package Screen.Framebuffer is
    function Height return Rose.Words.Word;
    --  The screen's size in pixels, or zero if Initialize failed.
 
-   procedure Map;
-   --  Map the framebuffer again, after a restore: device pages are not in
-   --  a checkpoint (ADR 0022, section 6).
+   procedure Restore;
+   --  After a restore, map the framebuffer again if this boot has the
+   --  one that Initialize found, at the same address and with the same
+   --  geometry and pixel format: device pages are not in a checkpoint
+   --  (ADR 0022, section 6). If it doesn't, as when the install media's
+   --  update entry keeps text mode (#1092), Copy draws nothing, and the
+   --  next boot that has it draws the whole screen again.
 
    procedure Copy
      (Buffer  : System.Address;
@@ -28,6 +32,7 @@ package Screen.Framebuffer is
    --  Copy Columns by Rows pixels at X, Y from Buffer, which holds the
    --  whole screen as 32-bit XRGB pixels with no padding between rows, to
    --  the framebuffer, converting them to its format. The rectangle must
-   --  be on the screen.
+   --  be on the screen. Nothing is drawn if Initialize failed, or if
+   --  Restore didn't find the framebuffer.
 
 end Screen.Framebuffer;
