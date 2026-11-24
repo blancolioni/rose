@@ -141,6 +141,13 @@ package body Rose.Kernel.Processes is
    --  Tell mem that Pid has exited, as if Pid had called Exit_Process on
    --  its Process interface.
 
+   procedure Put_Lost_Message
+     (Pid      : Process_Id;
+      Kind     : Message_Kind;
+      Endpoint : Rose.Objects.Endpoint_Index);
+   --  Report that the message queued for Pid is lost, because a message
+   --  of Kind for Endpoint takes its place (#1014).
+
    Page_Fault_Address : Rose.Words.Word_32;
    pragma Import (C, Page_Fault_Address, "page_fault_address");
 
@@ -1941,6 +1948,63 @@ package body Rose.Kernel.Processes is
       return Current_Page_Fault_Count;
    end Page_Fault_Count;
 
+   ----------------------
+   -- Put_Lost_Message --
+   ----------------------
+
+   procedure Put_Lost_Message
+     (Pid      : Process_Id;
+      Kind     : Message_Kind;
+      Endpoint : Rose.Objects.Endpoint_Index)
+   is
+      P : Kernel_Process_Entry renames Process_Table (Pid);
+
+      procedure Put_Kind (Item : Message_Kind);
+
+      --------------
+      -- Put_Kind --
+      --------------
+
+      procedure Put_Kind (Item : Message_Kind) is
+      begin
+         case Item is
+            when Call =>
+               Rose.Boot.Console.Put ("call");
+            when Restore_Notice =>
+               Rose.Boot.Console.Put ("restore notice");
+            when Signals =>
+               Rose.Boot.Console.Put ("signals");
+            when Interrupt =>
+               Rose.Boot.Console.Put ("interrupt");
+            when Timeout =>
+               Rose.Boot.Console.Put ("timeout");
+            when Unknown =>
+               Rose.Boot.Console.Put ("message from before the restore");
+         end case;
+      end Put_Kind;
+
+   begin
+      Rose.Boot.Console.Put ("lost queued message: ");
+      Debug.Put (Pid);
+      Rose.Boot.Console.Put (": lost ");
+      Put_Kind (P.Queued_Kind);
+      Rose.Boot.Console.Put (" ep ");
+      Rose.Boot.Console.Put (Natural (P.Queued_Endpoint));
+      if P.Queued_Endpoint in P.Endpoints'Range then
+         Rose.Boot.Console.Put (" ");
+         Rose.Boot.Console.Put (P.Endpoints (P.Queued_Endpoint).Endpoint);
+      end if;
+      if P.Queued_Kind = Call then
+         Rose.Boot.Console.Put (" from ");
+         Debug.Put (P.Queued_From);
+      end if;
+      Rose.Boot.Console.Put ("; replaced by ");
+      Put_Kind (Kind);
+      Rose.Boot.Console.Put (" ep ");
+      Rose.Boot.Console.Put (Natural (Endpoint));
+      Rose.Boot.Console.New_Line;
+   end Put_Lost_Message;
+
    ------------------
    -- Raise_Signal --
    ------------------
@@ -2678,7 +2742,8 @@ package body Rose.Kernel.Processes is
          Sender_Cap      => To.Queued_Params.Cap,
          Endpoint        => To.Queued_Endpoint,
          Identifier      => To.Queued_Cap_Id,
-         Params          => To.Queued_Params);
+         Params          => To.Queued_Params,
+         Kind            => To.Queued_Kind);
 
    end Send_Queued_Message;
 
@@ -2832,7 +2897,8 @@ package body Rose.Kernel.Processes is
            Find_Endpoint
              (Process, Rose.Interfaces.Processes.Restorable.Restored_Endpoint),
          Identifier      => 0,
-         Params          => Params);
+         Params          => Params,
+         Kind            => Restore_Notice);
    end Send_Restore_Notice;
 
    ------------------
@@ -2870,7 +2936,8 @@ package body Rose.Kernel.Processes is
            Find_Endpoint
              (Process, Rose.Interfaces.Processes.Signalled.Signal_Endpoint),
          Identifier      => 0,
-         Params          => Params);
+         Params          => Params,
+         Kind            => Signals);
    end Send_Signals;
 
    ----------------------
@@ -2883,7 +2950,8 @@ package body Rose.Kernel.Processes is
       Sender_Cap      : Rose.Capabilities.Capability;
       Endpoint        : Rose.Objects.Endpoint_Index;
       Identifier      : Rose.Objects.Capability_Identifier;
-      Params          : Rose.Invocation.Invocation_Record)
+      Params          : Rose.Invocation.Invocation_Record;
+      Kind            : Message_Kind := Call)
    is
       use type Rose.Objects.Endpoint_Id;
       use type Rose.Objects.Endpoint_Index;
@@ -2917,13 +2985,25 @@ package body Rose.Kernel.Processes is
 
             procedure Queue_Message is
             begin
-               if To.Flags (Message_Queued) then
-                  Rose.Boot.Console.Put_Line ("lost queued message");
+               --  A second interrupt for the same endpoint takes the place
+               --  of the first, and nothing is lost: a driver reads its
+               --  device until it has nothing more, so one interrupt is
+               --  enough (#1014). Signals never wait here, since they stay
+               --  in the process's Signals until it receives.
+
+               if To.Flags (Message_Queued)
+                 and then not (Kind = Interrupt
+                               and then To.Queued_Kind = Interrupt
+                               and then To.Queued_Endpoint = Endpoint)
+               then
+                  Put_Lost_Message (To_Process_Id, Kind, Endpoint);
                end if;
 
                To.Queued_Params := Send_Params;
                To.Queued_Endpoint := Endpoint;
                To.Queued_Cap_Id := Identifier;
+               To.Queued_Kind := Kind;
+               To.Queued_From := From_Process_Id;
                To.Flags (Message_Queued) := True;
 
                if To.Flags (Trace) then
