@@ -1,4 +1,4 @@
-command Rose.Core.Null_Stream : Caps.Create_Endpoint, Caps.Delete_Cap
+command Rose.Core.Null_Stream : Caps.Create_Endpoint
   with Summary     => "Serve the null stream.",
        Description => """
           Null_Stream serves the Stream that the system directory holds as
