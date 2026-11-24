@@ -31,7 +31,6 @@ project Clock is
        "rose-interfaces-time-clock_admin.ads",
        "rose-interfaces-time-clock_admin-server.ads",
        "rose-interfaces-time-clock_admin-server.adb",
-       "rose-interfaces-processes-restorable.ads",
        "rose-interfaces-processes-restorable-server.ads",
        "rose-interfaces-processes-restorable-server.adb");
    for Object_Dir use "./build/obj";
