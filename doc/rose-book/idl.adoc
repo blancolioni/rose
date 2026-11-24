@@ -54,7 +54,7 @@ ADR 0034 says which interface is in which group, and why:
 |===
 | Group | Interfaces and roles
 
-| `Caps` | `Cap`, `Cap_Set`, `Releasable_Cap_Set`, `Constructor`, `Bank_Constructor`, `Receiver`; the roles `Create_Endpoint`, `Create_Signal`, `Delete_Cap`, `Rescind_Cap` and `Cap_Set_Service`
+| `Caps` | `Cap`, `Cap_Set`, `Releasable_Cap_Set`, `Constructor`, `Bank_Constructor`, `Receiver`; the roles `Create_Endpoint`, `Create_Signal`, `Delete_Cap` (retired), `Rescind_Cap` and `Cap_Set_Service`
 | `Common` | `Named`, `Resource`, `Transactional`: the mix-ins that interfaces of several groups descend from
 | `Streams` | `Reader`, `Writer`, `Stream`, `Releasable_Reader`, `Releasable_Writer`, `Seekable`, `Seekable_Reader`, `Output_Redirect`; the roles `Standard_Input`, `Standard_Output`, `Standard_Error` and `Standard_IO`
 | `Processes` | `Process`, `Kernel_Process`, `Segment`, `Heap`, `Server`, `Launch`, `Exec`, `Executable`, `Memory`, `Signalled`, `Restorable`, `Replaceable`, `Saveable`, `Replacement`, `Replacer`; the role `Replace_Process`
@@ -915,7 +915,8 @@ end Standard_IO;
   A command that inherits none of the stream roles has no standard streams, so `Ada.Text_IO` has nowhere to write.
 * *A role is not an interface.* An interface provides its parents' operations; a command receives its roles' caps.
 
-The system caps are roles as well: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`, each with an IDL interface type (ADR 0002, section 1).
+The system caps are roles as well: `Create_Endpoint`, `Rescind_Cap` and `Create_Cap_Set`, each with an IDL interface type (ADR 0002, section 1).
+`Delete_Cap` is a role too, but it is retired (#1023): a command deletes its own caps with the invocation's `Delete` flag (#1022), and one that still declares the role is given a null cap.
 The generated main passes them to `Rose.System_Calls.Use_Capabilities`.
 
 [#packages]

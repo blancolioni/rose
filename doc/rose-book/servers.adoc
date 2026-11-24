@@ -319,7 +319,7 @@ Used by:: Everything installed after it, as its standard output, and the shell, 
 Serves one file: each file is a process of its own, which holds the file's contents in its memory, so that they persist with it.
 
 Provides:: `Writable_File` (ADR 0003), its version as a `Transactional_Writable_File` (ADR 0026), and `Replaceable` (ADR 0032), which only its directory holds.
-Requests:: nothing: it is a command, `Rose.Core.File`, with the roles `Create_Endpoint`, `Delete_Cap` and `Cap_Set_Service` (#867).
+Requests:: nothing: it is a command, `Rose.Core.File`, with the roles `Create_Endpoint` and `Cap_Set_Service` (#867).
 Used by:: `directory`, which launches a `file` process for each file it creates, in a bank of the file's own, with the command's generated client.
 
 A new version of `file` can take over from a running one (ADR 0032, #867).
@@ -334,7 +334,7 @@ See <<Files and Directories>> for how files, versions and commits work.
 Serves one directory: each directory is a process of its own, as each file is.
 
 Provides:: `Writable_Directory` (ADR 0003), and `Replaceable` (ADR 0032), which only whoever launched it holds: `auth` for a home directory, and the parent for a subdirectory.
-Requests:: nothing: it is a command, `Rose.Core.Directory`, with the roles `Create_Endpoint`, `Delete_Cap` and `Cap_Set_Service`, and the arguments `File_Launch` and `Directory_Launch` (#831).
+Requests:: nothing: it is a command, `Rose.Core.Directory`, with the roles `Create_Endpoint` and `Cap_Set_Service`, and the arguments `File_Launch` and `Directory_Launch` (#831).
 Used by:: `auth`, for each user's home directory, and other directories, for their subdirectories, each with the command's generated client; and the shell, as its current directory.
 
 Each entry of a directory is a `file` or `directory` command, launched when the entry is created, and ended when the entry is deleted.
