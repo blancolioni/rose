@@ -441,7 +441,6 @@ package body Tests.Registry is
       Rose.Core.Null_Stream_Client.Call
         (Endpoint        => Endpoint,
          Create_Endpoint => Create_Endpoint,
-         Delete_Cap      => Rose.System_Calls.Delete_Cap_Capability,
          Served          => Served,
          Null_Directory  => Null_Dir);
    exception

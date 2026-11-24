@@ -125,8 +125,9 @@ It is a command that keeps running after it completes, and serves the objects it
 include::../../src/drivers/null_stream/rose-core-null_stream.idl[]
 ----
 
-* *The roles are system caps:* `Create_Endpoint`, to make the endpoints it serves, and `Delete_Cap`.
-  The generated main gives them to `Rose.System_Calls.Use_Capabilities`.
+* *The role is a system cap:* `Create_Endpoint`, to make the endpoints it serves.
+  The generated main gives it to `Rose.System_Calls.Use_Capabilities`.
+  A program needs no cap to delete its own caps: `Rose.System_Calls.Delete_Cap` uses the invocation's `Delete` flag (#1022).
 * *The arguments are `out` interfaces.*
   They are results: the caller gets a cap for each when the command completes.
 * *`Server` names the procedure that serves them*, which the generated main calls after it has completed the launch call, and which doesn't return.

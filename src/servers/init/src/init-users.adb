@@ -391,9 +391,10 @@ package body Init.Users is
       Rose.System_Calls.Delete_Cap (Params.Caps (1));
       Linking := Params.Caps (2);
 
-      --  The null stream command's: Create_Endpoint and Delete_Cap; and
-      --  its result Served (src/drivers/null_stream/
-      --  rose-core-null_stream.idl).
+      --  The null stream command's role, Create_Endpoint, and its results
+      --  Served and Null_Directory (src/drivers/null_stream/
+      --  rose-core-null_stream.idl). It deletes its own caps with the
+      --  Delete flag (#1022), so it has no Delete_Cap role (#1023).
 
       Endpoint := Launch_Command (Null_Launch);
       if Endpoint = Rose.Capabilities.Null_Capability then
@@ -401,7 +402,7 @@ package body Init.Users is
       end if;
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
-      Rose.System_Calls.Send_Caps (Params, (Create_Endpoint, Delete_Cap));
+      Rose.System_Calls.Send_Cap (Params, Create_Endpoint);
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Receive_Caps (Params, 2);
       Rose.System_Calls.Invoke_Capability (Params);
