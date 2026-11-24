@@ -1,5 +1,6 @@
 with Rose.Capabilities.Standard;
 with Rose.Interfaces.Processes.Process;
+with Rose.Interfaces.Processes.Restorable;
 with Rose.Interfaces.Processes.Signalled;
 with Rose.System_Calls.Server;
 with Rose.Words;
@@ -36,6 +37,15 @@ package body Rose.Server is
       With_Context : Context_Handler;
       Params       : in out Rose.Invocation.Invocation_Record);
    --  Call whichever of Handler and With_Context is not null.
+
+   procedure Forget_Orphaned_Calls
+     (Context : in out Server_Context;
+      Notice  : Rose.Invocation.Invocation_Record);
+   --  Forget the deferred calls of Context whose reply caps the restore
+   --  notice Notice names. The kernel deleted those caps because their
+   --  callers weren't restored, and their buffers are no longer mapped,
+   --  so answering them would fault (#1114). The notice comes before any
+   --  other message, so no new call has been given one of those numbers.
 
    type Identifier_Set is
      array (Rose.Objects.Capability_Identifier) of Boolean
@@ -203,6 +213,38 @@ package body Rose.Server is
          end;
       end loop;
    end Defer_Call;
+
+   ---------------------------
+   -- Forget_Orphaned_Calls --
+   ---------------------------
+
+   procedure Forget_Orphaned_Calls
+     (Context : in out Server_Context;
+      Notice  : Rose.Invocation.Invocation_Record)
+   is
+      use type Rose.Capabilities.Capability;
+   begin
+      if not Notice.Control.Flags (Rose.Invocation.Send_Words) then
+         return;
+      end if;
+
+      for W in Rose.Invocation.Parameter_Word_Index range
+        0 .. Notice.Control.Last_Sent_Word
+      loop
+         for I in 1 .. Context.Endpoint_Count loop
+            declare
+               Rec : Endpoint_Record renames Context.Endpoints (I);
+            begin
+               if Rec.Blocked
+                 and then Rec.Params.Reply_Cap
+                   = Rose.Capabilities.Capability (Notice.Data (W))
+               then
+                  Rec.Blocked := False;
+               end if;
+            end;
+         end loop;
+      end loop;
+   end Forget_Orphaned_Calls;
 
    ---------------------
    -- Free_Identifier --
@@ -392,6 +434,20 @@ package body Rose.Server is
       if Context.Hook /= null then
          Context.Hook (Params);
       end if;
+
+      --  The kernel's restore notice has no reply cap. It names the reply
+      --  caps of deferred calls whose callers weren't restored (#1114).
+
+      declare
+         use type Rose.Objects.Endpoint_Id;
+      begin
+         if Params.Endpoint
+           = Rose.Interfaces.Processes.Restorable.Restored_Endpoint
+           and then Params.Reply_Cap = Rose.Capabilities.Null_Capability
+         then
+            Forget_Orphaned_Calls (Context, Params);
+         end if;
+      end;
 
       declare
          Handled : Boolean := False;

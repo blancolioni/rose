@@ -29,7 +29,7 @@ INTERFACES="processes-process processes-heap caps-cap_set processes-segment
     processes-server processes-process_control caps-cap storage-region
     storage-region_access
     streams-reader streams-writer storage-bank storage-dependent
-    common-resource processes-signalled"
+    common-resource processes-signalled processes-restorable"
 mkdir -p build/idl build/interfaces
 rm -f build/interfaces/*.ads
 IDL_FILES=""

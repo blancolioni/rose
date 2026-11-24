@@ -527,6 +527,7 @@ package body Rose.Kernel.Processes is
       end if;
       Proc.FPU_Valid := False;
       Proc.Signals := 0;
+      Proc.Orphan_Reply_Count := 0;
       Proc.Lent_Buffer_Pages := 0;
       Proc.Pinned_Pages := 0;
 
@@ -575,15 +576,23 @@ package body Rose.Kernel.Processes is
         (1 => (Proc.Page_Ranges (Invocation_Range_Index).Base, 0),
          others => (0, 0));
 
-      Map_Page
-        (Directory_Page => Directory_VP,
-         Virtual_Page   =>
-           Virtual_Address_To_Page (Invocation_Buffer_Range_Base),
-         Physical_Page  => Proc.Invocation_Page,
-         Readable       => True,
-         Writable       => True,
-         Executable     => False,
-         User           => True);
+      --  Each shared slot maps the process's own invocation page while
+      --  no caller lends it a buffer there. A call the process kept from
+      --  before a restore, whose buffer nothing maps any more, then
+      --  writes into its own page instead of faulting (#1114).
+
+      for Slot in 0 .. Max_Shared_Pages - 1 loop
+         Map_Page
+           (Directory_Page => Directory_VP,
+            Virtual_Page   =>
+              Virtual_Address_To_Page (Invocation_Buffer_Range_Base)
+              + Virtual_Page_Address (Slot),
+            Physical_Page  => Proc.Invocation_Page,
+            Readable       => True,
+            Writable       => True,
+            Executable     => False,
+            User           => True);
+      end loop;
 
       Map_Page
         (Directory_Page => Directory_VP,
@@ -2875,14 +2884,31 @@ package body Rose.Kernel.Processes is
    is
       use Rose.Invocation;
       To     : Kernel_Process_Entry renames Process_Table (Process);
-      Params : constant Invocation_Record :=
+      Count  : constant Natural := To.Orphan_Reply_Count;
+      Params : Invocation_Record :=
                  Invocation_Record'
                    (Control =>
                       Control_Word'
-                        (Flags  => (Send => True, others => False),
+                        (Flags  => (Send       => True,
+                                    Send_Words => Count > 0,
+                                    others     => False),
                          others => <>),
                     others  => <>);
    begin
+
+      --  The notice names the reply caps that the restore deleted, so
+      --  that Rose.Server forgets the deferred calls they belonged to
+      --  before any new call can be given one of those numbers (#1114).
+
+      for I in 1 .. Count loop
+         Params.Data (Parameter_Word_Index (I - 1)) :=
+           Rose.Words.Word (To.Orphan_Replies (I));
+      end loop;
+      if Count > 0 then
+         Params.Control.Last_Sent_Word := Parameter_Word_Index (Count - 1);
+      end if;
+      To.Orphan_Reply_Count := 0;
+
       if To.Flags (Trace) then
          Debug.Put (Process);
          Rose.Boot.Console.Put_Line (": sending restore notice");
@@ -3868,7 +3894,22 @@ package body Rose.Kernel.Processes is
                Rose.Boot.Console.New_Line;
             end if;
 
-            Unmap_Page (From_Pid, Rec.Page);
+            --  The slot goes back to the process's own page, not to
+            --  nothing, so that a stale call that answers into it later
+            --  can't fault (#1114). A boot module has no page of its own.
+
+            if P.Invocation_Page /= 0 then
+               Map_Page
+                 (Pid           => From_Pid,
+                  Virtual_Page  => Rec.Page,
+                  Physical_Page => P.Invocation_Page,
+                  Readable      => True,
+                  Writable      => True,
+                  Executable    => False,
+                  User          => True);
+            else
+               Unmap_Page (From_Pid, Rec.Page);
+            end if;
             Rec.Pid := 0;
          end if;
       end loop;

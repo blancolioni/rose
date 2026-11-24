@@ -712,6 +712,13 @@ private
    type Shared_Page_Array is
      array (Shared_Page_Index) of Shared_Page_Record;
 
+   Max_Orphan_Replies : constant := Rose.Invocation.Max_Parameter_Words;
+   type Orphan_Reply_Array is
+     array (1 .. Max_Orphan_Replies) of Rose.Capabilities.Capability;
+   --  The reply caps that a restore deleted from a process, because their
+   --  callers weren't restored, as many as the restore notice can name
+   --  (#1114).
+
    type Kernel_Process_Entry is
       record
          Stack             : Rose.Kernel.Arch.Stack_Frame;
@@ -780,6 +787,12 @@ private
          --  them and another process has used them since (#170).
          Signals           : Rose.Words.Word_32 := 0;
          --  The signal bits that are set and not yet delivered (#708).
+         Orphan_Replies     : Orphan_Reply_Array := (others => 0);
+         Orphan_Reply_Count : Natural := 0;
+         --  The reply caps that Resume_Restored_Process deleted, which
+         --  the restore notice names, so that Rose.Server forgets the
+         --  deferred calls they would have answered (#1114). Not saved
+         --  in a checkpoint.
       end record;
 
    type Kernel_Process_Table is
