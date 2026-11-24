@@ -384,16 +384,10 @@ The rest of phase 1 is idle#39.
 ==== Which programs use it
 
 The two targets are not mixed in one program.
-The kernel target needs only what the kernel run-time system (`rts/kernel`) has, so a program built with that run-time system uses it.
-A program built with the userland run-time system (`rts/user`) can use either:
-
-* *Kernel run-time system, kernel target:* the boot modules and the pager path (ADR 0008).
-* *Userland run-time system, kernel target:* the installed drivers `exec`, `command`, `keyboard`, `directory` and `file` (#490), petal, the `user` and `auth` servers, and the commands other than `cat` and `echo`.
-* *Userland run-time system, user-mode target:* `vga-console`, `cat` and `echo`.
-
-The userland run-time system itself will use the user-mode `Rose.Interfaces.Processes.Process` and `Rose.Interfaces.Caps.Cap_Set`, once idle#41 generates them.
-Until then it uses the kernel target's, which is enough until a user-mode program needs the user-mode version of one of them, since it uses only their constants.
-Each user-mode `Rose.Interfaces.G.X` declares everything the kernel target's does, so the programs built with the run-time system can move to the user-mode target one at a time.
+The kernel target needs only what the kernel run-time system (`rts/kernel`) has, so the boot modules and the pager path use it (ADR 0008).
+Every program built with the userland run-time system (`rts/user`) uses the user-mode target, and so does the run-time system itself, for the interfaces it uses (#490, #793).
+`scripts/check-targets` fails the build if a program on the userland run-time system is built for the kernel target.
+How such a program is built is in <<Building Programs>>.
 
 Handwritten libraries are either for one target, because they use its generated clients or servers (`Rose.Console_IO`, `Rose.Directories` and `Rose.Devices.GPT` use the kernel target's), or neutral, because they use none (`Rose.Server`, `Rose.System_Calls`, `Rose.Command_Line.Launch`).
 
@@ -558,14 +552,14 @@ Where the user-mode target differs from the kernel target:
 
 | `out String`, `in out String`
 | `out String` with `Last`
-| `Rose.Texts.Text` of the same mode, a bounded type written for Rose, since the run-time system has no `Ada.Strings.Bounded`
+| `Rose.Texts.Text` of the same mode, a bounded type written for Rose
 
 | `out interface X`
 | an `out` capability
 | `in out X_Client`, opened by the subprogram
 |===
 
-A limited class-wide result compiles and links with the userland run-time system's restrictions (`No_Allocators`, `No_Finalization`): it is returned on the secondary stack.
+A limited class-wide result is returned on the secondary stack, so it needs no allocator.
 A program that calls a function with an interface result, or serves an interface that has one, cannot have the restriction `No_Secondary_Stack`.
 
 A text holds up to `Rose.Texts.Max_Length` (1024) characters.
@@ -927,7 +921,7 @@ end Standard_IO;
   The interface type says what right the member grants.
 * *Inherited members come first* in the command's signature, each role once, as with parent interfaces.
 * *The standard streams are given to the run-time system* by the generated main, so a command uses them through `Ada.Text_IO`.
-  A command that inherits none of the stream roles can do no I/O: its generated configuration forbids `Ada.Text_IO`.
+  A command that inherits none of the stream roles has no standard streams, so `Ada.Text_IO` has nowhere to write.
 * *A role is not an interface.* An interface provides its parents' operations; a command receives its roles' caps.
 
 The system caps are roles as well: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`, each with an IDL interface type (ADR 0002, section 1).
