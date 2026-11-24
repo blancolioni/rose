@@ -587,6 +587,8 @@ package body Rose.Kernel.Processes.Snapshot is
            Rose.Objects.Endpoint_Index (Item.Queued_Endpoint);
          P.Queued_Cap_Id :=
            Rose.Objects.Capability_Identifier (Item.Queued_Cap_Id);
+         P.Queued_Kind := Unknown;
+         P.Queued_From := Null_Process_Id;
          Flags (Message_Queued) := Flags (Message_Queued)
            and then P.Queued_Params.Control.Flags
              (Rose.Invocation.Create_Reply_Cap);

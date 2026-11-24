@@ -184,7 +184,8 @@ package body Rose.Kernel.Interrupts is
          Sender_Cap      => Params.Cap,
          Endpoint        => Layout.Header.Endpoint,
          Identifier      => Layout.Header.Identifier,
-         Params          => Params);
+         Params          => Params,
+         Kind            => Rose.Kernel.Processes.Interrupt);
    end Send_Interrupt_Cap;
 
    -----------------
