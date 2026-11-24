@@ -95,8 +95,8 @@ package body Exec.Library is
    --  Copy ELF_Image into the region's free pages, and make Item the
    --  program record for it, which is not added yet. Same is True if Old
    --  is a program whose image is the same, page for page, and neither
-   --  has install caps. Success is False, and nothing is kept, if the
-   --  image doesn't fit.
+   --  has install caps: then nothing is written (#1109). Success is
+   --  False, and nothing is kept, if the image doesn't fit.
 
    procedure Find_Metadata (Program : in out Installed_Program_Record);
    --  Find the .rose_command section of Program's ELF image, if it has
@@ -472,10 +472,9 @@ package body Exec.Library is
 
       if Same then
 
-         --  The pages just written are the installed version's again:
-         --  give them back, so that the region doesn't grow.
+         --  Write_Image wrote nothing for it: the installed version
+         --  stays.
 
-         Next_Page := Item.ELF_Base;
          return Rose.Objects.Capability_Identifier (Old);
       end if;
 
@@ -519,10 +518,43 @@ package body Exec.Library is
       Old_Base   : Rose.Objects.Object_Id := 0;
       Old_Bound  : Rose.Objects.Object_Id := 0;
       Page_Index : Rose.Objects.Object_Id := 0;
+      --  The number of the image's pages read so far.
+      Matching   : Boolean;
+      --  Every page read so far is the same as Old's page at that index,
+      --  and none has been written: the new image's first Page_Index
+      --  pages are Old's, which can be copied from there if it differs.
 
       procedure Not_Installed (Message : String);
       --  Report that the image is not installed, and give back the pages
       --  written for it: a page of zeroes takes no space in the store.
+
+      function Put_Page (Page : Page_Buffer) return Boolean;
+      --  Write Page as the image's next page. If it doesn't fit, or the
+      --  store has no space for it, the image is not installed, and the
+      --  result is False.
+
+      function Copy_Old_Pages (Count : Rose.Objects.Object_Id) return Boolean;
+      --  Write Old's first Count pages as the image's first pages: the
+      --  ones that matched before a page differed. False if they don't
+      --  fit, as for Put_Page.
+
+      --------------------
+      -- Copy_Old_Pages --
+      --------------------
+
+      function Copy_Old_Pages
+        (Count : Rose.Objects.Object_Id)
+         return Boolean
+      is
+      begin
+         for Index in 1 .. Count loop
+            Region.Get (Old_Base + Index - 1, Old_Page);
+            if not Put_Page (Old_Page) then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Copy_Old_Pages;
 
       -------------------
       -- Not_Installed --
@@ -545,6 +577,35 @@ package body Exec.Library is
          Success := False;
       end Not_Installed;
 
+      --------------
+      -- Put_Page --
+      --------------
+
+      function Put_Page (Page : Page_Buffer) return Boolean is
+      begin
+
+         --  An image that doesn't fit is not installed, rather than
+         --  installed with its last pages missing (#669).
+
+         if Next_Page >= Page_Bound then
+            Not_Installed ("no room for");
+            return False;
+         end if;
+
+         --  Nor is one that the store has no space for (#945).
+
+         begin
+            Region.Put (Next_Page, Page);
+         exception
+            when Rose.Interfaces.Objects.Invocation_Error =>
+               Not_Installed ("no space for");
+               return False;
+         end;
+
+         Next_Page := Next_Page + 1;
+         return True;
+      end Put_Page;
+
    begin
       Item.Caps := (others => 0);
       Item.Caps (1 .. Caps'Length) := Caps;
@@ -554,7 +615,7 @@ package body Exec.Library is
       --  Install caps can't be compared, since a cap's number says
       --  nothing about what it is, so a program with any is changed.
 
-      Same := Old /= 0
+      Matching := Old /= 0
         and then Caps'Length = 0
         and then Installed_Programs (Old).Caps (1) = 0;
 
@@ -563,46 +624,48 @@ package body Exec.Library is
          Old_Bound := Installed_Programs (Old).ELF_Bound;
       end if;
 
+      --  While the image matches Old, nothing is written, so that an
+      --  unchanged program needs no room and no store space (#1109).
+
       loop
          ELF_Image.Read (Data, Last);
          exit when Last < Data'First;
 
-         --  An image that doesn't fit is not installed, rather than
-         --  installed with its last pages missing (#669).
-
-         if Next_Page >= Page_Bound then
-            Not_Installed ("no room for");
-            return;
-         end if;
-
          Buffer (Storage_Offset (Last) + 1 .. Buffer'Last) :=
            (others => 0);
 
-         --  Nor is one that the store has no space for (#945).
-
-         begin
-            Region.Put (Next_Page, Buffer);
-         exception
-            when Rose.Interfaces.Objects.Invocation_Error =>
-               Not_Installed ("no space for");
-               return;
-         end;
-
-         if Same then
+         if Matching then
             if Old_Base + Page_Index < Old_Bound then
                Region.Get (Old_Base + Page_Index, Old_Page);
-               Same := Old_Page = Buffer;
+               Matching := Old_Page = Buffer;
             else
-               Same := False;
+               Matching := False;
+            end if;
+
+            if not Matching and then not Copy_Old_Pages (Page_Index) then
+               return;
             end if;
          end if;
 
-         Next_Page := Next_Page + 1;
+         if not Matching and then not Put_Page (Buffer) then
+            return;
+         end if;
+
          Page_Index := Page_Index + 1;
       end loop;
 
+      Same := Matching and then Old_Base + Page_Index = Old_Bound;
+
+      --  An image that is a shorter copy of the start of Old's is its
+      --  own program, and its pages haven't been written yet.
+
+      if Matching and then not Same
+        and then not Copy_Old_Pages (Page_Index)
+      then
+         return;
+      end if;
+
       Item.ELF_Bound := Next_Page;
-      Same := Same and then Old_Base + Page_Index = Old_Bound;
       Success := True;
    end Write_Image;
 
