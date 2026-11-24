@@ -371,7 +371,6 @@ package body Tests.Registry is
       Rose.Core.Directory_Client.Call
         (Endpoint         => Endpoint,
          Create_Endpoint  => Given (Create_Endpoint),
-         Delete_Cap       => Given (Rose.System_Calls.Delete_Cap_Capability),
          Cap_Set_Service  => Given (Cap_Sets_Cap),
          File_Launch      =>
            (if Fresh then Launcher_Cap ("file")
@@ -412,7 +411,6 @@ package body Tests.Registry is
       Rose.Core.File_Client.Call
         (Endpoint        => Endpoint,
          Create_Endpoint => Given (Create_Endpoint),
-         Delete_Cap      => Given (Rose.System_Calls.Delete_Cap_Capability),
          Cap_Set_Service => Given (Cap_Sets_Cap),
          Served          => Served,
          Control         => Control,

@@ -201,7 +201,7 @@ package body Init.Self_Tests is
       procedure Delete_Chain (Chain : Chain_Array; Length : Natural) is
       begin
          for I in 1 .. Length loop
-            Call_On (Delete_Cap, Chain (I));
+            Rose.System_Calls.Delete_Cap (Chain (I));
          end loop;
       end Delete_Chain;
 
@@ -260,7 +260,7 @@ package body Init.Self_Tests is
       Check ("its sibling and its parent go on working",
              Works (Sibling) and then Works (Find_Cap));
 
-      Call_On (Delete_Cap, First);
+      Rose.System_Calls.Delete_Cap (First);
 
       --  Any process can give up a cap with the Delete flag, valid or not
       --  (#1022): Child is revoked, and Sibling isn't. Deleting each again
@@ -271,6 +271,15 @@ package body Init.Self_Tests is
       Check ("so is a valid one", Deleted (Sibling));
       Check ("and their numbers are free",
              not Deleted (Child) and then not Deleted (Sibling));
+
+      --  The kernel's Delete_Cap cap is retired, not removed (#1023):
+      --  only init has it, and it still deletes the cap it is sent.
+
+      First := Derive (Derive_Cap, Find_Cap);
+      Call_On (Delete_Cap, First);
+      Check ("the retired Delete_Cap cap still deletes",
+             First /= Rose.Capabilities.Null_Capability
+             and then not Deleted (First));
 
       --  The records that those used are free again, so there is room to
       --  derive to the depth that is allowed, twice, and not further.
@@ -289,9 +298,9 @@ package body Init.Self_Tests is
 
       First := Derive (Derive_Cap, Find_Cap);
       Child := Derive (Derive_Cap, First);
-      Call_On (Delete_Cap, First);
+      Rose.System_Calls.Delete_Cap (First);
       Check ("deleting a parent leaves its child working", Works (Child));
-      Call_On (Delete_Cap, Child);
+      Rose.System_Calls.Delete_Cap (Child);
 
       --  A parent that goes through a cap set, as a handover's caps do,
       --  keeps its power to revoke: the copy taken from the set is the
@@ -313,7 +322,7 @@ package body Init.Self_Tests is
             First := Derive (Derive_Cap, Find_Cap);
             Child := Derive (Derive_Cap, First);
             Sets.Append (Set, First);
-            Call_On (Delete_Cap, First);
+            Rose.System_Calls.Delete_Cap (First);
 
             Check ("a parent in a cap set leaves its child working",
                    not Sets.Has_Error and then Works (Child));
@@ -327,8 +336,8 @@ package body Init.Self_Tests is
             Check ("rescinding it revokes the child",
                    Works (Taken) and then not Works (Child));
 
-            Call_On (Delete_Cap, Taken);
-            Call_On (Delete_Cap, Child);
+            Rose.System_Calls.Delete_Cap (Taken);
+            Rose.System_Calls.Delete_Cap (Child);
             Sets.Release (Set);
          end;
       end if;
@@ -1021,7 +1030,6 @@ package body Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
       Replace_Process : Rose.Capabilities.Capability)
@@ -1063,15 +1071,14 @@ package body Init.Self_Tests is
 
       --  Its roles' caps, as src/utilities/hold_file/
       --  rose-core-hold_file.idl declares them: Create_Endpoint,
-      --  Standard_Output, Delete_Cap, Find_Command and Cap_Set_Service. It
-      --  replies with the file's Replaceable, once it holds the file.
+      --  Standard_Output, Find_Command and Cap_Set_Service. It replies
+      --  with the file's Replaceable, once it holds the file.
 
       Rose.System_Calls.Initialize_Send (Params, Endpoint);
       Rose.System_Calls.Send_Caps
         (Params,
          (Create_Endpoint,
           Standard_Output,
-          Delete_Cap,
           Commands,
           Cap_Sets));
       Rose.System_Calls.Receive_Words (Params, 1);
@@ -1084,7 +1091,7 @@ package body Init.Self_Tests is
       Control := Params.Caps (0);
 
       --  The file command's launch call, as src/drivers/file/
-      --  rose-core-file.idl declares it: Create_Endpoint, Delete_Cap and
+      --  rose-core-file.idl declares it: Create_Endpoint and
       --  Cap_Set_Service, then Previous, and its results Served and
       --  Control.
 
@@ -1092,7 +1099,7 @@ package body Init.Self_Tests is
         (Replace_Process => Replace_Process,
          Control         => Control,
          Program         => File_Cap,
-         Null_Caps       => 3,
+         Null_Caps       => 2,
          Empty_Strings   => 0,
          Results         => 2);
    end Replace_Held_File;
@@ -1172,8 +1179,8 @@ package body Init.Self_Tests is
       --  which a new version takes from the old one; and its results
       --  User and Control. Then the directory command's, as src/drivers/
       --  directory/rose-core-directory.idl declares it: Create_Endpoint,
-      --  Delete_Cap, Cap_Set_Service, File_Launch and Directory_Launch,
-      --  then Previous; and its results Served and Control.
+      --  Cap_Set_Service, File_Launch and Directory_Launch, then
+      --  Previous; and its results Served and Control.
 
       return Replace
           (Replace_Process => Replace_Process,
@@ -1186,7 +1193,7 @@ package body Init.Self_Tests is
           (Replace_Process => Replace_Process,
            Control         => Home_Ctl,
            Program         => Home_Cap,
-           Null_Caps       => 5,
+           Null_Caps       => 4,
            Empty_Strings   => 0,
            Results         => 2);
    end Replace_Held_User;
@@ -1199,7 +1206,6 @@ package body Init.Self_Tests is
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Clock           : Rose.Capabilities.Capability;
       Screen          : Rose.Capabilities.Capability;
@@ -1234,7 +1240,6 @@ package body Init.Self_Tests is
         (Params,
          (Standard_Output,
           Create_Endpoint,
-          Delete_Cap,
           Commands,
           Clock,
           Test_Bank,
@@ -1260,8 +1265,7 @@ package body Init.Self_Tests is
       Standard_Output : Rose.Capabilities.Capability;
       Commands        : Rose.Capabilities.Capability;
       Derive_Cap      : Rose.Capabilities.Capability;
-      Rescind_Cap     : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability)
+      Rescind_Cap     : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -1284,7 +1288,7 @@ package body Init.Self_Tests is
 
       Spare  := Derive (Derive_Cap, Commands);
       Parent := Derive (Derive_Cap, Commands);
-      Call_On (Delete_Cap, Spare);
+      Rose.System_Calls.Delete_Cap (Spare);
       Child  := Derive (Derive_Cap, Parent);
 
       if Parent = Rose.Capabilities.Null_Capability
@@ -1319,8 +1323,8 @@ package body Init.Self_Tests is
 
       --  Hold_derived has its own copies, which name the same records.
 
-      Call_On (Delete_Cap, Parent);
-      Call_On (Delete_Cap, Child);
+      Rose.System_Calls.Delete_Cap (Parent);
+      Rose.System_Calls.Delete_Cap (Child);
 
       return not Params.Control.Flags (Rose.Invocation.Error)
         and then Params.Control.Flags (Rose.Invocation.Send_Words)

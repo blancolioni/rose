@@ -106,7 +106,6 @@ package body Home_Holder is
          Rose.Core.Directory_Client.Call
            (Endpoint         => Endpoint,
             Create_Endpoint  => Rose.System_Calls.Create_Endpoint_Capability,
-            Delete_Cap       => Rose.System_Calls.Delete_Cap_Capability,
             Cap_Set_Service  => Cap_Set_Service,
             File_Launch      => File_Launch.Launch_Cap,
             Directory_Launch => Directory_Launch.Launch_Cap,

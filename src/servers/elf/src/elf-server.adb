@@ -38,7 +38,8 @@ package body Elf.Server is
    --  endpoint cap. They are kept until the next launch, because the
    --  reply to the launch sends them.
 
-   procedure Delete_Cap (Cap : Rose.Capabilities.Capability);
+   procedure Delete_Cap (Cap : Rose.Capabilities.Capability)
+     renames Rose.System_Calls.Delete_Cap;
 
    Invoke_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
@@ -248,22 +249,6 @@ package body Elf.Server is
          Instanced      => True);
       Rose.Interfaces.Processes.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
-
-   ----------------
-   -- Delete_Cap --
-   ----------------
-
-   procedure Delete_Cap (Cap : Rose.Capabilities.Capability) is
-      use type Rose.Capabilities.Capability;
-      Params : aliased Rose.Invocation.Invocation_Record;
-   begin
-      if Cap /= 0 then
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Cap);
-         Rose.System_Calls.Invoke_Capability (Params);
-      end if;
-   end Delete_Cap;
 
    -----------------
    -- Encode_Name --

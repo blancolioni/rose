@@ -26,7 +26,6 @@ package Init.Users is
    procedure Create_System_Directory
      (Find_Cap        : Rose.Capabilities.Capability;
       Create_Endpoint : Rose.Capabilities.Capability;
-      Delete_Cap      : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
       System          : out Rose.Capabilities.Capability);
    --  Launch a directory for the system directory, launch the null

@@ -996,8 +996,12 @@ package body Petal.Command_Launch is
                   Caps (Role.Cap_Index + 1) :=
                     Rose.System_Calls.Create_Endpoint_Capability;
                when Delete_Cap =>
+
+                  --  The role is retired (#1023): a command that still
+                  --  declares it is given a null cap.
+
                   Caps (Role.Cap_Index + 1) :=
-                    Rose.System_Calls.Delete_Cap_Capability;
+                    Rose.Capabilities.Null_Capability;
                when Rescind_Cap =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.System_Calls.Rescind_Cap_Capability;
@@ -1110,10 +1114,7 @@ package body Petal.Command_Launch is
             end if;
          end if;
 
-         Rose.System_Calls.Initialize_Send
-           (Params, Rose.System_Calls.Delete_Cap_Capability);
-         Rose.System_Calls.Send_Cap (Params, Endpoint);
-         Rose.System_Calls.Invoke_Capability (Params);
+         Rose.System_Calls.Delete_Cap (Endpoint);
          Release_Grants;
          Release_Command_Bank;
       end;

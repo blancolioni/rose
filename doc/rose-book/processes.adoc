@@ -65,7 +65,7 @@ A command that inherits no role gets no capability beyond its arguments.
 | `Standard_Error` | `Writer` | Standard error
 | `Standard_IO` | | All three streams
 | `Create_Endpoint` | Kernel interface (#162) | Creating further endpoints
-| `Delete_Cap` | Kernel interface (#162) | Deleting caps
+| `Delete_Cap` | Kernel interface (#162) | Nothing: it is retired, and given as a null cap (#1023), since a command deletes its own caps with the `Delete` flag (#1022)
 | `Rescind_Cap` | Kernel interface (#162) | Rescinding caps
 | `Create_Cap_Set` | `Constructor` | Creating cap sets
 |===

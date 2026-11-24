@@ -1,3 +1,8 @@
+--  Caps.Delete_Cap is retired (#1023): petal deletes its own caps with
+--  the Delete flag (#1022), and is given a null cap for the role. The
+--  role stays because the supervisor sends petal its caps by position
+--  (supervisor_loop.adb), and a supervisor is persistent: one installed
+--  by an earlier release keeps sending this layout after an update.
 command Rose.Core.Petal
   : Streams.Standard_IO, Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Rescind_Cap, Commands.Find_Command,
     Screens.Console, Time.Clock_Service, Users.Rights_Service,

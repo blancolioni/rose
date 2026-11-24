@@ -1,4 +1,4 @@
-command Rose.Core.Directory : Caps.Create_Endpoint, Caps.Delete_Cap, Caps.Cap_Set_Service
+command Rose.Core.Directory : Caps.Create_Endpoint, Caps.Cap_Set_Service
   with Summary     => "Serve a directory.",
        Description => """
           Directory serves one directory (ADR 0003): its entries, each a
