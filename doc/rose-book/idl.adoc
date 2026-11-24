@@ -4,7 +4,7 @@
 [NOTE]
 ====
 This chapter is a draft (#146).
-It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target, and idle adds a second target, for programs built with the userland run-time system (<<user-mode-target>>). It marks the planned changes: command declarations (idle#2) and ADR 0002.
+It describes the language and code generation as the original IDL compiler implemented them, which idle, its replacement (idle#1), keeps for the kernel target, and idle adds a second target, for programs built with the userland run-time system (<<user-mode-target>>). It also describes the command and package declarations of ADR 0002 (idle#2).
 References written idle#N are to issues in the compiler's own repository, https://github.com/blancolioni/idle[blancolioni/idle].
 ====
 
@@ -374,12 +374,11 @@ The instance table holds up to 1024 (endpoint, identifier) pairs for each interf
 The ATA server follows the same pattern for its drives, using the drive index as the identifier, but creates each drive's capabilities by hand, with endpoint ids from `Rose.Devices.Block` instead of the generated `Storage.Block_Array` server package.
 
 [#user-mode-target]
-=== User-mode target (in progress)
+=== User-mode target
 
 The user-mode target is for programs built with the userland run-time system, which has tagged types (#357).
 An IDL interface becomes an Ada interface type, so a parameter of type `interface File` accepts any object that implements `File`, whether it is reached through a capability or implemented in the same program.
-`idle --target user` generates interfaces (idle#40), commands (idle#43), interface arguments and results (idle#44), and string results and `out` strings (idle#45): everything that the kernel target generates.
-The rest of phase 1 is idle#39.
+`idle --target user` generates interfaces (idle#40), commands (idle#43), interface arguments and results (idle#44), and string results and `out` strings (idle#45): everything that the kernel target generates (idle#39).
 
 ==== Which programs use it
 
@@ -622,9 +621,9 @@ A further target could generate the user-mode packages with `SPARK_Mode` and con
 Whether to have this target is still open; it would tie in with the "Rose: SPARK annotations" project.
 
 [#commands]
-== Commands and packages (planned)
+== Commands and packages
 
-ADR 0002 (#135) adds two declarations to the language (idle#2).
+ADR 0002 (#135) added two declarations to the language, which idle implements (idle#2).
 
 * A `command` declaration declares a program's arguments, each with a mode, a type, an optional default, an optional short option and help text, with a final list argument that takes the remaining words.
   A command is named as a child of the package it belongs to, such as `Rose.Core.Echo`.
@@ -652,12 +651,6 @@ The build passes `interfaces/` and the directories that hold packages and comman
 
 A command declaration describes a program that the shell can run: its arguments, how they are given on the command line, and its help text.
 From it, the compiler generates the procedure spec the author implements, the program's main, and the metadata the shell's registry reads.
-
-[NOTE]
-====
-The syntax below is proposed in idle#2.
-Its main choices are settled (see <<command-decisions>>); the remaining open questions are listed at the end of this section.
-====
 
 ==== Declaring a command
 
@@ -820,8 +813,6 @@ Rose core utilities: <https://rose-os.org/rose-book/>
 Full documentation: <https://rose-os.org/rose-book/echo.html>
 ----
 
-The exact layout of the options list is still to be fixed; the order of the parts is settled.
-
 ==== What the compiler generates
 
 For `rose-core-echo.idl`, the compiler writes:
@@ -865,8 +856,8 @@ string_value  ::= String { '&' String }
                 | 'Text_File' '(' String ')'
 ----
 
-`Text_Block` is a new lexical element: `"""`, a line break, any number of lines, and a closing `"""` on a line of its own.
-The lexer also needs character literals, which it does not yet produce, and the parser needs string concatenation with `&`.
+`Text_Block` is a lexical element: `"""`, a line break, any number of lines, and a closing `"""` on a line of its own.
+Character literals and string concatenation with `&` are part of the grammar too.
 
 [#command-decisions]
 ==== Decisions
@@ -927,20 +918,11 @@ end Standard_IO;
 The system caps are roles as well: `Create_Endpoint`, `Delete_Cap`, `Rescind_Cap` and `Create_Cap_Set`, each with an IDL interface type (ADR 0002, section 1).
 The generated main passes them to `Rose.System_Calls.Use_Capabilities`.
 
-==== Open questions
-
-* Creating an endpoint returns two caps, so its interface needs `out` cap parameters, which the kernel target does not support yet.
-
 [#packages]
 === Packages
 
 A package is a named, versioned group of commands that are built, installed and versioned together, such as the core utilities that `init` installs at boot.
 Its declaration holds the information `--version` reports, so that no command has to repeat it.
-
-[NOTE]
-====
-The syntax below is a proposal, to be settled in idle#2.
-====
 
 ==== Declaring a package
 
@@ -1046,12 +1028,18 @@ There is NO WARRANTY, to the extent permitted by law.
 Written by Fraser Wilson.
 ----
 * `--help` ends with the package's help footer (see <<commands>>).
-* The registry records each command's package, so it can list the commands in a package and the installed packages with their versions.
-* The build collects every command that is a child of a package to form that package's set of executables.
-  `init` installs the `Rose.Core` package from the boot image, so its commands are registered before petal's first prompt.
+* `restore-install` installs the core commands from the install media, and the registry has each under its registered name before petal's first prompt (see <<Building Programs>>).
 
 [#command-visibility]
 ==== Which commands are visible
+
+[NOTE]
+====
+Not implemented yet (#1105).
+Petal and the command registry know a command only by its registered name: there is no `use`, no qualified name and no renaming, and a second command with the same name replaces the first.
+The registry doesn't record packages either, so it can't list a package's commands, or the installed packages with their versions.
+The rest of this section is the design.
+====
 
 The shell treats packages much as Ada treats a `use` clause:
 
@@ -1076,7 +1064,7 @@ After this, `debug_echo` runs `Debug.Echo`.
 
 ==== Grammar changes
 
-This proposal needs two changes to the grammar:
+Packages make two changes to the grammar:
 
 * A new kind of file:
 +
