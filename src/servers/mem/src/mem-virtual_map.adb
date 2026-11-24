@@ -76,9 +76,10 @@ package body Mem.Virtual_Map is
    --  If Mem.Page_Table can track fewer than Rose.Limits.Reserve_Low_Pages
    --  more pages, free clean pages, and then changed pages, until it can
    --  track Rose.Limits.Reserve_High_Pages, or there are no more (#591).
-   --  The table holds Rose.Limits.Max_Mapped_Pages, which is fewer than
-   --  a machine of more than 32 MB has, so it can fill while there are
-   --  free pages. Cached pages aren't evicted: they aren't in the table.
+   --  The table has room for twice mem's physical pages (#998), but
+   --  shared and cached pages can be mapped more than once, so it can
+   --  still fill while there are free pages. Cached pages aren't
+   --  evicted: they aren't in the table.
 
    -------------------
    -- Allocate_Page --
@@ -354,11 +355,34 @@ package body Mem.Virtual_Map is
       end loop;
    end Keep_Reserve;
 
+   --------------------------
+   -- Make_Room_For_Change --
+   --------------------------
+
+   procedure Make_Room_For_Change (Success : out Boolean) is
+   begin
+      --  Nothing here writes to the console, as for Keep_Reserve.
+
+      Success :=
+        Mem.Page_Table.Dirty_Page_Count < Rose.Limits.Max_Dirty_Pages;
+
+      while not Success and then not Stopped loop
+         declare
+            Freed : Boolean;
+         begin
+            Write_Changed_Pages (Freed);
+            exit when not Freed;
+         end;
+         Success :=
+           Mem.Page_Table.Dirty_Page_Count < Rose.Limits.Max_Dirty_Pages;
+      end loop;
+   end Make_Room_For_Change;
+
    ---------
    -- Map --
    ---------
 
-   procedure Map (Process       : Rose.Objects.Object_Id;
+   procedure Map (Process      : Rose.Objects.Object_Id;
                   Physical_Page : Rose.Addresses.Physical_Page_Address;
                   Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
                   Readable      : Boolean;

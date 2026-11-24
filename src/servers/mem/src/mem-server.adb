@@ -647,6 +647,7 @@ package body Mem.Server is
       Rose.Console_IO.Open (Console_Cap);
 
       Mem.Calls.Load_Memory_Map;
+      Mem.Page_Table.Initialize;
 
       Rose.Interfaces.Processes.Memory.Server.Create_Server
         (Server_Context => Server,
@@ -1063,15 +1064,43 @@ package body Mem.Server is
                         Mem.Processes.Fault_Process
                           (Pid, "second fault on writable page");
                      else
-                        --  page should be made writable, and dirty
-                        --  flag should be set (since this is the
-                        --  first write)
-                        Mem.Page_Table.Set_Writable (Position);
-                        Mem.Shared_Pages.Set_Modified (Physical_Page);
-                        Mem.Processes.Resume_Process (Pid);
-                        Mem.Processes.Count_Fault
-                          (Pid, Mem.Processes.Write_Fault,
-                           Rose.Trace.Ticks - Start);
+                        declare
+                           Room : Boolean := True;
+                        begin
+                           --  A persistent page past the limit of
+                           --  changed pages waits until some are paged
+                           --  out, or else for a checkpoint, so that a
+                           --  checkpoint always fits in the log's
+                           --  reserve (#998). A replayed fault can't
+                           --  wait, and goes past it.
+
+                           if Mem.Page_Table.Would_Pass_Dirty_Limit
+                             (Position)
+                           then
+                              Mem.Virtual_Map.Make_Room_For_Change (Room);
+                           end if;
+
+                           if not Room
+                             and then May_Wait
+                             and then Request_Checkpoint_Cap /= 0
+                             and then Held_Count < Held_Faults'Last
+                           then
+                              Held_Count := Held_Count + 1;
+                              Held_Faults (Held_Count) :=
+                                (Object, Virtual, Action);
+                           else
+                              --  page should be made writable, and
+                              --  dirty flag should be set (since this
+                              --  is the first write)
+                              Mem.Page_Table.Set_Writable (Position);
+                              Mem.Shared_Pages.Set_Modified
+                                (Physical_Page);
+                              Mem.Processes.Resume_Process (Pid);
+                              Mem.Processes.Count_Fault
+                                (Pid, Mem.Processes.Write_Fault,
+                                 Rose.Trace.Ticks - Start);
+                           end if;
+                        end;
                      end if;
                end case;
             end if;

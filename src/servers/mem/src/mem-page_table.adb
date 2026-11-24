@@ -1,5 +1,9 @@
+with System.Storage_Elements;
+
+with Rose.Console_IO;
 with Rose.Limits;
 with Rose.Trace;
+with Rose.Words;
 
 with Mem.Calls;
 with Mem.Page_Cache;
@@ -8,6 +12,20 @@ with Mem.Processes;
 with Mem.Shared_Pages;
 
 package body Mem.Page_Table is
+
+   --  The table is sized when mem starts, from its physical pages, and
+   --  mapped into mem at these addresses, from mem's own pages (#998).
+   --  Each part has room for the largest table, and only the pages that
+   --  this one needs are mapped: Max_Entries is twice the pages of a
+   --  32-bit physical address space.
+
+   Max_Entries : constant := 2 * 2 ** 20;
+   Max_Bucket_Bits : constant := 20;
+
+   Mapped_Base : constant := 16#1000_0000#;  --  Max_Entries * 8 bytes
+   Next_Base   : constant := 16#1100_0000#;  --  Max_Entries * 4 bytes
+   Dirty_Base  : constant := 16#1180_0000#;  --  Max_Entries * 4 bytes
+   Bucket_Base : constant := 16#1200_0000#;  --  2 ** 20 * 4 bytes
 
    type Mapped_Page_Record is
       record
@@ -23,19 +41,58 @@ package body Mem.Page_Table is
       end record
    with Pack, Size => 64;
 
-   type Mapped_Page_Array is array (Cursor range <>) of Mapped_Page_Record
+   type Mapped_Page_Array is
+     array (Cursor range 1 .. Max_Entries) of Mapped_Page_Record
      with Pack;
 
-   Mapped_Pages     : Mapped_Page_Array (1 .. Rose.Limits.Max_Mapped_Pages);
+   type Cursor_Array is array (Cursor range 1 .. Max_Entries) of Cursor;
+
+   type Dirty_Page_Array is array (1 .. Max_Entries) of Cursor;
+
+   type Bucket_Array is
+     array (Natural range 0 .. 2 ** Max_Bucket_Bits - 1) of Cursor;
+
+   Mapped_Pages : Mapped_Page_Array
+     with Import, Address => System'To_Address (Mapped_Base);
+
+   Next_Page : Cursor_Array
+     with Import, Address => System'To_Address (Next_Base);
+   --  The next entry in the same bucket, or, for a free entry, the next
+   --  free entry.
+
+   Dirty_Pages : Dirty_Page_Array
+     with Import, Address => System'To_Address (Dirty_Base);
+
+   Buckets : Bucket_Array
+     with Import, Address => System'To_Address (Bucket_Base);
+   --  The first entry of each bucket: Find looks only at the entries of
+   --  one bucket, not at the whole table.
+
+   Table_Last       : Cursor := 0;
+   --  The entries that the table has room for: Initialize maps them.
+   Bucket_Bits      : Natural := 0;
+
    Mapped_Page_Last : Cursor := 0;
    Free_Count       : Natural := 0;
+   Free_Head        : Cursor := 0;
+   --  Entries up to Mapped_Page_Last that are free, in a list through
+   --  Next_Page.
 
-   Dirty_Pages     : array (1 .. Rose.Limits.Max_Mapped_Pages) of Cursor;
    Dirty_Page_Last : Natural := 0;
 
    Clock_Hand : Cursor := 0;
    --  The page that Sweep_Clean_Pages or Sweep_Changed_Pages last
    --  stopped at.
+
+   function Bucket_Of
+     (Process : Process_Id;
+      Virtual : Rose.Addresses.Virtual_Page_Address)
+      return Natural;
+   --  The bucket of the page Virtual of Process.
+
+   procedure Release_Entry (Position : Cursor);
+   --  Take the page at Position out of its bucket, and make its entry
+   --  free.
 
    procedure Sweep
      (Changed  : Boolean;
@@ -49,6 +106,25 @@ package body Mem.Page_Table is
    --  Take pages that have been deleted out of the dirty page list, so
    --  that the next checkpoint doesn't save them: their slots will be
    --  used again for other pages.
+
+   ---------------
+   -- Bucket_Of --
+   ---------------
+
+   function Bucket_Of
+     (Process : Process_Id;
+      Virtual : Rose.Addresses.Virtual_Page_Address)
+      return Natural
+   is
+      use Rose.Words;
+      Key : constant Word_32 :=
+              (Word_32 (Virtual) * 16#9E37_79B1#)
+              xor (Word_32 (Process) * 16#85EB_CA6B#);
+   begin
+      --  The top bits of a multiplicative hash are the well mixed ones.
+
+      return Natural (Key / Word_32'(2) ** (32 - Bucket_Bits));
+   end Bucket_Of;
 
    -----------------------
    -- Clear_Dirty_Pages --
@@ -69,8 +145,7 @@ package body Mem.Page_Table is
    procedure Delete (Position : Cursor) is
       Was_Dirty : constant Boolean := Mapped_Pages (Position).Dirty;
    begin
-      Mapped_Pages (Position).Process := 0;
-      Free_Count := Free_Count + 1;
+      Release_Entry (Position);
 
       --  Only a dirty page is in the dirty page list. Dropping a clean
       --  page can happen during a checkpoint, which is going through the
@@ -115,8 +190,7 @@ package body Mem.Page_Table is
                      end if;
                   end if;
                end;
-               Element.Process := 0;
-               Free_Count := Free_Count + 1;
+               Release_Entry (I);
             end if;
          end;
       end loop;
@@ -159,17 +233,19 @@ package body Mem.Page_Table is
       return Cursor
    is
       use type Rose.Addresses.Virtual_Page_Address;
+      Position : Cursor := Buckets (Bucket_Of (Process, Virtual));
    begin
-      for I in 1 .. Mapped_Page_Last loop
+      while Position /= 0 loop
          declare
-            Element : Mapped_Page_Record renames Mapped_Pages (I);
+            Element : Mapped_Page_Record renames Mapped_Pages (Position);
          begin
             if Element.Process = Process
               and then Element.Virt = Virtual
             then
-               return I;
+               return Position;
             end if;
          end;
+         Position := Next_Page (Position);
       end loop;
       return 0;
    end Find;
@@ -180,8 +256,83 @@ package body Mem.Page_Table is
 
    function Free_Entries return Natural is
    begin
-      return Natural (Mapped_Pages'Last - Mapped_Page_Last) + Free_Count;
+      return Natural (Table_Last - Mapped_Page_Last) + Free_Count;
    end Free_Entries;
+
+   ----------------
+   -- Initialize --
+   ----------------
+
+   procedure Initialize is
+
+      Physical : constant Natural :=
+                   Natural (Mem.Physical_Map.Available_Pages);
+      Entries  : constant Natural :=
+                   Natural'Min
+                     (Max_Entries,
+                      Natural'Max (Rose.Limits.Min_Mapped_Pages,
+                                   2 * Physical));
+      Success  : Boolean := True;
+
+      procedure Map_Pages
+        (Base  : System.Address;
+         Bytes : Natural);
+      --  Map pages of mem's own from Base, enough for Bytes.
+
+      ---------------
+      -- Map_Pages --
+      ---------------
+
+      procedure Map_Pages
+        (Base  : System.Address;
+         Bytes : Natural)
+      is
+         use System.Storage_Elements;
+         Page  : Rose.Addresses.Physical_Page_Address;
+      begin
+         for I in 0 .. (Bytes + Rose.Limits.Page_Size - 1)
+           / Rose.Limits.Page_Size - 1
+         loop
+            exit when not Success;
+            Mem.Physical_Map.Allocate_Page (Page, Success);
+            if Success then
+               Mem.Calls.Load_Page
+                 (Page,
+                  Base + Storage_Offset (I * Rose.Limits.Page_Size));
+            end if;
+         end loop;
+      end Map_Pages;
+
+   begin
+      Bucket_Bits := 12;
+      while 2 ** Bucket_Bits < Entries / 2
+        and then Bucket_Bits < Max_Bucket_Bits
+      loop
+         Bucket_Bits := Bucket_Bits + 1;
+      end loop;
+
+      Map_Pages (Mapped_Pages'Address, Entries * 8);
+      Map_Pages (Next_Page'Address, Entries * 4);
+      Map_Pages (Dirty_Pages'Address, Entries * 4);
+      Map_Pages (Buckets'Address, 2 ** Bucket_Bits * 4);
+
+      if not Success then
+         Rose.Console_IO.Put_Line ("mem: no memory for the page table");
+         return;
+      end if;
+
+      for Bucket of Buckets (0 .. 2 ** Bucket_Bits - 1) loop
+         Bucket := 0;
+      end loop;
+
+      Table_Last := Cursor (Entries);
+
+      Rose.Console_IO.Put ("mem: page table: ");
+      Rose.Console_IO.Put (Entries);
+      Rose.Console_IO.Put (" entries for ");
+      Rose.Console_IO.Put (Physical);
+      Rose.Console_IO.Put_Line (" pages");
+   end Initialize;
 
    ------------
    -- Insert --
@@ -198,20 +349,15 @@ package body Mem.Page_Table is
       Persistent : Boolean)
    is
       Position : Cursor := 0;
+      Bucket   : constant Natural := Bucket_Of (Process, Virtual);
    begin
 
-      if Free_Count > 0 then
-         for I in 1 .. Mapped_Page_Last loop
-            if Mapped_Pages (I).Process = 0 then
-               Position := I;
-               Free_Count := Free_Count - 1;
-               exit;
-            end if;
-         end loop;
-      end if;
-
-      if Position = 0 then
-         if Mapped_Page_Last = Mapped_Pages'Last then
+      if Free_Head /= 0 then
+         Position := Free_Head;
+         Free_Head := Next_Page (Position);
+         Free_Count := Free_Count - 1;
+      else
+         if Mapped_Page_Last = Table_Last then
 
             --  The page is mapped already, so it is now one that mem
             --  doesn't track, and a later fault on it will fail its
@@ -242,6 +388,9 @@ package body Mem.Page_Table is
            Executable => Executable,
            Persistent => Persistent,
            Dirty      => False);
+
+      Next_Page (Position) := Buckets (Bucket);
+      Buckets (Bucket) := Position;
 
    end Insert;
 
@@ -348,6 +497,39 @@ package body Mem.Page_Table is
       return Mapped_Pages (Position).Process;
    end Process;
 
+   -------------------
+   -- Release_Entry --
+   -------------------
+
+   procedure Release_Entry (Position : Cursor) is
+      Page     : Mapped_Page_Record renames Mapped_Pages (Position);
+      Bucket   : constant Natural := Bucket_Of (Page.Process, Page.Virt);
+      Previous : Cursor := 0;
+      Current  : Cursor := Buckets (Bucket);
+   begin
+      if Page.Process = 0 then
+         return;
+      end if;
+
+      while Current /= 0 and then Current /= Position loop
+         Previous := Current;
+         Current := Next_Page (Current);
+      end loop;
+
+      if Current = Position then
+         if Previous = 0 then
+            Buckets (Bucket) := Next_Page (Position);
+         else
+            Next_Page (Previous) := Next_Page (Position);
+         end if;
+      end if;
+
+      Page.Process := 0;
+      Next_Page (Position) := Free_Head;
+      Free_Head := Position;
+      Free_Count := Free_Count + 1;
+   end Release_Entry;
+
    --------------------------
    -- Set_Physical_Address --
    --------------------------
@@ -377,6 +559,14 @@ package body Mem.Page_Table is
    begin
       Page.Writable := True;
       if Page.Persistent and then not Page.Dirty then
+         if Dirty_Page_Last >= Rose.Limits.Max_Dirty_Pages then
+
+            --  To the kernel's log, not the console, as for Insert. A
+            --  trace event carries 32 characters.
+
+            Rose.Trace.Event
+              ("mem: dirty limit passed, pid ", Natural (Page.Process));
+         end if;
          Dirty_Page_Last := Dirty_Page_Last + 1;
          Dirty_Pages (Dirty_Page_Last) := Position;
       end if;
@@ -470,5 +660,17 @@ package body Mem.Page_Table is
    begin
       return Mapped_Pages (Position).Virt;
    end Virtual_Address;
+
+   ----------------------------
+   -- Would_Pass_Dirty_Limit --
+   ----------------------------
+
+   function Would_Pass_Dirty_Limit (Position : Cursor) return Boolean is
+      Page : Mapped_Page_Record renames Mapped_Pages (Position);
+   begin
+      return Page.Persistent
+        and then not Page.Dirty
+        and then Dirty_Page_Last >= Rose.Limits.Max_Dirty_Pages;
+   end Would_Pass_Dirty_Limit;
 
 end Mem.Page_Table;

@@ -48,12 +48,12 @@ limits="$HERE/../src/base/rose-limits.ads"
 limit () {
     sed -n "s/^ *$1 *: constant := \([0-9_]*\);.*/\1/p" "$limits" | tr -d _
 }
-mapped=$(limit Max_Mapped_Pages)
+dirty=$(limit Max_Dirty_Pages)
 margin=$(limit Log_Table_Margin)
 copies=$(limit Clean_Copy_Limit)
-[ -n "$mapped" ] && [ -n "$margin" ] && [ -n "$copies" ] \
+[ -n "$dirty" ] && [ -n "$margin" ] && [ -n "$copies" ] \
     || { echo "cannot read the reserve from $limits"; exit 2; }
-reserve=$((mapped + margin + copies))
+reserve=$((dirty + margin + copies))
 
 check_log () {
     # check_log WHEN: run check-log.py on the disk, and fail if it finds

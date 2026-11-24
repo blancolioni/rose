@@ -28,6 +28,13 @@ package Mem.Virtual_Map is
    --  page of a process (#973), or else a batch of changed pages, paged
    --  out to the log (#974).
 
+   procedure Make_Room_For_Change (Success : out Boolean);
+   --  If Rose.Limits.Max_Dirty_Pages persistent pages are changed, page
+   --  out a batch of them, so that one more page can be changed (#998).
+   --  Success is False if none could be paged out: the caller waits for
+   --  a checkpoint, or changes the page anyway if it can't wait. It
+   --  writes nothing to the console.
+
    function Changes_Stopped return Boolean;
    --  No more changed pages can be paged out until a checkpoint ends:
    --  the table of changes is full, or the log refused a batch (ADR 0028,
