@@ -47,7 +47,10 @@ UPDATE_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-processes-replacer.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacer-client.o \
 	$(BUILDDIR)/rose-interfaces-processes-replacement.o \
-	$(BUILDDIR)/rose-interfaces-processes-replacement-client.o
+	$(BUILDDIR)/rose-interfaces-processes-replacement-client.o \
+	$(BUILDDIR)/rose-interfaces-screens.o \
+	$(BUILDDIR)/rose-interfaces-screens-terminal.o \
+	$(BUILDDIR)/rose-interfaces-screens-terminal-client.o
 LOG_READER_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader.o \
 	$(BUILDDIR)/rose-interfaces-checkpoints-log_reader-client.o
