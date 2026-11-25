@@ -880,9 +880,13 @@ def check_index_contents(log, info, previous, inside=None):
     A process's index carries on from the previous entry if it was there
     with the same memory process id, and its object id was there too: a
     process that took over another's object id with a replacement (ADR
-    0032) keeps its slot and its pages.  A process that is new to its
-    slot starts with nothing.  Each process's index is read into info's
-    "indexes", for the next entry.
+    0032) keeps its slot and its pages.  That is only so if the object
+    id the slot had before is gone: a replacement can also start in a
+    slot that another replacement's predecessor freed, in the same
+    interval, and the object that slot had is then still running in
+    another slot (#1117).  A process that is new to its slot starts with
+    nothing.  Each process's index is read into info's "indexes", for the
+    next entry.
 
     inside is given for the first restorable entry of a cleaned log
     (#953): the entries before it can't be restored, so their indexes
@@ -902,10 +906,13 @@ def check_index_contents(log, info, previous, inside=None):
     info["indexes"] = {}
     carried = previous is not None and previous.get("has_index")
     old_oids = set(previous["processes"].values()) if carried else set()
+    new_oids = set(info["processes"].values())
     expected = {}
     new_to_slot = set()
     for pid, oid in info["processes"].items():
-        if carried and pid in previous["processes"] and oid in old_oids:
+        before = previous["processes"].get(pid) if carried else None
+        if before is not None and oid in old_oids \
+                and (before == oid or before not in new_oids):
             expected[pid] = dict(previous["indexes"].get(pid, {}))
         else:
             expected[pid] = {}
