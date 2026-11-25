@@ -12,7 +12,6 @@ command Rose.Core.Hold_Pages : Caps.Create_Endpoint, Streams.Standard_Output
           later entry of the log, and writes the result. It never
           completes.
           """,
-       Server      => Page_Holder.Start_Server,
-       Live
+       Server      => Page_Holder.Start_Server
 is
 end Rose.Core.Hold_Pages;

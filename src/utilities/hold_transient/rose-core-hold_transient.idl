@@ -10,7 +10,6 @@ command Rose.Core.Hold_Transient : Caps.Create_Endpoint, Streams.Standard_Output
           the disk. If it is ever restored, it says so.
           """,
        Server      => Transient_Holder.Start_Server,
-       Live,
        Transient
 is
 end Rose.Core.Hold_Transient;

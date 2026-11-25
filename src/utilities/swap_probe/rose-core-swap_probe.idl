@@ -8,8 +8,7 @@ command Rose.Core.Swap_Probe : Caps.Create_Endpoint
           instead: init's test holds the calls to Target, so this call
           waits through the swap. It never completes.
           """,
-       Server      => Swap_Probe_Server.Start_Server,
-       Live
+       Server      => Swap_Probe_Server.Start_Server
 is
    Number : Natural
      with Help => "the number it answers";

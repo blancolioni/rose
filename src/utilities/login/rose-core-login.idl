@@ -14,7 +14,6 @@ command Rose.Core.Login
           call to it fails at a restore, and the supervisor launches it
           again.
           """,
-       Live,
        Transient
 is
    Auth : in Users.Auth
