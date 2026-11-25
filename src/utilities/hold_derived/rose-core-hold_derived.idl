@@ -12,8 +12,7 @@ command Rose.Core.Hold_Derived
           and Parent still does, and writes the result to standard
           output. It never completes.
           """,
-       Server      => Derived_Holder.Start_Server,
-       Live
+       Server      => Derived_Holder.Start_Server
 is
    Parent : in Commands.Lookup
      with Help => "a capability derived from the registry's";

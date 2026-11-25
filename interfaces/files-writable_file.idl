@@ -2,7 +2,6 @@
 --  from it, as readers are from a file (ADR 0009, section 4).
 
 interface Files.Writable_File : Files.File
-  with Versioned
 is
 
    function Append return interface Streams.Releasable_Writer;
