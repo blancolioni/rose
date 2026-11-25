@@ -11,7 +11,8 @@ command Rose.Core.Directory : Caps.Create_Endpoint, Caps.Cap_Set_Service
 
           A new version of the program can take over from a running one
           (ADR 0032, #831). Its state is the entries' names and kinds,
-          and the caps it holds for each entry: its writable interface,
+          whether each file is read-only (ADR 0036, section 8), and the
+          caps it holds for each entry: its writable interface,
           its Replaceable interface, its bank, and its read-only
           interface if one was given out. The launch caps and
           Cap_Set_Service are its arguments, which the handover passes on
@@ -31,6 +32,7 @@ is
      with Help => "the directory";
    Control : out Processes.Replaceable
      with Help => "its Replaceable interface, which its parent keeps";
-   Linking : out Files.Linking_Directory
-     with Help => "the directory, with the right to link directories into it";
+   Linking : out Files.Protecting_Directory
+     with Help => "the directory, with the rights to link directories into"
+                  & " it and to make its files read-only";
 end Rose.Core.Directory;
