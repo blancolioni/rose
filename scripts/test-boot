@@ -196,6 +196,42 @@ if console_since "$mark" | grep -q "^discarded\|petal: "; then
     fail "//system/null kept what was written, or petal refused it"
 fi
 
+# //system/version (ADR 0036, section 8; #1121), an ordinary file that
+# init made read-only: cat shows the version, writing to it is refused
+# and leaves it as it was, and kilo, which takes a File or a version of
+# one (ADR 0012, section 6), opens it as a viewer (#792).
+echo "Using //system/version"
+mark=$(console_mark)
+type_text "cat //system/version
+"
+wait_for_console "^Rose Version " 20 "$mark" \
+    || fail "cat //system/version did not show the version"
+type_text "echo changed > //system/version
+"
+type_text "cat //system/version
+"
+type_text "echo version done
+"
+wait_for_console "^version done" 20 "$mark" \
+    || fail "petal stopped after writing to //system/version"
+if ! console_since "$mark" | grep -q "petal: "; then
+    console_since "$mark"
+    fail "petal did not refuse to write to //system/version"
+fi
+if console_since "$mark" | grep -q "^changed"; then
+    console_since "$mark"
+    fail "//system/version was changed"
+fi
+type_text "kilo //system/version
+"
+wait_for "(read-only)" 30 \
+    || fail "kilo did not open //system/version read-only"
+type_text "x"
+wait_for "Read-only: kilo can.t change this file" 10 \
+    || fail "kilo did not refuse to change //system/version"
+press ctrl-q
+sleep 3
+
 # Petal's paths (ADR 0044): cd to a named directory, which pwd writes as
 # a path, a path from there, and cd with no argument back to //home.
 echo "Using paths"
