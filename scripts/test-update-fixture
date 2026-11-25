@@ -26,8 +26,12 @@
 #      when the fixture was made, so an empty line brings its prompt
 #      back. Then it logs in, and reads the file that
 #      make-restore-fixture left, notes, which a replaced file serves;
-#   3. boots "Previous", the set that hd0 had before, which has to
-#      restore the checkpoint that step 2 left, with petal on the screen;
+#   3. boots "Previous", the set that hd0 had before. If this build has
+#      the fixture's interface level, Previous has to restore the
+#      checkpoint that step 2 left, with petal on the screen. If this
+#      build added interfaces, that checkpoint has a level the previous
+#      set doesn't have, and Previous has to refuse it (ADR 0031,
+#      section 3);
 #   4. runs check-log.py on the disk, which has to find the log
 #      consistent.
 #
@@ -78,6 +82,17 @@ command -v qemu-system-i386 > /dev/null || {
 . "$HERE/qemu-test-lib.sh"
 
 qemu-img convert -O raw "$FIXTURE" "$DISK" || fail "could not copy the fixture"
+
+# The interface level of the fixture's last checkpoint, and this build's
+# (ADR 0031, section 2). A checkpoint that the new set writes has this
+# build's level, and the previous set restores it only if the two match.
+FIXTURE_LEVEL=$(python3 "$HERE/check-log.py" "$DISK" \
+    | sed -n 's/.*interfaces [0-9]*\.[0-9]* level \([0-9]*\).*/\1/p' \
+    | tail -1)
+BUILD_LEVEL=$(sed -n 's/^ *Level *: constant := \([0-9]*\);.*/\1/p' \
+    "$HERE/../build/version/rose-interface_level.ads")
+[ -n "$FIXTURE_LEVEL" ] || fail "no interface level in the fixture's log"
+[ -n "$BUILD_LEVEL" ] || fail "no interface level in this build"
 
 echo "Updating $(basename "$FIXTURE") from the install media"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
@@ -134,8 +149,19 @@ start_qemu
 choose_last_entry
 # Previous shows the old set's own menu.
 choose_last_entry
-# The checkpoint is the new set's, with petal at its prompt after cat.
-wait_for "hello from kilo" 200 || fail "Previous did not restore the checkpoint"
+if [ "$BUILD_LEVEL" -eq "$FIXTURE_LEVEL" ]; then
+    # The checkpoint is the new set's, with petal at its prompt after
+    # cat.
+    wait_for "hello from kilo" 200 \
+        || fail "Previous did not restore the checkpoint"
+else
+    # This build added interfaces, so the previous set can't read the
+    # new set's checkpoint, and leaves it alone (ADR 0031, section 3).
+    wait_for "can't read the checkpoint on hd0" 200 \
+        || fail "Previous did not refuse a checkpoint at level $BUILD_LEVEL"
+    echo "Previous refused the checkpoint: its level is $FIXTURE_LEVEL," \
+        "and this build's is $BUILD_LEVEL"
+fi
 stop_qemu
 
 echo "Checking the log"
