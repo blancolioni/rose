@@ -1,6 +1,6 @@
 # 45. Opening files by name from Ada.Text_IO
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-25
 - **Related:** #1124 (this decision), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands and directory caps), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (rights are types), [ADR 0021](0021-privilege.md) (categorised roles), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0027](0027-new-files-in-a-transaction.md) (new files in a transaction), [ADR 0036](0036-directory-views.md) (directory views), [ADR 0044](0044-petal-paths-as-uri-references.md) (paths as URI references)
 - **Amends:** [ADR 0044](0044-petal-paths-as-uri-references.md), whose consequences say that petal is the only program that resolves paths
