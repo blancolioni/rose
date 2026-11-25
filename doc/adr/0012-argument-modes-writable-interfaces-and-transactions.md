@@ -3,6 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-28
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 1, 4 and 5), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #345 (petal binds writable directories), Rose.Core project (#332 to #337)
+- **Amended by:** #792, where an argument can take one of several interfaces (section 6)
 
 ## Context
 
@@ -122,6 +123,49 @@ This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 - **section 4:** the commit is the command's, over all its `Versioned` arguments, not one argument's `out` or `in out` mode;
 - **section 5:** a directory grant is `in Directory` or `in Writable_Directory`, not `in out Directory`.
 
+### 6. An argument can take one of several interfaces
+
+Amended by #792. Section 2 gives a command one interface for each argument, and so one right. A command that can do more when it is given more had to pick one: kilo took `Transactional_Writable_File`, so it couldn't open a file that the user can only read.
+
+An interface argument's type can be a list of interfaces, joined by `or`:
+
+```ada
+command Rose.Core.Editors.Kilo : Screens.Console
+is
+   File : in Files.File or Files.Transactional_Writable_File
+     with Help => "the file to edit, or to view if it can't be written";
+end Rose.Core.Editors.Kilo;
+```
+
+- **The first interface is the parameter's type.** The command's profile takes its `Object'Class`. Each later interface must be a descendant of the first, and none may be repeated.
+- **The order is the shell's preference.** The list goes from least capable to most. The shell tries the interfaces from the right, and passes the first one it holds the right for. A missing right falls back to the next interface to the left. Any other failure, such as a missing file, is an error, as it is now.
+- **Each interface in the list is a form that the command handles.** `Writable_File` and `Transactional_Writable_File` behave differently (ADR 0026), so a command lists only the forms it means to handle. Kilo lists `File`, for a viewer, and `Transactional_Writable_File`, for the editor.
+- **Only `in` interface arguments can have a list.** An `out` argument returns the one cap the command chose.
+- **A default and aspects follow the list**, as they follow a single type: `Input : in Reader or Seekable_Reader := Standard_Input`.
+- **Section 3 applies to the form the shell passes.** A version is given and committed only if that form is `Versioned`. Given only a `File`, a transactional command has nothing to commit.
+
+**The command asks which form it got with a membership test.** The generated main opens a client of the interface that the shell passed. Object interfaces inherit their parents', so that client is already an object of the first interface, and is passed unchanged:
+
+```ada
+if File in Transactional_Writable_File_Object'Class then
+   Edit (Transactional_Writable_File_Object'Class (File));
+else
+   View (File);
+end if;
+```
+
+- **It is a question about the argument, not a probe of the object.** No operation asks the server what else the object supports, and there are no flags to test. It replaces the Unix habit of guessing what standard input is connected to with `ioctl` and `isatty`.
+- **It is safe by construction.** The dynamic type is what the shell passed, not what the object behind the cap could do. A command given a `File` has a `File` client, even if the file is writable underneath, so it can't regain a right it wasn't given.
+
+**How it is passed:**
+- **The cap** keeps the argument's place in the launch call.
+- **A selector**, one data word, says which interface the cap is for: 0 for the first, N for the Nth after it. A shell that doesn't know about lists sends 0, so the command gets the least form and still works. A selector out of range fails the launch.
+- **The metadata** names the first interface in the argument's `type interface` line, as now. Each later interface gets an `accepts` line, in order, with its own `versioned` and `transactional` lines, and then the selector's place.
+
+**User target only.** The kernel target's clients aren't tagged types, so a command can't test them. Idle reports a list on the kernel target as an error.
+
+**Petal's own input waits.** Petal should take `Input : in Stream or Terminal`, and turn on completion and history only for a `Terminal` (#791). But supervisor builds petal's launch by hand, and an old supervisor keeps that layout after an update, so the argument waits for a launcher that can pass it (#791, #1094).
+
 ## Consequences
 
 **Benefits**
@@ -130,6 +174,7 @@ This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 - `touch`, `mkdir`, `rename`, `remove` and `rmdir` can be written now, as live commands, without waiting for #141.
 - A command can return a writable cap.
 - The generated parameter's type is the argument's type. Idle doesn't map one interface to another.
+- A command can do more when it is given more, by testing the argument it got, with no flags or probing (section 6).
 
 **Costs**
 - **Idle:**
@@ -141,6 +186,10 @@ This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 - **Interfaces:** `writable_file.idl` and `writable_directory.idl` gain the `Versioned` aspect.
 - **Most commands that write are blocked until #141,** unless they declare `Live`. That is deliberate: a command shouldn't run live without saying so.
 - **ADR 0002's examples are out of date** where they use `out File`, `in out File` or `in out Directory`.
+- **Interface lists (section 6):**
+  - each list takes one of a command's 8 data words for its selector;
+  - petal tries each form in turn when it binds the argument;
+  - a command has a branch for each form it lists, and each needs testing.
 
 ## Open questions
 
@@ -156,3 +205,4 @@ This ADR replaces these parts of ADR 0002. ADR 0002 points here:
 - Petal: bind `in Writable_Directory` and `in Writable_File`, and refuse transactional commands with `Versioned` arguments until #141 (#345).
 - Update the Rose.Core issues (#332 to #337) to the new spellings.
 - #141: versions and the commit, for transactional commands.
+- Section 6 (#792): interface lists in idle (blancolioni/idle#94), petal's binding of them, and kilo taking `File or Transactional_Writable_File`. Petal's own input waits for #791.

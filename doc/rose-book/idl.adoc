@@ -579,6 +579,9 @@ For a command (see <<commands>>), the user-mode target generates the same three 
   It makes the same `Rose.Command_Line.Launch` calls, with the same argument indices, as the kernel target.
   Each capability argument becomes an `X_Client` local, opened from `Cap_Argument`.
   Once exceptions propagate (#170), the main also gets the handler from ADR 0002, `when E : others => Fail (Call, E)`, and until then an unhandled exception goes to the last-chance handler, which should reply `Fail` to the shell (#171).
+  An argument with an interface list also has a selector word, which names the interface its cap is for: 0 for the first, N for the Nth after it.
+  The main opens a client of that interface, and passes it as the first interface's `X_Object'Class`, so the command finds out which it got with a membership test.
+  A selector out of range fails the launch.
 * *A server command* attaches an `aliased` object, and sets each `out` interface parameter to the capability for one of the interfaces it attached the object to, from `X.Server.Interface_Cap`.
   The main replies with those capabilities, then runs the server loop: the procedure named by the `Server` aspect, or `Rose.Server.Start_Server`.
 * *The metadata* is the same for both targets.
@@ -726,6 +729,18 @@ No aspect is required: anything a declaration must have is part of its syntax, a
   Modes are written as in Ada parameters, although Ada object declarations have none, since an argument's mode is the most important thing about it.
 * *Defaults* are written `:= Value`.
   An argument without a default must be given on the command line.
+* *Interface lists.* An `in` interface argument can take one of several interfaces, joined by `or` (ADR 0012, section 6; #792):
++
+[source,ada]
+----
+File : in Files.File or Files.Transactional_Writable_File
+  with Help => "the file to edit, or to view if it can't be written";
+----
++
+The first interface is the parameter's type. Each later one must be a descendant of it, and none may be repeated.
+The list goes from least capable to most, and the shell passes the rightmost one that it holds the right for.
+A default and aspects follow the list, as they follow a single type.
+A list is only for `in` arguments, and only on the user-mode target.
 * *List arguments.* The last positional argument may have the type `String_List`, which takes all remaining positional words, and can be none.
   At most one argument may do this.
   `String_List` is a predefined type in command declarations, generated as `Rose.Command_Line.String_List`.
