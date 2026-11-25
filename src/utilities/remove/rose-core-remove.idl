@@ -5,9 +5,8 @@ command Rose.Core.Remove : Streams.Standard_Error
           is not given, and ends the file's process. Anything that still
           holds the file finds that it has gone. It fails if NAME is not a
           file; rmdir removes a directory. The command is live: the file
-          is removed as it runs (ADR 0012).
-          """,
-       Live
+          is removed as it runs (ADR 0026).
+          """
 is
    Name : String
      with Help => "the file to remove";

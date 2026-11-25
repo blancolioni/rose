@@ -16,8 +16,7 @@ command Rose.Core.File : Caps.Create_Endpoint, Caps.Cap_Set_Service
           Cap_Set_Service, as its argument is named.
           """,
        Server      => File_Server.Start_Server,
-       Replaceable => File_Server,
-       Live
+       Replaceable => File_Server
 is
    Served : out Files.Writable_File
      with Help => "the file";

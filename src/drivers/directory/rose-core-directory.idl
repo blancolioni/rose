@@ -21,8 +21,7 @@ command Rose.Core.Directory : Caps.Create_Endpoint, Caps.Cap_Set_Service
           restored from one.
           """,
        Server      => Directory_Server.Start_Server,
-       Replaceable => Directory_Server,
-       Live
+       Replaceable => Directory_Server
 is
    File_Launch : in Processes.Launch
      with Help => "the launch interface of the file command";

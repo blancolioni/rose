@@ -14,8 +14,7 @@ command Rose.Core.Hold_File
           still writes, and that the reader goes on from where it was,
           and writes the result to standard output. It never completes.
           """,
-       Server      => File_Holder.Start_Server,
-       Live
+       Server      => File_Holder.Start_Server
 is
    Control : out Processes.Replaceable
      with Help => "the file's Replaceable interface, for its replacement";

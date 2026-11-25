@@ -15,8 +15,7 @@ command Rose.Core.User : Caps.Create_Endpoint, Caps.Cap_Set_Service
           Previous alone, and an empty name.
           """,
        Server      => User_Server.Start_Server,
-       Replaceable => User_Server,
-       Live
+       Replaceable => User_Server
 is
    Name : String
      with Help => "the user's name";
