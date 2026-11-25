@@ -32,7 +32,7 @@ with Restore.Boot_Disk;
 with Restore.Boot_Sets;
 with Restore.Checkpoint_Log;
 with Restore.Command_Line;
-with Restore.Installer.Default;
+with Restore.Installer;
 with Restore.Start;
 
 procedure Restore.Install_Driver is
@@ -63,8 +63,7 @@ procedure Restore.Install_Driver is
    procedure Install_Commands_Again is
    begin
       Restore.Installer.Update
-        (File_System => Install_Media,
-         Source      => Restore.Installer.Default.Iterate_Steps'Access);
+        (File_System => Install_Media);
    end Install_Commands_Again;
 
    ------------------------
@@ -201,8 +200,7 @@ begin
          Open_Cap_Set (File_System, Install_Media_Cap);
          Rose.Directories.Open_Root_File_System (File_System);
          Restore.Installer.Install
-           (File_System => File_System,
-            Source      => Restore.Installer.Default.Iterate_Steps'Access);
+           (File_System => File_System);
       end;
 
       --  So that the disk boots without the install media.  A new

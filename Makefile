@@ -24,7 +24,7 @@ endif
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-rose: config interfaces $(ROSE) check-targets check-endpoint-ids programs exports stripped bootdisk iso finished
+rose: config interfaces $(ROSE) check-targets check-endpoint-ids install-list programs exports stripped bootdisk iso finished
 
 programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -39,7 +39,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets check-endpoint-ids test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets check-endpoint-ids check-install-list install-list test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -58,6 +58,26 @@ check-targets:
 # series, every id of the series' first tag must still be there (#827).
 check-endpoint-ids:
 	sh ./scripts/check-endpoint-ids
+
+# The install list (#1100): the programs an install puts on a system, in
+# order, which restore-install reads from /rose/install/list. It is checked
+# against DRIVERS and UTILITIES, then copied to build/install, which
+# scripts/rose-iso-install puts on the ISO. The copy is only made again
+# when one of these changes, so a line added to build/install/list by
+# hand, for a program from outside Rose, stays until then.
+INSTALL_LIST=src/servers/restore/install.list
+INSTALL_FLAGS=src/servers/restore/src/restore-installer.ads
+
+check-install-list:
+	python3 ./scripts/check-install-list $(INSTALL_LIST) $(INSTALL_FLAGS) \
+	    "$(DRIVERS)" "$(UTILITIES)"
+
+install-list: build/install/list
+
+build/install/list: $(INSTALL_LIST) $(INSTALL_FLAGS) scripts/check-install-list Makefile
+	$(MAKE) check-install-list
+	mkdir -p build/install
+	cp $(INSTALL_LIST) $@
 
 # Boot the ISO under QEMU, run the self tests, and check the checkpoint log.
 # This doesn't build anything, so run "make" first.  It takes about ten

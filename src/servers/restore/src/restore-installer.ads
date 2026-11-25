@@ -46,29 +46,26 @@ package Restore.Installer is
    --  updated, only by a test install, with self-tests on the kernel's
    --  command line (#1009). It is the last flag, so init's bits don't
    --  move.
+   --  In the install list, /rose/install/list (#1100), a flag is named
+   --  by its name in lower case, apart from Is_Driver, which the
+   --  category sets. scripts/check-install-list reads the names from
+   --  here.
 
    type Install_Flag_Array is array (Install_Flag) of Boolean;
 
-   type Step_Iterator is access
-     procedure (Process : not null access
-                  procedure (Name     : String;
-                             Category : String;
-                             Action   : Install_Action;
-                             Flags : Install_Flag_Array));
-
    procedure Install
      (File_System : Rose.Interfaces.Files.File_System.Client
-       .File_System_Client;
-      Source      : Step_Iterator);
-   --  Install the programs Source gives from /rose/install in
-   --  File_System.
+       .File_System_Client);
+   --  Install the programs that the install list, /rose/install/list
+   --  in File_System, names (#1100), in its order, from /rose/install.
+   --  A line of the list that can't be read is refused, and the console
+   --  says why.
 
    procedure Update
      (File_System : Rose.Interfaces.Files.File_System.Client
-       .File_System_Client;
-      Source      : Step_Iterator);
+       .File_System_Client);
    --  The update boot (ADR 0031, section 4; #829): install the saved
-   --  programs Source gives from /rose/install in File_System again, in
+   --  programs of the install list in File_System again, in
    --  the restored exec, with Exec.Update, and replace their entries in
    --  the restored command registry. The restored processes must be
    --  running. Launched programs are persistent, and are left as they

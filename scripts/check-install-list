@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""Check the install list (#1100) against the build.
+
+usage: check-install-list LIST INSTALLER_ADS DRIVERS UTILITIES
+
+LIST is src/servers/restore/install.list, which the build copies to
+/rose/install/list, and restore-install reads. INSTALLER_ADS is
+restore-installer.ads, whose Install_Flag type gives the flags' names.
+DRIVERS and UTILITIES are the top Makefile's lists, each one argument.
+
+Each line must be one that restore-install reads, and the list must name
+each program the build installs, once, in its category (DRIVERS in
+drivers, UTILITIES in bin), and nothing else. Restore refuses a bad line
+at install time and goes on; this finds it when Rose is built.
+
+Run from the top of the tree, by "make check-install-list". It prints
+each problem, and exits with 1 if there is one.
+"""
+
+import re
+import sys
+
+MAX_LINE = 200
+MAX_NAME = 100
+
+
+def flag_names(ads_path):
+    with open(ads_path, encoding="utf-8") as f:
+        text = f.read()
+    match = re.search(r"type\s+Install_Flag\s+is\s*\(([^)]*)\)", text)
+    if not match:
+        sys.exit(f"check-install-list: {ads_path}: no Install_Flag type")
+    names = [n.strip().lower() for n in match.group(1).split(",")]
+    return {n for n in names if n and n != "is_driver"}
+
+
+def main():
+    if len(sys.argv) != 5:
+        sys.exit(__doc__.strip().splitlines()[2])
+    list_path, ads_path, drivers, utilities = sys.argv[1:]
+    flags = flag_names(ads_path)
+    expected = {name: "drivers" for name in drivers.split()}
+    expected.update({name: "bin" for name in utilities.split()})
+
+    problems = []
+    seen = {}
+
+    def problem(number, text):
+        problems.append(f"check-install-list: {list_path}:{number}: {text}")
+
+    with open(list_path, encoding="utf-8") as f:
+        lines = f.read().split("\n")
+
+    for number, line in enumerate(lines, 1):
+        if len(line) > MAX_LINE:
+            problem(number, f"longer than {MAX_LINE} characters")
+            continue
+        fields = line.split("#", 1)[0].split()
+        if not fields:
+            continue
+        if len(fields) < 3:
+            problem(number, "a line needs a name, a category and an action")
+            continue
+        name, category, action, *line_flags = fields
+        if len(name) > MAX_NAME:
+            problem(number, "the name is too long")
+        if name.startswith(".") or "/" in name:
+            problem(number, f"{name}: a name can't start with . or have /")
+        if category not in ("bin", "drivers"):
+            problem(number, f"unknown category {category}")
+        if action not in ("launch", "save"):
+            problem(number, f"unknown action {action}")
+        for flag in line_flags:
+            if flag not in flags:
+                problem(number, f"unknown flag {flag}")
+        if name in seen:
+            problem(number, f"{name} is already on line {seen[name]}")
+            continue
+        seen[name] = number
+        if name not in expected:
+            problem(number, f"{name} is in neither DRIVERS nor UTILITIES")
+        elif expected[name] != category:
+            problem(number, f"{name} is in {expected[name]}, not {category}")
+
+    for name in expected:
+        if name not in seen:
+            problems.append(
+                f"check-install-list: {list_path}: {name} is built, "
+                f"but not in the list")
+
+    for p in problems:
+        print(p, file=sys.stderr)
+    return 1 if problems else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
