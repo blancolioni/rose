@@ -110,7 +110,6 @@ INSTALL_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-time-timeout.o \
 	$(BUILDDIR)/restore-boot_disk.o \
 	$(BUILDDIR)/restore-installer.o \
-	$(BUILDDIR)/restore-installer-default.o \
 	$(BUILDDIR)/rose-directories.o \
 	$(DIRECTORY_OBJECTS) \
 	$(FILE_OBJECTS) \

@@ -1,0 +1,105 @@
+# The programs that an install puts on a system, in the order it installs
+# them (#1100). The build copies this file to /rose/install/list on the
+# install media, and restore-install reads it there, both for a new
+# system and for the update boot.
+#
+# One program a line:
+#
+#   NAME  CATEGORY  ACTION  FLAG...
+#
+# CATEGORY is the directory of /rose/install that the program and its
+# .caps are in: bin or drivers. ACTION is launch, to start the program
+# once at install as a persistent process, or save, to install it in exec
+# and add it to the command registry under NAME. The flags are the names
+# of Restore.Installer.Install_Flag in lower case, apart from is_driver,
+# which the category sets. A # starts a comment.
+#
+# restore-install refuses a line it can't read, and says why on the
+# console. scripts/check-install-list checks this file against the
+# Makefile's DRIVERS and UTILITIES when Rose is built.
+
+exec               drivers  launch
+
+# The keyboard comes first, because the console reads it. It writes
+# nothing, so it doesn't need the persistent console.
+
+keyboard           drivers  launch  provides_keyboard_interface
+
+# With a framebuffer, the screen driver holds it, and the keys go to the
+# screen (ADR 0022, #582, #653).
+
+screen             drivers  launch  requires_framebuffer requires_keyboard_interface provides_screen
+
+# The persistent console is the terminal (#454): it draws what it is
+# written, and its line discipline reads the keyboard. It comes straight
+# after the keyboard and the screen, so that everything installed after it
+# writes to it. With a framebuffer it is on the screen's surface, and
+# takes its keys from the surface's events (#653); without one, it is on
+# the VGA text page, and reads the keyboard itself.
+
+surface-console    drivers  launch  requires_framebuffer requires_screen provides_console provides_input_stream
+vga-console        drivers  launch  requires_no_framebuffer requires_keyboard_interface provides_console provides_input_stream
+command            drivers  launch
+
+# The clock is persistent, so that a restore carries its time on
+# (ADR 0020).
+
+clock              drivers  launch  provides_clock
+
+# The cap sets of persistent processes, which a restore keeps (#825). It
+# writes to the console when it is restored.
+
+caps               drivers  launch  provides_cap_sets requires_console
+
+# Saved, not launched: each file and directory is its own process,
+# launched when it is created (ADR 0003).
+
+file               drivers  save
+directory          drivers  save
+
+# Saved, not launched: init launches it once, for the system directory's
+# null (ADR 0035), and the self tests launch their own.
+
+null_stream        drivers  save
+
+# Saved, not launched: run_self_tests' End_Process_Test launches it with
+# Launch, for its Process cap (#320, #831). test_only: only a test
+# install, with self-tests on the kernel's command line, installs it
+# (#1009).
+
+process_probe      drivers  save    test_only
+echo               bin      save
+list               bin      save
+cat                bin      save
+touch              bin      save
+mkdir              bin      save
+rename             bin      save
+remove             bin      save
+rmdir              bin      save
+copy               bin      save
+clear              bin      save
+date               bin      save
+set_date           bin      save
+uptime             bin      save
+user               bin      save
+auth               bin      save
+rights             bin      save
+login              bin      save
+supervisor         bin      save
+run_self_tests     bin      save    test_only
+hold_derived       bin      save    test_only
+hold_file          bin      save    test_only
+hold_home          bin      save    test_only
+swap_probe         bin      save    test_only
+page_probe         bin      save    test_only
+hold_pages         bin      save    test_only
+hold_transient     bin      save    test_only
+
+# The test server of the Replaceable interface, which run_self_tests
+# launches (#865).
+
+replaceable_test   bin      save    test_only
+argv               bin      save
+keytest            bin      save
+kilo               bin      save
+petal              bin      save    requires_input_stream
