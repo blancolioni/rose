@@ -618,6 +618,31 @@ procedure Rose.Core.Copy
   A unit type becomes a distinct numeric type whose `Image` includes the unit.
 * *After allocators and finalization* (#358, #359): remote objects that close their capabilities automatically, `Unbounded_String` in place of `Text`, namespaces and versions, and conformance declarations (ADR 0002, section 6).
 
+[#host-target]
+=== Host target
+
+`idle --target host --host-backings FILE` builds a command for the host's own Ada run-time system, to test it without Rose (#1101, idle#133).
+An interface has only its package, the same as the user-mode target's, with its object type: a host program has no caps, so there is no client or server.
+A command's spec is the user-mode target's, and its metadata has no linker section.
+Its main is built on `Rose.Command_Line.Host` in place of `Rose.Command_Line.Launch`:
+
+[source,ada]
+----
+Rose.Command_Line.Host.Receive (Call, Rose.Core.Touch_Metadata.Text);
+Rose.Host.Files.Open
+  (File, Rose.Command_Line.Host.Interface_Argument (Call, 1));
+Rose.Core.Touch (File => File);
+Rose.Command_Line.Host.Complete (Call);
+----
+
+`Receive` binds the process's command line to the arguments, by the metadata, as petal binds a command line.
+Each interface argument, and each role member that is an interface, is an object of its interface's host backing, the type that `FILE` gives for it (Rose's `interfaces/host-backings.txt`), opened with the text the user gave, or `""`.
+The main catches `Command_Failed` and reports it with `Fail`.
+The standard streams need nothing: they are the process's own.
+
+A server, a replaceable command, a system cap, an `out` argument, a list of interfaces, and an interface with no backing are refused, and nothing is written for the command.
+See <<testing-on-the-host>>.
+
 === User mode with SPARK (possible)
 
 A further target could generate the user-mode packages with `SPARK_Mode` and contracts derived from the IDL, such as preconditions that check a client is open and postconditions on results.

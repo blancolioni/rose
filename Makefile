@@ -39,7 +39,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets check-endpoint-ids check-install-list install-list test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs check-env check-targets check-endpoint-ids check-install-list install-list host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -127,6 +127,20 @@ test-drawing:
 
 # The tests of the store's block map and free map (ADR 0038, #504), built
 # and run on the host, in a few seconds.  CI runs them.
+# Commands built for the host's own Ada run-time, to test them without
+# booting Rose (#1101): each with "make host" in its directory (mk/host.mk),
+# and idle --target host. They need idle, and nothing else that Rose
+# builds. test-host runs them (scripts/test-host).
+HOST_COMMANDS=echo cat list touch copy mkdir remove rename date
+
+host-commands:
+	for command in $(HOST_COMMANDS); do \
+	    $(MAKE) -C src/utilities/$$command host || exit 1; \
+	done
+
+test-host: host-commands
+	sh ./scripts/test-host
+
 test-store:
 	cd src/servers/store/tests && gprbuild -q -P page_maps_tests.gpr \
 	    && ./build/test_page_maps
@@ -280,6 +294,7 @@ clean:
 	$(MAKE) -C doc clean
 	rm -rf build/*
 	rm -rf src/servers/*/build src/drivers/*/build src/utilities/*/build
+	rm -rf src/library/host/build
 	rm -rf images/tmp images/drivers images/rose.iso
 	rm -f logs/rose-objdump.txt logs/rose-*-objdump.txt logs/rose-*-elf.txt logs/rose-*.sha1 logs/rose-iso.log
 	find src rts projects -name "b~*" -delete

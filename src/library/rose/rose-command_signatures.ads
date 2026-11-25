@@ -1,8 +1,11 @@
-package Petal.Signatures is
+package Rose.Command_Signatures is
 
    --  The signature of a command, from the metadata that the IDL compiler
    --  puts in its executable (ADR 0002): lines of a key, a space and a
    --  value, in which a line break is written \n and a backslash \\.
+   --  Petal reads it to bind a command line, and so does a command built
+   --  for the host (Rose.Command_Line.Host, #1101), so that both bind it
+   --  the same way.
 
    Max_Text      : constant := 4096;
    Max_Arguments : constant := 16;
@@ -164,6 +167,46 @@ package Petal.Signatures is
       return String;
    --  The value of Field, with its escapes replaced.
 
+   function Is_Writable_Directory
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Value (Item, Argument.Interface_Name)
+                  = "Files.Writable_Directory");
+   --  True if Argument is an in Writable_Directory, which petal gives its
+   --  own writable cap (ADR 0012, section 4).
+
+   function Is_In_Directory
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Is_Writable_Directory (Item, Argument)
+       or else (Argument.Of_Type = Interface_Type
+                and then Argument.Mode = In_Mode
+                and then Value (Item, Argument.Interface_Name)
+                           = "Files.Directory"));
+   --  True if Argument is an in Directory or an in Writable_Directory. It
+   --  names a directory, and is bound to the current directory if it is
+   --  not given (ADR 0003, section 6; #342).
+
+   function Is_Input_Stream
+     (Item     : Signature;
+      Argument : Argument_Record)
+      return Boolean
+   is (Argument.Of_Type = Interface_Type
+       and then Argument.Mode = In_Mode
+       and then Argument.Has_Default
+       and then Value (Item, Argument.Default)
+                  = "Streams.Standard_Input");
+   --  True if Argument is an in Reader whose default is standard input
+   --  (#395; idle#52). It names a file in the current directory, which
+   --  the shell opens a reader on, or if it is not given, it is the
+   --  shell's own standard input. The command is given the Read cap of
+   --  either, as it is for the Standard_Input role, and can't tell which
+   --  it has.
+
    function Same_Name
      (Item     : Signature;
       Argument : Argument_Record;
@@ -172,4 +215,4 @@ package Petal.Signatures is
    --  True if Name, as written on the command line, names Argument: case
    --  does not matter, and a hyphen is the same as an underscore.
 
-end Petal.Signatures;
+end Rose.Command_Signatures;
