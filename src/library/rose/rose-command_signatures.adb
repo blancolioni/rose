@@ -1,4 +1,4 @@
-package body Petal.Signatures is
+package body Rose.Command_Signatures is
 
    function Lower (Ch : Character) return Character
    is (if Ch in 'A' .. 'Z'
@@ -393,4 +393,4 @@ package body Petal.Signatures is
       return Result (1 .. Last);
    end Value;
 
-end Petal.Signatures;
+end Rose.Command_Signatures;

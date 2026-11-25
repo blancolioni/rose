@@ -18,11 +18,11 @@ with Rose.Words;
 
 with Petal.Privileges;
 with Petal.Session;
-with Petal.Signatures;
+with Rose.Command_Signatures.Help;
 
 package body Petal.Command_Launch is
 
-   use Petal.Signatures;
+   use Rose.Command_Signatures;
    use System.Storage_Elements;
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word;
@@ -112,30 +112,6 @@ package body Petal.Command_Launch is
    procedure Warn (Message : String);
    --  Report the warning Message. The command still runs.
 
-   function Is_Writable_Directory
-     (Item     : Signature;
-      Argument : Argument_Record)
-      return Boolean
-   is (Argument.Of_Type = Interface_Type
-       and then Argument.Mode = In_Mode
-       and then Value (Item, Argument.Interface_Name)
-                  = "Files.Writable_Directory");
-   --  True if Argument is an in Writable_Directory, which gets petal's
-   --  own writable cap (ADR 0012, section 4).
-
-   function Is_In_Directory
-     (Item     : Signature;
-      Argument : Argument_Record)
-      return Boolean
-   is (Is_Writable_Directory (Item, Argument)
-       or else (Argument.Of_Type = Interface_Type
-                and then Argument.Mode = In_Mode
-                and then Value (Item, Argument.Interface_Name)
-                           = "Files.Directory"));
-   --  True if Argument is an in Directory or an in Writable_Directory. It
-   --  names a directory in petal's table, and is bound to the current
-   --  directory if it is not given (ADR 0003, section 6; #342).
-
    function Is_In_File
      (Item     : Signature;
       Argument : Argument_Record)
@@ -145,21 +121,6 @@ package body Petal.Command_Launch is
        and then Value (Item, Argument.Interface_Name) = "Files.File");
    --  True if Argument is an in File, which names a file in the current
    --  directory (#344). It must be given, unless it has a default.
-
-   function Is_Input_Stream
-     (Item     : Signature;
-      Argument : Argument_Record)
-      return Boolean
-   is (Argument.Of_Type = Interface_Type
-       and then Argument.Mode = In_Mode
-       and then Argument.Has_Default
-       and then Value (Item, Argument.Default)
-                  = "Streams.Standard_Input");
-   --  True if Argument is an in Reader whose default is standard input
-   --  (#395; idle#52). It names a file in the current directory, which
-   --  petal opens a reader on, or if it is not given, it is petal's own
-   --  standard input. The command is given the Read cap of either, as it
-   --  is for the Standard_Input role, and can't tell which it has.
 
    function Is_Writable_File
      (Item     : Signature;
@@ -245,8 +206,13 @@ package body Petal.Command_Launch is
    --  A command that had the console has ended: turn line editing and
    --  echo back on, and the attributes off, whatever it left (#734).
 
-   procedure Put_Help (Item : Signature);
-   procedure Put_Version (Item : Signature);
+   package Help is
+     new Rose.Command_Signatures.Help
+       (Put      => Ada_Text_IO.Put,
+        Put_Line => Ada_Text_IO.Put_Line);
+   use Help;
+   --  Help and version text, as the host's commands write it too
+   --  (#1101).
 
    procedure Run_Command
      (Line      : String;
@@ -1373,112 +1339,6 @@ package body Petal.Command_Launch is
       return Result;
    end Lower;
 
-
-   --------------
-   -- Put_Help --
-   --------------
-
-   procedure Put_Help (Item : Signature) is
-      use Ada_Text_IO;
-      Name : constant String := Value (Item, Item.Name);
-   begin
-      Put ("Usage: " & Name);
-      if (for some I in 1 .. Item.Argument_Count =>
-            Item.Arguments (I).Short_Name /= ' ')
-      then
-         Put (" [OPTION]...");
-      end if;
-      for Argument of Item.Arguments (1 .. Item.Argument_Count) loop
-         if Argument.Short_Name = ' ' then
-            declare
-               Upper : String := Value (Item, Argument.Name);
-            begin
-               for Ch of Upper loop
-                  if Ch in 'a' .. 'z' then
-                     Ch := Character'Val (Character'Pos (Ch) - 32);
-                  end if;
-               end loop;
-               if Argument.Of_Type = String_List_Type then
-                  Put (" [" & Upper & "]...");
-               elsif Argument.Has_Default
-                 or else Is_In_Directory (Item, Argument)
-               then
-                  Put (" [" & Upper & "]");
-               else
-                  Put (" " & Upper);
-               end if;
-            end;
-         end if;
-      end loop;
-      New_Line;
-
-      Put_Line (Value (Item, Item.Summary));
-      New_Line;
-
-      --  The options. A String_List argument takes the remaining words,
-      --  so it is only in the usage line.
-
-      for Argument of Item.Arguments (1 .. Item.Argument_Count) loop
-         if Argument.Of_Type /= String_List_Type then
-            declare
-               Long : String := Value (Item, Argument.Name);
-            begin
-               for Ch of Long loop
-                  if Ch = '_' then
-                     Ch := '-';
-                  elsif Ch in 'A' .. 'Z' then
-                     Ch := Character'Val (Character'Pos (Ch) + 32);
-                  end if;
-               end loop;
-               Put ("  "
-                    & (if Argument.Short_Name = ' ' then "    "
-                       else "-" & Argument.Short_Name & ", ")
-                    & "--"
-                    & (if Argument.Of_Type = Boolean_Type then "[no-]" else "")
-                    & Long);
-               if Argument.Of_Type /= Boolean_Type then
-                  Put ("=VALUE");
-               end if;
-               New_Line;
-               Put_Line ("        " & Value (Item, Argument.Help));
-            end;
-         end if;
-      end loop;
-      Put_Line ("      --help     display this help and exit");
-      Put_Line ("      --version  output version information and exit");
-
-      if Item.Description.Last >= Item.Description.First then
-         New_Line;
-         Put_Line (Value (Item, Item.Description));
-      end if;
-
-      if Item.Help_Footer.Last >= Item.Help_Footer.First then
-         New_Line;
-         Put_Line (Value (Item, Item.Help_Footer));
-      end if;
-   end Put_Help;
-
-   -----------------
-   -- Put_Version --
-   -----------------
-
-   procedure Put_Version (Item : Signature) is
-      use Ada_Text_IO;
-   begin
-      Put_Line (Value (Item, Item.Name)
-                & " (" & Value (Item, Item.Title) & ") "
-                & Value (Item, Item.Version));
-      if Item.Copyright.Last >= Item.Copyright.First then
-         Put_Line (Value (Item, Item.Copyright));
-      end if;
-      if Item.License.Last >= Item.License.First then
-         Put_Line (Value (Item, Item.License));
-      end if;
-      if Item.Authors.Last >= Item.Authors.First then
-         New_Line;
-         Put_Line ("Written by " & Value (Item, Item.Authors) & ".");
-      end if;
-   end Put_Version;
 
    -------------------
    -- Reset_Console --

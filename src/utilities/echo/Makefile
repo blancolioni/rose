@@ -15,3 +15,6 @@ echo:
 	$(USER_IDLE) \
 	    rose-core-echo.idl $(INTERFACES)/rose-core.idl
 	gprbuild $(GPRBUILD_CARGS)
+
+# Built for the host, to test it without Rose (#1101).
+include $(ROOT)/mk/host.mk
