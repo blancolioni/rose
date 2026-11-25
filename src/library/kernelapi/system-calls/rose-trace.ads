@@ -11,7 +11,8 @@ package Rose.Trace is
    procedure Set_Trace_Cap (Cap : Rose.Capabilities.Capability);
 
    procedure Event (Text : String);
-   --  Log Text. Only its first 64 characters are kept.
+   --  Log Text. Only its first 32 characters are kept: a call sends at
+   --  most eight words (#985).
 
    procedure Event
      (Text  : String;

@@ -101,6 +101,14 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  error, and nothing held, outside a checkpoint, or if the process's
    --  calls are held already.
 
+   Kernel_Log_Endpoint        : constant Rose.Objects.Endpoint_Index := 25;
+   --  Write the text in the sent buffer to the kernel's log, a line for
+   --  each line of the text, after the name of the calling process. Unlike
+   --  Trace_Endpoint, it always writes. An error if no buffer is sent, or
+   --  if it is longer than a page. Mem writes its messages here once it
+   --  is serving, because a call to the console can wait on a process
+   --  whose pages mem has dropped (#997, ADR 0028 section 8).
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

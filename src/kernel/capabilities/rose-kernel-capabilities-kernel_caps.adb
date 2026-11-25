@@ -382,6 +382,54 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Kernel_Log_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else System.Storage_Elements.">" (Params.Buffer_Length, 4096)
+            then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
+            declare
+               Text  : String (1 .. Natural (Params.Buffer_Length));
+               pragma Import (Ada, Text);
+               for Text'Address use Params.Buffer_Address;
+               Start : Positive := 1;
+
+               procedure Put_Line (Last : Natural);
+
+               --------------
+               -- Put_Line --
+               --------------
+
+               procedure Put_Line (Last : Natural) is
+               begin
+                  if Last >= Start then
+                     Rose.Kernel.Processes.Debug.Put
+                       (Rose.Kernel.Processes.Current_Process_Id);
+                     Rose.Boot.Console.Put (": ");
+                     Rose.Boot.Console.Put (Text (Start .. Last));
+                     Rose.Boot.Console.New_Line;
+                  end if;
+               end Put_Line;
+
+            begin
+               for I in Text'Range loop
+                  if Text (I) = Character'Val (10) then
+                     Put_Line (I - 1);
+                     Start := I + 1;
+                  end if;
+               end loop;
+               Put_Line (Text'Last);
+            end;
+
+            Params.Control.Flags :=
+              (Rose.Invocation.Reply => True, others => False);
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when Enter_Checkpoint_Endpoint =>
 
             --  A checkpoint never holds a process half handed over (ADR
