@@ -5,10 +5,9 @@ command Rose.Core.Remove_Directory : Streams.Standard_Error
           DIRECTORY, which is home if it is not given, and ends the
           directory's process. It fails if DIRECTORY_NAME is not a
           directory, or if it has entries. The command is live: the
-          directory is removed as it runs (ADR 0012).
+          directory is removed as it runs (ADR 0026).
           """,
-       Name        => "rmdir",
-       Live
+       Name        => "rmdir"
 is
    Directory_Name : String
      with Help => "the directory to remove";

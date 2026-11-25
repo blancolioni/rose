@@ -9,8 +9,7 @@ command Rose.Core.Rights
           asks for authority, and its Rights_Admin interface, which sets
           the policy. It then keeps serving them.
           """,
-       Server      => Rights_Server.Start_Server,
-       Live
+       Server      => Rights_Server.Start_Server
 is
    Rights : out Users.Rights
      with Help => "the Rights interface, for asking for authority";

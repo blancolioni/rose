@@ -15,8 +15,7 @@ command Rose.Core.Supervisor
           restore during a session finds it still waiting for the
           session.
           """,
-       Server      => Supervisor_Loop.Start_Server,
-       Live
+       Server      => Supervisor_Loop.Start_Server
 is
    Auth : in Users.Auth
      with Help => "the Auth interface, which login checks passwords with";

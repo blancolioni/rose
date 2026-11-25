@@ -21,8 +21,7 @@ command Rose.Core.Auth : Caps.Create_Endpoint, Commands.Find_Command, Caps.Cap_S
           from one.
           """,
        Server      => Auth_Server.Start_Server,
-       Replaceable => Auth_Server,
-       Live
+       Replaceable => Auth_Server
 is
    Auth : out Users.Auth
      with Help => "the Auth interface, for logging in";
