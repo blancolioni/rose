@@ -51,7 +51,7 @@ Persistent processes have their own cap set server (#825).
 The memory manager, described in <<Memory>>.
 
 Provides:: `Memory`, and a `Process` for each process, with its `Segment` and `Heap`.
-Launched with:: The kernel's memory region queries, page-on, delete and trace.
+Launched with:: The kernel's memory region queries, page-on and trace.
 Used by:: `elf`, to create the `Process` for each new process, and `checkpoint`.
 
 === `timer`
@@ -59,7 +59,7 @@ Used by:: `elf`, to create the `Process` for each new process, and `checkpoint`.
 Multiplexes the kernel's single timeout.
 
 Provides:: `Timer`, whose `Set_Timer` invokes a capability after a number of milliseconds; and `Cap`, whose `Destroy` cancels a timer.
-Launched with:: The kernel's set-timeout and get-ticks, and delete.
+Launched with:: The kernel's set-timeout and get-ticks.
 Used by:: `init`, to wait, `ata` and `checkpoint`.
 
 `timer` keeps up to 100 timers, in ticks of 10 milliseconds, and sets the kernel's timeout for the earliest.
@@ -70,7 +70,7 @@ When a timer expires, it invokes the timer's capability without waiting for a re
 Scans the PCI bus.
 
 Provides:: A lookup of a device by its vendor and device ids, which returns a capability for that device.
-Launched with:: The PCI configuration ports `CF8` and `CFC`, and delete.
+Launched with:: The PCI configuration ports `CF8` and `CFC`.
 Used by:: `ata`, to find its controller.
 
 === `ata`
@@ -78,7 +78,7 @@ Used by:: `ata`, to find its controller.
 The driver for ATA disks.
 
 Provides:: `ATA`, and a `Block_Device` for each drive, chosen by the identifier of the interface capability: hd0 is the system disk, and hd1 is the install media.
-Launched with:: The PCI lookup, IRQs 46 and 47, the ports `1F0`–`1F7` and `3F6`, the timer, and delete.
+Launched with:: The PCI lookup, IRQs 46 and 47, the ports `1F0`–`1F7` and `3F6`, and the timer.
 Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 
 === `store`
@@ -86,7 +86,7 @@ Used by:: `scan` and `partition`, for hd0, and `isofs`, for hd1.
 Manages persistent storage, divided into regions of pages.
 
 Provides:: `Store`, whose `Add_Backing_Store` adds a block array, and whose `Get_Root_Bank` returns the bank that every other is below; a `Bank` for each bank, whose `Reserve_Storage` returns a new region (ADR 0014); a `Region` for each region (`Get_Range`, `Get`, `Put`, `Read`, `Create_Subregion`, `Release`); and a `Reader` for reading a region as a stream.
-Launched with:: Delete, the console and trace.
+Launched with:: The console and trace.
 Used by:: `restore`, which adds the active swap partition as backing store; the installer, which stores executables in regions; and `elf`, which loads them.
 
 A backing store's block size must be the page size, 4096 bytes.
@@ -98,7 +98,7 @@ A page that has been reserved and not written since reads as zeroes, without a r
 Creates processes from ELF executables.
 
 Provides:: `Executable`, whose `Launch` returns the new process's `Process`, and whose `Launch_Command` returns the endpoint capability of a command (ADR 0002).
-Launched with:: Delete, rescind, the console, `Memory`, the kernel's create-process, and trace.
+Launched with:: Rescind, the console, `Memory`, the kernel's create-process, and trace.
 Used by:: `exec`.
 
 To launch a program, `elf`:
@@ -115,7 +115,7 @@ Reads the partition table of the system disk.
 *This is the server that reformats the disk.*
 
 Provides:: `Partitions` (`Release`, `Partition_Count`, `Get_Partition`), which `init` reads to find the swap and log partitions.
-Launched with:: The console, hd0, the exit capability and delete.
+Launched with:: The console, hd0 and the exit capability.
 Used by:: `init`.
 
 If hd0 has no GPT partition table, `scan` writes one.
@@ -129,7 +129,7 @@ Serves one partition of a block device as a block device of its own.
 `init` starts one for each swap and log partition that `scan` finds.
 
 Provides:: `Block_Device`, whose block numbers are relative to the start of the partition.
-Launched with:: The console, the device and delete, with the partition's start, its bound and its block size as launch words.
+Launched with:: The console and the device, with the partition's start, its bound and its block size as launch words.
 Used by:: `store`, for the active swap partition, `restore`, and `log`, for the log partition.
 
 A partition's block size can be a multiple of the device's: the swap partitions have 4096-byte blocks on a disk of 512-byte blocks.
@@ -139,7 +139,7 @@ A partition's block size can be a multiple of the device's: the swap partitions 
 Reads the ISO 9660 file system on the install media.
 
 Provides:: `File_System`, whose `Root_Directory` returns the root; `Directory` for each directory, for lookup only; and `Reader` for the contents of a file, returned by `Directory.Read_File`.
-Launched with:: The console, hd1 and delete.
+Launched with:: The console and hd1.
 Used by:: `restore`, to read the programs it installs.
 
 `Get_Ordinary_File` returns no capability, and the file system cannot be written.
@@ -157,7 +157,7 @@ Documenting them fully is tracked in #130.
 Installs and launches executables.
 
 Provides:: `Exec`, whose `Install` stores an executable and returns a `Launch` interface for it, and whose `Set_Standard_Output` sets the standard output that `exec` gives the programs it launches, and uses itself; and `Launch` for each installed program.
-Requests:: `create-endpoint`, `delete-endpoint` and `rescind-endpoint`.
+Requests:: `create-endpoint` and `rescind-endpoint`.
 Used by:: `init`, which installs every program after `exec` itself, and sets its standard output to `vga-console` once that is running.
 
 === `vga-console`
@@ -253,7 +253,7 @@ Holds cap sets for persistent processes (#825).
 The boot modules have their own cap set server, `bootcaps`, which ends after boot.
 
 Provides:: `Bank_Constructor`, whose `Create` makes a new, empty set, and whose `Create_In` makes one in a bank (#849); `Releasable_Cap_Set` for each set, with `Append`, `Get_Cap` and `Length` from `Cap_Set` and `Release` from `Resource`; and `Restorable`.
-Requests:: `create-endpoint`, `delete-endpoint`, `rescind-endpoint` and `create-signal`, and the persistent console's `Writer`, which the installer gives after them.
+Requests:: `create-endpoint`, `rescind-endpoint` and `create-signal`, and the persistent console's `Writer`, which the installer gives after them.
 Used by:: `init`, which gets `Bank_Constructor` from the installer, and leaves one set, of the registry's `Lookup` interface and the clock, for the boot test to find after a restore; and `run_self_tests`, through its `Cap_Set_Service` role.
 
 * *It is installed and restored,* so its sets, which are in its memory, and their capabilities, which are in its capability table, survive a restore.

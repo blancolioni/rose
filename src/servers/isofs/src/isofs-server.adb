@@ -511,9 +511,6 @@ package body IsoFS.Server is
 
       Next (Console_Cap);
       Next (Device_Cap);
-      Next (Delete_Cap);
-
-      Rose.System_Calls.Use_Capabilities (Delete_Cap => Delete_Cap);
 
       --  Nothing reads the cap set again (#826).
 

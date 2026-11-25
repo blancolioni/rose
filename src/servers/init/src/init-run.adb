@@ -61,6 +61,8 @@ package body Init.Run is
       Create_Endpoint_Cap  : constant Capability :=
                                Init_Caps.Create_Endpoint_Cap;
       Delete_Cap           : constant Capability := Init_Caps.Delete_Cap;
+      --  Retired (#1023): only the derive test uses it, to check that
+      --  the kernel still answers it.
       Rescind_Cap          : constant Capability := Init_Caps.Rescind_Cap;
       Derive_Cap           : constant Capability := Init_Caps.Derive_Cap;
       Exit_Cap             : constant Capability := Init_Caps.Exit_Cap;
@@ -434,7 +436,6 @@ package body Init.Run is
 
       Rose.System_Calls.Use_Capabilities
         (Create_Endpoint => Create_Endpoint_Cap,
-         Delete_Cap      => Delete_Cap,
          Rescind_Cap     => Rescind_Cap);
 
       Rose.System_Calls.Use_Buffer

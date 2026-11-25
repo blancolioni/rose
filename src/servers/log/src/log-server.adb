@@ -947,12 +947,11 @@ package body Log.Server is
 
       Console_Cap := Get_Cap (1);
       Start_Log_Cap := Get_Cap (2);
-      Store_Committed_Cap := Get_Cap (4);
-      Mem_Committed_Cap := Get_Cap (5);
+      Store_Committed_Cap := Get_Cap (3);
+      Mem_Committed_Cap := Get_Cap (4);
 
       --  Nothing reads the cap set again (#826).
 
-      Rose.System_Calls.Use_Capabilities (Delete_Cap => Get_Cap (3));
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
       Rose.Console_IO.Open (Console_Cap);

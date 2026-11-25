@@ -154,8 +154,7 @@ package body Init.Boot_Steps is
                          Rose.Init_Capabilities.Create_Endpoint_Cap,
                          Init.Boot.Cap_Set_Cap,
                          (Init.Boot.Console_Interface_Cap,
-                          Init.Boot.Hd0_Cap,
-                          Rose.Init_Capabilities.Delete_Cap));
+                          Init.Boot.Hd0_Cap));
       Setup       : Rose.Interfaces.Storage.Partition_Setup.Client
                       .Partition_Setup_Client;
    begin

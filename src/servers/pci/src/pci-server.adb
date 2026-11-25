@@ -35,7 +35,6 @@ package body PCI.Server is
 
       --  Nothing reads the cap set again (#826).
 
-      Rose.System_Calls.Use_Capabilities (Delete_Cap => Get_Cap (5));
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
    end Create_Caps;
