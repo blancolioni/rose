@@ -223,7 +223,7 @@ package body Tests.Processes is
         Rose.Interfaces.Processes.Process_Control.Client;
 
       Max_Probes : constant := 300;
-      --  More than the system can run, at 64 processes or at 256 (#913).
+      --  More than the system can run, at 80 processes (#913).
 
       Probes     : array (1 .. Max_Probes) of Control.Process_Control_Client;
       Count      : Natural := 0;

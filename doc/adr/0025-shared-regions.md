@@ -80,7 +80,7 @@ Amended by #593. The shared header pages also list the pages that were written b
 What the segment limit costs, from GNAT's representation of `mem-processes.adb` (`-gnatR2`):
 
 - **A segment record is 76 bytes**, 32 of them the open `Region` client. The rest of a process record is 100 bytes.
-- **The process table is static,** sized for `Max_Processes` (64), whatever is in use. Today it is 44 KiB, within the memory server's 396 KiB of static data.
+- **The process table is static,** sized for `Max_Processes` (64), whatever is in use. Today it is 44 KiB, within the memory server's 396 KiB of static data. *Since #873 and #913 it has `Rose.Limits.Mem_Process_Entries` entries, 24 for boot modules and 80 for launched processes: 104 of 2,532 bytes, about 257 KiB, which the kernel's `Boot_Module_Pages` allows for.*
 - **A saved process record is one page** while it has at most 101 segments: 32 bytes of header and 40 bytes for each segment.
 - **A fault scans the process's segments that are in use,** not the maximum, so it doesn't get slower as the limit rises.
 
@@ -95,7 +95,7 @@ What the segment limit costs, from GNAT's representation of `mem-processes.adb` 
 
 **The memory server's caps limit segments more than the table does.** Each segment over a region keeps its own open `Region` client, which is seven caps in the memory server: the interface cap and the six it fetches. The memory server has one cap table, of at most 4,096 caps (ADR 0023), for every process's segments.
 
-A rough count from the code is about 28 caps per process: three segments over regions, the kernel-process client, and the heap, server and interface caps. That is about 1,800 caps for 64 processes, which leaves room for about 330 more segments over regions in the whole system, whatever `Max_Segments` is. This figure is from reading the code and hasn't been measured.
+A rough count from the code is about 28 caps per process: three segments over regions, the kernel-process client, and the heap, server and interface caps. That is about 1,800 caps for 64 processes, which leaves room for about 330 more segments over regions in the whole system, whatever `Max_Segments` is. This figure is from reading the code and hasn't been measured. *Measured in #913: about 40 caps for each launched process, and the memory server's table filled at about 95 processes, boot modules included (#848).*
 
 So a segment for each package (ADR 0017) needs two changes beyond a larger limit:
 

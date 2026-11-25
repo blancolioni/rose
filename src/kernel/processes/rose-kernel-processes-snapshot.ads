@@ -10,11 +10,13 @@ package Rose.Kernel.Processes.Snapshot is
       Success    : out Boolean);
    --  Write the kernel's tables for every persistent process into
    --  Storage, in the format described in Rose.Checkpoints, and set
-   --  Page_Count to the number of pages used.  Success is False, and
-   --  nothing is written, if Storage is too small; it is also False if
-   --  more processes are waiting to send to one process than its record
-   --  can hold, or persistent processes handle more interrupts than the
-   --  header page can hold.
+   --  Page_Count to the number of pages they take.  Success is False,
+   --  and nothing is written, if Storage is too small, which is when
+   --  Page_Count is more than its pages: the caller can then offer a
+   --  larger Storage (#913). It is also False if more processes are
+   --  waiting to send to one process than its record can hold, or
+   --  persistent processes handle more interrupts than the header page
+   --  can hold.
 
    --  Restoring a checkpoint: each saved process is recreated with
    --  Restore_Process, while it can't run, then the memory server is

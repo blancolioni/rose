@@ -1,9 +1,17 @@
 package Rose.Limits is
 
-   Max_Processes : constant := 64;
+   Max_Processes : constant := 80;
    --  The kernel's limit: the most processes it runs at once, boot
    --  modules included. It bounds everything that counts processes, such
-   --  as the processes in a checkpoint (checkpoint, restore).
+   --  as the processes in a checkpoint (checkpoint, restore). It was 64
+   --  until #913; a checkpoint doesn't depend on it, so one made with the
+   --  old limit restores.
+   --
+   --  Not more: the memory server's caps run out at about 95 processes
+   --  (#848), and a process that calls it then faults, so the kernel's
+   --  limit is kept below that, where a launch is refused cleanly. The
+   --  kernel's and mem's process tables are also reserved at boot: 256
+   --  took about 2.4 MB more than 64, too much for a 32 MB system.
 
    Mem_Boot_Entries : constant := 24;
    --  The memory server's table keeps entries 1 to Mem_Boot_Entries for
