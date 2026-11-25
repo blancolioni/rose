@@ -195,25 +195,34 @@ A program is persistent like everything else: if it is still running at a checkp
 
 == Adding a Program to the Build
 
-A program is built and installed only as part of Rose.
-To add one:
+To add a program to Rose's own build:
 
 . Put it in `src/utilities/NAME`, with the files above, or in `src/drivers/NAME` with a `.driver` file in place of the `.caps`, if it needs hardware caps or is launched once at install.
 . Add `NAME` to `UTILITIES` (or `DRIVERS`) in the top-level `Makefile`.
   A utility's executable is stripped into `build/install/bin`, with its `.caps`.
-. Add it to the installer's list, in `src/servers/restore/src/restore-installer-default.adb`:
+. Add a line for it to the install list, `src/servers/restore/install.list`:
 +
-[source,ada]
 ----
-      Process ("touch", "bin", Save, Default_Flags);
+touch              bin      save
 ----
 +
-`Save` installs the program in `exec` and adds it to the command registry under that name, where petal finds it.
-`Launch` starts it once at install, as a persistent server.
+The fields are the program's name, its category (`bin` or `drivers`: the directory of `/rose/install` it is in) and its action.
+`save` installs the program in `exec` and adds it to the command registry under that name, where petal finds it.
+`launch` starts it once at install, as a persistent server.
+Any more fields are flags, such as `test_only` for a program that only a test install installs; the head of the file lists them.
+The list is in the order of the install, which matters for the programs that are launched: `exec` comes first, and the keyboard comes before the console.
 . Build with `./clean-build.sh` or `make`.
-  `scripts/check-targets` fails the build if the program isn't built for the user-mode target.
+  `scripts/check-targets` fails the build if the program isn't built for the user-mode target, and `scripts/check-install-list` fails it if the install list and the `Makefile` don't name the same programs.
 
-The installer's list is compiled into `restore-install`, so an install image can't carry a program that Rose's source doesn't name (#1100).
+The build copies the list to `/rose/install/list` on the install media, and `restore-install` reads it there, for a new system and for an update (#1100).
+It refuses a line it can't read, says why on the console, and goes on with the next.
+
+=== A Program from Outside Rose
+
+A program doesn't have to be in Rose's source to be on the install media.
+After building Rose, put the program's stripped executable and its `.caps` in `build/install/bin`, add its line to `build/install/list`, and build the ISO again with `make iso`.
+An install, or an update, then installs it like the others.
+The build copies `install.list` over `build/install/list` again only when the list, its check or the `Makefile` changes, so add the line again after that.
 
 == Running It on Rose
 
