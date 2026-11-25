@@ -3,6 +3,7 @@
 - **Status:** Proposed
 - **Date:** 2026-11-14
 - **Related:** #938 (this decision), #929 (the system directory, which this blocks), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (rights are types), [ADR 0035](0035-system-directory-and-special-files.md) (the system directory and special files, whose section 3 this amends), [ADR 0031](0031-updating-an-installation.md) (the interfaces freeze with 0.4.0)
+- **Amended by:** #1121, where an ordinary file can be read-only (section 8)
 
 ## Context
 
@@ -114,6 +115,28 @@ end Linking_Directory;
 - **Deleting it removes the entry and the directory's caps,** but doesn't end the directory, which this one didn't launch. `Delete_Directory` still needs it to be empty.
 - **`Add_Special_File` stays on `Writable_Directory`.** A stream can't make a cycle, so planting one in a home is ordinary writing.
 
+### 8. Read-only entries (#1121)
+
+Amended by #1121. Sections 1 and 2 give an entry the rights of the view it is reached through, narrowed by its own rights, but only special files and linked directories have rights of their own. An ordinary file is a `Writable_File` through a `Fixed_Directory` or a `Writable_Directory`. So no file in such a directory can be read-only on its own: a `//system/version` would be writable by every user. And a command declared `in File or Transactional_Writable_File` (ADR 0012, section 6) always gets the writable form.
+
+```ada
+interface Protecting_Directory : Linking_Directory is
+   procedure Make_Read_Only (Name : String);
+end Protecting_Directory;
+```
+
+- **An ordinary file can be read-only.** Through every view, it is handed out as a `File`. `Get_Writable_File` fails for it, and so does making a version of it. This is section 2's rule applied to ordinary files: the narrower of the entry's rights and the view's.
+- **Marking an entry is a right of its own**, and so a type of its own (ADR 0012). It descends from `Linking_Directory`, and follows section 7: the directory server serves it for every directory, but hands it only to whoever launches the directory, as the directory command's `Linking` result. Init keeps it for the system directory. Everyone else has a directory as a `Writable_Directory` or narrower.
+- **It protects the file from every view below the launcher's.** A holder of the `Writable_Directory` can still delete the entry and make a new one, as it can with any entry. A holder of a `Fixed_Directory` or `Directory`, such as petal for `system`, can only read it.
+- **It can't be undone.** Nothing makes an entry writable again; the launcher deletes it and makes it again.
+- **Only for ordinary files.** A directory's view already says how far down its rights go (section 1), and a special file has the rights it was added with (section 2). `Make_Read_Only` fails for any other entry.
+- **It's a new interface, not a new subprogram of `Writable_Directory` or `Linking_Directory`.** That keeps both interfaces' cap positions as 0.4.0 left them (ADR 0031). A client that expects a `Linking_Directory` from the `Linking` result still works, since inherited caps come first.
+- **The directory server keeps the mark** in the entry, and saves it with the directory's state, so it survives a restore and a replacement (ADR 0032, section 10).
+- **Init uses it for `//system/version`.** At install, init creates the file in the system directory, writes the Rose version and build id, and makes it read-only.
+- **Petal binds by what the entry gives** (ADR 0012, section 6). It asks for the writable file, and for a read-only entry it gets the `File`, so kilo opens `//system/version` as a viewer.
+
+**Open question:** should a user be able to make their own files read-only, protecting them from the views they hand to commands? That would need `Make_Read_Only` lower down, on something a `Writable_Directory` holder has, and is left for a real use.
+
 ## Consequences
 
 - **Rights stay types.** The type of a directory cap says whether its entries can be written, with no exception for special files.
@@ -137,3 +160,4 @@ end Linking_Directory;
 
 - #938: the IDL, the directory server and isofs.
 - #929: the system directory, against these interfaces.
+- #1121: `Protecting_Directory`, read-only entries in the directory server, and `//system/version` (section 8).
