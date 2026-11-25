@@ -87,7 +87,6 @@ package body Timer.Server is
 
       --  Nothing reads the cap set again (#826).
 
-      Rose.System_Calls.Use_Capabilities (Delete_Cap => Get_Cap (4));
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
       Timeout_Cap :=

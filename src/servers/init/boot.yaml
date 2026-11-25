@@ -125,7 +125,6 @@ stages:
         - {boot_tag: 1}
         - {ports: [out, 8, 0x2F8, 0x2F8], owner: none}
         - {ports: [in, 8, 0x2FD, 0x2FD], owner: none}
-        - delete
       exports:
         console_interface: Streams.Writer.Writer_Interface
         console_stream: Streams.Writer.Write_Endpoint
@@ -138,9 +137,8 @@ stages:
     - launch: mem
       oid: 4
       priority: memory
-      caps: [console_interface, region_count, get_region, page_on, delete,
-             trace, hold_calls, release_calls, swap_processes,
-             process_state]
+      caps: [console_interface, region_count, get_region, page_on, trace,
+             hold_calls, release_calls, swap_processes, process_state]
       exports:
         mem: Processes.Memory.Memory_Interface
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint
@@ -155,7 +153,7 @@ stages:
     - launch: timer
       oid: 13
       priority: device_driver
-      caps: [console_interface, set_timeout, get_ticks_64, delete]
+      caps: [console_interface, set_timeout, get_ticks_64]
       exports:
         timer: Time.Timer.Set_Timer_Endpoint
         timer_interface: Time.Timer.Timer_Interface
@@ -172,7 +170,6 @@ stages:
         - {ports: [out, 32, 0xCF8, 0xCF8]}
         - {ports: [out, 32, 0xCFC, 0xCFC]}
         - {ports: [in, 32, 0xCFC, 0xCFC]}
-        - delete
       exports:
         pci: 450
 
@@ -190,7 +187,6 @@ stages:
         - {ports: [in, 16, 0x1F0, 0x1F7]}
         - {ports: [out, 16, 0x1F0, 0x1F7]}
         - timer
-        - delete
       exports:
         hd0: {endpoint: Get_Interface_Endpoint, identifier: 0}
         # The install media is hd1, which only the install init uses.
@@ -200,7 +196,7 @@ stages:
     - launch: store
       oid: 7
       priority: device_driver
-      caps: [delete, console_interface, trace]
+      caps: [console_interface, trace]
       exports:
         storage: Storage.Store.Store_Interface
         add_storage: Storage.Store.Add_Backing_Store_Endpoint
@@ -221,8 +217,7 @@ stages:
     - launch: elf
       oid: 12
       priority: device_driver
-      caps: [delete, rescind, console_interface, mem, create_process,
-             trace]
+      caps: [rescind, console_interface, mem, create_process, trace]
       exports:
         launch_elf: Processes.Executable.Launch_Endpoint
         launch_command_elf: Processes.Executable.Launch_Command_Endpoint
@@ -230,7 +225,7 @@ stages:
     - launch: scan
       oid: 10
       priority: file_system
-      caps: [console_interface, hd0, exit, delete]
+      caps: [console_interface, hd0, exit]
       exports:
         release_partitions: Storage.Partitions.Release_Endpoint
         partition_count: Storage.Partitions.Partition_Count_Endpoint
@@ -246,19 +241,19 @@ stages:
       sender: install_endpoint
 
     # isofs deletes the caps of the file readers that are released
-    # (ADR 0009).
+    # (ADR 0009), with the Delete flag (#1022).
     - launch: isofs
       when: install
       oid: 8
       priority: file_system
-      caps: [console_interface, hd1, delete]
+      caps: [console_interface, hd1]
       exports:
         install_media_fs: Files.File_System.Root_Directory_Endpoint
 
     - launch: log
       oid: 16
       priority: log
-      caps: [console_interface, start_log, delete, store_committed,
+      caps: [console_interface, start_log, store_committed,
              mem_log_committed]
       exports:
         add_log_device: Checkpoints.Kernel_Log.Add_Log_Device_Endpoint
@@ -298,7 +293,6 @@ stages:
         - memory_restore
         - restore_derivations
         - exit
-        - delete
         - {cap: install_media_fs, when: install}
         - {cap: log_reset, when: install}
         - {cap: mbr, when: install}
@@ -323,7 +317,7 @@ stages:
       oid: 15
       priority: checkpoint
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
-             delete, memory_checkpoint, append_to_log, store_checkpoint,
+             memory_checkpoint, append_to_log, store_checkpoint,
              checkpoint_hold]
       exports:
         checkpointer: Checkpoints.Checkpointer.Take_Checkpoint_Endpoint

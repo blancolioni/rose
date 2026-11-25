@@ -97,22 +97,22 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | Id | Server | Receives | Provides to `init`
 | 3 | `console` | The text buffer at `B8000`, as a device page; cursor ports `3D4` and `3D5` | `Writer` and `Output_Redirect`
 | 14 | `bootcaps` | The console and the exit capability | `Constructor`, for creating cap sets, and `Resource`, to end it once boot is done
-| 4 | `mem` | Memory region queries, page-on, delete, trace | `Memory`, its `Checkpoint` endpoint, and `Memory_Restore`
-| 13 | `timer` | The kernel's set-timeout and get-ticks, delete | `Set_Timer`
-| 5 | `pci` | PCI configuration ports `CF8` and `CFC`, delete | Its device lookup endpoint
-| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer, delete | Block devices: hd0, the system disk, and on the install media hd1, the install media
-| 7 | `store` | Delete, the console, trace | `Store`, `Add_Backing_Store` and `Storage_Checkpoint`
-| 12 | `elf` | Create-process, `Memory`, delete, rescind, trace | `Executable.Launch` and `Launch_Command`
-| 10 | `scan` | hd0, the exit capability, delete | `Partitions`
-| 11 | `partition` | hd0 and delete, and the swap partition's start, bound and block size | The swap partition's `Block_Array`, with 4096-byte blocks
+| 4 | `mem` | Memory region queries, page-on, trace | `Memory`, its `Checkpoint` endpoint, and `Memory_Restore`
+| 13 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
+| 5 | `pci` | PCI configuration ports `CF8` and `CFC` | Its device lookup endpoint
+| 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Block devices: hd0, the system disk, and on the install media hd1, the install media
+| 7 | `store` | The console, trace | `Store`, `Add_Backing_Store` and `Storage_Checkpoint`
+| 12 | `elf` | Create-process, `Memory`, rescind, trace | `Executable.Launch` and `Launch_Command`
+| 10 | `scan` | hd0, the exit capability | `Partitions`
+| 11 | `partition` | hd0, and the swap partition's start, bound and block size | The swap partition's `Block_Array`, with 4096-byte blocks
 | 17 | `partition` | The same, for the log partition | The log partition's `Block_Array`, with 512-byte blocks
 | 18 | `partition` | Install media only: hd0's block 0 | `Block_Array`, for writing the MBR
 | 19 | `partition` | Install media only: the BIOS boot partition | `Block_Array`
 | 20 | `partition` | Install media only: the boot partition | `Block_Array`, with 4096-byte blocks
-| 8 | `isofs` | Install media only: hd1, delete | The install media's root directory
-| 16 | `log` | The kernel's start-log capability, delete | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
-| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, the exit capability, and delete. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag, restored-endpoint, for calling the restored `exec` and command registry on the update boot (#829), and mem's `Replacer`, for replacing the restored servers (#830) | (see <<restore-server>>)
-| 15 | `checkpoint` | The timer, enter and leave checkpoint, delete, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
+| 8 | `isofs` | Install media only: hd1 | The install media's root directory
+| 16 | `log` | The kernel's start-log capability | `Add_Log_Device`, `Append`, `Log_Reader`, and `Reset`
+| 9 | `restore` or `restore-install` | The swap and log partitions, `Add_Backing_Store`, `init`'s install endpoint, the log's `Add_Log_Device` and `Log_Reader`, and the capabilities for restoring: the kernel's restore-process, resume-process and restore-interrupt, `Storage_Checkpoint` and `Memory_Restore`, and the exit capability. `restore-install` also receives the install media, the log's `Reset`, the three partition servers for the boot loader, and, to ask before erasing hd0, the timer, the keyboard controller's status and data ports, and the boot loader's command line tag, restored-endpoint, for calling the restored `exec` and command registry on the update boot (#829), and mem's `Replacer`, for replacing the restored servers (#830) | (see <<restore-server>>)
+| 15 | `checkpoint` | The timer, enter and leave checkpoint, `Memory.Checkpoint`, log append, `Storage_Checkpoint` | --
 |===
 
 `init` launches the partition servers from the partitions that `scan` finds on hd0, using only the first of each type.

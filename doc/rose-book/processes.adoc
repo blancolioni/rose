@@ -75,7 +75,7 @@ A command that inherits no role gets no capability beyond its arguments.
 * *The generated main passes the system caps to `Rose.System_Calls.Use_Capabilities`*, so library code that needs them works unchanged.
   Most commands need none of them, since the command endpoint exists before the command starts.
 
-_Today_, every launched process receives the same caps by position: cap 2 is a cap set whose entries hold the standard streams, followed by system caps such as delete, rescind and create endpoint, and the run-time system reads them from fixed indices.
+_Today_, every launched process receives the same caps by position: cap 2 is a cap set whose entries hold the standard streams, followed by system caps such as rescind and create endpoint, and the run-time system reads them from fixed indices.
 `Rose.Capabilities.Standard` documents the convention.
 
 [#launch-sequence]

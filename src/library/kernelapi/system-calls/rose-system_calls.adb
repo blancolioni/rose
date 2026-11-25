@@ -4,7 +4,7 @@ package body Rose.System_Calls is
                       Rose.Words.Word'Size = 32;
 
    type Local_Cap_Type is
-     (Create_Endpoint, Delete_Cap, Rescind_Cap);
+     (Create_Endpoint, Rescind_Cap);
 
    Local_Cap     : array (Local_Cap_Type) of Rose.Capabilities.Capability :=
                                  (others => 0);
@@ -34,7 +34,7 @@ package body Rose.System_Calls is
    is (Local_Cap (Create_Endpoint));
 
    function Delete_Cap_Capability return Rose.Capabilities.Capability
-   is (Local_Cap (Delete_Cap));
+   is (Rose.Capabilities.Null_Capability);
 
    function Rescind_Cap_Capability return Rose.Capabilities.Capability
    is (Local_Cap (Rescind_Cap));
@@ -1209,10 +1209,12 @@ package body Rose.System_Calls is
          end if;
       end Use_Cap;
 
+      pragma Unreferenced (Delete_Cap);
+      --  Retired (#1023): a program built for 0.4.0 may still give it.
+
       use type Rose.Capabilities.Capability;
    begin
       Use_Cap (Create_Endpoint, Rose.System_Calls.Create_Endpoint);
-      Use_Cap (Delete_Cap, Rose.System_Calls.Delete_Cap);
       Use_Cap (Rescind_Cap, Rose.System_Calls.Rescind_Cap);
       if Create_Signal /= 0 then
          Local_Create_Signal := Create_Signal;

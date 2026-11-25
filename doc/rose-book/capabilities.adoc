@@ -169,7 +169,8 @@ Its endpoints are:
 | Exit Process | 31 | Ends the process
 |===
 
-A process is given a meta capability for each of the operations that it may use, and they are the system capabilities of the run-time system (see <<idl>>): `Create_Endpoint`, `Delete_Cap` and `Rescind_Cap`.
+A process is given a meta capability for each of the operations that it may use, and they are the system capabilities of the run-time system (see <<idl>>): `Create_Endpoint` and `Rescind_Cap`.
+The meta capability for deleting, `Delete_Cap`, is retired (#1023): any process deletes its own capabilities with the `Delete` flag, and only `init` still has it.
 A program that asks for `create-signal` is given the one that makes signal capabilities, which it gives to `Rose.System_Calls.Use_Capabilities` as `Create_Signal`.
 
 === Kernel Capabilities
