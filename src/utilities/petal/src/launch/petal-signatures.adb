@@ -225,8 +225,29 @@ package body Petal.Signatures is
                   elsif Key = "mode" then
                      Argument.Mode :=
                        (if Item = "out" then Out_Mode else In_Mode);
+                  elsif Key = "accepts" then
+
+                     --  One of the later interfaces of a list. The
+                     --  versioned and transactional lines after it are
+                     --  its own (ADR 0012, section 6).
+
+                     if Argument.Accept_Count < Max_Accepts then
+                        Argument.Accept_Count := Argument.Accept_Count + 1;
+                        Argument.Accepts (Argument.Accept_Count) :=
+                          (Interface_Name => Field, Transactional => False);
+                     end if;
                   elsif Key = "transactional" then
-                     Argument.Transactional := Item = "true";
+                     if Argument.Accept_Count > 0 then
+                        Argument.Accepts (Argument.Accept_Count)
+                          .Transactional := Item = "true";
+                     else
+                        Argument.Transactional := Item = "true";
+                     end if;
+                  elsif Key = "selector" then
+                     if Starts (Item, "word ") then
+                        Argument.Has_Selector := True;
+                        Argument.Selector_Word := After (Item, "word ");
+                     end if;
                   elsif Key = "place" then
                      if Starts (Item, "word ") then
                         Argument.Place := Word_Place;

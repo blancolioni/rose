@@ -80,6 +80,9 @@ package body Petal.Command_Launch is
          Text      : Slice;
          Cap       : Rose.Capabilities.Capability :=
            Rose.Capabilities.Null_Capability;
+         Selector  : Rose.Words.Word := 0;
+         --  For an argument whose type is a list of interfaces, which of
+         --  them Cap is for: 0 for the first (ADR 0012, section 6).
       end record;
    --  The value bound to an argument: a data word, the text of a String
    --  in the command line or in the signature's default, or the cap of
@@ -182,6 +185,42 @@ package body Petal.Command_Launch is
    --  True if Argument is an in Transactional_Writable_File, which names
    --  a file in the current directory. The command gets a version of it,
    --  or of a new file if there is none, and commits it (ADR 0026).
+
+   type Interface_Kind is
+     (Directory_Kind, Writable_Directory_Kind, File_Kind, Writable_File_Kind,
+      Transactional_File_Kind, Other_Kind);
+   --  What petal binds a name to, for one interface of an argument's list.
+
+   function Form_Name
+     (Item     : Signature;
+      Argument : Argument_Record;
+      Form     : Natural)
+      return String
+   is (if Form = 0 then Value (Item, Argument.Interface_Name)
+       else Value (Item, Argument.Accepts (Form).Interface_Name));
+   --  The name of the interface Form of Argument's list: 0 for the first,
+   --  which the argument declares, and N for the Nth after it.
+
+   function Kind_Of
+     (Item     : Signature;
+      Argument : Argument_Record;
+      Form     : Natural)
+      return Interface_Kind
+   is (if Form_Name (Item, Argument, Form) = "Files.Directory"
+       then Directory_Kind
+       elsif Form_Name (Item, Argument, Form) = "Files.Writable_Directory"
+       then Writable_Directory_Kind
+       elsif Form_Name (Item, Argument, Form) = "Files.File"
+       then File_Kind
+       elsif Form_Name (Item, Argument, Form) = "Files.Writable_File"
+       then Writable_File_Kind
+       elsif Form_Name (Item, Argument, Form)
+               = "Files.Transactional_Writable_File"
+         and then (if Form = 0 then Argument.Transactional
+                   else Argument.Accepts (Form).Transactional)
+       then Transactional_File_Kind
+       else Other_Kind);
+   --  The kind of the interface Form of Argument's list.
 
    procedure Launch
      (Command_Name : String;
@@ -293,6 +332,16 @@ package body Petal.Command_Launch is
       function Find_Short (Name : Character) return Natural;
       function Next_Positional return Natural;
 
+      procedure Bind_List
+        (Index        : Positive;
+         Text         : String;
+         From_Current : Boolean);
+      --  Bind Text to argument Index, whose type is a list of interfaces
+      --  (ADR 0012, section 6). Petal looks the name up once, at the most
+      --  it can get, and then passes the last interface of the list that
+      --  what it got can be, with its selector. A list of directories
+      --  that isn't given, From_Current, is the current directory.
+
       procedure Fail (Message : String);
 
       function New_Command_Bank return Rose.Capabilities.Capability;
@@ -325,6 +374,178 @@ package body Petal.Command_Launch is
       procedure Warn_Unneeded;
       --  Warn about each category that sudo named, and the command does
       --  not need. The command still runs.
+
+      ---------------
+      -- Bind_List --
+      ---------------
+
+      procedure Bind_List
+        (Index        : Positive;
+         Text         : String;
+         From_Current : Boolean)
+      is
+         use all type Petal.Session.File_Lookup;
+         use all type Petal.Session.Version_Lookup;
+         Argument : Argument_Record renames Item.Arguments (Index);
+         Value    : Bound_Value renames Values (Index);
+         Forms    : constant Natural := Argument.Accept_Count;
+         Files    : constant Boolean :=
+           (for all Form in 0 .. Forms =>
+              Kind_Of (Item, Argument, Form)
+                in File_Kind | Writable_File_Kind | Transactional_File_Kind);
+         Folders  : constant Boolean :=
+           (for all Form in 0 .. Forms =>
+              Kind_Of (Item, Argument, Form)
+                in Directory_Kind | Writable_Directory_Kind);
+
+         procedure Choose (Form : Natural; Cap : Rose.Capabilities.Capability);
+         --  Pass interface Form of the list, with Cap.
+
+         ------------
+         -- Choose --
+         ------------
+
+         procedure Choose
+           (Form : Natural;
+            Cap  : Rose.Capabilities.Capability)
+         is
+         begin
+            Value.Cap := Cap;
+            Value.Selector := Rose.Words.Word (Form);
+         end Choose;
+
+      begin
+         if Files then
+
+            --  The file, as writable as the directory will give it, and
+            --  then read-only if it won't.
+
+            declare
+               Writable_Cap : Rose.Capabilities.Capability;
+               Read_Cap     : Rose.Capabilities.Capability :=
+                 Rose.Capabilities.Null_Capability;
+               Writable     : Petal.Session.File_Lookup;
+               Readable     : Petal.Session.File_Lookup := No_Such_File;
+               Version      : Petal.Session.Version_Lookup;
+            begin
+               Petal.Session.Find_File (Text, True, Writable_Cap, Writable);
+               case Writable is
+                  when Bad_Path =>
+                     Fail (Petal.Session.Path_Error);
+                     return;
+                  when Not_A_File =>
+                     Fail ("'" & Text & "' is not a file");
+                     return;
+                  when File_Found =>
+                     null;
+                  when No_Such_File =>
+                     Petal.Session.Find_File
+                       (Text, False, Read_Cap, Readable);
+               end case;
+
+               --  The last interface that the file can be. A version can
+               --  be made of a writable file, or of a new one in a
+               --  directory that petal can write, which New_Version makes.
+
+               for Form in reverse 0 .. Forms loop
+                  case Kind_Of (Item, Argument, Form) is
+                     when Transactional_File_Kind =>
+                        if Readable /= File_Found then
+                           declare
+                              Cap : Rose.Capabilities.Capability;
+                           begin
+                              Petal.Session.New_Version (Text, Cap, Version);
+                              if Version = Version_Made then
+                                 Choose (Form, Cap);
+                                 return;
+                              end if;
+                           end;
+                        end if;
+                     when Writable_File_Kind =>
+                        if Writable = File_Found then
+                           Choose (Form, Writable_Cap);
+                           return;
+                        end if;
+                     when File_Kind =>
+                        if Readable = File_Found then
+                           Choose (Form, Read_Cap);
+                           return;
+                        elsif Writable = File_Found then
+                           declare
+                              Cap    : Rose.Capabilities.Capability;
+                              Result : Petal.Session.File_Lookup;
+                           begin
+                              Petal.Session.Find_File
+                                (Text, False, Cap, Result);
+                              if Result = File_Found then
+                                 Choose (Form, Cap);
+                                 return;
+                              end if;
+                           end;
+                        end if;
+                     when others =>
+                        null;
+                  end case;
+               end loop;
+
+               Fail
+                 (if Writable /= File_Found and then Readable /= File_Found
+                  then "no file named '" & Text & "'"
+                  else "cannot write '" & Text & "'");
+            end;
+
+         elsif Folders then
+
+            --  The directory, writable if petal holds it so.
+
+            declare
+               Writable_Cap : Rose.Capabilities.Capability;
+               Read_Cap     : Rose.Capabilities.Capability :=
+                 Rose.Capabilities.Null_Capability;
+               Writable     : Boolean;
+               Readable     : Boolean := False;
+            begin
+               if From_Current then
+                  Petal.Session.Current_Grant (True, Writable_Cap, Writable);
+               else
+                  Petal.Session.Find_Grant
+                    (Text, True, Writable_Cap, Writable);
+               end if;
+               if not Writable then
+                  if From_Current then
+                     Petal.Session.Current_Grant (False, Read_Cap, Readable);
+                  else
+                     Petal.Session.Find_Grant
+                       (Text, False, Read_Cap, Readable);
+                  end if;
+               end if;
+
+               for Form in reverse 0 .. Forms loop
+                  if Writable then
+                     Choose (Form, Writable_Cap);
+                     return;
+                  elsif Readable
+                    and then Kind_Of (Item, Argument, Form) = Directory_Kind
+                  then
+                     Choose (Form, Read_Cap);
+                     return;
+                  end if;
+               end loop;
+
+               Fail (if From_Current
+                     then "missing argument " & Argument_Name (Index)
+                     elsif not Writable and then not Readable
+                     then Petal.Session.Path_Error
+                     else "cannot write '" & Text & "'");
+            end;
+
+         else
+            Fail ("cannot bind " & Argument_Name (Index)
+                  & ": a list of interfaces can only be files (File,"
+                  & " Writable_File, Transactional_Writable_File) or"
+                  & " directories (Directory, Writable_Directory)");
+         end if;
+      end Bind_List;
 
       ----------
       -- Fail --
@@ -565,7 +786,9 @@ package body Petal.Command_Launch is
                   List_Words (List_Count) := Where;
                end if;
             when Interface_Type =>
-               if Is_In_Directory (Item, Argument) then
+               if Argument.Accept_Count > 0 then
+                  Bind_List (Index, Text, From_Current => False);
+               elsif Is_In_Directory (Item, Argument) then
                   declare
                      Found : Boolean;
                   begin
@@ -824,6 +1047,11 @@ package body Petal.Command_Launch is
             elsif Argument.Has_Default then
                Set_Value (Index, Value (Item, Argument.Default),
                           Argument.Default, From_Line => False);
+            elsif Argument.Accept_Count > 0
+              and then Is_In_Directory (Item, Argument)
+            then
+               Values (Index).Is_Set := True;
+               Bind_List (Index, "", From_Current => True);
             elsif Is_In_Directory (Item, Argument) then
                declare
                   Found : Boolean;
@@ -948,6 +1176,16 @@ package body Petal.Command_Launch is
                   when Cap_Place =>
                      Caps (Argument.Index + 1) := Values (Index).Cap;
                      Cap_Count := Natural'Max (Cap_Count, Argument.Index + 1);
+
+                     --  Which interface of a list the cap is for (ADR
+                     --  0012, section 6).
+
+                     if Argument.Has_Selector then
+                        Data (Argument.Selector_Word) :=
+                          Values (Index).Selector;
+                        Word_Count :=
+                          Natural'Max (Word_Count, Argument.Selector_Word + 1);
+                     end if;
                end case;
             end;
          end loop;

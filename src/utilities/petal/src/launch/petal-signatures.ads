@@ -35,6 +35,21 @@ package Petal.Signatures is
    --  buffer item, buffer items from Index with their number in data
    --  word Count_Word, or a cap (see Rose.Command_Line.Launch).
 
+   Max_Accepts : constant := 3;
+   --  The most interfaces after the first that an argument's list can
+   --  have, here (ADR 0012, section 6). Petal ignores any more, and can
+   --  still bind the first, with selector 0.
+
+   type Accepted_Record is
+      record
+         Interface_Name : Slice;
+         Transactional  : Boolean := False;
+      end record;
+   --  One of the later interfaces of an argument's list: its name, and
+   --  whether the shell gives the command a version of it to commit.
+
+   type Accepted_Array is array (1 .. Max_Accepts) of Accepted_Record;
+
    type Argument_Record is
       record
          Name            : Slice;
@@ -53,6 +68,15 @@ package Petal.Signatures is
          Has_Short_Value : Boolean := False;
          Short_Value     : Boolean := True;
          Help            : Slice;
+         Accept_Count    : Natural := 0;
+         Accepts         : Accepted_Array;
+         --  The interfaces after the first of a list, in order, for an
+         --  interface argument that takes one of several (ADR 0012,
+         --  section 6).
+         Has_Selector    : Boolean := False;
+         Selector_Word   : Natural := 0;
+         --  The data word that says which of the list the cap is for: 0
+         --  for the first, N for the Nth after it.
       end record;
    --  A command's argument. One with a short name is an option, given by
    --  name; the others are positional, in declaration order.
