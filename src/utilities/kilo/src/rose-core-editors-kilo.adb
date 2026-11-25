@@ -42,6 +42,7 @@ with Ada.Streams;
 with Ada.Containers.Vectors;
 with Ada.Strings.Unbounded;
 
+with Rose.Interfaces.Files.Transactional_Writable_File;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Streams.Releasable_Reader;
 with Rose.Interfaces.Streams.Releasable_Writer;
@@ -50,9 +51,7 @@ with Rose.Words;
 
 procedure Rose.Core.Editors.Kilo
   (Console : in out Rose.Interfaces.Screens.Terminal.Terminal_Object'Class;
-   File    : in out
-     Rose.Interfaces.Files.Transactional_Writable_File
-       .Transactional_Writable_File_Object'Class)
+   File    : in out Rose.Interfaces.Files.File.File_Object'Class)
 is
    use Ada.Strings.Unbounded;
    use type Rose.Words.Word;
@@ -105,6 +104,14 @@ is
 
    Dirty       : Boolean := False;
    --  The rows have changes that haven't been saved.
+
+   subtype Version_Class is
+     Rose.Interfaces.Files.Transactional_Writable_File
+       .Transactional_Writable_File_Object'Class;
+
+   Read_Only   : constant Boolean := File not in Version_Class;
+   --  Kilo was given the file only to read, not a version of it to commit
+   --  (ADR 0012, section 6). It shows the file, and changes nothing.
 
    Message     : Unbounded_String;
    --  The message under the status bar. Kilo shows it for five seconds;
@@ -423,8 +430,9 @@ is
    ---------------
 
    --  The file is a version, which starts as a copy of the file, or empty
-   --  if it was made for kilo (ADR 0026). A line feed ends a row, and a
-   --  carriage return before it is dropped, as in kilo.
+   --  if it was made for kilo (ADR 0026), or the file itself, to read. A
+   --  line feed ends a row, and a carriage return before it is dropped, as
+   --  in kilo.
 
    procedure Open_File is
       use Ada.Streams;
@@ -471,6 +479,20 @@ is
    is
    begin
       Done := False;
+
+      --  A file given only to read can be moved around and searched, but
+      --  not changed or saved.
+
+      if Read_Only
+        and then (Key = Enter or else Key = Ctrl_S
+                  or else Key = Backspace or else Key = Del
+                  or else Key = Rose.Keys.Delete
+                  or else Key = Tab or else Key in 32 .. 126)
+      then
+         Message :=
+           To_Unbounded_String ("Read-only: kilo can't change this file");
+         return;
+      end if;
 
       if Key = Enter then
          Insert_Newline;
@@ -592,13 +614,14 @@ is
       end loop;
 
       --  The status bar, in reverse video: the number of lines, whether
-      --  they have changed, and the cursor's row. The file's name isn't
-      --  shown, since kilo is given the file and not its name.
+      --  they have changed or can't be, and the cursor's row. The file's
+      --  name isn't shown, since kilo is given the file and not its name.
 
       declare
          Left  : constant String :=
            "kilo - " & Image (Count) & " lines"
-           & (if Dirty then " (modified)" else "");
+           & (if Read_Only then " (read-only)"
+              elsif Dirty then " (modified)" else "");
          Right : constant String :=
            Image (Cursor_Row + 1) & "/" & Image (Count);
          Bar   : String (1 .. Screen_Cols) := (others => ' ');
@@ -687,10 +710,11 @@ is
 
    procedure Save is
       use Ada.Streams;
-      Total : Natural := 0;
+      Version : Version_Class renames Version_Class (File);
+      Total   : Natural := 0;
    begin
       declare
-         Writer : Writer_Class := File.Rewrite;
+         Writer : Writer_Class := Version.Rewrite;
          Buffer : Stream_Element_Array (1 .. 4096);
          Last   : Stream_Element_Offset := 0;
       begin
@@ -715,7 +739,7 @@ is
             raise;
       end;
 
-      File.Commit;
+      Version.Commit;
       Dirty := False;
       Message :=
         To_Unbounded_String (Image (Total) & " bytes written on disk");
@@ -761,7 +785,8 @@ begin
    Open_File;
    Message :=
      To_Unbounded_String
-       ("HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
+       (if Read_Only then "HELP: Ctrl-Q = quit | Ctrl-F = find | read-only"
+        else "HELP: Ctrl-S = save | Ctrl-Q = quit | Ctrl-F = find");
 
    loop
       Refresh_Screen;

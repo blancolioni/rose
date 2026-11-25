@@ -8,9 +8,11 @@ command Rose.Core.Editors.Kilo : Screens.Console
           quits. With changes that haven't been saved, Ctrl-Q warns, and
           quits when it is pressed three more times; the changes are
           dropped. A file holds at most 64 KiB, and only printable ASCII
-          and Tab can be typed.
+          and Tab can be typed. A file that kilo is given only to read
+          opens read-only: it can be viewed and searched, but not changed
+          or saved.
           """
 is
-   File : in Files.Transactional_Writable_File
-     with Help => "the file to edit";
+   File : in Files.File or Files.Transactional_Writable_File
+     with Help => "the file to edit, or to view if it can't be written";
 end Rose.Core.Editors.Kilo;
