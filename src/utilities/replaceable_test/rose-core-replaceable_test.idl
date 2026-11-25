@@ -22,8 +22,7 @@ command Rose.Core.Replaceable_Test : Caps.Create_Endpoint, Caps.Cap_Set_Service
           its name is then "waited N after E errors".
           """,
        Server      => Replaceable_Test_Server.Start_Server,
-       Replaceable => Replaceable_Test_Server,
-       Live
+       Replaceable => Replaceable_Test_Server
 is
    Name : String
      with Help => "the name it serves, unless it takes over another";

@@ -48,9 +48,10 @@ include::../../src/utilities/touch/rose-core-touch.idl[]
   `Streams.Standard_Error` gives the command a standard error stream, and nothing else: `touch` has no standard output, and can't read the clock or launch anything.
   A command has only the authority its declaration names (ADR 0021).
 * *The arguments are typed.*
-  `Name` is a `String`, and `Directory` is an `in Files.Writable_Directory`: petal gives the command a cap for the directory, and the mode and type say which right (ADR 0012).
-  Petal reads the declaration from the program's metadata, so `touch notes` and `touch --name=notes --directory=//home/docs` both work, and `touch --help` is written from `Summary`, `Description` and `Help`.
-* *`Live` says that the command's changes take effect as it makes them*, rather than in a version that petal commits when it completes (ADR 0026).
+  `File` is an `in Files.Transactional_Writable_File`, so the argument's type is the right it gives (ADR 0012).
+  Petal binds the name: it finds the file, or makes it if there is none, and gives the command a version of it, which only the command can commit (ADR 0026).
+  `touch` needs no right over the directory, since petal makes the file.
+  Petal reads the declaration from the program's metadata, so `touch notes`, `touch //home/docs/notes` and `touch --file=notes` all work, and `touch --help` is written from `Summary`, `Description` and `Help`.
 
 === The body
 
@@ -62,7 +63,11 @@ include::../../src/utilities/touch/src/rose-core-touch.adb[]
 The parameters are the declaration's arguments.
 The role `Standard_Error` is not a parameter: the generated main gives it to the run-time system, and `Ada.Text_IO` writes to it.
 
-The command fails by raising `Rose.Command_Line.Command_Failed` with a message.
+The body only commits the version.
+Changes to a version take effect only when the command commits it, and petal releases the version when the command ends, which drops anything not committed.
+
+`touch` has nothing of its own to fail on: if petal can't make the file, it says so and doesn't run the command.
+A command fails by raising `Rose.Command_Line.Command_Failed` with a message.
 The launch call then fails, and petal shows the message.
 There is no exit code to set: a command that returns has completed.
 A call to another server that fails raises `Rose.Interfaces.Objects.Invocation_Error` (see <<user-mode-target>>).

@@ -4,6 +4,7 @@
 - **Date:** 2026-11-24
 - **Related:** #1096 (this decision), #342 (the current directory), #343 (`pwd`), #929 (the system directory), [ADR 0002](0002-typed-commands-and-directory-caps.md) (directories as named caps), [ADR 0035](0035-system-directory-and-special-files.md) (the system directory and special files), [ADR 0036](0036-directory-views.md) (directory views)
 - **Amends:** [ADR 0002](0002-typed-commands-and-directory-caps.md), section 5 (how a path names a directory in the table), and [ADR 0035](0035-system-directory-and-special-files.md), sections 2 and 5 (how petal names `system` and its special files)
+- **Amended by:** [ADR 0045](0045-opening-files-by-name.md), where the run-time system resolves these paths too, for `Ada.Text_IO`, but not above the current directory (#1124)
 
 ## Context
 

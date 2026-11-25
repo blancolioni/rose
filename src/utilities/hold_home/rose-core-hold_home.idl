@@ -14,8 +14,7 @@ command Rose.Core.Hold_Home
           from before and a new one work, and writes
           the result to standard output. It never completes.
           """,
-       Server      => Home_Holder.Start_Server,
-       Live
+       Server      => Home_Holder.Start_Server
 is
    User_Control : out Processes.Replaceable
      with Help => "the user server's Replaceable interface";

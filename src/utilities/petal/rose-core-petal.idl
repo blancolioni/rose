@@ -13,8 +13,7 @@ command Rose.Core.Petal
           commands from standard input and runs them, until the input
           ends, when it logs out and the command completes (#458).
           login runs it for each user who logs in (#457).
-          """,
-       Live
+          """
 is
    User : in Users.User
      with Help => "the user whose session this is";
