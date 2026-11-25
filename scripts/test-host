@@ -1,0 +1,163 @@
+#!/bin/sh
+# The tests of the commands built for the host (#1101): "make test-host"
+# builds them (make host-commands) and runs this. Each command runs in a
+# directory of its own, under ROSE_TEST_DIR ($HOME/scratch by default),
+# which is removed if every test passes.
+#
+# It checks what each command writes, its exit status (0 if it completed,
+# 1 if it failed, 2 for a wrong command line), and what it leaves in the
+# directory, so it also tests Rose.Command_Line.Host, which binds the
+# command line as petal does, and the host backings in src/library/host.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+UTILITIES=$HERE/../src/utilities
+
+mkdir -p "${ROSE_TEST_DIR:-$HOME/scratch}"
+WORK=$(mktemp -d "${ROSE_TEST_DIR:-$HOME/scratch}/rose-host.XXXXXX") || exit 2
+status=0
+
+pass () { echo "PASS $1"; }
+fail () { echo "FAIL $1"; status=1; }
+
+for name in echo cat list touch copy mkdir remove rename date; do
+  if [ ! -x "$UTILITIES/$name/build/host/bin/$name" ]; then
+    echo "test-host: $name isn't built for the host (make host-commands)"
+    exit 2
+  fi
+done
+
+# run NAME ARGUMENT... runs the command NAME in $WORK, and leaves what it
+# wrote in out and err, and its exit status in code.
+
+run () {
+  name=$1
+  shift
+  (cd "$WORK" && "$UTILITIES/$name/build/host/bin/$name" "$@" \
+     > "$WORK/../out.$$" 2> "$WORK/../err.$$" < /dev/null)
+  code=$?
+  out=$(cat "$WORK/../out.$$")
+  err=$(cat "$WORK/../err.$$")
+  rm -f "$WORK/../out.$$" "$WORK/../err.$$"
+}
+
+# check DESCRIPTION EXPECTED ACTUAL
+
+check () {
+  if [ "$2" = "$3" ]; then
+    pass "$1"
+  else
+    fail "$1: expected '$2', got '$3'"
+  fi
+}
+
+entries () { (cd "$WORK" && ls -A | tr '\n' ' '); }
+
+# echo: options as petal binds them.
+
+run echo hello world
+check "echo writes its arguments" "hello world" "$out"
+run echo -n abc
+check "echo -n writes no line feed" "abc" \
+  "$(cd "$WORK" && "$UTILITIES/echo/build/host/bin/echo" -n abc | od -An -c | tr -d ' ')"
+run echo --no-new-line x
+check "echo --no-new-line" "0 x" "$code $out"
+run echo --new-line=false y
+check "echo --new-line=false" "0 y" "$code $out"
+run echo -- -n literal
+check "echo: -- ends the options" "-n literal" "$out"
+run echo -q
+check "echo: an unknown option fails with status 2" \
+  "2 echo: invalid option -- 'q'" "$code $err"
+run echo --nonesuch
+check "echo: an unknown long option" "2 echo: unknown option --nonesuch" \
+  "$code $err"
+run echo --help
+check "echo --help" "0 Usage: echo [OPTION]... [ARGUMENTS]..." \
+  "$code $(echo "$out" | head -1)"
+run echo --version
+check "echo --version" "0 echo (Rose core utilities)" \
+  "$code $(echo "$out" | head -1 | cut -d' ' -f1-4)"
+
+# cat: a file, standard input, and a file that isn't there.
+
+printf 'line one\nline two\n' > "$WORK/a.txt"
+run cat a.txt
+check "cat writes a file" "line one
+line two" "$out"
+check "cat from standard input" "from standard input" \
+  "$(cd "$WORK" && echo "from standard input" \
+       | "$UTILITIES/cat/build/host/bin/cat")"
+run cat nosuch
+check "cat: no such file" "1 cat: no file named 'nosuch'" "$code $err"
+
+# touch: a new file is made empty; an existing one keeps what it holds,
+# and no version is left beside it.
+
+run touch b.txt
+check "touch makes an empty file" "0 0" "$code $(wc -c < "$WORK/b.txt")"
+run touch a.txt
+check "touch keeps a file's contents" "line one" "$(head -1 "$WORK/a.txt")"
+check "touch leaves no version" "a.txt b.txt " "$(entries)"
+
+# copy: the target is replaced, and no version is left.
+
+printf 'old\n' > "$WORK/c.txt"
+run copy a.txt c.txt
+check "copy replaces the target" "0 line two" "$code $(tail -1 "$WORK/c.txt")"
+check "copy leaves no version" "a.txt b.txt c.txt " "$(entries)"
+run copy nosuch d.txt
+check "copy: no such source" "1 copy: no file named 'nosuch'" "$code $err"
+run copy a.txt
+check "copy: a missing argument fails with status 2" \
+  "2 copy: missing argument Target" "$code $err"
+
+# mkdir and list: a directory that isn't given is the current one.
+
+run mkdir sub
+check "mkdir makes a directory" "0 a.txt b.txt c.txt sub " "$code $(entries)"
+run mkdir sub
+check "mkdir: it already exists" \
+  "1 mkdir: cannot create directory 'sub': it already exists" "$code $err"
+run mkdir inner sub
+check "mkdir in a given directory" "0 inner" "$code $(ls "$WORK/sub")"
+run list
+check "list writes the entries in order" "a.txt
+b.txt
+c.txt
+sub  (directory)" "$out"
+run list sub
+check "list of a given directory" "inner  (directory)" "$out"
+run list nosuch
+check "list: no such directory" "1 list: no directory named 'nosuch'" \
+  "$code $err"
+
+# rename and remove.
+
+run rename c.txt d.txt
+check "rename" "0 a.txt b.txt d.txt sub " "$code $(entries)"
+run rename a.txt b.txt
+check "rename: the new name is taken" "1" "$code"
+run remove sub
+check "remove: a directory isn't a file" \
+  "1 remove: cannot remove 'sub': it is not a file" "$code $err"
+run remove d.txt
+check "remove" "0 a.txt b.txt sub " "$code $(entries)"
+
+# date: the host's clock.
+
+run date -I
+case $out in
+  "$(date -u +%Y)"-[0-1][0-9]-[0-3][0-9]T[0-2][0-9]:[0-5][0-9]:[0-6][0-9]Z)
+    pass "date -I" ;;
+  *)
+    fail "date -I: got '$out'" ;;
+esac
+run date
+check "date writes UTC" "0 1" "$code $(echo "$out" | grep -c ' UTC ')"
+
+if [ $status -eq 0 ]; then
+  rm -rf "$WORK"
+else
+  echo "test-host: kept $WORK"
+fi
+exit $status
