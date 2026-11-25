@@ -1,0 +1,15 @@
+--  A directory, with the rights to link directories into it and to make
+--  its files read-only (ADR 0036, sections 7 and 8; #1121). The directory
+--  server serves it for every directory, but only whoever launches a
+--  directory gets it: the directory command's Linking result.
+
+interface Files.Protecting_Directory : Files.Linking_Directory is
+
+   procedure Make_Read_Only (Name : String);
+   --  Make the ordinary file Name read-only: through every view of the
+   --  directory it is handed out as a File, and Get_Writable_File fails
+   --  for it, so nothing can make a version of it either. It can't be
+   --  undone, but the entry can be deleted and made again. It fails if
+   --  there is no entry Name, or it isn't an ordinary file.
+
+end Files.Protecting_Directory;
