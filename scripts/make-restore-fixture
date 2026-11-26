@@ -18,12 +18,13 @@
 # The first user's name and password are qemu-test-lib.sh's, which
 # test-restore-fixture logs in with.
 #
-# At a release X.Y.0, the fixture of the release's ISO is uploaded to the
-# release on GitHub, as rose-X.Y.0-hd0.qcow2, where test-restore-fixture
-# finds it:
+# At the release where a series freezes its interfaces (scripts/
+# frozen-release: X.Y.0, or 0.4.1 for 0.4), the fixture of the release's
+# ISO is uploaded to the release on GitHub, as rose-X.Y.Z-hd0.qcow2, where
+# test-restore-fixture finds it:
 #
 #   scripts/make-restore-fixture images/rose.iso
-#   gh release upload vX.Y.0 images/fixtures/rose-X.Y.0-hd0.qcow2
+#   gh release upload vX.Y.Z images/fixtures/rose-X.Y.Z-hd0.qcow2
 #
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3.

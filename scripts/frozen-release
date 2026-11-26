@@ -1,0 +1,30 @@
+#!/bin/sh
+# Print the release at which a release series froze its interfaces (ADR
+# 0031, sections 2 and 8): X.Y.0, except 0.4.1 for the 0.4 series, whose
+# 0.4.0 was a first draft (#1138).
+#
+#   scripts/frozen-release [SERIES]
+#
+# SERIES is X.Y. Without it, the series of src/base/rose-version.ads.
+#
+# check-endpoint-ids compares the endpoint ids with the list at this
+# release's tag, and test-restore-fixture and test-update-fixture use the
+# fixture uploaded to this release.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+if [ $# -ge 1 ]; then
+    SERIES=$1
+else
+    VERSION=$(sed -n \
+        's/.*Version_String *: constant String := "\(.*\)";/\1/p' \
+        "$HERE/../src/base/rose-version.ads")
+    SERIES=$(echo "$VERSION" | sed -n 's/^\([0-9]*\.[0-9]*\)\..*/\1/p')
+fi
+
+case $SERIES in
+    "")  echo "frozen-release: no release series" >&2
+         exit 2 ;;
+    0.4) echo 0.4.1 ;;
+    *)   echo "$SERIES.0" ;;
+esac
