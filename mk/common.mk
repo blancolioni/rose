@@ -55,8 +55,10 @@ GPRBUILD_CARGS=-cargs -gno-record-gcc-switches
 KERNEL_RTS=$(ROOT)/rts/kernel/build/$(ARCH)
 USER_RTS=$(ROOT)/rts/user/build/$(ARCH)-rose
 
-# How a userland program runs idle: the user target, into build/generated,
-# without the units that the userland RTS provides through
-# rts/user/rose_rts.gpr, since a unit can belong to only one project
-# (#1080). Give it any other options and the IDL files.
-USER_IDLE=$(ROOT)/scripts/user-idle $(IDLE) $(ROOT)
+# How a userland program runs idle for its own IDL files, such as its
+# command's, with the user target, into build/generated. Give it any other
+# options and the IDL files. The interfaces in interfaces/ are generated
+# once, into the library that every userland program imports
+# (projects/user_library.gpr, #1067), so a program doesn't name them: a unit
+# can belong to only one project.
+USER_IDLE=$(IDLE) --target user -I $(INTERFACES) -o build/generated

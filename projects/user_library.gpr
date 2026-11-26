@@ -1,0 +1,55 @@
+with "checks.gpr";
+with "../rts/user/rose_rts.gpr";
+
+--  The library that every program built with the userland run-time system
+--  imports (#1067), built once instead of in every program:
+--
+--  * the user target's interface packages, which
+--    scripts/generate-user-interfaces generates from every interface in
+--    interfaces/;
+--
+--  * Rose's own userland packages, in src/library/rose. They and the
+--    interface packages depend on each other, so they are one project.
+--    Rose.Directories is left out: it uses the kernel's console, and only
+--    restore, a boot server, uses it.
+--
+--  The units that the userland RTS provides (rose_rts.gpr) are left out
+--  too, since a unit belongs to only one project. The top-level Makefile's
+--  user-library target lists the rest in units.lst, and builds this before
+--  any of the programs, with ROSE_USER_LIBRARY_BUILT=false. The programs
+--  see it as already built, so that programs built in parallel don't each
+--  try to build it.
+--
+--  It is compiled the way the programs are: the same run-time system,
+--  configuration pragmas, checks and switches. The linker takes only the
+--  objects that a program uses.
+
+library project User_Library is
+
+   Build_Dir := "../build/i686/user";
+
+   for Languages use ("Ada");
+   for Source_Dirs use
+     (Build_Dir & "/interfaces/generated",
+      "../src/library/rose");
+   for Source_List_File use Build_Dir & "/library/units.lst";
+   for Object_Dir use Build_Dir & "/library/obj";
+   for Library_Dir use Build_Dir & "/library/lib";
+   for Library_Name use "rose_user";
+   for Library_Kind use "static";
+   for Externally_Built use external ("ROSE_USER_LIBRARY_BUILT", "true");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "user-pragmas.config";
+      for Default_Switches ("ada") use
+        ("-s", "-g", "-C", "--RTS=../rts/user/build/i686-rose");
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use
+        ("-g", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib",
+         "-gnatVa", "-gnatwael", "-gnatyM79abcefhiklnoprst")
+        & Checks.Switches & Checks.Optimisation_Switches;
+   end Compiler;
+
+end User_Library;

@@ -1,20 +1,21 @@
 with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
 
 project Command is
 
    --  Built with the userland run-time system, which has Rose's base,
-   --  capability and system call packages, and the user-mode IDL target,
-   --  whose packages the Makefile generates in build/generated (#490).
-   --  The kernel target's packages, in kernelapi/generated, must not be
-   --  on the path: the two targets have units with the same names.
+   --  capability and system call packages, and the user-mode IDL target
+   --  (#490). The kernel target's packages, in kernelapi/generated, must
+   --  not be on the path: the two targets have units with the same names.
+   --  The interface packages and Rose's userland packages
+   --  (src/library/rose) come from user_library.gpr (#1067), and the RTS's
+   --  own units from rose_rts.gpr (#1080).
 
    --  The RTS's own units, its interface specs among them, come from
    --  rose_rts.gpr (#1080).
 
-   for Source_Dirs use
-      ("src",
-       "build/generated");
+   for Source_Dirs use ("src");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("command-driver.adb");
