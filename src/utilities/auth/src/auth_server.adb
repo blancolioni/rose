@@ -11,6 +11,7 @@ with Rose.Objects;
 with Rose.Random;
 with Rose.Server;
 with Rose.System_Calls;
+with Rose.Unsaved_Memory.Stacks;
 with Rose.Words;
 
 with Rose.Interfaces.Users.Auth.Server;
@@ -148,16 +149,27 @@ package body Auth_Server is
       Salt       : Storage_Array;
       Iterations : Positive;
       Hash       : out Storage_Array);
-   --  Hash Password, and then clear the stack that the hashing used.
+   --  Hash Password on a stack in unsaved memory. Hashing puts copies of
+   --  it on the stack: the HMAC key block and its pads, and the SHA-256
+   --  message schedule. Auth is persistent, so a checkpoint, which can
+   --  come at any time in the hash, would save them from its own stack
+   --  (#1059, #1140). The password itself comes in the request's buffer,
+   --  which is the caller's page, read in place.
 
-   procedure Scrub_Stack
-     with No_Inline;
-   --  Zero the stack below the caller, where the frames of what it called
-   --  last were. Hashing a password leaves copies of it there: the HMAC
-   --  key block and its pads, and the SHA-256 message schedule. Auth is
-   --  persistent, so a checkpoint would save them (#1059). The password
-   --  itself comes in the request's buffer, which is the caller's page,
-   --  read in place.
+   type Hash_Request is
+      record
+         Password        : System.Address;
+         Password_Length : Storage_Count;
+         Salt            : System.Address;
+         Salt_Length     : Storage_Count;
+         Iterations      : Positive;
+         Hash            : System.Address;
+         Hash_Length     : Storage_Count;
+      end record;
+   --  What Hash_Password passes to Hash_On_Unsaved_Stack.
+
+   procedure Hash_On_Unsaved_Stack (Argument : System.Address);
+   --  Derive the key for the Hash_Request at Argument.
 
    procedure Launch_User
      (Name    : String;
@@ -234,6 +246,24 @@ package body Auth_Server is
       Control := Rose.Replacement.Replaceable_Cap;
    end Create_Server;
 
+   ---------------------------
+   -- Hash_On_Unsaved_Stack --
+   ---------------------------
+
+   procedure Hash_On_Unsaved_Stack (Argument : System.Address) is
+      Request  : constant Hash_Request
+        with Import, Address => Argument;
+      Password : constant Storage_Array (1 .. Request.Password_Length)
+        with Import, Address => Request.Password;
+      Salt     : constant Storage_Array (1 .. Request.Salt_Length)
+        with Import, Address => Request.Salt;
+      Hash     : Storage_Array (1 .. Request.Hash_Length)
+        with Import, Address => Request.Hash;
+   begin
+      Rose.Crypto.PBKDF2_HMAC_SHA_256.Derive
+        (Password, Salt, Request.Iterations, Hash);
+   end Hash_On_Unsaved_Stack;
+
    -------------------
    -- Hash_Password --
    -------------------
@@ -244,13 +274,17 @@ package body Auth_Server is
       Iterations : Positive;
       Hash       : out Storage_Array)
    is
-      Password_Bytes : Storage_Array (1 .. Password'Length);
-      for Password_Bytes'Address use Password'Address;
-      pragma Import (Ada, Password_Bytes);
+      Request : constant Hash_Request :=
+                  (Password        => Password'Address,
+                   Password_Length => Password'Length,
+                   Salt            => Salt'Address,
+                   Salt_Length     => Salt'Length,
+                   Iterations      => Iterations,
+                   Hash            => Hash'Address,
+                   Hash_Length     => Hash'Length);
    begin
-      Rose.Crypto.PBKDF2_HMAC_SHA_256.Derive
-        (Password_Bytes, Salt, Iterations, Hash);
-      Scrub_Stack;
+      Rose.Unsaved_Memory.Stacks.Call
+        (Hash_On_Unsaved_Stack'Access, Request'Address);
    end Hash_Password;
 
    -----------------
@@ -532,18 +566,6 @@ package body Auth_Server is
          end;
       end loop;
    end Read_State;
-
-   -----------------
-   -- Scrub_Stack --
-   -----------------
-
-   procedure Scrub_Stack is
-      Scratch : Storage_Array (1 .. 8192)
-        with Volatile;
-      --  More than the hashing uses; the stack is 256 KiB.
-   begin
-      Scratch := (others => 0);
-   end Scrub_Stack;
 
    ------------------
    -- Start_Server --
