@@ -29,18 +29,22 @@ package body Elf.Loader is
    use Rose.Interfaces.Processes.Process.Client;
    use Rose.Interfaces.Storage.Bank.Client;
 
+   --  Reserving a region costs the store only its page ids: a page is
+   --  given space on a device when it is first written (#246), so the
+   --  stack and the heap use the backing store only for the pages that
+   --  the program writes.
+
    Stack_Bound : constant := 16#E000_0000#;
    Stack_Size  : constant := 16#0004_0000#;
-   --  The store allocates a region's backing blocks when it is reserved,
-   --  so every process's stack uses this much of the backing store,
-   --  however little of it is touched (#305).
    Stack_Base  : constant := Stack_Bound - Stack_Size;
 
    Heap_Base   : constant := 16#4000_0000#;
-   Heap_Size   : constant := 16#0010_0000#;
+   Heap_Bound  : constant := 16#C000_0000#;
+   Heap_Size   : constant := Heap_Bound - Heap_Base;
    --  Each program's heap starts empty at Heap_Base, and grows when the
-   --  program asks (interfaces/heap.idl), up to Heap_Size. As with the
-   --  stack, the store allocates all of its backing blocks now (#305).
+   --  program asks (interfaces/heap.idl), up to Heap_Bound (#759). The
+   --  heap stops where the window for shared regions starts
+   --  (Rose.Shared_Regions), which is below the stack.
 
    procedure Hand_Over
      (Process       : Process_Client;
@@ -212,7 +216,7 @@ package body Elf.Loader is
          Hand_Over
            (Process       => Process,
             Virtual_Base  => Heap_Base / Rose.Limits.Page_Size,
-            Virtual_Bound => (Heap_Base + Heap_Size) / Rose.Limits.Page_Size,
+            Virtual_Bound => Heap_Bound / Rose.Limits.Page_Size,
             Region        => Region,
             Flags         =>
               Rose.Interfaces.Processes.Segment.Segment_Readable
