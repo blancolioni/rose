@@ -1,3 +1,4 @@
+with Ada.Containers.Vectors;
 with System.Storage_Elements;
 
 with Rose.Objects;
@@ -22,6 +23,7 @@ package body File_Server is
 
    use Ada.Streams;
    use System.Storage_Elements;
+   use type Ada.Containers.Count_Type;
    use type Rose.Capabilities.Capability;
    use type Rose.Words.Word_32;
 
@@ -57,25 +59,39 @@ package body File_Server is
    Service_Name : constant String := "Cap_Set_Service";
    --  The name of its argument, so that a restore finds it.
 
-   Max_Size : constant := 2 ** 16;
-   --  A file holds at most 64 KiB for now (#215), in a fixed buffer. A
-   --  page of it uses memory only once it is written, and space on a
-   --  device only once it is written back (#305).
-
-   --  The file and its version (ADR 0026) each have a buffer.
+   --  The file and its version (ADR 0026) each have a buffer, a vector on
+   --  the heap, which grows as it is written (#760). The heap is a private
+   --  segment of the process, so the contents persist as the rest of its
+   --  memory does.
 
    type Buffer_Index is (File_Buffer, Version_Buffer);
 
-   Contents : array (Buffer_Index) of Storage_Array (1 .. Max_Size);
-   pragma Suppress_Initialization (Contents);
-   --  It is in .bss, so it starts as zeroes. Initializing it would
-   --  write every page when the process starts.
+   package Byte_Vectors is
+     new Ada.Containers.Vectors (Positive, Stream_Element);
 
-   Lengths  : array (Buffer_Index) of Storage_Count := (others => 0);
+   Contents : array (Buffer_Index) of Byte_Vectors.Vector;
+
+   function Length_Of (Buffer : Buffer_Index) return Storage_Count
+   is (Storage_Count (Contents (Buffer).Length));
+
+   Chunk_Length : constant := 4096;
+   --  How much of a buffer the state is written and read in at a time.
 
    procedure Copy (From, To : Buffer_Index);
    --  Make the contents of To those of From, and move a reader of To that
-   --  is past its new end back to it.
+   --  is past its new end back to it. If there is no memory for the copy,
+   --  raise Storage_Error, and To is as it was.
+
+   procedure Empty (Buffer : Buffer_Index);
+   --  Make Buffer empty, and give its memory back to the heap.
+
+   procedure Grow
+     (Buffer : Buffer_Index;
+      Length : Ada.Containers.Count_Type);
+   --  Make room in Buffer for Length elements at least, at least
+   --  doubling its capacity when it grows, so that a file written a piece
+   --  at a time is copied only a few times. Raise Storage_Error if there
+   --  is no memory, and Buffer is as it was.
 
    function Open_Reader
      (Buffer : Buffer_Index)
@@ -97,10 +113,10 @@ package body File_Server is
 
    procedure Write
      (Buffer : Buffer_Index;
-      Data   : Storage_Array);
+      Data   : Stream_Element_Array);
    --  A write goes at the end, since a writer has no position (ADR 0009,
-   --  section 4). A write that would go past Max_Size raises, and writes
-   --  nothing.
+   --  section 4). A write that would make the file too long for a vector,
+   --  or that there is no memory for, raises, and writes nothing.
 
    --  The file is an object served through Writable_File.
 
@@ -130,7 +146,7 @@ package body File_Server is
    overriding function Size
      (Item : in out File_Object)
       return Storage_Count
-   is (Lengths (File_Buffer));
+   is (Length_Of (File_Buffer));
 
    overriding function Open_Reader
      (Item : in out File_Object)
@@ -204,7 +220,7 @@ package body File_Server is
    overriding function Size
      (Item : in out Version_Object)
       return Storage_Count
-   is (Lengths (Version_Buffer));
+   is (Length_Of (Version_Buffer));
 
    overriding function Open_Reader
      (Item : in out Version_Object)
@@ -444,12 +460,15 @@ package body File_Server is
    -- Copy --
    ----------
 
+   --  The copy is made first, so that To changes only once it has
+   --  succeeded, and then moved into To, which frees what To had.
+
    procedure Copy (From, To : Buffer_Index) is
-      Length : constant Storage_Count := Lengths (From);
+      Length : constant Storage_Count := Length_Of (From);
       Reader : Reader_Access := Readers;
+      Copied : Byte_Vectors.Vector := Contents (From);
    begin
-      Contents (To) (1 .. Length) := Contents (From) (1 .. Length);
-      Lengths (To) := Length;
+      Contents (To).Move (Copied);
       while Reader /= null loop
          if Reader.Open
            and then Reader.Buffer = To
@@ -512,6 +531,38 @@ package body File_Server is
       Served := The_File.Writable_File_Cap;
       Control := Rose.Replacement.Replaceable_Cap;
    end Create_Server;
+
+   -----------
+   -- Empty --
+   -----------
+
+   procedure Empty (Buffer : Buffer_Index) is
+   begin
+      Contents (Buffer) := Byte_Vectors.Empty_Vector;
+   end Empty;
+
+   ----------
+   -- Grow --
+   ----------
+
+   --  Reserve_Capacity makes the new elements before it frees the old,
+   --  so if there is no memory, the buffer is as it was.
+
+   procedure Grow
+     (Buffer : Buffer_Index;
+      Length : Ada.Containers.Count_Type)
+   is
+      use Ada.Containers;
+      Target   : Byte_Vectors.Vector renames Contents (Buffer);
+      Capacity : constant Count_Type := Target.Capacity;
+      Doubled  : constant Count_Type :=
+        (if Capacity > Count_Type'Last / 2 then Length
+         else Count_Type'Max (2 * Capacity, Chunk_Length));
+   begin
+      if Length > Capacity then
+         Target.Reserve_Capacity (Count_Type'Max (Length, Doubled));
+      end if;
+   end Grow;
 
    -----------------
    -- New_Version --
@@ -614,7 +665,7 @@ package body File_Server is
       Writer : Writer_Access := Writers;
    begin
       if Empty then
-         Lengths (Buffer) := 0;
+         File_Server.Empty (Buffer);
          declare
             Reader : Reader_Access := Readers;
          begin
@@ -654,18 +705,19 @@ package body File_Server is
       Buffer : out Stream_Element_Array;
       Last   : out Stream_Element_Offset)
    is
-      Length   : constant Storage_Count := Lengths (Item.Buffer);
+      Length   : constant Storage_Count := Length_Of (Item.Buffer);
       Position : Storage_Count renames Item.Position;
       Count    : constant Storage_Count :=
         (if Position >= Length then 0
          else Storage_Count'Min (Buffer'Length, Length - Position));
-      Target   : Storage_Array (1 .. Count)
-        with Import, Address => Buffer'Address;
-      --  The start of Buffer, as the file's contents are stored.
+      Source   : Byte_Vectors.Vector renames Contents (Item.Buffer);
    begin
       Check (Item);
       Last := Buffer'First + Stream_Element_Offset (Count) - 1;
-      Target := Contents (Item.Buffer) (Position + 1 .. Position + Count);
+      for I in 1 .. Count loop
+         Buffer (Buffer'First + Stream_Element_Offset (I) - 1) :=
+           Source.Element (Positive (Position + I));
+      end loop;
       Position := Position + Count;
    end Read;
 
@@ -678,28 +730,35 @@ package body File_Server is
       Buffer : Buffer_Index)
    is
       Length : Storage_Count;
+      Left   : Storage_Count;
+      Chunk  : Stream_Element_Array (1 .. Chunk_Length);
+      Last   : Stream_Element_Offset;
    begin
       Storage_Count'Read (Stream, Length);
-      if Length > Max_Size then
-         raise Rose.Replacement.Bad_State with "file: too long";
-      end if;
 
-      declare
-         Data : Stream_Element_Array (1 .. Stream_Element_Offset (Length))
-           with Import, Address => Contents (Buffer)'Address;
-         Next : Stream_Element_Offset := Data'First;
-         Last : Stream_Element_Offset;
+      Empty (Buffer);
       begin
-         while Next <= Data'Last loop
-            Read (Stream.all, Data (Next .. Data'Last), Last);
-            if Last < Next then
-               raise Rose.Replacement.Bad_State with "file: state ends";
-            end if;
-            Next := Last + 1;
-         end loop;
+         Grow (Buffer, Ada.Containers.Count_Type (Length));
+      exception
+         when Storage_Error =>
+            raise Rose.Replacement.Bad_State with "file: too long";
       end;
 
-      Lengths (Buffer) := Length;
+      Left := Length;
+      while Left > 0 loop
+         Read
+           (Stream.all,
+            Chunk (1 .. Stream_Element_Offset
+                          (Storage_Count'Min (Left, Chunk_Length))),
+            Last);
+         if Last < Chunk'First then
+            raise Rose.Replacement.Bad_State with "file: state ends";
+         end if;
+         for Element of Chunk (1 .. Last) loop
+            Contents (Buffer).Append (Element);
+         end loop;
+         Left := Left - Storage_Count (Last);
+      end loop;
    end Read_Contents;
 
    ----------------
@@ -737,7 +796,7 @@ package body File_Server is
             Boolean'Read (Stream, Reader.Ended);
             Storage_Count'Read (Stream, Reader.Position);
             Reader.Position :=
-              Storage_Count'Min (Reader.Position, Lengths (Reader.Buffer));
+              Storage_Count'Min (Reader.Position, Length_Of (Reader.Buffer));
             Reader.Open := True;
             Reader.Next := Readers;
             Readers := Reader;
@@ -803,6 +862,7 @@ package body File_Server is
          end if;
          Writer := Writer.Next;
       end loop;
+      Empty (Version_Buffer);
       Item.Open := False;
    end Release;
 
@@ -837,7 +897,7 @@ package body File_Server is
       Offset_From_Start : Rose.Words.Word_64)
    is
       use type Rose.Words.Word_64;
-      Length : constant Storage_Count := Lengths (Item.Buffer);
+      Length : constant Storage_Count := Length_Of (Item.Buffer);
    begin
       Check (Item);
       Item.Position :=
@@ -859,18 +919,23 @@ package body File_Server is
    -- Write --
    -----------
 
+   --  Room is made for all of Data before any of it is appended, so a
+   --  write that fails leaves the buffer as it was.
+
    procedure Write
      (Buffer : Buffer_Index;
-      Data   : Storage_Array)
+      Data   : Stream_Element_Array)
    is
-      Length : Storage_Count renames Lengths (Buffer);
+      Target : Byte_Vectors.Vector renames Contents (Buffer);
    begin
-      if Data'Length > Max_Size - Length then
-         raise Constraint_Error with "the file is full";
+      if Data'Length > Ada.Containers.Count_Type'Last - Target.Length then
+         raise Constraint_Error with "the file is too long";
       end if;
 
-      Contents (Buffer) (Length + 1 .. Length + Data'Length) := Data;
-      Length := Length + Data'Length;
+      Grow (Buffer, Target.Length + Data'Length);
+      for Element of Data loop
+         Target.Append (Element);
+      end loop;
    end Write;
 
    -----------
@@ -881,12 +946,9 @@ package body File_Server is
      (Item   : in out Writer_Object;
       Buffer : Stream_Element_Array)
    is
-      Data : constant Storage_Array (1 .. Buffer'Length)
-        with Import, Address => Buffer'Address;
-      --  Buffer, as the file's contents are stored.
    begin
       Check (Item);
-      Write (Item.Buffer, Data);
+      Write (Item.Buffer, Buffer);
    end Write;
 
    --------------------
@@ -898,11 +960,24 @@ package body File_Server is
       Buffer : Buffer_Index;
       Length : Storage_Count)
    is
-      Data : Stream_Element_Array (1 .. Stream_Element_Offset (Length))
-        with Import, Address => Contents (Buffer)'Address;
+      Source : Byte_Vectors.Vector renames Contents (Buffer);
+      Chunk  : Stream_Element_Array (1 .. Chunk_Length);
+      Done   : Storage_Count := 0;
    begin
       Storage_Count'Write (Stream, Length);
-      Write (Stream.all, Data);
+      while Done < Length loop
+         declare
+            Count : constant Storage_Count :=
+              Storage_Count'Min (Length - Done, Chunk_Length);
+         begin
+            for I in 1 .. Count loop
+               Chunk (Stream_Element_Offset (I)) :=
+                 Source.Element (Positive (Done + I));
+            end loop;
+            Write (Stream.all, Chunk (1 .. Stream_Element_Offset (Count)));
+            Done := Done + Count;
+         end;
+      end loop;
    end Write_Contents;
 
    -----------------
@@ -923,10 +998,10 @@ package body File_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream, File_Interfaces.Identifier_Of (Context, The_File'Access));
-      Write_Contents (Stream, File_Buffer, Lengths (File_Buffer));
+      Write_Contents (Stream, File_Buffer, Length_Of (File_Buffer));
       Write_Contents
         (Stream, Version_Buffer,
-         (if The_Version.Open then Lengths (Version_Buffer) else 0));
+         (if The_Version.Open then Length_Of (Version_Buffer) else 0));
       Boolean'Write (Stream, The_Version.Open);
       if The_Version.Open then
          Rose.Objects.Capability_Identifier'Write
