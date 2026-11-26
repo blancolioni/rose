@@ -1,0 +1,121 @@
+#!/bin/sh
+# The repeated update test (#875): exec frees a retired program's image
+# once nothing runs it, so its region doesn't grow with each update.
+#
+#   scripts/test-update-repeat ISO_A ISO_B [COUNT]
+#
+# ISO_A and ISO_B are install images whose programs differ, such as two
+# builds of the same tree, one with uncommitted changes and one without:
+# login shows the build id (Rose.Build), so its image differs. COUNT is
+# the number of update boots, 3 by default. The test:
+#
+#   1. installs Rose on a new disk from ISO_A, as test-boot does, and
+#      checks that init's exec forward test freed the version that it
+#      retired, which nothing runs;
+#   2. boots from the disk, and stops once a checkpoint is at the login
+#      prompt;
+#   3. updates the disk COUNT times, from ISO_B, ISO_A, ISO_B and so on,
+#      as test-update-fixture's first step does. Each update installs a
+#      new version of each program that differs, and retires the old
+#      one. It has to free some of them, and none of exec's processes
+#      may be unknown to it. The pages that exec's images use, which it
+#      reports with each image it frees, have to be the same after the
+#      last update as after the first, once ISO_B is installed again: one
+#      version of each program, and what the restored processes run;
+#   4. runs check-log.py on the disk, which has to find the log
+#      consistent.
+#
+# It takes about twenty minutes with the default COUNT, and needs
+# qemu-system-i386, qemu-img and python3. It exits with 0 if everything
+# passed, and keeps the disk image and QEMU's files if anything failed.
+
+HERE=$(cd "$(dirname "$0")" && pwd)
+[ $# -ge 2 ] || {
+    echo "usage: $0 ISO_A ISO_B [COUNT]"
+    exit 2
+}
+ISO_A=$1
+ISO_B=$2
+COUNT=${3:-3}
+
+for iso in "$ISO_A" "$ISO_B"; do
+    [ -f "$iso" ] || { echo "no install image: $iso"; exit 2; }
+done
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+# in_use FILE: the pages in use that the last "exec: freed" line in FILE
+# reports, or nothing if there is none
+in_use () {
+    sed -n 's/^exec: freed [0-9]* pages of .*; \([0-9]*\) in use.*/\1/p' \
+        "$1" | tail -1
+}
+
+install_rose "$ISO_A"
+cp "$CONSOLE" "$WORK/console-install"
+grep "^exec: freed" "$WORK/console-install"
+grep -q "^exec: freed [0-9]* pages of replaceable_test" \
+    "$WORK/console-install" \
+    || { echo "FAIL: the install did not free replaceable_test's" \
+              "retired version"; exit 1; }
+
+echo "Booting from the disk, for a checkpoint at the login prompt"
+start_qemu
+choose_last_entry
+wait_for_console "login:" 300 || fail "the disk did not boot to login"
+sleep 45
+stop_qemu
+
+FIRST=
+LAST=
+update=1
+while [ $update -le "$COUNT" ]; do
+    if [ $((update % 2)) -eq 1 ]; then
+        ISO=$ISO_B
+    else
+        ISO=$ISO_A
+    fi
+    echo "Update $update of $COUNT, from $(basename "$ISO")"
+    start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+    # The menu's first entry boots hd0, and the next two update it: with
+    # the framebuffer, and in text mode with the serial console.
+    choose_entry 2
+    wait_for_serial "kernel: restarting" 900 \
+        || fail "update $update did not finish"
+    stop_qemu
+    cp "$CONSOLE" "$WORK/console-update-$update"
+
+    grep -q "update complete" "$WORK/console-update-$update" \
+        || { echo "FAIL: update $update did not complete"; exit 1; }
+    grep "^exec: \(new version\|freed\|can't follow\)" \
+        "$WORK/console-update-$update"
+    grep -q "^exec: can't follow" "$WORK/console-update-$update" \
+        && { echo "FAIL: exec couldn't follow a process"; exit 1; }
+
+    PAGES=$(in_use "$WORK/console-update-$update")
+    [ -n "$PAGES" ] \
+        || { echo "FAIL: update $update freed nothing"; exit 1; }
+    echo "Update $update: exec's images use $PAGES pages"
+    [ -n "$FIRST" ] || FIRST=$PAGES
+    [ $((update % 2)) -eq 1 ] && LAST=$PAGES
+    update=$((update + 1))
+done
+
+[ "$LAST" -eq "$FIRST" ] || {
+    echo "FAIL: exec's images use $LAST pages after the last update" \
+         "from $(basename "$ISO_B"), and used $FIRST after the first"
+    exit 1
+}
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.txt" || {
+    cat "$WORK/check-log.txt"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+
+rm -rf "$WORK"
+echo "PASS"
