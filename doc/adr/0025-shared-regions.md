@@ -95,7 +95,7 @@ What the segment limit costs, from GNAT's representation of `mem-processes.adb` 
 
 **The memory server's caps limit segments more than the table does.** Each segment over a region keeps its own open `Region` client, which is seven caps in the memory server: the interface cap and the six it fetches. The memory server has one cap table, of at most 4,096 caps (ADR 0023), for every process's segments.
 
-A rough count from the code is about 28 caps per process: three segments over regions, the kernel-process client, and the heap, server and interface caps. That is about 1,800 caps for 64 processes, which leaves room for about 330 more segments over regions in the whole system, whatever `Max_Segments` is. This figure is from reading the code and hasn't been measured. *Measured in #913: about 40 caps for each launched process, and the memory server's table filled at about 95 processes, boot modules included (#848).*
+A rough count from the code is about 28 caps per process: three segments over regions, the kernel-process client, and the heap, server and interface caps. That is about 1,800 caps for 64 processes, which leaves room for about 330 more segments over regions in the whole system, whatever `Max_Segments` is. This figure is from reading the code and hasn't been measured. *Measured in #913: about 40 caps for each launched process, six of them the operation caps of the process's bank, which the memory server kept and never deleted (#1131). Without that leak it is about 34, and the table still fills before 128 processes.*
 
 So a segment for each package (ADR 0017) needs two changes beyond a larger limit:
 

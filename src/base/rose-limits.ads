@@ -7,8 +7,8 @@ package Rose.Limits is
    --  until #913; a checkpoint doesn't depend on it, so one made with the
    --  old limit restores.
    --
-   --  Not more: the memory server's caps run out at about 95 processes
-   --  (#848), and a process that calls it then faults, so the kernel's
+   --  Not more: the memory server's caps run out before 128 processes
+   --  (#1131), and a process that calls it then faults, so the kernel's
    --  limit is kept below that, where a launch is refused cleanly. The
    --  kernel's and mem's process tables are also reserved at boot: 256
    --  took about 2.4 MB more than 64, too much for a 32 MB system.
