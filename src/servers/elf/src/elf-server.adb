@@ -59,6 +59,10 @@ package body Elf.Server is
          Command_Cap    : Rose.Capabilities.Capability := 0;
          Process_Client : Rose.Interfaces.Processes.Process.Client
            .Process_Client;
+         Bank_Client    : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+         --  The process's own bank, opened when the caller asks for it
+         --  (Bank), and closed when the process starts, since the reply
+         --  to Bank sends its cap.
          Start          : Rose.Words.Word := 0;
       end record;
 
@@ -104,6 +108,11 @@ package body Elf.Server is
    function Start
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability;
+
+   function Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability;
+   --  The starting process's own bank (#875), or null if it has none.
 
    function Is_Starting
      (Id : Rose.Objects.Capability_Identifier)
@@ -153,6 +162,33 @@ package body Elf.Server is
 
       Delete_Cap (Cap);
    end Add_Cap;
+
+   ----------
+   -- Bank --
+   ----------
+
+   function Bank
+     (Id : Rose.Objects.Capability_Identifier)
+      return Rose.Capabilities.Capability
+   is
+      use type Rose.Capabilities.Capability;
+      use Rose.Interfaces.Storage.Bank.Client;
+   begin
+      if not Is_Starting (Id) then
+         return 0;
+      end if;
+
+      declare
+         Item : Starting_Record renames Starting (Starting_Index (Id));
+      begin
+         if Get_Interface_Cap (Item.Bank_Client) = 0 then
+            Item.Bank_Client :=
+              Rose.Interfaces.Processes.Process.Client.Bank
+                (Item.Process_Client);
+         end if;
+         return Get_Interface_Cap (Item.Bank_Client);
+      end;
+   end Bank;
 
    --------------------
    -- Create_Process --
@@ -244,6 +280,7 @@ package body Elf.Server is
         (Server_Context => Server_Context,
          Add_Cap        => Add_Cap'Access,
          Start          => Start'Access,
+         Bank           => Bank'Access,
          Instanced      => True);
       Rose.Interfaces.Processes.Memory.Client.Open (Memory_Client, Memory_Cap);
    end Create_Server;
@@ -397,6 +434,7 @@ package body Elf.Server is
          end if;
 
          Close (Item.Process_Client);
+         Rose.Interfaces.Storage.Bank.Client.Close (Item.Bank_Client);
          Clean_Up;
          Delete_Cap (Item.Start_Cap);
          Delete_Cap (Item.Initial_Cap);
@@ -581,6 +619,7 @@ package body Elf.Server is
          Delete_Cap (Item.Interface_Cap);
          Delete_Cap (Item.Start_Cap);
          Delete_Cap (Item.Initial_Cap);
+         Rose.Interfaces.Storage.Bank.Client.Close (Item.Bank_Client);
 
          if Item.Command then
             Close (Item.Process_Client);

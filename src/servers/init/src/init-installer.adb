@@ -22,7 +22,8 @@ package body Init.Installer is
 
    Exec_Region_Length : constant := 4 * 2 ** 30;
    --  The storage for the images of the programs that exec installs,
-   --  and for every version an update installs, which exec keeps (#875).
+   --  and for every version an update installs, which exec keeps while
+   --  processes run it, and then frees for later images (#875).
    --  The store only gives a page space on a device when it is written,
    --  and charges a bank for a page only then, so the size costs only
    --  page ids, of which there are 2 ** 56. A region can't grow once it
