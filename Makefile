@@ -39,7 +39,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list user-library host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -245,7 +245,8 @@ $(RELOC): kernel boot
 # built from IDL needs the generated interfaces.
 
 $(BOOT_MODULES): config interfaces version $(KERNEL_RTS_LIB) $(ROSE)
-$(DRIVERS) $(UTILITIES): config interfaces version $(USER_RTS_LIB)
+$(DRIVERS) $(UTILITIES): config interfaces version user-library
+user-library: $(USER_RTS_LIB)
 kernel: config interfaces version
 boot: kernel
 exports stripped: programs
@@ -277,6 +278,26 @@ boot:
 
 idl:
 	$(MAKE) -C src/library/kernelapi/generated
+
+# The library that every program built with the userland run-time system
+# imports (#1067), projects/user_library.gpr: the user target's interface
+# packages and src/library/rose, built once. Its units are those, less the
+# ones that the RTS provides (rts/user/rose_rts.gpr), since a unit belongs to
+# only one project, and less Rose.Directories, which only restore uses. The
+# programs see the library as already built, so it is built here, before
+# any of them.
+
+USER_LIBRARY=build/$(ARCH)/user/library
+USER_RTS_UNITS=rts/user/build/rose-units.lst
+
+user-library:
+	IDLE=$(IDLE) sh ./scripts/generate-user-interfaces
+	mkdir -p $(USER_LIBRARY)
+	{ ls build/$(ARCH)/user/interfaces/generated; ls src/library/rose; } \
+	    | grep -vxF -f $(USER_RTS_UNITS) | grep -v '^rose-directories\.' \
+	    > $(USER_LIBRARY)/units.lst
+	gprbuild -p -j0 -P projects/user_library.gpr \
+	    -XROSE_USER_LIBRARY_BUILT=false $(GPRBUILD_CARGS)
 
 config:
 	mkdir -p $(BUILDDIR)

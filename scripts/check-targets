@@ -8,6 +8,11 @@
 # all. The kernel target is for the boot servers in src/servers, which are
 # built with the minimal run-time system.
 #
+# It also checks that such a program takes the interfaces in interfaces/
+# from the userland library (projects/user_library.gpr, #1067): its
+# Makefile doesn't give idle a file from there, which would put a unit in
+# two projects.
+#
 # Run from the top of the tree, by "make check-targets", which the build
 # runs before the programs. It prints each program that breaks the rule,
 # and exits with 1 if there is one.
@@ -37,6 +42,13 @@ for project in src/drivers/*/*.gpr src/utilities/*/*.gpr; do
     then
         echo "check-targets: $dir/Makefile: idle --target kernel for a" \
              "program built with the userland run-time system" >&2
+        status=1
+    fi
+
+    if [ -f "$dir/Makefile" ] && grep -q '$(INTERFACES)/' "$dir/Makefile"
+    then
+        echo "check-targets: $dir/Makefile: generates an interface from" \
+             "interfaces/, which the userland library already has" >&2
         status=1
     fi
 done
