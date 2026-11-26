@@ -8,6 +8,7 @@ with Rose.Interfaces.Processes.Signalled;
 
 with Rose.Arch.Interrupts;
 with Rose.Kernel.Cap_Tables;
+with Rose.Kernel.Checkpoint_Copies;
 with Rose.Kernel.Derivations;
 with Rose.Kernel.Page_Table;
 with Rose.Kernel.Processes.Debug;
@@ -32,6 +33,19 @@ package body Rose.Kernel.Processes is
    Log_State_Changes  : constant Boolean := False;
 
    Active_Checkpoint : Boolean := False;
+
+   function Checkpoint_Write
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean;
+   --  While the memory server writes a checkpoint, make Virtual_Page of
+   --  persistent process Pid writable, if the checkpoint made it
+   --  read-only or it is Write_Tracked, so that a write to it goes ahead
+   --  without waiting for the checkpoint to end (ADR 0030). A page of
+   --  the checkpoint that hasn't been saved is copied first, and the page
+   --  is recorded as written. False if the page isn't such a page, or if
+   --  there is no room for its copy or its record: the writer then waits
+   --  until End_Page_Copies.
 
    type Checked_Record is
       record
@@ -167,8 +181,9 @@ package body Rose.Kernel.Processes is
    procedure Disable_Write_Pages
      (Process : in out Kernel_Process_Entry);
 
-   procedure Enable_Write_Pages
-     (Process : in out Kernel_Process_Entry);
+   procedure End_Write_Pages
+     (Process : in out Kernel_Process_Entry;
+      Saved   : Boolean);
 
    -------------------
    -- Add_Reference --
@@ -336,10 +351,16 @@ package body Rose.Kernel.Processes is
    begin
       Writable := True;
 
+      --  During a checkpoint, the kernel writes the reply to the process's
+      --  own frame, and the checkpoint keeps a copy of the frame as it was
+      --  when the call was saved (ADR 0030, section 2).
+
       for Page in Rose.Addresses.Virtual_Address_To_Page (First)
         .. Rose.Addresses.Virtual_Address_To_Page (First + Record_Bytes - 1)
       loop
-         if not Is_Writable_User_Page (Pid, Page) then
+         if not Is_Writable_User_Page (Pid, Page)
+           and then not Checkpoint_Write (Pid, Page)
+         then
             Hold (Page);
             return;
          end if;
@@ -351,7 +372,9 @@ package body Rose.Kernel.Processes is
                      P.Lent_Buffer_Page
                        + Rose.Addresses.Virtual_Page_Address (Index);
          begin
-            if not Is_Writable_User_Page (Pid, Page) then
+            if not Is_Writable_User_Page (Pid, Page)
+              and then not Checkpoint_Write (Pid, Page)
+            then
                Hold (Page);
                return;
             end if;
@@ -360,6 +383,69 @@ package body Rose.Kernel.Processes is
 
       P.Lent_Buffer_Pages := 0;
    end Check_Reply_Record;
+
+   ----------------------
+   -- Checkpoint_Write --
+   ----------------------
+
+   function Checkpoint_Write
+     (Pid          : Process_Id;
+      Virtual_Page : Rose.Addresses.Virtual_Page_Address)
+      return Boolean
+   is
+      use Rose.Kernel.Page_Table;
+      P         : Kernel_Process_Entry renames Process_Table (Pid);
+      Directory : Rose.Addresses.Virtual_Page_Address;
+      Kind      : Checkpoint_Page_Kind;
+      Ready     : Boolean;
+   begin
+      if not Rose.Kernel.Checkpoint_Copies.Copying
+        or else not P.Flags (Persistent)
+      then
+         return False;
+      end if;
+
+      Directory :=
+        Rose.Kernel.Heap.Get_Virtual_Page
+          (Physical_Address_To_Page (P.Directory_Page));
+      Kind := Checkpoint_Kind (Directory, Virtual_Page);
+
+      case Kind is
+         when Other_Page =>
+            return False;
+
+         when Checkpoint_Read_Only_Page =>
+
+            --  The page was changed before the checkpoint started. Unless
+            --  the memory server has saved it, its frame is copied, and
+            --  the checkpoint saves the copy.
+
+            Rose.Kernel.Checkpoint_Copies.Prepare_Write
+              (Mapped_Physical_Page (Directory, Virtual_Page), Ready);
+            if not Ready then
+               Rose.Kernel.Checkpoint_Copies.Report_Full ("copy reserve");
+               return False;
+            end if;
+
+         when Write_Tracked_Page =>
+
+            --  The page is clean, so it isn't in the checkpoint, and needs
+            --  no copy (section 3).
+
+            null;
+      end case;
+
+      Rose.Kernel.Checkpoint_Copies.Record_Written
+        (P.Oid, Virtual_Page, Ready);
+
+      if not Ready then
+         Rose.Kernel.Checkpoint_Copies.Report_Full ("written pages");
+         return False;
+      end if;
+
+      Make_Written (Directory, Virtual_Page);
+      return True;
+   end Checkpoint_Write;
 
    --------------
    -- Copy_Cap --
@@ -634,9 +720,7 @@ package body Rose.Kernel.Processes is
    begin
       if P.State /= Blocked then
          return Other;
-      elsif P.Flags (Wait_Reply)
-        or else P.Flags (Checkpoint_Reply_Held)
-      then
+      elsif P.Flags (Wait_Reply) then
          return Calling;
       elsif P.Receive_Cap /= Rose.Capabilities.Null_Capability
         and then P.Current_Params.Cap = P.Receive_Cap
@@ -816,23 +900,69 @@ package body Rose.Kernel.Processes is
       end if;
    end Drop_Reference;
 
-   ------------------------
-   -- Enable_Write_Pages --
-   ------------------------
+   ---------------------
+   -- End_Page_Copies --
+   ---------------------
 
-   procedure Enable_Write_Pages
-     (Process : in out Kernel_Process_Entry)
+   procedure End_Page_Copies (Saved : Boolean) is
+   begin
+      Rose.Kernel.Checkpoint_Copies.Stop_Copies;
+
+      for P of Process_Table.all loop
+         if P.State /= Available
+           and then P.Flags (Persistent)
+         then
+            End_Write_Pages (P, Saved);
+            if P.State = Interrupted
+              and then P.Flags (Checkpoint_Page_Fault)
+            then
+               Debug.Put (To_Process_Id (P.Oid));
+               Rose.Boot.Console.Put_Line (": resuming after checkpoint");
+               P.Flags (Checkpoint_Page_Fault) := False;
+
+               if Current_Process_Id = Mem_Process then
+
+                  --  Mem is in its own call, End_Page_Copies, whose reply
+                  --  would replace a fault sent to it now, and the writer
+                  --  would wait for ever. The fault waits until mem next
+                  --  receives, as one does while mem is busy (#1013).
+
+                  P.Pending_Fault_Page := P.Checkpoint_Fault;
+                  P.Pending_Fault_Mapped := True;
+                  P.Pending_Fault_Write := True;
+                  P.Pending_Fault_Execute := False;
+                  P.Flags (Fault_Pending) := True;
+               else
+                  Handle_Page_Fault
+                    (Pid               => P.Pid,
+                     Virtual_Page      => P.Checkpoint_Fault,
+                     Is_Mapped         => True,
+                     Read_Attempt      => False,
+                     Write_Attempt     => True,
+                     Execution_Attempt => False);
+               end if;
+            end if;
+         end if;
+      end loop;
+   end End_Page_Copies;
+
+   ---------------------
+   -- End_Write_Pages --
+   ---------------------
+
+   procedure End_Write_Pages
+     (Process : in out Kernel_Process_Entry;
+      Saved   : Boolean)
    is
       Addr : constant Rose.Addresses.Virtual_Page_Address :=
                Rose.Kernel.Heap.Get_Virtual_Page
                  (Physical_Address_To_Page (Process.Directory_Page));
    begin
       Debug.Put (Process.Pid);
-      Rose.Boot.Console.Put (": enable write pages");
+      Rose.Boot.Console.Put (": end write pages");
       Rose.Boot.Console.New_Line;
-      Rose.Kernel.Page_Table.Activate_Page_Directory (Addr);
-      Rose.Kernel.Page_Table.Enable_Page_Writes (Addr);
-   end Enable_Write_Pages;
+      Rose.Kernel.Page_Table.End_Page_Writes (Addr, Saved);
+   end End_Write_Pages;
 
    ----------------------
    -- Enter_Checkpoint --
@@ -841,6 +971,12 @@ package body Rose.Kernel.Processes is
    procedure Enter_Checkpoint is
    begin
       Active_Checkpoint := True;
+
+      --  Before the pages are made read-only, which notes the frames that
+      --  are changed (ADR 0030).
+
+      Rose.Kernel.Checkpoint_Copies.Start_Copies;
+
       for P of Process_Table.all loop
          if P.State /= Available
            and then P.Flags (Persistent)
@@ -1118,6 +1254,17 @@ package body Rose.Kernel.Processes is
 
       Current_Page_Fault_Count := Current_Page_Fault_Count + 1;
 
+      --  While mem writes a checkpoint, the kernel makes a page writable
+      --  itself where it can, and the process goes on at once with the
+      --  write (ADR 0030).
+
+      if Protection_Violation
+        and then Write_Attempt
+        and then Checkpoint_Write (Current_Process_Id, Virtual_Page)
+      then
+         return Rose.Kernel.Interrupts.Finished;
+      end if;
+
       Handle_Page_Fault
         (Pid               => Current_Process_Id,
          Virtual_Page      => Virtual_Page,
@@ -1145,16 +1292,19 @@ package body Rose.Kernel.Processes is
       use type Rose.Words.Word;
    begin
 
-      if Active_Checkpoint
+      if Rose.Kernel.Checkpoint_Copies.Copying
         and then Is_Mapped
         and then Write_Attempt
         and then Process_Table (Pid).Flags (Persistent)
       then
-         --  write attempt failed because of active checkpoint.
-         --  record situation and return
+         --  A write to a mapped page while mem writes the checkpoint,
+         --  which the kernel couldn't make writable (Checkpoint_Write):
+         --  the reserve of copies or the list of written pages is full,
+         --  or the page is read-only for some other reason. Mem is busy,
+         --  so the process waits until End_Page_Copies (ADR 0030).
          --
          --  Only a persistent process has its pages made read-only by a
-         --  checkpoint, and Leave_Checkpoint only resumes those, so any
+         --  checkpoint, and End_Page_Copies only resumes those, so any
          --  other write fault goes to mem as usual (#231).
 
          Debug.Put (Pid);
@@ -1728,35 +1878,17 @@ package body Rose.Kernel.Processes is
          Release_Calls (Checkpoint_Held);
          Checkpoint_Held := Null_Process_Id;
       end if;
-      for P of Process_Table.all loop
-         if P.State /= Available
-           and then P.Flags (Persistent)
-         then
-            Enable_Write_Pages (P);
-            if P.State = Interrupted
-              and then P.Flags (Checkpoint_Page_Fault)
-            then
-               Debug.Put (To_Process_Id (P.Oid));
-               Rose.Boot.Console.Put_Line (": resuming after checkpoint");
-               P.Flags (Checkpoint_Page_Fault) := False;
-               Handle_Page_Fault
-                 (Pid               => P.Pid,
-                  Virtual_Page      => P.Checkpoint_Fault,
-                  Is_Mapped         => True,
-                  Read_Attempt      => False,
-                  Write_Attempt     => True,
-                  Execution_Attempt => False);
-            end if;
-            if P.State = Blocked
-              and then P.Flags (Checkpoint_Reply_Held)
-            then
-               Debug.Put (To_Process_Id (P.Oid));
-               Rose.Boot.Console.Put_Line (": reply after checkpoint");
-               P.Flags (Checkpoint_Reply_Held) := False;
-               P.State := Ready;
-            end if;
-         end if;
-      end loop;
+
+      --  Mem ends the copying when it has saved its pages. If it didn't,
+      --  its pages are still changed in its tables, so none is clean, and
+      --  the pages written meanwhile wait in the list for its next
+      --  End_Page_Copies.
+
+      if Rose.Kernel.Checkpoint_Copies.Copying then
+         Rose.Boot.Console.Put_Line
+           ("kernel: checkpoint left before End_Page_Copies");
+         End_Page_Copies (Saved => False);
+      end if;
    end Leave_Checkpoint;
 
    -------------------
@@ -1793,7 +1925,8 @@ package body Rose.Kernel.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       User          : Boolean;
-      Managed       : Boolean := False)
+      Managed       : Boolean := False;
+      Write_Tracked : Boolean := False)
    is
       P : Kernel_Process_Entry renames Process_Table (Pid);
    begin
@@ -1806,7 +1939,8 @@ package body Rose.Kernel.Processes is
          Writable       => Writable,
          Executable     => Executable,
          User           => User,
-         Managed        => Managed);
+         Managed        => Managed,
+         Write_Tracked  => Write_Tracked);
    end Map_Page;
 
    --------------------------
@@ -3047,15 +3181,16 @@ package body Rose.Kernel.Processes is
 
             procedure Queue_Message is
             begin
-               --  A second interrupt for the same endpoint takes the place
-               --  of the first, and nothing is lost: a driver reads its
-               --  device until it has nothing more, so one interrupt is
-               --  enough (#1014). Signals never wait here, since they stay
-               --  in the process's Signals until it receives.
+               --  A second interrupt or timeout for the same endpoint
+               --  takes the place of the first, and nothing is lost: a
+               --  driver reads its device until it has nothing more, and
+               --  the timer server fires every timer that is due, so one
+               --  is enough (#1014). Signals never wait here, since they
+               --  stay in the process's Signals until it receives.
 
                if To.Flags (Message_Queued)
-                 and then not (Kind = Interrupt
-                               and then To.Queued_Kind = Interrupt
+                 and then not (Kind in Interrupt | Timeout
+                               and then To.Queued_Kind = Kind
                                and then To.Queued_Endpoint = Endpoint)
                then
                   Put_Lost_Message (To_Process_Id, Kind, Endpoint);
@@ -3238,22 +3373,14 @@ package body Rose.Kernel.Processes is
 
       if Current_Process.State = Killed then
          null;
-      elsif Active_Checkpoint
-        and then Current_Process.Flags (Persistent)
-        and then Current_Process.State = Blocked
-        and then State = Ready
-      then
-
-         --  The reply would be written into the process's invocation
-         --  record, which the checkpoint has already saved as the call,
-         --  so a restore would make the call again from the reply (#543).
-         --  The process stays blocked until Leave_Checkpoint.
-
-         Current_Process.Flags (Invoke_Reply) := True;
-         Current_Process.Flags (Checkpoint_Reply_Held) := True;
       else
          --  A reply held for a page of the invocation record stays
          --  until the process resumes (#715).
+         --
+         --  During a checkpoint, a reply to a persistent process is not
+         --  held. Check_Reply_Record has the record's pages copied before
+         --  the reply is written, so the checkpoint still saves the call,
+         --  not the reply (ADR 0030, section 2; #543).
 
          Current_Process.Flags (Invoke_Reply) :=
            (Current_Process.State = Blocked and then State = Ready)

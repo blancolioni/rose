@@ -101,7 +101,7 @@ package Rose.Command_Signatures is
       Console_Cap, Clock_Service_Cap, Storage_Service_Cap,
       Screen_Service_Cap, Create_Signal_Cap, Cap_Set_Service_Cap,
       Package_State_Cap,
-      Replace_Process_Cap, Other_Role_Cap);
+      Replace_Process_Cap, Timer_Service_Cap, Other_Role_Cap);
    --  A cap that one of the command's roles needs, other than a stream:
    --  a system cap, a bank for the Storage_Service role, which petal
    --  makes below its own for each command (ADR 0025, #517), the screen
@@ -112,8 +112,9 @@ package Rose.Command_Signatures is
    --  yet either (#708), the command registry's Commands interface for
    --  the Find_Command role (#460), the console's Terminal for the
    --  Console role (#454), the null cap for the Replace_Process role,
-   --  since petal holds no Replacer (#866), or a role the shell does not
-   --  supply.
+   --  since petal holds no Replacer (#866), the null cap for the
+   --  Timer_Service role, since petal holds no timer (#1014), or a role
+   --  the shell does not supply.
 
    type Role_Cap_Record is
       record

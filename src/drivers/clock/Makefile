@@ -5,15 +5,12 @@ all: clock
 	cp ./build/bin/clock ../../../build/$(ARCH)/drivers/clock
 
 # clock is built with the userland run-time system, and serves its
-# interfaces through the user-mode IDL target (#367).
+# interfaces through the user-mode IDL target (#367), whose packages come
+# from the userland library (projects/user_library.gpr, #1067).
 
 clock:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	mkdir -p build/generated
-	$(USER_IDLE) \
-	    $(INTERFACES)/time-clock.idl $(INTERFACES)/time-clock_admin.idl \
-	    $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)
 
 # The calendar arithmetic is plain Ada, so it is tested on the host.

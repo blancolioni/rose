@@ -115,6 +115,30 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  refuses a launch when it has few left, since a call to it needs a
    --  reply cap in its table (#1131).
 
+   --  Copying pages written during a checkpoint (ADR 0030). Only mem has
+   --  these caps.
+
+   Add_Copy_Frames_Endpoint   : constant Rose.Objects.Endpoint_Index := 27;
+   --  Each data word sent is a frame that mem gives the kernel's reserve
+   --  of frames for copies. Mem no longer uses them. Reply with the
+   --  number of free frames in the reserve, in data word 0.
+
+   Copy_Saved_Page_Endpoint   : constant Rose.Objects.Endpoint_Index := 28;
+   --  Data word 0 is a frame. Data word 0 of the reply is 1 if the frame
+   --  is in the checkpoint that is running: it was neither filled nor
+   --  saved since the checkpoint started. If a writable buffer of a page
+   --  is sent, the frame's contents when the checkpoint started, from its
+   --  copy if it has one, are copied into it, and the frame is saved: a
+   --  later write needs no copy. With no buffer, nothing changes.
+
+   End_Page_Copies_Endpoint   : constant Rose.Objects.Endpoint_Index := 29;
+   --  Mem has saved its pages, or failed if data word 0 is 0. Stop
+   --  copying, end the read-only flags, and resume the processes that
+   --  waited to write. The pages written during the checkpoint go into
+   --  the writable buffer sent, of a page, as four words each: the
+   --  process's object id, low word first, the virtual page, and 0. Reply
+   --  with their number in data word 0.
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

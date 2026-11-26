@@ -15,6 +15,7 @@ with Rose.Kernel.Clock;
 with Rose.Kernel.Heap;
 
 with Rose.Kernel.Checkpoint;
+with Rose.Kernel.Checkpoint_Copies;
 
 with Rose.Kernel.Processes.Debug;
 with Rose.Kernel.Processes.Snapshot;
@@ -24,6 +25,11 @@ with Rose.Arch.Interrupts;
 with Rose.Multiboot;
 
 package body Rose.Kernel.Capabilities.Kernel_Caps is
+
+   procedure Reply_With_Word
+     (Params : Rose.Invocation.Invocation_Access;
+      Value  : Rose.Words.Word);
+   --  Reply to the current process with Value in data word 0.
 
    function Process_Cap
      (Pid : Rose.Kernel.Processes.Process_Id;
@@ -450,6 +456,109 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             Rose.Kernel.Processes.Set_Current_State
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
+
+         when Add_Copy_Frames_Endpoint =>
+            if Params.Control.Flags (Rose.Invocation.Send_Words) then
+               for I in 0 .. Params.Control.Last_Sent_Word loop
+                  declare
+                     use type Rose.Words.Word;
+                     Added : Boolean;
+                  begin
+                     Rose.Kernel.Checkpoint_Copies.Add_Frame
+                       (Rose.Addresses.Physical_Page_Address
+                          (Params.Data (I) mod 2 ** 20),
+                        Added);
+                  end;
+               end loop;
+            end if;
+
+            Reply_With_Word
+              (Params,
+               Rose.Words.Word (Rose.Kernel.Checkpoint_Copies.Reserve_Count));
+
+         when Copy_Saved_Page_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Words) then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
+            declare
+               use type System.Storage_Elements.Storage_Offset;
+               use type Rose.Words.Word;
+               Frame : constant Rose.Addresses.Physical_Page_Address :=
+                         Rose.Addresses.Physical_Page_Address
+                           (Params.Data (0) mod 2 ** 20);
+               Saved : Boolean;
+            begin
+               if Params.Control.Flags (Rose.Invocation.Send_Buffer) then
+                  if not Params.Control.Flags
+                    (Rose.Invocation.Writable_Buffer)
+                    or else Params.Buffer_Length < 4096
+                  then
+                     Rose.Kernel.Processes.Return_Error
+                       (Params, Rose.Invocation.Request_Error);
+                     return;
+                  end if;
+
+                  Rose.Kernel.Checkpoint_Copies.Save_Frame
+                    (Frame, Params.Buffer_Address, Saved);
+               else
+                  Saved := Rose.Kernel.Checkpoint_Copies.In_Checkpoint
+                    (Frame);
+               end if;
+
+               Reply_With_Word
+                 (Params, Rose.Words.Word (Boolean'Pos (Saved)));
+            end;
+
+         when End_Page_Copies_Endpoint =>
+            if not Params.Control.Flags (Rose.Invocation.Send_Buffer)
+              or else not Params.Control.Flags
+                (Rose.Invocation.Writable_Buffer)
+              or else System.Storage_Elements."<"
+                (Params.Buffer_Length, 4096)
+            then
+               Rose.Kernel.Processes.Return_Error
+                 (Params, Rose.Invocation.Request_Error);
+               return;
+            end if;
+
+            declare
+               use Rose.Kernel.Checkpoint_Copies;
+               use type Rose.Words.Word;
+               use type Rose.Objects.Object_Id;
+               Saved   : constant Boolean :=
+                           Params.Control.Flags (Rose.Invocation.Send_Words)
+                           and then Params.Data (0) /= 0;
+               Entries : array (1 .. 1024) of Rose.Words.Word_32
+                 with Import, Address => Params.Buffer_Address;
+               Count   : Natural;
+            begin
+               if Copying then
+                  Rose.Kernel.Processes.End_Page_Copies (Saved);
+               end if;
+
+               Count := Written_Count;
+
+               for I in 1 .. Count loop
+                  declare
+                     Process : Rose.Objects.Object_Id;
+                     Page    : Rose.Addresses.Virtual_Page_Address;
+                  begin
+                     Get_Written (I, Process, Page);
+                     Entries (4 * I - 3) :=
+                       Rose.Words.Word_32 (Process mod 2 ** 32);
+                     Entries (4 * I - 2) :=
+                       Rose.Words.Word_32 (Process / 2 ** 32);
+                     Entries (4 * I - 1) := Rose.Words.Word_32 (Page);
+                     Entries (4 * I) := 0;
+                  end;
+               end loop;
+
+               Clear_Written;
+               Reply_With_Word (Params, Rose.Words.Word (Count));
+            end;
 
          when Enter_Checkpoint_Endpoint =>
 
@@ -942,6 +1051,26 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
          Payload =>
            Rose.Kernel.Processes.To_Object_Id (Pid));
    end Process_Cap;
+
+   ---------------------
+   -- Reply_With_Word --
+   ---------------------
+
+   procedure Reply_With_Word
+     (Params : Rose.Invocation.Invocation_Access;
+      Value  : Rose.Words.Word)
+   is
+   begin
+      Params.all :=
+        (Control =>
+           (Flags  => (Rose.Invocation.Reply => True, others => False),
+            others => <>),
+         others  => <>);
+      Rose.Invocation.Send_Word (Params.all, Value);
+      Rose.Kernel.Processes.Set_Current_State
+        (Rose.Kernel.Processes.Current_Process_Id,
+         Rose.Kernel.Processes.Ready);
+   end Reply_With_Word;
 
    ------------------
    -- Sent_Process --

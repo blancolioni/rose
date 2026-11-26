@@ -134,13 +134,11 @@ package body Timer.Server is
    procedure Destroy_Timer (Id : Rose.Objects.Capability_Identifier) is
       use type Rose.Objects.Capability_Identifier;
       Found : Boolean := False;
-      First : Boolean := False;
    begin
       for Index in 1 .. Queue_Front loop
          if Queue (Index).Id = Id then
             Delete_Caps (Queue (Index));
             Found := True;
-            First := Index = Queue_Front;
          elsif Found then
             Queue (Index - 1) := Queue (Index);
          end if;
@@ -148,15 +146,6 @@ package body Timer.Server is
 
       if Found then
          Queue_Front := Queue_Front - 1;
-
-         --  The kernel's timeout was set for the timeout just destroyed,
-         --  so it is set for the next one. Otherwise the next one would
-         --  arrive then, early (#984). With none left, the kernel's
-         --  timeout still arrives, and On_Timeout ignores it.
-
-         if First then
-            Update_Timer_Queue;
-         end if;
       end if;
 
    end Destroy_Timer;
@@ -193,29 +182,32 @@ package body Timer.Server is
 
    procedure On_Timeout (Id : Rose.Objects.Capability_Identifier) is
       pragma Unreferenced (Id);
-      Params : aliased Rose.Invocation.Invocation_Record;
+      Now : constant Ticks_Type := Current_Ticks;
    begin
-      --  The kernel's timeout can be for a timeout that has since been
-      --  destroyed: then the queue is empty, or its first timeout isn't
-      --  due yet, and the kernel's timeout is set for that one (#984).
 
-      if Queue_Front = 0 then
-         return;
-      elsif Queue (Queue_Front).Timeout > Current_Ticks then
-         Update_Timer_Queue;
-         return;
-      end if;
+      --  The kernel's timeout says only that it is time to look at the
+      --  queue. It may be stale, if an earlier timer was set or the
+      --  front one destroyed after it was set, and it may stand for
+      --  more than one, since the kernel keeps one queued timeout in
+      --  place of two (#1014). So every timer that is due fires, and
+      --  no other.
 
-      declare
-         Timeout : constant Timeout_Entry := Queue (Queue_Front);
-      begin
-         Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
-         Params.Control.Flags (Rose.Invocation.Block) := False;
-         Rose.System_Calls.Invoke_Capability (Params);
-         Delete_Caps (Timeout);
-         Queue_Front := Queue_Front - 1;
-         Update_Timer_Queue;
-      end;
+      while Queue_Front > 0
+        and then Queue (Queue_Front).Timeout <= Now
+      loop
+         declare
+            Params  : aliased Rose.Invocation.Invocation_Record;
+            Timeout : constant Timeout_Entry := Queue (Queue_Front);
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
+            Params.Control.Flags (Rose.Invocation.Block) := False;
+            Rose.System_Calls.Invoke_Capability (Params);
+            Delete_Caps (Timeout);
+            Queue_Front := Queue_Front - 1;
+         end;
+      end loop;
+
+      Update_Timer_Queue;
    end On_Timeout;
 
    ---------------
@@ -299,8 +291,9 @@ package body Timer.Server is
                       Queue (Queue_Front).Timeout;
             Current : constant Ticks_Type := Current_Ticks;
          begin
-            --  The kernel never sends a timeout of 0 ticks, so one that
-            --  is already due is sent at the next tick.
+
+            --  The kernel never fires a timeout of 0 ticks, so a timer
+            --  that is due already fires on the next tick.
 
             Set_Timer
               (if Ticks <= Current then 1 else Ticks - Current);

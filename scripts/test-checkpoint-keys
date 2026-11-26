@@ -1,0 +1,107 @@
+#!/bin/sh
+# Boot test of typing during checkpoints (#795, ADR 0030), under QEMU, with
+# a framebuffer.
+#
+#   scripts/test-checkpoint-keys [ISO] [ROUNDS]
+#
+# ISO is the install image, images/rose.iso by default, and ROUNDS the
+# number of lines to type, 14 by default. The test:
+#
+#   1. installs Rose on a new disk from the install menu's framebuffer
+#      test install, as test-screen does;
+#   2. boots from the disk, logs in, and types ROUNDS lines of the form
+#      "echo N" and 72 more characters, at the harness's pace of a key every
+#      0.15 s, so that about one line in three is typed while a checkpoint
+#      runs; each line's echo has to come back whole.
+#
+# Until ADR 0030, a persistent process that wrote to its memory during a
+# checkpoint was stopped until it ended, and the keyboard driver with it,
+# so keys typed then were lost: about half the lines typed during a
+# checkpoint lost a run of characters. The test says how many lines were
+# typed during one, and fails if none was, since it would then prove
+# nothing. It takes about ten minutes, and exits with 0 if every line came
+# back whole.
+
+ISO=${1:-images/rose.iso}
+ROUNDS=${2:-14}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v qemu-system-i386 > /dev/null || {
+    echo "qemu-system-i386 not found"
+    exit 2
+}
+. "$HERE/qemu-test-lib.sh"
+
+screen () {
+    python3 "$HERE/fb-text.py" "$MONITOR"
+}
+
+checkpoints () {
+    # checkpoints: the number of checkpoints that have started, and that
+    # have ended, in the serial log
+    echo "$(grep -c "Entering checkpoint" "$WORK/serial")" \
+         "$(grep -c "Leaving checkpoint" "$WORK/serial")"
+}
+
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+qemu-img create -f raw "$DISK" 6G > /dev/null
+
+echo "Installing, with a framebuffer"
+start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+choose_entry 2
+waited=0
+while [ $waited -lt 900 ]; do
+    grep -q -- "kernel: restarting" "$WORK/serial" 2> /dev/null && break
+    screen > "$WORK/screen.txt"
+    answer_install "$WORK/screen.txt"
+    sleep 1
+    waited=$((waited + 2))
+done
+grep -q -- "kernel: restarting" "$WORK/serial" \
+    || fail "the install did not finish"
+sleep 15
+stop_qemu
+
+echo "Booting from the disk, which restores the install"
+start_qemu
+log_in
+
+letters=abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789
+lost=0
+during=0
+round=1
+while [ $round -le "$ROUNDS" ]; do
+    text="$round$letters"
+    before=$(checkpoints)
+    type_text "clear
+"
+    sleep 2
+    type_text "echo $text
+"
+    sleep 2
+    after=$(checkpoints)
+    if [ "$before" != "$after" ] \
+        || [ "${before% *}" != "${before#* }" ]
+    then
+        when="during a checkpoint"
+        during=$((during + 1))
+    else
+        when="between checkpoints"
+    fi
+    if screen | sed 's/ *$//' | grep -qx -- "$text"; then
+        echo "line $round: whole, $when"
+    else
+        echo "line $round: LOST KEYS, $when"
+        screen | sed 's/ *$//' | grep -- "echo" | tail -1
+        lost=$((lost + 1))
+    fi
+    round=$((round + 1))
+done
+
+stop_qemu
+
+[ $lost -eq 0 ] || fail "$lost of $ROUNDS lines lost keys"
+[ $during -gt 0 ] || fail "no line was typed during a checkpoint"
+echo "$ROUNDS lines whole, $during of them typed during a checkpoint"
+rm -rf "$WORK"
+echo "PASS"

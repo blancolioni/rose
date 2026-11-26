@@ -659,6 +659,9 @@ package body Mem.Server is
       Process_State_Cap  := Get_Cap (9);
       Kernel_Log_Cap     := Get_Cap (10);
       Free_Caps_Cap      := Get_Cap (11);
+      Add_Copy_Frames_Cap := Get_Cap (12);
+      Copy_Saved_Page_Cap := Get_Cap (13);
+      End_Page_Copies_Cap := Get_Cap (14);
 
       --  Nothing reads the cap set again (#826).
 
@@ -668,6 +671,11 @@ package body Mem.Server is
 
       Mem.Calls.Load_Memory_Map;
       Mem.Page_Table.Initialize;
+
+      --  Before any checkpoint, which can start as soon as processes run
+      --  (ADR 0030, section 6).
+
+      Mem.Calls.Add_Copy_Frames (Rose.Limits.Checkpoint_Copy_Frames);
 
       --  From here on, mem writes to the kernel's log, never the console.
       --  The console calls its driver, a launched process, and if mem has

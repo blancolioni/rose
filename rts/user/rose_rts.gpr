@@ -10,9 +10,9 @@
 --  units (create-sources.sh writes the list), already built, in the RTS's
 --  adalib.
 --
---  A program can't have its own copy of one of these units, since a unit
---  belongs to only one project: programs run idle through USER_IDLE in
---  mk/common.mk, which deletes idle's copies from build/generated.
+--  Nothing else can have its own copy of one of these units, since a unit
+--  belongs to only one project: the interface specs among them are left
+--  out of the userland library (projects/user_library.gpr, #1067).
 
 project Rose_RTS is
 
