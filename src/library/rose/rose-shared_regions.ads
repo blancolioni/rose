@@ -9,7 +9,8 @@ package Rose.Shared_Regions is
    --  memory, so their writes are seen at once by the others. The
    --  mappings go in the part of the address space that is kept for them,
    --  C000_0000 to D000_0000, and this package chooses where. A program
-   --  that uses it puts nothing else there.
+   --  that uses it puts nothing else there. The heap segment that elf
+   --  adds ends where this window starts (#759).
 
    Mapping_Error : exception;
 
