@@ -44,7 +44,7 @@ The process's own pages are all this covers: a password that it sends to another
 === Unsaved Memory
 
 A persistent process can keep part of its memory out of every checkpoint, for something it holds but mustn't keep, such as a password while it is typed (#1132).
-`Rose.Unsaved_Memory.Allocate` maps a segment that isn't persistent (`Segment.Add_Nonpersistent_Segment`) in the window `B000_0000` to `C000_0000`:
+`Rose.Unsaved_Memory.Allocate` maps a segment that isn't persistent (`Segment.Add_Nonpersistent_Segment`) in the window `D000_0000` to `D100_0000`, between the shared regions and the stack:
 
 * *Its pages start as zeros,* and `mem` maps them as not persistent, as it does a transient process's pages, so they are never written to the log.
 * *After a restore they are zeros again.* The segment is restored, but not what it held.

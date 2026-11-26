@@ -10,9 +10,11 @@ package Rose.Unsaved_Memory is
    --  are never paged out either, so the memory is meant to be small.
    --
    --  The segments go in the part of the address space that is kept for
-   --  them, B000_0000 to C000_0000, below the shared segments
-   --  (Rose.Shared_Regions), and this package chooses where. A program
-   --  that uses it puts nothing else there.
+   --  them, D000_0000 to D100_0000, above the shared segments
+   --  (Rose.Shared_Regions) and well below the stack, which ends at
+   --  E000_0000, and this package chooses where. Below the shared
+   --  segments is the heap's, which may grow up to them (#759). A program
+   --  that uses this package puts nothing else there.
 
    Mapping_Error : exception;
 

@@ -15,8 +15,8 @@ package body Tests.Unsaved_Memory is
    Pages     : constant := 2;
    Size      : constant := Pages * Page_Size;
 
-   Window_Base  : constant := 16#B000_0000#;
-   Window_Bound : constant := 16#C000_0000#;
+   Window_Base  : constant := 16#D000_0000#;
+   Window_Bound : constant := 16#D100_0000#;
 
    type Word_Array is array (1 .. Size / 4) of Word_32
      with Volatile_Components;

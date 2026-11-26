@@ -11,8 +11,8 @@ package body Rose.Unsaved_Memory is
 
    Page_Size : constant := 4096;
 
-   Window_Base  : constant Word := 16#B_0000#;
-   Window_Bound : constant Word := 16#C_0000#;
+   Window_Base  : constant Word := 16#D_0000#;
+   Window_Bound : constant Word := 16#D_1000#;
    --  The pages kept for unsaved segments.
 
    Max_Mappings : constant := 8;
