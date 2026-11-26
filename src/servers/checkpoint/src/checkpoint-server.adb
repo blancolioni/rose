@@ -22,12 +22,20 @@ package body Checkpoint.Server is
    Timer : Rose.Interfaces.Time.Timer.Client.Timer_Client;
 
    Timeout_Cap           : Rose.Interfaces.Caps.Cap.Client.Cap_Client;
+   Has_Timeout           : Boolean := False;
+   --  The timer's control cap for the latest timeout, if it hasn't
+   --  arrived yet.
+
+   Timeout_Id            : Rose.Objects.Capability_Identifier := 0;
+   --  The identifier of the latest timeout's cap. A timeout from an
+   --  earlier one is ignored.
    Enter_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Leave_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Memory_Checkpoint_Cap : Rose.Capabilities.Capability;
    Append_Log_Cap        : Rose.Capabilities.Capability;
    Store_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Hold_Cap              : Rose.Capabilities.Capability;
+   Last_Entry_Cap        : Rose.Capabilities.Capability;
 
    Max_Table_Pages : constant := 1 + 4 + 5 * Rose.Limits.Max_Processes;
    --  The header page, four pages of derivation records (the kernel's
@@ -69,9 +77,22 @@ package body Checkpoint.Server is
    --  Checkpointer.Request_Checkpoint, which the memory server sends
    --  without waiting (ADR 0028, section 6).
 
-   function Checkpoint return Boolean;
-   --  Take a checkpoint: False if the kernel could not take its snapshot,
-   --  and there is none.
+   function Checkpoint (Wait_For_Commit : Boolean) return Boolean;
+   --  Take a checkpoint, and set the timer for the next one. False if the
+   --  kernel could not take its snapshot and there is none. If
+   --  Wait_For_Commit, also False if the log didn't commit the entry
+   --  (#984).
+
+   procedure Set_Timer;
+   --  Ask the timer for a timeout in 30 seconds, after every checkpoint
+   --  however it was started. The timer sends a timeout without waiting,
+   --  so one that arrives while the server is in a call is lost, and
+   --  the next checkpoint sets the timer again (#984). The timeout set
+   --  before is destroyed. If it was sent just before, it arrives with
+   --  an earlier identifier, and is ignored.
+
+   function Last_Entry return Rose.Words.Word_64;
+   --  The log's last committed entry, or 0 if there is none.
 
    function Enter_Checkpoint (Page_Count : out Natural) return Boolean;
    --  Enter checkpoint mode, with the kernel's tables in Kernel_Tables.
@@ -122,8 +143,12 @@ package body Checkpoint.Server is
    -- Checkpoint --
    ----------------
 
-   function Checkpoint return Boolean is
+   function Checkpoint (Wait_For_Commit : Boolean) return Boolean is
+      use type Rose.Words.Word_64;
       Page_Count : Natural;
+      Committed  : constant Rose.Words.Word_64 :=
+                     (if Wait_For_Commit then Last_Entry else 0);
+      Result     : Boolean;
    begin
 
       --  The kernel's tables come first in the log entry, then the
@@ -144,12 +169,26 @@ package body Checkpoint.Server is
          Store_Checkpoint;
          Execute_Checkpoint;
          Leave_Checkpoint;
-         return True;
+
+         --  Leaving checkpoint mode tells the log to commit, without
+         --  waiting for it. The kernel gives the log that notice before
+         --  any caller (#1013), so the log answers this call only after
+         --  the commit. A commit that fails leaves the last entry where
+         --  it was, and the log has said why (#984).
+
+         --  Only a caller of Take_Checkpoint waits for this. Meanwhile
+         --  the server is in a call, and the sends that don't wait,
+         --  from the timer and the memory server, are refused.
+
+         Result := not Wait_For_Commit or else Last_Entry /= Committed;
       else
          Rose.Console_IO.Put_Line
            ("checkpoint: kernel tables not saved; skipping checkpoint");
-         return False;
+         Result := False;
       end if;
+
+      Set_Timer;
+      return Result;
    end Checkpoint;
 
    -------------------
@@ -171,6 +210,7 @@ package body Checkpoint.Server is
       Append_Log_Cap := Get_Cap (6);
       Store_Checkpoint_Cap := Get_Cap (7);
       Hold_Cap := Get_Cap (8);
+      Last_Entry_Cap := Get_Cap (9);
 
       Rose.Console_IO.Open (Console_Cap);
       Rose.System_Calls.Use_Capabilities
@@ -192,12 +232,7 @@ package body Checkpoint.Server is
          Take_Checkpoint    => Take_Checkpoint'Access,
          Request_Checkpoint => Request_Checkpoint'Access);
 
-      Timeout_Cap :=
-        Rose.Interfaces.Time.Timer.Client.Set_Timer
-          (Item         => Timer,
-           Milliseconds => 30_000,
-           Cap          => Rose.Interfaces.Time.Timeout.Server
-             .Get_On_Timeout_Cap);
+      Set_Timer;
 
    end Create_Server;
 
@@ -310,6 +345,22 @@ package body Checkpoint.Server is
       Rose.System_Calls.Invoke_Capability (Params);
    end Hold_Store;
 
+   ----------------
+   -- Last_Entry --
+   ----------------
+
+   function Last_Entry return Rose.Words.Word_64 is
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      Rose.System_Calls.Initialize_Send (Params, Last_Entry_Cap);
+      Rose.System_Calls.Receive_Words (Params, 2);
+      Rose.System_Calls.Invoke_Capability (Params);
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return 0;
+      end if;
+      return Rose.System_Calls.Get_Word_64 (Params, 0);
+   end Last_Entry;
+
    ----------------------
    -- Leave_Checkpoint --
    ----------------------
@@ -328,20 +379,20 @@ package body Checkpoint.Server is
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier)
    is
-      pragma Unreferenced (Id);
+      use type Rose.Objects.Capability_Identifier;
       Taken : Boolean with Unreferenced;
    begin
-      Rose.Interfaces.Caps.Cap.Client.Destroy (Timeout_Cap);
+      --  A timeout destroyed by the last checkpoint, but already sent,
+      --  has nothing to do: that checkpoint set the timer again.
+
+      if Id /= Timeout_Id or else not Has_Timeout then
+         return;
+      end if;
+
       Rose.Interfaces.Caps.Cap.Client.Close (Timeout_Cap);
+      Has_Timeout := False;
 
-      Taken := Checkpoint;
-
-      Timeout_Cap :=
-        Rose.Interfaces.Time.Timer.Client.Set_Timer
-          (Item         => Timer,
-           Milliseconds => 30_000,
-           Cap          => Rose.Interfaces.Time.Timeout.Server
-             .Get_On_Timeout_Cap);
+      Taken := Checkpoint (Wait_For_Commit => False);
    end On_Timeout;
 
    ------------------------
@@ -355,8 +406,37 @@ package body Checkpoint.Server is
       Taken : Boolean with Unreferenced;
    begin
       --  There's no reply: the memory server didn't wait for one.
-      Taken := Checkpoint;
+      Taken := Checkpoint (Wait_For_Commit => False);
    end Request_Checkpoint;
+
+   ---------------
+   -- Set_Timer --
+   ---------------
+
+   procedure Set_Timer is
+      use type Rose.Objects.Capability_Identifier;
+      Cap : Rose.Capabilities.Capability;
+   begin
+      if Has_Timeout then
+         Rose.Interfaces.Caps.Cap.Client.Destroy (Timeout_Cap);
+         Rose.Interfaces.Caps.Cap.Client.Close (Timeout_Cap);
+      end if;
+
+      Timeout_Id := Timeout_Id + 1;
+      Cap := Rose.Server.Create_Endpoint
+        (Rose.Interfaces.Time.Timeout.On_Timeout_Endpoint, Timeout_Id);
+
+      Timeout_Cap :=
+        Rose.Interfaces.Time.Timer.Client.Set_Timer
+          (Item         => Timer,
+           Milliseconds => 30_000,
+           Cap          => Cap);
+      Has_Timeout := True;
+
+      --  The timer has its own copy of the cap.
+
+      Rose.System_Calls.Delete_Cap (Cap);
+   end Set_Timer;
 
    ------------------
    -- Start_Server --
@@ -390,7 +470,7 @@ package body Checkpoint.Server is
    is
       pragma Unreferenced (Id);
    begin
-      return (if Checkpoint then 1 else 0);
+      return (if Checkpoint (Wait_For_Commit => True) then 1 else 0);
    end Take_Checkpoint;
 
 end Checkpoint.Server;
