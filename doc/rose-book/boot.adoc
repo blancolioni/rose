@@ -308,7 +308,7 @@ A process that depends on state a checkpoint cannot hold, such as a device or th
 When a new system has been installed, `init` launches `checkpoint`.
 On a test install it then runs the tests (below). It then launches `auth`, asks the person installing for the first user's name and password (#456), creates that user, with a home directory (ADR 0003), through `auth`, and checks that the user can log in. It then says that the system is installed, waits for enter, launches the console supervisor, `supervisor`, and restarts from the disk once the install's checkpoint is written (#413).
 
-A test install is one with `self-tests` on the kernel's command line, which only the install media's last menu entry has (#1009). `scripts/test-boot` and the other QEMU tests choose that entry.
+A test install is one with `self-tests` on the kernel's command line, which only two of the install media's menu entries have (#1009): the last, in text mode, which `scripts/test-boot` and the other QEMU tests choose, and the one after the erasing install, which keeps the framebuffer, for `scripts/test-screen` (#1088).
 
 * `restore-install` installs the programs that only the tests use: the holders, the probes, `replaceable_test` and `run_self_tests`. Any other install skips them, and an update without `self-tests` doesn't update them.
 * `init` runs its derive, swap, hand-over and page tests, starts the persistent holders (`hold_pages`, `hold_transient`, `hold_derived`, `hold_file` and `hold_home`), which the boot tests check after a restore, replaces a file, a user and `auth` with new versions, tests exec's `Update`, runs `run_self_tests`, and leaves a cap set for the restore check.

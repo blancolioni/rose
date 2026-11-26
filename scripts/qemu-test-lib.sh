@@ -96,8 +96,10 @@ choose_entry () {
     # choose_entry N: choose entry N of the GRUB menu, counting from 0,
     # as choose_last_entry does, but with Home and then N presses of Down.
     # On the install media with a disk that has Rose, entry 0 boots the
-    # disk, entry 1 updates it (#830), and entry 2 installs, erasing it
-    # (#836).
+    # disk, entries 1 and 2 update it, with the framebuffer and in text
+    # mode (#830, #1092), entry 3 installs, entry 4 installs, erasing it
+    # (#836), and entry 5 is the test install with the framebuffer
+    # (#1088). With no Rose on the disk, the install entries start at 0.
     i=0
     while [ $i -lt 24 ]; do
         monitor "sendkey home"

@@ -6,10 +6,11 @@
 #
 # ISO is the install image, images/rose.iso by default. The test:
 #
-#   1. installs Rose on a new disk from the install menu's first entry,
-#      which keeps the framebuffer, so that the screen driver holds the framebuffer and the
-#      keyboard, and the console is surface-console on its surface; the
-#      install's self tests, which init runs, have to pass, as the console
+#   1. installs Rose on a new disk from the install menu's framebuffer
+#      test install, the third entry with no Rose on the disk (#1088), so
+#      that the screen driver holds the framebuffer and the keyboard, and
+#      the console is surface-console on its surface; the install's self
+#      tests, which init runs, have to pass, as the console
 #      shows; and the console has to show the boot's early messages, which
 #      the boot console wrote to the serial port and replays to it (#654);
 #   2. boots from the disk's first entry, which restores the
@@ -54,6 +55,9 @@ qemu-img create -f raw "$DISK" 6G > /dev/null
 
 echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+# The test install that keeps the framebuffer: after the first install
+# entry and the erasing one, since the new disk has no Rose (#1088).
+choose_entry 2
 
 # The install restarts the machine when it has finished. Until then, read
 # the screen every two seconds or so, and keep the self tests' result. The
