@@ -1,3 +1,5 @@
+with System;
+
 package Rose.Kernel.Page_Table is
 
    type Change_Count is mod 2 ** 64;
@@ -37,11 +39,17 @@ package Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Managed        : Boolean := False);
+      Managed        : Boolean := False;
+      Write_Tracked  : Boolean := False);
    --  Managed is true for a page the memory server maps.  Only those are
    --  part of a checkpoint, so Disable_Page_Writes leaves every other
    --  page writable: device pages such as the VGA text page, and shared
    --  invocation buffers.
+   --
+   --  Write_Tracked is true for a clean page of a writable segment, which
+   --  the memory server maps read-only to see its first write. During a
+   --  checkpoint, the kernel makes it writable itself (ADR 0030, section
+   --  3).
 
    procedure Unmap_Page
      (Directory_Page : Rose.Addresses.Virtual_Page_Address;
@@ -88,12 +96,41 @@ package Rose.Kernel.Page_Table is
    --  by this page.  If write enabled, and mapped by the memory server,
    --  disable and set the checkpoint-read-only flag.
 
-   procedure Enable_Page_Writes
-     (Directory_Page : Rose.Addresses.Virtual_Page_Address);
-   --  Scan all pages referenced by directory pages referenced
-   --  by this page.  If checkpoint-read-only set, clear it and
-   --  enable page writes.
-   --  Inverse of Disable_Page_Writes
+   procedure End_Page_Writes
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Saved          : Boolean);
+   --  Clear the checkpoint-read-only flag of every page that still has
+   --  it. The page stays read-only, so the memory server sees its next
+   --  write. If Saved, the memory server has saved it and it is clean,
+   --  so it becomes Write_Tracked (ADR 0030, section 5).
+
+   type Checkpoint_Page_Kind is
+     (Other_Page, Checkpoint_Read_Only_Page, Write_Tracked_Page);
+
+   function Checkpoint_Kind
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Checkpoint_Page_Kind;
+   --  Whether Virtual_Page is a present, read-only user page that is
+   --  checkpoint-read-only or Write_Tracked.
+
+   procedure Make_Written
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address);
+   --  Make Virtual_Page writable, and clear its checkpoint-read-only and
+   --  Write_Tracked flags.
+
+   procedure Copy_Frame
+     (From : Rose.Addresses.Physical_Page_Address;
+      To   : Rose.Addresses.Physical_Page_Address);
+   --  Copy the contents of frame From to frame To, through two windows in
+   --  the kernel's address space.
+
+   procedure Copy_Frame
+     (From : Rose.Addresses.Physical_Page_Address;
+      To   : System.Address);
+   --  Copy the contents of frame From to the page at To, which is mapped
+   --  writable in the current address space.
 
    procedure Report_Mapped_Pages
      (Directory_Page : Rose.Addresses.Physical_Address);

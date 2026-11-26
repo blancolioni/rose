@@ -56,6 +56,7 @@ KERNOBJECTS=\
 	$(BUILDDIR)/rose-kernel-capabilities-receive.o \
 	$(BUILDDIR)/rose-kernel-capabilities-reply.o \
 	$(BUILDDIR)/rose-kernel-checkpoint.o \
+	$(BUILDDIR)/rose-kernel-checkpoint_copies.o \
 	$(BUILDDIR)/rose-kernel-clock.o \
 	$(BUILDDIR)/rose-kernel-command_line.o \
 	$(BUILDDIR)/rose-kernel-debug.o \

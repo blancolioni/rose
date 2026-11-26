@@ -129,16 +129,14 @@ screen () {
 }
 
 type_text () {
-    # type_text TEXT: type TEXT, holding each key while a checkpoint runs
-    # (qemu-keys.py, #807)
-    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
+    # type_text TEXT: type TEXT (qemu-keys.py). Keys go on during a
+    # checkpoint, which must not lose them (ADR 0030, #795)
+    python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
 }
 
 press () {
-    # press KEY...: press keys by their QEMU names, such as up or ctrl-s,
-    # holding each while a checkpoint runs
-    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" \
-        --key "$@"
+    # press KEY...: press keys by their QEMU names, such as up or ctrl-s
+    python3 "$HERE/qemu-keys.py" "$MONITOR" --key "$@"
 }
 
 wait_for () {

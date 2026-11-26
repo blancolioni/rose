@@ -890,7 +890,11 @@ package body Mem.Processes is
                --  writable segments are saved by checkpoints, and so
                --  indexed.
             begin
-               Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
+               --  New contents: the frame is in no checkpoint that is
+               --  running (ADR 0030).
+
+               Mem.Calls.Load_Page
+                 (Physical_Page, Buffer'Address, Fill => True);
 
                if Log_Page /= 0 then
                   Mem.Page_Log.Read (Log_Page, Buffer'Address);
@@ -1339,7 +1343,7 @@ package body Mem.Processes is
          pragma Import (Ada, Buffer);
          for Buffer'Address use To_System_Address (Y);
       begin
-         Mem.Calls.Load_Page (Physical, Buffer'Address);
+         Mem.Calls.Load_Page (Physical, Buffer'Address, Fill => True);
          Buffer := Page;
          Mem.Calls.Unload_Page (Physical, Buffer'Address);
       end;
