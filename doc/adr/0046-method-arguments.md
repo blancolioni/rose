@@ -1,9 +1,19 @@
 # 46. Method arguments and named subsets
 
-- **Status:** Proposed
+- **Status:** Rejected
 - **Date:** 2026-11-26
 - **Related:** #422 (this decision), [ADR 0001](0001-capability-revocation.md) (derive and membranes), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, section 5 and the open question on attenuation), [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md) (the type is the right), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0027](0027-new-files-in-a-transaction.md) (new files in a transaction), [ADR 0034](0034-interface-packages.md) (interface packages), [ADR 0036](0036-directory-views.md) (directory views)
-- **Amends:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md), section 2, so that the type of an argument can be a method or a named subset of an interface, as well as an interface
+- **Would have amended:** [ADR 0012](0012-argument-modes-writable-interfaces-and-transactions.md), section 2, so that the type of an argument can be a method or a named subset of an interface, as well as an interface
+
+## Why it was rejected
+
+Narrowing a large interface to some of its methods works around interfaces that are too large. The better fix is interfaces that already say what a command can do. The ability to delete a child of a container can be an interface of its own, which `Writable_Directory` inherits, so a command that only deletes takes that interface. Each ancestor of an interface already has its own interface cap, and petal already narrows to a view (ADR 0036), so this needs no new syntax in idle and no new binding in petal. An interface for an ability also means the same thing on any container, not just on a directory.
+
+The context section's argument against splitting holds only for one interface per method. Splitting by ability keeps related operations together, such as deleting a file and deleting a directory.
+
+#422 moves to 0.5.0, where narrower grants are taken up again as interfaces for abilities.
+
+The rest of this record is the proposal as it was written.
 
 ## Context
 

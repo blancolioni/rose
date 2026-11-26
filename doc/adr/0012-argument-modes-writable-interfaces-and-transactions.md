@@ -4,7 +4,6 @@
 - **Date:** 2026-10-28
 - **Related:** [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands, sections 1, 4 and 5), [ADR 0003](0003-directories-files-and-users.md) (directories, files and users), #141 (shell-owned commit), #345 (petal binds writable directories), Rose.Core project (#332 to #337)
 - **Amended by:** #792, where an argument can take one of several interfaces (section 6)
-- **Amended by:** [ADR 0046](0046-method-arguments.md), where an argument can be a method or a named subset of an interface (section 2, #422)
 
 ## Context
 
@@ -43,7 +42,7 @@ Idle accepts `in out` on command arguments today, and no Rose command uses it.
 
 ### 2. The type is the right
 
-An argument's interface type says what the command can do with the object. [ADR 0046](0046-method-arguments.md) lets the type be a method or a named subset as well. A command that creates entries in a directory takes a `Writable_Directory`. A command that writes a file takes a `Writable_File`.
+An argument's interface type says what the command can do with the object. A command that creates entries in a directory takes a `Writable_Directory`. A command that writes a file takes a `Writable_File`.
 
 An interface argument is a cap, which is a reference, and the mode of a reference doesn't limit what can be done through it. Ada works the same way: `Ada.Text_IO.Put` takes its `File` with mode `in`, and still writes to the file.
 
@@ -197,7 +196,7 @@ end if;
 - **A live log in a transactional command.** A build commits its outputs together, but its log should survive a failure. This is like the Writer monad: an effect that sits outside the transaction and is kept whatever the result. Standard error already works this way (section 3). A command could perhaps declare more log streams as roles. Making one `Versioned` argument live inside a transactional command can wait for a real case.
 - **Snapshot reads.** A transactional command's `in File` is the live file. A read consistent with the command's writes needs a version of a `File`, which isn't `Versioned`. This waits for the persistence layer to version any object.
 - **Directory versions.** What does a version of a `Writable_Directory` hold, and what does committing it do when the command has also written files inside it? This is part of #141.
-- **Narrower grants.** A `Writable_Directory` can create entries, and with #346 delete and rename them too. Should `touch` get a grant that can only create? This is ADR 0002's open question on attenuation. Answered by [ADR 0046](0046-method-arguments.md): an argument can be typed by a single method, such as `in Files.Writable_Directory.Create_File`, or by a named subset of an interface (#422).
+- **Narrower grants.** A `Writable_Directory` can create entries, and with #346 delete and rename them too. Should `touch` get a grant that can only create? This is ADR 0002's open question on attenuation. #422 proposes arguments typed by a single method, such as `in Writable_Directory.Create_File`.
 
 ## Follow-up work
 
