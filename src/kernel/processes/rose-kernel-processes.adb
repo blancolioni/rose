@@ -996,6 +996,22 @@ package body Rose.Kernel.Processes is
       return Rose.Capabilities.Null_Capability;
    end Find_Receive_Cap;
 
+   --------------------
+   -- Free_Cap_Count --
+   --------------------
+
+   function Free_Cap_Count (Pid : Process_Id) return Natural is
+      Table : Cap_Tables.Cap_Table renames Process_Table (Pid).Caps;
+      Used  : Natural := 0;
+   begin
+      for Cap in 1 .. Cap_Tables.Last_Cap (Table) loop
+         if Cap_Tables.Is_Active (Table, Cap) then
+            Used := Used + 1;
+         end if;
+      end loop;
+      return Cap_Tables.Max_Capability_Index - Used;
+   end Free_Cap_Count;
+
    -------------
    -- Get_Cap --
    -------------

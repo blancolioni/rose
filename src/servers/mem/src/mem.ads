@@ -12,6 +12,9 @@ package Mem is
    Region_Range_Cap    : Rose.Capabilities.Capability;
    Start_Paging_Cap    : Rose.Capabilities.Capability;
 
+   Free_Caps_Cap       : Rose.Capabilities.Capability := 0;
+   --  The kernel's count of the caps mem can still create (#1131).
+
    type Process_Id is mod 2 ** 16;
    Null_Process_Id : constant Process_Id := 0;
 

@@ -96,7 +96,11 @@ package Rose.Init_Capabilities is
    --  Writes text to the kernel's log (serial), whether or not tracing is
    --  on.  Mem has it, for messages it can't send to the console (#997).
 
-   Last_Cap               : constant := 36;
+   Free_Caps_Cap          : constant := 37;
+   --  Tells the caller how many caps it can still create. Mem has it, and
+   --  refuses a launch when it has few left (#1131).
+
+   Last_Cap               : constant := 37;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;

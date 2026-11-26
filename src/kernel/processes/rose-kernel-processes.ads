@@ -84,6 +84,11 @@ package Rose.Kernel.Processes is
       Layout         : Rose.Capabilities.Layout.Capability_Layout)
       return Rose.Capabilities.Capability;
 
+   function Free_Cap_Count (Pid : Process_Id) return Natural;
+   --  The number of caps that Pid can still create: the slots of its table
+   --  that are not in use (#1131). It looks at every slot up to the last
+   --  one in use.
+
    function Has_Cap
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)

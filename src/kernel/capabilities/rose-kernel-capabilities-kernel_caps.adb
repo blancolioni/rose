@@ -430,6 +430,27 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
               (Rose.Kernel.Processes.Current_Process_Id,
                Rose.Kernel.Processes.Ready);
 
+         when Free_Caps_Endpoint =>
+            declare
+               Free : constant Natural :=
+                        Rose.Kernel.Processes.Free_Cap_Count
+                          (Rose.Kernel.Processes.Current_Process_Id);
+            begin
+               Params.all :=
+                 (Control =>
+                    (Flags          =>
+                         (Rose.Invocation.Reply => True,
+                          others                     => False),
+                     others         => <>),
+                  others  => <>);
+
+               Rose.Invocation.Send_Word (Params.all, Rose.Words.Word (Free));
+            end;
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Rose.Kernel.Processes.Current_Process_Id,
+               Rose.Kernel.Processes.Ready);
+
          when Enter_Checkpoint_Endpoint =>
 
             --  A checkpoint never holds a process half handed over (ADR

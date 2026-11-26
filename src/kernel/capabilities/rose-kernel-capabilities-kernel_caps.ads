@@ -109,6 +109,12 @@ package Rose.Kernel.Capabilities.Kernel_Caps is
    --  is serving, because a call to the console can wait on a process
    --  whose pages mem has dropped (#997, ADR 0028 section 8).
 
+   Free_Caps_Endpoint         : constant Rose.Objects.Endpoint_Index := 26;
+   --  Reply with the number of caps the calling process can still create,
+   --  in data word 0: the slots of its table that are not in use. Mem
+   --  refuses a launch when it has few left, since a call to it needs a
+   --  reply cap in its table (#1131).
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);
