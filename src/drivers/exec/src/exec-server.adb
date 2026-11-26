@@ -10,11 +10,14 @@ with Rose.Trace;
 with Rose.System_Calls;
 
 with Rose.Interfaces.Caps.Cap_Set.Client;
+with Rose.Interfaces.Objects;
 with Rose.Interfaces.Processes.Exec.Server;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Processes.Launch.Server;
 with Rose.Interfaces.Processes.Process_Control.Client;
+with Rose.Interfaces.Processes.Restorable.Server;
 with Rose.Interfaces.Processes.Starting_Process.Client;
+with Rose.Interfaces.Storage.Bank;
 with Rose.Interfaces.Streams.Reader;
 with Rose.Interfaces.Streams.Writer;
 
@@ -28,16 +31,33 @@ package body Exec.Server is
    subtype Control_Class is Rose.Interfaces.Processes.Process_Control
      .Process_Control_Object'Class;
 
-   --  One object serves Exec. Each installed program is an object of its
-   --  own, which serves its Launch interface; Exec's own Launch
-   --  operations launch nothing.
+   --  One object serves Exec, and takes the restore notice. Each
+   --  installed program is an object of its own, which serves its Launch
+   --  interface; Exec's own Launch operations launch nothing.
 
    type Exec_Object is
-     new Rose.Interfaces.Processes.Exec.Server.Exec_Interface with null record;
+     new Rose.Interfaces.Processes.Exec.Server.Exec_Interface
+     and Rose.Interfaces.Processes.Restorable.Server.Restorable_Interface
+     with null record;
 
    overriding function Exec_Cap
      (Item : in out Exec_Object)
       return Rose.Capabilities.Capability;
+
+   overriding function Restorable_Cap
+     (Item : in out Exec_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding procedure Restored (Item : in out Exec_Object);
+   --  Register the processes that exec launched with their banks again
+   --  (#875).
+
+   Bank_Signal : constant Rose.Server.Signal_Bit := 8;
+   --  The bit of the signal that the store raises when the bank of a
+   --  process that exec launched is destroyed (ADR 0006, ADR 0014).
+
+   procedure On_Bank_Signal;
+   --  A process that exec launched has ended, or one of them has.
 
    overriding function Launch_Cap
      (Item : in out Exec_Object)
@@ -135,13 +155,16 @@ package body Exec.Server is
 
    function Start_Launched
      (Params : Rose.Invocation.Invocation_Record;
+      Id     : Rose.Objects.Capability_Identifier;
       Caps   : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability;
    --  Params is the reply to the ELF server's Launch or Launch_Command,
-   --  which has made the process but not started it (#234): give it
-   --  Caps, one at a time, start it, and return what Start gives, or
-   --  null if the launch failed. That is kept until the next launch,
-   --  because the reply to the launch sends it, and then deleted.
+   --  which has made a process of program Id but not started it (#234):
+   --  give it Caps, one at a time, start it, and return what Start
+   --  gives, or null if the launch failed. That is kept until the next
+   --  launch, because the reply to the launch sends it, and then
+   --  deleted. A process that starts is added to Exec.Library's, with
+   --  its bank (#875).
 
    Max_Install_Caps : constant := 16;
 
@@ -181,7 +204,13 @@ package body Exec.Server is
 
       Exec.Output.Set (Standard_Output);
       Exec.Library.Set_Region (Region_Cap);
+      Exec.Library.Set_Signal
+        (Rose.System_Calls.Create_Signal_Cap (Bank_Signal));
+      Rose.Server.Set_Signal_Handler
+        (Context, Bank_Signal, On_Bank_Signal'Access);
       Rose.Interfaces.Processes.Exec.Server.Publish (Context, The_Exec'Access);
+      Rose.Interfaces.Processes.Restorable.Server.Attach
+        (Context, The_Exec'Access);
    end Create_Server;
 
    ----------------
@@ -290,7 +319,8 @@ package body Exec.Server is
       return Rose.Interfaces.Processes.Process_Control.Client
         .From_Cap
           (Start_Launched
-             (Params, Exec.Library.Install_Caps (Id) & Standard_Output));
+             (Params, Id,
+              Exec.Library.Install_Caps (Id) & Standard_Output));
    end Launch;
 
    ----------------
@@ -353,7 +383,7 @@ package body Exec.Server is
       Rose.Trace.Event ("command launched");
       Delete_Cap (Bank);
 
-      return Start_Launched (Params, (1 .. 0 => 0));
+      return Start_Launched (Params, Id, (1 .. 0 => 0));
    end Launch_Command;
 
    ---------------
@@ -443,6 +473,15 @@ package body Exec.Server is
       raise Constraint_Error with "exec: Exec is not a program";
    end Not_A_Program;
 
+   --------------------
+   -- On_Bank_Signal --
+   --------------------
+
+   procedure On_Bank_Signal is
+   begin
+      Exec.Library.Check_Processes;
+   end On_Bank_Signal;
+
    ------------------
    -- Read_Cap_Set --
    ------------------
@@ -472,6 +511,25 @@ package body Exec.Server is
          return Caps;
       end;
    end Read_Cap_Set;
+
+   --------------------
+   -- Restorable_Cap --
+   --------------------
+
+   overriding function Restorable_Cap
+     (Item : in out Exec_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Processes.Restorable.Server.Cap_Of (Context, Item));
+
+   --------------
+   -- Restored --
+   --------------
+
+   overriding procedure Restored (Item : in out Exec_Object) is
+      pragma Unreferenced (Item);
+   begin
+      Exec.Library.Register_Again;
+   end Restored;
 
    ---------------------------
    -- Send_Launch_Arguments --
@@ -519,6 +577,7 @@ package body Exec.Server is
 
    function Start_Launched
      (Params : Rose.Invocation.Invocation_Record;
+      Id     : Rose.Objects.Capability_Identifier;
       Caps   : Rose.Capabilities.Capability_Array)
       return Rose.Capabilities.Capability
    is
@@ -526,6 +585,9 @@ package body Exec.Server is
       Starting_Cap : Rose.Capabilities.Capability;
       Starting     : Rose.Interfaces.Processes.Starting_Process.Client
         .Starting_Process_Client;
+      Bank         : Rose.Capabilities.Capability :=
+                       Rose.Capabilities.Null_Capability;
+      --  The process's own bank (#875).
    begin
       if Last_Result /= Rose.Capabilities.Null_Capability then
          Delete_Cap (Last_Result);
@@ -546,6 +608,28 @@ package body Exec.Server is
       for Cap of Caps loop
          Starting.Add_Cap (Cap);
       end loop;
+
+      --  The bank is asked for before Start, while elf still has the
+      --  process. Without it, the process is never followed, and its
+      --  program's image is kept.
+
+      begin
+         declare
+            Process_Bank : Rose.Interfaces.Storage.Bank.Bank_Object'Class :=
+              Starting.Bank;
+         begin
+            Bank := Process_Bank.Bank_Cap;
+         end;
+      exception
+         when Rose.Interfaces.Objects.Invocation_Error =>
+            Bank := Rose.Capabilities.Null_Capability;
+      end;
+
+      --  It is registered before it starts, so that it can't end first.
+      --  If the start fails, elf ends the process, which destroys its
+      --  bank, and the registration goes with it.
+
+      Exec.Library.Add_Process (Id, Bank);
 
       Last_Result := Starting.Start;
       Rose.Interfaces.Processes.Starting_Process.Client.Close (Starting);

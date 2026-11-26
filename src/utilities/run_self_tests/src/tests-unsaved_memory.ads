@@ -9,4 +9,12 @@ package Tests.Unsaved_Memory is
    --  isn't allocated raises Mapping_Error. That a checkpoint doesn't
    --  save them is test-boot's password check.
 
+   function Unsaved_Stack_Test return Boolean;
+   --  Rose.Unsaved_Memory.Stacks (#1140): call a procedure on an unsaved
+   --  stack, and check that its locals are in the window, that it gets
+   --  its argument and can fill in what it points to, and that an
+   --  exception it raises comes out of Call. Call it more times than a
+   --  process can have unsaved segments, to check that each stack is
+   --  released.
+
 end Tests.Unsaved_Memory;

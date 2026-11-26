@@ -21,9 +21,9 @@ interface Processes.Exec : Processes.Launch is
    --  installed version's, and neither has install caps, nothing is
    --  installed, and the result is the installed version's Launch.
    --  Otherwise the new version is installed, and the old one is
-   --  retired: its pages stay, because the processes running it map
-   --  them, and its launch caps launch the new version from then on
-   --  (#902). With no program called Name, it is the same as Install.
+   --  retired: its pages stay while processes run it, because they map
+   --  them, and are freed when the last one ends (#875). Its launch caps
+   --  launch the new version from then on (#902). With no program called Name, it is the same as Install.
 
    function Update
      (Executable   : interface Streams.Reader;

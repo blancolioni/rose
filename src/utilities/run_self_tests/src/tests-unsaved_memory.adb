@@ -2,7 +2,7 @@ with Ada.Text_IO;
 
 with System.Storage_Elements;
 
-with Rose.Unsaved_Memory;
+with Rose.Unsaved_Memory.Stacks;
 with Rose.Words;
 
 package body Tests.Unsaved_Memory is
@@ -27,6 +27,20 @@ package body Tests.Unsaved_Memory is
    function All_Zero (Words : Word_Array) return Boolean
    is (for all W of Words => W = 0);
 
+   type Probe_Record is
+      record
+         Fail_Now : Boolean;
+         Local_At : Integer_Address;
+         Sum      : Word_32;
+      end record;
+
+   Probe_Failed : exception;
+
+   procedure Probe (Argument : System.Address);
+   --  Called on an unsaved stack with a Probe_Record: note where a local
+   --  is, fill a kilobyte of the stack, and add it up, or raise
+   --  Probe_Failed if Fail_Now.
+
    ----------
    -- Fail --
    ----------
@@ -36,6 +50,27 @@ package body Tests.Unsaved_Memory is
       Ada.Text_IO.Put (": " & Message);
       return False;
    end Fail;
+
+   -----------
+   -- Probe --
+   -----------
+
+   procedure Probe (Argument : System.Address) is
+      Item  : Probe_Record with Import, Address => Argument;
+      Local : array (1 .. 256) of Word_32 with Volatile_Components;
+   begin
+      if Item.Fail_Now then
+         raise Probe_Failed;
+      end if;
+      for I in Local'Range loop
+         Local (I) := Word_32 (I);
+      end loop;
+      Item.Local_At := To_Integer (Local'Address);
+      Item.Sum := 0;
+      for W of Local loop
+         Item.Sum := Item.Sum + W;
+      end loop;
+   end Probe;
 
    -------------------------
    -- Unsaved_Memory_Test --
@@ -112,5 +147,45 @@ package body Tests.Unsaved_Memory is
          return Passed;
       end;
    end Unsaved_Memory_Test;
+
+   ------------------------
+   -- Unsaved_Stack_Test --
+   ------------------------
+
+   function Unsaved_Stack_Test return Boolean is
+      Item : Probe_Record;
+   begin
+      Ada.Text_IO.Put ("Unsaved stack test");
+
+      --  A process has at most eight unsaved segments, so ten calls only
+      --  work if each releases its stack.
+
+      for Call_Count in 1 .. 10 loop
+         Item := (Fail_Now => False, Local_At => 0, Sum => 0);
+         Rose.Unsaved_Memory.Stacks.Call (Probe'Access, Item'Address);
+         if Item.Local_At < Window_Base
+           or else Item.Local_At >= Window_Bound
+         then
+            return Fail ("a local isn't in the window");
+         elsif Item.Sum /= 256 * 257 / 2 then
+            return Fail ("the procedure didn't fill in its argument");
+         end if;
+      end loop;
+
+      Item.Fail_Now := True;
+      begin
+         Rose.Unsaved_Memory.Stacks.Call (Probe'Access, Item'Address);
+         return Fail ("an exception didn't come out of Call");
+      exception
+         when Probe_Failed =>
+            null;
+      end;
+
+      --  And the stack of the call that raised was released too.
+
+      Item.Fail_Now := False;
+      Rose.Unsaved_Memory.Stacks.Call (Probe'Access, Item'Address);
+      return True;
+   end Unsaved_Stack_Test;
 
 end Tests.Unsaved_Memory;
