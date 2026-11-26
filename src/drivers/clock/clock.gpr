@@ -1,16 +1,17 @@
 with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
 
 project Clock is
 
-   --  Built with the userland run-time system and the user-mode IDL
-   --  target (#367), whose packages the Makefile generates in
-   --  build/generated. The run-time system has Rose's base, capability
-   --  and system call packages.
+   --  Built with the userland run-time system and the user-mode IDL target
+   --  (#367). The run-time system has Rose's base, capability and system
+   --  call packages. The interface packages and Rose's userland packages
+   --  (src/library/rose) come from user_library.gpr (#1067), and the RTS's
+   --  own units from rose_rts.gpr (#1080).
 
    for Source_Dirs use
       ("src",
-       "build/generated",
        "../../library/kernelapi/devices");
    for Source_Files use
       ("clock.ads",
@@ -23,16 +24,7 @@ project Clock is
        "clock-server.adb",
        "rose-devices.ads",
        "rose-devices-port_io.ads",
-       "rose-devices-port_io.adb",
-       "rose-interfaces-time.ads",
-       "rose-interfaces-time-clock.ads",
-       "rose-interfaces-time-clock-server.ads",
-       "rose-interfaces-time-clock-server.adb",
-       "rose-interfaces-time-clock_admin.ads",
-       "rose-interfaces-time-clock_admin-server.ads",
-       "rose-interfaces-time-clock_admin-server.adb",
-       "rose-interfaces-processes-restorable-server.ads",
-       "rose-interfaces-processes-restorable-server.adb");
+       "rose-devices-port_io.adb");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("clock-driver.adb");

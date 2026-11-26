@@ -1,16 +1,18 @@
 with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
 
 project Uptime is
 
-   --  The user-mode IDL target's packages are generated in
-   --  build/generated (#554). The RTS's own units, its interface specs
-   --  among them, come from rose_rts.gpr (#1080).
+   --  The user-mode IDL target's packages for its own IDL files are
+   --  generated in build/generated (#554). The interface packages and
+   --  Rose's userland packages (src/library/rose) come from
+   --  user_library.gpr (#1067), and the RTS's own units from rose_rts.gpr
+   --  (#1080).
 
    for Source_Dirs use
       ("src",
-       "build/generated",
-       "../../library/rose");
+       "build/generated");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("rose-core-uptime_main.adb");

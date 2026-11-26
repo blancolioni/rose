@@ -6,21 +6,11 @@ all: surface_console
 
 # The persistent console on the screen's surface (#653). It is built with
 # the userland run-time system, and serves its interfaces through the
-# user-mode IDL target, like vga-console. It holds the surface's client,
-# and maps its buffer with Rose.Shared_Regions, which needs the Process
-# client.
+# user-mode IDL target, like vga-console, whose packages come from the
+# userland library (projects/user_library.gpr, #1067). It holds the
+# surface's client, and maps its buffer with Rose.Shared_Regions.
 
 surface_console:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	mkdir -p build/generated
-	$(USER_IDLE) \
-	    $(INTERFACES)/streams-reader.idl $(INTERFACES)/streams-writer.idl \
-	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
-	    $(INTERFACES)/screens-surface.idl $(INTERFACES)/common-resource.idl \
-	    $(INTERFACES)/storage-region.idl \
-	    $(INTERFACES)/storage-region_access.idl $(INTERFACES)/processes-process.idl \
-	    $(INTERFACES)/processes-process_control.idl \
-	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
-	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/processes-restorable.idl
 	gprbuild $(GPRBUILD_CARGS)
