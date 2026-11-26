@@ -27,3 +27,6 @@ copy:
 	    $(INTERFACES)/common-resource.idl \
 	    $(INTERFACES)/streams-seekable.idl
 	gprbuild $(GPRBUILD_CARGS)
+
+# Built for the host, to test it without Rose (#1101).
+include $(ROOT)/mk/host.mk

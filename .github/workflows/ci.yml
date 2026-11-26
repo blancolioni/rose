@@ -110,6 +110,9 @@ jobs:
       - name: Test the store's block map and free map
         run: make test-store
 
+      - name: Test the commands built for the host
+        run: make test-host
+
       - name: Build
         run: ./clean-build.sh
 

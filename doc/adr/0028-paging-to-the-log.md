@@ -109,7 +109,7 @@ A fault on a page that has a copy in the log reads that log page and maps it.
 - **Shared pages that anything maps** (ADR 0025, section 3). When the last mapping goes, a shared page is written back to its region, as now.
 - **Pages the kernel has pinned** for a call in progress: the pages of a buffer that the kernel has mapped into another process's shared slot (#519). The caller's process entry records the buffer it has lent, since a caller has one call at a time, and the kernel's `Unmap_Page` refuses to unmap those pages, so `mem` skips them (#972). The kernel says so in its log.
 
-`mem` must also never wait, while it pages, on a process whose pages it may have paged out, since only `mem` can bring them back (#914). So it writes nothing to the console then: the console calls its driver, which is a launched process (#973).
+`mem` must also never wait, while it pages, on a process whose pages it may have paged out, since only `mem` can bring them back (#914). So it writes nothing to the console then: the console calls its driver, which is a launched process (#973). Since mem is serving page faults all the time, it never writes to the console once it serves. Its messages go to the kernel's log on serial instead, through a kernel cap that init gives it (`Kernel_Log_Cap`), which involves no other process (#997).
 
 ### 9. Restore reads one entry
 

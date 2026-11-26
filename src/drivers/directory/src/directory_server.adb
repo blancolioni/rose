@@ -23,8 +23,8 @@ with Rose.Interfaces.Files.Fixed_Directory.Client;
 with Rose.Interfaces.Processes.Launch.Client;
 with Rose.Interfaces.Objects;
 with Rose.Interfaces.Files.Writable_Directory.Client;
-with Rose.Interfaces.Files.Linking_Directory;
-with Rose.Interfaces.Files.Linking_Directory.Server;
+with Rose.Interfaces.Files.Protecting_Directory;
+with Rose.Interfaces.Files.Protecting_Directory.Server;
 with Rose.Interfaces.Files.Writable_File;
 with Rose.Interfaces.Files.Writable_File.Client;
 with Rose.Interfaces.Streams.Readable;
@@ -49,7 +49,7 @@ package body Directory_Server is
    subtype Fixed_Directory_Class is
      Rose.Interfaces.Files.Fixed_Directory.Fixed_Directory_Object'Class;
 
-   Format : constant Rose.Words.Word_32 := 3;
+   Format : constant Rose.Words.Word_32 := 4;
    --  The version of this server's part of the state (#831):
    --
    --    the directory's identifier
@@ -118,14 +118,18 @@ package body Directory_Server is
          --  A special file's Stream, whose cap is Served. A special file
          --  has no process, bank or Control of the directory's: it holds
          --  a cap that it was given, and hands it out (ADR 0035).
+         Made_Read_Only : Boolean := False;
+         --  An ordinary file that Make_Read_Only made read-only (ADR 0036,
+         --  section 8): it is handed out as a File through every view,
+         --  and Get_Writable_File fails for it.
       end record;
 
    --  The directory is one object, served through Writable_Directory
    --  with the user-mode IDL target (#528).
 
    type Directory_Object is limited new
-     Rose.Interfaces.Files.Linking_Directory.Server
-       .Linking_Directory_Interface
+     Rose.Interfaces.Files.Protecting_Directory.Server
+       .Protecting_Directory_Interface
      with null record;
 
    overriding function Tree_Cap
@@ -259,6 +263,16 @@ package body Directory_Server is
    overriding function Linking_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability;
+
+   overriding function Protecting_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability;
+
+   overriding procedure Make_Read_Only
+     (Item : in out Directory_Object;
+      Name : String);
+   --  Make the ordinary file Name read-only (ADR 0036, section 8). Raises
+   --  if there is no entry Name, or it isn't an ordinary file.
 
    overriding procedure Add_Directory
      (Item      : in out Directory_Object;
@@ -548,14 +562,14 @@ package body Directory_Server is
          end case;
       end loop;
 
-      Rose.Interfaces.Files.Linking_Directory.Server.Attach
+      Rose.Interfaces.Files.Protecting_Directory.Server.Attach
         (Context, The_Directory'Access, Directory_Id);
       Rose.Replacement.Attach
         (Context'Access, Write_State'Access, Cap_Set_Service);
 
       Served := The_Directory.Writable_Directory_Cap;
       Control := Rose.Replacement.Replaceable_Cap;
-      Linking := The_Directory.Linking_Directory_Cap;
+      Linking := The_Directory.Protecting_Directory_Cap;
    end Create_Server;
 
    ----------------------
@@ -610,9 +624,9 @@ package body Directory_Server is
    overriding function Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Linking_Directory.Server.Cap_Of
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
          (Context, Item,
-          Rose.Interfaces.Files.Linking_Directory.Directory_Interface));
+          Rose.Interfaces.Files.Protecting_Directory.Directory_Interface));
 
    -----------------
    -- Entry_Count --
@@ -749,9 +763,10 @@ package body Directory_Server is
    overriding function Fixed_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Linking_Directory.Server.Cap_Of
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
          (Context, Item,
-          Rose.Interfaces.Files.Linking_Directory.Fixed_Directory_Interface));
+          Rose.Interfaces.Files.Protecting_Directory
+            .Fixed_Directory_Interface));
 
    ----------------
    -- Get_Branch --
@@ -937,7 +952,9 @@ package body Directory_Server is
    is
       pragma Unreferenced (Item);
    begin
-      if Is_Kind (Index, Rose.Interfaces.Files.Directory.Ordinary_File) then
+      if Is_Kind (Index, Rose.Interfaces.Files.Directory.Ordinary_File)
+        and then not Entries (Index).Made_Read_Only
+      then
          return File_Clients.From_Cap (Entries (Index).Served);
       else
          return File_Clients.From_Cap (Rose.Capabilities.Null_Capability);
@@ -1052,7 +1069,42 @@ package body Directory_Server is
    overriding function Linking_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Linking_Directory.Server.Cap_Of (Context, Item));
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
+         (Context, Item,
+          Rose.Interfaces.Files.Protecting_Directory
+            .Linking_Directory_Interface));
+
+   --------------------
+   -- Make_Read_Only --
+   --------------------
+
+   overriding procedure Make_Read_Only
+     (Item : in out Directory_Object;
+      Name : String)
+   is
+      pragma Unreferenced (Item);
+      Index : constant Natural := Find (Name);
+   begin
+      if Index = 0 then
+         raise Constraint_Error with "make read-only: no such entry";
+      elsif Entries (Index).Kind
+        /= Rose.Interfaces.Files.Directory.Ordinary_File
+      then
+         raise Constraint_Error with "make read-only: not an ordinary file";
+      end if;
+
+      Entries (Index).Made_Read_Only := True;
+   end Make_Read_Only;
+
+   ------------------------------
+   -- Protecting_Directory_Cap --
+   ------------------------------
+
+   overriding function Protecting_Directory_Cap
+     (Item : in out Directory_Object)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
+         (Context, Item));
 
    ----------------
    -- Read_State --
@@ -1089,6 +1141,9 @@ package body Directory_Server is
             Rose.Interfaces.Files.Directory.File_Kind'Read (Stream, Item.Kind);
             if Version >= 3 then
                Boolean'Read (Stream, Item.Linked);
+            end if;
+            if Version >= 4 then
+               Boolean'Read (Stream, Item.Made_Read_Only);
             end if;
 
             Item.Served := Named.Cap (Cap_Name (Index, "Served"));
@@ -1213,9 +1268,9 @@ package body Directory_Server is
    overriding function Tree_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Linking_Directory.Server.Cap_Of
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
          (Context, Item,
-          Rose.Interfaces.Files.Linking_Directory.Tree_Interface));
+          Rose.Interfaces.Files.Protecting_Directory.Tree_Interface));
 
    ----------------------------
    -- Writable_Directory_Cap --
@@ -1224,9 +1279,9 @@ package body Directory_Server is
    overriding function Writable_Directory_Cap
      (Item : in out Directory_Object)
       return Rose.Capabilities.Capability
-   is (Rose.Interfaces.Files.Linking_Directory.Server.Cap_Of
+   is (Rose.Interfaces.Files.Protecting_Directory.Server.Cap_Of
          (Context, Item,
-          Rose.Interfaces.Files.Linking_Directory
+          Rose.Interfaces.Files.Protecting_Directory
             .Writable_Directory_Interface));
 
    -----------------
@@ -1241,7 +1296,7 @@ package body Directory_Server is
       Rose.Words.Word_32'Write (Stream, Format);
       Rose.Objects.Capability_Identifier'Write
         (Stream,
-         Rose.Interfaces.Files.Linking_Directory.Server.Identifier_Of
+         Rose.Interfaces.Files.Protecting_Directory.Server.Identifier_Of
            (Context, The_Directory'Access));
       Natural'Write (Stream, Entry_Count);
 
@@ -1256,6 +1311,7 @@ package body Directory_Server is
             Rose.Interfaces.Files.Directory.File_Kind'Write (Stream, Item
               .Kind);
             Boolean'Write (Stream, Item.Linked);
+            Boolean'Write (Stream, Item.Made_Read_Only);
 
             Named.Add (Cap_Name (Index, "Served"), Item.Served);
             if Item.Kind /= Rose.Interfaces.Files.Directory.Special_File

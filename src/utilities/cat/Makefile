@@ -16,3 +16,6 @@ cat:
 	    rose-core-cat.idl $(INTERFACES)/rose-core.idl \
 	    $(INTERFACES)/streams-reader.idl
 	gprbuild $(GPRBUILD_CARGS)
+
+# Built for the host, to test it without Rose (#1101).
+include $(ROOT)/mk/host.mk

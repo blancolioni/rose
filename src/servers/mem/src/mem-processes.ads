@@ -262,11 +262,6 @@ package Mem.Processes is
      (Process           : Process_Id;
       New_Virtual_Bound : Rose.Addresses.Virtual_Page_Address);
 
-   procedure Allocate_Physical_Page
-     (Process       : Process_Id;
-      Virtual_Page  : Rose.Addresses.Virtual_Page_Address;
-      R, W, X, P    : Boolean := False);
-
    procedure Iterate_Saved_Processes
      (Process : not null access procedure (Pid : Process_Id));
    --  Call Process for each process that goes into a checkpoint: every

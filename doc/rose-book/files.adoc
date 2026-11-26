@@ -64,6 +64,10 @@ A file or directory comes in two forms, and the type of a cap says which right i
   `Add_Special_File` adds one, and the directory hands it out rather than serving it: a `Directory` gives its `Reader`, and a `Fixed_Directory` its `Stream`.
   Deleting it removes the entry, but not the server, which the directory didn't launch.
 * *The system directory* is made at install, and holds `null`, the null stream: reading it gives end of file, and writing to it succeeds and keeps nothing.
+  It also holds `version`, the Rose version and build id, which init writes and makes read-only.
+* *A file can be read-only* (ADR 0036, section 8).
+  `Protecting_Directory.Make_Read_Only` marks an ordinary file, and from then on every view hands it out as a `File`: `Get_Writable_File` fails for it, so nothing can make a version of it either.
+  Only whoever launches a directory has that right, as for linking a directory in, so `cat //system/version` works, `echo x > //system/version` is refused, and kilo opens it read-only.
   Login gives it to petal as a `Fixed_Directory`, which petal names `system`, so `cat //system/null` and `echo hi > //system/null` work, and nobody can change what is in it.
   A command gets it only as an argument the user names.
 * *A directory is a tree* (ADR 0042).

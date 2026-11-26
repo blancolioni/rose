@@ -9,6 +9,13 @@ package Rose.Console_IO is
    procedure Open
      (Console_Cap : Rose.Capabilities.Capability);
 
+   procedure Open_Kernel_Log
+     (Log_Cap : Rose.Capabilities.Capability);
+   --  From now on, write to the kernel's log (Init_Capabilities.
+   --  Kernel_Log_Cap), which goes to serial, and close the console. For a
+   --  server that must never wait on the console, as mem must not while it
+   --  pages (#997).
+
    procedure Put (Ch : Character);
    procedure Put (Text : String);
    procedure Put (Num : Integer);

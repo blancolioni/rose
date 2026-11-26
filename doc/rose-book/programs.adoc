@@ -237,17 +237,45 @@ Then run it from petal by its name: `touch notes`.
 
 In QEMU, `scripts/test-boot` installs and boots the image, and the other `scripts/test-*` scripts show how to type at petal and read what it writes.
 
+[#testing-on-the-host]
 == Testing on the Host
 
-A command can't be built for the host yet: its main and its arguments are Rose's (#1101).
-What can be tested on the host is code that doesn't use Rose's interfaces, so the pattern is to keep the logic in plain Ada packages, and the command thin:
+A command can be built for the host's own Ada run-time system, and run there, so that it can be tested without installing and booting Rose (#1101).
+Its source doesn't change: `idle --target host` generates its spec, main and metadata (see <<host-target>>), and the host's side of it is in `src/library/host`.
+
+[source,sh]
+----
+$ make -C src/utilities/copy host
+$ src/utilities/copy/build/host/bin/copy notes.txt backup.txt
+----
+
+* *Arguments* are bound as petal binds them, from the command's metadata: options by name (`--name=VALUE`, `--no-name` for a Boolean, `-x` for a short name), then the rest by position, with `--` ending the options.
+  `--help` and `--version` write what petal writes.
+  A wrong command line exits with status 2, a command that raises `Command_Failed` writes its message after its name on standard error and exits with 1, and one that completes exits with 0.
+* *Standard streams* are the process's own.
+* *Interface arguments and roles* are host backings: types in `Rose.Host` that implement the interfaces' object types over the host's files, streams and clock.
+  `interfaces/host-backings.txt` lists them.
+  A directory that isn't given is the current one, a file is a path, a `Transactional_Writable_File` is a version, a copy beside the file that `Commit` puts in its place (ADR 0026), and the clock is the host's.
+  A backing fails a call by raising `Invocation_Error`, as a client does when its server fails it.
+
+idle refuses, with a message, what the host can't run yet: a command that takes an interface with no backing, a server, a replaceable command, a system cap, an `out` argument, or a list of interfaces.
+
+To build a command for the host, its `Makefile` includes `mk/host.mk`, after its own rules:
+
+[source,make]
+----
+include $(ROOT)/mk/host.mk
+----
+
+`make test-host` builds the commands that have it, which are listed in `HOST_COMMANDS` in the top-level `Makefile`, and runs `scripts/test-host`, which checks what each one writes, its exit status, and what it leaves in its directory.
+CI runs it before it builds Rose, since it needs only idle.
+
+Code that doesn't use Rose's interfaces can also be tested on its own, with a project that names its plain Ada sources:
 
 * `Rose.Drawing` and `Rose.Drawing.Text` are tested by `make test-drawing`, with a project of their own in `src/library/drawing/tests`.
 * The store's block and free maps are tested by `make test-store`.
 * Petal's `sudo` decisions are plain Ada, tested by `make -C src/utilities/petal test`.
 * `Rose.Crypto` is tested against its test vectors in `src/tests/crypto`.
-
-Each has a project that names the plain Ada sources and builds them with the host's own GNAT and run-time system.
 
 == Alire
 

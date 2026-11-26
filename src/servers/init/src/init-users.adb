@@ -16,6 +16,8 @@ with Rose.Interfaces.Files.Writable_Directory.Client;
 with Rose.Interfaces.Files.Writable_File.Client;
 with Rose.Interfaces.Streams.Stream.Client;
 with Rose.Interfaces.Files.Linking_Directory.Client;
+with Rose.Interfaces.Files.Protecting_Directory.Client;
+with Rose.Build;
 
 with Init.Calls;
 
@@ -436,6 +438,43 @@ package body Init.Users is
       Rose.Interfaces.Files.Linking_Directory.Client.Open (Linker, Linking);
       Rose.Interfaces.Files.Linking_Directory.Client.Add_Directory
         (Linker, "null-directory", Null_Directory);
+
+      --  version, the Rose version and build id, as an ordinary file that
+      --  nobody can change: init writes it, and makes it read-only with
+      --  the right that only it has (ADR 0036, section 8; #1121). Init
+      --  keeps no cap to it.
+
+      declare
+         use Rose.Interfaces.Files.Writable_File.Client;
+         use Rose.Interfaces.Streams.Releasable_Writer.Client;
+         Text      : constant String := Rose.Build.Full_Name & ASCII.LF;
+         Data      : Storage_Array (1 .. Text'Length);
+         File      : Writable_File_Client :=
+           Rose.Interfaces.Files.Writable_Directory.Client.Create_File
+             (Directory, "version");
+         Protector : Rose.Interfaces.Files.Protecting_Directory.Client
+           .Protecting_Directory_Client;
+      begin
+         if Get_Interface_Cap (File) /= Rose.Capabilities.Null_Capability
+         then
+            for I in Text'Range loop
+               Data (Storage_Offset (I - Text'First + 1)) :=
+                 Character'Pos (Text (I));
+            end loop;
+            declare
+               Writer : Releasable_Writer_Client := Rewrite (File);
+            begin
+               Write (Writer, Data);
+               Release (Writer);
+               Close (Writer);
+            end;
+            Close (File);
+            Rose.Interfaces.Files.Protecting_Directory.Client.Open
+              (Protector, Linking);
+            Rose.Interfaces.Files.Protecting_Directory.Client.Make_Read_Only
+              (Protector, "version");
+         end if;
+      end;
 
       Rose.System_Calls.Initialize_Send (Params, Served);
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word (Fixed_Ancestor));

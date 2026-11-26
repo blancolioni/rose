@@ -1,9 +1,15 @@
 with Rose.Interfaces.Streams.Writer.Client;
+with Rose.Invocation;
 with Rose.System_Calls;
 
 package body Rose.Console_IO is
 
    Client : Rose.Interfaces.Streams.Writer.Client.Writer_Client;
+   Console_Open : Boolean := False;
+
+   Kernel_Log : Rose.Capabilities.Capability :=
+                  Rose.Capabilities.Null_Capability;
+   --  When it is set, text goes to the kernel's log instead (#997).
 
    Text_Buffer   : String (1 .. 4096)
      with Alignment => 4096;
@@ -42,8 +48,29 @@ package body Rose.Console_IO is
    is
    begin
       Rose.Interfaces.Streams.Writer.Client.Open (Client, Console_Cap);
+      Console_Open := True;
       Buffer_Length := 0;
    end Open;
+
+   ---------------------
+   -- Open_Kernel_Log --
+   ---------------------
+
+   procedure Open_Kernel_Log
+     (Log_Cap : Rose.Capabilities.Capability)
+   is
+   begin
+      if Buffer_Length > 0 then
+         Send_Buffer;
+      end if;
+
+      if Console_Open then
+         Rose.Interfaces.Streams.Writer.Client.Close (Client);
+         Console_Open := False;
+      end if;
+
+      Kernel_Log := Log_Cap;
+   end Open_Kernel_Log;
 
    ---------
    -- Put --
@@ -272,9 +299,22 @@ package body Rose.Console_IO is
             Buffer_Size  => 4096);
       end if;
 
-      Rose.Interfaces.Streams.Writer.Client.Write
-        (Item   => Client,
-         Buffer => Storage_Buffer);
+      if Rose.Capabilities."/="
+        (Kernel_Log, Rose.Capabilities.Null_Capability)
+      then
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Kernel_Log);
+            Rose.System_Calls.Send_Storage_Array
+              (Params, Storage_Buffer, False);
+            Rose.System_Calls.Invoke_Capability (Params);
+         end;
+      else
+         Rose.Interfaces.Streams.Writer.Client.Write
+           (Item   => Client,
+            Buffer => Storage_Buffer);
+      end if;
       Buffer_Length := 0;
    end Send_Buffer;
 

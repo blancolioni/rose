@@ -138,7 +138,8 @@ stages:
       oid: 4
       priority: memory
       caps: [console_interface, region_count, get_region, page_on, trace,
-             hold_calls, release_calls, swap_processes, process_state]
+             hold_calls, release_calls, swap_processes, process_state,
+             kernel_log]
       exports:
         mem: Processes.Memory.Memory_Interface
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint

@@ -1,0 +1,21 @@
+# The host backings (#1101): for each interface that a command built for
+# the host can take, the type that implements its object type over the
+# host's files, streams and clock. idle --target host --host-backings
+# reads this, and refuses a command that takes any other interface
+# (idle#133). The types are in src/library/host; each has an Open that
+# binds an argument, from the text the user gave, or "".
+
+Files.Directory                    Rose.Host.Files.Directory
+Files.Fixed_Directory              Rose.Host.Files.Directory
+Files.Writable_Directory           Rose.Host.Files.Directory
+Files.File                         Rose.Host.Files.File
+Files.Writable_File                Rose.Host.Files.File
+Files.Transactional_Writable_File  Rose.Host.Files.Version
+
+Streams.Reader                     Rose.Host.Streams.Reader
+Streams.Releasable_Reader          Rose.Host.Streams.Reader
+Streams.Seekable_Reader            Rose.Host.Streams.Reader
+Streams.Writer                     Rose.Host.Streams.Writer
+Streams.Releasable_Writer          Rose.Host.Streams.Writer
+
+Time.Clock                         Rose.Host.Time.Clock

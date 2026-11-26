@@ -53,6 +53,9 @@ package body Mem.Server is
    Process_State_Cap  : Rose.Capabilities.Capability := 0;
    --  The kernel's handover caps (#862), which init gives mem.
 
+   Kernel_Log_Cap     : Rose.Capabilities.Capability := 0;
+   --  Where mem's messages go once it serves (#997).
+
 
    Request_Checkpoint_Cap : Rose.Capabilities.Capability := 0;
    --  The checkpoint server's Checkpointer.Request_Checkpoint, from the
@@ -641,6 +644,7 @@ package body Mem.Server is
       Release_Calls_Cap  := Get_Cap (7);
       Swap_Processes_Cap := Get_Cap (8);
       Process_State_Cap  := Get_Cap (9);
+      Kernel_Log_Cap     := Get_Cap (10);
 
       --  Nothing reads the cap set again (#826).
 
@@ -650,6 +654,14 @@ package body Mem.Server is
 
       Mem.Calls.Load_Memory_Map;
       Mem.Page_Table.Initialize;
+
+      --  From here on, mem writes to the kernel's log, never the console.
+      --  The console calls its driver, a launched process, and if mem has
+      --  dropped one of that process's pages, the driver faults to mem,
+      --  which waits on the console: a deadlock (#997, ADR 0028 section
+      --  8). The kernel's log is serial, and needs no other process.
+
+      Rose.Console_IO.Open_Kernel_Log (Kernel_Log_Cap);
 
       Rose.Interfaces.Processes.Memory.Server.Create_Server
         (Server_Context => Server,
