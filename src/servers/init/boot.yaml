@@ -139,7 +139,7 @@ stages:
       priority: memory
       caps: [console_interface, region_count, get_region, page_on, trace,
              hold_calls, release_calls, swap_processes, process_state,
-             kernel_log]
+             kernel_log, free_caps]
       exports:
         mem: Processes.Memory.Memory_Interface
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint

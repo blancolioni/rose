@@ -144,7 +144,9 @@ package body Rose.Kernel.Processes.Init is
            Init_Caps.Checkpoint_Hold_Cap   =>
              Kernel (Kernel_Caps.Checkpoint_Hold_Endpoint),
            Init_Caps.Kernel_Log_Cap        =>
-             Kernel (Kernel_Caps.Kernel_Log_Endpoint));
+             Kernel (Kernel_Caps.Kernel_Log_Endpoint),
+           Init_Caps.Free_Caps_Cap         =>
+             Kernel (Kernel_Caps.Free_Caps_Endpoint));
 
    begin
       for Index in Layouts'Range loop

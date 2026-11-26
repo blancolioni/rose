@@ -645,6 +645,7 @@ package body Mem.Server is
       Swap_Processes_Cap := Get_Cap (8);
       Process_State_Cap  := Get_Cap (9);
       Kernel_Log_Cap     := Get_Cap (10);
+      Free_Caps_Cap      := Get_Cap (11);
 
       --  Nothing reads the cap set again (#826).
 

@@ -98,6 +98,17 @@ package body Mem.Processes is
    subtype Kernel_Process_Client is
      Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
 
+   Launch_Reserve : constant := Rose.Limits.Max_Processes + 64;
+   --  Mem refuses a launch when it can create fewer caps than this. Each
+   --  call to mem needs a reply cap in its table, and a process it can't
+   --  reply to faults: the reserve leaves one for each process that may
+   --  be waiting on mem, and room for the caps of one more launch, about
+   --  30 (#1131).
+
+   function Free_Caps return Natural;
+   --  How many caps mem can still create, from the kernel. Natural'Last
+   --  if mem doesn't have the kernel's cap.
+
    procedure Keep_Used_Caps (Process : in out Kernel_Process_Client);
    --  Delete the caps of an opened Kernel_Process that mem never calls
    --  after Get_Object_Id: it keeps Destroy, Resume and Fault (#1131).
@@ -572,7 +583,30 @@ package body Mem.Processes is
       return 0;
    end Find_Process;
 
-   ------------------
+   ---------------
+   -- Free_Caps --
+   ---------------
+
+   function Free_Caps return Natural is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Free_Caps_Cap = Rose.Capabilities.Null_Capability then
+         return Natural'Last;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Free_Caps_Cap);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return Natural'Last;
+      end if;
+
+      return Natural (Params.Data (0));
+   end Free_Caps;
+
+   ---------------------
    -- Get_Bank_Cap --
    ------------------
 
@@ -1479,6 +1513,15 @@ package body Mem.Processes is
       Client : Rose.Interfaces.Processes.Kernel_Process.Client
         .Kernel_Process_Client;
    begin
+      --  Few caps left: refuse the launch while every caller can still
+      --  have a reply cap. Like running out of slots below, the caller
+      --  fails the launch, and nothing is written (#1131, #915).
+
+      if not Boot_Module and then Free_Caps < Launch_Reserve then
+         Rose.System_Calls.Delete_Cap (Process_Cap);
+         return 0;
+      end if;
+
       while Process_Table (Next_Pid).State /= Available loop
          if Next_Pid = Last then
             Next_Pid := First;
