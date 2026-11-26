@@ -478,6 +478,7 @@ package body Mem.Server is
 
    procedure Ask_For_Checkpoint is
       use type Rose.Capabilities.Capability;
+      use type Rose.Invocation.Invocation_Error;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       if Checkpoint_Requested
@@ -493,6 +494,18 @@ package body Mem.Server is
                                others              => False);
       Params.Cap := Request_Checkpoint_Cap;
       Rose.System_Calls.Invoke_Capability (Params);
+
+      --  A send that doesn't wait is refused while the checkpoint server
+      --  is in a call of its own, such as waiting for the log to commit
+      --  (#984). mem asks again at its next fault or commit, rather than
+      --  waiting for a checkpoint that nobody is taking.
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Error = Rose.Invocation.Request_Would_Block
+      then
+         return;
+      end if;
+
       Checkpoint_Requested := True;
    end Ask_For_Checkpoint;
 
