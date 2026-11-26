@@ -421,6 +421,15 @@ package body Mem.Page_Table is
       return Mapped_Pages (Position).Mapped;
    end Is_Mapped;
 
+   -------------------
+   -- Is_Persistent --
+   -------------------
+
+   function Is_Persistent (Position : Cursor) return Boolean is
+   begin
+      return Mapped_Pages (Position).Persistent;
+   end Is_Persistent;
+
    -----------------
    -- Is_Readable --
    -----------------
