@@ -57,13 +57,17 @@ package body Mem.Virtual_Map is
    --  page, which the caller frees or uses (ADR 0028, section 5; #973). A
    --  clean page has a copy in the log or in its segment's region, which
    --  a later fault reads, so it can be dropped without writing anything.
-   --  Only pages of persistent, writable segments that are not shared are
-   --  dropped: other pages have no copy, or are shared, and boot modules
-   --  are not in mem's page table. Success is False if there is none.
+   --  Only pages of persistent segments that are not shared are dropped:
+   --  other pages have no copy, or are shared, and boot modules are not
+   --  in mem's page table. A page of a read-only segment is dropped too
+   --  (#1116), unless it is cached and another process maps it. Success
+   --  is False if there is none.
 
    function Is_Candidate (Position : Mem.Page_Table.Cursor) return Boolean;
-   --  The page at Position is of a persistent, writable segment, and is
-   --  not shared: one that mem can page out, if it is clean or changed.
+   --  The page at Position is of a persistent segment, and is not shared:
+   --  one that mem can page out, if it is clean or changed. A page of a
+   --  read-only segment is never changed, and is read again from its
+   --  segment's region, so its segment must have one.
 
    procedure Write_Changed_Pages (Success : out Boolean);
    --  Page out a batch of changed pages: unmap them, append them to the
@@ -222,16 +226,33 @@ package body Mem.Virtual_Map is
             return;
          end if;
 
-         --  The kernel refuses a page of a buffer that the process has
-         --  lent to a server in its call in progress, and says so in its
-         --  log (#972). The page is passed over.
+         --  A cached page of a read-only segment that another process
+         --  maps stays. Its last mapping can go, and the page then leaves
+         --  the cache, since its memory is used again (#1116).
 
-         Mem.Calls.Unmap
-           (Process  =>
-              Mem.Processes.Process_Object_Id
-                (Mem.Page_Table.Process (Position)),
-            Virtual  => Mem.Page_Table.Virtual_Address (Position),
-            Unmapped => Taken);
+         declare
+            Physical : constant Rose.Addresses.Physical_Page_Address :=
+                         Mem.Page_Table.Physical_Address (Position);
+         begin
+            if not Mem.Page_Cache.Is_Last_Mapping (Physical) then
+               return;
+            end if;
+
+            --  The kernel refuses a page of a buffer that the process has
+            --  lent to a server in its call in progress, and says so in
+            --  its log (#972). The page is passed over.
+
+            Mem.Calls.Unmap
+              (Process  =>
+                 Mem.Processes.Process_Object_Id
+                   (Mem.Page_Table.Process (Position)),
+               Virtual  => Mem.Page_Table.Virtual_Address (Position),
+               Unmapped => Taken);
+
+            if Taken then
+               Mem.Page_Cache.Forget (Physical);
+            end if;
+         end;
       end Try_Page;
 
       Position : Mem.Page_Table.Cursor;
@@ -278,20 +299,20 @@ package body Mem.Virtual_Map is
       Page_Object : Rose.Objects.Object_Id;
       Valid, Readable, Writable, Executable, Persistent : Boolean;
    begin
-      if Mem.Shared_Pages.Is_Shared
-        (Mem.Page_Table.Physical_Address (Position))
-      then
-         return False;
-      end if;
+      --  The segment first, and the table of shared pages last: that
+      --  looks through every entry, and a framebuffer's surface has
+      --  hundreds, so a sweep that asked first was slow (#1116).
 
       Mem.Processes.Get_Process_Segment
         (Pid, Virt, Page_Object,
          Valid, Readable, Writable, Executable, Persistent);
 
       return Valid
-        and then Writable
         and then Persistent
-        and then Mem.Processes.Shared_Page (Pid, Virt) = 0;
+        and then (Writable or else Page_Object /= 0)
+        and then Mem.Processes.Shared_Page (Pid, Virt) = 0
+        and then not Mem.Shared_Pages.Is_Shared
+          (Mem.Page_Table.Physical_Address (Position));
    end Is_Candidate;
 
    ------------------

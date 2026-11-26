@@ -23,11 +23,6 @@
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk.
 #
-# The machine has 64 MB, not the other tests' 32: the screen's surface is
-# a shared region of 768 pages, and with it, the test install's programs
-# leave mem short of pages during the self tests, where it livelocks
-# (#1116, #1143).
-#
 # The screen's text is read from QEMU's screen dumps by fb-text.py. It
 # takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
@@ -40,7 +35,6 @@ command -v qemu-system-i386 > /dev/null || {
     echo "qemu-system-i386 not found"
     exit 2
 }
-QEMU_MEMORY=64
 . "$HERE/qemu-test-lib.sh"
 
 screen () {

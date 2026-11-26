@@ -52,7 +52,11 @@ A persistent process can keep part of its memory out of every checkpoint, for so
 
 The consoles keep what is typed there until it is read: they are persistent, and a checkpoint can come while a password is half typed.
 A restore drops what was typed anyway (#523).
-Auth still hashes a password on its stack, which a checkpoint saves (#1140).
+
+Something that is worked on, not just held, leaves copies on the stack, and so does whatever it calls.
+`Rose.Unsaved_Memory.Stacks.Call` runs a procedure on a stack of its own in unsaved memory, and zeroes and releases the stack when the procedure returns (#1140).
+Auth hashes passwords this way.
+Otherwise a checkpoint during a hash, which takes about a second in QEMU, would save the HMAC pads from auth's stack, and each pad is the password XORed with a constant.
 
 === Page Objects
 

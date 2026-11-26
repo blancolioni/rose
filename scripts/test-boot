@@ -25,8 +25,8 @@
 #      left starting (#915), stops the machine, and runs check-log.py on
 #      the disk, which has to find the checkpoint log consistent; and
 #      checks that the marker of hold_transient, a transient process
-#      (#524), and the first user's password (#1059) are nowhere on the
-#      disk.
+#      (#524), and the first user's password (#1059), and the HMAC pads
+#      that auth makes from it (#1140), are nowhere on the disk.
 #
 # It takes about ten minutes, and needs qemu-system-i386, qemu-img and
 # python3. It exits with 0 if everything passed, and keeps the disk image
@@ -338,16 +338,34 @@ grep -q "paged out before the checkpoint" "$WORK/check-log.out" || {
 # was being typed (#1132).
 # Any six characters of it in a row count: a line that was read stayed
 # in the console's buffer until later lines were typed over it, and the
-# next one could cover only its start.
+# next one could cover only its start. So do six of the HMAC pads that
+# auth's hash makes from it, the password XORed with 36 and with 5C
+# (hex), which a checkpoint during a hash would save from auth's stack
+# (#1140).
 echo "Looking for the first user's password on the disk"
-windows=$(echo "$first_password" | awk '{
-    for (i = 1; i + 5 <= length($0); i++) {
-        printf "%s%s", sep, substr($0, i, 6); sep = "|"
-    }
-}')
-if grep -q -a -E "$windows" "$DISK"; then
-    echo "FAIL: the first user's password is on the disk;" \
-         "the disk image is in $WORK"
+found=$(python3 - "$DISK" "$first_password" << 'EOF'
+import mmap
+import re
+import sys
+
+disk, password = sys.argv[1], sys.argv[2].encode()
+names = {0: "the password", 0x36: "its inner pad", 0x5C: "its outer pad"}
+forms = {}
+for key, name in names.items():
+    form = bytes(c ^ key for c in password)
+    for i in range(len(form) - 5):
+        forms[form[i:i + 6]] = name
+pattern = re.compile(b"|".join(re.escape(f) for f in forms))
+with open(disk, "rb") as f:
+    data = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+    m = pattern.search(data)
+    if m:
+        print("%s at byte %d" % (forms[m.group()], m.start()))
+EOF
+)
+if [ -n "$found" ]; then
+    echo "FAIL: the first user's password is on the disk: $found;"
+    echo "the disk image is in $WORK"
     exit 1
 fi
 

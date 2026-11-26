@@ -37,4 +37,14 @@ package Mem.Page_Cache is
    --  Take out of the cache a page that nothing maps, so that its memory
    --  can be used again. Success is False if there is none.
 
+   function Is_Last_Mapping
+     (Physical : Rose.Addresses.Physical_Page_Address)
+      return Boolean;
+   --  Physical is not a cached page, or only one process maps it: a page
+   --  that can be unmapped to use its memory again (#1116).
+
+   procedure Forget (Physical : Rose.Addresses.Physical_Page_Address);
+   --  Take Physical out of the cache, if it is there, because its last
+   --  mapping has gone and its memory is used again.
+
 end Mem.Page_Cache;
