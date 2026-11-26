@@ -7,6 +7,7 @@ with Rose.Limits;
 with Rose.Objects;
 with Rose.Words;
 
+with Mem.Calls;
 with Mem.Cleaning;
 with Mem.Log_Index;
 with Mem.Page_Log;
@@ -34,6 +35,29 @@ package body Mem.Checkpoints is
      with Import, Address => Checkpoint_Header'Address;
    Shared_Header : Shared_Header_Page
      with Import, Address => Checkpoint_Header'Address;
+
+   type Save_Page is new System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size)
+     with Alignment => Rose.Limits.Page_Size;
+
+   Save_Buffer : Save_Page;
+   --  The kernel copies each saved page here, as it was when the
+   --  checkpoint started (ADR 0030, section 4).
+
+   Written : Mem.Calls.Written_Pages
+     (1 .. Rose.Limits.Checkpoint_Written_Pages);
+   --  The pages that processes wrote during the checkpoint, from the
+   --  kernel. Neither is on the stack, which is small.
+
+   procedure Save_Page_Contents
+     (Physical : Rose.Addresses.Physical_Page_Address;
+      Append   : not null access procedure (Buffer : System.Address));
+   --  Append Physical's contents when the checkpoint started.
+
+   procedure End_Copies (Saved : Boolean);
+   --  End the kernel's copies, and mark the pages written during the
+   --  checkpoint as changed, so that the next checkpoint saves them (ADR
+   --  0030, section 5).
 
    procedure Write_Tables
      (Append     : not null access procedure (Buffer : System.Address);
@@ -150,6 +174,19 @@ package body Mem.Checkpoints is
             return;
          end if;
 
+         --  A page whose frame was filled since the checkpoint started
+         --  isn't in it: the kernel's tables are from the start. The next
+         --  checkpoint saves it (ADR 0030, section 1).
+
+         if not Mem.Calls.In_Checkpoint
+           (Mem.Page_Table.Physical_Address (Position))
+         then
+            Mem.Page_Table.Set_Next_Checkpoint (Position, True);
+            return;
+         end if;
+
+         Mem.Page_Table.Set_Next_Checkpoint (Position, False);
+
          if Checkpoint_Header.Count = Max_Page_References then
             Append (Checkpoint_Header'Address);
             Reset_Header;
@@ -172,9 +209,11 @@ package body Mem.Checkpoints is
          Physical : constant Rose.Addresses.Physical_Page_Address :=
                       Mem.Page_Table.Physical_Address (Position);
       begin
-         Mem.Page_Table.Set_Read_Only (Position);
-         if not Mem.Shared_Pages.Is_Shared (Physical) then
-            Mem.Virtual_Map.With_Page (Physical, Append_Batch_Page'Access);
+         if Mem.Shared_Pages.Is_Shared (Physical) then
+            Mem.Page_Table.Set_Read_Only (Position);
+         elsif not Mem.Page_Table.Is_Next_Checkpoint (Position) then
+            Mem.Page_Table.Set_Read_Only (Position);
+            Save_Page_Contents (Physical, Append_Batch_Page'Access);
          end if;
       end Write_Page;
 
@@ -186,6 +225,7 @@ package body Mem.Checkpoints is
       if not Mem.Page_Log.Is_Available then
          Rose.Console_IO.Put_Line
            ("mem: checkpoint: no Page_Log; nothing saved");
+         End_Copies (Saved => False);
          return;
       end if;
 
@@ -238,7 +278,65 @@ package body Mem.Checkpoints is
             Mem.Shared_Pages.Clear_Checkpoint_Pages;
          end if;
       end if;
+
+      --  After the dirty pages are cleared, so that the pages written
+      --  during the checkpoint stay changed. In the same request, so
+      --  that they are in mem's tables before it handles a fault or a
+      --  page-out (ADR 0030, section 5).
+
+      End_Copies (Saved => not Failed);
    end Checkpoint;
+
+   ----------------
+   -- End_Copies --
+   ----------------
+
+   procedure End_Copies (Saved : Boolean) is
+      Last : Natural;
+   begin
+      if not Mem.Calls.Has_Page_Copies then
+         return;
+      end if;
+
+      Mem.Calls.End_Page_Copies (Saved, Written, Last);
+
+      for Item of Written (1 .. Last) loop
+         declare
+            Pid : constant Mem.Process_Id :=
+                    Mem.Processes.Get_Process_Id (Item.Process);
+         begin
+            if Pid /= Mem.Null_Process_Id then
+               declare
+                  Position : constant Mem.Page_Table.Cursor :=
+                               Mem.Page_Table.Find (Pid, Item.Page);
+               begin
+                  if Mem.Page_Table.Has_Element (Position) then
+                     Mem.Page_Table.Set_Written (Position);
+                     Mem.Shared_Pages.Set_Modified
+                       (Mem.Page_Table.Physical_Address (Position));
+                  end if;
+               end;
+            end if;
+         end;
+      end loop;
+   end End_Copies;
+
+   ------------------------
+   -- Save_Page_Contents --
+   ------------------------
+
+   procedure Save_Page_Contents
+     (Physical : Rose.Addresses.Physical_Page_Address;
+      Append   : not null access procedure (Buffer : System.Address))
+   is
+   begin
+      if Mem.Calls.Has_Page_Copies then
+         Mem.Calls.Copy_Saved_Page (Physical, Save_Buffer'Address);
+         Append (Save_Buffer'Address);
+      else
+         Mem.Virtual_Map.With_Page (Physical, Append);
+      end if;
+   end Save_Page_Contents;
 
    ------------------------
    -- Write_Shared_Pages --
@@ -326,7 +424,7 @@ package body Mem.Checkpoints is
       is
          pragma Unreferenced (Page);
       begin
-         Mem.Virtual_Map.With_Page (Physical, Append);
+         Save_Page_Contents (Physical, Append);
       end Write_Page;
 
    begin

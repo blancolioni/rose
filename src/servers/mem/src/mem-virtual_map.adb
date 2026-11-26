@@ -411,20 +411,24 @@ package body Mem.Virtual_Map is
                   Executable    : Boolean;
                   Persistent    : Boolean)
    is
-      pragma Unreferenced (Writable);
    begin
       --  Room in the table first, so that the page is tracked. The page
       --  being mapped isn't in the table yet, so it isn't freed (#591).
 
       Keep_Entries;
 
+      --  Every page is mapped read-only, so that mem sees its first write.
+      --  During a checkpoint, the kernel sees it instead, if the page is
+      --  persistent and its segment writable (ADR 0030, section 3).
+
       Mem.Calls.Map
-        (Process    => Process,
-         Physical   => Physical_Page,
-         Virtual    => Virtual_Page,
-         Readable   => Readable,
-         Writeable  => False,
-         Executable => Executable);
+        (Process       => Process,
+         Physical      => Physical_Page,
+         Virtual       => Virtual_Page,
+         Readable      => Readable,
+         Writeable     => False,
+         Executable    => Executable,
+         Write_Tracked => Writable and then Persistent);
       Mem.Page_Table.Insert
         (Process    => Mem.Processes.Get_Process_Id (Process),
          Physical   => Physical_Page,

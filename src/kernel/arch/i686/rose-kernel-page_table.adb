@@ -5,6 +5,7 @@ with Rose.Addresses;
 with Rose.Words;
 
 with Rose.Boot.Console;
+with Rose.Kernel.Checkpoint_Copies;
 with Rose.Kernel.Heap;
 
 package body Rose.Kernel.Page_Table is
@@ -16,7 +17,7 @@ package body Rose.Kernel.Page_Table is
    type Page_Entry is
       record
          PFA                  : Physical_Page_Address := 0;
-         Available_11         : Boolean               := False;
+         Write_Tracked        : Boolean               := False;
          Managed              : Boolean               := False;
          Checkpoint_Read_Only : Boolean               := False;
          Global               : Boolean               := False;
@@ -43,7 +44,7 @@ package body Rose.Kernel.Page_Table is
          Global               at 1 range 0 .. 0;
          Checkpoint_Read_Only at 1 range 1 .. 1;
          Managed              at 1 range 2 .. 2;
-         Available_11         at 1 range 3 .. 3;
+         Write_Tracked        at 1 range 3 .. 3;
          PFA                  at 1 range 4 .. 23;
       end record;
 
@@ -114,7 +115,8 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Managed        : Boolean);
+      Managed        : Boolean;
+      Write_Tracked  : Boolean := False);
 
    procedure Unmap_Page
      (Directory      : in out Page_Table_Array;
@@ -123,6 +125,26 @@ package body Rose.Kernel.Page_Table is
    procedure Invalidate_Page
      (Virtual_Page : Rose.Addresses.Virtual_Page_Address);
    --  Drop the TLB entry for Virtual_Page in the current address space
+
+   function Entry_Address
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return System.Address;
+   --  The address of Virtual_Page's page table entry, or Null_Address if
+   --  it has no page table.
+
+   Source_Window : Rose.Addresses.Virtual_Page_Address := 0;
+   Target_Window : Rose.Addresses.Virtual_Page_Address := 0;
+   --  Two pages of the kernel's heap, whose mappings Copy_Frame points at
+   --  the frames it copies. The heap's own frames under them are unused.
+   --  They are in the kernel's part of the address space, which every
+   --  process shares.
+
+   procedure Set_Window
+     (Window : in out Rose.Addresses.Virtual_Page_Address;
+      Frame  : Rose.Addresses.Physical_Page_Address);
+   --  Map Window to Frame, taking the window's page from the heap the
+   --  first time.
 
    -----------------------------
    -- Activate_Page_Directory --
@@ -177,6 +199,71 @@ package body Rose.Kernel.Page_Table is
       return Change_Total;
    end Changes;
 
+   ---------------------
+   -- Checkpoint_Kind --
+   ---------------------
+
+   function Checkpoint_Kind
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return Checkpoint_Page_Kind
+   is
+      Item : constant Page_Entry :=
+               User_Page_Entry (Directory_Page, Virtual_Page);
+   begin
+      if not Item.Present
+        or else not Item.User
+        or else not Item.Managed
+        or else Item.Writable
+      then
+         return Other_Page;
+      elsif Item.Checkpoint_Read_Only then
+         return Checkpoint_Read_Only_Page;
+      elsif Item.Write_Tracked then
+         return Write_Tracked_Page;
+      else
+         return Other_Page;
+      end if;
+   end Checkpoint_Kind;
+
+   ----------------
+   -- Copy_Frame --
+   ----------------
+
+   procedure Copy_Frame
+     (From : Rose.Addresses.Physical_Page_Address;
+      To   : Rose.Addresses.Physical_Page_Address)
+   is
+   begin
+      Set_Window (Target_Window, To);
+      Copy_Frame (From, System'To_Address
+                    (Virtual_Page_To_Address (Target_Window)));
+   end Copy_Frame;
+
+   ----------------
+   -- Copy_Frame --
+   ----------------
+
+   procedure Copy_Frame
+     (From : Rose.Addresses.Physical_Page_Address;
+      To   : System.Address)
+   is
+      type Page_Words is array (1 .. Physical_Page_Bytes / 4)
+        of Rose.Words.Word_32;
+   begin
+      Set_Window (Source_Window, From);
+
+      declare
+         Source : Page_Words
+           with Import, Address =>
+             System'To_Address (Virtual_Page_To_Address (Source_Window));
+         Target : Page_Words
+           with Import, Address => To;
+      begin
+         Target := Source;
+      end;
+   end Copy_Frame;
+
    ------------------
    -- Count_Change --
    ------------------
@@ -219,6 +306,8 @@ package body Rose.Kernel.Page_Table is
                   then
                      Table_Entry.Writable := False;
                      Table_Entry.Checkpoint_Read_Only := True;
+                     Rose.Kernel.Checkpoint_Copies.Note_Changed
+                       (Table_Entry.PFA);
                      if Log_Checkpoint_Pages then
                         Show_Page_Entry (Table_Entry);
                      end if;
@@ -230,12 +319,13 @@ package body Rose.Kernel.Page_Table is
 
    end Disable_Page_Writes;
 
-   ------------------------
-   -- Enable_Page_Writes --
-   ------------------------
+   ---------------------
+   -- End_Page_Writes --
+   ---------------------
 
-   procedure Enable_Page_Writes
-     (Directory_Page : Rose.Addresses.Virtual_Page_Address)
+   procedure End_Page_Writes
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Saved          : Boolean)
    is
       Directory : Page_Table_Array;
       pragma Import (Ada, Directory);
@@ -260,7 +350,12 @@ package body Rose.Kernel.Page_Table is
                   if Table_Entry.Present
                     and then Table_Entry.Checkpoint_Read_Only
                   then
+                     --  The page is still read-only, so its next write
+                     --  goes to the memory server, or to the kernel if it
+                     --  is Write_Tracked and a checkpoint is running.
+
                      Table_Entry.Checkpoint_Read_Only := False;
+                     Table_Entry.Write_Tracked := Saved;
                      if Log_Checkpoint_Pages then
                         Show_Page_Entry (Table_Entry);
                      end if;
@@ -269,7 +364,46 @@ package body Rose.Kernel.Page_Table is
             end;
          end if;
       end loop;
-   end Enable_Page_Writes;
+   end End_Page_Writes;
+
+   -------------------
+   -- Entry_Address --
+   -------------------
+
+   function Entry_Address
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+      return System.Address
+   is
+      Directory : Page_Table_Array;
+      pragma Import (Ada, Directory);
+      for Directory'Address use
+        System'To_Address (Virtual_Page_To_Address (Directory_Page));
+
+      Directory_Index : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page / 1024);
+      Table_Index     : constant Page_Entry_Index :=
+                          Page_Entry_Index (Virtual_Page mod 1024);
+   begin
+      if not Directory (Directory_Index).Present
+        or else Directory (Directory_Index).PFA = 0
+      then
+         return System.Null_Address;
+      end if;
+
+      declare
+         Phys_Addr   : constant Physical_Address :=
+                         Physical_Address (Directory (Directory_Index).PFA)
+                         * Physical_Page_Bytes;
+         Addr        : constant Virtual_Address :=
+                         Rose.Kernel.Heap.Get_Virtual_Address (Phys_Addr);
+         Table_Page  : Page_Table_Array;
+         for Table_Page'Address use System'To_Address (Addr);
+         pragma Import (Ada, Table_Page);
+      begin
+         return Table_Page (Table_Index)'Address;
+      end;
+   end Entry_Address;
 
    ------------------------------
    -- Free_Process_Page_Tables --
@@ -408,6 +542,35 @@ package body Rose.Kernel.Page_Table is
          (Rose.Addresses.To_Virtual_Address (Page_Directory'Address)
           - Kernel_Virtual_Base));
 
+   ------------------
+   -- Make_Written --
+   ------------------
+
+   procedure Make_Written
+     (Directory_Page : Rose.Addresses.Virtual_Page_Address;
+      Virtual_Page   : Rose.Addresses.Virtual_Page_Address)
+   is
+      Addr : constant System.Address :=
+               Entry_Address (Directory_Page, Virtual_Page);
+   begin
+      if Addr = System.Null_Address then
+         return;
+      end if;
+
+      declare
+         Table_Entry : Page_Entry with Import, Address => Addr;
+      begin
+         Table_Entry.Writable := True;
+         Table_Entry.Checkpoint_Read_Only := False;
+         Table_Entry.Write_Tracked := False;
+      end;
+
+      --  Only the current address space can hold the old entry: any other
+      --  is flushed when cr3 is loaded with it.
+
+      Invalidate_Page (Virtual_Page);
+   end Make_Written;
+
    ---------------------
    -- Map_Kernel_Page --
    ---------------------
@@ -437,7 +600,8 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Managed        : Boolean := False)
+      Managed        : Boolean := False;
+      Write_Tracked  : Boolean := False)
    is
       Directory : Page_Table_Array;
       pragma Import (Ada, Directory);
@@ -445,7 +609,8 @@ package body Rose.Kernel.Page_Table is
         System'To_Address (Virtual_Page_To_Address (Directory_Page));
    begin
       Map_Page (Directory, Virtual_Page, Physical_Page,
-                Readable, Writable, Executable, User, Managed);
+                Readable, Writable, Executable, User, Managed,
+                Write_Tracked);
    end Map_Page;
 
    --------------
@@ -460,7 +625,8 @@ package body Rose.Kernel.Page_Table is
       Writable       : Boolean;
       Executable     : Boolean;
       User           : Boolean;
-      Managed        : Boolean)
+      Managed        : Boolean;
+      Write_Tracked  : Boolean := False)
    is
       pragma Unreferenced (Executable, Readable);   --   :-(
       Directory_Index : constant Page_Entry_Index :=
@@ -521,6 +687,7 @@ package body Rose.Kernel.Page_Table is
          Table_Entry.Writable := Writable;
          Table_Entry.User := User;
          Table_Entry.Managed := Managed;
+         Table_Entry.Write_Tracked := Write_Tracked and then not Writable;
          if Log_Page_Table then
             Show_Page_Entry (Table_Entry);
          end if;
@@ -640,6 +807,27 @@ package body Rose.Kernel.Page_Table is
       end loop;
    end Report_Mapped_Pages;
 
+   ----------------
+   -- Set_Window --
+   ----------------
+
+   procedure Set_Window
+     (Window : in out Rose.Addresses.Virtual_Page_Address;
+      Frame  : Rose.Addresses.Physical_Page_Address)
+   is
+   begin
+      if Window = 0 then
+         Window := Rose.Kernel.Heap.Allocate_Page;
+      end if;
+
+      Map_Page (Page_Directory, Window, Frame,
+                Readable   => True,
+                Writable   => True,
+                Executable => False,
+                User       => False,
+                Managed    => False);
+   end Set_Window;
+
    ---------------------
    -- Show_Page_Entry --
    ---------------------
@@ -669,7 +857,7 @@ package body Rose.Kernel.Page_Table is
       Rose.Boot.Console.Put (": ");
       Rose.Boot.Console.Put (Word_32 (Page.PFA) * 4096);
       Rose.Boot.Console.Put (" ");
-      Put_Flag (Page.Available_11, "z");
+      Put_Flag (Page.Write_Tracked, "z");
       Put_Flag (Page.Managed, "y");
       Put_Flag (Page.Checkpoint_Read_Only, "r");
       Put_Flag (Page.Global, "g");
