@@ -1,16 +1,17 @@
 #!/bin/sh
 # The restore test (#737, ADR 0031 section 2 and section 6): this build's
 # kernel and boot modules have to restore the checkpoint of a disk that
-# the release series' first release installed.
+# the release where its series froze installed.
 #
 #   scripts/test-restore-fixture [FIXTURE]
 #
 # FIXTURE is a disk that make-restore-fixture wrote. Without it, the test
 # uses the fixture of this build's release series X.Y: the disk installed
-# by release X.Y.0, rose-X.Y.0-hd0.qcow2, which is uploaded to the
-# release on GitHub. It is downloaded once, to images/fixtures. If the
-# release has no fixture, which is so until X.Y.0 is released, the test
-# says so and passes.
+# by the release where the series froze its interfaces (scripts/
+# frozen-release: X.Y.0, or 0.4.1 for 0.4), rose-X.Y.Z-hd0.qcow2, which is
+# uploaded to that release on GitHub. It is downloaded once, to
+# images/fixtures. If the release has no fixture, which is so until it is
+# released, the test says so and passes.
 #
 # The test:
 #
@@ -47,16 +48,17 @@ else
         echo "no release series in the version, $VERSION"
         exit 2
     }
-    NAME=rose-$SERIES.0-hd0.qcow2
+    FROZEN=$(sh "$HERE/frozen-release" "$SERIES") || exit 2
+    NAME=rose-$FROZEN-hd0.qcow2
     FIXTURE=$HERE/../images/fixtures/$NAME
     if [ ! -f "$FIXTURE" ]; then
-        URL=https://github.com/blancolioni/rose/releases/download/v$SERIES.0/$NAME
+        URL=https://github.com/blancolioni/rose/releases/download/v$FROZEN/$NAME
         mkdir -p "$(dirname "$FIXTURE")" || exit 2
         if curl -fsL -o "$FIXTURE.part" "$URL"; then
             mv -f "$FIXTURE.part" "$FIXTURE"
         else
             rm -f "$FIXTURE.part"
-            echo "No $SERIES.0 fixture yet ($URL); nothing to restore"
+            echo "No $FROZEN fixture yet ($URL); nothing to restore"
             exit 0
         fi
     fi
