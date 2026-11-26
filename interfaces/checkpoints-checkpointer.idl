@@ -4,15 +4,16 @@ interface Checkpoints.Checkpointer is
    --  starts (#413).
 
    function Take_Checkpoint return Natural;
-   --  Take a checkpoint, and return when its log entry is committed: 1,
-   --  or 0 if there was no checkpoint, because the kernel could not take
-   --  its snapshot.
+   --  Take a checkpoint, and return once the log has committed its entry
+   --  or failed to: 1 if the entry is committed, and 0 if it isn't, or
+   --  if there was no checkpoint because the kernel could not take its
+   --  snapshot (#984).
 
    procedure Request_Checkpoint;
    --  Take a checkpoint now. The memory server sends this without
    --  waiting when its table of changes fills (ADR 0028, section 6),
    --  since the checkpoint needs the memory server. If the checkpoint
-   --  server is busy, the send fails with Request_Would_Block, and a
-   --  checkpoint is being taken anyway.
+   --  server is busy, the send fails with Request_Would_Block, and the
+   --  memory server asks again at its next fault or commit (#984).
 
 end Checkpoints.Checkpointer;

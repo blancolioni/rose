@@ -262,6 +262,9 @@ stages:
         append_to_log: Checkpoints.Kernel_Log.Append_Endpoint
         log_reader: Checkpoints.Log_Reader.Log_Reader_Interface
         log_reset: Checkpoints.State.Reset_Endpoint
+        # For the checkpoint server, to learn whether a checkpoint's
+        # entry was committed (#984).
+        log_last_entry: Checkpoints.Log_Reader.Last_Entry_Endpoint
         # For mem, to append to the open entry and read pages back (ADR
         # 0028).
         page_log: Checkpoints.Page_Log.Page_Log_Interface
@@ -320,6 +323,6 @@ stages:
       priority: checkpoint
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
              memory_checkpoint, append_to_log, store_checkpoint,
-             checkpoint_hold]
+             checkpoint_hold, log_last_entry]
       exports:
         checkpointer: Checkpoints.Checkpointer.Take_Checkpoint_Endpoint
