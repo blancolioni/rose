@@ -3,6 +3,7 @@ with Rose.Boot.Console;
 with Rose.Limits;
 with Rose.Words;
 
+with Rose.Kernel.Checkpoint_Copies;
 with Rose.Kernel.Clock;
 with Rose.Kernel.Processes;
 with Rose.Kernel.Processes.Debug;
@@ -80,6 +81,18 @@ package body Rose.Kernel.Capabilities.Page_Table is
                   Rose.Boot.Console.Put (Rose.Words.Word (Page));
                   Rose.Boot.Console.Put (" pinned for a call");
                   Rose.Boot.Console.New_Line;
+                  Rose.Kernel.Processes.Return_Error
+                    (Params, Rose.Invocation.Request_Would_Block);
+               elsif Rose.Kernel.Checkpoint_Copies.Copying
+                 and then Rose.Kernel.Checkpoint_Copies.Is_Written
+                   (Rose.Invocation.Get_Object_Id (Params.all, 0), Page)
+               then
+
+                  --  The process wrote the page during the checkpoint,
+                  --  but mem's tables say it is clean until mem has the
+                  --  list of written pages: dropping it would lose the
+                  --  write (ADR 0030, section 5).
+
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Request_Would_Block);
                else
@@ -172,8 +185,41 @@ package body Rose.Kernel.Capabilities.Page_Table is
                           (Permissions and 2) /= 0;
       Executable      : constant Boolean :=
                           (Permissions and 4) /= 0;
+      Write_Tracked   : constant Boolean :=
+                          (Virtual_Word / 2 ** 28) mod 2 = 1;
+      --  Map: a clean page of a writable segment, which the kernel makes
+      --  writable itself during a checkpoint (ADR 0030, section 3).
+      Fill            : constant Boolean :=
+                          (Virtual_Word / 2 ** 27) mod 2 = 1;
+      --  Load_Page: mem is about to fill the frame with new contents, so
+      --  it is no longer in a checkpoint that is running (ADR 0030,
+      --  section 1).
 
    begin
+      if Fill then
+         Rose.Kernel.Checkpoint_Copies.Mark_Fresh (Physical_Page);
+      end if;
+
+      --  A frame that a checkpoint still has to save is copied before a
+      --  process can write it through a new mapping (ADR 0030, section
+      --  2). Mem's own mappings (Load_Page) are not: it reads and fills
+      --  frames through them, and is never saved.
+
+      if Writable
+        and then Pid /= Rose.Kernel.Processes.Current_Process_Id
+        and then Rose.Kernel.Checkpoint_Copies.Copying
+      then
+         declare
+            Ready : Boolean;
+         begin
+            Rose.Kernel.Checkpoint_Copies.Prepare_Write
+              (Physical_Page, Ready);
+            if not Ready then
+               Rose.Kernel.Checkpoint_Copies.Report_Full ("copy reserve");
+            end if;
+         end;
+      end if;
+
       Rose.Kernel.Processes.Map_Page
         (Pid           => Pid,
          Virtual_Page  => Virtual_Page,
@@ -182,7 +228,8 @@ package body Rose.Kernel.Capabilities.Page_Table is
          Writable      => Writable,
          Executable    => Executable,
          User          => True,
-         Managed       => True);
+         Managed       => True,
+         Write_Tracked => Write_Tracked);
 
       if Available_Pages > 0 then
          Rose.Kernel.Clock.Update_Mem

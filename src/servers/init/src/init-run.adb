@@ -358,7 +358,8 @@ package body Init.Run is
             Screen          => Screen_Cap,
             Create_Signal   => Rose.Init_Capabilities.Create_Signal_Cap,
             Cap_Sets        => Cap_Sets_Cap,
-            Replace_Process => Init.Boot.Mem_Replace_Process_Cap)
+            Replace_Process => Init.Boot.Mem_Replace_Process_Cap,
+            Timer           => Init.Boot.Timer_Interface_Cap)
          then
             Init.Calls.Send_String
               (Console_Stream_Cap, "init: self tests failed" & NL);

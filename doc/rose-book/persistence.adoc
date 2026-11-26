@@ -119,6 +119,7 @@ So a process can hold more memory than the machine has.
 `mem` maps a page of a writable segment read-only at first.
 The first write to it faults, and `mem` makes the page writable and adds it to its list of dirty pages (`Set_Writable`; see <<Memory>>).
 A checkpoint saves each dirty page, and makes it read-only again (`Set_Read_Only`), so that the next write is seen.
+`mem` maps such a page with a second spare bit set, _write-tracked_, which lets the kernel see the first write itself while `mem` is busy with a checkpoint (see <<Checkpoint Mode>>).
 
 _Device pages_ are an exception.
 A page that the kernel maps straight into a process, such as the VGA text page that `vga-console` writes to, is not managed by `mem`, so it is not part of a checkpoint.
@@ -134,22 +135,36 @@ A checkpoint is one entry in the log, which `checkpoint` writes in this order (`
 . `checkpoint` appends the kernel's tables to the entry.
 . `store` appends its tables.
 . `mem` appends header pages that list its dirty pages, then the pages, then its tables, and then the pages of shared segments.
+  It reads each page through the kernel (`Copy_Saved_Page`), which gives it the page as it was when the checkpoint started.
+  It then ends the copying (`End_Page_Copies`), and marks the pages written meanwhile as dirty.
 . The kernel tells `log` to commit the entry, and leaves checkpoint mode.
 
 The kernel's tables are a snapshot of the moment the checkpoint started, and the pages must agree with them.
 
 === Checkpoint Mode
 
-While the kernel is in checkpoint mode, the state of the persistent processes must not change before it is saved:
+A checkpoint saves every page as it was when the checkpoint started, since the kernel's tables are a snapshot of that moment.
+Persistent processes go on running while it is written, and the kernel copies a page before a process changes it (ADR 0030):
 
-* *Writes.*
-  The kernel write-protects every page that `mem` mapped for a persistent process.
-  A write to one faults, and the process waits until the kernel leaves checkpoint mode; the write then reaches `mem` as an ordinary write fault.
-  Other pages stay writable: device pages, so that a write to the screen doesn't fault, and the buffers of calls in progress (#314).
+* *Changed pages.*
+  The kernel write-protects every page that `mem` mapped writable for a persistent process, and marks it _checkpoint-read-only_: these are the dirty pages that the checkpoint saves.
+  On the first write to one, the kernel copies the page's frame into a frame of a reserve that `mem` gave it at start-up, makes the page writable, and lets the write go ahead.
+  The process stays on its own frame; the copy is the checkpoint's.
+  When `mem` saves the page (`Copy_Saved_Page`), it gets the copy, and the copy goes back to the reserve.
+  A page that `mem` has already saved needs no copy.
+* *Clean pages.*
+  A write-tracked page is clean, so it isn't in the checkpoint, and the kernel makes it writable without a copy.
+  The kernel lists the pages written either way, and gives the list to `mem` when it ends the copying (`End_Page_Copies`), so that the next checkpoint saves them.
 * *Replies.*
-  A persistent process that would get a reply or a message stays blocked until the kernel leaves checkpoint mode (#714).
-  The kernel copies a reply into the process's invocation record, in its memory, past the read-only pages.
-  Without the wait, the checkpoint would hold the call in the kernel's tables and the reply in the process's memory, and after a restore the call would be made again from the reply.
+  A reply or message to a persistent process goes through the same check before the kernel copies it into the process's invocation record, so the checkpoint keeps the call as it was saved, and the process gets its reply at once.
+* *Waiting.*
+  A writer waits until `mem` ends the copying only if the reserve or the list of written pages is full, or if the page is read-only for another reason, such as a write fault that needs `mem`, which is busy.
+  The kernel says so in its log, once for each checkpoint.
+* *New pages.*
+  A page that `mem` maps during the checkpoint is not in it: `mem` tells the kernel when it fills a frame (`Load_Page`), and leaves such a page dirty for the next checkpoint.
+
+Other pages are never protected: device pages, so that a write to the screen doesn't fault, and the buffers of calls in progress (#314).
+A device writes memory without going through the page tables, so its DMA buffers must not be persistent pages.
 
 The boot modules go on running, which is what lets `checkpoint`, `mem`, `store`, `log`, `partition` and `ata` write the checkpoint.
 

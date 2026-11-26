@@ -100,7 +100,14 @@ package Rose.Init_Capabilities is
    --  Tells the caller how many caps it can still create. Mem has it, and
    --  refuses a launch when it has few left (#1131).
 
-   Last_Cap               : constant := 37;
+   Add_Copy_Frames_Cap    : constant := 38;
+   Copy_Saved_Page_Cap    : constant := 39;
+   End_Page_Copies_Cap    : constant := 40;
+   --  Copying pages written during a checkpoint (ADR 0030). Mem has them:
+   --  it gives the kernel frames for copies, saves pages through the
+   --  kernel, and ends the copying when it has saved them.
+
+   Last_Cap               : constant := 40;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
