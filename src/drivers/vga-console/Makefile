@@ -17,5 +17,11 @@ vga_console:
 	    $(INTERFACES)/streams-reader.idl $(INTERFACES)/streams-writer.idl \
 	    $(INTERFACES)/streams-stream.idl $(INTERFACES)/screens-terminal.idl \
 	    $(INTERFACES)/devices-event_listener.idl $(INTERFACES)/devices-event_source.idl \
-	    $(INTERFACES)/processes-restorable.idl 	    $(INTERFACES)/processes-process.idl 	    $(INTERFACES)/processes-process_control.idl 	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/storage-region.idl 	    $(INTERFACES)/storage-region_access.idl 	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl 	    $(INTERFACES)/common-resource.idl
+	    $(INTERFACES)/processes-restorable.idl \
+	    $(INTERFACES)/processes-process.idl \
+	    $(INTERFACES)/processes-process_control.idl \
+	    $(INTERFACES)/processes-heap.idl $(INTERFACES)/storage-region.idl \
+	    $(INTERFACES)/storage-region_access.idl \
+	    $(INTERFACES)/storage-bank.idl $(INTERFACES)/storage-dependent.idl \
+	    $(INTERFACES)/common-resource.idl
 	gprbuild $(GPRBUILD_CARGS)
