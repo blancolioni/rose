@@ -106,11 +106,14 @@ package body Mem.Server is
          Old_Pid         : Process_Id := 0;
          New_Cap         : Rose.Capabilities.Capability := 0;
          New_Oid         : Rose.Objects.Object_Id := 0;
+         Bank_Cap        : Rose.Capabilities.Capability := 0;
       end record;
    --  The one replacement in progress. Old_Cap and New_Cap name the two
    --  processes to the kernel: caps to their objects, which the caller
    --  gave. Mem's slot of the new version is found by New_Oid, since
-   --  the process can end before the replacement does.
+   --  the process can end before the replacement does. Bank_Cap is the
+   --  bank that Bank returns: the reply sends a copy, and mem keeps its
+   --  own until the replacement ends (#1131).
 
    Current_Replacement  : Replacement_Record;
    Last_Replacement_Id  : Rose.Objects.Capability_Identifier := 0;
@@ -824,11 +827,15 @@ package body Mem.Server is
    ---------------------
 
    procedure End_Replacement is
+      use type Rose.Capabilities.Capability;
       R : Replacement_Record renames Current_Replacement;
    begin
       Rose.System_Calls.Delete_Cap (R.Old_Cap);
       Rose.System_Calls.Delete_Cap (R.New_Cap);
       Rose.System_Calls.Delete_Cap (R.Replacement_Cap);
+      if R.Bank_Cap /= 0 then
+         Rose.System_Calls.Delete_Cap (R.Bank_Cap);
+      end if;
       R := (others => <>);
    end End_Replacement;
 
@@ -1539,7 +1546,8 @@ package body Mem.Server is
          Old_Cap         => Old,
          Old_Pid         => Pid,
          New_Cap         => 0,
-         New_Oid         => 0);
+         New_Oid         => 0,
+         Bank_Cap        => 0);
 
       return Current_Replacement.Replacement_Cap;
    end Replace_Process;
@@ -1552,11 +1560,17 @@ package body Mem.Server is
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Capabilities.Capability
    is
+      use type Rose.Capabilities.Capability;
    begin
       if not Is_Current (Id) then
          return 0;
       end if;
-      return Mem.Processes.Parent_Bank (Current_Replacement.Old_Pid);
+
+      if Current_Replacement.Bank_Cap = 0 then
+         Current_Replacement.Bank_Cap :=
+           Mem.Processes.Parent_Bank (Current_Replacement.Old_Pid);
+      end if;
+      return Current_Replacement.Bank_Cap;
    end Replacement_Bank;
 
    -----------------------
