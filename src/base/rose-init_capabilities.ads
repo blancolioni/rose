@@ -92,7 +92,11 @@ package Rose.Init_Capabilities is
    --  checkpoint server takes the store's part and mem's as one snapshot
    --  (#1061).  Only the checkpoint server has it.
 
-   Last_Cap               : constant := 35;
+   Kernel_Log_Cap         : constant := 36;
+   --  Writes text to the kernel's log (serial), whether or not tracing is
+   --  on.  Mem has it, for messages it can't send to the console (#997).
+
+   Last_Cap               : constant := 36;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
