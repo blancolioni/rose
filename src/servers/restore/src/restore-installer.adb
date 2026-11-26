@@ -80,6 +80,45 @@ package body Restore.Installer is
      (1 .. Rose.Limits.Page_Size)
      with Alignment => 4096;
 
+   List_Path     : constant String := "/rose/install/list";
+   Max_List_Size : constant := 16 * 1024;
+   Max_Line      : constant := 200;
+   Max_Name      : constant := 100;
+
+   List_Text : System.Storage_Elements.Storage_Array (1 .. Max_List_Size);
+   --  The install list (#1100), read whole before anything is installed,
+   --  so that its reader is released first.
+
+   List_Transfer : System.Storage_Elements.Storage_Array
+     (1 .. Rose.Limits.Page_Size)
+     with Alignment => 4096;
+   --  The invocation buffer while the list is read, which each part of
+   --  it arrives in, as in Restore.Boot_Sets, rather than whatever
+   --  buffer Rose.Console_IO left.
+
+   procedure Read_List
+     (Install_Directory : Rose.Interfaces.Files.Directory.Client
+        .Directory_Client;
+      Last              : out System.Storage_Elements.Storage_Count;
+      Success           : out Boolean);
+   --  Read the list in Install_Directory into List_Text (1 .. Last).
+   --  Success is False, and the console says why, if there is no list,
+   --  or it is too big, or it can't be read.
+
+   procedure Find_Flag
+     (Word  : String;
+      Flag  : out Install_Flag;
+      Found : out Boolean);
+   --  The flag that Word names in the list: its name in lower case.
+   --  Is_Driver has none, because the category sets it.
+
+   function Is_Space (Ch : Character) return Boolean
+   is (Ch = ' '
+       or else Ch = Character'Val (9)
+       or else Ch = Character'Val (13));
+   --  Spaces and tabs separate the fields of a line of the list, and a
+   --  carriage return before a line feed is ignored.
+
    --  procedure Install_From_Directory
    --    (Directory_Entry : Rose.Directories.Directory_Entry_Type);
    --
@@ -108,12 +147,12 @@ package body Restore.Installer is
    procedure For_Each_Program
      (File_System : Rose.Interfaces.Files.File_System.Client
        .File_System_Client;
-      Source      : Step_Iterator;
       Handle      : Program_Handler;
       Found       : out Boolean);
-   --  Call Handle for each program Source gives, with its category's
-   --  directory in /rose/install. Found is False if there is no
-   --  /rose/install.
+   --  Call Handle for each program that the install list names, in its
+   --  order, with its category's directory in /rose/install. Found is
+   --  False if there is no /rose/install, or no list in it that can be
+   --  read.
 
    Exec_Client : Rose.Interfaces.Processes.Exec.Client.Exec_Client;
    Map_Client  : Rose.Interfaces.Commands.Map.Client.Map_Client;
@@ -230,6 +269,62 @@ package body Restore.Installer is
       end if;
    end Find_File;
 
+   ---------------
+   -- Find_Flag --
+   ---------------
+
+   procedure Find_Flag
+     (Word  : String;
+      Flag  : out Install_Flag;
+      Found : out Boolean)
+   is
+      Matches : Boolean;
+   begin
+      Flag := Install_Flag'First;
+      Found := False;
+
+      --  A case, so that a new flag can't be left without a name.
+
+      for Candidate in Install_Flag loop
+         case Candidate is
+            when Provides_Keyboard_Interface =>
+               Matches := Word = "provides_keyboard_interface";
+            when Requires_Keyboard_Interface =>
+               Matches := Word = "requires_keyboard_interface";
+            when Provides_Input_Stream =>
+               Matches := Word = "provides_input_stream";
+            when Requires_Input_Stream =>
+               Matches := Word = "requires_input_stream";
+            when Provides_Console =>
+               Matches := Word = "provides_console";
+            when Is_Driver =>
+               Matches := False;
+            when Provides_Clock =>
+               Matches := Word = "provides_clock";
+            when Requires_Framebuffer =>
+               Matches := Word = "requires_framebuffer";
+            when Provides_Screen =>
+               Matches := Word = "provides_screen";
+            when Requires_No_Framebuffer =>
+               Matches := Word = "requires_no_framebuffer";
+            when Requires_Screen =>
+               Matches := Word = "requires_screen";
+            when Provides_Cap_Sets =>
+               Matches := Word = "provides_cap_sets";
+            when Requires_Console =>
+               Matches := Word = "requires_console";
+            when Test_Only =>
+               Matches := Word = "test_only";
+         end case;
+
+         if Matches then
+            Flag := Candidate;
+            Found := True;
+            return;
+         end if;
+      end loop;
+   end Find_Flag;
+
    ----------------------
    -- For_Each_Program --
    ----------------------
@@ -237,23 +332,39 @@ package body Restore.Installer is
    procedure For_Each_Program
      (File_System : Rose.Interfaces.Files.File_System.Client
        .File_System_Client;
-      Source      : Step_Iterator;
       Handle      : Program_Handler;
       Found       : out Boolean)
    is
       use Rose.Interfaces.Files.Directory.Client;
+      use type System.Storage_Elements.Storage_Offset;
       Install_Path       : constant String := "/rose/install";
       Install_Directory  : Directory_Client;
       Category_Directory : Directory_Client;
       Category_Name      : String (1 .. 100);
       Category_Last      : Natural := 0;
       Have_Category      : Boolean := False;
+      List_Last          : System.Storage_Elements.Storage_Count;
 
       procedure Process_Executable
         (Name     : String;
          Category : String;
          Action   : Install_Action;
          Flags    : Install_Flag_Array);
+
+      procedure Process_Line
+        (Line        : String;
+         Line_Number : Positive);
+      --  Install the program that Line of the list names, unless it is
+      --  blank or only a comment, or refuse it.
+
+      procedure Refuse
+        (Line_Number : Positive;
+         Reason      : String;
+         Detail      : String := "");
+      --  Say that line Line_Number of the list is refused, and why:
+      --  Reason, then Detail, which is the field at fault, if any. They
+      --  are separate so that nothing is concatenated, which would make
+      --  the stack unbounded.
 
       ------------------------
       -- Process_Executable --
@@ -272,14 +383,9 @@ package body Restore.Installer is
          if not Have_Category
            or else Category_Name (1 .. Category_Last) /= Category
          then
-            if Category = "" then
-               Category_Directory := Install_Directory;
-               Have_Category := True;
-            else
-               Open_Directory
-                 (Install_Directory, Category, Category_Directory,
-                  Have_Category);
-            end if;
+            Open_Directory
+              (Install_Directory, Category, Category_Directory,
+               Have_Category);
 
             if not Have_Category then
                Rose.Console_IO.Put ("install: cannot find directory ");
@@ -309,6 +415,141 @@ package body Restore.Installer is
             Flags     => Install_Flags);
       end Process_Executable;
 
+      ------------------
+      -- Process_Line --
+      ------------------
+
+      procedure Process_Line
+        (Line        : String;
+         Line_Number : Positive)
+      is
+         type Field is
+            record
+               First : Positive;
+               Last  : Natural;
+            end record;
+
+         Max_Fields : constant := 3 + Install_Flag_Array'Length;
+
+         Fields : array (1 .. Max_Fields) of Field;
+         Count  : Natural := 0;
+         Stop   : Natural := Line'Last;
+         Next   : Positive := Line'First;
+         Action : Install_Action;
+         Flags  : Install_Flag_Array := (others => False);
+      begin
+         for I in Line'Range loop
+            if Line (I) = '#' then
+               Stop := I - 1;
+               exit;
+            end if;
+         end loop;
+
+         while Next <= Stop loop
+            if Is_Space (Line (Next)) then
+               Next := Next + 1;
+            else
+               if Count = Max_Fields then
+                  Refuse (Line_Number, "too many fields");
+                  return;
+               end if;
+               Count := Count + 1;
+               Fields (Count).First := Next;
+               while Next <= Stop and then not Is_Space (Line (Next)) loop
+                  Next := Next + 1;
+               end loop;
+               Fields (Count).Last := Next - 1;
+            end if;
+         end loop;
+
+         if Count = 0 then
+            return;
+         elsif Count < 3 then
+            Refuse (Line_Number,
+                    "a line needs a name, a category and an action");
+            return;
+         end if;
+
+         declare
+            Name     : String renames
+                         Line (Fields (1).First .. Fields (1).Last);
+            Category : String renames
+                         Line (Fields (2).First .. Fields (2).Last);
+            Act      : String renames
+                         Line (Fields (3).First .. Fields (3).Last);
+         begin
+            if Name'Length > Max_Name then
+               Refuse (Line_Number, "the name is too long");
+               return;
+            elsif Name (Name'First) = '.' then
+               Refuse (Line_Number, "a name can't start with .");
+               return;
+            end if;
+
+            for Ch of Name loop
+               if Ch = '/' then
+                  Refuse (Line_Number, "a name can't have / in it");
+                  return;
+               end if;
+            end loop;
+
+            if Category /= "bin" and then Category /= "drivers" then
+               Refuse (Line_Number, "unknown category", Category);
+               return;
+            end if;
+
+            if Act = "launch" then
+               Action := Launch;
+            elsif Act = "save" then
+               Action := Save;
+            else
+               Refuse (Line_Number, "unknown action", Act);
+               return;
+            end if;
+
+            for I in 4 .. Count loop
+               declare
+                  Word  : String renames
+                            Line (Fields (I).First .. Fields (I).Last);
+                  Flag  : Install_Flag;
+                  Known : Boolean;
+               begin
+                  Find_Flag (Word, Flag, Known);
+                  if not Known then
+                     Refuse (Line_Number, "unknown flag", Word);
+                     return;
+                  end if;
+                  Flags (Flag) := True;
+               end;
+            end loop;
+
+            Process_Executable (Name, Category, Action, Flags);
+         end;
+      end Process_Line;
+
+      ------------
+      -- Refuse --
+      ------------
+
+      procedure Refuse
+        (Line_Number : Positive;
+         Reason      : String;
+         Detail      : String := "")
+      is
+      begin
+         Rose.Console_IO.Put ("install: ");
+         Rose.Console_IO.Put (List_Path);
+         Rose.Console_IO.Put (" line ");
+         Rose.Console_IO.Put (Num => Line_Number);
+         Rose.Console_IO.Put (": ");
+         Rose.Console_IO.Put (Reason);
+         if Detail /= "" then
+            Rose.Console_IO.Put (" ");
+            Rose.Console_IO.Put (Detail);
+         end if;
+         Rose.Console_IO.Put_Line (": refused");
+      end Refuse;
+
    begin
 
       declare
@@ -330,7 +571,46 @@ package body Restore.Installer is
          return;
       end if;
 
-      Source (Process_Executable'Access);
+      Read_List (Install_Directory, List_Last, Found);
+      if not Found then
+         return;
+      end if;
+
+      declare
+         Line        : String (1 .. Max_Line) := (others => ' ');
+         Line_Length : Natural := 0;
+         Too_Long    : Boolean := False;
+         Line_Number : Natural := 0;
+      begin
+
+         --  One past the end of the list ends a last line that has no
+         --  line feed.
+
+         for Index in 1 .. List_Last + 1 loop
+            declare
+               Ch : constant Character :=
+                      (if Index > List_Last
+                       then Character'Val (10)
+                       else Character'Val (List_Text (Index)));
+            begin
+               if Ch = Character'Val (10) then
+                  Line_Number := Line_Number + 1;
+                  if Too_Long then
+                     Refuse (Line_Number, "the line is too long");
+                  else
+                     Process_Line (Line (1 .. Line_Length), Line_Number);
+                  end if;
+                  Line_Length := 0;
+                  Too_Long := False;
+               elsif Line_Length = Line'Last then
+                  Too_Long := True;
+               else
+                  Line_Length := Line_Length + 1;
+                  Line (Line_Length) := Ch;
+               end if;
+            end;
+         end loop;
+      end;
    end For_Each_Program;
 
    ----------------------------
@@ -432,13 +712,12 @@ package body Restore.Installer is
 
    procedure Install
      (File_System : Rose.Interfaces.Files.File_System.Client
-       .File_System_Client;
-      Source      : Step_Iterator)
+       .File_System_Client)
    is
       Found : Boolean;
    begin
       For_Each_Program
-        (File_System, Source, Install_Executable'Access, Found);
+        (File_System, Install_Executable'Access, Found);
       if not Found then
          return;
       end if;
@@ -723,6 +1002,81 @@ package body Restore.Installer is
       Interface_Caps := Array_Of_Capabilities (Caps);
    end Open_Interface;
 
+   ---------------
+   -- Read_List --
+   ---------------
+
+   procedure Read_List
+     (Install_Directory : Rose.Interfaces.Files.Directory.Client
+        .Directory_Client;
+      Last              : out System.Storage_Elements.Storage_Count;
+      Success           : out Boolean)
+   is
+      use System.Storage_Elements;
+      use Rose.Interfaces.Files.Directory.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
+      Index         : constant Natural :=
+                        Find_File (Install_Directory, "list");
+      Reader        : Releasable_Reader_Client;
+      Saved_Address : System.Address;
+      Saved_Length  : Storage_Count;
+      Failed        : Boolean := False;
+   begin
+      Last := 0;
+      Success := False;
+
+      if Index = 0 then
+         Rose.Console_IO.Put_Line ("install: cannot find " & List_Path);
+         return;
+      end if;
+
+      if Entry_Size (Install_Directory, Index) > Max_List_Size then
+         Rose.Console_IO.Put_Line
+           ("install: " & List_Path & " is bigger than 16 KiB");
+         return;
+      end if;
+
+      Reader :=
+        Rose.Interfaces.Files.File.Client.Open_Reader
+          (Get_Ordinary_File (Install_Directory, Index));
+
+      Saved_Address := Rose.System_Calls.Buffer_Address;
+      Saved_Length := Rose.System_Calls.Buffer_Length;
+      Rose.System_Calls.Use_Buffer
+        (List_Transfer'Address, List_Transfer'Length);
+
+      while Last < List_Text'Last loop
+         declare
+            Chunk_Last : constant Storage_Count :=
+                           Storage_Count'Min
+                             (Last + List_Transfer'Length, List_Text'Last);
+            Count      : Storage_Offset;
+         begin
+            Read (Reader, List_Text (Last + 1 .. Chunk_Last), Count);
+            if Rose.Interfaces.Streams.Releasable_Reader.Client.Has_Error
+              or else Count < 0
+              or else Count > Chunk_Last - Last
+            then
+               Failed := True;
+               exit;
+            end if;
+            exit when Count = 0;
+            Last := Last + Count;
+         end;
+      end loop;
+
+      Rose.System_Calls.Use_Buffer (Saved_Address, Saved_Length);
+      Release (Reader);
+
+      if Failed then
+         Rose.Console_IO.Put_Line ("install: cannot read " & List_Path);
+         Last := 0;
+         return;
+      end if;
+
+      Success := True;
+   end Read_List;
+
    ------------------------
    -- Report_Not_Updated --
    ------------------------
@@ -928,8 +1282,7 @@ package body Restore.Installer is
 
    procedure Update
      (File_System : Rose.Interfaces.Files.File_System.Client
-       .File_System_Client;
-      Source      : Step_Iterator)
+       .File_System_Client)
    is
       use Rose.Capabilities;
       Exec_Cap : constant Capability :=
@@ -963,7 +1316,7 @@ package body Restore.Installer is
 
       Rose.Console_IO.Put_Line ("restore: installing the commands again");
       For_Each_Program
-        (File_System, Source, Update_Executable'Access, Found);
+        (File_System, Update_Executable'Access, Found);
       Report_Not_Updated;
 
       --  Then the restored servers that can take over from themselves,
