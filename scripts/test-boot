@@ -281,7 +281,20 @@ type_text "clear
 sleep 3
 press ctrl-d
 wait_for "login:" 60 || fail "logging out did not bring back the login prompt"
-log_in
+# The password is typed in two parts, with a checkpoint between them, so
+# that the console holds the first part while the checkpoint runs. What
+# is typed is in memory that checkpoints don't save (#1132), so the
+# check for the password on the disk, below, still finds nothing.
+sleep 45
+type_text "$first_user
+"
+wait_for "password:" 20 || fail "no password prompt"
+type_text "$(echo "$first_password" | cut -c1-6)"
+wait_for_checkpoint 180 \
+    || fail "no checkpoint while the password was being typed"
+type_text "$(echo "$first_password" | cut -c7-)
+"
+wait_for "petal>" 60 || fail "could not log in a second time"
 type_text "echo second session
 "
 wait_for "^second session" 20 || fail "the second session does not run commands"
@@ -321,10 +334,11 @@ grep -q "paged out before the checkpoint" "$WORK/check-log.out" || {
 
 # The first user's password went through the console and auth, which
 # are persistent, at the install and at each login, and must not reach
-# the disk (#1059).
-# Any six characters of it in a row count: a line that was read stays
-# in the console's buffer until later lines are typed over it, and the
-# next one may cover only its start.
+# the disk (#1059), even though a checkpoint ran while the second login's
+# was being typed (#1132).
+# Any six characters of it in a row count: a line that was read stayed
+# in the console's buffer until later lines were typed over it, and the
+# next one could cover only its start.
 echo "Looking for the first user's password on the disk"
 windows=$(echo "$first_password" | awk '{
     for (i = 1; i + 5 <= length($0); i++) {
@@ -333,6 +347,15 @@ windows=$(echo "$first_password" | awk '{
 }')
 if grep -q -a -E "$windows" "$DISK"; then
     echo "FAIL: the first user's password is on the disk;" \
+         "the disk image is in $WORK"
+    exit 1
+fi
+
+# The consoles keep what is typed in unsaved memory, which a restore
+# finds as zeros; a trace event says if it wasn't (#1132).
+if grep -a -q "console: typed input was saved" "$WORK/install-serial" \
+     "$WORK/serial"; then
+    echo "FAIL: a checkpoint saved what was typed at the console;" \
          "the disk image is in $WORK"
     exit 1
 fi

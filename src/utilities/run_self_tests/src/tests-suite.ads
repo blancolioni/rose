@@ -29,6 +29,7 @@ with Tests.Smoke;
 with Tests.Stack;
 with Tests.Strings;
 with Tests.Streams;
+with Tests.Unsaved_Memory;
 with Tests.Users;
 
 package Tests.Suite is
@@ -72,6 +73,7 @@ package Tests.Suite is
                    Tests.Shared_Segments.Shared_Segment_Test'Access,
                    Tests.Shared_Segments.Overlap_Test'Access,
                    Tests.Shared_Regions.Shared_Regions_Test'Access,
+                   Tests.Unsaved_Memory.Unsaved_Memory_Test'Access,
                    Tests.Regions.Put_Limit_Test'Access,
                    Tests.Regions.Reuse_Test'Access,
                    Tests.Screen.Screen_Test'Access,
