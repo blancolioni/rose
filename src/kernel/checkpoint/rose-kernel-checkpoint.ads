@@ -14,7 +14,9 @@ package Rose.Kernel.Checkpoint is
    --  Write a snapshot of the kernel's tables for the persistent
    --  processes into Tables (see Rose.Checkpoints), set Page_Count to
    --  the number of pages it takes, and enter checkpoint mode.  If the
-   --  snapshot doesn't fit, Success is False and nothing else happens.
+   --  snapshot can't be written, Success is False and nothing else
+   --  happens; Page_Count is then more than Tables' pages if Tables was
+   --  too small (Rose.Kernel.Processes.Snapshot.Write_Tables).
 
    procedure Leave_Checkpoint;
 

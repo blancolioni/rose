@@ -1128,6 +1128,30 @@ package body Mem.Processes is
                  Register_Process (Process_Cap, Boot_Module => False);
       Cap    : Rose.Capabilities.Capability;
       Launch : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+
+      procedure Give_Up;
+      --  Mem has no room for the process's caps (#913). Give its slot
+      --  back, and end the bank made for it. The caller ends the kernel's
+      --  process, as when there is no slot.
+
+      -------------
+      -- Give_Up --
+      -------------
+
+      procedure Give_Up is
+         P : Memory_Process_Record renames Process_Table (Pid);
+      begin
+         if P.Bank_Cap /= 0 then
+            End_Bank (P.Oid);
+            Rose.System_Calls.Delete_Cap (P.Bank_Cap);
+         end if;
+         if P.Heap /= 0 then
+            Rose.System_Calls.Delete_Cap (P.Heap);
+         end if;
+         Rose.Interfaces.Processes.Kernel_Process.Client.Close (P.Process);
+         P := No_Process;
+      end Give_Up;
+
    begin
       if Pid = 0 then
          Rose.System_Calls.Delete_Cap (Bank_Cap);
@@ -1160,6 +1184,12 @@ package body Mem.Processes is
            Endpoint_Id  =>
              Rose.Interfaces.Processes.Process.Process_Interface,
            Identifier   => Process_Identifier (Pid));
+
+      if Cap = 0 then
+         Give_Up;
+         return 0;
+      end if;
+
       Process_Table (Pid).Interface_Cap := Cap;
       return Cap;
    end New_Process;
@@ -1353,6 +1383,7 @@ package body Mem.Processes is
       Next_Pid : Real_Process_Id :=
                    (if Boot_Module then Next_Boot_Pid
                     else Next_Launched_Pid);
+      use type Rose.Capabilities.Capability;
       Start  : constant Process_Id := Next_Pid;
       Client : Rose.Interfaces.Processes.Kernel_Process.Client
         .Kernel_Process_Client;
@@ -1387,7 +1418,12 @@ package body Mem.Processes is
                  Rose.Interfaces.Processes.Kernel_Process.Client
                    .Get_Object_Id (Client);
       begin
-         if Find_Process (Identifier_Of (Oid)) /= 0 then
+         --  Mem may have no room for the client's caps, and then the
+         --  call fails (#913).
+
+         if Rose.Interfaces.Processes.Kernel_Process.Client.Has_Error
+           or else Find_Process (Identifier_Of (Oid)) /= 0
+         then
             Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
             return 0;
          end if;
@@ -1404,6 +1440,11 @@ package body Mem.Processes is
                            Rose.Interfaces.Processes.Heap.Heap_Interface,
                          Identifier   => Identifier_Of (Oid));
       begin
+         if Heap_Cap = 0 then
+            Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
+            return 0;
+         end if;
+
          Process_Table (Next_Pid) := No_Process;
          Process_Table (Next_Pid).State := Active;
          Process_Table (Next_Pid).Oid := Oid;

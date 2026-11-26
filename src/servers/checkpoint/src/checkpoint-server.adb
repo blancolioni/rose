@@ -29,17 +29,32 @@ package body Checkpoint.Server is
    Store_Checkpoint_Cap  : Rose.Capabilities.Capability;
    Hold_Cap              : Rose.Capabilities.Capability;
 
-   Max_Table_Pages : constant := 1 + 2 * Rose.Limits.Max_Processes;
-   --  The header page, and for each process its record and one page of
-   --  caps (Rose.Checkpoints.Caps_Per_Page of them).  A process with more
-   --  caps needs more pages; if the tables don't fit, the kernel skips
-   --  the checkpoint.
+   Max_Table_Pages : constant := 1 + 4 + 5 * Rose.Limits.Max_Processes;
+   --  The header page, four pages of derivation records (the kernel's
+   --  4,095 of them), and for each process its record and four pages of
+   --  caps (Rose.Checkpoints.Caps_Per_Page each), on average. If the
+   --  tables need more, the kernel skips the checkpoint.
 
    Kernel_Tables : System.Storage_Elements.Storage_Array
      (1 .. Max_Table_Pages * Rose.Limits.Page_Size)
      with Alignment => Rose.Limits.Page_Size;
    --  The kernel writes the snapshot of its tables here when the
-   --  checkpoint starts.
+   --  checkpoint starts. Only its first Ready_Pages are offered to the
+   --  kernel, and only they are ever touched: the memory server maps a
+   --  page of this boot module's .bss when it is first touched, so the
+   --  rest costs only address space (#913).
+
+   First_Ready_Pages : constant := 64;
+   --  The pages offered at the first checkpoint: about 18 processes'
+   --  tables take 40 pages.
+
+   Grow_Slack : constant := 16;
+   --  The pages added beyond what the kernel says it needs, so that a
+   --  few more processes don't make it ask again.
+
+   Ready_Pages : Natural := First_Ready_Pages;
+   --  The pages of Kernel_Tables offered to the kernel, which grow when
+   --  the kernel says that its tables don't fit.
 
    procedure On_Timeout
      (Id    : in     Rose.Objects.Capability_Identifier);
@@ -191,26 +206,64 @@ package body Checkpoint.Server is
    ----------------------
 
    function Enter_Checkpoint (Page_Count : out Natural) return Boolean is
-      Params : aliased Rose.Invocation.Invocation_Record;
+
+      function Try (Needed : out Natural) return Boolean;
+      --  Offer the kernel the first Ready_Pages of Kernel_Tables. True if
+      --  it entered checkpoint mode; Needed is then the pages its tables
+      --  took, and otherwise the pages they need, which is more than
+      --  Ready_Pages if they didn't fit.
+
+      ---------
+      -- Try --
+      ---------
+
+      function Try (Needed : out Natural) return Boolean is
+         Params : aliased Rose.Invocation.Invocation_Record;
+         Length : constant System.Storage_Elements.Storage_Count :=
+                    System.Storage_Elements.Storage_Count
+                      (Ready_Pages * Rose.Limits.Page_Size);
+      begin
+         --  The kernel writes into Kernel_Tables directly, so every page
+         --  that it is offered must be mapped and writable first.
+         Kernel_Tables (1 .. Length) := (others => 0);
+
+         Rose.System_Calls.Initialize_Send (Params, Enter_Checkpoint_Cap);
+         Rose.System_Calls.Send_Buffer
+           (Params, Length, Kernel_Tables'Address, True);
+         Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
+         Params.Control.Last_Recv_Word := 0;
+         Rose.System_Calls.Invoke_Capability (Params);
+
+         Needed := Natural (Params.Data (0));
+         return not Params.Control.Flags (Rose.Invocation.Error);
+      end Try;
+
    begin
-      --  The kernel writes into Kernel_Tables directly, so every page
-      --  of it must be mapped and writable first.
-      Kernel_Tables := (others => 0);
+      if Try (Page_Count) then
+         return True;
+      end if;
 
-      Rose.System_Calls.Initialize_Send (Params, Enter_Checkpoint_Cap);
-      Rose.System_Calls.Send_Buffer
-        (Params, Kernel_Tables'Length, Kernel_Tables'Address, True);
-      Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
-      Params.Control.Last_Recv_Word := 0;
-      Rose.System_Calls.Invoke_Capability (Params);
+      --  The kernel says how many pages its tables need, and they can
+      --  have more of Kernel_Tables once: before checkpoint mode, the
+      --  memory server maps the new pages when they are touched (#913).
 
-      if Params.Control.Flags (Rose.Invocation.Error) then
+      if Page_Count <= Ready_Pages or else Page_Count > Max_Table_Pages
+      then
          Page_Count := 0;
          return False;
       end if;
 
-      Page_Count := Natural (Params.Data (0));
-      return True;
+      Ready_Pages := Natural'Min (Page_Count + Grow_Slack, Max_Table_Pages);
+      Rose.Console_IO.Put ("checkpoint: kernel tables now have ");
+      Rose.Console_IO.Put (Integer (Ready_Pages));
+      Rose.Console_IO.Put_Line (" pages");
+
+      if Try (Page_Count) then
+         return True;
+      end if;
+
+      Page_Count := 0;
+      return False;
    end Enter_Checkpoint;
 
    ------------------------

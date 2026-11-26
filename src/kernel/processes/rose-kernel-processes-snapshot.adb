@@ -1167,7 +1167,6 @@ package body Rose.Kernel.Processes.Snapshot is
 
       if Page_Count > Available then
          Success := False;
-         Page_Count := 0;
          return;
       end if;
 
