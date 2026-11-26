@@ -90,6 +90,18 @@ package body Mem.Page_Cache is
       return 0;
    end Find;
 
+   ------------
+   -- Forget --
+   ------------
+
+   procedure Forget (Physical : Rose.Addresses.Physical_Page_Address) is
+      Index : constant Natural := Index_Of (Physical);
+   begin
+      if Index /= 0 then
+         Cache (Index).Used := False;
+      end if;
+   end Forget;
+
    --------------
    -- Index_Of --
    --------------
@@ -106,6 +118,19 @@ package body Mem.Page_Cache is
       end loop;
       return 0;
    end Index_Of;
+
+   ---------------------
+   -- Is_Last_Mapping --
+   ---------------------
+
+   function Is_Last_Mapping
+     (Physical : Rose.Addresses.Physical_Page_Address)
+      return Boolean
+   is
+      Index : constant Natural := Index_Of (Physical);
+   begin
+      return Index = 0 or else Cache (Index).Mappings <= 1;
+   end Is_Last_Mapping;
 
    -------------
    -- Release --
