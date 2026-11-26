@@ -1,6 +1,6 @@
 #!/bin/sh
 # The update test (#830, ADR 0031 section 6): this build's install media
-# has to update a disk that the release series' first release installed,
+# has to update a disk that the release where its series froze installed,
 # keeping its checkpoint, and replace its replaceable servers.
 #
 #   scripts/test-update-fixture [FIXTURE [ISO]]
@@ -36,7 +36,7 @@
 #      consistent.
 #
 # A fixture made from this build is enough to test the update while
-# 0.X.0 isn't released: the update replaces every replaceable server,
+# the frozen release isn't out: the update replaces every replaceable server,
 # whether or not its program changed. Checking that a server reports the
 # new version needs a fixture from an earlier release.
 #
@@ -58,16 +58,17 @@ else
         echo "no release series in the version, $VERSION"
         exit 2
     }
-    NAME=rose-$SERIES.0-hd0.qcow2
+    FROZEN=$(sh "$HERE/frozen-release" "$SERIES") || exit 2
+    NAME=rose-$FROZEN-hd0.qcow2
     FIXTURE=$HERE/../images/fixtures/$NAME
     if [ ! -f "$FIXTURE" ]; then
-        URL=https://github.com/blancolioni/rose/releases/download/v$SERIES.0/$NAME
+        URL=https://github.com/blancolioni/rose/releases/download/v$FROZEN/$NAME
         mkdir -p "$(dirname "$FIXTURE")" || exit 2
         if curl -fsL -o "$FIXTURE.part" "$URL"; then
             mv -f "$FIXTURE.part" "$FIXTURE"
         else
             rm -f "$FIXTURE.part"
-            echo "No $SERIES.0 fixture yet ($URL); nothing to update"
+            echo "No $FROZEN fixture yet ($URL); nothing to update"
             exit 0
         fi
     fi
