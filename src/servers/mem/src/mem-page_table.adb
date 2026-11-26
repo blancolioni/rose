@@ -38,6 +38,8 @@ package body Mem.Page_Table is
          Writable   : Boolean;
          Executable : Boolean;
          Persistent : Boolean;
+         Next       : Boolean;
+         --  Dirty, but not in the checkpoint that is running (ADR 0030).
       end record
    with Pack, Size => 64;
 
@@ -131,11 +133,26 @@ package body Mem.Page_Table is
    -----------------------
 
    procedure Clear_Dirty_Pages is
+      Kept : Natural := 0;
    begin
-      for Position of Dirty_Pages (1 .. Dirty_Page_Last) loop
-         Mapped_Pages (Position).Dirty := False;
+      --  A page that the checkpoint didn't save stays in the list, which
+      --  is only ever shortened, so it can be rewritten in place.
+
+      for I in 1 .. Dirty_Page_Last loop
+         declare
+            Position : constant Cursor := Dirty_Pages (I);
+            Page     : Mapped_Page_Record renames Mapped_Pages (Position);
+         begin
+            if Page.Next then
+               Page.Next := False;
+               Kept := Kept + 1;
+               Dirty_Pages (Kept) := Position;
+            else
+               Page.Dirty := False;
+            end if;
+         end;
       end loop;
-      Dirty_Page_Last := 0;
+      Dirty_Page_Last := Kept;
    end Clear_Dirty_Pages;
 
    ------------
@@ -387,7 +404,8 @@ package body Mem.Page_Table is
            Writable   => Writable,
            Executable => Executable,
            Persistent => Persistent,
-           Dirty      => False);
+           Dirty      => False,
+           Next       => False);
 
       Next_Page (Position) := Buckets (Bucket);
       Buckets (Bucket) := Position;
@@ -420,6 +438,15 @@ package body Mem.Page_Table is
    begin
       return Mapped_Pages (Position).Mapped;
    end Is_Mapped;
+
+   ------------------------
+   -- Is_Next_Checkpoint --
+   ------------------------
+
+   function Is_Next_Checkpoint (Position : Cursor) return Boolean is
+   begin
+      return Mapped_Pages (Position).Next;
+   end Is_Next_Checkpoint;
 
    -------------------
    -- Is_Persistent --
@@ -539,6 +566,18 @@ package body Mem.Page_Table is
       Free_Count := Free_Count + 1;
    end Release_Entry;
 
+   -------------------------
+   -- Set_Next_Checkpoint --
+   -------------------------
+
+   procedure Set_Next_Checkpoint
+     (Position : Cursor;
+      Next     : Boolean)
+   is
+   begin
+      Mapped_Pages (Position).Next := Next;
+   end Set_Next_Checkpoint;
+
    --------------------------
    -- Set_Physical_Address --
    --------------------------
@@ -566,6 +605,25 @@ package body Mem.Page_Table is
    procedure Set_Writable (Position : Cursor) is
       Page : Mapped_Page_Record renames Mapped_Pages (Position);
    begin
+      Set_Written (Position);
+
+      Mem.Calls.Map
+        (Process    =>
+           Mem.Processes.Process_Object_Id (Page.Process),
+         Physical   => Page.Phys,
+         Virtual    => Page.Virt,
+         Readable   => Page.Readable,
+         Writeable  => Page.Writable,
+         Executable => Page.Executable);
+   end Set_Writable;
+
+   -----------------
+   -- Set_Written --
+   -----------------
+
+   procedure Set_Written (Position : Cursor) is
+      Page : Mapped_Page_Record renames Mapped_Pages (Position);
+   begin
       Page.Writable := True;
       if Page.Persistent and then not Page.Dirty then
          if Dirty_Page_Last >= Rose.Limits.Max_Dirty_Pages then
@@ -580,16 +638,7 @@ package body Mem.Page_Table is
          Dirty_Pages (Dirty_Page_Last) := Position;
       end if;
       Page.Dirty := True;
-
-      Mem.Calls.Map
-        (Process    =>
-           Mem.Processes.Process_Object_Id (Page.Process),
-         Physical   => Page.Phys,
-         Virtual    => Page.Virt,
-         Readable   => Page.Readable,
-         Writeable  => Page.Writable,
-         Executable => Page.Executable);
-   end Set_Writable;
+   end Set_Written;
 
    -----------
    -- Sweep --

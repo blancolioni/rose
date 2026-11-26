@@ -20,7 +20,7 @@ A process passes its invocation record to the kernel by address, not in register
 
 The kernel copies in the first two words of the record, the control word and the capability, and then what the control word says was sent: the words up to `SW` if `Send_Words` is set, the capabilities up to `SC` if `Send_Caps` is set, and the buffer's address and length if `Send_Buffer` or `Writable_Buffer` is set (#892).
 It never reads the caller's `Reply Capability`, `Endpoint Id` or `Identifier`.
-When it resumes the process with a reply, it copies out the six header words, which it writes on every delivery, and what the reply sent, to the same address, past the write protection of a checkpoint, which is why a persistent process waits for its reply until a checkpoint has finished (see <<Persistence>>).
+When it resumes the process with a reply, it copies out the six header words, which it writes on every delivery, and what the reply sent, to the same address, past any write protection, which is why the kernel first copies a page that a checkpoint has yet to save (see <<Checkpoint Mode>>).
 The copy reads the flags and counts by their bit positions, which the representation clause of `Rose.Invocation.Control_Word` fixes; `mp.s` names the same positions.
 
 Passing words 0 and 1 in registers, which are free on `sysenter`, would save the copy and the validity check for calls that need nothing else.

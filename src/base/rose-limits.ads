@@ -53,6 +53,19 @@ package Rose.Limits is
    --  changes, which can't wait, can take it past the limit, and the
    --  memory server says so in the kernel's log.
 
+   Checkpoint_Written_Pages : constant := 256;
+   --  The pages that persistent processes can write during a checkpoint
+   --  without the memory server: the kernel makes them writable itself,
+   --  and gives the list to the memory server at End_Page_Copies (ADR
+   --  0030, sections 3 and 5). A writer past the limit waits for the
+   --  end. The memory server marks them changed then, even past
+   --  Max_Dirty_Pages, so the log's reserve has room for them too.
+
+   Checkpoint_Copy_Frames : constant := 64;
+   --  The frames the memory server gives the kernel at start-up, for
+   --  copies of pages written during a checkpoint before they are saved
+   --  (ADR 0030, section 6).
+
    Reserve_Low_Pages  : constant := 64;
    Reserve_High_Pages : constant := 128;
    --  The memory server's reserve of free pages: when fewer than
@@ -92,14 +105,15 @@ package Rose.Limits is
 
    Log_Table_Margin  : constant := 512;
    Log_Reserve_Pages : constant :=
-                         Max_Dirty_Pages + Log_Table_Margin
-                         + Clean_Copy_Limit;
+                         Max_Dirty_Pages + Checkpoint_Written_Pages
+                         + Log_Table_Margin + Clean_Copy_Limit;
    --  The checkpoint log keeps Log_Reserve_Pages free for checkpoints and
    --  cleaning (#1029). Only a commit frees space in the log, so a log
    --  too full for a checkpoint would stay full. The memory server pages
    --  nothing out that would leave less than the reserve, so once the
    --  log is that low, a checkpoint's pages are only the changed pages
-   --  in memory, at most Max_Dirty_Pages, and its tables, which take
+   --  in memory, at most Max_Dirty_Pages and the pages written during
+   --  the last checkpoint, and its tables, which take
    --  less than Log_Table_Margin. Cleaning copies into the reserve, but
    --  leaves Log_Table_Margin. It doesn't grow with the machine's memory,
    --  since the changed pages are limited, not the mapped ones (#998).

@@ -890,7 +890,11 @@ package body Mem.Processes is
                --  writable segments are saved by checkpoints, and so
                --  indexed.
             begin
-               Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
+               --  New contents: the frame is in no checkpoint that is
+               --  running (ADR 0030).
+
+               Mem.Calls.Load_Page
+                 (Physical_Page, Buffer'Address, Fill => True);
 
                if Log_Page /= 0 then
                   Mem.Page_Log.Read (Log_Page, Buffer'Address);
@@ -1040,11 +1044,10 @@ package body Mem.Processes is
         (Rose.Interfaces.Storage.Region_Access.Subprogram_Count /= 4,
          "Region_Access has another operation: delete its cap below too");
 
-      Get   : constant Rose.Capabilities.Capability :=
-                Client.Get_Get_Cap (Region);
-      Put   : constant Rose.Capabilities.Capability :=
-                Client.Get_Put_Cap (Region);
-      Empty : Client.Region_Access_Client;
+      Get : constant Rose.Capabilities.Capability :=
+              Client.Get_Get_Cap (Region);
+      Put : constant Rose.Capabilities.Capability :=
+              Client.Get_Put_Cap (Region);
    begin
       Rose.System_Calls.Delete_Cap (Client.Get_Get_Range_Cap (Region));
       Rose.System_Calls.Delete_Cap (Client.Get_Read_Cap (Region));
@@ -1053,18 +1056,16 @@ package body Mem.Processes is
          Rose.System_Calls.Delete_Cap (Put);
       end if;
 
-      --  Open_Cap_Set leaves the interface cap as it was, and that cap is
-      --  deleted: its slot can hold another cap by the time Close deletes
-      --  it again. Fill an empty client, whose interface cap is null.
+      --  Open_Cap_Set makes a client with no interface cap, so Close won't
+      --  delete the deleted one again (idle#135).
 
       Client.Open_Cap_Set
-        (Client    => Empty,
+        (Client    => Region,
          Get_Range => Rose.Capabilities.Null_Capability,
          Get       => Get,
          Put       =>
            (if Shared then Put else Rose.Capabilities.Null_Capability),
          Read      => Rose.Capabilities.Null_Capability);
-      Region := Empty;
    end Keep_Used_Caps;
 
    --------------------
@@ -1085,22 +1086,18 @@ package body Mem.Processes is
                   Client.Get_Resume_Cap (Process);
       Fault   : constant Rose.Capabilities.Capability :=
                   Client.Get_Fault_Cap (Process);
-      Empty   : Kernel_Process_Client;
    begin
       Rose.System_Calls.Delete_Cap (Client.Get_Name_Cap (Process));
       Rose.System_Calls.Delete_Cap (Client.Get_Get_Object_Id_Cap (Process));
       Rose.System_Calls.Delete_Cap (Client.Get_Interface_Cap (Process));
 
-      --  As for a Region_Access: the interface cap is deleted.
-
       Client.Open_Cap_Set
-        (Client        => Empty,
+        (Client        => Process,
          Name          => Rose.Capabilities.Null_Capability,
          Destroy       => Destroy,
          Get_Object_Id => Rose.Capabilities.Null_Capability,
          Resume        => Resume,
          Fault         => Fault);
-      Process := Empty;
    end Keep_Used_Caps;
 
    ------------------
@@ -1346,7 +1343,7 @@ package body Mem.Processes is
          pragma Import (Ada, Buffer);
          for Buffer'Address use To_System_Address (Y);
       begin
-         Mem.Calls.Load_Page (Physical, Buffer'Address);
+         Mem.Calls.Load_Page (Physical, Buffer'Address, Fill => True);
          Buffer := Page;
          Mem.Calls.Unload_Page (Physical, Buffer'Address);
       end;

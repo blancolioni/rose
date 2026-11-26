@@ -113,7 +113,24 @@ package Mem.Page_Table is
 
    procedure Clear_Dirty_Pages;
    --  Every page in the dirty page list is clean, and the list is empty:
-   --  a checkpoint has saved them.
+   --  a checkpoint has saved them. A page marked Set_Next_Checkpoint stays
+   --  dirty and in the list, and loses the mark.
+
+   procedure Set_Next_Checkpoint
+     (Position : Cursor;
+      Next     : Boolean);
+   --  Next: the dirty page at Position isn't in the checkpoint that is
+   --  running, since its frame was filled after the checkpoint started.
+   --  The next checkpoint saves it (ADR 0030, section 1).
+
+   function Is_Next_Checkpoint (Position : Cursor) return Boolean;
+
+   procedure Set_Written (Position : Cursor);
+   --  The kernel made the page at Position writable during a checkpoint,
+   --  and a process wrote it (ADR 0030, section 5). As Set_Writable, but
+   --  the page is already mapped writable, and is added to the dirty page
+   --  list even past Rose.Limits.Max_Dirty_Pages, which is why the log's
+   --  reserve has room for Rose.Limits.Checkpoint_Written_Pages more.
 
    function Dirty_Page_Count return Natural;
 

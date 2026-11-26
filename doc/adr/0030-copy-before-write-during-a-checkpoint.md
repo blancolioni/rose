@@ -1,6 +1,6 @@
 # 30. Copying a page before it is written during a checkpoint
 
-- **Status:** Proposed
+- **Status:** Accepted. Implemented in #1160; see [Implementation](#implementation) for where it differs from the text below.
 - **Date:** 2026-11-09
 - **Related:** #795 (this decision), #807 (its duplicate), #543 and #714 (replies held during a checkpoint), #314 (buffers of calls in progress), [ADR 0005](0005-persistent-console.md) (device pages), [ADR 0007](0007-networking.md) (networking), [ADR 0008](0008-install-boot-and-pager-path.md) (the pager path), [ADR 0025](0025-shared-regions.md) (shared regions), [ADR 0028](0028-paging-to-the-log.md) (paging to the log, which this amends)
 
@@ -158,3 +158,20 @@ So a checkpoint under heavy writing is no worse than today, and the usual case d
   - Copying the checkpoint's side instead (section 2) leaves every mapping alone.
 - **`mem` does the copying.** `mem` already owns physical memory and handles write faults. But it is busy writing the checkpoint for most of it, so a write that waited for `mem` would wait almost as long as today.
 - **Copy every dirty page when the checkpoint starts.** This needs as many free frames as there are dirty pages, and copies all of them, where most are never written during the checkpoint. Copying before the first write copies only what is written.
+
+## Implementation
+
+Built in #1160 (`Rose.Kernel.Checkpoint_Copies`, `Mem.Checkpoints`). It differs from the decision above in these ways:
+
+- **The reserve stays in the kernel** (section 6). Every copy goes back to the reserve when `mem` saves its page, or at `End_Page_Copies`, so no frame is lost. `mem` gives the kernel `Rose.Limits.Checkpoint_Copy_Frames` frames once, at start-up, and doesn't refill it. `End_Page_Copies` returns only the written pages.
+- **Which frames are copied** (sections 1 and 2). The kernel keeps two bits for each frame during a checkpoint:
+  - _changed_, set by `Disable_Page_Writes` for the frame of each page it makes checkpoint-read-only;
+  - _marked_, set when `mem` saves the frame (`Copy_Saved_Page`), or fills it with new contents (`Load_Page` with a fill flag, bit 27 of its page word).
+
+  A write copies a frame only if it is changed and not marked. That covers a frame of a shared segment that is clean and write-tracked in one process and changed in another. A frame that `mem` frees and fills again during the checkpoint is marked, so a stale copy is never used.
+- **Pages that `mem` maps during the checkpoint** (section 1). `Copy_Saved_Page` with no buffer asks whether a frame is still in the checkpoint: not marked. `mem` asks for each dirty page while it writes the header pages, and leaves a page that isn't in it dirty, for the next checkpoint to save. Shared pages are still saved whatever their frame holds.
+- **The end of the copying** (section 5). The kernel doesn't make the remaining checkpoint-read-only pages writable: it clears the flag, and the page stays read-only, as `Leave_Checkpoint` did. If `mem` saved its pages, they are clean, so they become write-tracked. If it failed, they stay dirty and only read-only. `Leave_Checkpoint` ends the copying itself if `mem` didn't, and the written pages wait in the list for `mem`'s next `End_Page_Copies`.
+- **Write-tracked** is bit 11 of the page table entry, sent by `mem` as bit 28 of `Map`'s page word. `mem` sets it on every page of a persistent writable segment that it maps, since it maps every page read-only first.
+- **The written pages** are at most `Rose.Limits.Checkpoint_Written_Pages`, 256. `mem` marks them dirty even past `Max_Dirty_Pages`, and the log's reserve has room for them.
+- **A writer that waits** resumes at `End_Page_Copies`, not when a copy is freed.
+- **`Checkpoint_Reply_Held`** keeps its place among the process flags, which a checkpoint saves by position, as `Retired_Reply_Held`, and is never set.
