@@ -1,15 +1,15 @@
 command Rose.Core.Run_Self_Tests
   : Streams.Standard_Output, Caps.Create_Endpoint, Commands.Find_Command, Time.Clock_Service,
     Storage.Storage_Service, Screens.Screen_Service, Caps.Create_Signal, Caps.Cap_Set_Service,
-    Processes.Replace_Process
+    Processes.Replace_Process, Time.Timer_Service
   with Summary     => "Run Rose's self tests.",
        Description => """
           Run_Self_Tests runs Rose's self tests, and writes each test's
           name and result, and a summary, to standard output. It fails
           if any test fails. Init runs it on a fresh install (#460).
           A test that needs a bank, the screen, the Create_Signal cap,
-          the cap set server or mem's Replacer is skipped without it, as
-          when it is run from petal.
+          the cap set server, mem's Replacer or the timer is skipped
+          without it, as when it is run from petal.
           """
 is
 end Rose.Core.Run_Self_Tests;

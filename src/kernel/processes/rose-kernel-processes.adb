@@ -3047,15 +3047,16 @@ package body Rose.Kernel.Processes is
 
             procedure Queue_Message is
             begin
-               --  A second interrupt for the same endpoint takes the place
-               --  of the first, and nothing is lost: a driver reads its
-               --  device until it has nothing more, so one interrupt is
-               --  enough (#1014). Signals never wait here, since they stay
-               --  in the process's Signals until it receives.
+               --  A second interrupt or timeout for the same endpoint
+               --  takes the place of the first, and nothing is lost: a
+               --  driver reads its device until it has nothing more, and
+               --  the timer server fires every timer that is due, so one
+               --  is enough (#1014). Signals never wait here, since they
+               --  stay in the process's Signals until it receives.
 
                if To.Flags (Message_Queued)
-                 and then not (Kind = Interrupt
-                               and then To.Queued_Kind = Interrupt
+                 and then not (Kind in Interrupt | Timeout
+                               and then To.Queued_Kind = Kind
                                and then To.Queued_Endpoint = Endpoint)
                then
                   Put_Lost_Message (To_Process_Id, Kind, Endpoint);

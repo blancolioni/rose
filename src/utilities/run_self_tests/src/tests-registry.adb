@@ -28,6 +28,8 @@ package body Tests.Registry is
                            Rose.Capabilities.Null_Capability;
    Cap_Sets_Cap        : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
+   Timer_Interface_Cap : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
    Bank_Cap_Sets_Cap   : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;
    Replacer_Cap        : Rose.Capabilities.Capability :=
@@ -343,6 +345,15 @@ package body Tests.Registry is
       Screen_Surface_Cap := Screen;
    end Set_Screen;
 
+   ---------------
+   -- Set_Timer --
+   ---------------
+
+   procedure Set_Timer (Timer : Rose.Capabilities.Capability) is
+   begin
+      Timer_Interface_Cap := Timer;
+   end Set_Timer;
+
    ---------------------
    -- Start_Directory --
    ---------------------
@@ -446,5 +457,14 @@ package body Tests.Registry is
          Served := Rose.Capabilities.Null_Capability;
          Null_Dir := Rose.Capabilities.Null_Capability;
    end Start_Null_Stream;
+
+   -----------
+   -- Timer --
+   -----------
+
+   function Timer return Rose.Capabilities.Capability is
+   begin
+      return Timer_Interface_Cap;
+   end Timer;
 
 end Tests.Registry;

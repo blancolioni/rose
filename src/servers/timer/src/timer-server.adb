@@ -182,15 +182,31 @@ package body Timer.Server is
 
    procedure On_Timeout (Id : Rose.Objects.Capability_Identifier) is
       pragma Unreferenced (Id);
-      Params : aliased Rose.Invocation.Invocation_Record;
-      Timeout : constant Timeout_Entry :=
-                  Queue (Queue_Front);
+      Now : constant Ticks_Type := Current_Ticks;
    begin
-      Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
-      Params.Control.Flags (Rose.Invocation.Block) := False;
-      Rose.System_Calls.Invoke_Capability (Params);
-      Delete_Caps (Timeout);
-      Queue_Front := Queue_Front - 1;
+
+      --  The kernel's timeout says only that it is time to look at the
+      --  queue. It may be stale, if an earlier timer was set or the
+      --  front one destroyed after it was set, and it may stand for
+      --  more than one, since the kernel keeps one queued timeout in
+      --  place of two (#1014). So every timer that is due fires, and
+      --  no other.
+
+      while Queue_Front > 0
+        and then Queue (Queue_Front).Timeout <= Now
+      loop
+         declare
+            Params  : aliased Rose.Invocation.Invocation_Record;
+            Timeout : constant Timeout_Entry := Queue (Queue_Front);
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Timeout.Cap);
+            Params.Control.Flags (Rose.Invocation.Block) := False;
+            Rose.System_Calls.Invoke_Capability (Params);
+            Delete_Caps (Timeout);
+            Queue_Front := Queue_Front - 1;
+         end;
+      end loop;
+
       Update_Timer_Queue;
    end On_Timeout;
 
@@ -275,8 +291,12 @@ package body Timer.Server is
                       Queue (Queue_Front).Timeout;
             Current : constant Ticks_Type := Current_Ticks;
          begin
+
+            --  The kernel never fires a timeout of 0 ticks, so a timer
+            --  that is due already fires on the next tick.
+
             Set_Timer
-              (if Ticks < Current then 0 else Ticks - Current);
+              (if Ticks <= Current then 1 else Ticks - Current);
          end;
       end if;
    end Update_Timer_Queue;
