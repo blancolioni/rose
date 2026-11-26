@@ -7,7 +7,7 @@
 # ISO_A and ISO_B are install images whose programs differ, such as two
 # builds of the same tree, one with uncommitted changes and one without:
 # login shows the build id (Rose.Build), so its image differs. COUNT is
-# the number of update boots, 3 by default. The test:
+# the number of update boots, at least 2, and 4 by default. The test:
 #
 #   1. installs Rose on a new disk from ISO_A, as test-boot does, and
 #      checks that init's exec forward test freed the version that it
@@ -17,11 +17,16 @@
 #   3. updates the disk COUNT times, from ISO_B, ISO_A, ISO_B and so on,
 #      as test-update-fixture's first step does. Each update installs a
 #      new version of each program that differs, and retires the old
-#      one. It has to free some of them, and none of exec's processes
-#      may be unknown to it. The pages that exec's images use, which it
-#      reports with each image it frees, have to be the same after the
-#      last update as after the first, once ISO_B is installed again: one
-#      version of each program, and what the restored processes run;
+#      one. A login of the old version is still running then, and the
+#      checkpoint that the update restarts into doesn't keep it, since
+#      login is transient. So the next update's restore ends it, and
+#      exec frees the version once it has been restored, before it
+#      installs anything. From the second update on, each has to free
+#      something, and none of exec's processes may be unknown to it.
+#      The pages that exec's images use, which it reports with each
+#      image it frees, have to be the same at the last even-numbered
+#      update as at the second: one version of each program, and what
+#      the restored processes run;
 #   4. runs check-log.py on the disk, which has to find the log
 #      consistent.
 #
@@ -36,7 +41,8 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 }
 ISO_A=$1
 ISO_B=$2
-COUNT=${3:-3}
+COUNT=${3:-4}
+[ "$COUNT" -ge 2 ] || { echo "COUNT must be at least 2"; exit 2; }
 
 for iso in "$ISO_A" "$ISO_B"; do
     [ -f "$iso" ] || { echo "no install image: $iso"; exit 2; }
@@ -95,18 +101,22 @@ while [ $update -le "$COUNT" ]; do
     grep -q "^exec: can't follow" "$WORK/console-update-$update" \
         && { echo "FAIL: exec couldn't follow a process"; exit 1; }
 
-    PAGES=$(in_use "$WORK/console-update-$update")
-    [ -n "$PAGES" ] \
-        || { echo "FAIL: update $update freed nothing"; exit 1; }
-    echo "Update $update: exec's images use $PAGES pages"
-    [ -n "$FIRST" ] || FIRST=$PAGES
-    [ $((update % 2)) -eq 1 ] && LAST=$PAGES
+    if [ $update -ge 2 ]; then
+        PAGES=$(in_use "$WORK/console-update-$update")
+        [ -n "$PAGES" ] \
+            || { echo "FAIL: update $update freed nothing"; exit 1; }
+        echo "Update $update: exec's images use $PAGES pages"
+        if [ $((update % 2)) -eq 0 ]; then
+            [ -n "$FIRST" ] || FIRST=$PAGES
+            LAST=$PAGES
+        fi
+    fi
     update=$((update + 1))
 done
 
 [ "$LAST" -eq "$FIRST" ] || {
-    echo "FAIL: exec's images use $LAST pages after the last update" \
-         "from $(basename "$ISO_B"), and used $FIRST after the first"
+    echo "FAIL: exec's images use $LAST pages at the last even-numbered" \
+         "update, and used $FIRST at the second"
     exit 1
 }
 
