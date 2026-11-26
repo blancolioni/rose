@@ -5,7 +5,8 @@ command Rose.Core.File : Caps.Create_Endpoint, Caps.Cap_Set_Service
           writers opened on it, and at most one version of it (ADR 0026).
           A directory launches it for each file it creates, against a
           bank of the file's own, and destroys that bank to delete the
-          file. A file holds at most 64 KiB (#215).
+          file. Its contents are on its heap, and grow as they are
+          written (#760).
 
           A new version of the program can take over from a running one
           (ADR 0032, #867). Its state is the contents of the file and of
