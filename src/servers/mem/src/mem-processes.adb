@@ -86,8 +86,21 @@ package body Mem.Processes is
    --  operation caps are deleted: mem keeps only the interface cap, and
    --  the others would stay in its table for ever (#1131).
 
+   procedure Keep_Used_Caps
+     (Region : in out Rose.Interfaces.Storage.Region_Access.Client
+                .Region_Access_Client;
+      Shared : Boolean);
+   --  Delete the caps of an opened segment's Region that mem never calls:
+   --  it keeps Get, and Put for a Shared segment, whose pages it writes
+   --  back. Get_Range is called once, before this. Each segment held five
+   --  caps, and mem's table limited the processes (#1131).
+
    subtype Kernel_Process_Client is
      Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
+
+   procedure Keep_Used_Caps (Process : in out Kernel_Process_Client);
+   --  Delete the caps of an opened Kernel_Process that mem never calls
+   --  after Get_Object_Id: it keeps Destroy, Resume and Fault (#1131).
 
    type Fault_Count is
       record
@@ -417,6 +430,8 @@ package body Mem.Processes is
          return;
       end if;
 
+      Keep_Used_Caps (New_Segment.Region, Shared);
+
       P.Num_Segments := P.Num_Segments + 1;
       P.Segments (P.Num_Segments) := Segment_Record'
         (Base         => Virtual_Base,
@@ -453,12 +468,10 @@ package body Mem.Processes is
    begin
       --  Closing the process's own region releases it, since Region is
       --  a Resource; closing a Region_Access leaves the region (#403).
+      --  Close deletes only the caps that Keep_Used_Caps kept, since
+      --  deleting a null cap does nothing.
 
-      if Rose.Interfaces.Storage.Region_Access.Client.Get_Interface_Cap
-        (Segment.Region) /= 0
-      then
-         Rose.Interfaces.Storage.Region_Access.Client.Close (Segment.Region);
-      end if;
+      Rose.Interfaces.Storage.Region_Access.Client.Close (Segment.Region);
 
       if Segment.Private_Region
         and then Segment.Owner /= Rose.Capabilities.Null_Capability
@@ -978,6 +991,84 @@ package body Mem.Processes is
       end loop;
    end Iterate_Saved_Processes;
 
+   --------------------
+   -- Keep_Used_Caps --
+   --------------------
+
+   procedure Keep_Used_Caps
+     (Region : in out Rose.Interfaces.Storage.Region_Access.Client
+                .Region_Access_Client;
+      Shared : Boolean)
+   is
+      package Client renames Rose.Interfaces.Storage.Region_Access.Client;
+
+      pragma Compile_Time_Error
+        (Rose.Interfaces.Storage.Region_Access.Subprogram_Count /= 4,
+         "Region_Access has another operation: delete its cap below too");
+
+      Get   : constant Rose.Capabilities.Capability :=
+                Client.Get_Get_Cap (Region);
+      Put   : constant Rose.Capabilities.Capability :=
+                Client.Get_Put_Cap (Region);
+      Empty : Client.Region_Access_Client;
+   begin
+      Rose.System_Calls.Delete_Cap (Client.Get_Get_Range_Cap (Region));
+      Rose.System_Calls.Delete_Cap (Client.Get_Read_Cap (Region));
+      Rose.System_Calls.Delete_Cap (Client.Get_Interface_Cap (Region));
+      if not Shared then
+         Rose.System_Calls.Delete_Cap (Put);
+      end if;
+
+      --  Open_Cap_Set leaves the interface cap as it was, and that cap is
+      --  deleted: its slot can hold another cap by the time Close deletes
+      --  it again. Fill an empty client, whose interface cap is null.
+
+      Client.Open_Cap_Set
+        (Client    => Empty,
+         Get_Range => Rose.Capabilities.Null_Capability,
+         Get       => Get,
+         Put       =>
+           (if Shared then Put else Rose.Capabilities.Null_Capability),
+         Read      => Rose.Capabilities.Null_Capability);
+      Region := Empty;
+   end Keep_Used_Caps;
+
+   --------------------
+   -- Keep_Used_Caps --
+   --------------------
+
+   procedure Keep_Used_Caps (Process : in out Kernel_Process_Client) is
+      package Client renames
+        Rose.Interfaces.Processes.Kernel_Process.Client;
+
+      pragma Compile_Time_Error
+        (Rose.Interfaces.Processes.Kernel_Process.Subprogram_Count /= 5,
+         "Kernel_Process has another operation: delete its cap below too");
+
+      Destroy : constant Rose.Capabilities.Capability :=
+                  Client.Get_Destroy_Cap (Process);
+      Resume  : constant Rose.Capabilities.Capability :=
+                  Client.Get_Resume_Cap (Process);
+      Fault   : constant Rose.Capabilities.Capability :=
+                  Client.Get_Fault_Cap (Process);
+      Empty   : Kernel_Process_Client;
+   begin
+      Rose.System_Calls.Delete_Cap (Client.Get_Name_Cap (Process));
+      Rose.System_Calls.Delete_Cap (Client.Get_Get_Object_Id_Cap (Process));
+      Rose.System_Calls.Delete_Cap (Client.Get_Interface_Cap (Process));
+
+      --  As for a Region_Access: the interface cap is deleted.
+
+      Client.Open_Cap_Set
+        (Client        => Empty,
+         Name          => Rose.Capabilities.Null_Capability,
+         Destroy       => Destroy,
+         Get_Object_Id => Rose.Capabilities.Null_Capability,
+         Resume        => Resume,
+         Fault         => Fault);
+      Process := Empty;
+   end Keep_Used_Caps;
+
    ------------------
    -- Kill_Process --
    ------------------
@@ -1445,6 +1536,7 @@ package body Mem.Processes is
             return 0;
          end if;
 
+         Keep_Used_Caps (Client);
          Process_Table (Next_Pid) := No_Process;
          Process_Table (Next_Pid).State := Active;
          Process_Table (Next_Pid).Oid := Oid;
@@ -1754,6 +1846,7 @@ package body Mem.Processes is
              (Create_Cap   => Create_Endpoint_Cap,
               Endpoint_Id  => Rose.Interfaces.Processes.Heap.Heap_Interface,
               Identifier   => Identifier_Of (Oid));
+         Keep_Used_Caps (Client);
          P.Process := Client;
          P.Interface_Cap :=
            Rose.System_Calls.Server.Create_Endpoint
@@ -1809,6 +1902,7 @@ package body Mem.Processes is
          begin
             Open_Region (Segment, Region);
             Get_Range (Segment, Region_Base, Region_Bound, Has_Range);
+            Keep_Used_Caps (Segment.Region, Segment.Flags (Shared));
             if Has_Range then
                Segment.Region_Base := Region_Base;
                Segment.Region_Bound := Region_Bound;

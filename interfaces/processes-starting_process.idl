@@ -13,4 +13,13 @@ interface Processes.Starting_Process is
 
    function Start return Capability;
 
+   --  The process's own bank (ADR 0015): a null cap if it has none. The
+   --  caller launched the process against the bank above it, so this
+   --  gives it nothing that it couldn't do already. Exec registers a
+   --  Storage.Dependent with it, to learn when the process ends, and
+   --  frees a retired program's image once none of its processes run
+   --  (#875). Asked before Start.
+
+   function Bank return interface Storage.Bank;
+
 end Processes.Starting_Process;

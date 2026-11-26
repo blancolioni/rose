@@ -28,5 +28,6 @@ exec:
 	    $(INTERFACES)/caps-cap.idl \
 	    $(INTERFACES)/caps-cap_set.idl \
 	    $(INTERFACES)/processes-starting_process.idl \
+	    $(INTERFACES)/processes-restorable.idl \
 	    $(INTERFACES)/processes-heap.idl
 	gprbuild $(GPRBUILD_CARGS)

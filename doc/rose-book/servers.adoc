@@ -325,7 +325,7 @@ Used by:: `directory`, which launches a `file` process for each file it creates,
 A new version of `file` can take over from a running one (ADR 0032, #867).
 Its state is the file's contents and its version's, and the readers and writers that are open, each with the identifier it had, so that clients' caps keep working.
 
-A file holds up to 64 KiB (#760).
+A file's contents are on the heap, and grow as they are written (#760).
 Each reader has its own position, and writers have none (ADR 0009).
 See <<Files and Directories>> for how files, versions and commits work.
 
