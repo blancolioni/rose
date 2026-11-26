@@ -160,6 +160,9 @@ package body Rose.Command_Signatures is
                              and then Name = "Replace_Process"
                            then Replace_Process_Cap
                            elsif Key = "cap"
+                             and then Name = "Timer_Service"
+                           then Timer_Service_Cap
+                           elsif Key = "cap"
                              and then Name = "Package_State"
                            then Package_State_Cap
                            else Other_Role_Cap);

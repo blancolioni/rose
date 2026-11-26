@@ -54,6 +54,14 @@ package Tests.Registry is
    function Replacer return Rose.Capabilities.Capability;
    --  Mem's Replacer, or the null cap.
 
+   procedure Set_Timer (Timer : Rose.Capabilities.Capability);
+   --  The timer server's Timer interface, which Run_Self_Tests is given
+   --  for its Timer_Service role on a fresh install (#1014), or the null
+   --  cap.
+
+   function Timer return Rose.Capabilities.Capability;
+   --  The timer's Timer interface, or the null cap.
+
    function Commands return Rose.Capabilities.Capability;
    --  The command registry's Commands interface, which Run_Self_Tests is
    --  given for its Find_Command role.

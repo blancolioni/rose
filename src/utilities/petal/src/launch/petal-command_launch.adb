@@ -1237,7 +1237,7 @@ package body Petal.Command_Launch is
                      Fail ("petal has no package state to give the command");
                   end if;
                when Screen_Service_Cap | Cap_Set_Service_Cap
-                  | Replace_Process_Cap
+                  | Replace_Process_Cap | Timer_Service_Cap
                =>
                   Caps (Role.Cap_Index + 1) :=
                     Rose.Capabilities.Null_Capability;

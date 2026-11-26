@@ -11,7 +11,8 @@ package Init.Self_Tests is
       Screen          : Rose.Capabilities.Capability;
       Create_Signal   : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
-      Replace_Process : Rose.Capabilities.Capability)
+      Replace_Process : Rose.Capabilities.Capability;
+      Timer           : Rose.Capabilities.Capability)
       return Boolean;
    --  Run the run_self_tests command, found through the command
    --  registry's Find_Cap, and wait for it to finish (#460). It is called
@@ -24,8 +25,9 @@ package Init.Self_Tests is
    --  Screen_Service role (#582), and Create_Signal, the kernel cap that
    --  makes signal caps, for its Create_Signal role (#708), Cap_Sets,
    --  the Create cap of the userland cap set server, for its
-   --  Cap_Set_Service role (#825), and Replace_Process, mem's Replacer,
-   --  for its Replace_Process role (#866).
+   --  Cap_Set_Service role (#825), Replace_Process, mem's Replacer,
+   --  for its Replace_Process role (#866), and Timer, the timer's Timer
+   --  interface, for its Timer_Service role (#1014).
    --  True if the command completed, False if it could not be run, or
    --  failed because a test failed.
 

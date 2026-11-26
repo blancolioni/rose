@@ -29,6 +29,7 @@ with Tests.Smoke;
 with Tests.Stack;
 with Tests.Strings;
 with Tests.Streams;
+with Tests.Timers;
 with Tests.Unsaved_Memory;
 with Tests.Users;
 
@@ -63,6 +64,7 @@ package Tests.Suite is
                    Tests.Float_Text.Float_Text_Test'Access,
                    Tests.Clock.Calendar_Test'Access,
                    Tests.Clock.Clock_Test'Access,
+                   Tests.Timers.Timer_Test'Access,
                    Tests.Ada_Calendar.Ada_Calendar_Test'Access,
                    Tests.Numerics.Random_Seed_Test'Access,
                    Tests.Rights.Rights_Test'Access,

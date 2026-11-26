@@ -19,6 +19,8 @@ run_self_tests:
 	    $(INTERFACES)/users-auth.idl \
 	    $(INTERFACES)/users-auth_admin.idl \
 	    $(INTERFACES)/time-clock.idl \
+	    $(INTERFACES)/time-timer.idl \
+	    $(INTERFACES)/time-timeout.idl \
 	    $(INTERFACES)/users-rights.idl \
 	    $(INTERFACES)/users-rights_admin.idl \
 	    $(INTERFACES)/processes-launch.idl \
