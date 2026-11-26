@@ -131,6 +131,7 @@ Amended by #1138. 0.4.0 is a first draft of the 0.4 interfaces, and the series f
 
 - **0.4.1 can change or remove** interfaces and operations that 0.4.0 shipped, as well as add them. From `v0.4.1` on, section 2 applies: `endpoint-ids.txt` is append-only, and an interface that is no longer wanted is retired.
 - **The restore promise moves with the freeze.** A checkpoint holds endpoint ids, so a checkpoint made by 0.4.0 isn't promised to restore on 0.4.1 or later, and an update boot from 0.4.0 isn't promised to keep it. A checkpoint made by 0.4.1 restores on every later 0.4.x.
+- **0.4.1 refuses 0.4.0's checkpoints.** The interface level can't tell them apart from 0.4.1's, since 0.4.1 may have as many endpoint ids as 0.4.0 or more, so 0.4.1 writes kernel tables version 14 with the same layout, and `restore` refuses version 13 with a message that names 0.4.0. An update boot from 0.4.0 stops there, as for any refused checkpoint, and the disk needs a new install.
 - **The tests use 0.4.1's image.** The fixture of section 6 is made from 0.4.1 and uploaded to its release. `scripts/frozen-release` names the release where a series froze, and `check-endpoint-ids`, `test-restore-fixture` and `test-update-fixture` use it.
 - **Later series freeze at X.Y.0,** as sections 2 and 6 say. This is a one-off for 0.4.
 
