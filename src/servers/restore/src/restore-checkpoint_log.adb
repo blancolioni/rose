@@ -403,17 +403,21 @@ package body Restore.Checkpoint_Log is
       end if;
 
       if Kernel_Header.Version /= Rose.Checkpoints.Kernel_Table_Version then
-         if Kernel_Header.Version = 13 then
-            Rose.Console_IO.Put ("restore: log: entry at ");
-            Rose.Console_IO.Put (Natural (Location));
-            Rose.Console_IO.Put
-              (" was written by 0.4.0, whose interfaces were a first"
-               & " draft (#1138); install 0.4.1 again");
-            Rose.Console_IO.New_Line;
-         end if;
-         Refuse_Version
-           (Location, "kernel tables", Kernel_Header.Version,
-            Rose.Checkpoints.Kernel_Table_Version);
+         declare
+            From_0_4_0 : constant Boolean := Kernel_Header.Version = 13;
+            --  Read before Refuse_Version prints: sending a line to the
+            --  console overwrites Page, where Kernel_Header is.
+         begin
+            Refuse_Version
+              (Location, "kernel tables", Kernel_Header.Version,
+               Rose.Checkpoints.Kernel_Table_Version);
+            if From_0_4_0 then
+               Rose.Console_IO.Put
+                 ("restore: log: it was written by 0.4.0, whose interfaces"
+                  & " were a first draft (#1138); install 0.4.1 again");
+               Rose.Console_IO.New_Line;
+            end if;
+         end;
          return False;
       end if;
 
