@@ -130,6 +130,8 @@ package body Init.Run is
                                    Null_Capability;
       --  For that test, the Launch interface of replaceable_test's first
       --  version, from its install.
+      Copy_Test_Failed         : Boolean := False;
+      --  Set if a step of the exec copy test failed (#1110).
 
       Restored           : Boolean := False;
       --  Set if the restore server restored a checkpoint, in which case
@@ -680,6 +682,51 @@ package body Init.Run is
                         "init: exec forward test: FAIL: the launch through"
                         & " the old cap failed" & NL);
                end case;
+            elsif Params.Data (1) = 93 then
+
+               --  Step Data (2), from 1 to 5, of the test of exec's
+               --  Update copying an installed image's matching pages
+               --  (#1110). Cap 0 reads that step's image, which
+               --  restore-install releases once this replies.
+
+               declare
+                  Step   : constant Rose.Words.Word := Params.Data (2);
+                  Result : constant Init.Self_Tests.Forward_Result :=
+                    Init.Self_Tests.Exec_Copy_Test
+                      (Update_Cap    => Exec_Update_Cap,
+                       Binary_Stream => Params.Caps (0));
+               begin
+                  case Result is
+                     when Init.Self_Tests.Passed =>
+                        null;
+                     when Init.Self_Tests.No_Update_Cap =>
+                        Copy_Test_Failed := True;
+                        Init.Calls.Send_String
+                          (Console_Stream_Cap,
+                           "init: exec copy test: FAIL: no Update cap"
+                           & NL);
+                     when Init.Self_Tests.Nothing_From_Restore =>
+                        Copy_Test_Failed := True;
+                        Init.Calls.Send_String
+                          (Console_Stream_Cap,
+                           "init: exec copy test: FAIL: nothing from"
+                           & " restore" & NL);
+                     when others =>
+                        Copy_Test_Failed := True;
+                        Init.Calls.Send_String
+                          (Console_Stream_Cap,
+                           "init: exec copy test: FAIL: update "
+                           & Character'Val
+                               (Character'Pos ('0') + Natural (Step mod 10))
+                           & " failed" & NL);
+                  end case;
+
+                  if Step = 5 and then not Copy_Test_Failed then
+                     Init.Calls.Send_String
+                       (Console_Stream_Cap,
+                        "init: exec copy test: PASS" & NL);
+                  end if;
+               end;
             elsif Params.Data (1) = 96 then
 
                --  The screen driver is running, and cap 0 is its surface.

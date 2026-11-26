@@ -24,7 +24,7 @@ endif
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
 
-rose: config interfaces $(ROSE) check-targets check-endpoint-ids install-list programs exports stripped bootdisk iso finished
+rose: config interfaces $(ROSE) check-targets check-endpoint-ids install-list programs copy-test-images exports stripped bootdisk iso finished
 
 programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -39,7 +39,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs check-env check-targets check-endpoint-ids check-install-list install-list host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -192,6 +192,13 @@ $(UTILITIES): %:
 	$(MAKE) -C src/utilities/$@
 	strip -o build/install/bin/$@ src/utilities/$@/build/bin/$@-driver
 	cp src/utilities/$@/$@.caps build/install/bin/$@.caps
+
+# The images of init's test of exec's Update copying an installed image's
+# matching pages (#1110), made from replaceable_test's. They are not in the
+# install list.
+copy-test-images: replaceable_test
+	sh ./scripts/make-copy-test-images build/install/bin/replaceable_test \
+	    build/install/bin
 
 exports:
 	sh ./scripts/export-elf-trace

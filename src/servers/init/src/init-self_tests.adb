@@ -345,6 +345,38 @@ package body Init.Self_Tests is
       return Passed;
    end Derive_Test;
 
+   --------------------
+   -- Exec_Copy_Test --
+   --------------------
+
+   function Exec_Copy_Test
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability)
+      return Forward_Result
+   is
+      No_Caps : constant Init.Calls.Array_Of_Capabilities (1 .. 0) :=
+                  (others => Rose.Capabilities.Null_Capability);
+      Launch  : Rose.Capabilities.Capability;
+   begin
+      if Update_Cap = Rose.Capabilities.Null_Capability then
+         return No_Update_Cap;
+      elsif Binary_Stream = Rose.Capabilities.Null_Capability then
+         return Nothing_From_Restore;
+      end if;
+
+      Launch :=
+        Init.Installer.Update_Executable
+          (Update_Cap, Binary_Stream, "copy_test", No_Caps);
+      Rose.System_Calls.Delete_Cap (Binary_Stream);
+
+      if Launch = Rose.Capabilities.Null_Capability then
+         return Update_Failed;
+      end if;
+
+      Rose.System_Calls.Delete_Cap (Launch);
+      return Passed;
+   end Exec_Copy_Test;
+
    -----------------------
    -- Exec_Forward_Test --
    -----------------------
