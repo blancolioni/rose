@@ -1,6 +1,7 @@
 with Rose.Boot.Console;
 with Rose.Interfaces.Checkpoints.Kernel_Log;
 with Rose.Invocation;
+with Rose.Limits;
 
 with Rose.Kernel.Processes.Snapshot;
 
@@ -79,6 +80,8 @@ package body Rose.Kernel.Checkpoint is
       Page_Count : out Natural;
       Success    : out Boolean)
    is
+      Given : constant Natural :=
+                Natural (Tables'Length / Rose.Limits.Page_Size);
    begin
       --  The snapshot is taken first, while the caller's page directory
       --  is still active, because Tables is in the caller's memory.
@@ -86,8 +89,17 @@ package body Rose.Kernel.Checkpoint is
         (Tables, Page_Count, Success);
 
       if not Success then
-         Rose.Boot.Console.Put_Line
-           ("kernel: checkpoint tables do not fit; not entering checkpoint");
+         if Page_Count > Given then
+            Rose.Boot.Console.Put ("kernel: checkpoint tables need ");
+            Rose.Boot.Console.Put (Page_Count);
+            Rose.Boot.Console.Put (" pages, given ");
+            Rose.Boot.Console.Put (Given);
+            Rose.Boot.Console.New_Line;
+         else
+            Rose.Boot.Console.Put_Line
+              ("kernel: checkpoint tables not saved; "
+               & "not entering checkpoint");
+         end if;
          return;
       end if;
 

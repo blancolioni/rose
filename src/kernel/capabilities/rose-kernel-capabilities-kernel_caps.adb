@@ -465,9 +465,14 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                Rose.Kernel.Checkpoint.Enter_Checkpoint
                  (Tables, Page_Count, Success);
 
+               --  The error's word is the pages that the tables need,
+               --  so that a caller whose buffer was too small can offer
+               --  a larger one (#913).
+
                if not Success then
                   Rose.Kernel.Processes.Return_Error
-                    (Params, Rose.Invocation.Request_Error);
+                    (Params, Rose.Invocation.Request_Error,
+                     Rose.Words.Word (Page_Count));
                   return;
                end if;
 

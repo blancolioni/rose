@@ -15,7 +15,7 @@ ADR 0002 says that directories are independent capabilities, that the shell keep
 - **No users.** Init launches petal with a positional cap set: the three standard streams, a `current_directory` slot that is always null, system caps, the command registry's `Find` and the trace cap.
 - **Petal starts with a prompt.** It prints its version and enters `Petal.Read.Reader_Loop`. There is no start-up file.
 - **Interface arguments.** The IDL compiler (idle) already generates commands with interface-typed arguments, such as `Directory : in Directory`, received as caps.
-- **The kernel has room for 64 processes** (`Max_Processes`, defined in both `Rose.Kernel` and `Rose.Kernel.Limits`).
+- **The kernel has room for 64 processes** (`Max_Processes`, defined in both `Rose.Kernel` and `Rose.Kernel.Limits`). *Since #913 it is 80, defined once in `Rose.Limits`.*
 
 ### Constraints
 
@@ -85,7 +85,7 @@ Each writable directory and each writable file is its own process: a `directory`
 - **Creating an entry launches a process.** A directory process holds the launch caps for the `directory` and `file` executables. `Create_File` launches a new file process, keeps its caps in the new entry, and returns a `Writable_File` client. `Create_Directory` does the same with a new directory process.
 - **Why one process per object.** The cap for a file or directory then names a process directly, with no object id in the cap to check, and the kernel's per-process accounting and revocation apply to each file. Overhead is expected to be small: the code is shared (#200), so each process costs its own data pages, its stack and a kernel process entry, not much more than the file would take on disk.
 - **Each server is written as an independent process.** A file server knows nothing of its directory, and a directory server talks to its children only through their interfaces. Later, user-mode scheduling and private process tables will let a directory and its children run inside a single kernel process. Servers written this way can move there unchanged.
-- **The kernel process limit is accepted for now.** The kernel has room for 64 processes, which is enough for the first user's home directory alongside the boot servers. A directory tree of any size waits for the single-process model above, not for a bigger kernel table. If the boot set doesn't fit, `Max_Processes` is raised, and defined once, as a stopgap.
+- **The kernel process limit is accepted for now.** The kernel has room for 64 processes, which is enough for the first user's home directory alongside the boot servers. A directory tree of any size waits for the single-process model above, not for a bigger kernel table. If the boot set doesn't fit, `Max_Processes` is raised, and defined once, as a stopgap. *#913 did this in 0.4.1: the limit is 80, in `Rose.Limits` only. It doesn't replace the single-process model.*
 
 ### 3. Users
 

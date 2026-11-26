@@ -79,6 +79,13 @@ package body Mem.Processes is
       Bound   : out Rose.Objects.Object_Id;
       Success : out Boolean);
 
+   function Interface_Cap_Of
+     (Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client)
+      return Rose.Capabilities.Capability;
+   --  The interface cap of a Bank client that a call returned, opened. Its
+   --  operation caps are deleted: mem keeps only the interface cap, and
+   --  the others would stay in its table for ever (#1131).
+
    subtype Kernel_Process_Client is
      Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
 
@@ -571,7 +578,7 @@ package body Mem.Processes is
       begin
          if P.Bank_Cap = 0 and then Have_Banks then
             P.Bank_Cap :=
-              Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+              Interface_Cap_Of
                 (Rose.Interfaces.Storage.Process_Banks.Client.Process_Bank
                    (Process_Banks, P.Oid));
          end if;
@@ -871,6 +878,44 @@ package body Mem.Processes is
       end loop;
    end Initialize_Page;
 
+   ----------------------
+   -- Interface_Cap_Of --
+   ----------------------
+
+   function Interface_Cap_Of
+     (Bank : Rose.Interfaces.Storage.Bank.Client.Bank_Client)
+      return Rose.Capabilities.Capability
+   is
+      package Client renames Rose.Interfaces.Storage.Bank.Client;
+
+      pragma Compile_Time_Error
+        (Rose.Interfaces.Storage.Bank.Subprogram_Count /= 6,
+         "Bank has another operation: delete its cap below too");
+
+      procedure Delete (Cap : Rose.Capabilities.Capability);
+
+      ------------
+      -- Delete --
+      ------------
+
+      procedure Delete (Cap : Rose.Capabilities.Capability) is
+         use type Rose.Capabilities.Capability;
+      begin
+         if Cap /= 0 then
+            Rose.System_Calls.Delete_Cap (Cap);
+         end if;
+      end Delete;
+
+   begin
+      Delete (Client.Get_Reserve_Storage_Cap (Bank));
+      Delete (Client.Get_Create_Sub_Bank_Cap (Bank));
+      Delete (Client.Get_Add_Dependent_Cap (Bank));
+      Delete (Client.Get_Get_Usage_Cap (Bank));
+      Delete (Client.Get_Destroy_Cap (Bank));
+      Delete (Client.Get_Index_Cap (Bank));
+      return Client.Get_Interface_Cap (Bank);
+   end Interface_Cap_Of;
+
    -----------------
    -- Is_Launched --
    -----------------
@@ -1083,6 +1128,30 @@ package body Mem.Processes is
                  Register_Process (Process_Cap, Boot_Module => False);
       Cap    : Rose.Capabilities.Capability;
       Launch : Rose.Interfaces.Storage.Bank.Client.Bank_Client;
+
+      procedure Give_Up;
+      --  Mem has no room for the process's caps (#913). Give its slot
+      --  back, and end the bank made for it. The caller ends the kernel's
+      --  process, as when there is no slot.
+
+      -------------
+      -- Give_Up --
+      -------------
+
+      procedure Give_Up is
+         P : Memory_Process_Record renames Process_Table (Pid);
+      begin
+         if P.Bank_Cap /= 0 then
+            End_Bank (P.Oid);
+            Rose.System_Calls.Delete_Cap (P.Bank_Cap);
+         end if;
+         if P.Heap /= 0 then
+            Rose.System_Calls.Delete_Cap (P.Heap);
+         end if;
+         Rose.Interfaces.Processes.Kernel_Process.Client.Close (P.Process);
+         P := No_Process;
+      end Give_Up;
+
    begin
       if Pid = 0 then
          Rose.System_Calls.Delete_Cap (Bank_Cap);
@@ -1098,7 +1167,7 @@ package body Mem.Processes is
       if Have_Banks and then Bank_Cap /= 0 then
          Rose.Interfaces.Storage.Bank.Client.Open (Launch, Bank_Cap);
          Process_Table (Pid).Bank_Cap :=
-           Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+           Interface_Cap_Of
              (Rose.Interfaces.Storage.Process_Banks.Client.Create_Process_Bank
                 (Process_Banks,
                  Parent  => Rose.Interfaces.Storage.Bank.Client.Index (Launch),
@@ -1115,6 +1184,12 @@ package body Mem.Processes is
            Endpoint_Id  =>
              Rose.Interfaces.Processes.Process.Process_Interface,
            Identifier   => Process_Identifier (Pid));
+
+      if Cap = 0 then
+         Give_Up;
+         return 0;
+      end if;
+
       Process_Table (Pid).Interface_Cap := Cap;
       return Cap;
    end New_Process;
@@ -1220,7 +1295,7 @@ package body Mem.Processes is
       if not Have_Banks or else Process not in Real_Process_Id then
          return 0;
       end if;
-      return Rose.Interfaces.Storage.Bank.Client.Get_Interface_Cap
+      return Interface_Cap_Of
         (Rose.Interfaces.Storage.Process_Banks.Client.Parent_Bank
            (Process_Banks, Process_Table (Process).Oid));
    end Parent_Bank;
@@ -1308,6 +1383,7 @@ package body Mem.Processes is
       Next_Pid : Real_Process_Id :=
                    (if Boot_Module then Next_Boot_Pid
                     else Next_Launched_Pid);
+      use type Rose.Capabilities.Capability;
       Start  : constant Process_Id := Next_Pid;
       Client : Rose.Interfaces.Processes.Kernel_Process.Client
         .Kernel_Process_Client;
@@ -1342,7 +1418,12 @@ package body Mem.Processes is
                  Rose.Interfaces.Processes.Kernel_Process.Client
                    .Get_Object_Id (Client);
       begin
-         if Find_Process (Identifier_Of (Oid)) /= 0 then
+         --  Mem may have no room for the client's caps, and then the
+         --  call fails (#913).
+
+         if Rose.Interfaces.Processes.Kernel_Process.Client.Has_Error
+           or else Find_Process (Identifier_Of (Oid)) /= 0
+         then
             Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
             return 0;
          end if;
@@ -1359,6 +1440,11 @@ package body Mem.Processes is
                            Rose.Interfaces.Processes.Heap.Heap_Interface,
                          Identifier   => Identifier_Of (Oid));
       begin
+         if Heap_Cap = 0 then
+            Rose.Interfaces.Processes.Kernel_Process.Client.Close (Client);
+            return 0;
+         end if;
+
          Process_Table (Next_Pid) := No_Process;
          Process_Table (Next_Pid).State := Active;
          Process_Table (Next_Pid).Oid := Oid;

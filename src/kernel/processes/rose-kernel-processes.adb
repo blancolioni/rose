@@ -2428,6 +2428,13 @@ package body Rose.Kernel.Processes is
 
          return True;
       end Buffer_Is_Mapped;
+
+      Receiver_Params : constant Rose.Invocation.Invocation_Record :=
+                          To.Current_Params;
+      --  What the receiver asked for, put back if the message can't be
+      --  delivered, so that it still waits for its next message as it
+      --  asked to (#913).
+
    begin
 
       To.Current_Params := Params;
@@ -2460,6 +2467,7 @@ package body Rose.Kernel.Processes is
                      Rose.Boot.Console.Put (": out of capabilities");
                      Rose.Boot.Console.New_Line;
 
+                     To.Current_Params := Receiver_Params;
                      Rose.Invocation.Set_Error
                        (Params => From.Current_Params,
                         Error  => Rose.Invocation.Out_Of_Capabilities);
@@ -2842,6 +2850,18 @@ package body Rose.Kernel.Processes is
                      Debug.Put (To_Process_Id);
                      Rose.Boot.Console.Put (": out of capabilities");
                      Rose.Boot.Console.New_Line;
+
+                     --  The caller's call fails, and it runs again with
+                     --  the error. Left blocked, and no longer waiting for
+                     --  the reply, it would take its next message as the
+                     --  reply (#913). The server keeps its caps, and is
+                     --  told too.
+
+                     To.Current_Params.Caps := (others => Null_Capability);
+                     Rose.Invocation.Set_Error
+                       (Params => To.Current_Params,
+                        Error  => Rose.Invocation.Out_Of_Capabilities);
+                     Set_Current_State (To_Process_Id, Ready);
 
                      Rose.Invocation.Set_Error
                        (Params => From.Current_Params,
