@@ -239,7 +239,10 @@ package body Store.Devices is
 
    Banks : Bank_Array;
 
-   Max_Dependents : constant := 256;
+   Max_Dependents : constant := 512;
+   --  Exec registers every process that it launches (#875), as well as
+   --  caps registering the sets made in banks (#849). Each registration
+   --  holds two caps here: its own, and the server's signal.
 
    type Dependent_Record is
       record
