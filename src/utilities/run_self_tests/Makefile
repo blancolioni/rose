@@ -7,7 +7,7 @@ all: run_self_tests
 # The spec of Rose.Core.Run_Self_Tests, its main and its metadata are
 # generated from IDL (ADR 0002) for the user target (#460, #528), with
 # Held_Call, replaceable_test's own test interface (#879). Rose.Core and
-# the interfaces the tests uses come from the userland library
+# the interfaces the tests use come from the userland library
 # (projects/user_library.gpr, #1067).
 
 run_self_tests:
