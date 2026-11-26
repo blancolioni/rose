@@ -1052,7 +1052,23 @@ package body Mem.Server is
                   when Execute =>
                      Mem.Processes.Fault_Process (Pid, "execute not allowed");
                   when Write =>
-                     if Mem.Page_Table.Is_Writable (Position) then
+                     if Mem.Page_Table.Is_Writable (Position)
+                       and then not Mem.Page_Table.Is_Persistent (Position)
+                     then
+
+                        --  A checkpoint makes every page of a persistent
+                        --  process read-only, and only clears the flag
+                        --  that says so afterwards. A page it saves is
+                        --  made read-only in this table too, so its next
+                        --  write is a first write, but a page it doesn't
+                        --  save, of a segment that isn't persistent
+                        --  (Rose.Unsaved_Memory, #1132), is still marked
+                        --  writable here. It is made writable again.
+
+                        Mem.Page_Table.Set_Writable (Position);
+                        Mem.Processes.Resume_Process (Pid);
+
+                     elsif Mem.Page_Table.Is_Writable (Position) then
                         --  page was already writable
                         Rose.Console_IO.Put_Line
                           ("mem: second fault on writable page");
