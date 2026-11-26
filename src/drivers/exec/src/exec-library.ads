@@ -28,15 +28,16 @@ package Exec.Library is
    --  Name (#829). If its image is the same, and neither has install
    --  caps, return the installed version's number, with Changed False.
    --  Otherwise install it, retire the installed version, and return the
-   --  new number with Changed True. 0 if there is no room for it.
+   --  new number with Changed True. 0 if there is no room for it. The
+   --  retired version is freed at once if no process runs it.
 
    function Newest
      (Id : Rose.Objects.Capability_Identifier)
       return Rose.Objects.Capability_Identifier;
    --  The newest version of program Id: Id itself, or, if Update retired
    --  it, the version that replaced it, and so on (#902). A retired
-   --  version's pages are kept, and its launch caps launch the newest
-   --  version. 0 if there is no program Id.
+   --  version's pages are kept while its processes run, and its launch
+   --  caps launch the newest version. 0 if there is no program Id.
 
    function Image_Region
      (Id : Rose.Objects.Capability_Identifier)
@@ -68,5 +69,33 @@ package Exec.Library is
       Last   : out Natural);
    --  The contents of the .rose_command section of program Id (ADR 0002),
    --  or nothing if it has none.
+
+   --  The processes that run each program (#875). Every process that
+   --  exec launches is registered with its own bank (ADR 0015) as a
+   --  Storage.Dependent, so the store signals exec when it ends. Once no
+   --  process runs a retired version, its image is freed: its subregion
+   --  is released, its pages are written with zeroes, which take no
+   --  space in the store, and its range of the region is used again.
+   --  A version that one of its processes couldn't be registered for is
+   --  never freed, since exec can't tell when that process ends.
+
+   procedure Set_Signal (Signal : Rose.Capabilities.Capability);
+   --  The signal cap that each registration raises when its bank is
+   --  destroyed.
+
+   procedure Add_Process
+     (Id   : Rose.Objects.Capability_Identifier;
+      Bank : Rose.Capabilities.Capability);
+   --  A process of program Id is about to start, whose own bank is Bank,
+   --  or null if it has none. Register it, and keep Bank.
+
+   procedure Check_Processes;
+   --  The signal: forget the processes whose banks have been destroyed,
+   --  and free each retired version that no process runs.
+
+   procedure Register_Again;
+   --  Exec has been restored. Registrations aren't saved in a
+   --  checkpoint, so register each process again, forget the ones whose
+   --  banks have gone, and free what no process runs.
 
 end Exec.Library;

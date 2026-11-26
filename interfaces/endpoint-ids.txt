@@ -173,6 +173,7 @@
 16#FE75_CCFE_B02D_75F2#  interface rose.interfaces.processes.starting_process
 16#C2DE_3307_4855_4505#  rose.interfaces.processes.starting_process.add_cap(in capability)
 16#85CC_015E_7E38_3EB0#  rose.interfaces.processes.starting_process.start return capability
+16#5C1D_A9E9_B9ED_FF7F#  rose.interfaces.processes.starting_process.bank return interface rose.interfaces.storage.bank
 16#8FFE_549A_483A_1162#  interface rose.interfaces.screens.supervisor
 16#19A7_9A5D_A31E_4B5D#  rose.interfaces.screens.supervisor.start
 16#39A2_5FBE_F70E_01A5#  interface rose.interfaces.screens.surface

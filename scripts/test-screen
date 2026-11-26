@@ -6,10 +6,11 @@
 #
 # ISO is the install image, images/rose.iso by default. The test:
 #
-#   1. installs Rose on a new disk from the install menu's first entry,
-#      which keeps the framebuffer, so that the screen driver holds the framebuffer and the
-#      keyboard, and the console is surface-console on its surface; the
-#      install's self tests, which init runs, have to pass, as the console
+#   1. installs Rose on a new disk from the install menu's framebuffer
+#      test install, the third entry with no Rose on the disk (#1088), so
+#      that the screen driver holds the framebuffer and the keyboard, and
+#      the console is surface-console on its surface; the install's self
+#      tests, which init runs, have to pass, as the console
 #      shows; and the console has to show the boot's early messages, which
 #      the boot console wrote to the serial port and replays to it (#654);
 #   2. boots from the disk's first entry, which restores the
@@ -21,6 +22,11 @@
 #      its mark with the arrow keys (#734);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk.
+#
+# The machine has 64 MB, not the other tests' 32: the screen's surface is
+# a shared region of 768 pages, and with it, the test install's programs
+# leave mem short of pages during the self tests, where it livelocks
+# (#1116, #1143).
 #
 # The screen's text is read from QEMU's screen dumps by fb-text.py. It
 # takes about ten minutes, and needs qemu-system-i386, qemu-img and
@@ -34,6 +40,7 @@ command -v qemu-system-i386 > /dev/null || {
     echo "qemu-system-i386 not found"
     exit 2
 }
+QEMU_MEMORY=64
 . "$HERE/qemu-test-lib.sh"
 
 screen () {
@@ -54,6 +61,9 @@ qemu-img create -f raw "$DISK" 6G > /dev/null
 
 echo "Installing, with a framebuffer"
 start_qemu -boot d -drive file="$ISO",if=ide,index=1,media=cdrom
+# The test install that keeps the framebuffer: after the first install
+# entry and the erasing one, since the new disk has no Rose (#1088).
+choose_entry 2
 
 # The install restarts the machine when it has finished. Until then, read
 # the screen every two seconds or so, and keep the self tests' result. The
