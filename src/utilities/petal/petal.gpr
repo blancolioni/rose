@@ -1,12 +1,16 @@
 with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
 
 project petal is
 
-   --  Built with the userland run-time system and the user-mode IDL
-   --  target, whose packages the Makefile generates in build/generated
-   --  (#793). The kernel target's packages, in kernelapi/generated, must
-   --  not be on the path: the two targets have units with the same names.
+   --  Built with the userland run-time system and the user-mode IDL target,
+   --  whose packages for its own IDL files the Makefile generates in
+   --  build/generated (#793). The kernel target's packages, in
+   --  kernelapi/generated, must not be on the path: the two targets have
+   --  units with the same names. The interface packages and Rose's userland
+   --  packages (src/library/rose) come from user_library.gpr (#1067), and
+   --  the RTS's own units from rose_rts.gpr (#1080).
 
    --  The RTS's own units, its interface specs among them, come from
    --  rose_rts.gpr (#1080).
@@ -18,8 +22,7 @@ project petal is
        "./src/read",
        "./src/session",
        "./src/rose",
-       "./build/generated",
-       "../../library/rose");
+       "./build/generated");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("rose-core-petal_main.adb");

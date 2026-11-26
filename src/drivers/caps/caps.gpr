@@ -1,37 +1,21 @@
 with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
 
 project Caps is
 
-   --  The userland cap set server (#825), built with the userland
-   --  run-time system and the user-mode IDL target, whose packages the
-   --  Makefile generates in build/generated.
+   --  The userland cap set server (#825), built with the userland run-time
+   --  system and the user-mode IDL target. The interface packages and
+   --  Rose's userland packages (src/library/rose) come from
+   --  user_library.gpr (#1067), and the RTS's own units from rose_rts.gpr
+   --  (#1080).
 
-   for Source_Dirs use ("src", "build/generated");
+   for Source_Dirs use ("src");
    for Source_Files use
       ("caps.ads",
        "caps-driver.adb",
        "caps-server.ads",
-       "caps-server.adb",
-       "rose-interfaces-caps-bank_constructor.ads",
-       "rose-interfaces-caps-bank_constructor-server.ads",
-       "rose-interfaces-caps-bank_constructor-server.adb",
-       "rose-interfaces-caps-constructor.ads",
-       "rose-interfaces-caps-constructor-server.ads",
-       "rose-interfaces-caps-constructor-server.adb",
-       "rose-interfaces-caps-releasable_cap_set.ads",
-       "rose-interfaces-caps-releasable_cap_set-server.ads",
-       "rose-interfaces-caps-releasable_cap_set-server.adb",
-       "rose-interfaces-processes-restorable-server.ads",
-       "rose-interfaces-processes-restorable-server.adb",
-       "rose-interfaces-storage-bank-client.ads",
-       "rose-interfaces-storage-bank-client.adb",
-       "rose-interfaces-storage-dependent-client.ads",
-       "rose-interfaces-storage-dependent-client.adb",
-       "rose-interfaces-storage-region-client.ads",
-       "rose-interfaces-storage-region-client.adb",
-       "rose-interfaces-streams-reader-client.ads",
-       "rose-interfaces-streams-reader-client.adb");
+       "caps-server.adb");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
    for Main use ("caps-driver.adb");

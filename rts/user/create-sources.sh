@@ -21,29 +21,28 @@ DIRS="$DIRS build/gnat-src"
 # source directories goes into the library. Process needs the specs of
 # its parents, and of the interfaces that its operations name, and
 # Rose.Streams those of Reader and Writer (#727). Programs
-# built with the RTS get these specs from rose_rts.gpr, and don't keep
-# copies of their own (#1080).
+# built with the RTS get these specs from rose_rts.gpr (#1080).
+#
+# They come from the one idle run over every interface that the user
+# target's interface library is built from (#1067), which leaves them out.
+# They are copied, not linked, so that they stay as the RTS was built with
+# them when an interface changes, until the RTS is built again.
 
-IDLE=${IDLE:-idle}
 INTERFACES="processes-process processes-heap caps-cap_set processes-segment
     processes-server processes-process_control caps-cap storage-region
     storage-region_access
     streams-reader streams-writer storage-bank storage-dependent
     common-resource processes-signalled processes-restorable"
-mkdir -p build/idl build/interfaces
+GENERATED=../../build/$ARCH/user/interfaces/generated
+sh ../../scripts/generate-user-interfaces || exit 1
+mkdir -p build/interfaces
 rm -f build/interfaces/*.ads
-IDL_FILES=""
-for name in $INTERFACES
-do
-    IDL_FILES="$IDL_FILES ../../interfaces/$name.idl"
-done
-$IDLE --target user -I ../../interfaces -o build/idl $IDL_FILES || exit 1
 # The interfaces' groups (ADR 0034), whose empty packages idle writes
 # with them, are copied too.
 IDL_GROUPS="caps common processes storage streams"
 for name in $IDL_GROUPS $INTERFACES
 do
-    cp build/idl/rose-interfaces-$name.ads build/interfaces/ || exit 1
+    cp $GENERATED/rose-interfaces-$name.ads build/interfaces/ || exit 1
 done
 DIRS="$DIRS build/interfaces"
 

@@ -74,15 +74,15 @@ A call to another server that fails raises `Rose.Interfaces.Objects.Invocation_E
 
 === What idle generates
 
-The Makefile runs idle with `--target user` through `scripts/user-idle`, which writes into `build/generated`:
+The Makefile runs idle with `--target user` through `USER_IDLE`, which writes into `build/generated`:
 
 * `rose-core-touch.ads`, the procedure's spec;
 * `rose-core-touch_main.adb`, the program's main: it receives the launch call, gives the run-time system the standard streams, opens a client for each interface argument, calls the procedure, and completes the call;
 * `rose-core-touch_metadata.ads`, the declaration as text in the `.rose_command` section, which is where petal and `--help` find it;
-* `rose-core-touch_client.ads`, for a program that launches `touch`;
-* the packages of every interface the command uses, with their clients and servers.
+* `rose-core-touch_client.ads`, for a program that launches `touch`.
 
-`scripts/user-idle` then removes the units that the run-time system has already, since a unit can belong to only one project (#1080).
+The packages of the interfaces in `interfaces`, with their clients and servers, are not generated here.
+The build generates them once, for every program, into the userland library (#1067).
 
 === The Makefile
 
@@ -92,7 +92,8 @@ include::../../src/utilities/touch/Makefile[]
 ----
 
 `mk/common.mk` sets the architecture, the paths of the interfaces and the run-time system, and `USER_IDLE`.
-Every interface that the command uses is given to idle by hand, with every interface it inherits from and every interface their operations return: `Writable_Directory` brings `Fixed_Directory`, `Directory`, `Tree`, and the file and stream interfaces.
+The Makefile gives idle only the command's own IDL file.
+A program never gives it a file from `interfaces`, since those units are in the userland library already, and a unit can belong to only one project: `make check-targets` refuses a Makefile that does.
 
 The `all` target also copies the executable to `build/i686/drivers`, which the top-level build doesn't use for a command.
 
@@ -104,10 +105,11 @@ include::../../src/utilities/touch/touch.gpr[]
 ----
 
 * *`rose_rts.gpr` is the userland run-time system*, built in `rts/user`, and `--RTS` names its directory.
+* *`user_library.gpr` is the userland library* (#1067): the packages of every interface in `interfaces`, and Rose's own library in `src/library/rose`, such as `Rose.Command_Line`.
+  The top-level build builds it before the programs, and the linker takes only the parts a program uses.
 * *`checks.gpr` gives the checks*, with `-gnata` and `-gnato`, and `-gnatp` too if the scenario variable `ROSE_CHECKS` is `unchecked`.
 * *`-m32`, `-nostdlib` and `-ffreestanding`:* the program is 32-bit x86 code with no C library, and starts at `rts/user/start/start.o`.
 * *The warnings are errors* (`-gnatwae`), and the style checks are Rose's.
-* *`../../library/rose`* is Rose's own library, such as `Rose.Command_Line` and `Rose.Server`.
 
 === The other files
 
