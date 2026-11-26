@@ -12,7 +12,16 @@ package body Tests.Heap is
    Block_Count : constant := 2_000;
    Large_Size  : constant := 400_000;
 
+   Huge_Size   : constant := 1_536 * 2 ** 20;
+   Second_Size : constant := 1_024 * 2 ** 20;
+   --  The heap segment is 2 GiB, so one block of each size fits, but not
+   --  both.
+
    Blocks : array (1 .. Block_Count) of Block_Access;
+
+   function Huge_Test return Boolean;
+   --  Allocate a block much larger than the heap's old limit, check that
+   --  a second large block raises Storage_Error, and free both.
 
    function Expected
      (Seed     : Positive;
@@ -93,9 +102,63 @@ package body Tests.Heap is
          Fill (Large, 3);
          Valid := Is_Filled (Large, 3);
          Free (Large);
-         return Valid;
+         if not Valid then
+            return False;
+         end if;
       end;
+
+      return Huge_Test;
    end Heap_Test;
+
+   ---------------
+   -- Huge_Test --
+   ---------------
+
+   function Huge_Test return Boolean is
+      Huge  : Block_Access := new Block (1 .. Huge_Size);
+      Valid : Boolean := True;
+   begin
+
+      --  The heap grows far past its old 1 MiB without the pages in
+      --  between being touched. Only the ends of the block are written.
+
+      Huge (Huge'First) := 'H';
+      Huge (Huge'Last) := 'T';
+      Valid := Huge (Huge'First) = 'H' and then Huge (Huge'Last) = 'T';
+
+      --  With the huge block still there, another cannot fit below the
+      --  heap segment's limit, so the heap does not grow and the
+      --  allocation raises Storage_Error (#759).
+
+      if Valid then
+         declare
+            Second : Block_Access;
+         begin
+            Second := new Block (1 .. Second_Size);
+            Free (Second);
+            Valid := False;
+         exception
+            when Storage_Error =>
+               null;
+         end;
+      end if;
+
+      Free (Huge);
+
+      --  The heap still serves small blocks.
+
+      if Valid then
+         declare
+            Small : Block_Access := new Block (1 .. 100);
+         begin
+            Fill (Small, 4);
+            Valid := Is_Filled (Small, 4);
+            Free (Small);
+         end;
+      end if;
+
+      return Valid;
+   end Huge_Test;
 
    ---------------
    -- Is_Filled --

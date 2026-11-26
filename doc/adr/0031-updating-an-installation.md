@@ -4,6 +4,7 @@
 - **Date:** 2026-11-09
 - **Amended by:** #875, where a retired program image is freed once no process runs it (section 4)
 - **Related:** #738 (this decision), #375 (checkpoint format version and boot server updates), #737 (restore test from the 0.4.0 image), #736 (endpoint ids), #460 (the command registry), #413 (the install media boots hd0), #824 (replacing a running persistent process), #825 (cap sets), #829 (installing the commands again), [ADR 0008](0008-install-boot-and-pager-path.md) (install boot and pager path, whose open question on updating the pager path this answers), [ADR 0014](0014-banks.md) (banks), [ADR 0015](0015-process-ownership.md) (process ownership), [ADR 0021](0021-privilege.md) (privilege), [ADR 0026](0026-commands-commit-their-own-versions.md) (commands commit their own versions), [ADR 0029](0029-installed-capabilities.md) (installed capabilities), #890 (updating across a release series)
+- **Amended by:** #1138, where the 0.4 series freezes its interfaces at 0.4.1, not 0.4.0 (section 8)
 
 ## Context
 
@@ -45,11 +46,11 @@ A boot set can restore a checkpoint if two things match.
 - **Table formats.** The table versions in the log entry, as now. A new table format in 0.4.x needs `restore` to read the old one as well, or the release can't be a 0.4.x.
 - **Interfaces.** Each log entry records an **interface level**: the release series, such as 0.4, and the number of lines in `interfaces/endpoint-ids.txt` when the boot set was built. A boot set restores an entry of the same series whose level is no higher than its own.
 
-For the level to mean anything, `endpoint-ids.txt` is **append-only within a series**. After `v0.4.0` is tagged, `make check-endpoint-ids` also compares the file with the one at the series' first tag, and fails if any line of it has changed or gone. A 0.4.x can add interfaces and operations, and can't change or remove one. Changing one waits for 0.5.0, which starts a new series (section 7).
+For the level to mean anything, `endpoint-ids.txt` is **append-only within a series**. Once a series freezes, at X.Y.0, or at 0.4.1 for 0.4 (section 8), `make check-endpoint-ids` also compares the file with the one at the frozen release's tag, and fails if any line of it has changed or gone. A later 0.4.x can add interfaces and operations, and can't change or remove one. Changing one waits for 0.5.0, which starts a new series (section 7).
 
 **An interface or operation that is no longer wanted is retired, not removed.** A restored process may still call it, so it can't go away within the series:
 
-- **Servers go on answering it,** as they did. A server can answer it through the operation that replaces it, but a call that worked in 0.4.0 still works.
+- **Servers go on answering it,** as they did. A server can answer it through the operation that replaces it, but a call that worked in 0.4.1 still works.
 - **New code avoids it.** A new server doesn't implement a retired interface unless a client from the series needs it, and a new client doesn't call it.
 - **The IDL marks it,** with a comment on the line before the operation or interface: `--  Retired in 0.4.N (#issue): use X instead.` Its line stays in `endpoint-ids.txt`.
 - **Removing it waits for the next series,** and then only if no process carried over from this series calls it (section 7).
@@ -98,16 +99,16 @@ A persistent process is replaced with its new version only if its server impleme
 
 The release notes of each 0.4.x say which fixes are in servers that aren't replaceable, and so need a new install to take effect.
 
-The promise of section 2 still holds. A replaced server answers the same endpoint ids as the one it replaces, because a new version within a series only adds to the interfaces. The persistent processes of a 0.4.0 checkpoint call the boot modules and the replaced servers through the 0.4.0 interfaces, and every 0.4.x still answers them.
+The promise of section 2 still holds. A replaced server answers the same endpoint ids as the one it replaces, because a new version within a series only adds to the interfaces. The persistent processes of a 0.4.1 checkpoint call the boot modules and the replaced servers through the 0.4.1 interfaces, and every 0.4.x still answers them.
 
 ### 6. Testing
 
-The restore test from the 0.4.0 image (#737) checks section 2 on every build. The image is a disk that 0.4.0 installed and used, made by `scripts/make-restore-fixture` and uploaded to the 0.4.0 release; `scripts/test-restore-fixture` writes the build's boot set onto a copy, restores it, and runs the self tests. A second test runs an update boot on the 0.4.0 image with the current install media, and checks:
+The restore test from the frozen release's image (#737) checks section 2 on every build. The image is a disk that the release where the series froze (0.4.1 for 0.4, section 8) installed and used, made by `scripts/make-restore-fixture` and uploaded to that release; `scripts/test-restore-fixture` writes the build's boot set onto a copy, restores it, and runs the self tests. A second test runs an update boot on the same image with the current install media, and checks:
 
 - that hd0 then boots the new set;
 - that a command reports the new version;
 - that a replaced server, such as `file`, reports the new version, and the files opened before the update still work;
-- that **Previous** still boots 0.4.0.
+- that **Previous** still boots the image's release.
 
 ### 7. Updating to a new series
 
@@ -123,22 +124,32 @@ The update boot is the one of section 1. A new series doesn't need a separate me
 - **Replaceable servers.** The update boot replaces them as in section 5. The new version reads the state its 0.4.N predecessor saved (ADR 0032, section 2), so each such server's reader for 0.4.N's format stays in 0.5.0. Later 0.5.y releases read only what 0.5.0 saved.
 - **Processes that can't be replaced.** They are what keeps the 0.4.N interfaces in 0.5. A 0.4.x before N can shrink that set by making `exec` or the registry replaceable. That is an addition, so a 0.4.x can make it.
 
-Nothing in this section is needed in 0.4.0 beyond what sections 2 and 5 already require: the interface level in each log entry, and `Replaceable` and `Saveable` in the servers that hold state. Anything else 0.5 needs from 0.4 can be added by a 0.4.x up to N.
+Nothing in this section is needed in 0.4.1 beyond what sections 2 and 5 already require: the interface level in each log entry, and `Replaceable` and `Saveable` in the servers that hold state. Anything else 0.5 needs from 0.4 can be added by a 0.4.x up to N.
 
 **Testing.** The tests of section 6 run for 0.5.0 against 0.4.N's image as well. `scripts/make-restore-fixture` makes an image from 0.4.N, which is uploaded to the 0.4.N release, and 0.5.0's update boot is run on it.
+
+### 8. The 0.4 series freezes at 0.4.1
+
+Amended by #1138. 0.4.0 is a first draft of the 0.4 interfaces, and the series freezes at 0.4.1.
+
+- **0.4.1 can change or remove** interfaces and operations that 0.4.0 shipped, as well as add them. From `v0.4.1` on, section 2 applies: `endpoint-ids.txt` is append-only, and an interface that is no longer wanted is retired.
+- **The restore promise moves with the freeze.** A checkpoint holds endpoint ids, so a checkpoint made by 0.4.0 isn't promised to restore on 0.4.1 or later, and an update boot from 0.4.0 isn't promised to keep it. A checkpoint made by 0.4.1 restores on every later 0.4.x.
+- **0.4.1 refuses 0.4.0's checkpoints.** The interface level can't tell them apart from 0.4.1's, since 0.4.1 may have as many endpoint ids as 0.4.0 or more, so 0.4.1 writes kernel tables version 14 with the same layout, and `restore` refuses version 13 with a message that names 0.4.0. An update boot from 0.4.0 stops there, as for any refused checkpoint, and the disk needs a new install.
+- **The tests use 0.4.1's image.** The fixture of section 6 is made from 0.4.1 and uploaded to its release. `scripts/frozen-release` names the release where a series froze, and `check-endpoint-ids`, `test-restore-fixture` and `test-update-fixture` use it.
+- **Later series freeze at X.Y.0,** as sections 2 and 6 say. This is a one-off for 0.4.
 
 ## Consequences
 
 - **A 0.4.x release can fix the kernel, the boot modules, the commands and the replaceable servers** without losing the checkpoint.
 - **It can't fix a persistent process that isn't replaceable.** A bug in `exec`, the registry, or a driver that can't hand over its device stays until a new install.
 - **0.4.0 needs #824 and #825 before it is tagged.** `Replaceable` and the changes to `Cap_Set` are interfaces, and the interfaces freeze with the tag.
-- **The interfaces of 0.4.0 are frozen for the whole series.** Additions are allowed, and so is retiring an interface or operation (section 2). `check-endpoint-ids` enforces the rest.
+- **The interfaces of 0.4.1 are frozen for the rest of the series** (section 8). Additions are allowed, and so is retiring an interface or operation (section 2). `check-endpoint-ids` enforces the rest.
 - **Updating needs the install media,** as installing does. A network update can use the same steps once there is a network (ADR 0007), with the media replaced by a downloaded image.
 - **The boot partition holds two boot sets,** about 7 MB of its 16 MiB. A much larger boot set needs a larger boot partition, which needs a new install.
 - **An update boot is a restore,** so it runs the restore path with a new boot set, which is what #737 tests.
 - **Every series can take over the one before it,** from one release, so an installation can be updated indefinitely, through each bridge release in turn.
 - **A new series carries a little of the old one** in its first release: readers for the bridge release's table and state formats, and the endpoint ids that its unreplaced processes call. A later release of the new series drops the readers.
-- **0.4.0 commits to nothing new for 0.5.** 0.5's needs are met by 0.4.N, which can still add to the 0.4 interfaces.
+- **0.4.1 commits to nothing new for 0.5.** 0.5's needs are met by 0.4.N, which can still add to the 0.4 interfaces.
 
 ## Alternatives considered
 

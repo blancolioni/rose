@@ -15,14 +15,15 @@
 # reviewer can see.
 #
 # Within a release series the list is append-only (ADR 0031, section 2):
-# every line of the list at the series' first tag (v0.4.0 for 0.4) must
-# still be in the current list, unchanged, because a checkpoint from that
-# release holds those ids. New lines are allowed. The lists are compared
+# every line of the list at the tag of the release where the series froze
+# (scripts/frozen-release: vX.Y.0, or v0.4.1 for 0.4, #1138) must still be
+# in the current list, unchanged, because a checkpoint from that release
+# holds those ids. New lines are allowed. The lists are compared
 # as sets, so the file stays sorted by name; the interface level is the
 # number of lines (scripts/make-interface-level).
 #
-# Before the first tag exists (X.Y.0-dev, or the X.Y.0 release itself
-# before it is tagged), the series check is skipped. After it, a missing
+# Before that tag exists (up to the frozen release itself, before it is
+# tagged), the series check is skipped. After it, a missing
 # tag is an error, since it most likely means a clone without tags.
 # ENDPOINT_IDS_TAG names another tag to check against, for testing.
 #
@@ -44,7 +45,9 @@ RELEASE=$(version_part Version_Release)
     echo "check-endpoint-ids: no version in $VERSION" >&2
     exit 2
 }
-TAG=${ENDPOINT_IDS_TAG:-v$MAJOR.$MINOR.0}
+FROZEN=$(sh scripts/frozen-release "$MAJOR.$MINOR") || exit 2
+FROZEN_RELEASE=${FROZEN##*.}
+TAG=${ENDPOINT_IDS_TAG:-v$FROZEN}
 
 current=$(mktemp) || exit 2
 tagged=$(mktemp) || exit 2
@@ -60,7 +63,7 @@ check_series() {
     fi
 
     if ! git rev-parse -q --verify "refs/tags/$TAG" > /dev/null; then
-        if [ -z "$ENDPOINT_IDS_TAG" ] && [ "$RELEASE" = 0 ]; then
+        if [ -z "$ENDPOINT_IDS_TAG" ] && [ "$RELEASE" -le "$FROZEN_RELEASE" ]; then
             echo "check-endpoint-ids: no tag $TAG yet, so the ids of the" \
                  "series are not checked"
             return 0

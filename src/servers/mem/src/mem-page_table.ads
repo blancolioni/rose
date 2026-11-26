@@ -11,6 +11,9 @@ package Mem.Page_Table is
    function Is_Writable (Position : Cursor) return Boolean;
    function Is_Executable (Position : Cursor) return Boolean;
    function Is_Dirty (Position : Cursor) return Boolean;
+   function Is_Persistent (Position : Cursor) return Boolean;
+   --  True if checkpoints save the page: a private page of a persistent
+   --  segment of a process that isn't transient.
 
    function Process
      (Position : Cursor)

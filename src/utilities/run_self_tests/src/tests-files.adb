@@ -394,27 +394,120 @@ package body Tests.Files is
          Version.Release;
       end;
 
-      --  A write past the end of the largest file fails, and writes
-      --  nothing.
+      --  A file has no fixed size (#760). It grows past the 64 KiB that
+      --  was its limit, a version grows past its file and is committed,
+      --  and a file that has grown can be emptied and written again.
 
       declare
-         Large  : constant Stream_Element_Array (1 .. 4096) := (others => 0);
-         Size   : constant Storage_Count := File.Size;
-         Writer : Writers.Releasable_Writer_Client;
-      begin
-         Writer.Open (Writer_Cap (File));
-         for I in 1 .. 16 loop
-            Writer.Write (Large);
-         end loop;
-         Ada.Text_IO.Put (": a file grew past its largest size");
-         return False;
-      exception
-         when Rose.Interfaces.Objects.Invocation_Error =>
-            Writer.Close;
-            if File.Size /= Size + 15 * Large'Length then
-               Ada.Text_IO.Put (": a refused write changed the file");
+         Chunks     : constant := 20;
+         Chunk_Size : constant Storage_Count := Chunks * Page_Bytes;
+
+         function Pattern (Offset : Storage_Count) return Stream_Element
+         is (Stream_Element ((Offset / Page_Bytes * 7 + Offset) mod 256));
+         --  The byte at Offset of a large file.
+
+         procedure Write_Chunks
+           (Target : in out Writable_File_Class;
+            From   : Natural;
+            Empty  : Boolean);
+         --  Write Chunks pages of Pattern to Target, from page From, after
+         --  emptying it if Empty is True.
+
+         function Holds (Length : Storage_Count) return Boolean;
+         --  True if File holds Length bytes of Pattern.
+
+         -----------
+         -- Holds --
+         -----------
+
+         function Holds (Length : Storage_Count) return Boolean is
+            Reader : Readers.Releasable_Reader_Client;
+            Chunk  : Stream_Element_Array (1 .. Page_Bytes);
+            Count  : Stream_Element_Offset;
+            Offset : Storage_Count := 0;
+         begin
+            if File.Size /= Length then
                return False;
             end if;
+
+            Reader.Open (Reader_Cap (File));
+            loop
+               Reader.Read (Chunk, Count);
+               exit when Count < Chunk'First;
+               for Element of Chunk (Chunk'First .. Count) loop
+                  if Offset >= Length or else Element /= Pattern (Offset)
+                  then
+                     Reader.Close;
+                     return False;
+                  end if;
+                  Offset := Offset + 1;
+               end loop;
+            end loop;
+            Reader.Close;
+            return Offset = Length;
+         end Holds;
+
+         ------------------
+         -- Write_Chunks --
+         ------------------
+
+         procedure Write_Chunks
+           (Target : in out Writable_File_Class;
+            From   : Natural;
+            Empty  : Boolean)
+         is
+            Writer : Writers.Releasable_Writer_Client;
+            Chunk  : Stream_Element_Array (1 .. Page_Bytes);
+         begin
+            Writer.Open (Writer_Cap (Target, Empty));
+            for Page in From .. From + Chunks - 1 loop
+               for I in Chunk'Range loop
+                  Chunk (I) :=
+                    Pattern (Storage_Count (Page) * Page_Bytes
+                             + Storage_Count (I - Chunk'First));
+               end loop;
+               Writer.Write (Chunk);
+            end loop;
+            Writer.Close;
+         end Write_Chunks;
+
+      begin
+         Write_Chunks (File, From => 0, Empty => True);
+         if not Holds (Chunk_Size) then
+            Ada.Text_IO.Put (": a file did not grow past 64 KiB");
+            return False;
+         end if;
+
+         declare
+            Version : Version_Class := File.New_Version;
+         begin
+            Write_Chunks (Version, From => Chunks, Empty => False);
+            if File.Size /= Chunk_Size
+              or else Version.Size /= 2 * Chunk_Size
+            then
+               Ada.Text_IO.Put (": a version did not grow past its file");
+               return False;
+            end if;
+            Version.Commit;
+            Version.Release;
+         end;
+
+         if not Holds (2 * Chunk_Size) then
+            Ada.Text_IO.Put (": a large version was not committed");
+            return False;
+         end if;
+
+         Rewrite (File, Hello);
+         First.Open (Reader_Cap (File));
+         First.Read (Buffer, Last);
+         First.Close;
+         if File.Size /= Hello'Length
+           or else Last /= Hello'Length
+           or else Buffer (1 .. Last) /= Hello
+         then
+            Ada.Text_IO.Put (": a file that grew was not rewritten");
+            return False;
+         end if;
       end;
 
       return True;

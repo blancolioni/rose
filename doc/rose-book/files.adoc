@@ -16,7 +16,9 @@ Its contents are a buffer in its own memory, which it reads and writes as any pr
 * *Writing a file is writing memory.*
   The first write to a page of the buffer makes the page dirty, as for any persistent process, and the next checkpoint saves it to the log.
   A page that has never been written takes no memory and no space on the disk (#305).
-* *A file holds at most 64 KiB for now,* in a fixed buffer (#760).
+* *A file has no fixed size* (#760).
+  Its contents and its version's are each a buffer on the heap, which grows as it is written.
+  A write that can't get the memory fails, and leaves the file as it was.
 * *A file has no name.*
   Its name is an entry in a directory, and the file's process knows nothing of it.
 
@@ -189,7 +191,8 @@ A command says in its signature whether it wants a file or a version (see <<comm
   `Create_File`, `Rename` and the deletes change a directory as they are made.
 * *There is no commit of several files at once.*
   Each version is committed on its own.
-* *A file holds at most 64 KiB* (#760).
+* *A file is limited by its process's heap,* which is 2 GB (#759).
+  The file, its version and, during a handover, a copy of its state all come out of it, so a file can't be much larger than a few hundred MB.
 * *One argument can't take a file that may or may not be writable* (#792).
   It would accept an interface or its ancestor, such as a `Writable_File` if the user may write the file, and a `File` otherwise.
 * *Petal doesn't say why it can't write a file* (#752), for example because another command is writing a version of it.

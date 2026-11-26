@@ -13,8 +13,9 @@ package Text_Console.Line_Discipline is
    --  for Read_Key, and nothing is echoed.
    --
    --  What is typed stays in the console's memory only until it is read
-   --  or dropped: the console is persistent, and what is typed may be a
-   --  password, which a checkpoint would save (#1059).
+   --  or dropped (#1059), and that memory is never saved by a checkpoint
+   --  (Rose.Unsaved_Memory, #1132): the console is persistent, and what
+   --  is typed may be a password.
 
    procedure On_Key
      (Key       : Rose.Keys.Key_Code;
@@ -60,6 +61,8 @@ package Text_Console.Line_Discipline is
    --  off. Echo and line editing stay as they are. After a restore, the
    --  input is what was typed before the checkpoint, and may be part of
    --  a password (#523). The program reading it was restored too, so the
-   --  modes it set still hold.
+   --  modes it set still hold. What was typed is in unsaved memory, so it
+   --  should be zeros by then: if it isn't, a trace event says that a
+   --  checkpoint saved it (#1132).
 
 end Text_Console.Line_Discipline;

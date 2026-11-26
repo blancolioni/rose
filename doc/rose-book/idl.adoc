@@ -68,7 +68,7 @@ ADR 0034 says which interface is in which group, and why:
 | `Screens` | `Terminal`, `Surface`; the roles `Console` and `Screen_Service`
 |===
 
-From 0.4.0, an interface can't move to another group within a release series, since its endpoint ids hash its full name.
+From 0.4.1, an interface can't move to another group within a release series, since its endpoint ids hash its full name.
 A new interface goes in an existing group, or in a new one.
 
 == Lexical elements
