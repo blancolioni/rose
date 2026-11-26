@@ -86,9 +86,10 @@ test:
 	sh ./scripts/test-boot
 
 # The restore test (#737): this build has to restore the checkpoint of a
-# disk installed by its release series' first release, X.Y.0, whose
-# fixture is on the GitHub release.  Until X.Y.0 is released there is no
-# fixture, and it passes with a message.  CI runs it.
+# disk installed by the release where its series froze, X.Y.0 (0.4.1 for
+# 0.4, scripts/frozen-release), whose fixture is on the GitHub release.
+# Until that release is out there is no fixture, and it passes with a
+# message.  CI runs it.
 test-restore:
 	sh ./scripts/test-restore-fixture
 

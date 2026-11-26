@@ -163,6 +163,22 @@ wait_for_serial () {
     return 1
 }
 
+wait_for_checkpoint () {
+    # wait_for_checkpoint SECONDS: wait until a checkpoint that starts
+    # after now has ended. Each checkpoint writes "Entering checkpoint"
+    # and then "Leaving checkpoint" to the serial log, so once there are
+    # more of the second than there were of the first, one has.
+    entered=$(grep -a -c "Entering checkpoint" "$WORK/serial")
+    waited=0
+    while [ $waited -lt "$1" ]; do
+        left=$(grep -a -c "Leaving checkpoint" "$WORK/serial")
+        [ "$left" -gt "$entered" ] && return 0
+        sleep 5
+        waited=$((waited + 5))
+    done
+    return 1
+}
+
 console_mark () {
     # console_mark: the number of lines in CONSOLE so far, for
     # console_since and wait_for_console

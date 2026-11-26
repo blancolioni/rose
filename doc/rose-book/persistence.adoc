@@ -41,6 +41,19 @@ After a restore, capabilities for the process fail, as for a process that has en
 
 The process's own pages are all this covers: a password that it sends to another process is in that process's memory too (#1059).
 
+=== Unsaved Memory
+
+A persistent process can keep part of its memory out of every checkpoint, for something it holds but mustn't keep, such as a password while it is typed (#1132).
+`Rose.Unsaved_Memory.Allocate` maps a segment that isn't persistent (`Segment.Add_Nonpersistent_Segment`) in the window `D000_0000` to `D100_0000`, between the shared regions and the stack:
+
+* *Its pages start as zeros,* and `mem` maps them as not persistent, as it does a transient process's pages, so they are never written to the log.
+* *After a restore they are zeros again.* The segment is restored, but not what it held.
+* *They are never paged out,* so the memory is meant to be small.
+
+The consoles keep what is typed there until it is read: they are persistent, and a checkpoint can come while a password is half typed.
+A restore drops what was typed anyway (#523).
+Auth still hashes a password on its stack, which a checkpoint saves (#1140).
+
 === Page Objects
 
 A page object is a page of storage, named by a 64-bit page object id from `FF00_0000_0000_0000` to `FFFF_FFFF_FFFF_FFFF`.

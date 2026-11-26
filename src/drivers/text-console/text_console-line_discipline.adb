@@ -1,5 +1,8 @@
 with System.Storage_Elements;
 
+with Rose.Trace;
+with Rose.Unsaved_Memory;
+
 package body Text_Console.Line_Discipline is
 
    use System.Storage_Elements;
@@ -16,7 +19,39 @@ package body Text_Console.Line_Discipline is
 
    Line_Editing : Boolean := True;
 
-   Input_Buffer : Storage_Array (1 .. 4096);
+   Input_Size : constant := 4096;
+
+   Max_Keys : constant := 256;
+
+   type Key_Press is
+      record
+         Key       : Rose.Keys.Key_Code := 0;
+         Modifiers : Rose.Keys.Modifier_Set := 0;
+      end record;
+
+   type Key_Index is mod Max_Keys;
+
+   type Key_Array is array (Key_Index) of Key_Press;
+
+   type Typed_Input is
+      record
+         Buffer : Storage_Array (1 .. Input_Size);
+         Keys   : Key_Array;
+      end record;
+   --  What has been typed and not read. It is in memory that checkpoints
+   --  don't save (#1132): the console is persistent, and a checkpoint
+   --  can come while a password is being typed. Restore drops what was
+   --  typed anyway (#523).
+
+   Typed : Typed_Input
+     with Import,
+          Address =>
+            Rose.Unsaved_Memory.Allocate
+              (Typed_Input'Max_Size_In_Storage_Elements);
+   --  Imported, so that it isn't initialized: unsaved memory starts as
+   --  zeros, which are its default values.
+
+   Input_Buffer : Storage_Array renames Typed.Buffer;
    Input_Last   : Storage_Count := 0;
    Line_Start   : Storage_Count := 0;
    --  Input_Buffer (1 .. Line_Start) are the lines that are complete and
@@ -28,17 +63,7 @@ package body Text_Console.Line_Discipline is
 
    Echo_Input   : Boolean := True;
 
-   type Key_Press is
-      record
-         Key       : Rose.Keys.Key_Code := 0;
-         Modifiers : Rose.Keys.Modifier_Set := 0;
-      end record;
-
-   Max_Keys : constant := 256;
-
-   type Key_Index is mod Max_Keys;
-
-   Keys       : array (Key_Index) of Key_Press;
+   Keys       : Key_Array renames Typed.Keys;
    First_Key  : Key_Index := 0;
    Key_Count  : Natural range 0 .. Max_Keys := 0;
    --  The keys typed with line editing off that haven't been read, from
@@ -85,9 +110,16 @@ package body Text_Console.Line_Discipline is
    -------------------
 
    procedure Discard_Input is
+      Typed_Bytes : Storage_Array
+        (1 .. Typed_Input'Max_Size_In_Storage_Elements)
+        with Import, Address => Typed'Address;
    begin
-      --  Clear what was typed as well, so that the next checkpoint
-      --  doesn't save it again.
+      --  After a restore, unsaved memory is zeros again. Anything else
+      --  was saved by a checkpoint, which is what #1132 stops.
+
+      if (for some Byte of Typed_Bytes => Byte /= 0) then
+         Rose.Trace.Event ("console: typed input was saved");
+      end if;
 
       Input_Buffer (1 .. Input_Last) := (others => 0);
       Input_Last := 0;
