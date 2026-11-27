@@ -219,6 +219,15 @@ package body Restore.Installer is
 
    procedure Send_Cap_Sets (Constructor_Cap : Rose.Capabilities.Capability);
 
+   procedure Send_Copy_Test
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client);
+   --  Send init the five images of its test of exec's Update copying an
+   --  installed image's matching pages (#1110), one call each, from the
+   --  files copy_test, copy_test_a and copy_test_b in Directory, which
+   --  the build makes from replaceable_test: copy_test, then each of the
+   --  others twice. Init updates the program copy_test with each. If a
+   --  file is missing, nothing is sent, and init doesn't pass the test.
+
    procedure Send_Forward_Test
      (Directory  : Rose.Interfaces.Files.Directory.Client.Directory_Client;
       Exec_Index : Positive);
@@ -955,6 +964,7 @@ package body Restore.Installer is
 
                         if Name = "replaceable_test" then
                            Send_Forward_Test (Directory, Exec_Index);
+                           Send_Copy_Test (Directory);
                         end if;
                   end case;
                end;
@@ -1191,6 +1201,57 @@ package body Restore.Installer is
       Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(98));
       Rose.System_Calls.Invoke_Capability (Params);
    end Send_Console;
+
+   --------------------
+   -- Send_Copy_Test --
+   --------------------
+
+   procedure Send_Copy_Test
+     (Directory : Rose.Interfaces.Files.Directory.Client.Directory_Client)
+   is
+      use Rose.Interfaces.Files.Directory.Client;
+      use Rose.Interfaces.Streams.Releasable_Reader.Client;
+
+      type Image_Name is (Base, Changed_End, Shorter);
+      Images  : constant array (Image_Name) of Natural :=
+        (Base        => Find_File (Directory, "copy_test"),
+         Changed_End => Find_File (Directory, "copy_test_a"),
+         Shorter     => Find_File (Directory, "copy_test_b"));
+      Steps   : constant array (Rose.Words.Word range 1 .. 5) of Image_Name :=
+        (Base, Changed_End, Changed_End, Shorter, Shorter);
+   begin
+      if (for some Index of Images => Index = 0) then
+         Rose.Console_IO.Put_Line
+           ("restore: exec copy test: an image is missing");
+         return;
+      end if;
+
+      for Step in Steps'Range loop
+         declare
+            Index         : constant Positive := Images (Steps (Step));
+            Binary_Reader : constant Releasable_Reader_Client :=
+              Rose.Interfaces.Files.File.Client.Open_Reader
+                (Get_Ordinary_File (Directory, Index));
+            Params        : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Init_Cap);
+            Rose.System_Calls.Send_Cap
+              (Params,
+               Rose.Interfaces.Streams.Reader.Client.Get_Interface_Cap
+                 (Conversions.To_Reader (Binary_Reader)));
+            Rose.System_Calls.Send_Word
+              (Params, Natural (Entry_Size (Directory, Index)));
+            Rose.System_Calls.Send_Word (Params, Rose.Words.Word'(93));
+            Rose.System_Calls.Send_Word (Params, Step);
+            Rose.System_Calls.Invoke_Capability (Params);
+
+            --  Init has updated copy_test from the reader by the time it
+            --  replies.
+
+            Release (Binary_Reader);
+         end;
+      end loop;
+   end Send_Copy_Test;
 
    -----------------------
    -- Send_Forward_Test --

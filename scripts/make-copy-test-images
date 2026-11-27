@@ -1,0 +1,43 @@
+#!/bin/sh
+# make-copy-test-images IMAGE DIR: write the three images of init's test of
+# exec's Update copying an installed image's matching pages (#1110) to DIR,
+# from IMAGE, replaceable_test's stripped ELF image.
+#
+#   copy_test    IMAGE's first four pages
+#   copy_test_a  copy_test with its last byte changed: only its last page
+#                differs, so exec copies the three before it
+#   copy_test_b  copy_test's first three pages, a shorter copy of the start
+#                of copy_test_a, so exec copies them all at the end
+#
+# They don't have to run: the test checks what exec stores. They are not
+# in the install list, so no install puts them in exec.
+
+set -e
+
+[ $# -eq 2 ] || { echo "usage: $0 IMAGE DIR" >&2; exit 2; }
+IMAGE=$1
+DIR=$2
+
+PAGE=4096
+SIZE=$(wc -c < "$IMAGE")
+[ "$SIZE" -ge $((4 * PAGE)) ] || {
+    echo "$0: $IMAGE is shorter than four pages" >&2
+    exit 1
+}
+
+mkdir -p "$DIR"
+head -c $((4 * PAGE)) "$IMAGE" > "$DIR/copy_test"
+head -c $((3 * PAGE)) "$IMAGE" > "$DIR/copy_test_b"
+
+# Flip the low bit of copy_test's last byte.
+LAST=$(tail -c 1 "$DIR/copy_test" | od -An -tu1 | tr -d ' ')
+{
+    head -c $((4 * PAGE - 1)) "$DIR/copy_test"
+    printf "\\$(printf '%03o' $((LAST ^ 1)))"
+} > "$DIR/copy_test_a"
+
+cmp -s "$DIR/copy_test" "$DIR/copy_test_a" && {
+    echo "$0: copy_test_a is the same as copy_test" >&2
+    exit 1
+}
+exit 0
