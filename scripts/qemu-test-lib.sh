@@ -357,6 +357,19 @@ check_install () {
     grep "exec forward test" "$CONSOLE" | tail -1
     grep -q "init: exec forward test: PASS" "$CONSOLE" \
         || { echo "FAIL: init's exec forward test did not pass"; exit 1; }
+
+    # Exec's Update copies an installed image's matching pages, at the
+    # first page that differs and at the end of a shorter image (#1110).
+    # Of init's five updates of copy_test, the first, second and fourth
+    # are new versions; the third and fifth repeat the one before, which
+    # exec finds the same only if it stored it page for page.
+    grep "exec copy test" "$CONSOLE" | tail -1
+    grep -q "init: exec copy test: PASS" "$CONSOLE" \
+        || { echo "FAIL: init's exec copy test did not pass"; exit 1; }
+    versions=$(grep -c "exec: new version of copy_test" "$CONSOLE")
+    [ "$versions" -eq 3 ] \
+        || { echo "FAIL: exec made $versions new versions of copy_test," \
+                  "not 3"; exit 1; }
 }
 
 wait_for_install () {

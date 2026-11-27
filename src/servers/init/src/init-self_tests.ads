@@ -95,6 +95,24 @@ package Init.Self_Tests is
      (Passed, No_Update_Cap, Nothing_From_Restore, Update_Failed,
       No_Test_Bank, Launch_Failed);
    --  The result of Exec_Forward_Test: Passed, or the step that failed.
+   --  Exec_Copy_Test gives the first four.
+
+   function Exec_Copy_Test
+     (Update_Cap    : Rose.Capabilities.Capability;
+      Binary_Stream : Rose.Capabilities.Capability)
+      return Forward_Result;
+   --  Update the program copy_test from Binary_Stream with Update_Cap,
+   --  exec's Update, with no install caps, so that exec compares the
+   --  image with the installed version's (#1110). Restore-install sends
+   --  five images in turn: the first four pages of replaceable_test,
+   --  then twice the same with its last byte changed, which copies the
+   --  three matching pages, then twice its first three pages, which
+   --  copies them at the end. Each second update is of the image just
+   --  installed, which exec finds the same only if it stored it page for
+   --  page. Exec says "new version" for each change, which the test
+   --  script counts: init can't see whether an image changed. Passed if
+   --  the update gave a Launch interface; Binary_Stream and that are
+   --  deleted.
 
    function Exec_Forward_Test
      (Update_Cap    : Rose.Capabilities.Capability;
