@@ -1,4 +1,5 @@
-# What the boot tests under QEMU (test-clock, test-boot) share.  A test
+# What the boot tests under QEMU (test-clock, test-boot) share, and
+# test-bochs, which replaces the functions that drive QEMU.  A test
 # sets HERE to the directory of its script, and sources this:
 #
 #   HERE=$(cd "$(dirname "$0")" && pwd)
@@ -269,6 +270,13 @@ install_rose () {
     wait_for_install 400 || fail "the install did not finish"
     sleep 15
     stop_qemu
+    check_install
+}
+
+check_install () {
+    # check_install: check what the install's tests wrote to CONSOLE and
+    # the serial log. test-bochs, which installs under Bochs, checks the
+    # same (#1159).
 
     # The next boot overwrites the console, so keep the install's (#982).
     cp "$CONSOLE" "$WORK/install-console"
@@ -463,4 +471,3 @@ check_kilo () {
     screen | grep -q "^hello from kilo" \
         || fail "the file lost its first line"
 }
-                                                                                                                                                                                                                                                                

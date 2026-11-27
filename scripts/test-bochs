@@ -1,0 +1,238 @@
+#!/bin/sh
+# Boot test of the whole system, under Bochs (#1159).
+#
+#   scripts/test-bochs [ISO]
+#
+# ISO is the install image, images/rose.iso by default. Every other boot
+# test runs under QEMU, which can differ from a real PC (#905), so this
+# one runs Rose on a second emulator. The test:
+#
+#   1. installs Rose on a new disk with the menu's test install, answers
+#      the install's questions, and checks what the install's tests
+#      wrote, as test-boot does (check_install);
+#   2. boots from the disk, which restores the install's checkpoint, logs
+#      in as the first user, and runs run_self_tests, which has to pass
+#      every test;
+#   3. waits for a checkpoint, stops the machine, and runs check-log.py
+#      on the disk, which has to find the checkpoint log consistent.
+#
+# It doesn't run keytest or kilo, as test-boot does, because they read the
+# screen, and Bochs's screen can't be read back here.
+#
+# Bochs runs with its term display, in a pseudo terminal that
+# bochs-run.py keeps, which is how the test types. That display can't show
+# graphics modes, so Bochs's VBE extension is off, and GRUB and Rose keep
+# the VGA text mode. With "clock: sync=none", Bochs runs as fast as it
+# can, and its clock follows the instructions it runs, not the host's.
+#
+# It takes about half an hour, and needs bochs (with its term display),
+# python3 and truncate. It exits with 0 if everything passed, and keeps
+# the disk image and Bochs's files if anything failed.
+
+ISO=${1:-images/rose.iso}
+HERE=$(cd "$(dirname "$0")" && pwd)
+
+command -v bochs > /dev/null || {
+    echo "bochs not found"
+    exit 2
+}
+[ -f "$ISO" ] || { echo "no install image: $ISO"; exit 2; }
+ISO=$(cd "$(dirname "$ISO")" && pwd)/$(basename "$ISO")
+
+# The QEMU tests' library gives WORK, DISK, CONSOLE, the first user, the
+# waits on the serial log and the console, and check_install. The
+# functions that drive the machine are replaced below.
+. "$HERE/qemu-test-lib.sh"
+
+SOCKET=$WORK/keys
+
+start_bochs () {
+    # start_bochs BOOT: start Bochs, booting from BOOT, cdrom or disk,
+    # with ISO in the CD drive
+    cat > "$WORK/bochsrc" << EOF
+memory: guest=32, host=32
+romimage: file=\$BXSHARE/BIOS-bochs-latest
+vgaromimage: file=\$BXSHARE/VGABIOS-lgpl-latest.bin
+vga: extension=none
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+ata0-master: type=disk, path="$DISK", mode=flat
+ata0-slave: type=cdrom, path="$ISO", status=inserted
+boot: $1
+com1: enabled=1, mode=file, dev=$WORK/serial-new
+com2: enabled=1, mode=file, dev=$WORK/console-new
+clock: sync=none, time0=local
+cpu: ips=50000000
+log: $WORK/bochs.log
+EOF
+    rm -f "$DISK.lock" "$SOCKET"
+    # Bochs writes each port's file from the start, and the QEMU tests'
+    # files go on from one boot to the next, so each boot's are added to
+    # them as it stops (stop_bochs).
+    rm -f "$WORK/serial-new" "$WORK/console-new"
+    touch "$WORK/serial" "$CONSOLE" "$WORK/serial-new" "$WORK/console-new"
+    ROSE_SERIAL=$WORK/serial-new python3 "$HERE/bochs-run.py" serve \
+        "$SOCKET" "$WORK/bochsrc" "$WORK/screen" > "$WORK/bochs-run.log" 2>&1 &
+    echo $! > "$WORK/pid"
+    sleep 2
+}
+
+# The waits read the serial log and the console while the machine runs,
+# so while it does they read this boot's files.
+boot_files () {
+    SERIAL_FILE=$WORK/serial-new
+    CONSOLE=$WORK/console-new
+}
+
+stop_bochs () {
+    if [ -f "$WORK/pid" ]; then
+        kill "$(cat "$WORK/pid")" 2> /dev/null
+        i=0
+        while kill -0 "$(cat "$WORK/pid")" 2> /dev/null && [ $i -lt 20 ]; do
+            sleep 1
+            i=$((i + 1))
+        done
+        rm -f "$WORK/pid"
+    fi
+    CONSOLE=$WORK/console
+    for port in serial console; do
+        [ -f "$WORK/$port-new" ] || continue
+        cat "$WORK/$port-new" >> "$WORK/$port"
+        rm -f "$WORK/$port-new"
+    done
+}
+
+fail () {
+    echo "FAIL: $1"
+    echo "The console:"
+    tail -12 "$CONSOLE"
+    stop_bochs
+    echo "The disk image and Bochs's files are in $WORK"
+    exit 1
+}
+
+type_text () {
+    python3 "$HERE/bochs-run.py" type "$SOCKET" "$1"
+}
+
+press () {
+    python3 "$HERE/bochs-run.py" key "$SOCKET" "$@"
+}
+
+choose_last_entry () {
+    # As the QEMU tests do, End for fifteen seconds, then Return. But
+    # Bochs's keyboard keeps only sixteen bytes that the machine hasn't
+    # read, and drops the rest, and while GRUB loads it reads none: the
+    # Return can be dropped, and then GRUB waits with its countdown
+    # stopped. So Return is pressed again until the kernel starts, and
+    # writes its command line and its modules to the serial log. The last
+    # entry is the serial console's, on the install media and the disk.
+    i=0
+    while [ $i -lt 15 ]; do
+        press end
+        sleep 1
+        i=$((i + 1))
+    done
+    tries=0
+    while [ $tries -lt 5 ]; do
+        press ret
+        waited=0
+        while [ $waited -lt 60 ]; do
+            # The kernel writes its command line before the modules.
+            if grep -a -q "^\[0000000000\] Module:" "$SERIAL_FILE" \
+                   2> /dev/null; then
+                grep -a -q "^\[0000000000\] serial-console" "$SERIAL_FILE" \
+                    || fail "GRUB booted an entry with no serial console"
+                return 0
+            fi
+            sleep 2
+            waited=$((waited + 2))
+        done
+        tries=$((tries + 1))
+    done
+    fail "GRUB did not boot the kernel"
+}
+
+wait_for_bochs_install () {
+    # wait_for_bochs_install SECONDS: as wait_for_install does, but
+    # reading the questions from the console's copy, where each is on its
+    # last line until it is answered
+    waited=0
+    answered=
+    while [ $waited -lt "$1" ]; do
+        answer_install "$CONSOLE"
+        grep -a -q -- "kernel: restarting" "$SERIAL_FILE" 2> /dev/null \
+            && return 0
+        kill -0 "$(cat "$WORK/pid" 2> /dev/null)" 2> /dev/null \
+            || fail "Bochs stopped"
+        sleep 1
+        waited=$((waited + 1))
+    done
+    return 1
+}
+
+bochs_log_in () {
+    # Log in as the first user, at the login prompt of a boot from the
+    # disk, reading the prompts from the console's copy. Each wait is
+    # about five times test-boot's, as Bochs is that much slower.
+    mark=$(console_mark)
+    wait_for_console "login:" 900 "$mark" || fail "no login prompt"
+    sleep 45
+    type_text "$first_user
+"
+    wait_for_console "password:" 300 "$mark" || fail "no password prompt"
+    type_text "$first_password
+"
+    wait_for_console "petal>" 600 "$mark" || fail "could not log in"
+}
+
+truncate -s "${ROSE_TEST_DISK_SIZE:-6G}" "$DISK"
+
+echo "Installing"
+start_bochs cdrom
+boot_files
+choose_last_entry
+wait_for_bochs_install 3600 || fail "the install did not finish"
+sleep 15
+stop_bochs
+check_install
+
+echo "Booting from the disk, which restores the install's checkpoint"
+start_bochs disk
+boot_files
+choose_last_entry
+bochs_log_in
+
+echo "Running the self tests"
+mark=$(console_mark)
+type_text "run_self_tests
+"
+wait_for_console "Test result:" 900 "$mark" \
+    || fail "the self tests did not finish"
+result=$(console_since "$mark" | grep "Test result:" | tail -1)
+echo "$result"
+set -- $(echo "$result" \
+    | sed -n 's/.*tests \([0-9][0-9]*\); passed \([0-9][0-9]*\);.*/\1 \2/p')
+[ $# -eq 2 ] && [ "$1" -gt 0 ] && [ "$1" -eq "$2" ] \
+    || fail "not every self test passed"
+
+echo "Waiting for a checkpoint, then stopping the machine"
+entered=$(grep -a -c "Entering checkpoint" "$SERIAL_FILE")
+waited=0
+while [ "$(grep -a -c "Leaving checkpoint" "$SERIAL_FILE")" -le "$entered" ]
+do
+    [ $waited -lt 900 ] || fail "no checkpoint after the self tests"
+    sleep 5
+    waited=$((waited + 5))
+done
+stop_bochs
+
+echo "Checking the log"
+python3 "$HERE/check-log.py" "$DISK" > "$WORK/check-log.out" || {
+    cat "$WORK/check-log.out"
+    echo "FAIL: the log is not consistent; the disk image is in $WORK"
+    exit 1
+}
+tail -3 "$WORK/check-log.out"
+
+rm -rf "$WORK"
+echo "PASS"

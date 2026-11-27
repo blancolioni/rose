@@ -25,7 +25,9 @@ sudo dnf install git-core make gcc gcc-gnat gprbuild binutils findutils gawk \
 ```
 
 Install [Alire](https://alire.ada.dev) as well, to build idle (see below).
-To test under Bochs too, install bochs and run `sh bochs/run-bochs.sh`.
+To test under Bochs too, install bochs and run `sh bochs/run-bochs.sh`, or
+`scripts/test-bochs`, which installs Rose from `images/rose.iso` under Bochs
+with no display, logs in and runs the self tests (about half an hour).
 
 `clean-build.sh --book` also builds the book, which needs:
 
