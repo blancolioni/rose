@@ -59,8 +59,13 @@ check:
 clean:
 	rm -f *.ad[bs]
 
+# The idle program itself, so that a new idle generates every interface
+# again: what it generates can change when no .idl file has (#1170). It is
+# empty if IDLE isn't found, which check reports.
+IDLE_PROGRAM := $(shell command -v $(IDLE) 2>/dev/null)
+
 # Every interface depends on all of them, since a parent can change.
-rose-interfaces-%.ads: ../../../../interfaces/%.idl $(SOURCES)
+rose-interfaces-%.ads: ../../../../interfaces/%.idl $(SOURCES) $(IDLE_PROGRAM)
 	$(IDLE) --target kernel -o . $<
 
 $(IDL): %: rose-interfaces-%.ads
