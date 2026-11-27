@@ -72,6 +72,13 @@ package body Rose.Kernel.Processes is
    Checkpoint_Held : Process_Id := Null_Process_Id;
    --  The process whose calls Hold_Calls_For_Checkpoint holds until the
    --  checkpoint ends (#1061).
+
+   Memory_Held : Boolean := False;
+   --  Mem's calls are held for a checkpoint (Hold_Memory, #1174).
+
+   Memory_Waiter : Process_Id := Null_Process_Id;
+   --  The process that waits for mem to receive before it starts a
+   --  checkpoint (Wait_For_Memory).
    --  Each process's part in a handover (Hold_Calls, Swap_Processes). It
    --  is kept out of the process table, as Checked_Records is: a
    --  checkpoint never starts while a handover is in progress.
@@ -1006,7 +1013,9 @@ package body Rose.Kernel.Processes is
       Wake_Waiting_Processes (Pid);
       Set_Current_State (Pid, Killed);
 
-      if Can_Send_To_Memory then
+      --  During a checkpoint, the exit waits for it to end (#1174).
+
+      if Can_Send_To_Memory and then not Active_Checkpoint then
          Send_Exit (Pid);
       else
          P.Flags (Exit_Pending) := True;
@@ -1361,8 +1370,11 @@ package body Rose.Kernel.Processes is
 
    function Handover_In_Progress return Boolean is
    begin
-      for Handover of Handovers loop
-         if Handover.Held or else Handover.Retired then
+      for Pid in Handovers'Range loop
+         if (Handovers (Pid).Held
+             and then not (Memory_Held and then Pid = Mem_Process))
+           or else Handovers (Pid).Retired
+         then
             return True;
          end if;
       end loop;
@@ -1423,7 +1435,9 @@ package body Rose.Kernel.Processes is
       end if;
 
       for P of Process_Table.all loop
-         if P.Flags (Fault_Pending) or else P.Flags (Exit_Pending) then
+         if P.Flags (Fault_Pending)
+           or else (P.Flags (Exit_Pending) and then not Active_Checkpoint)
+         then
             return True;
          end if;
       end loop;
@@ -1561,6 +1575,22 @@ package body Rose.Kernel.Processes is
       Checkpoint_Held := Pid;
       Success := True;
    end Hold_Calls_For_Checkpoint;
+
+   -----------------
+   -- Hold_Memory --
+   -----------------
+
+   procedure Hold_Memory (Caller : Process_Id) is
+   begin
+      if not Have_Process_Handlers or else Memory_Held then
+         return;
+      end if;
+
+      Handovers (Mem_Process).Held := True;
+      Handovers (Mem_Process).Except := 0;
+      Handovers (Mem_Process).Caller := Caller;
+      Memory_Held := True;
+   end Hold_Memory;
 
    ----------------------------
    -- Is_Blocked_On_Endpoint --
@@ -1879,6 +1909,10 @@ package body Rose.Kernel.Processes is
          Checkpoint_Held := Null_Process_Id;
       end if;
 
+      --  And the calls to mem, and the exits that waited (#1174).
+
+      Release_Memory;
+
       --  Mem ends the copying when it has saved its pages. If it didn't,
       --  its pages are still changed in its tables, so none is clean, and
       --  the pages written meanwhile wait in the list for its next
@@ -1960,6 +1994,41 @@ package body Rose.Kernel.Processes is
              (Physical_Address_To_Page (P.Directory_Page)),
          Virtual_Page   => Virtual_Page);
    end Mapped_Physical_Page;
+
+   -----------------
+   -- Memory_Idle --
+   -----------------
+
+   function Memory_Idle return Boolean is
+   begin
+      return not Have_Process_Handlers
+        or else Current_Activity (Mem_Process) = Receiving;
+   end Memory_Idle;
+
+   ----------------------
+   -- Memory_Receiving --
+   ----------------------
+
+   procedure Memory_Receiving (Pid : Process_Id) is
+   begin
+      if Pid /= Mem_Process or else Memory_Waiter = Null_Process_Id then
+         return;
+      end if;
+
+      declare
+         W : Kernel_Process_Entry renames Process_Table (Memory_Waiter);
+      begin
+         W.Current_Params.Control.Flags :=
+           (Rose.Invocation.Error => True,
+            Rose.Invocation.Reply => True,
+            others                => False);
+         W.Current_Params.Control.Last_Sent_Word := 0;
+         W.Current_Params.Control.Error :=
+           Rose.Invocation.Request_Would_Block;
+         Set_Current_State (Memory_Waiter, Ready);
+      end;
+      Memory_Waiter := Null_Process_Id;
+   end Memory_Receiving;
 
    --------------------------
    -- Move_Single_Use_Caps --
@@ -2358,6 +2427,29 @@ package body Rose.Kernel.Processes is
       P.State := Available;
       P.Name := (others => ' ');
    end Release_Entry;
+
+   --------------------
+   -- Release_Memory --
+   --------------------
+
+   procedure Release_Memory is
+   begin
+      if Memory_Held then
+         Memory_Held := False;
+         Release_Calls (Mem_Process);
+      end if;
+
+      --  Exits that waited for the checkpoint go to mem now, if it is
+      --  waiting to receive. Otherwise it takes them at its next
+      --  receive.
+
+      if Have_Process_Handlers
+        and then Can_Send_To_Memory
+        and then Has_Pending_Memory_Request (Mem_Process)
+      then
+         Send_Pending_Memory_Request;
+      end if;
+   end Release_Memory;
 
    ----------------------------
    -- Report_Current_Process --
@@ -2872,7 +2964,9 @@ package body Rose.Kernel.Processes is
             Last_Fault_Pid := Pid;
             Send_Page_Fault (Pid);
             return;
-         elsif Process_Table (Pid).Flags (Exit_Pending) then
+         elsif Process_Table (Pid).Flags (Exit_Pending)
+           and then not Active_Checkpoint
+         then
             Last_Fault_Pid := Pid;
             Send_Exit (Pid);
             return;
@@ -4123,6 +4217,17 @@ package body Rose.Kernel.Processes is
          end if;
       end if;
    end Use_Tick;
+
+   ---------------------
+   -- Wait_For_Memory --
+   ---------------------
+
+   procedure Wait_For_Memory (Caller : Process_Id) is
+   begin
+      Hold_Memory (Caller);
+      Memory_Waiter := Caller;
+      Set_Current_State (Caller, Blocked);
+   end Wait_For_Memory;
 
    -----------------------
    -- Wait_For_Receiver --

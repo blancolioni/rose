@@ -552,7 +552,8 @@ def check_mem_tables(log, first, last, regions, verbose, info):
         for s in range(segment_count):
             base, bound, limit, flags, r_base, r_bound, r_offset = \
                 struct.unpack_from("<IIIIQQQ", record, 32 + s * 40)
-            if (r_base or r_bound) and (r_base, r_bound) not in regions:
+            if (r_base or r_bound) and (r_base, r_bound) not in regions \
+                    and oid not in info.get("store_ended", ()):
                 return False, ("memory process %d: segment %05x..%05x uses "
                                "region %x..%x, which the storage server "
                                "doesn't have"
@@ -600,6 +601,16 @@ def check_entry(log, first, last, verbose, info):
         log, kernel_first + kernel_pages, last, verbose)
     if not ok:
         return False, kernel + "; " + store
+    # The processes the store has queued to end, whose banks and regions
+    # are gone, but which the kernel and mem still have (#1174).
+    store_page = log.page(kernel_first + kernel_pages)
+    ended_count = min(u32(store_page, 44), MAX_STORE_SLOTS)
+    info["store_ended"] = set(
+        struct.unpack_from("<%dQ" % ended_count, store_page,
+                           56 + 2 * MAX_STORE_SLOTS))
+    if ended_count:
+        store += "; %d process%s to end" % (
+            ended_count, "" if ended_count == 1 else "es")
     kernel = kernel + "; " + store
 
     # The memory server's tables come after its batches and index sections
@@ -623,6 +634,9 @@ def check_entry(log, first, last, verbose, info):
         return False, kernel + "; " + tables
     missing = oids - set(processes.values())
     if missing:
+        # The memory server's tables are whole, so the next entry's
+        # indexes still carry on from this one's (#1174).
+        info["tables_disagree"] = True
         return False, ("%s; %s: the kernel's processes %s are not in the "
                        "memory server's %s"
                        % (kernel, tables, sorted(missing),
@@ -1178,6 +1192,14 @@ def main():
                      first, last, description, "" if ok else "  ** BAD"))
             if not ok:
                 failures += 1
+            if not ok and info.get("tables_disagree") \
+                    and info.get("has_index"):
+                # Only the process tables disagree, so the next entry's
+                # indexes are checked against this one's, rather than
+                # against nothing (#1174).
+                info["indexes"] = {
+                    pid: read_index(log, info["directories"].get(pid, 0))
+                    for pid in info["processes"]}
             previous = info if "indexes" in info else None
             last_info = info if ok else None
 

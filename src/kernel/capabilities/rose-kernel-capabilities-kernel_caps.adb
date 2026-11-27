@@ -568,6 +568,7 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             if Rose.Kernel.Processes.Handover_In_Progress then
                Rose.Boot.Console.Put_Line
                  ("kernel: no checkpoint during a handover");
+               Rose.Kernel.Processes.Release_Memory;
                Rose.Kernel.Processes.Return_Error
                  (Params, Rose.Invocation.Request_Error);
                return;
@@ -579,10 +580,26 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
             then
                Rose.Boot.Console.Put_Line
                  ("kernel: enter checkpoint needs a writable buffer");
+               Rose.Kernel.Processes.Release_Memory;
                Rose.Kernel.Processes.Return_Error
                  (Params, Rose.Invocation.Request_Error);
                return;
             end if;
+
+            --  Mem's tables are saved after the kernel's, so the snapshot
+            --  waits until mem is in none of its operations, and mem's
+            --  calls are held from the snapshot until the checkpoint ends
+            --  (#1174). Until mem receives, the caller waits, and is then
+            --  told to ask again.
+
+            if not Rose.Kernel.Processes.Memory_Idle then
+               Rose.Kernel.Processes.Wait_For_Memory
+                 (Rose.Kernel.Processes.Current_Process_Id);
+               return;
+            end if;
+
+            Rose.Kernel.Processes.Hold_Memory
+              (Rose.Kernel.Processes.Current_Process_Id);
 
             declare
                Tables     : System.Storage_Elements.Storage_Array
@@ -600,6 +617,7 @@ package body Rose.Kernel.Capabilities.Kernel_Caps is
                --  a larger one (#913).
 
                if not Success then
+                  Rose.Kernel.Processes.Release_Memory;
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Request_Error,
                      Rose.Words.Word (Page_Count));

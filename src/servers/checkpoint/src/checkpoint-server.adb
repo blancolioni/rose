@@ -60,6 +60,11 @@ package body Checkpoint.Server is
    --  The pages added beyond what the kernel says it needs, so that a
    --  few more processes don't make it ask again.
 
+   Max_Enter_Attempts : constant := 100;
+   --  How many times Enter_Checkpoint waits for the memory server to be
+   --  in none of its operations before the checkpoint is skipped
+   --  (#1174).
+
    Ready_Pages : Natural := First_Ready_Pages;
    --  The pages of Kernel_Tables offered to the kernel, which grow when
    --  the kernel says that its tables don't fit.
@@ -253,21 +258,43 @@ package body Checkpoint.Server is
       ---------
 
       function Try (Needed : out Natural) return Boolean is
+         use type Rose.Invocation.Invocation_Error;
          Params : aliased Rose.Invocation.Invocation_Record;
          Length : constant System.Storage_Elements.Storage_Count :=
                     System.Storage_Elements.Storage_Count
                       (Ready_Pages * Rose.Limits.Page_Size);
       begin
-         --  The kernel writes into Kernel_Tables directly, so every page
-         --  that it is offered must be mapped and writable first.
-         Kernel_Tables (1 .. Length) := (others => 0);
+         --  The kernel waits until the memory server is in none of its
+         --  operations, and then says to ask again (#1174). Each wait
+         --  ends when it next receives, so a few are enough.
 
-         Rose.System_Calls.Initialize_Send (Params, Enter_Checkpoint_Cap);
-         Rose.System_Calls.Send_Buffer
-           (Params, Length, Kernel_Tables'Address, True);
-         Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
-         Params.Control.Last_Recv_Word := 0;
-         Rose.System_Calls.Invoke_Capability (Params);
+         for Attempt in 1 .. Max_Enter_Attempts loop
+
+            --  The kernel writes into Kernel_Tables directly, so every
+            --  page that it is offered must be mapped and writable
+            --  first.
+
+            Kernel_Tables (1 .. Length) := (others => 0);
+
+            Rose.System_Calls.Initialize_Send
+              (Params, Enter_Checkpoint_Cap);
+            Rose.System_Calls.Send_Buffer
+              (Params, Length, Kernel_Tables'Address, True);
+            Params.Control.Flags (Rose.Invocation.Recv_Words) := True;
+            Params.Control.Last_Recv_Word := 0;
+            Rose.System_Calls.Invoke_Capability (Params);
+
+            exit when not Params.Control.Flags (Rose.Invocation.Error)
+              or else Params.Control.Error
+                /= Rose.Invocation.Request_Would_Block;
+
+            if Attempt = Max_Enter_Attempts then
+               Rose.Console_IO.Put_Line
+                 ("checkpoint: the memory server stayed busy");
+               Needed := 0;
+               return False;
+            end if;
+         end loop;
 
          Needed := Natural (Params.Data (0));
          return not Params.Control.Flags (Rose.Invocation.Error);

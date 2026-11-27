@@ -73,6 +73,11 @@ package body Rose.Kernel.Capabilities.Receive is
             if Next_Sender = Rose.Kernel.Processes.Null_Process_Id then
                if Params.Control.Flags (Rose.Invocation.Block) then
                   Rose.Kernel.Processes.Receive (Receiver_Id, Params.all);
+
+                  --  A checkpoint may be waiting for mem to receive
+                  --  (#1174).
+
+                  Rose.Kernel.Processes.Memory_Receiving (Receiver_Id);
                else
                   Rose.Kernel.Processes.Return_Error
                     (Params, Rose.Invocation.Request_Would_Block);
