@@ -88,6 +88,8 @@ Banks and their dependent objects are saved in the store's checkpoint (ADR 0014,
 
 Amended by #750: which process owns a bank is saved in the store's bank table, so nothing holds a cap to a bank across a restore. The store's queue of processes to end isn't saved, because mem empties it as soon as it is told. A checkpoint taken in between would restore a process whose bank is gone: it can still run, but reserving storage fails. Ending it at the restore is a follow-up.
 
+Amended by #1174: the store saves its queue of processes to end with its tables, and a restore ends them. Mem no longer ends them at the start of its part of a checkpoint, because the kernel has already saved its tables, which still have the processes. It ends them once its own tables are saved, so the kernel's, the store's and mem's parts all describe the same moment. After a restore, the restore server calls mem's `Processes_Ended` before any process runs, and mem ends the processes in the restored queue.
+
 ## Consequences
 
 - **#424 becomes small for the directory server.** It already gets each entry's `Process` cap from `Launch`. It keeps the cap in the entry, and calls `Destroy` when the entry is deleted (#346). A directory's files are launched against the directory's bank, so destroying a directory also ends its files, if there are any.

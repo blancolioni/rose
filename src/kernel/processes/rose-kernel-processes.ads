@@ -601,9 +601,41 @@ package Rose.Kernel.Processes is
    --  for Old_Pid, or New_Pid has no room for the endpoints or the caps.
 
    function Handover_In_Progress return Boolean;
-   --  True if any process has its calls held or is retired.
+   --  True if any process has its calls held or is retired. A hold on
+   --  mem's calls for a checkpoint (Hold_Memory) doesn't count.
+
+   function Memory_Idle return Boolean;
+   --  True if mem waits to receive, and so is in none of its operations,
+   --  or if there is no mem yet. A checkpoint starts only then, so that
+   --  mem's tables are saved as they were at the kernel's snapshot
+   --  (#1174).
+
+   procedure Hold_Memory (Caller : Process_Id);
+   --  Hold the calls to mem, except Caller's, until Release_Memory, as
+   --  Hold_Calls does. The checkpoint server holds them from the kernel's
+   --  snapshot until the checkpoint ends, so that no process is launched
+   --  or destroyed between the kernel's part and mem's (#1174).
+
+   procedure Wait_For_Memory (Caller : Process_Id);
+   --  Mem is busy, so Caller, which wants to start a checkpoint, waits
+   --  until mem next waits to receive, with mem's other calls held
+   --  meanwhile. Caller's call then fails with Request_Would_Block, and
+   --  it asks again. Page faults, requests for heap memory and exits
+   --  still reach mem, so mem can finish what it is doing.
+
+   procedure Memory_Receiving (Pid : Process_Id);
+   --  Pid waits to receive, with nothing to take. If Pid is mem, and a
+   --  checkpoint waits for it (Wait_For_Memory), the checkpoint goes on.
+
+   procedure Release_Memory;
+   --  End the hold of Hold_Memory, if there is one, and give mem what
+   --  waited for it meanwhile.
 
    procedure Enter_Checkpoint;
+   --  From now until Leave_Checkpoint, an exit waits for the checkpoint
+   --  to end before it reaches mem: the kernel's snapshot has the
+   --  process, so mem's tables must have it too (#1174).
+
    procedure Leave_Checkpoint;
 
    procedure End_Page_Copies (Saved : Boolean);

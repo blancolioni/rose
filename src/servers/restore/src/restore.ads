@@ -30,6 +30,10 @@ package Restore is
    --  The kernel's exit cap: restore exits when it has finished, so that
    --  its caps go with it (#451).
 
+   Processes_Ended_Cap : Rose.Capabilities.Capability;
+   --  Mem's Processes_Ended: the restored store may have processes
+   --  queued to end, and mem ends them before any process runs (#1174).
+
    --  Only restore-install has these (Restore.Install_Driver).
    Install_Media_Cap   : Rose.Capabilities.Capability :=
                            Rose.Capabilities.Null_Capability;

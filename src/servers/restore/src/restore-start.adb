@@ -88,6 +88,18 @@ package body Restore.Start is
       end;
 
       if Restored then
+
+         --  The store's tables may have processes queued to end, which
+         --  were still running at the checkpoint, so mem ends them now,
+         --  before any process runs (#1174).
+
+         declare
+            Params : aliased Rose.Invocation.Invocation_Record;
+         begin
+            Rose.System_Calls.Initialize_Send (Params, Processes_Ended_Cap);
+            Rose.System_Calls.Invoke_Capability (Params);
+         end;
+
          Restore.Checkpoints.Resume_Processes;
          Rose.Console_IO.Put_Line ("restore: restored processes are running");
       end if;
@@ -135,6 +147,7 @@ package body Restore.Start is
       Next (Memory_Restore_Cap);
       Next (Restore_Derivations_Cap);
       Next (Exit_Cap);
+      Next (Processes_Ended_Cap);
    end Get_Caps;
 
    ----------

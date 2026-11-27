@@ -270,8 +270,10 @@ package body Store.Devices is
    --  The processes to end because their own banks were destroyed (ADR
    --  0015, #750), which mem takes one at a time, and the cap of mem's
    --  Processes_Ended, which the store sends to without waiting when it
-   --  queues one.  The queue isn't saved: mem empties it as soon as it is
-   --  told.
+   --  queues one.  The queue is saved with the store's tables: the
+   --  kernel's and mem's tables still have the processes, because mem
+   --  ends none during a checkpoint, and a restore has mem end them
+   --  before any process runs (#1174).
 
    procedure Destroy_Bank_Tree
      (Bank   : Natural;
@@ -688,6 +690,11 @@ package body Store.Devices is
       Table_Header.Tree_Root := Rose.Words.Word_64 (Root);
       Table_Header.Region_Generations := Region_Generations;
       Table_Header.Bank_Generations := Bank_Generations;
+      Table_Header.Ended_Count := Rose.Words.Word_32 (Ended_Count);
+      for Index in 1 .. Ended_Count loop
+         Table_Header.Ended (Index) :=
+           Rose.Words.Word_64 (Ended_Queue (Index));
+      end loop;
       Append;
 
       for Index in 1 .. Region_Count loop
@@ -2264,6 +2271,24 @@ package body Store.Devices is
                Restore_Banks_Left := Natural (Header.Bank_Count);
                Region_Generations := Header.Region_Generations;
                Bank_Generations := Header.Bank_Generations;
+
+               --  The processes queued to end when the checkpoint was
+               --  taken are queued again. Mem ends them when the restore
+               --  server asks it to, before any process runs (#1174).
+
+               Ended_Count :=
+                 Natural'Min (Natural (Header.Ended_Count),
+                              Ended_Queue'Last);
+               for Index in 1 .. Ended_Count loop
+                  Ended_Queue (Index) :=
+                    Rose.Objects.Object_Id (Header.Ended (Index));
+               end loop;
+               if Ended_Count > 0 then
+                  Rose.Console_IO.Put
+                    ("storage: restore: processes to end: ");
+                  Rose.Console_IO.Put (Ended_Count);
+                  Rose.Console_IO.New_Line;
+               end if;
 
                Restore_Space
                  (Root   => Device_Page (Header.Tree_Root),

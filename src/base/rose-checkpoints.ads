@@ -330,6 +330,14 @@ package Rose.Checkpoints is
      array (1 .. Max_Store_Slots) of Rose.Words.Word_8
      with Pack, Size => Max_Store_Slots * 8;
 
+   type Store_Ended_Processes is
+     array (1 .. Max_Store_Slots) of Rose.Words.Word_64
+     with Pack, Size => Max_Store_Slots * 64;
+   --  The processes that the store has queued for mem to end, because
+   --  their banks were destroyed, and that mem hadn't ended when the
+   --  store saved its tables (#1174). A restore ends them before any
+   --  process runs.
+
    type Store_Table_Header is
       record
          Magic            : Rose.Words.Word_64 := Store_Table_Magic;
@@ -342,13 +350,18 @@ package Rose.Checkpoints is
          Image_Copy       : Rose.Words.Word_32 := 0;
          Bank_Count       : Rose.Words.Word_32 := 0;
          Bank_Page_Count  : Rose.Words.Word_32 := 0;
-         Unused           : Rose.Words.Word_32 := 0;
+         Ended_Count      : Rose.Words.Word_32 := 0;
+         --  The first Ended_Count of Ended are queued to end (#1174).
+         --  It was always zero before, so a table without them reads
+         --  as one with none.
          Tree_Root        : Rose.Words.Word_64 := 0;
          Region_Generations : Store_Generations := (others => 0);
          Bank_Generations   : Store_Generations := (others => 0);
+         Ended            : Store_Ended_Processes := (others => 0);
          Reserved         : System.Storage_Elements.Storage_Array
                               (1 .. Rose.Limits.Page_Size - 56
-                                      - 2 * Max_Store_Slots) :=
+                                      - 2 * Max_Store_Slots
+                                      - 8 * Max_Store_Slots) :=
                                 (others => 0);
       end record
      with Pack, Size => Rose.Limits.Page_Size * 8;

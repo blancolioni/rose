@@ -527,16 +527,16 @@ package body Mem.Server is
          Request_Checkpoint_Cap := Request_Checkpoint;
       end if;
 
-      --  The processes whose banks the store has destroyed end first, so
-      --  that mem's part doesn't keep segments whose regions are gone
-      --  from the store's. The checkpoint server holds the store's other
-      --  callers until the checkpoint ends, so no more can be destroyed
-      --  meanwhile (#1061).
-
-      Drain_Ended;
+      --  The kernel saved its tables before this call, so mem saves its
+      --  own as they were then, and ends no process first: the processes
+      --  whose banks the store has destroyed are in the kernel's tables,
+      --  and the store saves its queue of them, which a restore ends
+      --  before any process runs (#1174). They end once mem's part is
+      --  saved.
 
       Mem.Cleaning.Prepare_Checkpoint;
       Mem.Checkpoints.Checkpoint;
+      Drain_Ended;
 
       --  Whether it asked for this one or not, mem can page out again,
       --  and the held faults can find pages: the changed pages are clean,
