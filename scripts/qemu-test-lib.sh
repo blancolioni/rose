@@ -130,16 +130,14 @@ screen () {
 }
 
 type_text () {
-    # type_text TEXT: type TEXT, holding each key while a checkpoint runs
-    # (qemu-keys.py, #807)
-    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
+    # type_text TEXT: type TEXT (qemu-keys.py). Keys go on during a
+    # checkpoint, which must not lose them (ADR 0030, #795)
+    python3 "$HERE/qemu-keys.py" "$MONITOR" "$1"
 }
 
 press () {
-    # press KEY...: press keys by their QEMU names, such as up or ctrl-s,
-    # holding each while a checkpoint runs
-    ROSE_SERIAL="$WORK/serial" python3 "$HERE/qemu-keys.py" "$MONITOR" \
-        --key "$@"
+    # press KEY...: press keys by their QEMU names, such as up or ctrl-s
+    python3 "$HERE/qemu-keys.py" "$MONITOR" --key "$@"
 }
 
 wait_for () {
@@ -236,6 +234,25 @@ answer_install () {
     esac
 }
 
+check_install_test () {
+    # check_install_test NAME: the install's run of the self test NAME
+    # passed, and wasn't skipped. A failure's message can wrap, so a line
+    # that doesn't say PASS is preferred, and only a line that says PASS
+    # passes.
+    line=$(grep -F "$1" "$CONSOLE" | sort -u | grep -v "PASS" | tail -1)
+    [ -n "$line" ] || line=$(grep -F "$1" "$CONSOLE" | tail -1)
+    echo "$line"
+    case "$line" in
+        *skipped*|"")
+            ;;
+        *PASS*)
+            return 0
+            ;;
+    esac
+    echo "FAIL: the install's $1 did not pass (see $WORK/install-console)"
+    exit 1
+}
+
 install_rose () {
     # install_rose ISO: install Rose on a new disk, answering its questions,
     # and wait for the install to finish
@@ -260,6 +277,9 @@ check_install () {
     # check_install: check what the install's tests wrote to CONSOLE and
     # the serial log. test-bochs, which installs under Bochs, checks the
     # same (#1159).
+
+    # The next boot overwrites the console, so keep the install's (#982).
+    cp "$CONSOLE" "$WORK/install-console"
 
     # Init's own tests run during the install, and report on the console.
     if grep -q -e ": FAIL" -e "test failed" "$CONSOLE"
@@ -290,138 +310,30 @@ check_install () {
         echo "FAIL: the install's self tests failed"
         exit 1
     fi
-    cap_sets=$(grep "Cap set test" "$CONSOLE" | tail -1)
-    echo "$cap_sets"
-    case "$cap_sets" in
-        *skipped*|*FAIL*|"")
-            echo "FAIL: the install's cap set test did not pass"
-            exit 1
-            ;;
-    esac
+    check_install_test "Cap set test"
 
-    # The test of Replaceable needs the cap set server too (#865). A
-    # failure's message can wrap, so its line is kept whole, and only a
-    # line that says PASS, and wasn't skipped, passes.
-    replacement=$(grep "Replacement test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replacement" ] \
-        || replacement=$(grep "Replacement test" "$CONSOLE" \
-                             | tail -1)
-    echo "$replacement"
-    case "$replacement" in
-        *skipped*|"")
-            echo "FAIL: the install's replacement test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replacement test did not pass"
-            exit 1
-            ;;
-    esac
+    # The test of Replaceable needs the cap set server too (#865), and the
+    # tests of replacing a running server need mem's Replacer, which only
+    # the install's run has: a process (#866), a file server with files
+    # open (#867), and a user server, a directory and auth (#831).
+    check_install_test "Replacement test"
+    check_install_test "Replace process test"
+    check_install_test "Replace file test"
+    check_install_test "Replace user test"
+    check_install_test "Replace directory test"
+    check_install_test "Replace auth test"
 
-    # The test of replacing a running server needs mem's Replacer, which
-    # only the install's run has (#866). It is checked as the test of
-    # Replaceable is.
-    replace=$(grep "Replace process test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replace" ] \
-        || replace=$(grep "Replace process test" "$CONSOLE" \
-                         | tail -1)
-    echo "$replace"
-    case "$replace" in
-        *skipped*|"")
-            echo "FAIL: the install's replace process test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replace process test did not pass"
-            exit 1
-            ;;
-    esac
-
-    # So is the test of replacing a file server with files open (#867).
-    replace_file=$(grep "Replace file test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replace_file" ] \
-        || replace_file=$(grep "Replace file test" \
-                              "$CONSOLE" | tail -1)
-    echo "$replace_file"
-    case "$replace_file" in
-        *skipped*|"")
-            echo "FAIL: the install's replace file test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replace file test did not pass"
-            exit 1
-            ;;
-    esac
-
-    # So is the test of replacing a user server with a session open (#831).
-    replace_user=$(grep "Replace user test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replace_user" ] \
-        || replace_user=$(grep "Replace user test" \
-                              "$CONSOLE" | tail -1)
-    echo "$replace_user"
-    case "$replace_user" in
-        *skipped*|"")
-            echo "FAIL: the install's replace user test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replace user test did not pass"
-            exit 1
-            ;;
-    esac
-
-    # And of replacing a directory with entries (#831).
-    replace_dir=$(grep "Replace directory test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replace_dir" ] \
-        || replace_dir=$(grep "Replace directory test" \
-                             "$CONSOLE" | tail -1)
-    echo "$replace_dir"
-    case "$replace_dir" in
-        *skipped*|"")
-            echo "FAIL: the install's replace directory test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replace directory test did not pass"
-            exit 1
-            ;;
-    esac
-
-    # And of replacing auth with a user and a session (#831).
-    replace_auth=$(grep "Replace auth test" "$CONSOLE" \
-        | sort -u | grep -v "PASS" | tail -1)
-    [ -n "$replace_auth" ] \
-        || replace_auth=$(grep "Replace auth test" \
-                              "$CONSOLE" | tail -1)
-    echo "$replace_auth"
-    case "$replace_auth" in
-        *skipped*|"")
-            echo "FAIL: the install's replace auth test did not pass"
-            exit 1
-            ;;
-        *PASS*)
-            ;;
-        *)
-            echo "FAIL: the install's replace auth test did not pass"
-            exit 1
-            ;;
-    esac
+    # The tests that need a bank of their own skip themselves in petal's
+    # runs, so only the install's run checks them (#982).
+    check_install_test "Shared segment test"
+    check_install_test "Segment overlap test"
+    check_install_test "Shared regions test"
+    check_install_test "Region put limit test"
+    check_install_test "Region reuse test"
+    check_install_test "Bank dependent test"
+    check_install_test "Bank limit test"
+    check_install_test "Bank reuse test"
+    check_install_test "Bank cap set test"
 
     # Init replaces the file that hold_file holds, which the restore then
     # checks (#867).

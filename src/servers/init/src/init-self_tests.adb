@@ -1211,7 +1211,8 @@ package body Init.Self_Tests is
       Screen          : Rose.Capabilities.Capability;
       Create_Signal   : Rose.Capabilities.Capability;
       Cap_Sets        : Rose.Capabilities.Capability;
-      Replace_Process : Rose.Capabilities.Capability)
+      Replace_Process : Rose.Capabilities.Capability;
+      Timer           : Rose.Capabilities.Capability)
       return Boolean
    is
       use type Rose.Words.Word;
@@ -1246,7 +1247,8 @@ package body Init.Self_Tests is
           Screen,
           Create_Signal,
           Cap_Sets,
-          Replace_Process));
+          Replace_Process,
+          Timer));
       Rose.System_Calls.Receive_Words (Params, 1);
       Rose.System_Calls.Invoke_Capability (Params);
 

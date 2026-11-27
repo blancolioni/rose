@@ -478,6 +478,7 @@ package body Mem.Server is
 
    procedure Ask_For_Checkpoint is
       use type Rose.Capabilities.Capability;
+      use type Rose.Invocation.Invocation_Error;
       Params : aliased Rose.Invocation.Invocation_Record;
    begin
       if Checkpoint_Requested
@@ -493,6 +494,18 @@ package body Mem.Server is
                                others              => False);
       Params.Cap := Request_Checkpoint_Cap;
       Rose.System_Calls.Invoke_Capability (Params);
+
+      --  A send that doesn't wait is refused while the checkpoint server
+      --  is in a call of its own, such as waiting for the log to commit
+      --  (#984). mem asks again at its next fault or commit, rather than
+      --  waiting for a checkpoint that nobody is taking.
+
+      if Params.Control.Flags (Rose.Invocation.Error)
+        and then Params.Control.Error = Rose.Invocation.Request_Would_Block
+      then
+         return;
+      end if;
+
       Checkpoint_Requested := True;
    end Ask_For_Checkpoint;
 
@@ -645,6 +658,10 @@ package body Mem.Server is
       Swap_Processes_Cap := Get_Cap (8);
       Process_State_Cap  := Get_Cap (9);
       Kernel_Log_Cap     := Get_Cap (10);
+      Free_Caps_Cap      := Get_Cap (11);
+      Add_Copy_Frames_Cap := Get_Cap (12);
+      Copy_Saved_Page_Cap := Get_Cap (13);
+      End_Page_Copies_Cap := Get_Cap (14);
 
       --  Nothing reads the cap set again (#826).
 
@@ -654,6 +671,11 @@ package body Mem.Server is
 
       Mem.Calls.Load_Memory_Map;
       Mem.Page_Table.Initialize;
+
+      --  Before any checkpoint, which can start as soon as processes run
+      --  (ADR 0030, section 6).
+
+      Mem.Calls.Add_Copy_Frames (Rose.Limits.Checkpoint_Copy_Frames);
 
       --  From here on, mem writes to the kernel's log, never the console.
       --  The console calls its driver, a launched process, and if mem has

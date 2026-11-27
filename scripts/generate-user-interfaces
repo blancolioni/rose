@@ -1,0 +1,41 @@
+#!/bin/sh
+# generate-user-interfaces
+#
+# Generates the user target's interface packages (#1067): idle over every
+# interface in interfaces/, once, into build/$ARCH/user/interfaces/generated.
+# The userland RTS copies the few specs it needs from there
+# (rts/user/create-sources.sh), and projects/user_library.gpr builds the
+# rest as a library, which every program built with the userland RTS
+# imports. Programs generate only their own command packages.
+#
+# Run from the top of the tree, or from anywhere: it finds the top from its
+# own path. IDLE can name an idle that isn't on the path.
+#
+# idle writes into an empty directory, and only the files whose text has
+# changed are copied over, so a run with no changes recompiles nothing.
+# Files that idle no longer writes, for an interface that has gone, are
+# deleted, so that the library doesn't keep them.
+
+ARCH=i686
+root=$(cd "$(dirname "$0")/.." && pwd) || exit 1
+idle=${IDLE:-idle}
+
+out=$root/build/$ARCH/user/interfaces/generated
+new=$root/build/$ARCH/user/interfaces/generated.new
+
+rm -rf "$new"
+mkdir -p "$out" "$new" || exit 1
+$idle --target user -I "$root/interfaces" -o "$new" "$root"/interfaces/*.idl \
+    || exit 1
+
+for file in "$out"/*; do
+    [ -e "$file" ] || continue
+    [ -e "$new/$(basename "$file")" ] || rm -f "$file" || exit 1
+done
+
+for file in "$new"/*; do
+    target=$out/$(basename "$file")
+    cmp -s "$file" "$target" || cp "$file" "$target" || exit 1
+done
+
+rm -rf "$new"

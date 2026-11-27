@@ -139,7 +139,8 @@ stages:
       priority: memory
       caps: [console_interface, region_count, get_region, page_on, trace,
              hold_calls, release_calls, swap_processes, process_state,
-             kernel_log]
+             kernel_log, free_caps, add_copy_frames, copy_saved_page,
+             end_page_copies]
       exports:
         mem: Processes.Memory.Memory_Interface
         memory_checkpoint: Processes.Memory.Checkpoint_Endpoint
@@ -261,6 +262,9 @@ stages:
         append_to_log: Checkpoints.Kernel_Log.Append_Endpoint
         log_reader: Checkpoints.Log_Reader.Log_Reader_Interface
         log_reset: Checkpoints.State.Reset_Endpoint
+        # For the checkpoint server, to learn whether a checkpoint's
+        # entry was committed (#984).
+        log_last_entry: Checkpoints.Log_Reader.Last_Entry_Endpoint
         # For mem, to append to the open entry and read pages back (ADR
         # 0028).
         page_log: Checkpoints.Page_Log.Page_Log_Interface
@@ -319,6 +323,6 @@ stages:
       priority: checkpoint
       caps: [console_interface, timer, enter_checkpoint, leave_checkpoint,
              memory_checkpoint, append_to_log, store_checkpoint,
-             checkpoint_hold]
+             checkpoint_hold, log_last_entry]
       exports:
         checkpointer: Checkpoints.Checkpointer.Take_Checkpoint_Endpoint

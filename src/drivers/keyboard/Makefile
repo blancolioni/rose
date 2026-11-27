@@ -6,14 +6,10 @@ all: keyboard
 
 # keyboard is built with the userland run-time system, and serves
 # Event_Source and its interrupt through the user-mode IDL target (#490).
-# They and the interfaces they use are generated in build/generated.
+# They and the interfaces they use come from the userland library
+# (projects/user_library.gpr, #1067).
 
 keyboard:
 	mkdir -p build/obj
 	mkdir -p build/bin
-	mkdir -p build/generated
-	$(USER_IDLE) \
-	    $(INTERFACES)/devices-event_source.idl \
-	    $(INTERFACES)/devices-event_listener.idl \
-	    $(INTERFACES)/devices-interrupt_handler.idl
 	gprbuild $(GPRBUILD_CARGS)

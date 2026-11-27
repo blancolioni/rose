@@ -84,6 +84,11 @@ package Rose.Kernel.Processes is
       Layout         : Rose.Capabilities.Layout.Capability_Layout)
       return Rose.Capabilities.Capability;
 
+   function Free_Cap_Count (Pid : Process_Id) return Natural;
+   --  The number of caps that Pid can still create: the slots of its table
+   --  that are not in use (#1131). It looks at every slot up to the last
+   --  one in use.
+
    function Has_Cap
      (Pid : Process_Id;
       Cap : Rose.Capabilities.Capability)
@@ -383,7 +388,8 @@ package Rose.Kernel.Processes is
       Writable      : Boolean;
       Executable    : Boolean;
       User          : Boolean;
-      Managed       : Boolean := False);
+      Managed       : Boolean := False;
+      Write_Tracked : Boolean := False);
 
    procedure Unmap_Page
      (Pid           : Process_Id;
@@ -600,6 +606,14 @@ package Rose.Kernel.Processes is
    procedure Enter_Checkpoint;
    procedure Leave_Checkpoint;
 
+   procedure End_Page_Copies (Saved : Boolean);
+   --  The memory server has saved its pages, or Saved is False if it
+   --  failed: the kernel no longer copies pages before they are written,
+   --  the pages that the checkpoint made read-only lose that flag, and
+   --  become Write_Tracked if Saved, and the processes that waited to
+   --  write go on (ADR 0030, section 5). The list of written pages is
+   --  kept for the memory server.
+
    procedure Save_Owner_FPU_State;
    --  Save the registers of the FPU owner into its process table entry,
    --  without changing the owner, so that the entry's state is current
@@ -616,7 +630,7 @@ private
       Interrupt_Resume, Message_Queued, Trace, Boot_Module,
       Persistent, Checkpoint_Page_Fault, Fault_Pending, Restore_Notice,
       Restored_Blocked, Memory_Registered, Exit_Pending,
-      Checkpoint_Reply_Held, Call_Restart, Reply_Fault);
+      Retired_Reply_Held, Call_Restart, Reply_Fault);
    --  Flags are saved in a checkpoint by position, so new ones go last.
    --  Memory_Registered: mem was told about the process when it was
    --  loaded, so mem ends it when it exits. Exit_Pending: it has exited,
@@ -625,7 +639,8 @@ private
    --  makes the call again when it resumes, instead of returning from an
    --  interrupt (#713). Reply_Fault: the process is interrupted for a
    --  page of its invocation record, and is given its reply when it
-   --  resumes (#715).
+   --  resumes (#715). Retired_Reply_Held is never set: it held a reply
+   --  until a checkpoint ended, until ADR 0030, and keeps its place.
 
    type Process_Flag_Array is array (Process_Flag) of Boolean;
 

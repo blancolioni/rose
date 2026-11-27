@@ -12,6 +12,16 @@ package Mem is
    Region_Range_Cap    : Rose.Capabilities.Capability;
    Start_Paging_Cap    : Rose.Capabilities.Capability;
 
+   Free_Caps_Cap       : Rose.Capabilities.Capability := 0;
+   --  The kernel's count of the caps mem can still create (#1131).
+
+   Add_Copy_Frames_Cap : Rose.Capabilities.Capability := 0;
+   Copy_Saved_Page_Cap : Rose.Capabilities.Capability := 0;
+   End_Page_Copies_Cap : Rose.Capabilities.Capability := 0;
+   --  The kernel's copies of pages written during a checkpoint (ADR
+   --  0030): mem gives it frames, saves pages through it, and ends the
+   --  copying when it has saved them.
+
    type Process_Id is mod 2 ** 16;
    Null_Process_Id : constant Process_Id := 0;
 

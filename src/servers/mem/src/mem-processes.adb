@@ -98,6 +98,17 @@ package body Mem.Processes is
    subtype Kernel_Process_Client is
      Rose.Interfaces.Processes.Kernel_Process.Client.Kernel_Process_Client;
 
+   Launch_Reserve : constant := Rose.Limits.Max_Processes + 64;
+   --  Mem refuses a launch when it can create fewer caps than this. Each
+   --  call to mem needs a reply cap in its table, and a process it can't
+   --  reply to faults: the reserve leaves one for each process that may
+   --  be waiting on mem, and room for the caps of one more launch, about
+   --  30 (#1131).
+
+   function Free_Caps return Natural;
+   --  How many caps mem can still create, from the kernel. Natural'Last
+   --  if mem doesn't have the kernel's cap.
+
    procedure Keep_Used_Caps (Process : in out Kernel_Process_Client);
    --  Delete the caps of an opened Kernel_Process that mem never calls
    --  after Get_Object_Id: it keeps Destroy, Resume and Fault (#1131).
@@ -572,7 +583,30 @@ package body Mem.Processes is
       return 0;
    end Find_Process;
 
-   ------------------
+   ---------------
+   -- Free_Caps --
+   ---------------
+
+   function Free_Caps return Natural is
+      use type Rose.Capabilities.Capability;
+      Params : aliased Rose.Invocation.Invocation_Record;
+   begin
+      if Free_Caps_Cap = Rose.Capabilities.Null_Capability then
+         return Natural'Last;
+      end if;
+
+      Rose.System_Calls.Initialize_Send (Params, Free_Caps_Cap);
+      Rose.System_Calls.Receive_Words (Params, 1);
+      Rose.System_Calls.Invoke_Capability (Params);
+
+      if Params.Control.Flags (Rose.Invocation.Error) then
+         return Natural'Last;
+      end if;
+
+      return Natural (Params.Data (0));
+   end Free_Caps;
+
+   ---------------------
    -- Get_Bank_Cap --
    ------------------
 
@@ -856,7 +890,11 @@ package body Mem.Processes is
                --  writable segments are saved by checkpoints, and so
                --  indexed.
             begin
-               Mem.Calls.Load_Page (Physical_Page, Buffer'Address);
+               --  New contents: the frame is in no checkpoint that is
+               --  running (ADR 0030).
+
+               Mem.Calls.Load_Page
+                 (Physical_Page, Buffer'Address, Fill => True);
 
                if Log_Page /= 0 then
                   Mem.Page_Log.Read (Log_Page, Buffer'Address);
@@ -1006,11 +1044,10 @@ package body Mem.Processes is
         (Rose.Interfaces.Storage.Region_Access.Subprogram_Count /= 4,
          "Region_Access has another operation: delete its cap below too");
 
-      Get   : constant Rose.Capabilities.Capability :=
-                Client.Get_Get_Cap (Region);
-      Put   : constant Rose.Capabilities.Capability :=
-                Client.Get_Put_Cap (Region);
-      Empty : Client.Region_Access_Client;
+      Get : constant Rose.Capabilities.Capability :=
+              Client.Get_Get_Cap (Region);
+      Put : constant Rose.Capabilities.Capability :=
+              Client.Get_Put_Cap (Region);
    begin
       Rose.System_Calls.Delete_Cap (Client.Get_Get_Range_Cap (Region));
       Rose.System_Calls.Delete_Cap (Client.Get_Read_Cap (Region));
@@ -1019,18 +1056,16 @@ package body Mem.Processes is
          Rose.System_Calls.Delete_Cap (Put);
       end if;
 
-      --  Open_Cap_Set leaves the interface cap as it was, and that cap is
-      --  deleted: its slot can hold another cap by the time Close deletes
-      --  it again. Fill an empty client, whose interface cap is null.
+      --  Open_Cap_Set makes a client with no interface cap, so Close won't
+      --  delete the deleted one again (idle#135).
 
       Client.Open_Cap_Set
-        (Client    => Empty,
+        (Client    => Region,
          Get_Range => Rose.Capabilities.Null_Capability,
          Get       => Get,
          Put       =>
            (if Shared then Put else Rose.Capabilities.Null_Capability),
          Read      => Rose.Capabilities.Null_Capability);
-      Region := Empty;
    end Keep_Used_Caps;
 
    --------------------
@@ -1051,22 +1086,18 @@ package body Mem.Processes is
                   Client.Get_Resume_Cap (Process);
       Fault   : constant Rose.Capabilities.Capability :=
                   Client.Get_Fault_Cap (Process);
-      Empty   : Kernel_Process_Client;
    begin
       Rose.System_Calls.Delete_Cap (Client.Get_Name_Cap (Process));
       Rose.System_Calls.Delete_Cap (Client.Get_Get_Object_Id_Cap (Process));
       Rose.System_Calls.Delete_Cap (Client.Get_Interface_Cap (Process));
 
-      --  As for a Region_Access: the interface cap is deleted.
-
       Client.Open_Cap_Set
-        (Client        => Empty,
+        (Client        => Process,
          Name          => Rose.Capabilities.Null_Capability,
          Destroy       => Destroy,
          Get_Object_Id => Rose.Capabilities.Null_Capability,
          Resume        => Resume,
          Fault         => Fault);
-      Process := Empty;
    end Keep_Used_Caps;
 
    ------------------
@@ -1312,7 +1343,7 @@ package body Mem.Processes is
          pragma Import (Ada, Buffer);
          for Buffer'Address use To_System_Address (Y);
       begin
-         Mem.Calls.Load_Page (Physical, Buffer'Address);
+         Mem.Calls.Load_Page (Physical, Buffer'Address, Fill => True);
          Buffer := Page;
          Mem.Calls.Unload_Page (Physical, Buffer'Address);
       end;
@@ -1479,6 +1510,15 @@ package body Mem.Processes is
       Client : Rose.Interfaces.Processes.Kernel_Process.Client
         .Kernel_Process_Client;
    begin
+      --  Few caps left: refuse the launch while every caller can still
+      --  have a reply cap. Like running out of slots below, the caller
+      --  fails the launch, and nothing is written (#1131, #915).
+
+      if not Boot_Module and then Free_Caps < Launch_Reserve then
+         Rose.System_Calls.Delete_Cap (Process_Cap);
+         return 0;
+      end if;
+
       while Process_Table (Next_Pid).State /= Available loop
          if Next_Pid = Last then
             Next_Pid := First;

@@ -16,7 +16,8 @@ procedure Rose.Core.Run_Self_Tests
    Cap_Set_Service : in out
      Rose.Interfaces.Caps.Bank_Constructor.Bank_Constructor_Object'Class;
    Replace_Process : in out Rose.Interfaces.Processes.Replacer
-     .Replacer_Object'Class)
+     .Replacer_Object'Class;
+   Timer_Service   : in out Rose.Interfaces.Time.Timer.Timer_Object'Class)
 is
    Self_Tests_Failed : exception;
    --  Raised when a test fails, so that the command fails, and its
@@ -46,6 +47,7 @@ begin
    Tests.Registry.Set_Cap_Sets (Cap_Set_Service.Constructor_Cap);
    Tests.Registry.Set_Bank_Cap_Sets (Cap_Set_Service.Bank_Constructor_Cap);
    Tests.Registry.Set_Replacer (Replace_Process.Replacer_Cap);
+   Tests.Registry.Set_Timer (Timer_Service.Timer_Cap);
    Rose.System_Calls.Use_Capabilities
      (Create_Signal => Create_Signal.Cap_Cap);
 
