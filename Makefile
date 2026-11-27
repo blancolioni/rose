@@ -23,8 +23,10 @@ endif
 
 # The default target builds a bootable ISO.  The hard disk image (hdd), the
 # book (doc) and publishing (publish-iso) are separate; all does the lot.
+# It checks the tools first: a stale idle builds a system that fails at
+# random (#1172).
 
-rose: config interfaces $(ROSE) check-targets check-endpoint-ids install-list programs exports stripped bootdisk iso finished
+rose: check-env config interfaces $(ROSE) check-targets check-endpoint-ids install-list programs exports stripped bootdisk iso finished
 
 programs: $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
