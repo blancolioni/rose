@@ -55,6 +55,29 @@ else
     problem "python3 not found"
 fi
 
+# idle has no version number, so check what it generates instead.  An idle
+# older than idle PR #136 generates an Open_Cap_Set that keeps the client's
+# old interface cap, and mem's Kill_Process then deletes a cap number that
+# can name another cap by then, such as the reply cap of the call it is
+# serving (#1172).  The build would work, and the system fail at random.
+if command -v "$IDLE" >/dev/null 2>&1; then
+    idle_dir=build/check-env-idle
+    rm -rf "$idle_dir"
+    mkdir -p "$idle_dir/out"
+    printf 'interface Check.Probe is\n   procedure Ping;\nend Check.Probe;\n' \
+        > "$idle_dir/check-probe.idl"
+    if ! "$IDLE" -o "$idle_dir/out" "$idle_dir/check-probe.idl" \
+        > "$idle_dir/idle.log" 2>&1
+    then
+        problem "$IDLE fails on a one-operation interface; see $idle_dir/idle.log"
+    elif ! grep -q "Client.Interface_Cap := Rose.Capabilities.Null_Capability" \
+        "$idle_dir/out/rose-interfaces-check-probe-client.adb"
+    then
+        problem "$IDLE is too old: its Open_Cap_Set keeps a stale interface cap; build idle from main (idle PR #136 or later)"
+    fi
+    rm -rf "$idle_dir"
+fi
+
 if [ $failed = yes ]; then
     echo "check-env: the build can't run until these are fixed" >&2
     exit 1

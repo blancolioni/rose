@@ -1,3 +1,4 @@
+with Ada.Exceptions;
 with Ada.Text_IO;
 
 with Rose.System_Calls;
@@ -62,8 +63,10 @@ begin
          begin
             Success := Test.all;
          exception
-            when others =>
-               Ada.Text_IO.Put (": raised an exception");
+            when E : others =>
+               Ada.Text_IO.Put
+                 (": raised " & Ada.Exceptions.Exception_Name (E)
+                  & ": " & Ada.Exceptions.Exception_Message (E));
                Success := False;
          end;
          Tests_Run := Tests_Run + 1;
