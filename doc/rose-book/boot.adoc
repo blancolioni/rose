@@ -187,7 +187,7 @@ The process maps the pages again in `Restored`, and sets its device up again, wh
 A device writes them without going through the page tables, so `mem` could neither protect nor copy them during a checkpoint (ADR 0030).
 
 The pool is less than 640 KiB, and which program has which pages is written in each program's list.
-A general allocator, for RAM above the first megabyte, is the rest of #291.
+A general allocator, for RAM above the first megabyte, is #1201.
 
 [#handing-over-the-console]
 === Handing over the console
