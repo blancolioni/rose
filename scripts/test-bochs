@@ -42,6 +42,9 @@ ISO=$(cd "$(dirname "$ISO")" && pwd)/$(basename "$ISO")
 # The QEMU tests' library gives WORK, DISK, CONSOLE, the first user, the
 # waits on the serial log and the console, and check_install. The
 # functions that drive the machine are replaced below.
+# Bochs has no virtio network card, so check_install doesn't look for
+# the virtio-net driver's test (#295).
+NETWORK_CARD=none
 . "$HERE/qemu-test-lib.sh"
 
 SOCKET=$WORK/keys

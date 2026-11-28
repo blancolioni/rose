@@ -231,6 +231,32 @@ Ctrl with a letter gives its control character.
 It maps scan codes through a layout table with an AltGr level and dead keys; only the US layout exists, and choosing another is #743.
 It doesn't echo the keys; the console does.
 
+=== `virtio_net`
+
+The driver for QEMU's virtio network card, through the card's legacy interface (#295).
+QEMU's scripts and the boot tests give the guest the card, on QEMU's user-mode network (#293).
+
+Provides:: `Network_Device` (#294), published, and `Restorable`.
+Requests:: `create-endpoint`, `boot-tag 1` (the kernel's command line), `device-pages 16 16` (the 64 KiB at `10000`, see <<dma-pages>>), and then the card: `pci-device 0x1AF4 0x1000 0`, its BAR 0 as 8-, 16- and 32-bit input and output ports, and `pci-interrupt` (see <<pci-devices>>). It also has the console.
+Used by:: nothing yet; `net` will be its client (#296, ADR 0007).
+
+The card's two queues and their buffers are in the DMA pages, which are mapped at their own addresses, so an address in them is also the address to give the card.
+Each queue takes three pages, for up to 256 entries.
+There are sixteen receive buffers and four transmit buffers, of 2 KiB each.
+Each buffer is two descriptors, the virtio-net header and the frame, since a legacy card may expect them apart.
+The driver accepts only the card's MAC address feature.
+
+* **`Send_Frame`** copies the frame to a free transmit buffer, and fails when all four are in use.
+* **`Receive_Frame`** takes the oldest frame from the receive queue, and gives its buffer back to the card. It never waits. When all sixteen buffers are full, the card drops the frames that arrive.
+* **The interrupt** says that the card has used a buffer. The driver reads the card's ISR status, which makes the card drop its line, and raises the signal that `Notify` gave it, if a frame is waiting. The line is level-triggered, so the kernel masks it, and the driver unmasks it with its acknowledge capability (see <<_interrupt_capabilities>>).
+* **`Link_Up`** is true while the card is started: the card's link status isn't negotiated.
+
+The card's requests come last in its list. On a machine without the card, `init` refuses all of them, so the caps before them keep their numbers, and the console is given in the slot where the card's `PCI_Device` would have been. The driver knows that there is no card because the slot where the console would be is empty, and then it serves nothing.
+
+When it is restored, the driver maps its pages again, switches on the card's I/O space and bus mastering, and starts the card again: the card has been reset, and the DMA pages are never saved (ADR 0030).
+
+On a test install, with `self-tests` on the kernel's command line, the driver sends an ARP request for `10.0.2.2`, QEMU's gateway, and a second one once it has acknowledged the interrupt of the first reply. The boot tests require both replies: the second shows that the line was unmasked.
+
 === `clock`
 
 Serves the system's time (ADR 0020, #494).

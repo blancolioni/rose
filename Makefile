@@ -11,7 +11,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
-DRIVERS=command ps2 exec file directory null_stream vga-console clock caps screen surface-console process_probe memory_surface trellis
+DRIVERS=command ps2 exec file directory null_stream vga-console clock caps screen surface-console process_probe memory_surface trellis virtio_net
 UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login supervisor run_self_tests hold_derived hold_file hold_home swap_probe page_probe hold_pages hold_transient replaceable_test petal argv keytest kilo
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where

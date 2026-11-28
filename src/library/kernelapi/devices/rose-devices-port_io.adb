@@ -56,6 +56,32 @@ package body Rose.Devices.Port_IO is
    -- Port_In_16 --
    ----------------
 
+   function Port_In_16
+     (Port   : Rose.Capabilities.Capability;
+      Offset : Rose.Words.Word_8)
+      return Rose.Words.Word_16
+   is
+      use Rose.Invocation;
+      Params : aliased Invocation_Record;
+   begin
+      Params.Cap := Port;
+      Params.Control.Flags := (Send       => True,
+                               Block      => True,
+                               Send_Words => True,
+                               Recv_Words => True,
+                               No_Trace   => True,
+                               others     => False);
+      Params.Control.Last_Sent_Word := 0;
+      Params.Control.Last_Recv_Word := 0;
+      Params.Data (0) := Rose.Words.Word (Offset);
+      Rose.System_Calls.Invoke_Capability (Params);
+      return Rose.Words.Word_16 (Params.Data (0));
+   end Port_In_16;
+
+   ----------------
+   -- Port_In_16 --
+   ----------------
+
    procedure Port_In_16
      (Port : Rose.Capabilities.Capability;
       Data : out Word_16_Array)
@@ -110,6 +136,32 @@ package body Rose.Devices.Port_IO is
       Params.Cap := Port;
       Rose.System_Calls.Invoke_Capability (Params);
       return Params.Data (0);
+   end Port_In_32;
+
+   ----------------
+   -- Port_In_32 --
+   ----------------
+
+   function Port_In_32
+     (Port   : Rose.Capabilities.Capability;
+      Offset : Rose.Words.Word_8)
+      return Rose.Words.Word_32
+   is
+      use Rose.Invocation;
+      Params : aliased Invocation_Record;
+   begin
+      Params.Cap := Port;
+      Params.Control.Flags := (Send       => True,
+                               Block      => True,
+                               Send_Words => True,
+                               Recv_Words => True,
+                               No_Trace   => True,
+                               others     => False);
+      Params.Control.Last_Sent_Word := 0;
+      Params.Control.Last_Recv_Word := 0;
+      Params.Data (0) := Rose.Words.Word (Offset);
+      Rose.System_Calls.Invoke_Capability (Params);
+      return Rose.Words.Word_32 (Params.Data (0));
    end Port_In_32;
 
    ----------------
@@ -255,7 +307,27 @@ package body Rose.Devices.Port_IO is
      (Port    : Rose.Capabilities.Capability;
       Offset  : Rose.Words.Word_8;
       Value   : Rose.Words.Word_16)
-   is null;
+   is
+      use Rose.Invocation;
+      use type Rose.Words.Word;
+      Params : aliased Invocation_Record;
+   begin
+
+      --  A range of 16-bit ports takes the offset in the low byte of the
+      --  word, and the value above it, as a range of 8-bit ports does
+      --  (#295).
+
+      Params.Cap := Port;
+      Params.Control.Flags := (Send       => True,
+                               Block      => True,
+                               Send_Words => True,
+                               No_Trace   => True,
+                               others     => False);
+      Params.Control.Last_Sent_Word := 0;
+      Params.Data (0) :=
+        Rose.Words.Word (Offset) + 256 * Rose.Words.Word (Value);
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Port_Out_16;
 
    -----------------
    -- Port_Out_32 --
@@ -287,6 +359,29 @@ package body Rose.Devices.Port_IO is
      (Port    : Rose.Capabilities.Capability;
       Offset  : Rose.Words.Word_8;
       Value   : Rose.Words.Word_32)
-   is null;
+   is
+      use Rose.Invocation;
+      use type Rose.Words.Word;
+      Params : aliased Invocation_Record;
+   begin
+
+      --  A range of 32-bit ports takes a word of four offsets, a byte
+      --  each, and then the four values (#985). Offset 255 writes
+      --  nothing, so only the first value is written (#295).
+
+      Params.Cap := Port;
+      Params.Control.Flags := (Send       => True,
+                               Block      => True,
+                               Send_Words => True,
+                               No_Trace   => True,
+                               others     => False);
+      Params.Control.Last_Sent_Word := 4;
+      Params.Data (0) := Rose.Words.Word (Offset) + 16#FFFF_FF00#;
+      Params.Data (1) := Value;
+      Params.Data (2) := 0;
+      Params.Data (3) := 0;
+      Params.Data (4) := 0;
+      Rose.System_Calls.Invoke_Capability (Params);
+   end Port_Out_32;
 
 end Rose.Devices.Port_IO;

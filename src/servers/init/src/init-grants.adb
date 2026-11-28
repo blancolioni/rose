@@ -36,7 +36,9 @@ package body Init.Grants is
    --  its ids and its index among devices with those ids, since its
    --  address is in the identifier of its cap, which init can't read.
 
-   Max_Grants : constant := 32;
+   Max_Grants : constant := 64;
+   --  The drivers' ports, interrupts and pages, and those of init's
+   --  tests. 32 was too few once virtio_net had its card (#295).
 
    type Grant_Kind is (Port_Grant, Interrupt_Grant, Page_Grant);
 
@@ -132,6 +134,19 @@ package body Init.Grants is
            and then Last >= Grant.First
          then
             return False;
+         end if;
+      end loop;
+
+      --  An owner asking again for what it has, such as a BAR's ports
+      --  for each size and direction (#295), needs no second record.
+
+      for Grant of Grants (1 .. Grant_Count) loop
+         if Grant.Kind = Kind
+           and then Grant.Owner = Owner
+           and then Grant.First = First
+           and then Grant.Last = Last
+         then
+            return True;
          end if;
       end loop;
 

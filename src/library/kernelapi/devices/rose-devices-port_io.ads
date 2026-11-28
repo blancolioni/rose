@@ -16,6 +16,18 @@ package Rose.Devices.Port_IO is
      (Port  : Rose.Capabilities.Capability)
       return Rose.Words.Word_32;
 
+   function Port_In_16
+     (Port   : Rose.Capabilities.Capability;
+      Offset : Rose.Words.Word_8)
+      return Rose.Words.Word_16;
+   --  Read the 16 bits at Offset in Port's range (#295)
+
+   function Port_In_32
+     (Port   : Rose.Capabilities.Capability;
+      Offset : Rose.Words.Word_8)
+      return Rose.Words.Word_32;
+   --  Read the 32 bits at Offset in Port's range (#295)
+
    procedure Port_Out_8
      (Port  : Rose.Capabilities.Capability;
       Value : Rose.Words.Word_8);

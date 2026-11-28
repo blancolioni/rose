@@ -1,0 +1,13 @@
+create-endpoint
+boot-tag           1              # the kernel's command line, for self-tests
+device-pages       16 16          # 10000 to 1FFFF: the queues and buffers
+# The card's requests come last: on a machine without one, init refuses
+# all of them, and the caps above keep their numbers (#295).
+pci-device         0x1AF4 0x1000 0  # the first virtio network card
+pci-port-in-8      0              # BAR 0: the legacy registers
+pci-port-in-16     0
+pci-port-in-32     0
+pci-port-out-8     0
+pci-port-out-16    0
+pci-port-out-32    0
+pci-interrupt

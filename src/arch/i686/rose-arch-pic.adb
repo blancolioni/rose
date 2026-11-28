@@ -1,6 +1,21 @@
 
 package body Rose.Arch.PIC is
 
+   -----------------
+   -- Disable_IRQ --
+   -----------------
+
+   procedure Disable_IRQ (IRQ : Rose.Words.Word_8) is
+      IRQ_Line : constant Word_8 :=
+                   (if IRQ < 8 then IRQ else IRQ - 8);
+      Port     : constant Word_16 :=
+                   (if IRQ < 8 then PIC_1_Data else PIC_2_Data);
+      Value    : constant Word_8 :=
+                   Inb (Port) or 2 ** Natural (IRQ_Line);
+   begin
+      Outb (Port, Value);
+   end Disable_IRQ;
+
    ----------------
    -- Enable_IRQ --
    ----------------
@@ -47,5 +62,19 @@ package body Rose.Arch.PIC is
       Outb (PIC_2_Data, 16#FF#);
 
    end Initialise_PIC;
+
+   ------------------------
+   -- Is_Level_Triggered --
+   ------------------------
+
+   function Is_Level_Triggered (IRQ : Rose.Words.Word_8) return Boolean is
+      IRQ_Line : constant Word_8 :=
+                   (if IRQ < 8 then IRQ else IRQ - 8);
+      Port     : constant Word_16 :=
+                   (if IRQ < 8 then ELCR_1 else ELCR_2);
+   begin
+      return IRQ < 16
+        and then (Inb (Port) and 2 ** Natural (IRQ_Line)) /= 0;
+   end Is_Level_Triggered;
 
 end Rose.Arch.PIC;

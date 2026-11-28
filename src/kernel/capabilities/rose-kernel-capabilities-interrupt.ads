@@ -4,6 +4,11 @@ package Rose.Kernel.Capabilities.Interrupt is
 
    Reserve_Interrupt_Endpoint : constant := 1;
 
+   Acknowledge_Endpoint       : constant := 3;
+   --  Unmask the cap's line, which the kernel masks when it sends an
+   --  interrupt from a level-triggered line (#295). Reserve replies with
+   --  a cap for it, if the caller receives caps.
+
    Derive_Endpoint            : constant :=
                                   Rose.Init_Capabilities
                                     .Derive_Interrupt_Endpoint;
