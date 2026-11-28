@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-10-31
 - **Related:** #578 (this decision), project 54 (the implementation), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0005](0005-persistent-console.md) (the persistent console), [ADR 0006](0006-signals.md) (signals), [ADR 0013](0013-typed-streams.md) (typed streams), [ADR 0014](0014-banks.md) (banks)
-- **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2); #654, where the early messages are replayed on the screen when the console starts (section 1)
+- **Amended by:** #653, where a holder that is a server is told of its surface's events by a signal, and reads them without waiting (section 2); #654, where the early messages are replayed on the screen when the console starts (section 1); #588, where the wheel is an event of its own (sections 4 and 7)
 
 ## Context
 
@@ -89,6 +89,13 @@ A pointer driver (a PS/2 mouse to begin with, #588) gives the `screen` driver a 
 
 The pointer is another event in the surface's event stream, so the surface interface doesn't change.
 
+Amended by #588. A wheel turn is an event of its own, not part of the pointer event:
+
+- **A wheel event carries the steps the wheel turned,** positive towards the user, and nothing else. A pointer event carries a position and the buttons, and a wheel turn changes neither, so it has no place in one. Treating the wheel as two more buttons, as X does, would need a press and a release for every step, and would give the steps no sign or size.
+- **It goes where a pointer event at the same moment would go:** to the surface under the cursor, or to the surface with the grab, and to no other. It doesn't move focus.
+- **It is not combined with movement.** The `screen` driver queues the wheel and the movement as separate events, and the display server forwards each as it comes. A wheel event is never overwritten by a later one, so no steps are lost, while a pointer event with the same buttons as the one queued before it may replace it.
+- **A device with no wheel sends none.** A horizontal wheel, or a tilt, would be another kind of event, added the same way.
+
 ### 5. Layout is tiled, with the keyboard and the pointer
 
 The server, not the clients, decides where each surface goes. It tiles the screen: one full-screen surface to begin with, then splits. A reserved key chord is handled by the server and never forwarded. It moves focus, splits, closes and swaps tiles (#585). The pointer does the same: a click focuses, and dragging a divider resizes the tiles on either side. A client is told its size in an event and doesn't choose it.
@@ -105,7 +112,7 @@ There is no stacking and no overlap to begin with, so the server needs no clippi
 
 ### 7. Interfaces
 
-The interfaces are declared in `interfaces/` (#581): the display server (create a surface, with the size it asks for), the surface (get its buffer, report damage, get its event stream, read the pointer's position, ask for a cursor shape), and the event type (key, pointer, focus, size). Operations that can fail are procedures that raise, not functions that return `Boolean` (idle#60).
+The interfaces are declared in `interfaces/` (#581): the display server (create a surface, with the size it asks for), the surface (get its buffer, report damage, get its event stream, read the pointer's position, ask for a cursor shape), and the event type (key, pointer, focus, size, and, since #588, wheel). Operations that can fail are procedures that raise, not functions that return `Boolean` (idle#60).
 
 ## Consequences
 
