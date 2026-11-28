@@ -286,6 +286,14 @@ check_install () {
     # the serial log. test-bochs, which installs under Bochs, checks the
     # same (#1159).
 
+    # Restore says FAIL when it couldn't write the boot loader in full,
+    # and the disk won't boot. The install carries on, so this is the
+    # place to catch it, not the boot from the disk.
+    if grep -a "^restore: FAIL" "$CONSOLE"; then
+        echo "FAIL: the install did not write the boot loader"
+        exit 1
+    fi
+
     # The next boot overwrites the console, so keep the install's (#982).
     cp "$CONSOLE" "$WORK/install-console"
 

@@ -148,7 +148,7 @@ function Head (Items : list of T; Count : Natural) return list of T;
 
 ### 5. Lists carry their schema, and views are passed as data
 
-- **A list starts with a header:** the record's type id, then a table of its fields' names, types and positions, as a record file does (ADR 0047 section 4). Its elements follow, field by field in the table's order.
+- **A list starts with a header:** the record's type id, then a table of its fields' names, types and positions, as a record file does (ADR 0047 section 4). Its elements follow, field by field in the table's order. Section 7 gives the bytes.
 - **A view is resolved when the operation is bound.** For `ls | since yesterday`, the shell finds the default view `File_Info as Dated` and compiles it against the producer's schema into a mapping: for each field of `Dated`, a position in the producer's elements or a constant. It gives the mapping to `Since` with the list.
 - **The operation reads elements through the mapping,** in its generated code. It needs nothing compiled for `File_Info`.
 - **Evolution falls out of it.** A producer that has appended fields has a longer schema, and the mapping skips the new ones. A producer that lacks a field the view names gives the field's default.
@@ -170,6 +170,28 @@ This is how Haskell passes type-class dictionaries: the bound is the constraint,
 - **A field can be a record,** and a view can reach into it with a dotted path. A nested record's fields are in the schema, as a table within the table.
 - **A field can't be a list** for now. A list in a record needs a length in each element, and nothing needs one yet.
 - **A record file stays flat** (ADR 0047 section 4). A record with nested fields is written to a record file only after flattening, and ADR 0047 doesn't need that yet.
+
+### 7. A list's bytes
+
+Added for #140, which builds the header of section 5. Words are little-endian, and a string is its length in a word, then its bytes, then zeros up to a multiple of four, as in a record's encoding (idle#113).
+
+- **A typed stream is a byte stream whose bytes are a list.** It is a `Streams.Reader` or `Streams.Writer`, not an interface generic over its element (ADR 0013 section 2), so idle needs no generic interfaces. The list's header names its record, and a role will name it in a command's signature.
+- **The header:**
+  - a word, 16#3153_4C52#, which is "RLS1" in its bytes
+  - the record's type id, two words, low first
+  - the length of the field table in bytes, a word
+  - the field table
+- **The field table** (idle#145): the number of fields, a word, then for each field:
+  - its name, in lower case
+  - the canonical form of its type, as `idle --list-fields` writes it
+  - its kind, a word: 1 unsigned word, 2 unsigned double word, 3 signed word, 4 signed double word, 5 Boolean, 6 enumeration, 7 string, 8 record
+  - for an enumeration, the number of its literals, a word, and each literal, in lower case
+  - for kinds 1 to 4, its unit's symbol, empty until idle#118
+  - for a record, its own field table
+- **The records follow the header,** each its own encoding, which starts with its length and its number of fields (idle#114). A reader finds each record's end without the table, and its codec copes with fields added or missing.
+- **A `Write` sends whole records,** with the header before the first. A record longer than the writer's buffer is sent by itself.
+- **The stream's end is the list's end** (ADR 0011). An empty stream is an empty list, and so is a list that is only its header.
+- **`Rose.Typed_Streams`** writes and reads lists of one record type over `Streams.Writer` and `Streams.Reader`, instantiated with the record's type id, field table and codec, which idle generates. Its reader refuses a list of another record and a stream that isn't a list. A reader of other records, through a view, is idle#142's.
 
 ## Consequences
 
@@ -202,7 +224,7 @@ The options in each section are the alternatives considered there. One more:
 - **Where views are found.** All IDL files that the shell can see, or only those named in its configuration, and whether a job inside a membrane sees the shell's views.
 - **How a user picks a named view** at the prompt.
 - **Defaults.** Whether a default can name another field, such as `Modified := Created`.
-- **The header's encoding,** and whether it is sent again after a restore.
+- **Whether the header is sent again after a restore.** Section 7 gives its encoding.
 - **More than one bound,** as `T as Dated and Location`, for an operation that needs two meanings.
 
 ## Follow-up work

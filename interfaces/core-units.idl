@@ -1,0 +1,18 @@
+--  Quantities and moments that typed streams carry (ADR 0048, #140). Each
+--  is a distinct type, so a size can't be mixed with a count, or a
+--  duration with a time. Their units' symbols, for text, come with
+--  idle#118.
+
+interface Core.Units is
+
+   type Bytes is new Word_64;
+   --  A size, in bytes.
+
+   type Duration is new Integer_64;
+   --  A length of time, in nanoseconds. Negative for one that goes back.
+
+   type Time is new Word_64;
+   --  A moment, in nanoseconds since 1970-01-01 00:00:00 UTC, without leap
+   --  seconds, as Time.Clock.Realtime gives it.
+
+end Core.Units;

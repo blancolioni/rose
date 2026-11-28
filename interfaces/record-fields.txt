@@ -1,0 +1,3 @@
+rose.interfaces.core.files.file_info 1 name string
+rose.interfaces.core.files.file_info 2 kind rose.interfaces.files.directory.file_kind
+rose.interfaces.core.files.file_info 3 size rose.interfaces.core.units.bytes

@@ -116,6 +116,9 @@ jobs:
       - name: Test the surfaces' event queue
         run: make test-surfaces
 
+      - name: Test typed streams
+        run: make test-typed-streams
+
       - name: Test the commands built for the host
         run: make test-host
 

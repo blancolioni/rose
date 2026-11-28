@@ -1,0 +1,25 @@
+project Typed_Streams_Tests is
+
+   --  The tests of Rose.Typed_Streams (#140), built and run on the host
+   --  with its own GNAT and run-time system, by "make test-typed-streams"
+   --  at the top, which first generates the user target's interface
+   --  packages, and typed_test.idl's, into build/generated with idle.
+   --  Only the units that the test needs are compiled.
+
+   for Source_Dirs use
+     (".", "build/generated", "../rose", "../capabilities", "../../base");
+   for Object_Dir use "build/obj";
+   for Exec_Dir use "build";
+   for Main use ("test_typed_streams.adb");
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnat12", "-gnata");
+      for Switches ("test_typed_streams.adb") use
+        ("-g", "-gnat12", "-gnata", "-gnatwa", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+      for Switches ("rose-typed_streams.adb") use
+        ("-g", "-gnat12", "-gnata", "-gnatwae", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+   end Compiler;
+
+end Typed_Streams_Tests;

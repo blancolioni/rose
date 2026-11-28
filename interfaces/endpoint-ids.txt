@@ -73,6 +73,9 @@
 16#22AE_DB6F_D66B_F560#  rose.interfaces.common.tree.find_entry(in string) return natural
 16#9E2C_C526_09CE_429A#  rose.interfaces.common.tree.get_branch(in positive) return interface rose.interfaces.common.tree
 16#3EE4_5241_3DE7_5141#  rose.interfaces.common.tree.get_leaf(in positive) return interface rose.interfaces.streams.readable
+16#7563_E444_2617_D2E6#  interface rose.interfaces.core.files
+16#714E_68F0_35E0_EF9D#  record rose.interfaces.core.files.file_info
+16#E245_8E22_1EC7_813F#  interface rose.interfaces.core.units
 16#031A_56C0_8635_63BF#  interface rose.interfaces.devices.ata
 16#D851_CBDE_A4DD_3515#  rose.interfaces.devices.ata.get_device return interface rose.interfaces.storage.block_array
 16#8EBE_14B1_86EA_92C2#  interface rose.interfaces.devices.event_listener

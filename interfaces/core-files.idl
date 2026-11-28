@@ -1,0 +1,15 @@
+--  The record a directory listing writes, one for each entry (ADR 0048,
+--  #140): what Files.Directory can say about an entry today. Within a
+--  series it only gains fields, at its end, each with a default (ADR
+--  0048, section 4), such as the time an entry was changed, once
+--  directories know it.
+
+interface Core.Files is
+
+   type File_Info is record
+      Name : String;
+      Kind : Files.Directory.File_Kind;
+      Size : Core.Units.Bytes;
+   end record;
+
+end Core.Files;
