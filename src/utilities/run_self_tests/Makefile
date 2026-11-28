@@ -20,7 +20,8 @@ run_self_tests:
 	$(USER_IDLE) --command-client \
 	    ../../drivers/file/rose-core-file.idl \
 	    ../../drivers/directory/rose-core-directory.idl \
-	    ../../drivers/null_stream/rose-core-null_stream.idl
+	    ../../drivers/null_stream/rose-core-null_stream.idl \
+	    ../../drivers/trellis/rose-core-trellis.idl
 	$(USER_IDLE) --command-client \
 	    ../user/rose-core-user.idl \
 	    ../auth/rose-core-auth.idl

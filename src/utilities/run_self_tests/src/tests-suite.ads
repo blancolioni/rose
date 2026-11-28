@@ -4,6 +4,7 @@ with Tests.Cap_Sets;
 with Tests.Clock;
 with Tests.Containers;
 with Tests.Directories;
+with Tests.Display;
 with Tests.Dispatching;
 with Tests.Exceptions;
 with Tests.Files;
@@ -81,6 +82,7 @@ package Tests.Suite is
                    Tests.Regions.Reuse_Test'Access,
                    Tests.Screen.Screen_Test'Access,
                    Tests.Screen.Test_Surface_Test'Access,
+                   Tests.Display.Display_Test'Access,
                    Tests.Signals.Signal_Test'Access,
                    Tests.Banks.Dependent_Test'Access,
                    Tests.Banks.Reuse_Test'Access,
