@@ -1,0 +1,10 @@
+interface Devices.Input_Controller :
+  Devices.Event_Source, Devices.Pointer_Source is
+
+   --  A controller with a keyboard and a pointing device, as the PS/2
+   --  controller is (#588): its keys are its Event_Source, and its
+   --  pointer is its Pointer_Source. One cap gives both, so that the
+   --  installer can give the screen driver both with one cap; a program
+   --  that wants only the keys is given the Event_Source ancestor.
+
+end Devices.Input_Controller;

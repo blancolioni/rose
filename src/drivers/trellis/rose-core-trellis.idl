@@ -1,0 +1,23 @@
+command Rose.Core.Trellis : Caps.Create_Endpoint, Caps.Create_Signal
+  with Summary     => "Serve a display on a surface.",
+       Description => """
+          Trellis is the display server (ADR 0022, #583): the lattice a
+          rose climbs, laid out in a grid, as its windows are. It draws
+          on a root surface, the screen's or a surface of another display
+          server, and gives each client a surface of its own, whose
+          buffer comes from trellis's own bank. A client's damage is
+          copied into the root's buffer at the window's place, and the
+          root is told of it. Where no window is, the root shows a
+          stippled black and white weave.
+
+          It takes its input from the root's events: keys go to the
+          first surface until focus comes (#584), and the pointer's
+          events are dropped until #589.
+          """,
+       Server      => Trellis_Server.Start_Server
+is
+   Root : in Screens.Surface
+     with Help => "the surface it draws on";
+   Served : out Screens.Display
+     with Help => "the display, which gives each client a surface";
+end Rose.Core.Trellis;

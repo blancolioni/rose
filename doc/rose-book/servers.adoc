@@ -210,15 +210,22 @@ Provides:: `Map` (`Add`, `Remove`, `Find`), from a command's name to its launch 
 Requests:: `create-endpoint`.
 Used by:: `init`, which adds the commands it installs and launches the shell from the registry, and the shell, which finds commands by name.
 
-=== `keyboard`
+=== `ps2`
 
-The driver for the PC keyboard.
+The driver for the PS/2 controller: the PC keyboard, and the mouse (#588).
+It was `keyboard` until 0.5.0.
+One process drives both, because both send their bytes through the controller's one data port; the status port says whose each byte is.
 
-Provides:: `Event_Source`, whose `Add_Listener` registers the one listener that receives each key.
-Requests:: `create-endpoint`, `register-interrupt 33`, and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
-Used by:: `vga-console`.
+Provides:: `Input_Controller`, published, whose ancestors are `Event_Source`, whose `Add_Listener` registers the one listener that receives each key, and `Pointer_Source`, whose `Add_Pointer_Listener` registers the one listener that receives the mouse's movement and buttons; and `Restorable`.
+Requests:: `create-endpoint`, `register-interrupt 33` and `register-interrupt 44` (the keyboard's IRQ 1 and the mouse's IRQ 12), and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
+Used by:: `vga-console`, which is given the `Event_Source`, and `screen`.
 
-`keyboard` gives keys, each with the modifiers that were held (`Rose.Keys`, #734).
+At start, and again when it is restored, since a new boot leaves the controller's second port off, `ps2` sets the mouse up by polling, before it handles the interrupts: it enables the second port and its interrupt, sets the mouse's defaults, and asks whether it has a wheel, which makes its packets four bytes.
+A mouse that doesn't answer is left alone, and the keyboard works as before.
+`Mouse_Packets` decodes the packets; it does no I/O, and `make test-ps2` tests it on the host.
+The movement of the packets that arrive together, with the same buttons, is added up and sent in one `On_Pointer`; a change of buttons is sent on its own.
+
+`ps2` gives keys, each with the modifiers that were held (`Rose.Keys`, #734).
 A key is the Unicode code point of the character that it types, or a named key above the code points: the arrows, Home, End, Page Up, Page Down, Insert, Delete and F1 to F12.
 Ctrl with a letter gives its control character.
 It maps scan codes through a layout table with an AltGr level and dead keys; only the US layout exists, and choosing another is #743.
@@ -278,8 +285,8 @@ Used by:: `init`, which gets `Bank_Constructor` from the installer, and leaves o
 
 The driver for the boot loader's linear framebuffer, which gives out the whole screen as one surface (ADR 0022, #582).
 
-Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Notify`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Reader` that `Events` returns, which is also the `Event_Listener` it registers with the keyboard; and `Restorable`.
-Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB; and, from `restore`, the keyboard's `Event_Source`.
+Provides:: `Surface`, published, with `Get_Size`, `Get_Buffer`, `Damage`, `Notify`, `Events`, `Get_Pointer` and `Set_Cursor`; the `Reader` that `Events` returns, which is also the `Event_Listener` and the `Pointer_Listener` it registers with `ps2`; and `Restorable`.
+Requests:: `create-endpoint`, `framebuffer`, `boot-tag 8` (the framebuffer's geometry and pixel format), and `bank 2048 1`, for the surface's buffer, up to 8 MB; and, from `restore`, the `ps2` driver's `Input_Controller` (the flag `requires_input_controller`).
 Used by:: `surface-console`, which holds the surface and will hand it to the display server (#655); and `init`, which gets the surface from the installer and gives it to `run_self_tests` at install, for its `Screen_Service` role.
 
 * *It uses only a 32-bit RGB framebuffer below 4 GB.*
@@ -290,13 +297,17 @@ Used by:: `surface-console`, which holds the surface and will hand it to the dis
 * *`Damage` copies a rectangle of the buffer to the framebuffer,* cut to the screen, converting each pixel when the framebuffer's colours are not where XRGB has them.
 * *It redraws the screen after a restore.*
   The buffer comes back with the checkpoint, and the framebuffer's pages don't, so when it is told that it has been restored, it maps the framebuffer again and copies the whole buffer to it.
-* *Its events are the keys* (ADR 0022, as amended by #653).
+* *Its events are the keys and the mouse* (ADR 0022, as amended by #653; #588).
   It holds the keyboard, queues each key as a key event, of kind 1 with the character, and signals the holder.
   The holder gives it a signal cap with `Notify`, and from then on a `Read` of the events never waits: it returns the whole events that are ready, or nothing.
   Without a signal cap, a `Read` waits for an event.
-  The pointer comes with #588: `Get_Pointer` says that the pointer isn't over the surface, `Set_Cursor` does nothing, and `Release` does nothing, because the screen surface is handed on, never destroyed.
+* *It keeps the pointer's position,* which starts in the middle of the screen, moves a pixel for each of the mouse's counts, and stays on the screen.
+  Each movement or change of buttons is queued as a pointer event, of kind 2 with the position and the buttons; if the newest event queued is a pointer event with the same buttons, it is overwritten instead, so that movement alone can't fill the queue.
+  The wheel is queued as a wheel event, of kind 5 with the steps.
+  `Get_Pointer` gives the position: the surface is the whole screen, so the pointer is always over it.
+  `Set_Cursor` does nothing, since the display server draws the cursor, and `Release` does nothing, because the screen surface is handed on, never destroyed.
 
-`restore` installs `screen` straight after `keyboard`, only if the boot loader gave a 32-bit RGB framebuffer: `init` skips it otherwise.
+`restore` installs `screen` straight after `ps2`, only if the boot loader gave a 32-bit RGB framebuffer: `init` skips it otherwise.
 The default entries of the install media's GRUB menu and the disk's keep the framebuffer, and the last entries, "text mode", don't (see <<boot-variants>>).
 
 === `surface-console`
@@ -313,8 +324,9 @@ Used by:: Everything installed after it, as its standard output, and the shell, 
 * *Each write reports the rows that it changed* to the surface with `Damage`.
 * *Its keys are the surface's events.*
   It gives the surface a signal cap for its own signal bit 8 (ADR 0006), and when it is signalled it reads the events until there are none, and gives each key to the line discipline.
-* *It isn't `Restorable`.*
-  Its cells and the surface's buffer come back with the checkpoint, and the `screen` driver redraws the screen.
+  It has no use for the pointer's events; with `pointer-trace` on the kernel's command line, it writes each one to COM2, as `pointer: X Y BUTTONS` or `wheel: STEPS`, for `scripts/test-screen` (#588).
+* *Its cells and the surface's buffer come back with the checkpoint,* and the `screen` driver redraws the screen.
+  When it is restored, it discards what was typed before the checkpoint (#523), and reads the new boot's command line again.
 
 `restore` installs it straight after `screen`, with the screen's surface, only if there is a framebuffer.
 

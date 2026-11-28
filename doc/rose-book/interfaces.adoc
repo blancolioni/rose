@@ -259,8 +259,11 @@ end Writable_Directory;
 | `Block_Array` | | `Get_Parameters`, `Read_Blocks`, `Write_Blocks` | `ata`, `partition`
 | `ATA` | | `Get_Device` | `ata`
 | `Partitions` | `Resource` | `Partition_Count`, `Get_Partition` | `scan`
-| `Interrupt_Handler` | | `Handle_Interrupt` | `keyboard`
-| `Event_Source` | | `Add_Listener` | `keyboard`
+| `Interrupt_Handler` | | `Handle_Interrupt` | `ps2`
+| `Event_Source` | | `Add_Listener` | `ps2`
+| `Pointer_Source` | | `Add_Pointer_Listener` | `ps2`
+| `Input_Controller` | `Event_Source`, `Pointer_Source` | | `ps2`
+| `Pointer_Listener` | | `On_Pointer` | `screen`
 | `Event_Listener` | | `On_Event` | `vga-console`
 |===
 

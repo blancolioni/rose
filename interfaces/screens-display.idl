@@ -1,0 +1,18 @@
+interface Screens.Display is
+
+   --  A display server (ADR 0022), such as trellis (#583). It holds a
+   --  root surface, and gives each client a surface of its own: the
+   --  client draws only into that surface, and sees only the input sent
+   --  to it.
+
+   function Create_Surface
+     (Width  : Word;
+      Height : Word)
+      return interface Screens.Surface;
+   --  A new surface, as close to Width by Height pixels as the layout
+   --  allows. The server decides where the surface goes and how big it
+   --  is: the client reads its size with Get_Size, and is told with a
+   --  Size event when it changes. Release destroys the surface. Fails if
+   --  the server has no room for another surface.
+
+end Screens.Display;

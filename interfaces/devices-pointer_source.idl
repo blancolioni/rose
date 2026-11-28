@@ -1,0 +1,11 @@
+interface Devices.Pointer_Source is
+
+   --  A pointing device (#588), which tells its listener of each
+   --  movement and button change.
+
+   procedure Add_Pointer_Listener
+     (Listener : interface Devices.Pointer_Listener);
+   --  Listener is told from now on. A source has one listener: a second
+   --  call is ignored, as Event_Source.Add_Listener's is.
+
+end Devices.Pointer_Source;

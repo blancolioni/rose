@@ -8,12 +8,14 @@ with Rose.Invocation;
 with Rose.Keys;
 with Rose.Server;
 with Rose.Shared_Regions;
+with Rose.Surface_Events;
 with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Devices.Event_Listener.Server;
-with Rose.Interfaces.Devices.Event_Source.Client;
+with Rose.Interfaces.Devices.Input_Controller.Client;
+with Rose.Interfaces.Devices.Pointer_Listener.Server;
 with Rose.Interfaces.Storage.Region;
 with Rose.Interfaces.Storage.Region_Access.Client;
 with Rose.Interfaces.Processes.Restorable.Server;
@@ -21,13 +23,13 @@ with Rose.Interfaces.Streams.Reader.Client;
 with Rose.Interfaces.Streams.Reader.Server;
 with Rose.Interfaces.Screens.Surface.Server;
 
-with Screen.Events;
 with Screen.Framebuffer;
 
 package body Screen.Server is
 
    use Rose.Words;
    use type System.Address;
+   use type Interfaces.Integer_32;
 
    --  The whole screen as one surface (ADR 0022, section 1). Its holder
    --  draws into the buffer, which both of them map shared, and Damage
@@ -91,12 +93,14 @@ package body Screen.Server is
       return Rose.Capabilities.Capability;
 
    --  The surface's events. The stream is also the keyboard's
-   --  Event_Listener, which queues each key (#653). The pointer comes
-   --  with #588.
+   --  Event_Listener, which queues each key (#653), and the mouse's
+   --  Pointer_Listener, which queues its movement and buttons (#588).
 
    type Event_Stream is limited new
      Rose.Interfaces.Streams.Reader.Server.Reader_Interface
      and Rose.Interfaces.Devices.Event_Listener.Server.Event_Listener_Interface
+     and Rose.Interfaces.Devices.Pointer_Listener.Server
+       .Pointer_Listener_Interface
      with null record;
 
    overriding procedure On_Event
@@ -104,6 +108,17 @@ package body Screen.Server is
       Code : Rose.Words.Word);
 
    overriding function Event_Listener_Cap
+     (Item : in out Event_Stream)
+      return Rose.Capabilities.Capability;
+
+   overriding procedure On_Pointer
+     (Item    : in out Event_Stream;
+      DX      : Interfaces.Integer_32;
+      DY      : Interfaces.Integer_32;
+      DZ      : Interfaces.Integer_32;
+      Buttons : Rose.Words.Word);
+
+   overriding function Pointer_Listener_Cap
      (Item : in out Event_Stream)
       return Rose.Capabilities.Capability;
 
@@ -119,6 +134,8 @@ package body Screen.Server is
    Server_Context : Rose.Server.Server_Context;
    The_Surface    : aliased Screen_Surface;
    The_Events     : aliased Event_Stream;
+   Queue          : Rose.Surface_Events.Event_Queue;
+   --  The surface's events, until the holder reads them.
 
    Holder_Signal  : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
@@ -135,6 +152,14 @@ package body Screen.Server is
 
    Invocation_Buffer : System.Storage_Elements.Storage_Array (1 .. 4096)
      with Alignment => 4096;
+
+   Pointer_X       : Interfaces.Integer_32 := 0;
+   Pointer_Y       : Interfaces.Integer_32 := 0;
+   Pointer_Buttons : Rose.Words.Word := 0;
+   --  Where the pointer is, in the screen's pixels, kept on the screen,
+   --  and the buttons that are down. It starts in the middle. One count
+   --  of the mouse's is one pixel: acceleration belongs in the display
+   --  server (#588).
 
    procedure Redraw;
    --  Copy the whole buffer to the framebuffer.
@@ -245,12 +270,13 @@ package body Screen.Server is
    is
       pragma Unreferenced (Item);
    begin
-      --  There is no pointer until #588.
+      --  The surface is the whole screen, so the pointer is always over
+      --  it, unless there is no screen.
 
-      Over := False;
-      X := 0;
-      Y := 0;
-      Buttons := 0;
+      Over := Buffer_Address /= System.Null_Address;
+      X := (if Over then Pointer_X else 0);
+      Y := (if Over then Pointer_Y else 0);
+      Buttons := (if Over then Pointer_Buttons else 0);
    end Get_Pointer;
 
    --------------
@@ -294,12 +320,106 @@ package body Screen.Server is
       --  The keyboard gives a key and its modifiers in one word, which
       --  are the event's Code and State (surface.idl, #734).
 
-      Screen.Events.Add
-        (Screen.Events.Key_Event,
+      Rose.Surface_Events.Add
+        (Queue, Rose.Surface_Events.Key_Event,
          Word_32 (Rose.Keys.Key_Of (Code)),
          Word_32 (Rose.Keys.Modifiers_Of (Code)));
       Event_Queued;
    end On_Event;
+
+   ----------------
+   -- On_Pointer --
+   ----------------
+
+   overriding procedure On_Pointer
+     (Item    : in out Event_Stream;
+      DX      : Interfaces.Integer_32;
+      DY      : Interfaces.Integer_32;
+      DZ      : Interfaces.Integer_32;
+      Buttons : Rose.Words.Word)
+   is
+      pragma Unreferenced (Item);
+
+      function Moved
+        (Position : Interfaces.Integer_32;
+         Change   : Interfaces.Integer_32;
+         Size     : Rose.Words.Word)
+         return Interfaces.Integer_32;
+      --  Position moved by Change, kept from 0 to Size - 1
+
+      function To_Word (Value : Interfaces.Integer_32) return Word_32
+      is (Word_32'Mod (Value));
+
+      -----------
+      -- Moved --
+      -----------
+
+      function Moved
+        (Position : Interfaces.Integer_32;
+         Change   : Interfaces.Integer_32;
+         Size     : Rose.Words.Word)
+         return Interfaces.Integer_32
+      is
+         Result : constant Long_Long_Integer :=
+                    Long_Long_Integer (Position) + Long_Long_Integer (Change);
+      begin
+         if Result < 0 or else Size = 0 then
+            return 0;
+         elsif Result >= Long_Long_Integer (Size) then
+            return Interfaces.Integer_32 (Size - 1);
+         else
+            return Interfaces.Integer_32 (Result);
+         end if;
+      end Moved;
+
+      Queued : Boolean := False;
+
+   begin
+      if Buffer_Address = System.Null_Address then
+         return;
+      end if;
+
+      --  A move that the edge of the screen stops queues nothing.
+
+      declare
+         X : constant Interfaces.Integer_32 :=
+               Moved (Pointer_X, DX, Screen.Framebuffer.Width);
+         Y : constant Interfaces.Integer_32 :=
+               Moved (Pointer_Y, DY, Screen.Framebuffer.Height);
+      begin
+         if X /= Pointer_X or else Y /= Pointer_Y
+           or else Buttons /= Pointer_Buttons
+         then
+            Pointer_X := X;
+            Pointer_Y := Y;
+            Pointer_Buttons := Buttons;
+            Rose.Surface_Events.Add_Pointer
+              (Queue, To_Word (Pointer_X), To_Word (Pointer_Y),
+               Word_32 (Pointer_Buttons));
+            Queued := True;
+         end if;
+      end;
+
+      if DZ /= 0 then
+         Rose.Surface_Events.Add
+           (Queue, Rose.Surface_Events.Wheel_Event, To_Word (DZ));
+         Queued := True;
+      end if;
+
+      if Queued then
+         Event_Queued;
+      end if;
+   end On_Pointer;
+
+   --------------------------
+   -- Pointer_Listener_Cap --
+   --------------------------
+
+   overriding function Pointer_Listener_Cap
+     (Item : in out Event_Stream)
+      return Rose.Capabilities.Capability
+   is (Rose.Interfaces.Devices.Pointer_Listener.Server.Cap_Of
+         (Server_Context, Item));
 
    ----------
    -- Read --
@@ -313,7 +433,7 @@ package body Screen.Server is
       pragma Unreferenced (Item);
       use type Rose.Capabilities.Capability;
    begin
-      if Screen.Events.Is_Empty
+      if Rose.Surface_Events.Is_Empty (Queue)
         and then Holder_Signal = Rose.Capabilities.Null_Capability
       then
 
@@ -324,7 +444,7 @@ package body Screen.Server is
          Last := 0;
          Rose.Server.Block_Current_Request (Server_Context);
       else
-         Screen.Events.Take (Buffer, Last);
+         Rose.Surface_Events.Take (Queue, Buffer, Last);
       end if;
    end Read;
 
@@ -435,6 +555,8 @@ package body Screen.Server is
             Buffer_Address := Rose.Shared_Regions.Map (Region);
          end;
          Redraw;
+         Pointer_X := Interfaces.Integer_32 (Screen.Framebuffer.Width / 2);
+         Pointer_Y := Interfaces.Integer_32 (Screen.Framebuffer.Height / 2);
       end if;
 
       Rose.Interfaces.Screens.Surface.Server.Publish
@@ -445,18 +567,20 @@ package body Screen.Server is
         (Server_Context, The_Events'Access);
       Rose.Interfaces.Devices.Event_Listener.Server.Attach
         (Server_Context, The_Events'Access);
+      Rose.Interfaces.Devices.Pointer_Listener.Server.Attach
+        (Server_Context, The_Events'Access);
 
-      --  The screen holds the keyboard, and the console on the surface
-      --  takes its keys from the surface's events (ADR 0022, #653).
+      --  The screen holds the keyboard and the mouse, and the console on
+      --  the surface takes its keys from the surface's events (ADR 0022,
+      --  #653, #588).
 
       declare
-         Keyboard : Rose.Interfaces.Devices.Event_Source.Client
-           .Event_Source_Client;
+         use Rose.Interfaces.Devices.Input_Controller.Client;
+         Input : Input_Controller_Client;
       begin
-         Rose.Interfaces.Devices.Event_Source.Client
-           .Open (Keyboard, Keyboard_Cap);
-         Rose.Interfaces.Devices.Event_Source.Client.Add_Listener
-           (Keyboard, The_Events);
+         Open (Input, Input_Cap);
+         Add_Listener (Input, The_Events);
+         Add_Pointer_Listener (Input, The_Events);
       end;
 
       Rose.Server.Start_Server (Server_Context);
