@@ -4,6 +4,7 @@
 - **Date:** 2026-10-26
 - **Revised:** 2026-11-27, to follow the ADRs written since (interface groups, signals, abilities as interfaces, privilege, petal paths, the clock, random numbers, copy before write, replacement)
 - **Related:** #290 (this decision), #1182 (0.5.0 networking), [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0006](0006-signals.md) (signals), [ADR 0016](0016-random-numbers.md) (random numbers), [ADR 0020](0020-clock.md) (clock), [ADR 0021](0021-privilege.md) (privilege), [ADR 0030](0030-copy-before-write-during-a-checkpoint.md) (copy before write), [ADR 0032](0032-replacing-a-running-process.md) (replacement), [ADR 0034](0034-interface-packages.md) (interface packages), [ADR 0044](0044-petal-paths-as-uri-references.md) (petal paths), #1148 (interfaces for abilities), #291 to #301 (project 59 (Networking))
+- **Amended by:** #1187, where the interfaces met idle and Ada: `Network.Full_Access` (`access` is reserved), `Accept_Connection` (`accept` is reserved), `Release` from `Common.Resource` in place of `Close` (every generated client has a `Close` of its own), `Datagram.Notify`, and failures without a name (sections 3 to 6 and 10)
 
 ## Context
 
@@ -78,8 +79,8 @@ interface Network.Local_Ports is
    function Get_Local_Port (Port : Natural) return interface Network.Local_Port;
 end Network.Local_Ports;
 
-interface Network.Access : Network.Remote_Hosts, Network.Local_Ports is
-end Network.Access;
+interface Network.Full_Access : Network.Remote_Hosts, Network.Local_Ports is
+end Network.Full_Access;
 
 interface Network.Host is
    function Address return String;
@@ -96,34 +97,36 @@ interface Network.Local_Port is
    function Listen return interface Network.Listener;
 end Network.Local_Port;
 
-interface Network.Listener is
-   function Accept return interface Network.Connection;
+interface Network.Listener : Common.Resource is
+   function Accept_Connection return interface Network.Connection;
 end Network.Listener;
 
-interface Network.Connection : Streams.Reader, Streams.Writer is
-   procedure Close;
+interface Network.Connection : Streams.Stream, Common.Resource is
 end Network.Connection;
 
-interface Network.Datagram is
+interface Network.Datagram : Common.Resource is
    procedure Send (Buffer : Stream_Element_Array);
    procedure Receive
      (Buffer : out Stream_Element_Array;
       Last   : out Stream_Element_Offset);
+   procedure Notify (Signal : Capability);
 end Network.Datagram;
 ```
 
 - **`Network.Remote_Hosts`** grants a set of remote addresses: all of them, or one network after `Restrict`. `Get_Host` raises for an address outside the set. `Restrict` returns a `Remote_Hosts`, so a restricted cap has no way to ask for local ports, rather than a way that always fails.
 - **`Network.Local_Ports`** grants listening on local ports.
-- **`Network.Access`** is both. It is what `net` gives init, and nothing else holds it unless init passes it on.
+- **`Network.Full_Access`** is both. It is what `net` gives init, and nothing else holds it unless init passes it on.
 - **`Network.Host`** grants one remote address, on any port. `Echo` is ping: it sends an ICMP echo request and returns the round-trip time in milliseconds, or raises after `Timeout`.
 - **`Network.Service`** grants one address and one port. It is the narrowest grant, for a command that talks to one server. It is kept because grants should be as tight as possible, but no command needs it yet, so its use is unproven.
 - **`Network.Local_Port`** grants listening on one local port. Ports for outgoing connections are allocated by `net` and are not a grant.
-- **A connection is a byte stream.** `Network.Connection` is `Streams.Reader` plus `Streams.Writer`, so a command that takes a stream can be given a connection. `Close` closes it in both directions.
+- **A connection is a byte stream.** `Network.Connection` is a `Streams.Stream`, so a command that takes a stream can be given a connection. A `Read` that returns nothing is the end of the stream (ADR 0011): the far end has closed its side.
+- **Connections, listeners and datagram endpoints are resources** (ADR 0010). `Release` closes a connection in both directions, stops a listener, or closes a datagram endpoint, and frees its port. A generated client's `Close` releases first, and `Forget` doesn't.
 - **A datagram endpoint is connected.** `Network.Datagram` sends to, and receives from, the one address and port it was opened for. Each endpoint has a bounded queue of received datagrams.
-- **Operations fail by raising** (idle#60). A call on a connection that has been closed, by `Close`, by the peer, or by a restore (section 6), raises `Closed`. A call that runs out of time raises `Timed_Out`.
+- **A datagram endpoint can signal its holder.** After `Notify`, `Receive` never waits, and returns nothing when the queue is empty, as `Screens.Surface` does for its events (ADR 0022, as amended by #653). `dns` is a server and can't wait in `Receive`, so it reads after each signal. A connection has no `Notify`: a `Read` that returns nothing is already the end of the stream, so it can't also mean "nothing yet". A server that serves connections waits for a later design.
+- **Operations fail by raising** (idle#60). A call on a connection that has been released, reset by the far end, or closed by a restore (section 6) fails, and so does a call that runs out of time. The failure has no name: the client raises `Invocation_Error`, whatever the server raised. A client that needs the reason waits for idle to carry one.
 - **Addresses are strings,** such as `"10.0.2.2"`. `net` parses them. This keeps addresses out of the interfaces' types, so IPv6 can come later without changing them.
 - **Commands take the narrowest cap they need.** `ping` takes `Host : in Network.Host`. A command that fetches one URL takes a `Network.Service`, and one that follows links takes a `Network.Remote_Hosts` and a `Network.Resolver`.
-- **`net` serves about 30 operations,** with `Processes.Restorable` and `Processes.Replaceable`, which is within the limit of 64 endpoints.
+- **`net` registers about 46 endpoints,** counting the interfaces it inherits, `Processes.Restorable`, `Processes.Replaceable` and `Processes.Signalled`. The limit is 64 for each process, so there is room, but not for much more.
 
 ### 4. Names come from a resolver cap
 
@@ -134,18 +137,20 @@ end Network.Resolver;
 
 interface Network.Status is
    function Local_Address return String;
+   function Prefix_Length return Natural;
    function Gateway return String;
-   function Name_Servers return String;
+   function Name_Server_Count return Natural;
+   function Name_Server (Index : Positive) return String;
 end Network.Status;
 ```
 
-- **`dns` serves `Network.Resolver`.** It is launched with a `Network.Remote_Hosts` cap, the set of hosts it may return, and a `Network.Status` cap. `Network.Status` is read-only: it gives the local address, the gateway and the name servers that DHCP gave `net`, as strings.
+- **`dns` serves `Network.Resolver`.** It is launched with a `Network.Remote_Hosts` cap, the set of hosts it may return, and a `Network.Status` cap. `Network.Status` is read-only: it gives the local address, the gateway and the name servers that DHCP gave `net`, as strings, which are empty until `net` has an address.
 - **A resolver can't widen authority.** `dns` makes the caps it returns by calling `Get_Host` on its own `Remote_Hosts` cap, so it can only return hosts within that set. A resolver launched with a restricted cap resolves only to hosts in it.
-- **It queries over a datagram cap** for port 53 on the name server, and caches answers for their time to live, measured in real time (ADR 0020).
+- **It queries over a datagram cap** for port 53 on the name server, with `Notify`, so a query in flight doesn't stop it answering others, and caches answers for their time to live, measured in real time (ADR 0020).
 
 ### 5. `net` defers requests per connection
 
-A `Read` on a connection with no data, an `Accept` with no connection waiting, or an `Echo` waiting for its reply must not stop `net` from serving anything else.
+A `Read` on a connection with no data, an `Accept_Connection` with no connection waiting, or an `Echo` waiting for its reply must not stop `net` from serving anything else.
 
 - **`net` holds each such request** and replies when it can be answered, or when it times out. A client blocked in `Read` on one connection blocks only itself.
 - **`Rose.Server` defers a request for one instance,** not a whole endpoint (#1072). A deferred request is held with its reply cap and the instance it was for, and the server replies to it later. More than one request can be held for each handler.
@@ -156,7 +161,7 @@ After a restore, caps keep their authority, but the state of the network does no
 
 - **The card process implements `Processes.Restorable`.** When restored, it maps its DMA pages again, resets the card and sets up its queues (#291).
 - **`net` implements `Processes.Restorable`.** When restored, it:
-  - closes every TCP connection as if the peer had reset it. Requests it was holding raise `Closed`, and so does every later call on those connections except `Close`;
+  - closes every TCP connection as if the peer had reset it. Requests it was holding fail, and so does every later call on those connections except `Release`;
   - keeps listeners and datagram endpoints, and empties their queues;
   - empties the ARP cache, since the hosts on the link may have changed;
   - runs DHCP again, asking for the address it had (INIT-REBOOT, RFC 2131). The machine may have moved to another network while it was down, so the old lease is confirmed rather than assumed, even when it hasn't expired.
@@ -185,11 +190,11 @@ TCP's initial sequence numbers, ephemeral ports and DNS query identifiers must b
 
 ### 10. Who holds what
 
-- **`net` gives init a `Network.Access` cap,** and a `Network.Status` cap.
+- **`net` gives init a `Network.Full_Access` cap,** and a `Network.Status` cap.
 - **Init gives `dns` a `Remote_Hosts` and a `Status`.**
-- **Remote hosts and the resolver are public roles.** Petal is given a `Remote_Hosts` and the `Resolver`, and binds them like `User` and `Home` (ADR 0003, section 5). Reaching out to other hosts is what most network commands do, and a command still gets only the hosts its arguments name.
-- **Listening is privileged.** A role for `Local_Ports` or `Local_Port` has the category `network` (ADR 0021). Petal doesn't hold it. A command that listens asks the broker, through `sudo network`.
-- **Changing the network's configuration** (a static address, renewing or releasing the DHCP lease) is a `Network.Configuration` cap whose role has the category `network`, granted by the broker. `ifconfig` is the first command that would take it, as ADR 0021 expects.
+- **Remote hosts, the resolver and the status are public roles:** `Network.Remote_Hosts_Service`, `Network.Resolver_Service` and `Network.Status_Service`. Petal is given a `Remote_Hosts` and the `Resolver`, and binds them like `User` and `Home` (ADR 0003, section 5). Reaching out to other hosts is what most network commands do, and a command still gets only the hosts its arguments name.
+- **Listening is privileged.** `Network.Local_Ports_Service` has the category `network` (ADR 0021). Petal doesn't hold it. A command that listens asks the broker, through `sudo network`.
+- **Changing the network's configuration** (a static address, renewing or releasing the DHCP lease) is a `Network.Configuration` cap: `Set_Static`, `Add_Name_Server`, `Use_DHCP` and `Renew_Lease`, with `Network.Status` inherited. Its role, `Network.Configuration_Service`, has the category `network`, and the broker grants it. `ifconfig` is the first command that would take it, as ADR 0021 expects.
 
 ### 11. Petal binds network arguments by their type
 
@@ -245,13 +250,13 @@ ADR 0044 leaves schemes for later, and network names are its example. A scheme n
 
 - `Rose.Server`: defer requests per instance (#1072).
 - Timer: expiries through signal caps only (#1073).
-- IDL: the `Network` group: `Remote_Hosts`, `Local_Ports`, `Access`, `Host`, `Service`, `Local_Port`, `Listener`, `Connection`, `Datagram`, `Status`, `Configuration` and `Resolver` (new issue).
-- Petal: bind network arguments by type (section 11), and take the `Remote_Hosts` and `Resolver` roles (new issue).
-- `mem`: a way for a process to keep its working set mapped (section 7; new issue).
+- IDL: the `Network` group: `Remote_Hosts`, `Local_Ports`, `Full_Access`, `Host`, `Service`, `Local_Port`, `Listener`, `Connection`, `Datagram`, `Status`, `Configuration` and `Resolver`, and their roles (#1187).
+- Petal: bind network arguments by type (section 11), and take the `Remote_Hosts` and `Resolver` roles (#1188).
+- `mem`: a way for a process to keep its working set mapped (section 7; #1189).
 - The existing issues, #291 to #301, with these changes:
-  - #294: the interface is `Devices.Network_Device`; receiving is by signal and `Receive_Frame`; the card process never calls `net`; it feeds an `Entropy_Source`.
-  - #296: `net` is `Restorable` and `Replaceable`, takes a `Random` cap, and gives init `Network.Access`.
+  - #294: the interface is `Devices.Network_Device`, with `Notify` for a signal cap; receiving is by signal and `Receive_Frame`; the card process never calls `net`; it feeds an `Entropy_Source`.
+  - #296: `net` is `Restorable` and `Replaceable`, takes a `Random` cap, and gives init `Network.Full_Access`.
   - #297: `ping` takes a `Network.Host` and uses `Echo`.
   - #298: datagram endpoints are connected, opened from a `Network.Service`.
   - #300: `dns` serves `Network.Resolver`, gets its name servers from `Network.Status`, takes a `Random` cap, and keeps unexpired answers across a restore.
-  - #301: connections are `Network.Connection` caps, closed on restore and on replacement.
+  - #301: connections are `Network.Connection` caps, released with `Release`, and closed on restore and on replacement.

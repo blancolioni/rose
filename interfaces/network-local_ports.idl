@@ -1,0 +1,9 @@
+--  The right to listen on local ports (ADR 0007, section 3). It is a
+--  privileged grant: its role has the category "network" (ADR 0021).
+
+interface Network.Local_Ports is
+
+   function Get_Local_Port (Port : Natural) return interface Network.Local_Port;
+   --  Fails if Port is 0 or more than 65535.
+
+end Network.Local_Ports;

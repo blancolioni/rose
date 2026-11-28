@@ -113,6 +113,41 @@
 16#0E8F_C5A1_CD83_6C0D#  rose.interfaces.files.writable_file.append return interface rose.interfaces.streams.releasable_writer
 16#002F_05A1_84F7_BB94#  rose.interfaces.files.writable_file.rewrite return interface rose.interfaces.streams.releasable_writer
 16#1C9B_98C6_87F7_C407#  rose.interfaces.files.writable_file.new_version return interface rose.interfaces.files.transactional_writable_file
+16#5756_6F69_EC7C_354F#  interface rose.interfaces.network.configuration
+16#9969_0B15_4224_DDED#  rose.interfaces.network.configuration.set_static(in string; in natural; in string)
+16#1ACD_3364_95E3_DBF6#  rose.interfaces.network.configuration.add_name_server(in string)
+16#6624_3451_0239_E6AE#  rose.interfaces.network.configuration.use_dhcp
+16#25AA_25DF_CB11_7D95#  rose.interfaces.network.configuration.renew_lease
+16#6F6A_B96D_C345_02EF#  interface rose.interfaces.network.connection
+16#3C83_8E16_36D5_D3C9#  interface rose.interfaces.network.datagram
+16#7545_BD19_FD90_F3DB#  rose.interfaces.network.datagram.send(in stream_element_array)
+16#0250_5B5B_324A_9074#  rose.interfaces.network.datagram.receive(out stream_element_array; out stream_element_offset)
+16#5644_808A_F3F2_F05D#  rose.interfaces.network.datagram.notify(in capability)
+16#6A99_D118_0759_68F1#  interface rose.interfaces.network.full_access
+16#AF64_8DD7_BB0A_B953#  interface rose.interfaces.network.host
+16#1C71_232B_09BF_65D3#  rose.interfaces.network.host.address return string
+16#5024_18F8_839D_7EC5#  rose.interfaces.network.host.get_service(in natural) return interface rose.interfaces.network.service
+16#BA42_7501_27ED_7B25#  rose.interfaces.network.host.echo(in natural) return natural
+16#7035_DEFE_0818_4DB2#  interface rose.interfaces.network.listener
+16#47BD_EC9E_EB50_A149#  rose.interfaces.network.listener.accept_connection return interface rose.interfaces.network.connection
+16#C345_08EC_A2EE_79D4#  interface rose.interfaces.network.local_port
+16#4978_8D70_6BD3_CDA3#  rose.interfaces.network.local_port.listen return interface rose.interfaces.network.listener
+16#0416_D1C5_17A2_5655#  interface rose.interfaces.network.local_ports
+16#B8D3_F1FA_2447_C8D4#  rose.interfaces.network.local_ports.get_local_port(in natural) return interface rose.interfaces.network.local_port
+16#ABAE_A1AC_D09C_9C93#  interface rose.interfaces.network.remote_hosts
+16#B8D4_396B_F1C7_B9C1#  rose.interfaces.network.remote_hosts.get_host(in string) return interface rose.interfaces.network.host
+16#049E_EDD0_9156_C5E6#  rose.interfaces.network.remote_hosts.restrict(in string; in natural) return interface rose.interfaces.network.remote_hosts
+16#6076_34F0_5B2A_1197#  interface rose.interfaces.network.resolver
+16#7251_EEDF_3545_C5C8#  rose.interfaces.network.resolver.resolve(in string) return interface rose.interfaces.network.host
+16#1A17_498B_5660_FC0E#  interface rose.interfaces.network.service
+16#CA7F_406C_6671_F4DD#  rose.interfaces.network.service.connect return interface rose.interfaces.network.connection
+16#50AC_910A_021C_5D4F#  rose.interfaces.network.service.open_datagram return interface rose.interfaces.network.datagram
+16#9524_9146_C968_6F89#  interface rose.interfaces.network.status
+16#6151_0B9E_A8E3_A917#  rose.interfaces.network.status.local_address return string
+16#C781_27AE_9415_A982#  rose.interfaces.network.status.prefix_length return natural
+16#CFAF_A439_61F5_4BF8#  rose.interfaces.network.status.gateway return string
+16#2B69_DC53_0E9F_23A8#  rose.interfaces.network.status.name_server_count return natural
+16#6AA4_E8D5_3D9A_48B3#  rose.interfaces.network.status.name_server(in positive) return string
 16#8CEF_3574_F911_CB64#  interface rose.interfaces.processes.exec
 16#F977_7D4E_8999_11F6#  rose.interfaces.processes.exec.install(in interface rose.interfaces.streams.reader; in string; in capability) return interface rose.interfaces.processes.launch
 16#E01C_44C1_0774_98B2#  rose.interfaces.processes.exec.set_standard_output(in interface rose.interfaces.streams.writer)
