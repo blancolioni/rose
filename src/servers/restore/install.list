@@ -69,6 +69,11 @@ null_stream        drivers  save
 # (#1009).
 
 process_probe      drivers  save    test_only
+
+# Saved, not launched, and only in a test install: the display server's
+# tests launch it as a stand-in for the screen (#583).
+
+memory_surface     drivers  save    test_only
 echo               bin      save
 list               bin      save
 cat                bin      save

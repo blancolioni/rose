@@ -179,6 +179,8 @@
 16#C2DE_3307_4855_4505#  rose.interfaces.processes.starting_process.add_cap(in capability)
 16#85CC_015E_7E38_3EB0#  rose.interfaces.processes.starting_process.start return capability
 16#5C1D_A9E9_B9ED_FF7F#  rose.interfaces.processes.starting_process.bank return interface rose.interfaces.storage.bank
+16#FC2A_E690_EF9A_715A#  interface rose.interfaces.screens.display
+16#B7E0_2BA3_9AA4_2465#  rose.interfaces.screens.display.create_surface(in word; in word) return interface rose.interfaces.screens.surface
 16#8FFE_549A_483A_1162#  interface rose.interfaces.screens.supervisor
 16#19A7_9A5D_A31E_4B5D#  rose.interfaces.screens.supervisor.start
 16#39A2_5FBE_F70E_01A5#  interface rose.interfaces.screens.surface
@@ -201,6 +203,9 @@
 16#EF2B_475B_489F_C4B2#  rose.interfaces.screens.terminal.enable_line_editing
 16#A521_A70F_EB07_A849#  rose.interfaces.screens.terminal.enable_echo
 16#117A_77FD_4E9D_376E#  rose.interfaces.screens.terminal.disable_echo
+16#8104_CF93_4EBE_67C0#  interface rose.interfaces.screens.test_surface
+16#E88C_615B_4406_4284#  rose.interfaces.screens.test_surface.inject(in word; in word; in word; in word)
+16#9E71_D427_D1A3_36B4#  rose.interfaces.screens.test_surface.set_size(in word; in word)
 16#E0C5_8BA1_30EC_B5E1#  interface rose.interfaces.storage.bank
 16#A9D1_CE2B_9717_7E2B#  rose.interfaces.storage.bank.reserve_storage(in word_64) return interface rose.interfaces.storage.region
 16#F659_471E_B358_EDEF#  rose.interfaces.storage.bank.create_sub_bank(in word_64; in word) return interface rose.interfaces.storage.bank

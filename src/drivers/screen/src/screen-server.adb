@@ -8,6 +8,7 @@ with Rose.Invocation;
 with Rose.Keys;
 with Rose.Server;
 with Rose.Shared_Regions;
+with Rose.Surface_Events;
 with Rose.System_Calls;
 with Rose.Words;
 
@@ -22,7 +23,6 @@ with Rose.Interfaces.Streams.Reader.Client;
 with Rose.Interfaces.Streams.Reader.Server;
 with Rose.Interfaces.Screens.Surface.Server;
 
-with Screen.Events;
 with Screen.Framebuffer;
 
 package body Screen.Server is
@@ -134,6 +134,8 @@ package body Screen.Server is
    Server_Context : Rose.Server.Server_Context;
    The_Surface    : aliased Screen_Surface;
    The_Events     : aliased Event_Stream;
+   Queue          : Rose.Surface_Events.Event_Queue;
+   --  The surface's events, until the holder reads them.
 
    Holder_Signal  : Rose.Capabilities.Capability :=
                       Rose.Capabilities.Null_Capability;
@@ -318,8 +320,8 @@ package body Screen.Server is
       --  The keyboard gives a key and its modifiers in one word, which
       --  are the event's Code and State (surface.idl, #734).
 
-      Screen.Events.Add
-        (Screen.Events.Key_Event,
+      Rose.Surface_Events.Add
+        (Queue, Rose.Surface_Events.Key_Event,
          Word_32 (Rose.Keys.Key_Of (Code)),
          Word_32 (Rose.Keys.Modifiers_Of (Code)));
       Event_Queued;
@@ -391,15 +393,16 @@ package body Screen.Server is
             Pointer_X := X;
             Pointer_Y := Y;
             Pointer_Buttons := Buttons;
-            Screen.Events.Add_Pointer
-              (To_Word (Pointer_X), To_Word (Pointer_Y),
+            Rose.Surface_Events.Add_Pointer
+              (Queue, To_Word (Pointer_X), To_Word (Pointer_Y),
                Word_32 (Pointer_Buttons));
             Queued := True;
          end if;
       end;
 
       if DZ /= 0 then
-         Screen.Events.Add (Screen.Events.Wheel_Event, To_Word (DZ));
+         Rose.Surface_Events.Add
+           (Queue, Rose.Surface_Events.Wheel_Event, To_Word (DZ));
          Queued := True;
       end if;
 
@@ -430,7 +433,7 @@ package body Screen.Server is
       pragma Unreferenced (Item);
       use type Rose.Capabilities.Capability;
    begin
-      if Screen.Events.Is_Empty
+      if Rose.Surface_Events.Is_Empty (Queue)
         and then Holder_Signal = Rose.Capabilities.Null_Capability
       then
 
@@ -441,7 +444,7 @@ package body Screen.Server is
          Last := 0;
          Rose.Server.Block_Current_Request (Server_Context);
       else
-         Screen.Events.Take (Buffer, Last);
+         Rose.Surface_Events.Take (Queue, Buffer, Last);
       end if;
    end Read;
 
