@@ -5,13 +5,14 @@ package body Mem.Shared_Pages is
    use type Rose.Addresses.Physical_Page_Address;
    use type Rose.Objects.Object_Id;
 
-   Max_Shared_Pages : constant := 2048;
-   --  Room for two full-screen 1024 x 768 buffers of 32-bit pixels, and
-   --  more besides.
+   Max_Shared_Pages : constant := 8192;
+   --  32 MB of shared pages: ten full-screen 1024 x 768 buffers of 32-bit
+   --  pixels, for the screen and the display server's surfaces, with
+   --  room for a resize, while a surface's old and new buffers both
+   --  exist (#583).
 
    type Shared_Page is
       record
-         Used     : Boolean := False;
          Modified : Boolean := False;
          Unsaved  : Boolean := False;
          Page     : Rose.Objects.Object_Id := 0;
@@ -24,12 +25,21 @@ package body Mem.Shared_Pages is
 
    Table      : array (1 .. Max_Shared_Pages) of Shared_Page;
    Used_Count : Natural := 0;
+   --  The pages are Table (1 .. Used_Count), with no gaps: Release moves
+   --  the last into the place of the one it removes. So a search costs
+   --  the pages that are shared, not the size of the table, and a
+   --  checkpoint asks about every dirty page.
 
    Released       : array (1 .. Max_Shared_Pages) of Rose.Objects.Object_Id;
    Released_Count : Natural := 0;
    --  The pages released since the last checkpoint.
 
    procedure Add_Released (Page : Rose.Objects.Object_Id);
+
+   procedure Append
+     (Item    : Shared_Page;
+      Success : out Boolean);
+   --  Add Item at the end of the table, unless it is full.
 
    function Index_Of
      (Physical : Rose.Addresses.Physical_Page_Address)
@@ -58,20 +68,12 @@ package body Mem.Shared_Pages is
       Success  : out Boolean)
    is
    begin
-      for Item of Table loop
-         if not Item.Used then
-            Item := (Used     => True,
-                     Modified => False,
-                     Unsaved  => False,
-                     Page     => Page,
-                     Physical => Physical,
-                     Mappings => 1);
-            Used_Count := Used_Count + 1;
-            Success := True;
-            return;
-         end if;
-      end loop;
-      Success := False;
+      Append ((Modified => False,
+               Unsaved  => False,
+               Page     => Page,
+               Physical => Physical,
+               Mappings => 1),
+              Success);
    end Add;
 
    ------------------
@@ -96,13 +98,31 @@ package body Mem.Shared_Pages is
       Released (Released_Count) := Page;
    end Add_Released;
 
+   ------------
+   -- Append --
+   ------------
+
+   procedure Append
+     (Item    : Shared_Page;
+      Success : out Boolean)
+   is
+   begin
+      if Used_Count = Max_Shared_Pages then
+         Success := False;
+      else
+         Used_Count := Used_Count + 1;
+         Table (Used_Count) := Item;
+         Success := True;
+      end if;
+   end Append;
+
    ----------------------------
    -- Clear_Checkpoint_Pages --
    ----------------------------
 
    procedure Clear_Checkpoint_Pages is
    begin
-      for Item of Table loop
+      for Item of Table (1 .. Used_Count) loop
          Item.Unsaved := False;
       end loop;
       Released_Count := 0;
@@ -117,8 +137,8 @@ package body Mem.Shared_Pages is
       return Rose.Addresses.Physical_Page_Address
    is
    begin
-      for Item of Table loop
-         if Item.Used and then Item.Page = Page then
+      for Item of Table (1 .. Used_Count) loop
+         if Item.Page = Page then
             return Item.Physical;
          end if;
       end loop;
@@ -132,7 +152,7 @@ package body Mem.Shared_Pages is
    function Has_Checkpoint_Pages return Boolean is
    begin
       return Released_Count > 0
-        or else (for some Item of Table => Item.Used and then Item.Unsaved);
+        or else (for some Item of Table (1 .. Used_Count) => Item.Unsaved);
    end Has_Checkpoint_Pages;
 
    --------------
@@ -144,15 +164,8 @@ package body Mem.Shared_Pages is
       return Natural
    is
    begin
-      --  Most of the time nothing is shared, and a checkpoint asks about
-      --  every dirty page.
-
-      if Used_Count = 0 then
-         return 0;
-      end if;
-
-      for Index in Table'Range loop
-         if Table (Index).Used and then Table (Index).Physical = Physical then
+      for Index in 1 .. Used_Count loop
+         if Table (Index).Physical = Physical then
             return Index;
          end if;
       end loop;
@@ -195,8 +208,8 @@ package body Mem.Shared_Pages is
                    Physical : Rose.Addresses.Physical_Page_Address))
    is
    begin
-      for Item of Table loop
-         if Item.Used and then Item.Unsaved then
+      for Item of Table (1 .. Used_Count) loop
+         if Item.Unsaved then
             Action (Item.Page, Item.Physical);
          end if;
       end loop;
@@ -220,19 +233,16 @@ package body Mem.Shared_Pages is
          return;
       end if;
 
-      declare
-         Item : Shared_Page renames Table (Index);
-      begin
-         if Item.Mappings > 1 then
-            Item.Mappings := Item.Mappings - 1;
-         else
-            Last := True;
-            Modified := Item.Modified;
-            Add_Released (Item.Page);
-            Item := (others => <>);
-            Used_Count := Used_Count - 1;
-         end if;
-      end;
+      if Table (Index).Mappings > 1 then
+         Table (Index).Mappings := Table (Index).Mappings - 1;
+      else
+         Last := True;
+         Modified := Table (Index).Modified;
+         Add_Released (Table (Index).Page);
+         Table (Index) := Table (Used_Count);
+         Table (Used_Count) := (others => <>);
+         Used_Count := Used_Count - 1;
+      end if;
    end Release;
 
    -------------
@@ -245,25 +255,17 @@ package body Mem.Shared_Pages is
       Success  : out Boolean)
    is
    begin
-      Success := False;
-
       if Find (Page) /= 0 then
+         Success := False;
          return;
       end if;
 
-      for Item of Table loop
-         if not Item.Used then
-            Item := (Used     => True,
-                     Modified => True,
-                     Unsaved  => True,
-                     Page     => Page,
-                     Physical => Physical,
-                     Mappings => 0);
-            Used_Count := Used_Count + 1;
-            Success := True;
-            return;
-         end if;
-      end loop;
+      Append ((Modified => True,
+               Unsaved  => True,
+               Page     => Page,
+               Physical => Physical,
+               Mappings => 0),
+              Success);
    end Restore;
 
    ------------------
@@ -285,8 +287,8 @@ package body Mem.Shared_Pages is
 
    procedure Unsave_Modified is
    begin
-      for Item of Table loop
-         if Item.Used and then Item.Modified then
+      for Item of Table (1 .. Used_Count) loop
+         if Item.Modified then
             Item.Unsaved := True;
          end if;
       end loop;
