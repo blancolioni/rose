@@ -292,6 +292,11 @@ check_install () {
     echo "init's derive, swap and hand over tests: $(sort -u "$CONSOLE" \
         | grep -c ': ok') of their checks seen ok"
 
+    # Init's DMA test (#291) must have mapped its pages and checked them,
+    # and not only been refused.
+    grep -q "dma test: mapped pages hold what was written: ok" "$CONSOLE" \
+        || { echo "FAIL: init's DMA test did not check its pages"; exit 1; }
+
     # The kernel writes each swap of the swap test (ADR 0032, #862) to its
     # own log.
     grep -a "takes over from" "$WORK/serial" \

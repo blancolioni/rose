@@ -99,6 +99,62 @@ package body Rose.Kernel.Capabilities.Pages is
             Rose.Kernel.Processes.Set_Current_State
               (Pid, Rose.Kernel.Processes.Ready);
 
+         when Identity_Map_Range =>
+            declare
+               use Rose.Invocation;
+               use Rose.Words;
+               Range_Id   : constant Rose.Objects.Object_Id :=
+                              Cap.Payload
+                              - Rose.Objects.Page_Object_Id'First;
+               First_Page : constant Physical_Page_Address :=
+                              Physical_Page_Address
+                                (Range_Id mod 2 ** 32);
+               Page_Count : constant Word :=
+                              Word (Range_Id / 2 ** 32);
+               Valid      : Boolean :=
+                              Page_Count > 0
+                              and then First_Page < Identity_Range_Bound
+                              and then Page_Count
+                                <= Identity_Range_Bound
+                                   - Word (First_Page);
+            begin
+               if Valid then
+                  for I in 0 .. Page_Count - 1 loop
+                     if Rose.Kernel.Physical_Memory.Is_RAM
+                       (First_Page + Physical_Page_Address (I))
+                     then
+                        Valid := False;
+                        exit;
+                     end if;
+                  end loop;
+               end if;
+
+               if Valid then
+                  for I in 0 .. Page_Count - 1 loop
+                     declare
+                        Page : constant Physical_Page_Address :=
+                                 First_Page + Physical_Page_Address (I);
+                     begin
+                        Rose.Kernel.Processes.Map_Page
+                          (Pid           => Pid,
+                           Virtual_Page  => Virtual_Page_Address (Page),
+                           Physical_Page => Page,
+                           Readable      => True,
+                           Writable      => True,
+                           Executable    => False,
+                           User          => True);
+                     end;
+                  end loop;
+
+                  Params.Control.Flags := (Reply => True, others => False);
+               else
+                  Rose.Kernel.Processes.Return_Error (Params, Request_Error);
+               end if;
+            end;
+
+            Rose.Kernel.Processes.Set_Current_State
+              (Pid, Rose.Kernel.Processes.Ready);
+
          when others =>
             null;
       end case;

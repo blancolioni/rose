@@ -180,20 +180,29 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                  (Process_Id, Rose.Kernel.Processes.Ready);
             end;
 
-         when Device_Range =>
+         when Device_Range | Device_Identity_Range =>
             declare
                use type Rose.Capabilities.Capability;
+               use type Rose.Objects.Endpoint_Index;
+               package Pages renames Rose.Kernel.Capabilities.Pages;
+               Identity : constant Boolean :=
+                            Cap.Header.Endpoint = Device_Identity_Range;
                First   : constant Word := Params.Data (0);
                Count   : constant Word := Params.Data (1);
                Valid   : Boolean :=
                            Params.Control.Flags (Send_Words)
                            and then Params.Control.Last_Sent_Word = 1
                            and then Count in
-                             1 .. Rose.Kernel.Capabilities.Pages
-                                    .Max_Device_Range_Pages
+                             1 .. Pages.Max_Device_Range_Pages
                            and then First <= Rose.Limits.Max_Physical_Pages
                            and then Count - 1
-                             <= Rose.Limits.Max_Physical_Pages - First;
+                             <= Rose.Limits.Max_Physical_Pages - First
+                           and then
+                             (not Identity
+                              or else (First < Pages.Identity_Range_Bound
+                                       and then Count
+                                         <= Pages.Identity_Range_Bound
+                                            - First));
                New_Cap : Rose.Capabilities.Capability;
             begin
                if Valid then
@@ -223,8 +232,9 @@ package body Rose.Kernel.Capabilities.Physical_Memory is
                              (Cap_Type =>
                                   Rose.Capabilities.Layout.Page_Object_Cap,
                               Endpoint =>
-                                Rose.Kernel.Capabilities.Pages
-                                  .Map_Device_Range,
+                                (if Identity
+                                 then Pages.Identity_Map_Range
+                                 else Pages.Map_Device_Range),
                               others   => <>),
                            Payload =>
                              Rose.Kernel.Capabilities.Pages
