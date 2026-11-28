@@ -113,6 +113,9 @@ jobs:
       - name: Test the PS/2 mouse's packet decoder
         run: make test-ps2
 
+      - name: Test the surfaces' event queue
+        run: make test-surfaces
+
       - name: Test the commands built for the host
         run: make test-host
 
