@@ -53,6 +53,17 @@ package Init.Self_Tests is
    --  the Delete flag (#1022).  It reports each check on Standard_Output,
    --  and is True if they all passed.
 
+   function DMA_Test
+     (Standard_Output : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Grant init two DMA pages (#291), as a device-pages request does,
+   --  map them, and check that they hold what is written to them; and
+   --  check that a grant that overlaps them for another owner is refused,
+   --  and that the kernel refuses a range that runs past the first
+   --  megabyte, and one that is RAM. The pages are 16#9C# and 16#9D#,
+   --  above init's own image. It reports each check on Standard_Output,
+   --  and is True if they all passed.
+
    function Swap_Test
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;

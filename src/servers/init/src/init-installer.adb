@@ -333,6 +333,9 @@ package body Init.Installer is
                Cap := Init.Grants.Interrupt (Owner, Values (1));
             elsif N = "device-page" and then Count = 1 then
                Cap := Init.Grants.Device_Page (Owner, Values (1));
+            elsif N = "device-pages" and then Count = 2 then
+               Cap := Init.Grants.Device_Pages
+                 (Owner, Values (1), Values (2));
             elsif N = "pci-device" and then Count = 3 then
                Cap := Init.Grants.PCI_Device
                  (Owner, Init.Boot.PCI_Cap,

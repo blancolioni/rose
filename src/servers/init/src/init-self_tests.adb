@@ -1,3 +1,5 @@
+with System;
+
 with Rose.Invocation;
 with Rose.System_Calls;
 with Rose.Words;
@@ -346,6 +348,91 @@ package body Init.Self_Tests is
 
       return Passed;
    end Derive_Test;
+
+   --------------
+   -- DMA_Test --
+   --------------
+
+   function DMA_Test
+     (Standard_Output : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word_32;
+
+      First      : constant := 16#9C#;
+      Count      : constant := 2;
+      Page_Words : constant := 1024;
+
+      Owner : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
+      Other : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
+
+      Passed : Boolean := True;
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String (Standard_Output, "dma test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
+         Init.Calls.Send_String
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
+         Passed := Passed and then Ok;
+      end Check;
+
+      Pages_Cap : constant Rose.Capabilities.Capability :=
+                    Init.Grants.Device_Pages (Owner, First, Count);
+
+   begin
+      Check ("pages granted",
+             Pages_Cap /= Rose.Capabilities.Null_Capability);
+
+      if Pages_Cap /= Rose.Capabilities.Null_Capability then
+         Init.Calls.Send (Pages_Cap);
+
+         declare
+            Memory : array (0 .. Count * Page_Words - 1)
+              of Rose.Words.Word_32
+              with Import, Volatile,
+                   Address => System'To_Address (First * 4096);
+            Same   : Boolean := True;
+         begin
+            for I in Memory'Range loop
+               Memory (I) := Rose.Words.Word_32 (I) xor 16#A5A5_5A5A#;
+            end loop;
+            for I in Memory'Range loop
+               if Memory (I) /= (Rose.Words.Word_32 (I) xor 16#A5A5_5A5A#)
+               then
+                  Same := False;
+               end if;
+            end loop;
+            Check ("mapped pages hold what was written", Same);
+         end;
+      end if;
+
+      Check ("overlapping grant refused",
+             Init.Grants.Device_Pages (Other, First + 1, 2)
+             = Rose.Capabilities.Null_Capability);
+
+      Check ("range past the first megabyte refused",
+             Init.Calls.Call
+               (Rose.Init_Capabilities.Device_Identity_Ranges_Cap,
+                (16#F0#, 16#20#))
+             = Rose.Capabilities.Null_Capability);
+
+      Check ("RAM refused",
+             Init.Calls.Call
+               (Rose.Init_Capabilities.Device_Identity_Ranges_Cap,
+                (0, 1))
+             = Rose.Capabilities.Null_Capability);
+
+      return Passed;
+   end DMA_Test;
 
    --------------------
    -- Exec_Copy_Test --

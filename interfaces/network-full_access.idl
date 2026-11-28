@@ -1,0 +1,7 @@
+--  The whole network: every remote address, and every local port (ADR
+--  0007, section 3). net gives one to init, and nothing else holds it
+--  unless init passes it on.
+
+interface Network.Full_Access : Network.Remote_Hosts, Network.Local_Ports is
+
+end Network.Full_Access;

@@ -292,6 +292,11 @@ check_install () {
     echo "init's derive, swap and hand over tests: $(sort -u "$CONSOLE" \
         | grep -c ': ok') of their checks seen ok"
 
+    # Init's DMA test (#291) must have mapped its pages and checked them,
+    # and not only been refused.
+    grep -q "dma test: mapped pages hold what was written: ok" "$CONSOLE" \
+        || { echo "FAIL: init's DMA test did not check its pages"; exit 1; }
+
     # Init's PCI test (#292) must have found the IDE controller's BARs.
     grep -q "pci test: BAR 4 is 16 I/O ports: ok" "$CONSOLE" \
         || { echo "FAIL: init's PCI test did not decode a BAR"; exit 1; }

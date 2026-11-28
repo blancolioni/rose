@@ -81,6 +81,16 @@ package Init.Grants is
    --  A cap that maps physical page Page at the same address, or the
    --  null cap if another owner has it, or the kernel refuses.
 
+   function Device_Pages
+     (Owner : Owner_Id;
+      First : Rose.Words.Word;
+      Count : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+   --  One cap that maps physical pages First .. First + Count - 1 at their
+   --  own addresses, for DMA (#291), or the null cap if Count is 0,
+   --  another owner has any of them, or the kernel refuses: the kernel
+   --  grants only pages in the first megabyte that aren't RAM.
+
    function Framebuffer
      (Owner : Owner_Id)
       return Rose.Capabilities.Capability;

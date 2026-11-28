@@ -162,6 +162,28 @@ package body Init.Grants is
         (Rose.Init_Capabilities.Device_Pages_Cap, (1 => Page));
    end Device_Page;
 
+   ------------------
+   -- Device_Pages --
+   ------------------
+
+   function Device_Pages
+     (Owner : Owner_Id;
+      First : Rose.Words.Word;
+      Count : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+   begin
+      if Count = 0
+        or else not Claim (Page_Grant, Owner, First, First + Count - 1)
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Init.Calls.Call
+        (Rose.Init_Capabilities.Device_Identity_Ranges_Cap,
+         (First, Count));
+   end Device_Pages;
+
    -----------------
    -- Framebuffer --
    -----------------
