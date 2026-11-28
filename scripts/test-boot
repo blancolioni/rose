@@ -95,8 +95,8 @@ grep -q "restored process [0-9]*/hold_pages\[" "$WORK/serial" \
 if grep -q "restored process [0-9]*/hold_transient" "$WORK/serial"; then
     fail "the transient hold_transient was restored"
 fi
-grep "storage: restore: transient banks:" "$CONSOLE" | tail -1
-grep -q "storage: restore: transient banks: [1-9]" "$CONSOLE" \
+grep "storage: restore: transient banks:" "$WORK/serial" | tail -1
+grep -q "storage: restore: transient banks: [1-9]" "$WORK/serial" \
     || fail "the store did not destroy the transient bank at the restore"
 
 # Hold_derived checks its capabilities the first time it is restored,

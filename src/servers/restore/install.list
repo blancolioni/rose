@@ -80,6 +80,12 @@ process_probe      drivers  save    test_only
 # tests launch it as a stand-in for the screen (#583).
 
 memory_surface     drivers  save    test_only
+
+# Saved, not launched: the display server (ADR 0022, #583), which runs on
+# a surface it is given. The console starts it on the screen's surface
+# with #655; until then, only the self tests run it.
+
+trellis            drivers  save
 echo               bin      save
 list               bin      save
 cat                bin      save

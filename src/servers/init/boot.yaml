@@ -201,7 +201,9 @@ stages:
     - launch: store
       oid: 7
       priority: device_driver
-      caps: [console_interface, trace]
+      # kernel_log: the store writes to the kernel's log, not the console,
+      # since it serves mem (#1212).
+      caps: [console_interface, trace, kernel_log]
       exports:
         storage: Storage.Store.Store_Interface
         add_storage: Storage.Store.Add_Backing_Store_Endpoint

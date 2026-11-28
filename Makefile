@@ -11,7 +11,7 @@ RELOC=$(BUILDDIR)/rose.reloc.o
 PROJECT=projects/kernel_$(ARCH).gpr
 PROJDRIVERS=projects/drivers_$(ARCH).gpr
 
-DRIVERS=command ps2 exec file directory null_stream vga-console clock caps screen surface-console process_probe memory_surface virtio_net
+DRIVERS=command ps2 exec file directory null_stream vga-console clock caps screen surface-console process_probe memory_surface trellis virtio_net
 UTILITIES=echo list cat touch mkdir rename remove rmdir copy clear date set_date uptime user auth rights login supervisor run_self_tests hold_derived hold_file hold_home swap_probe page_probe hold_pages hold_transient replaceable_test petal argv keytest kilo
 
 # The boot modules are the ones boot.yaml lists (#374), which is also where
@@ -156,12 +156,16 @@ test-ps2:
 	cd src/drivers/ps2/tests && gprbuild -q -P mouse_packets_tests.gpr \
 	    && ./build/test_mouse_packets
 
-# The tests of the surfaces' event queue (#583), built and run on the
-# host, in a few seconds.  CI runs them.
+# The tests of the surfaces' event queue and of the display server's
+# layout (#583), built and run on the host, in a few seconds.  CI runs
+# them.
 test-surfaces:
 	cd src/library/surface_events_tests \
 	    && gprbuild -q -P surface_events_tests.gpr \
 	    && ./build/test_surface_events
+	cd src/drivers/trellis/tests \
+	    && gprbuild -q -P trellis_layout_tests.gpr \
+	    && ./build/test_trellis_layout
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"
