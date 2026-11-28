@@ -74,6 +74,11 @@ if command -v "$IDLE" >/dev/null 2>&1; then
         "$idle_dir/out/rose-interfaces-check-probe-client.adb"
     then
         problem "$IDLE is too old: its Open_Cap_Set keeps a stale interface cap; build idle from main (idle PR #136 or later)"
+    elif ! "$IDLE" --list-fields "$idle_dir/check-probe.idl" \
+        > "$idle_dir/idle.log" 2>&1
+    then
+        # check-endpoint-ids lists the fields of records (#1209).
+        problem "$IDLE is too old: it has no --list-fields; build idle from main (idle PR #141 or later)"
     fi
     rm -rf "$idle_dir"
 fi
