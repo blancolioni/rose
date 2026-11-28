@@ -36,12 +36,20 @@ package body Store.Server is
 
       Console_Cap := Get_Cap (1);
       Rose.Trace.Set_Trace_Cap (Get_Cap (2));
+      Kernel_Log_Cap := Get_Cap (3);
 
       --  Nothing reads the cap set again (#826).
 
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
-      Rose.Console_IO.Open (Console_Cap);
+      --  The store writes to the kernel's log, never the console. It
+      --  serves mem, which writes pages back to regions; the console
+      --  calls its driver, a launched process, and if one of the driver's
+      --  pages is out, the driver faults to mem, which is waiting on the
+      --  store: a deadlock (#1212, as #997 was for mem). The kernel's log
+      --  is serial, and needs no other process.
+
+      Rose.Console_IO.Open_Kernel_Log (Kernel_Log_Cap);
 
       Rose.Interfaces.Storage.Store.Server.Create_Server
         (Server_Context    => Server_Context,
