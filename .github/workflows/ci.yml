@@ -110,6 +110,9 @@ jobs:
       - name: Test the store's block map and free map
         run: make test-store
 
+      - name: Test the PS/2 mouse's packet decoder
+        run: make test-ps2
+
       - name: Test the commands built for the host
         run: make test-host
 

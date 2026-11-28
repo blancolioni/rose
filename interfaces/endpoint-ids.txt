@@ -79,8 +79,13 @@
 16#8551_9DAF_2AD6_655C#  rose.interfaces.devices.event_listener.on_event(in word)
 16#C550_4CF2_2A68_4255#  interface rose.interfaces.devices.event_source
 16#79CA_7A0A_D102_4F7B#  rose.interfaces.devices.event_source.add_listener(in interface rose.interfaces.devices.event_listener)
+16#3824_2E27_9FA4_3080#  interface rose.interfaces.devices.input_controller
 16#4E3C_3D4A_E02C_7CEE#  interface rose.interfaces.devices.interrupt_handler
 16#5FDA_85C7_D446_CC09#  rose.interfaces.devices.interrupt_handler.handle_interrupt(in word)
+16#8F0F_1952_23A7_DE77#  interface rose.interfaces.devices.pointer_listener
+16#B095_0940_8905_FBBE#  rose.interfaces.devices.pointer_listener.on_pointer(in integer_32; in integer_32; in integer_32; in word)
+16#E460_BFDB_DFB2_5337#  interface rose.interfaces.devices.pointer_source
+16#A015_DDDD_CFC3_3894#  rose.interfaces.devices.pointer_source.add_pointer_listener(in interface rose.interfaces.devices.pointer_listener)
 16#287F_188F_36A1_0F16#  interface rose.interfaces.files.directory
 16#73CC_523C_3838_6440#  rose.interfaces.files.directory.entry_file_kind(in positive) return rose.interfaces.files.directory.file_kind
 16#AC27_39EA_3493_1BEC#  rose.interfaces.files.directory.entry_size(in positive) return storage_count

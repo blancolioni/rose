@@ -1,0 +1,22 @@
+interface Devices.Pointer_Listener is
+
+   --  Told of a pointing device's movement and buttons (#588), as an
+   --  Event_Listener is told of keys. It is pushed, because a driver is
+   --  woken by interrupts and can't wait in a Read; when typed streams
+   --  exist (ADR 0013, #140), this becomes a stream of an event with the
+   --  same fields, and this interface is retired.
+
+   procedure On_Pointer
+     (DX      : Integer_32;
+      DY      : Integer_32;
+      DZ      : Integer_32;
+      Buttons : Word);
+   --  DX and DY: relative movement, in the device's counts, with Y
+   --  positive down. DZ: the wheel, positive towards the user. Buttons:
+   --  the buttons that are down now, bit 0 the left, 1 the right, 2 the
+   --  middle, and 3 and 4 the extra ones: the mask that
+   --  Screens.Surface.Get_Pointer gives. Nothing here assumes PS/2, so
+   --  that a USB mouse can give the same calls. An absolute pointer,
+   --  such as a tablet, would be a descendant interface.
+
+end Devices.Pointer_Listener;

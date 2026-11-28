@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list user-library host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list user-library host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store test-ps2 prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -147,6 +147,12 @@ test-host: host-commands
 test-store:
 	cd src/servers/store/tests && gprbuild -q -P page_maps_tests.gpr \
 	    && ./build/test_page_maps
+
+# The tests of the PS/2 mouse's packet decoder (#588), built and run on
+# the host, in a few seconds.  CI runs them.
+test-ps2:
+	cd src/drivers/ps2/tests && gprbuild -q -P mouse_packets_tests.gpr \
+	    && ./build/test_mouse_packets
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"
