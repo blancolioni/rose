@@ -81,6 +81,12 @@
 16#79CA_7A0A_D102_4F7B#  rose.interfaces.devices.event_source.add_listener(in interface rose.interfaces.devices.event_listener)
 16#4E3C_3D4A_E02C_7CEE#  interface rose.interfaces.devices.interrupt_handler
 16#5FDA_85C7_D446_CC09#  rose.interfaces.devices.interrupt_handler.handle_interrupt(in word)
+16#085A_3B29_1282_973F#  interface rose.interfaces.devices.network_device
+16#0F08_CD73_0B64_657F#  rose.interfaces.devices.network_device.mac_address return word_64
+16#7BED_3480_60B3_567B#  rose.interfaces.devices.network_device.link_up return boolean
+16#1ED0_6D27_A475_7BB6#  rose.interfaces.devices.network_device.notify(in capability)
+16#E6CD_F3BB_3837_A350#  rose.interfaces.devices.network_device.send_frame(in stream_element_array)
+16#BB05_A7EE_5B9D_D4BE#  rose.interfaces.devices.network_device.receive_frame(out stream_element_array; out stream_element_offset)
 16#287F_188F_36A1_0F16#  interface rose.interfaces.files.directory
 16#73CC_523C_3838_6440#  rose.interfaces.files.directory.entry_file_kind(in positive) return rose.interfaces.files.directory.file_kind
 16#AC27_39EA_3493_1BEC#  rose.interfaces.files.directory.entry_size(in positive) return storage_count
