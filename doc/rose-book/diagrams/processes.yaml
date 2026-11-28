@@ -42,8 +42,8 @@ processes:
                note: home}
   caps:       {at: [640, 255], kind: persistent, label: caps,
                note: cap sets}
-  keyboard:   {at: [860, 255], kind: persistent, label: keyboard,
-               note: IRQ 33}
+  keyboard:   {at: [860, 255], kind: persistent, label: ps2,
+               note: IRQ 1 and 12}
   file:       {at: [90, 345], kind: persistent, label: file, note: .petalrc}
   exec:       {at: [430, 345], kind: persistent, label: exec}
   vga:        {at: [1000, 345], kind: persistent, label: vga-console,

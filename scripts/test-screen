@@ -62,7 +62,7 @@ choose_entry 2
 # The install restarts the machine when it has finished. Until then, read
 # the screen every two seconds or so, and keep the self tests' result. The
 # result is on the screen for only a few seconds before the restart, since
-# the console scrolls quickly (#787). Restore installs the keyboard before
+# the console scrolls quickly (#787). Restore installs ps2 before
 # surface-console, so its line is on the screen only if the boot console
 # replayed it.
 : > "$WORK/install-results.txt"
@@ -74,7 +74,7 @@ while [ $waited -lt 900 ]; do
     screen > "$WORK/screen.txt"
     answer_install "$WORK/screen.txt"
     grep "Test result:" "$WORK/screen.txt" >> "$WORK/install-results.txt"
-    grep -q "installing: keyboard: done" "$WORK/screen.txt" && early=yes
+    grep -q "installing: ps2: done" "$WORK/screen.txt" && early=yes
     sleep 1
     waited=$((waited + 2))
 done

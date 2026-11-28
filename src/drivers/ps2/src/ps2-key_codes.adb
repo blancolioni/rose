@@ -1,4 +1,4 @@
-package body Keyboard.Codes is
+package body PS2.Key_Codes is
 
    use Rose.Keys;
    use type Rose.Words.Word;
@@ -350,4 +350,4 @@ package body Keyboard.Codes is
       end;
    end Handle_Key;
 
-end Keyboard.Codes;
+end PS2.Key_Codes;
