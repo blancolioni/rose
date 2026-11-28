@@ -2,7 +2,7 @@ with "../../../projects/checks.gpr";
 with "../../../rts/user/rose_rts.gpr";
 with "../../../projects/user_library.gpr";
 
-project Keyboard is
+project PS2 is
 
    --  Built with the userland run-time system, which has Rose's base,
    --  capability and system call packages, and the user-mode IDL target
@@ -20,12 +20,12 @@ project Keyboard is
        "../../library/kernelapi/devices");
    for Object_Dir use "./build/obj";
    for Exec_Dir use "./build/bin";
-   for Main use ("keyboard-driver.adb");
+   for Main use ("ps2-driver.adb");
 
    package Builder is
-      for Global_Configuration_Pragmas use "keyboard-pragmas.config";
+      for Global_Configuration_Pragmas use "ps2-pragmas.config";
       for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
-      for Executable ("keyboard-driver.adb") use "keyboard";
+      for Executable ("ps2-driver.adb") use "ps2";
    end Builder;
 
    package Compiler is
@@ -45,4 +45,4 @@ project Keyboard is
       for Default_Switches ("ada") use ("-M72");
    end Pretty_Printer;
 
-end Keyboard;
+end PS2;

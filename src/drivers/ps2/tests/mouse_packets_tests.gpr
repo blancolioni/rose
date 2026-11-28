@@ -1,0 +1,25 @@
+project Mouse_Packets_Tests is
+
+   --  The tests of the PS/2 mouse's packet decoder (#588), built and run
+   --  on the host with its own GNAT and run-time system:
+   --
+   --     gprbuild -P mouse_packets_tests.gpr && ./build/test_mouse_packets
+   --
+   --  or "make test-ps2" at the top. Mouse_Packets needs only Interfaces.
+
+   for Source_Dirs use (".", "../src");
+   for Source_Files use
+     ("test_mouse_packets.adb",
+      "mouse_packets.ads",
+      "mouse_packets.adb");
+   for Object_Dir use "build";
+   for Exec_Dir use "build";
+   for Main use ("test_mouse_packets.adb");
+
+   package Compiler is
+      for Default_Switches ("ada") use
+        ("-g", "-gnat12", "-gnata", "-gnatwa", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+   end Compiler;
+
+end Mouse_Packets_Tests;

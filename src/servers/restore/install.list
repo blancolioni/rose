@@ -20,15 +20,16 @@
 
 exec               drivers  launch
 
-# The keyboard comes first, because the console reads it. It writes
-# nothing, so it doesn't need the persistent console.
+# The PS/2 controller's driver comes first, because the console reads
+# its keyboard. It writes nothing, so it doesn't need the persistent
+# console. It drives the mouse too (#588).
 
-keyboard           drivers  launch  provides_keyboard_interface
+ps2                drivers  launch  provides_keyboard_interface
 
-# With a framebuffer, the screen driver holds it, and the keys go to the
-# screen (ADR 0022, #582, #653).
+# With a framebuffer, the screen driver holds it, and the keys and the
+# mouse go to the screen (ADR 0022, #582, #653, #588).
 
-screen             drivers  launch  requires_framebuffer requires_keyboard_interface provides_screen
+screen             drivers  launch  requires_framebuffer requires_input_controller provides_screen
 
 # The persistent console is the terminal (#454): it draws what it is
 # written, and its line discipline reads the keyboard. It comes straight
@@ -68,6 +69,11 @@ null_stream        drivers  save
 # (#1009).
 
 process_probe      drivers  save    test_only
+
+# Saved, not launched, and only in a test install: the display server's
+# tests launch it as a stand-in for the screen (#583).
+
+memory_surface     drivers  save    test_only
 echo               bin      save
 list               bin      save
 cat                bin      save

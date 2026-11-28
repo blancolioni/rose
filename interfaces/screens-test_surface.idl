@@ -1,0 +1,20 @@
+interface Screens.Test_Surface : Screens.Surface is
+
+   --  A surface in plain memory, for the tests: a stand-in for the
+   --  screen, with scripted events (ADR 0022, section 1, headless tests;
+   --  #583, #587). Only the test program memory_surface serves it.
+
+   procedure Inject
+     (Kind   : Word;
+      First  : Word;
+      Second : Word;
+      Third  : Word);
+   --  Queue an event, as if the screen had it, and signal the holder.
+
+   procedure Set_Size
+     (Width  : Word;
+      Height : Word);
+   --  Give the surface a new buffer, Width by Height pixels and all
+   --  black, and queue a Size event. The old buffer is released.
+
+end Screens.Test_Surface;

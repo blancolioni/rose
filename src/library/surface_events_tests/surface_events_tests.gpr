@@ -1,0 +1,28 @@
+project Surface_Events_Tests is
+
+   --  The tests of Rose.Surface_Events (#583), built and run on the host
+   --  with its own GNAT and run-time system:
+   --
+   --     gprbuild -P surface_events_tests.gpr && ./build/test_surface_events
+   --
+   --  or "make test-surfaces" at the top. The package needs only Rose,
+   --  Rose.Words and Ada.Streams.
+
+   for Source_Dirs use (".", "../rose", "../../base");
+   for Source_Files use
+     ("test_surface_events.adb",
+      "rose.ads",
+      "rose-words.ads",
+      "rose-surface_events.ads",
+      "rose-surface_events.adb");
+   for Object_Dir use "build";
+   for Exec_Dir use "build";
+   for Main use ("test_surface_events.adb");
+
+   package Compiler is
+      for Default_Switches ("ada") use
+        ("-g", "-gnat12", "-gnata", "-gnatwa", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+   end Compiler;
+
+end Surface_Events_Tests;
