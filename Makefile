@@ -41,7 +41,7 @@ all:
 # are also directory names, so without this make thinks they are up to date
 # and skips their recipes.
 
-.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list user-library host-commands test-host test test-screen test-restore restore-fixture test-drawing test-store test-ps2 test-surfaces prove rts interfaces idl config kernel boot exports stripped \
+.PHONY: all rose programs copy-test-images check-env check-targets check-endpoint-ids check-install-list install-list user-library host-commands test-host test test-screen test-typed-streams test-restore restore-fixture test-drawing test-store test-ps2 test-surfaces prove rts interfaces idl config kernel boot exports stripped \
     bootdisk hdd iso finished doc clean publish-iso version \
     $(BOOT_MODULES) $(DRIVERS) $(UTILITIES)
 
@@ -166,6 +166,22 @@ test-surfaces:
 	cd src/drivers/trellis/tests \
 	    && gprbuild -q -P trellis_layout_tests.gpr \
 	    && ./build/test_trellis_layout
+
+# The tests of Rose.Typed_Streams (#140), built and run on the host, in a
+# few seconds, with the user target's interface packages, which idle
+# generates first. CI runs them.
+
+TYPED_STREAMS_TESTS=src/library/typed_streams_tests
+
+test-typed-streams:
+	rm -rf $(TYPED_STREAMS_TESTS)/build/generated
+	mkdir -p $(TYPED_STREAMS_TESTS)/build/generated
+	$(IDLE) --target user -I interfaces \
+	    -o $(TYPED_STREAMS_TESTS)/build/generated \
+	    interfaces/*.idl $(TYPED_STREAMS_TESTS)/typed_test.idl
+	cd $(TYPED_STREAMS_TESTS) \
+	    && gprbuild -q -P typed_streams_tests.gpr \
+	    && ./build/test_typed_streams
 
 # The run-time systems are built when they are missing, so make works after
 # make clean.  They aren't rebuilt when their sources change: "make rts"

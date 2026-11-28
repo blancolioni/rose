@@ -1,0 +1,12 @@
+--  A record with a default, for the tests of Rose.Typed_Streams (#140): a
+--  list from a program that knows only Name, or that knows a field after
+--  Count, still reads.
+
+interface Typed_Test is
+
+   type Entry_Info is record
+      Name  : String;
+      Count : Natural := 7;
+   end record;
+
+end Typed_Test;
