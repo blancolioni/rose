@@ -59,7 +59,8 @@ under QEMU, runs the self tests, and checks the checkpoint log; it needs
 
 The scripts in `qemu` and `bochs` use the disk `images/rose-hd0.img`, which
 `make hdd` makes (`qemu/init-qemu.sh` makes it if it isn't there), and write
-their serial output to `logs`.
+their serial output to `logs`.  The QEMU scripts give the guest a virtio
+network card on QEMU's user-mode network, which needs no setup on the host.
 
 `clean-build.sh` runs `make -j` with a job for each processor (set `JOBS` to
 change that), and so can you.  `make` builds the run-time systems if they are

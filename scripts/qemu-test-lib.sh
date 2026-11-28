@@ -42,9 +42,13 @@ fail () {
 }
 
 start_qemu () {
+    # The machine is the one that the scripts in qemu boot, with a virtio
+    # network card on QEMU's user-mode network in place of QEMU's default
+    # e1000 (#293).
     rm -f "$MONITOR"
     qemu-system-i386 -m "$QEMU_MEMORY" -display none -serial file:"$WORK/serial" \
         -serial file:"$CONSOLE" \
+        -netdev user,id=net0 -device virtio-net-pci,netdev=net0 \
         -monitor unix:"$MONITOR",server,nowait -pidfile "$WORK/pid" \
         -drive file="$DISK",index=0,if=ide,format=raw "$@" \
         > "$WORK/qemu.log" 2>&1 &
