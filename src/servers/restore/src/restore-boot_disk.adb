@@ -117,9 +117,30 @@ package body Restore.Boot_Disk is
          end if;
 
          Release (Reader);
-         Rose.Console_IO.Put ("restore: wrote " & Name & ": ");
-         Rose.Console_IO.Put (Integer (Address));
-         Rose.Console_IO.Put_Line (" blocks");
+
+         --  A file that couldn't be read leaves a disk that doesn't
+         --  boot, and the install would otherwise carry on as if it
+         --  had worked. The boot tests look for the FAIL.
+
+         declare
+            Expected : constant Rose.Directories.File_Size :=
+                         (Rose.Directories.Size (Path)
+                          + Rose.Directories.File_Size (Block_Size) - 1)
+                         / Rose.Directories.File_Size (Block_Size);
+         begin
+            if Rose.Directories.File_Size (Address) < Expected then
+               Rose.Console_IO.Put ("restore: FAIL: wrote " & Name & ": ");
+               Rose.Console_IO.Put (Integer (Address));
+               Rose.Console_IO.Put (" of ");
+               Rose.Console_IO.Put (Integer (Expected));
+               Rose.Console_IO.Put_Line
+                 (" blocks; the disk will not boot");
+            else
+               Rose.Console_IO.Put ("restore: wrote " & Name & ": ");
+               Rose.Console_IO.Put (Integer (Address));
+               Rose.Console_IO.Put_Line (" blocks");
+            end if;
+         end;
       end;
    end Write_File;
 
