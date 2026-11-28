@@ -102,7 +102,7 @@ This is how a client that knows only a process and an endpoint id gets a capabil
 === Page Object Capabilities
 
 A page object gives access to a page of memory, or to a range of pages.
-Two endpoints are implemented: `Identity_Map_Page`, which maps the page at its own address, and `Map_Device_Range`, which maps a range of device pages at an address in the device window, if none of them is RAM (#582).
+Three endpoints are implemented: `Identity_Map_Page`, which maps the page at its own address; `Map_Device_Range`, which maps a range of device pages at an address in the device window, if none of them is RAM (#582); and `Identity_Map_Range`, which maps a range of device pages in the first megabyte at their own addresses, if none of them is RAM, for DMA (#291, see <<dma-pages>>).
 
 ==== Page Object Capability Layout
 
@@ -114,8 +114,8 @@ A page table capability maps a page into the page table that it names (`Map_Page
 
 === Physical Memory Capabilities
 
-A physical memory capability has one of these endpoints: reserving device memory, getting the number of regions of memory that the boot loader reported, getting one of them, and giving a capability for a device page, or for a range of them.
-Only init has the capabilities for the last two, which give a capability that maps a page or a range at the same address, or in the device window, unless a page is RAM.
+A physical memory capability has one of these endpoints: reserving device memory, getting the number of regions of memory that the boot loader reported, getting one of them, and giving a capability for a device page, a range of them, or a DMA range.
+Only init has the capabilities for the last three, which give a capability that maps a page at its own address, a range in the device window, or a range in the first megabyte at its own addresses, unless a page is RAM.
 
 === Interrupt Capabilities
 

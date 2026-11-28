@@ -293,6 +293,8 @@ package body Rose.Multiboot is
       Rose.Boot.Console.Put
         ("Announced mbi size: ");
       Rose.Boot.Console.Put (Natural (Size));
+      Rose.Boot.Console.Put (" at ");
+      Rose.Boot.Console.Put (Multiboot_Address);
       Rose.Boot.Console.New_Line;
 
       declare

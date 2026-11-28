@@ -285,6 +285,9 @@ package body Init.Installer is
                Cap := Init.Grants.Interrupt (Owner, Values (1));
             elsif N = "device-page" and then Count = 1 then
                Cap := Init.Grants.Device_Page (Owner, Values (1));
+            elsif N = "device-pages" and then Count = 2 then
+               Cap := Init.Grants.Device_Pages
+                 (Owner, Values (1), Values (2));
             elsif N = "framebuffer" and then Count = 0 then
                Cap := Init.Grants.Framebuffer (Owner);
             elsif N = "bank" and then Count = 2 then

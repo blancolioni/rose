@@ -12,6 +12,15 @@ package Rose.Kernel.Capabilities.Pages is
    --  Device_Window_Bound), and the whole range is mapped there, writable
    --  and not executable, if it fits.  A page that is RAM is refused.
 
+   Identity_Map_Range : constant Rose.Objects.Endpoint_Index := 3;
+   --  A range of device pages in the first megabyte (#291), mapped at
+   --  their own addresses, writable and not executable, so that the
+   --  holder can give their addresses to a device for DMA.  A page that
+   --  is RAM is refused.
+
+   Identity_Range_Bound : constant := 16#100#;
+   --  The first page that an identity range can't reach: one megabyte.
+
    Max_Device_Range_Pages : constant :=
                               (Device_Window_Bound - Device_Window_Base)
                               / Physical_Page_Bytes;
