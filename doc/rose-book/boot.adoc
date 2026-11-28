@@ -99,7 +99,7 @@ A process that holds a cap to a boot server holds its object id, so the id has t
 | 14 | `bootcaps` | The console and the exit capability | `Constructor`, for creating cap sets, and `Resource`, to end it once boot is done
 | 4 | `mem` | Memory region queries, page-on, trace | `Memory`, its `Checkpoint` endpoint, and `Memory_Restore`
 | 13 | `timer` | The kernel's set-timeout and get-ticks | `Set_Timer`
-| 5 | `pci` | PCI configuration ports `CF8` and `CFC` | Its device lookup endpoint
+| 5 | `pci` | PCI configuration ports `CF8` and `CFC` | `Devices.PCI_Bus`
 | 6 | `ata` | Ports `1F0`–`1F7` and `3F6`, IRQs 46 and 47, PCI, the timer | Block devices: hd0, the system disk, and on the install media hd1, the install media
 | 7 | `store` | The console, trace | `Store`, `Add_Backing_Store` and `Storage_Checkpoint`
 | 12 | `elf` | Create-process, `Memory`, rescind, trace | `Executable.Launch` and `Launch_Command`
@@ -165,8 +165,30 @@ Each program on the install media comes with a list of the capabilities it asks 
 `init` grants each request that its policy allows, and leaves out the rest:
 
 * any program may have `create-endpoint`, and `create-signal`, which makes signal capabilities for its own signal bits (see <<signals>>);
-* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `framebuffer` (the boot loader's linear framebuffer, if it gave one), `boot-tag 8` (the framebuffer's geometry), and `bank PAGES REGIONS` (a bank of its own under the root bank, with those limits, which must not be zero; see ADR 0014);
+* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, a PCI device and its hardware (see <<pci-devices>>), `framebuffer` (the boot loader's linear framebuffer, if it gave one), `boot-tag 8` (the framebuffer's geometry), and `bank PAGES REGIONS` (a bank of its own under the root bank, with those limits, which must not be zero; see ADR 0014);
 * hardware that another program already has is refused (see <<_init>>).
+
+A number in a request is decimal, or hexadecimal after `0x`.
+
+[#pci-devices]
+=== PCI devices
+
+A driver for a PCI device asks for the device, and then for its hardware (#292):
+
+----
+pci-device 0x1AF4 0x1000 0   # the first virtio network card
+pci-port-in-8 0              # its BAR 0, as 8-bit input ports
+pci-port-out-32 0            # and as 32-bit output ports
+pci-interrupt                # its interrupt
+----
+
+* `pci-device VENDOR DEVICE INDEX` gives the `Devices.PCI_Device` of the INDEXth device with those ids, counting from 0, and records it as the driver's.
+* `pci-port-in-N BAR` and `pci-port-out-N BAR`, where N is 8, 16 or 32, give a port capability for every port of that I/O BAR of the device, of that size and direction.
+* `pci-interrupt` gives a capability for the device's interrupt.
+
+The ports and the interrupt are granted as `port-in-8` and `register-interrupt` are, so another program can't have them, and they are for the device that the last `pci-device` request gave.
+The firmware assigns the BARs, and they are granted at the install, so a driver depends on the firmware assigning the same ones at every boot, as QEMU's does.
+An interrupt line can be shared between devices, but an interrupt is granted to one program.
 
 [#handing-over-the-console]
 === Handing over the console

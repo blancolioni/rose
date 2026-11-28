@@ -7,7 +7,9 @@ with Rose.Invocation;
 with Rose.Objects;
 with Rose.Words;                       use Rose.Words;
 
-with Rose.Devices.PCI.Client;
+with Rose.Devices.PCI;
+with Rose.Interfaces.Devices.Pci_Bus.Client;
+with Rose.Interfaces.Devices.Pci_Device.Client;
 with Rose.Devices.Port_IO;
 
 with Rose.Console_IO;
@@ -24,7 +26,8 @@ package body ATA.Server is
    ATA_Native_0    : constant Rose.Words.Word_8 := 2#0000_0001#;
    ATA_Native_1    : constant Rose.Words.Word_8 := 2#0000_0100#;
 
-   Device_Cap  : Rose.Capabilities.Capability;
+   package PCI_Bus renames Rose.Interfaces.Devices.Pci_Bus.Client;
+   package PCI_Device renames Rose.Interfaces.Devices.Pci_Device.Client;
 
    type Vendor_Device_Record is
       record
@@ -54,9 +57,11 @@ package body ATA.Server is
    -------------------
 
    procedure Create_Server is
-      use type Rose.Capabilities.Capability;
-
       Next_Cap_Index : Positive := 1;
+
+      Bus    : PCI_Bus.Pci_Bus_Client;
+      Device : PCI_Device.Pci_Device_Client;
+      Found  : Boolean := False;
 
       procedure Next (Cap : out Rose.Capabilities.Capability);
 
@@ -97,29 +102,28 @@ package body ATA.Server is
 
       Rose.System_Calls.Delete_Cap (Get_Cap_From_Set);
 
-      Device_Cap := Rose.Capabilities.Null_Capability;
+      PCI_Bus.Open (Bus, PCI_Cap);
 
       for Rec of Known_Devices loop
-         Device_Cap :=
-           Rose.System_Calls.Client.Get_Capability
-             (PCI_Cap, (Rec.Vendor, Rec.Device));
-         exit when Device_Cap /= Rose.Capabilities.Null_Capability;
+         Device := PCI_Bus.Find_Device (Bus, Rec.Vendor, Rec.Device, 0);
+         Found := not PCI_Bus.Has_Error;
+         exit when Found;
       end loop;
 
-      if Device_Cap = Rose.Capabilities.Null_Capability then
+      if not Found then
          Rose.Console_IO.Put_Line
            ("ata: no devices");
       else
-         Rose.Console_IO.Put ("ata: probing PCI IDE devices with device cap ");
-         Rose.Console_IO.Put (Rose.Words.Word_8 (Device_Cap));
-         Rose.Console_IO.New_Line;
+         Rose.Console_IO.Put_Line ("ata: probing PCI IDE devices");
 
          declare
             use Rose.Devices.PCI;
-            use Rose.Devices.PCI.Client;
-            Class_Id     : constant Word_8 := Get (Device_Cap, R_Class);
-            Sub_Class_Id : constant Word_8 := Get (Device_Cap, R_Sub_Class);
-            Prog_IF      : constant Word_8 := Get (Device_Cap, R_Prog_IF);
+            Class_Word   : constant Word_32 :=
+                             PCI_Device.Read_Config (Device, 2);
+            Class_Id     : constant Word_8 := Byte_Of (Class_Word, R_Class);
+            Sub_Class_Id : constant Word_8 :=
+                             Byte_Of (Class_Word, R_Sub_Class);
+            Prog_IF      : constant Word_8 := Byte_Of (Class_Word, R_Prog_IF);
             Is_IDE       : constant Boolean :=
                              Class_Id = PCI_Mass_Storage
                                  and then Sub_Class_Id = PCI_IDE;
@@ -127,10 +131,9 @@ package body ATA.Server is
                              (Prog_IF and ATA_Native_0) /= 0;
             Has_Native_1 : constant Boolean :=
                              (Prog_IF and ATA_Native_1) /= 0;
---              IRQ          : constant Word_8 :=
---                               Get (Device_Cap, R_Interrupt_Line);
             Base_DMA     : constant Word_32 :=
-                             Get (Device_Cap, R_BAR_4)
+                             PCI_Device.Read_Config
+                               (Device, Natural (R_BAR_4))
                                and PCI_Bar_IO_Mask;
 
          begin

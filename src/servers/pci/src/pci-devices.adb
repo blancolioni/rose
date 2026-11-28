@@ -2,129 +2,103 @@ with Rose.Console_IO;
 
 package body PCI.Devices is
 
-   Table : PCI_Device_Table;
+   Table : array (Device_Index) of Device_Record;
+   Count : Device_Count := 0;
 
    ----------------
    -- Add_Device --
    ----------------
 
-   procedure Add_Device
-     (Bus        : Rose.Devices.PCI.Bus_Type;
-      Slot       : Rose.Devices.PCI.Device_Type;
-      Fn         : Rose.Devices.PCI.Function_Type;
-      Vendor     : Rose.Words.Word_16;
-      Device     : Rose.Words.Word_16;
-      Device_EP  : Rose.Objects.Endpoint_Id;
-      Device_Cap : Rose.Capabilities.Capability)
-   is
+   procedure Add_Device (Item : Device_Record) is
       use Rose.Words;
-      Address : constant Rose.Devices.PCI.Device_Address :=
-                  Rose.Devices.PCI.To_Address (Bus, Slot, Fn);
    begin
-      if PCI_Device_Count < Max_PCI_Devices then
-         PCI_Device_Count := PCI_Device_Count + 1;
-         Rose.Console_IO.Put (Word_8 (Bus));
-         Rose.Console_IO.Put (":");
-         Rose.Console_IO.Put (Word_8 (Slot));
-         Rose.Console_IO.Put (".");
-         Rose.Console_IO.Put (Natural (Fn));
-         Rose.Console_IO.Put (" ");
-         Rose.Console_IO.Put (Rose.Words.Word_32 (Address));
-         Rose.Console_IO.Put ("    ");
-         Rose.Console_IO.Put (Vendor);
-         Rose.Console_IO.Put (":");
-         Rose.Console_IO.Put (Device);
-         Rose.Console_IO.Put (" cap ");
-         Rose.Console_IO.Put (Rose.Words.Word_8 (Device_Cap));
-         Rose.Console_IO.New_Line;
-
-         Table (PCI_Device_Count) :=
-           PCI_Device_Record'
-             (Active  => True,
-              Address => Address,
-              Bus     => Bus,
-              Slot    => Slot,
-              Fn      => Fn,
-              Vendor  => Vendor,
-              Device  => Device,
-              EP      => Device_EP,
-              Cap     => Device_Cap);
+      if Count = Device_Count'Last then
+         Rose.Console_IO.Put_Line ("pci: too many devices");
+         return;
       end if;
+
+      Count := Count + 1;
+      Table (Count) := Item;
+
+      Rose.Console_IO.Put (Word_8 (Item.Bus));
+      Rose.Console_IO.Put (":");
+      Rose.Console_IO.Put (Word_8 (Item.Slot));
+      Rose.Console_IO.Put (".");
+      Rose.Console_IO.Put (Natural (Item.Fn));
+      Rose.Console_IO.Put (" ");
+      Rose.Console_IO.Put (Word_16 (Item.Vendor));
+      Rose.Console_IO.Put (":");
+      Rose.Console_IO.Put (Word_16 (Item.Device));
+      if Item.Interrupt_Line /= No_Interrupt then
+         Rose.Console_IO.Put (" irq ");
+         Rose.Console_IO.Put (Item.Interrupt_Line);
+      end if;
+      Rose.Console_IO.New_Line;
    end Add_Device;
 
-   ---------------------
-   -- Find_Device_Cap --
-   ---------------------
+   ----------
+   -- Find --
+   ----------
 
-   function Find_Device_Cap
-     (Vendor, Device : Rose.Words.Word_16)
-      return Rose.Capabilities.Capability
+   function Find
+     (Vendor, Device : Rose.Words.Word_32;
+      Index          : Natural)
+      return Device_Count
    is
+      use type Rose.Words.Word_32;
+      Seen : Natural := 0;
    begin
-      for Index in 1 .. PCI_Device_Count loop
-         declare
-            use type Rose.Words.Word_16;
-            Item : PCI_Device_Record renames Table (Index);
-         begin
-            if Item.Vendor = Vendor and then Item.Device = Device then
-               return Item.Cap;
+      for I in 1 .. Count loop
+         if Table (I).Vendor = Vendor and then Table (I).Device = Device then
+            if Seen = Index then
+               return I;
             end if;
-         end;
+            Seen := Seen + 1;
+         end if;
       end loop;
-      return Rose.Capabilities.Null_Capability;
-   end Find_Device_Cap;
+      return 0;
+   end Find;
 
-   -----------------
-   -- Get_Address --
-   -----------------
+   ----------
+   -- Find --
+   ----------
 
-   procedure Get_Device
-     (Device_EP  : Rose.Objects.Endpoint_Id;
-      Found      : out Boolean;
-      Bus        : out Rose.Devices.PCI.Bus_Type;
-      Slot       : out Rose.Devices.PCI.Device_Type;
-      Fn         : out Rose.Devices.PCI.Function_Type)
+   function Find
+     (Id : Rose.Objects.Capability_Identifier)
+      return Device_Count
    is
+      use type Rose.Objects.Capability_Identifier;
    begin
-      Found := False;
-      for Index in 1 .. PCI_Device_Count loop
-         declare
-            use type Rose.Objects.Endpoint_Id;
-            Item : PCI_Device_Record renames Table (Index);
-         begin
-            if Item.EP = Device_EP then
-               Found := True;
-               Bus := Item.Bus;
-               Slot := Item.Slot;
-               Fn := Item.Fn;
-               exit;
-            end if;
-         end;
+      for I in 1 .. Count loop
+         if Identifier (Table (I)) = Id then
+            return I;
+         end if;
       end loop;
-   end Get_Device;
+      return 0;
+   end Find;
 
---     ---------------
---     -- Read_Word --
---     ---------------
---
---     function Read_Word
---       (Bus  : Bus_Number;
---        Slot : Device_Number;
---        Fn   : Function_Number;
---        Reg  : Register_Number)
---        return Rose.Words.Word_32
---     is
---        use Rose.Words;
---        Address : constant Word_32 :=
---                    2 ** 31
---                    + Word_32 (Bus) * 2 ** 16
---                    + Word_32 (Slot) * 2 ** 11
---                    + Word_32 (Fn) * 2 ** 8
---                    + Word_32 (Reg) * 4;
---        Data    : Word_32;
---     begin
---        Data := PCI.Calls.Port_Out_In (Address);
---        return Data;
---     end Read_Word;
+   ---------
+   -- Get --
+   ---------
+
+   function Get (Index : Device_Index) return Device_Record is
+   begin
+      return Table (Index);
+   end Get;
+
+   ----------------
+   -- Identifier --
+   ----------------
+
+   function Identifier
+     (Item : Device_Record)
+      return Rose.Objects.Capability_Identifier
+   is
+      use type Rose.Objects.Capability_Identifier;
+   begin
+      return Rose.Objects.Capability_Identifier (Item.Bus) * 256
+        + Rose.Objects.Capability_Identifier (Item.Slot) * 8
+        + Rose.Objects.Capability_Identifier (Item.Fn);
+   end Identifier;
 
 end PCI.Devices;

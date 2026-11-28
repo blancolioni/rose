@@ -3,6 +3,8 @@ with Rose.System_Calls;
 with Rose.Words;
 
 with Rose.Init_Capabilities;
+with Rose.Interfaces.Devices.Pci_Bus.Client;
+with Rose.Interfaces.Devices.Pci_Device.Client;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Caps.Constructor.Client;
 with Rose.Interfaces.Processes.Launch.Client;
@@ -909,6 +911,127 @@ package body Init.Self_Tests is
       Run (With_Checkpoints => False);
       return Passed;
    end Page_Out_Test;
+
+   --------------
+   -- PCI_Test --
+   --------------
+
+   function PCI_Test
+     (Bus             : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean
+   is
+      use type Rose.Words.Word_32;
+      package Bus_Client renames Rose.Interfaces.Devices.Pci_Bus.Client;
+      package Device_Client renames
+        Rose.Interfaces.Devices.Pci_Device.Client;
+
+      IDE_Ids : constant array (1 .. 2) of Rose.Words.Word_32 :=
+                  (16#7010#, 16#7111#);
+      --  PIIX3's and PIIX4's IDE controllers, which ata knows
+
+      Passed     : Boolean := True;
+      Bus_Item   : Bus_Client.Pci_Bus_Client;
+      Device     : Device_Client.Pci_Device_Client;
+      IDE_Id     : Rose.Words.Word_32 := 0;
+
+      procedure Check (Name : String; Ok : Boolean);
+      --  Report the check Name, and fail the test if it did not hold.
+
+      -----------
+      -- Check --
+      -----------
+
+      procedure Check (Name : String; Ok : Boolean) is
+      begin
+         Init.Calls.Send_String (Standard_Output, "pci test: ");
+         Init.Calls.Send_String (Standard_Output, Name);
+         Init.Calls.Send_String
+           (Standard_Output, (if Ok then ": ok" else ": FAIL"));
+         Init.Calls.Send_String (Standard_Output, (1 => NL));
+         Passed := Passed and then Ok;
+      end Check;
+
+   begin
+      Bus_Client.Open (Bus_Item, Bus);
+
+      for Id of IDE_Ids loop
+         Device := Bus_Client.Find_Device (Bus_Item, 16#8086#, Id, 0);
+         if not Bus_Client.Has_Error then
+            IDE_Id := Id;
+            exit;
+         end if;
+      end loop;
+
+      Check ("IDE controller found", IDE_Id /= 0);
+      if IDE_Id = 0 then
+         return False;
+      end if;
+
+      declare
+         Second : constant Device_Client.Pci_Device_Client :=
+                    Bus_Client.Find_Device (Bus_Item, 16#8086#, IDE_Id, 1);
+         pragma Unreferenced (Second);
+      begin
+         Check ("no second IDE controller", Bus_Client.Has_Error);
+      end;
+
+      Check ("vendor id read back",
+             Device_Client.Vendor_Id (Device) = 16#8086#
+             and then Device_Client.Read_Config (Device, 0) mod 65536
+                        = 16#8086#);
+
+      declare
+         Is_IO      : Boolean;
+         Base, Size : Rose.Words.Word_32;
+      begin
+         Device_Client.Get_Bar (Device, 4, Is_IO, Base, Size);
+         Check ("BAR 4 is 16 I/O ports",
+                not Device_Client.Has_Error and then Is_IO
+                and then Size = 16 and then Base /= 0);
+      end;
+
+      declare
+         Old  : constant Rose.Words.Word_32 :=
+                  Device_Client.Read_Config (Device, 1) mod 65536;
+      begin
+         Device_Client.Set_Command (Device, Old and 16#0407#);
+         Check ("command register written back unchanged",
+                not Device_Client.Has_Error
+                and then Device_Client.Read_Config (Device, 1) mod 65536
+                           = Old);
+
+         Device_Client.Set_Command (Device, 16#0100#);
+         Check ("other command bits refused",
+                Device_Client.Has_Error
+                and then Device_Client.Read_Config (Device, 1) mod 65536
+                           = Old);
+      end;
+
+      declare
+         Owner  : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
+         Other  : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
+         Client : Device_Client.Pci_Device_Client;
+         Cap    : constant Rose.Capabilities.Capability :=
+                    Init.Grants.PCI_Device
+                      (Owner, Bus, 16#8086#, IDE_Id, 0, Client);
+      begin
+         Check ("device granted", Cap /= Rose.Capabilities.Null_Capability);
+         Check ("BAR 4 ports granted",
+                Cap /= Rose.Capabilities.Null_Capability
+                and then Init.Grants.PCI_Ports
+                  (Owner, Client, 4,
+                   Rose.Init_Capabilities.Port_In_Range_Endpoint,
+                   Rose.Init_Capabilities.Port_Size_8)
+                /= Rose.Capabilities.Null_Capability);
+         Check ("device refused to another owner",
+                Init.Grants.PCI_Device
+                  (Other, Bus, 16#8086#, IDE_Id, 0, Client)
+                = Rose.Capabilities.Null_Capability);
+      end;
+
+      return Passed;
+   end PCI_Test;
 
    -------------
    -- Replace --

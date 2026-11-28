@@ -67,11 +67,15 @@ When a timer expires, it invokes the timer's capability without waiting for a re
 
 === `pci`
 
-Scans the PCI bus.
+Scans the PCI bus at every boot: every bus and slot, and every function of a device that has more than one.
+It decodes each device's base address registers (BARs) by writing ones to them with the device's decoding switched off, and reads its interrupt line.
+It leaves the BARs of displays and bridges alone: switching off a display's decoding would hide the boot console's screen, and a bridge can use those registers for other things.
 
-Provides:: A lookup of a device by its vendor and device ids, which returns a capability for that device.
+Provides:: `Devices.PCI_Bus`, whose `Find_Device` gives the Nth device with a vendor and device id, as a `Devices.PCI_Device` (#292).
+  A device's capability has its bus, slot and function as its identifier, so it names the same device after a restore, whatever order the bus is scanned in.
+  `PCI_Device` reads the device's configuration registers, gives its decoded BARs and its interrupt line, and writes its command register: I/O space, memory space, bus master and interrupt disable, and no other bit.
 Launched with:: The PCI configuration ports `CF8` and `CFC`.
-Used by:: `ata`, to find its controller.
+Used by:: `ata`, to find its controller, and `init`, which gives drivers their devices.
 
 === `ata`
 

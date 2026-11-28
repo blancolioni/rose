@@ -70,6 +70,19 @@ package Init.Self_Tests is
    --  probes. It reports each check on Standard_Output, and is True if
    --  they all passed.
 
+   function PCI_Test
+     (Bus             : Rose.Capabilities.Capability;
+      Standard_Output : Rose.Capabilities.Capability)
+      return Boolean;
+   --  Check the pci server's interfaces (#292) on the IDE controller that
+   --  ata uses, found through Bus, the pci server's PCI_Bus: that it is
+   --  found once and only once, that its vendor id reads back, that BAR 4
+   --  decodes as 16 I/O ports, that its command register can be written
+   --  back unchanged and that a write of any other bit is refused, and
+   --  that init grants the device to one owner only, and the ports of its
+   --  BAR 4. It reports each check on Standard_Output, and is True if they
+   --  all passed.
+
    function Page_Out_Test
      (Find_Cap        : Rose.Capabilities.Capability;
       Standard_Output : Rose.Capabilities.Capability;

@@ -87,6 +87,15 @@
 16#1ED0_6D27_A475_7BB6#  rose.interfaces.devices.network_device.notify(in capability)
 16#E6CD_F3BB_3837_A350#  rose.interfaces.devices.network_device.send_frame(in stream_element_array)
 16#BB05_A7EE_5B9D_D4BE#  rose.interfaces.devices.network_device.receive_frame(out stream_element_array; out stream_element_offset)
+16#0608_4918_7750_482F#  interface rose.interfaces.devices.pci_bus
+16#7AE2_C8B9_F62F_CE89#  rose.interfaces.devices.pci_bus.find_device(in word_32; in word_32; in natural) return interface rose.interfaces.devices.pci_device
+16#EAF8_68FA_B90C_2164#  interface rose.interfaces.devices.pci_device
+16#5324_623B_3197_27C9#  rose.interfaces.devices.pci_device.vendor_id return word_32
+16#3D83_3A99_25E1_DC85#  rose.interfaces.devices.pci_device.device_id return word_32
+16#880F_DA35_B384_0CE3#  rose.interfaces.devices.pci_device.read_config(in natural) return word_32
+16#E3ED_97DC_6B53_BBC2#  rose.interfaces.devices.pci_device.set_command(in word_32)
+16#DBAB_550B_8660_6412#  rose.interfaces.devices.pci_device.get_bar(in natural; out boolean; out word_32; out word_32)
+16#9E71_487F_6502_B774#  rose.interfaces.devices.pci_device.interrupt_line return natural
 16#287F_188F_36A1_0F16#  interface rose.interfaces.files.directory
 16#73CC_523C_3838_6440#  rose.interfaces.files.directory.entry_file_kind(in positive) return rose.interfaces.files.directory.file_kind
 16#AC27_39EA_3493_1BEC#  rose.interfaces.files.directory.entry_size(in positive) return storage_count
