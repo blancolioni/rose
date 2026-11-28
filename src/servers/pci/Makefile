@@ -18,9 +18,13 @@ OBJECTS= \
 	$(BUILDDIR)/rose-devices-pci-server.o \
 	$(BUILDDIR)/rose-devices-port_io.o \
 	$(BUILDDIR)/rose-interfaces.o \
+	$(BUILDDIR)/rose-interfaces-devices.o \
+	$(BUILDDIR)/rose-interfaces-devices-pci_bus-server.o \
+	$(BUILDDIR)/rose-interfaces-devices-pci_device-server.o \
 	$(BUILDDIR)/rose-interfaces-streams-writer.o \
 	$(BUILDDIR)/rose-interfaces-streams-writer-client.o \
 	$(BUILDDIR)/rose-invocation.o \
+	$(BUILDDIR)/rose-server.o \
 	$(BUILDDIR)/rose-system_calls.o \
 	$(BUILDDIR)/rose-system_calls-client.o \
 	$(BUILDDIR)/rose-system_calls-server.o \

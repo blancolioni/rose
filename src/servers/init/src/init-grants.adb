@@ -4,6 +4,7 @@ with Rose.Init_Capabilities;
 with Rose.Invocation;
 with Rose.System_Calls;
 
+with Rose.Interfaces.Devices.Pci_Bus.Client;
 with Rose.Interfaces.Storage.Bank.Client;
 with Rose.Interfaces.Storage.Store.Client;
 
@@ -20,6 +21,20 @@ package body Init.Grants is
    Tag_Buffer : System.Storage_Elements.Storage_Array (0 .. 31);
    --  Room for the start of the framebuffer tag, up to its type.  It is
    --  not on the stack, which is small in init.
+
+   Max_PCI_Claims : constant := 16;
+
+   type PCI_Claim is
+      record
+         Vendor, Device, Index : Rose.Words.Word;
+         Owner                 : Owner_Id;
+      end record;
+
+   PCI_Claims      : array (1 .. Max_PCI_Claims) of PCI_Claim;
+   PCI_Claim_Count : Natural := 0;
+   --  The PCI devices given to programs. A device is known to init by
+   --  its ids and its index among devices with those ids, since its
+   --  address is in the identifier of its cap, which init can't read.
 
    Max_Grants : constant := 32;
 
@@ -259,6 +274,104 @@ package body Init.Grants is
       Last_Owner := Last_Owner + 1;
       return Last_Owner;
    end Next_Owner;
+
+   ----------------
+   -- PCI_Device --
+   ----------------
+
+   function PCI_Device
+     (Owner  : Owner_Id;
+      Bus    : Rose.Capabilities.Capability;
+      Vendor : Rose.Words.Word;
+      Device : Rose.Words.Word;
+      Index  : Rose.Words.Word;
+      Client : out Rose.Interfaces.Devices.Pci_Device.Client
+                     .Pci_Device_Client)
+      return Rose.Capabilities.Capability
+   is
+      package Bus_Client renames Rose.Interfaces.Devices.Pci_Bus.Client;
+      Bus_Item : Bus_Client.Pci_Bus_Client;
+   begin
+      for Item of PCI_Claims (1 .. PCI_Claim_Count) loop
+         if Item.Vendor = Vendor and then Item.Device = Device
+           and then Item.Index = Index and then Item.Owner /= Owner
+         then
+            return Rose.Capabilities.Null_Capability;
+         end if;
+      end loop;
+
+      if PCI_Claim_Count = Max_PCI_Claims then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Bus_Client.Open (Bus_Item, Bus);
+      Client := Bus_Client.Find_Device
+        (Bus_Item, Vendor, Device, Natural (Index));
+      if Bus_Client.Has_Error then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      PCI_Claim_Count := PCI_Claim_Count + 1;
+      PCI_Claims (PCI_Claim_Count) := (Vendor, Device, Index, Owner);
+
+      return Rose.Interfaces.Devices.Pci_Device.Client.Get_Interface_Cap
+        (Client);
+   end PCI_Device;
+
+   -------------------
+   -- PCI_Interrupt --
+   -------------------
+
+   function PCI_Interrupt
+     (Owner  : Owner_Id;
+      Device : Rose.Interfaces.Devices.Pci_Device.Client.Pci_Device_Client)
+      return Rose.Capabilities.Capability
+   is
+      package Device_Client renames
+        Rose.Interfaces.Devices.Pci_Device.Client;
+      Line : constant Natural := Device_Client.Interrupt_Line (Device);
+   begin
+      if Device_Client.Has_Error or else Line > 15 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Interrupt
+        (Owner,
+         Rose.Init_Capabilities.First_Device_Vector + Rose.Words.Word (Line));
+   end PCI_Interrupt;
+
+   ---------------
+   -- PCI_Ports --
+   ---------------
+
+   function PCI_Ports
+     (Owner    : Owner_Id;
+      Device   : Rose.Interfaces.Devices.Pci_Device.Client
+                   .Pci_Device_Client;
+      BAR      : Rose.Words.Word;
+      Endpoint : Rose.Words.Word;
+      Size     : Rose.Words.Word)
+      return Rose.Capabilities.Capability
+   is
+      package Device_Client renames
+        Rose.Interfaces.Devices.Pci_Device.Client;
+      Is_IO      : Boolean;
+      Base, Span : Rose.Words.Word_32;
+   begin
+      if BAR > 5 then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      Device_Client.Get_Bar (Device, Natural (BAR), Is_IO, Base, Span);
+
+      if Device_Client.Has_Error or else not Is_IO or else Span = 0
+        or else Base > 16#FFFF# or else Span > 16#1_0000# - Base
+      then
+         return Rose.Capabilities.Null_Capability;
+      end if;
+
+      return Ports (Owner, Endpoint, Size, Base, Base + Span - 1);
+   end PCI_Ports;
 
    -----------
    -- Ports --

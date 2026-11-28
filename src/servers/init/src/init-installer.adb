@@ -4,6 +4,7 @@ with Rose.Init_Capabilities;
 with Rose.Limits;
 with Rose.Objects;
 
+with Rose.Interfaces.Devices.Pci_Device.Client;
 with Rose.Interfaces.Processes.Starting_Process.Client;
 with Rose.Interfaces.Storage.Region.Client;
 with Rose.Interfaces.Streams.Reader.Client;
@@ -175,6 +176,12 @@ package body Init.Installer is
 
       Owner : constant Init.Grants.Owner_Id := Init.Grants.Next_Owner;
       Text  : String renames Grant_Text;
+
+      PCI_Client : Rose.Interfaces.Devices.Pci_Device.Client
+                     .Pci_Device_Client;
+      Have_PCI   : Boolean := False;
+      --  The device that the last pci-device request gave, which the
+      --  pci-port and pci-interrupt requests after it are for (#292)
       Last  : Natural := 0;
       Index : Positive := 1;
 
@@ -188,7 +195,7 @@ package body Init.Installer is
       procedure Request (Line : String) is
          Name      : String (1 .. 32);
          Name_Last : Natural := 0;
-         Values    : array (1 .. 2) of Rose.Words.Word := (others => 0);
+         Values    : array (1 .. 3) of Rose.Words.Word := (others => 0);
          Count     : Natural := 0;
          Position  : Positive := Line'First;
          Bad       : Boolean := False;
@@ -238,24 +245,65 @@ package body Init.Installer is
                exit;
             end if;
             Count := Count + 1;
-            while Position <= Line'Last
-              and then not Is_Space (Line (Position))
-            loop
-               if Line (Position) in '0' .. '9'
-                 and then Values (Count) < 2 ** 24
+
+            --  A number is decimal, or hexadecimal after 0x, as PCI ids
+            --  are always written (#292).
+
+            declare
+               Base : Rose.Words.Word := 10;
+            begin
+               if Position < Line'Last
+                 and then Line (Position) = '0'
+                 and then Line (Position + 1) in 'x' | 'X'
                then
-                  Values (Count) :=
-                    Values (Count) * 10
-                    + Character'Pos (Line (Position)) - 48;
-               else
-                  Bad := True;
+                  Base := 16;
+                  Position := Position + 2;
+                  if Position > Line'Last
+                    or else Is_Space (Line (Position))
+                  then
+                     Bad := True;
+                  end if;
                end if;
-               Position := Position + 1;
-            end loop;
+
+               while Position <= Line'Last
+                 and then not Is_Space (Line (Position))
+               loop
+                  declare
+                     Ch    : constant Character := Line (Position);
+                     Digit : constant Integer :=
+                               (case Ch is
+                                   when '0' .. '9' =>
+                                     Character'Pos (Ch) - 48,
+                                   when 'a' .. 'f' =>
+                                     Character'Pos (Ch) - 87,
+                                   when 'A' .. 'F' =>
+                                     Character'Pos (Ch) - 55,
+                                   when others     => -1);
+                  begin
+                     if Digit in 0 .. Integer (Base) - 1
+                       and then Values (Count) < 2 ** 24
+                     then
+                        Values (Count) :=
+                          Values (Count) * Base + Rose.Words.Word (Digit);
+                     else
+                        Bad := True;
+                     end if;
+                  end;
+                  Position := Position + 1;
+               end loop;
+            end;
          end loop;
 
          declare
             N : String renames Name (1 .. Name_Last);
+
+            function PCI_Port
+              (Endpoint, Size : Rose.Words.Word)
+               return Rose.Capabilities.Capability
+            is (Init.Grants.PCI_Ports
+                  (Owner, PCI_Client, Values (1), Endpoint, Size));
+            --  The ports of BAR Values (1) of the device that the last
+            --  pci-device request gave.
 
             function Port
               (Single, Ranged : Rose.Words.Word)
@@ -288,6 +336,38 @@ package body Init.Installer is
             elsif N = "device-pages" and then Count = 2 then
                Cap := Init.Grants.Device_Pages
                  (Owner, Values (1), Values (2));
+            elsif N = "pci-device" and then Count = 3 then
+               Cap := Init.Grants.PCI_Device
+                 (Owner, Init.Boot.PCI_Cap,
+                  Values (1), Values (2), Values (3), PCI_Client);
+               Have_PCI := Cap /= Rose.Capabilities.Null_Capability;
+            elsif N = "pci-interrupt" and then Count = 0 and then Have_PCI
+            then
+               Cap := Init.Grants.PCI_Interrupt (Owner, PCI_Client);
+            elsif N = "pci-port-in-8" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_In_Range_Endpoint,
+                                Init_Caps.Port_Size_8);
+            elsif N = "pci-port-in-16" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_In_Range_Endpoint,
+                                Init_Caps.Port_Size_16);
+            elsif N = "pci-port-in-32" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_In_Range_Endpoint,
+                                Init_Caps.Port_Size_32);
+            elsif N = "pci-port-out-8" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_Out_Range_Endpoint,
+                                Init_Caps.Port_Size_8);
+            elsif N = "pci-port-out-16" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_Out_Range_Endpoint,
+                                Init_Caps.Port_Size_16);
+            elsif N = "pci-port-out-32" and then Count = 1 and then Have_PCI
+            then
+               Cap := PCI_Port (Init_Caps.Port_Out_Range_Endpoint,
+                                Init_Caps.Port_Size_32);
             elsif N = "framebuffer" and then Count = 0 then
                Cap := Init.Grants.Framebuffer (Owner);
             elsif N = "bank" and then Count = 2 then

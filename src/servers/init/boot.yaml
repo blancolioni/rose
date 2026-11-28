@@ -176,7 +176,7 @@ stages:
         - {ports: [out, 32, 0xCFC, 0xCFC]}
         - {ports: [in, 32, 0xCFC, 0xCFC]}
       exports:
-        pci: 450
+        pci: Devices.Pci_Bus.Pci_Bus_Interface
 
     - launch: ata
       oid: 6

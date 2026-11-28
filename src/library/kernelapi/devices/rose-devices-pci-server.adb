@@ -2,8 +2,14 @@ with Rose.Devices.Port_IO;
 
 package body Rose.Devices.PCI.Server is
 
-   Last_Get_Address  : Rose.Words.Word_32 := Rose.Words.Word_32'Last;
-   Last_Get_Data     : Rose.Words.Word_32 := 0;
+   function Register_Address
+     (Bus      : Bus_Type;
+      Device   : Device_Type;
+      Fn       : Function_Type;
+      Register : Register_32)
+      return Rose.Words.Word_32
+   is (Rose.Words.Word_32 (To_Address (Bus, Device, Fn))
+       + Rose.Words.Word_32 (Register) * 4);
 
    ---------
    -- Get --
@@ -18,13 +24,11 @@ package body Rose.Devices.PCI.Server is
       Register         : Register_8)
       return Rose.Words.Word_8
    is
-      use Rose.Words;
-      R_32  : constant Register_32 := Register_32 (Register / 4);
-      Value : constant Rose.Words.Word_32 :=
-                Get (Command_Out_Port, Data_In_Port,
-                     Bus, Device, Fn, R_32);
    begin
-      return Word_8 (Value / 2 ** (Natural (Register) mod 4 * 8) mod 2 ** 8);
+      return Byte_Of
+        (Get (Command_Out_Port, Data_In_Port,
+              Bus, Device, Fn, Register_32 (Register / 4)),
+         Register);
    end Get;
 
    ---------
@@ -41,10 +45,9 @@ package body Rose.Devices.PCI.Server is
       return Rose.Words.Word_16
    is
       use Rose.Words;
-      R_32  : constant Register_32 := Register_32 (Register / 2);
       Value : constant Rose.Words.Word_32 :=
                 Get (Command_Out_Port, Data_In_Port,
-                     Bus, Device, Fn, R_32);
+                     Bus, Device, Fn, Register_32 (Register / 2));
    begin
       if Register mod 2 = 0 then
          return Word_16 (Value mod 65536);
@@ -66,17 +69,29 @@ package body Rose.Devices.PCI.Server is
       Register         : Register_32)
       return Rose.Words.Word_32
    is
-      use Rose.Words;
-      Address : constant Rose.Words.Word :=
-                  Word_32 (To_Address (Bus, Device, Fn))
-                  + Word_32 (Register) * 4;
    begin
-      if Last_Get_Address /= Address then
-         Rose.Devices.Port_IO.Port_Out_32 (Command_Out_Port, Address);
-         Last_Get_Data := Rose.Devices.Port_IO.Port_In_32 (Data_In_Port);
-         Last_Get_Address := Address;
-      end if;
-      return Last_Get_Data;
+      Rose.Devices.Port_IO.Port_Out_32
+        (Command_Out_Port, Register_Address (Bus, Device, Fn, Register));
+      return Rose.Devices.Port_IO.Port_In_32 (Data_In_Port);
    end Get;
+
+   ---------
+   -- Put --
+   ---------
+
+   procedure Put
+     (Command_Out_Port : Rose.Capabilities.Capability;
+      Data_Out_Port    : Rose.Capabilities.Capability;
+      Bus              : Bus_Type;
+      Device           : Device_Type;
+      Fn               : Function_Type;
+      Register         : Register_32;
+      Value            : Rose.Words.Word_32)
+   is
+   begin
+      Rose.Devices.Port_IO.Port_Out_32
+        (Command_Out_Port, Register_Address (Bus, Device, Fn, Register));
+      Rose.Devices.Port_IO.Port_Out_32 (Data_Out_Port, Value);
+   end Put;
 
 end Rose.Devices.PCI.Server;
