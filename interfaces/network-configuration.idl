@@ -1,0 +1,25 @@
+--  The right to change how the network is configured (ADR 0007, section
+--  10). It is a privileged grant: its role has the category "network"
+--  (ADR 0021).
+
+interface Network.Configuration : Network.Status is
+
+   procedure Set_Static
+     (Address       : String;
+      Prefix_Length : Natural;
+      Gateway       : String);
+   --  Stop using DHCP, release the lease if there is one, and use this
+   --  address. The name servers are emptied. Fails if an argument isn't
+   --  an address, or Prefix_Length is too long for it.
+
+   procedure Add_Name_Server (Address : String);
+   --  Fails if Address isn't an address.
+
+   procedure Use_DHCP;
+   --  Forget a static address, and ask DHCP for one.
+
+   procedure Renew_Lease;
+   --  Ask the DHCP server to renew the lease now. Fails if the address
+   --  is static.
+
+end Network.Configuration;

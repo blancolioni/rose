@@ -1,0 +1,12 @@
+--  Names for remote hosts (ADR 0007, section 4). There is no global
+--  namespace: a name means what the resolver a program was given says.
+--  A resolver returns only hosts that its own Remote_Hosts cap grants,
+--  so it can't widen a program's authority.
+
+interface Network.Resolver is
+
+   function Resolve (Name : String) return interface Network.Host;
+   --  Fails if the name has no address, or its address is outside the
+   --  resolver's set.
+
+end Network.Resolver;

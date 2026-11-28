@@ -1,0 +1,12 @@
+--  A listening TCP port (ADR 0007, section 3). Release stops listening,
+--  and frees the port (ADR 0010). It survives a restore, with its queue
+--  of waiting connections emptied (section 6).
+
+interface Network.Listener : Common.Resource is
+
+   function Accept_Connection return interface Network.Connection;
+   --  The next connection from a remote host, waiting until one comes.
+   --  net holds the request meanwhile, so the wait stops only the
+   --  caller.
+
+end Network.Listener;

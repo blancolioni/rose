@@ -1,0 +1,1 @@
+role Network.Resolver_Service : Network.Resolver;
