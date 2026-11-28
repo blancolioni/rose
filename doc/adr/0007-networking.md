@@ -1,6 +1,6 @@
 # 7. Networking
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-26
 - **Revised:** 2026-11-27, to follow the ADRs written since (interface groups, signals, abilities as interfaces, privilege, petal paths, the clock, random numbers, copy before write, replacement)
 - **Related:** #290 (this decision), #1182 (0.5.0 networking), [ADR 0001](0001-capability-revocation.md) (revocation), [ADR 0002](0002-typed-commands-and-directory-caps.md) (typed commands), [ADR 0004](0004-restore-notification.md) (restore notification), [ADR 0006](0006-signals.md) (signals), [ADR 0016](0016-random-numbers.md) (random numbers), [ADR 0020](0020-clock.md) (clock), [ADR 0021](0021-privilege.md) (privilege), [ADR 0030](0030-copy-before-write-during-a-checkpoint.md) (copy before write), [ADR 0032](0032-replacing-a-running-process.md) (replacement), [ADR 0034](0034-interface-packages.md) (interface packages), [ADR 0044](0044-petal-paths-as-uri-references.md) (petal paths), #1148 (interfaces for abilities), #291 to #301 (project 59 (Networking))
