@@ -20,10 +20,11 @@
 
 exec               drivers  launch
 
-# The keyboard comes first, because the console reads it. It writes
-# nothing, so it doesn't need the persistent console.
+# The PS/2 controller's driver comes first, because the console reads
+# its keyboard. It writes nothing, so it doesn't need the persistent
+# console. It drives the mouse too (#588).
 
-keyboard           drivers  launch  provides_keyboard_interface
+ps2                drivers  launch  provides_keyboard_interface
 
 # With a framebuffer, the screen driver holds it, and the keys go to the
 # screen (ADR 0022, #582, #653).

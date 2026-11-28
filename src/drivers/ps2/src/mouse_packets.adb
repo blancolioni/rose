@@ -116,6 +116,15 @@ package body Mouse_Packets is
    -- Reset --
    -----------
 
+   procedure Reset (Item : out Combiner) is
+   begin
+      Item := (Buttons => 0, Held => False, Sum => (others => <>));
+   end Reset;
+
+   -----------
+   -- Reset --
+   -----------
+
    procedure Reset
      (Item  : in out Decoder;
       Wheel : Boolean)

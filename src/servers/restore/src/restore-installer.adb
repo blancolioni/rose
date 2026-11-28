@@ -64,6 +64,10 @@ package body Restore.Installer is
    Clock_Ancestor         : constant := 1;
    --  The ancestor of Clock_Admin (interfaces/clock_admin.idl).
 
+   Event_Source_Ancestor  : constant := 1;
+   --  The keyboard's ancestor of Input_Controller, which the ps2 driver
+   --  publishes (interfaces/devices-input_controller.idl, #588).
+
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Screen_Surface_Cap     : Rose.Capabilities.Capability :=
@@ -905,9 +909,16 @@ package body Restore.Installer is
                         Rose.System_Calls.Invoke_Capability (Reply);
 
                         if Flags (Provides_Keyboard_Interface) then
+
+                           --  The ps2 driver publishes Input_Controller,
+                           --  whose ancestors are the keyboard and the
+                           --  mouse (#588).
+
                            Keyboard_Interface_Cap :=
-                             Get_Public_Interface_From_Process
-                               (Rose.Invocation.Sent_Cap (Reply, 0));
+                             Get_Ancestor_Interface
+                               (Get_Public_Interface_From_Process
+                                  (Rose.Invocation.Sent_Cap (Reply, 0)),
+                                Event_Source_Ancestor);
                         end if;
 
                         if Flags (Provides_Clock) then

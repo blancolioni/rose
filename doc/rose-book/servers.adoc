@@ -206,15 +206,22 @@ Provides:: `Map` (`Add`, `Remove`, `Find`), from a command's name to its launch 
 Requests:: `create-endpoint`.
 Used by:: `init`, which adds the commands it installs and launches the shell from the registry, and the shell, which finds commands by name.
 
-=== `keyboard`
+=== `ps2`
 
-The driver for the PC keyboard.
+The driver for the PS/2 controller: the PC keyboard, and the mouse (#588).
+It was `keyboard` until 0.5.0.
+One process drives both, because both send their bytes through the controller's one data port; the status port says whose each byte is.
 
-Provides:: `Event_Source`, whose `Add_Listener` registers the one listener that receives each key.
-Requests:: `create-endpoint`, `register-interrupt 33`, and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
-Used by:: `vga-console`.
+Provides:: `Input_Controller`, published, whose ancestors are `Event_Source`, whose `Add_Listener` registers the one listener that receives each key, and `Pointer_Source`, whose `Add_Pointer_Listener` registers the one listener that receives the mouse's movement and buttons; and `Restorable`.
+Requests:: `create-endpoint`, `register-interrupt 33` and `register-interrupt 44` (the keyboard's IRQ 1 and the mouse's IRQ 12), and the ports `96` and `100` (`60` and `64` hexadecimal) for input and output.
+Used by:: `vga-console`, which is given the `Event_Source`, and `screen`.
 
-`keyboard` gives keys, each with the modifiers that were held (`Rose.Keys`, #734).
+At start, and again when it is restored, since a new boot leaves the controller's second port off, `ps2` sets the mouse up by polling, before it handles the interrupts: it enables the second port and its interrupt, sets the mouse's defaults, and asks whether it has a wheel, which makes its packets four bytes.
+A mouse that doesn't answer is left alone, and the keyboard works as before.
+`Mouse_Packets` decodes the packets; it does no I/O, and `make test-ps2` tests it on the host.
+The movement of the packets that arrive together, with the same buttons, is added up and sent in one `On_Pointer`; a change of buttons is sent on its own.
+
+`ps2` gives keys, each with the modifiers that were held (`Rose.Keys`, #734).
 A key is the Unicode code point of the character that it types, or a named key above the code points: the arrows, Home, End, Page Up, Page Down, Insert, Delete and F1 to F12.
 Ctrl with a letter gives its control character.
 It maps scan codes through a layout table with an AltGr level and dead keys; only the US layout exists, and choosing another is #743.

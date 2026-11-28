@@ -52,6 +52,9 @@ package Mouse_Packets with Pure is
    --  listener is called once for a run of them. A change of buttons is
    --  never combined with the movement around it.
 
+   procedure Reset (Item : out Combiner);
+   --  Hold nothing, with no buttons down.
+
    procedure Add
      (Item  : in out Combiner;
       Event : Pointer_Event;
