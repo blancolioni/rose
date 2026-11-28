@@ -1,0 +1,28 @@
+project Trellis_Layout_Tests is
+
+   --  The tests of trellis's layout arithmetic (#583), built and run on
+   --  the host with its own GNAT and run-time system:
+   --
+   --     gprbuild -P trellis_layout_tests.gpr && ./build/test_trellis_layout
+   --
+   --  or "make test-surfaces" at the top. Trellis_Layout needs only Rose
+   --  and Rose.Words.
+
+   for Source_Dirs use (".", "../src", "../../../base");
+   for Source_Files use
+     ("test_trellis_layout.adb",
+      "rose.ads",
+      "rose-words.ads",
+      "trellis_layout.ads",
+      "trellis_layout.adb");
+   for Object_Dir use "build";
+   for Exec_Dir use "build";
+   for Main use ("test_trellis_layout.adb");
+
+   package Compiler is
+      for Default_Switches ("ada") use
+        ("-g", "-gnat12", "-gnata", "-gnatwa", "-gnatVa",
+         "-gnatyabcefhiklmnoprst", "-gnatyM79");
+   end Compiler;
+
+end Trellis_Layout_Tests;
