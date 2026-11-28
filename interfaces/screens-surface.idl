@@ -54,6 +54,9 @@ interface Screens.Surface : Common.Resource is
    --        Focused is 1 when the surface has the keyboard, and 0 when
    --        it has lost it.
    --     Kind 4, Size:     Kind, Width, Height, 0
+   --     Kind 5, Wheel:    Kind, Steps, 0, 0
+   --        Steps is an Integer_32 word: how far the wheel turned,
+   --        positive towards the user (#588).
    --
    --  A Read returns the whole events that are ready, and waits only if
    --  there are none and Notify hasn't been called. This is a byte stream until typed streams exist

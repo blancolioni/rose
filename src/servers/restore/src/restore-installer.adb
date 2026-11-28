@@ -64,10 +64,17 @@ package body Restore.Installer is
    Clock_Ancestor         : constant := 1;
    --  The ancestor of Clock_Admin (interfaces/clock_admin.idl).
 
+   Event_Source_Ancestor  : constant := 1;
+   --  The keyboard's ancestor of Input_Controller, which the ps2 driver
+   --  publishes (interfaces/devices-input_controller.idl, #588).
+
    Keyboard_Interface_Cap : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Screen_Surface_Cap     : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+   Input_Controller_Cap   : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
+   --  The ps2 driver's Input_Controller, for Requires_Input_Controller.
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Terminal_Cap           : Rose.Capabilities.Capability :=
@@ -324,6 +331,8 @@ package body Restore.Installer is
                Matches := Word = "requires_console";
             when Test_Only =>
                Matches := Word = "test_only";
+            when Requires_Input_Controller =>
+               Matches := Word = "requires_input_controller";
          end case;
 
          if Matches then
@@ -863,6 +872,8 @@ package body Restore.Installer is
 
          if Flags (Requires_Keyboard_Interface) then
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         elsif Flags (Requires_Input_Controller) then
+            Rose.System_Calls.Send_Cap (Params, Input_Controller_Cap);
          elsif Flags (Requires_Screen) then
             Rose.System_Calls.Send_Cap (Params, Screen_Surface_Cap);
          elsif Flags (Requires_Console) then
@@ -905,9 +916,17 @@ package body Restore.Installer is
                         Rose.System_Calls.Invoke_Capability (Reply);
 
                         if Flags (Provides_Keyboard_Interface) then
-                           Keyboard_Interface_Cap :=
+
+                           --  The ps2 driver publishes Input_Controller,
+                           --  whose ancestors are the keyboard and the
+                           --  mouse (#588).
+
+                           Input_Controller_Cap :=
                              Get_Public_Interface_From_Process
                                (Rose.Invocation.Sent_Cap (Reply, 0));
+                           Keyboard_Interface_Cap :=
+                             Get_Ancestor_Interface
+                               (Input_Controller_Cap, Event_Source_Ancestor);
                         end if;
 
                         if Flags (Provides_Clock) then

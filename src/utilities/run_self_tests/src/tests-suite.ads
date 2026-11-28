@@ -80,6 +80,7 @@ package Tests.Suite is
                    Tests.Regions.Put_Limit_Test'Access,
                    Tests.Regions.Reuse_Test'Access,
                    Tests.Screen.Screen_Test'Access,
+                   Tests.Screen.Test_Surface_Test'Access,
                    Tests.Signals.Signal_Test'Access,
                    Tests.Banks.Dependent_Test'Access,
                    Tests.Banks.Reuse_Test'Access,

@@ -1,7 +1,7 @@
 with Rose.Keys;
 with Rose.Words;
 
-package Keyboard.Codes is
+package PS2.Key_Codes is
 
    type Key_Press is
       record
@@ -23,4 +23,4 @@ package Keyboard.Codes is
    --  nothing, and the key after one gives the character that the two
    --  compose, or both if they don't.
 
-end Keyboard.Codes;
+end PS2.Key_Codes;
