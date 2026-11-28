@@ -1,0 +1,2 @@
+role Network.Local_Ports_Service : Network.Local_Ports
+  with Category => "network";

@@ -1,0 +1,14 @@
+--  The right to reach one port on one remote address (ADR 0007, section
+--  3), the narrowest network grant.
+
+interface Network.Service is
+
+   function Connect return interface Network.Connection;
+   --  Open a TCP connection. Fails if the far end refuses it, or doesn't
+   --  answer.
+
+   function Open_Datagram return interface Network.Datagram;
+   --  A UDP endpoint that sends to, and receives from, this address and
+   --  port only.
+
+end Network.Service;

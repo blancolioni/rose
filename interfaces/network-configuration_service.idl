@@ -1,0 +1,2 @@
+role Network.Configuration_Service : Network.Configuration
+  with Category => "network";

@@ -1,0 +1,16 @@
+--  The right to reach one remote address, on any port (ADR 0007, section
+--  3). It holds authority, not state, so it keeps working across a
+--  restore.
+
+interface Network.Host is
+
+   function Address return String;
+
+   function Get_Service (Port : Natural) return interface Network.Service;
+   --  Fails if Port is 0 or more than 65535.
+
+   function Echo (Timeout : Natural) return Natural;
+   --  Send an ICMP echo request, and return the round-trip time in
+   --  milliseconds. Fails if no reply comes within Timeout milliseconds.
+
+end Network.Host;

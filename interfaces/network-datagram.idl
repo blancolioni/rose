@@ -1,0 +1,27 @@
+--  A UDP endpoint, connected to one remote address and port (ADR 0007,
+--  section 3). It has a bounded queue of received datagrams; a datagram
+--  that arrives when the queue is full is dropped. Release closes the
+--  endpoint, and frees its local port (ADR 0010). It survives a restore,
+--  with its queue emptied (section 6).
+
+interface Network.Datagram : Common.Resource is
+
+   procedure Send (Buffer : Stream_Element_Array);
+   --  Send Buffer as one datagram. Fails if it is too long for one.
+
+   procedure Receive
+     (Buffer : out Stream_Element_Array;
+      Last   : out Stream_Element_Offset);
+   --  Take the oldest datagram in the queue. A datagram longer than
+   --  Buffer is cut short. Waits until one arrives, unless Notify has
+   --  been called: then it never waits, and Last < Buffer'First if the
+   --  queue is empty.
+
+   procedure Notify (Signal : Capability);
+   --  Signal is a signal cap (ADR 0006), which net invokes, never
+   --  waiting, when a datagram arrives. From then on, Receive never
+   --  waits. A holder that is a server, and can't wait in Receive, such
+   --  as dns, calls Receive after each signal until it returns nothing.
+   --  A later Notify replaces the signal cap.
+
+end Network.Datagram;

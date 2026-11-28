@@ -1,0 +1,19 @@
+--  The right to reach a set of remote addresses (ADR 0007, section 3):
+--  every address, or one network after Restrict. Addresses are strings,
+--  such as "10.0.2.2", which net parses, so that IPv6 can come later
+--  without changing the interface.
+
+interface Network.Remote_Hosts is
+
+   function Get_Host (Address : String) return interface Network.Host;
+   --  Fails if Address isn't an address, or isn't in the set.
+
+   function Restrict
+     (Address       : String;
+      Prefix_Length : Natural)
+      return interface Network.Remote_Hosts;
+   --  The addresses in the network Address / Prefix_Length that are
+   --  also in this set. Fails if Address isn't an address, or
+   --  Prefix_Length is too long for it.
+
+end Network.Remote_Hosts;
