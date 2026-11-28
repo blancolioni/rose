@@ -16,7 +16,11 @@ package body IsoFS.Directories is
    --  Directory records: one for each entry, with "." and "..", of every
    --  directory that has been read (#651).
 
-   Max_Files       : constant := 64;
+   Max_Files       : constant := 256;
+   --  Every file opened, which keeps its entry: the install opens each
+   --  program's image and its .caps, and then the boot loader's files.
+   --  64 ran out once trellis (#583) and virtio_net (#295) were both
+   --  installed, and boot.fat couldn't be opened.
    Max_Readers     : constant := 20;
 
    Block_Device : Rose.Interfaces.Storage.Block_Array.Client
