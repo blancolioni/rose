@@ -277,14 +277,41 @@ package body Rose.Kernel.Capabilities.Arch is
                            end if;
                         end;
 
-                     when Data_16 =>
-                        Params.Data (I) :=
-                          Word (Rose.Arch.Port_In_16 (First_Port));
-                        Log (First_Port, Params.Data (I));
-                     when Data_32 =>
-                        Params.Data (I) :=
-                          Word (Rose.Arch.Port_In_32 (First_Port));
-                        Log (First_Port, Params.Data (I));
+                     when Data_16 | Data_32 =>
+
+                        --  With an offset, the whole value must be in the
+                        --  range, as a PCI device's registers are (#295).
+                        --  Without one, the first port is read, as before.
+
+                        declare
+                           Port  : Word_16 := First_Port;
+                           Width : constant Word_16 :=
+                                     (if Size = Data_16 then 2 else 4);
+                           Valid : Boolean := True;
+                        begin
+                           if Params.Control.Flags (Send_Words)
+                             and then I <= Params.Control.Last_Sent_Word
+                           then
+                              Valid := Params.Data (I) < 256;
+                              Port := Port + Word_16 (Params.Data (I) mod 256);
+                              Valid := Valid
+                                and then Port in First_Port .. Last_Port
+                                and then Last_Port - Port >= Width - 1;
+                           end if;
+
+                           if not Valid then
+                              Log_Error (Port, 0, "bad port");
+                              Params.Data (I) := Word'Last;
+                           elsif Size = Data_16 then
+                              Params.Data (I) :=
+                                Word (Rose.Arch.Port_In_16 (Port));
+                              Log (Port, Params.Data (I));
+                           else
+                              Params.Data (I) :=
+                                Word (Rose.Arch.Port_In_32 (Port));
+                              Log (Port, Params.Data (I));
+                           end if;
+                        end;
                      when Data_64 =>
                         Log_Error (First_Port, 0, "64-bit not available");
                   end case;

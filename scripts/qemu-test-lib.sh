@@ -30,6 +30,10 @@ DISK=$WORK/disk.img
 MONITOR=$WORK/monitor
 CONSOLE=$WORK/console
 QEMU_MEMORY=${QEMU_MEMORY:-32}
+NETWORK_CARD=${NETWORK_CARD:-virtio}
+# The machine's network card: virtio, which start_qemu gives the guest
+# (#293), or none, as under Bochs. check_install requires the virtio-net
+# driver's test only with the card (#295).
 first_user=fraser
 first_password=rose
 
@@ -304,6 +308,17 @@ check_install () {
     # Init's PCI test (#292) must have found the IDE controller's BARs.
     grep -q "pci test: BAR 4 is 16 I/O ports: ok" "$CONSOLE" \
         || { echo "FAIL: init's PCI test did not decode a BAR"; exit 1; }
+
+    # The virtio-net driver's test (#295) must have had two ARP replies
+    # from QEMU's gateway. The second shows that the card's interrupt
+    # line, which the kernel masks, was unmasked by the acknowledge.
+    if [ "$NETWORK_CARD" = virtio ]; then
+        grep -q "virtio-net test: ARP reply from 10.0.2.2: ok" "$CONSOLE" \
+            || { echo "FAIL: the virtio-net driver had no ARP reply"; exit 1; }
+        grep -q "virtio-net test: another reply after the acknowledge: ok" \
+            "$CONSOLE" \
+            || { echo "FAIL: the virtio-net driver's interrupt was not unmasked"; exit 1; }
+    fi
 
     # The kernel writes each swap of the swap test (ADR 0032, #862) to its
     # own log.

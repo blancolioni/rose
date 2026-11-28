@@ -29,6 +29,19 @@ package Rose.Arch.PIC is
    procedure Initialise_PIC;
    pragma Export (C, Initialise_PIC, "initialise_pic");
 
+   ELCR_1 : constant := 16#4D0#;
+   ELCR_2 : constant := 16#4D1#;
+   --  The edge/level control registers of the PIIX and later chipsets:
+   --  a set bit makes that IRQ level-triggered. The firmware sets the
+   --  lines that it gives to PCI devices.
+
    procedure Enable_IRQ (IRQ : Rose.Words.Word_8);
+
+   procedure Disable_IRQ (IRQ : Rose.Words.Word_8);
+   --  Mask IRQ at its PIC.
+
+   function Is_Level_Triggered (IRQ : Rose.Words.Word_8) return Boolean;
+   --  True if the chipset's edge/level control register says that IRQ is
+   --  level-triggered (#295).
 
 end Rose.Arch.PIC;

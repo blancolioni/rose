@@ -1,0 +1,42 @@
+with "../../../projects/checks.gpr";
+with "../../../rts/user/rose_rts.gpr";
+with "../../../projects/user_library.gpr";
+
+project Virtio_Net is
+
+   --  Built with the userland run-time system and the user-mode IDL
+   --  target, as ps2 is (#295). The interface packages and Rose's
+   --  userland packages come from user_library.gpr (#1067), and the RTS's
+   --  own units from rose_rts.gpr (#1080).
+
+   for Source_Dirs use
+      ("src",
+       "../../library/kernelapi/devices");
+   for Object_Dir use "./build/obj";
+   for Exec_Dir use "./build/bin";
+   for Main use ("virtio_net-driver.adb");
+
+   package Builder is
+      for Global_Configuration_Pragmas use "virtio_net-pragmas.config";
+      for Default_Switches ("ada") use ("-s", "-k", "-g", "-C", "-j2", "--RTS=../../../rts/user/build/i686-rose");
+      for Executable ("virtio_net-driver.adb") use "virtio_net";
+   end Builder;
+
+   package Compiler is
+      for Default_Switches ("ada") use ("-g", "-gnatwael", "-gnatVa", "-gnatyabcefhiklmnoprst", "-m32", "-gnat12", "-fno-strict-aliasing", "-nostdlib") & Checks.Switches
+        & Checks.Optimisation_Switches;
+   end Compiler;
+
+   package Binder is
+      for Default_Switches ("ada") use ("-E");
+   end Binder;
+
+   package Linker is
+      for Default_Switches ("ada") use ("-m32", "-Wl,-T../../linker.ld", "-ffreestanding", "-nostdlib", "../../../rts/user/start/start.o");
+   end Linker;
+
+   package Pretty_Printer is
+      for Default_Switches ("ada") use ("-M72");
+   end Pretty_Printer;
+
+end Virtio_Net;

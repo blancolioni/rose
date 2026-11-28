@@ -7,6 +7,7 @@ with Rose.Kernel.Processes;
 with Rose.Kernel.Processes.Debug;
 
 with Rose.Arch.Interrupts;
+with Rose.Arch.PIC;
 with Rose.Kernel.Interrupts;
 
 package body Rose.Kernel.Capabilities.Interrupt is
@@ -70,6 +71,12 @@ package body Rose.Kernel.Capabilities.Interrupt is
                  (Rose.Kernel.Processes.Current_Process_Id);
                Rose.Boot.Console.Put (": added handler for irq ");
                Rose.Boot.Console.Put (Natural (Vector));
+               if Vector in 32 .. 47
+                 and then Rose.Arch.PIC.Is_Level_Triggered
+                   (Rose.Words.Word_8 (Natural (Vector) - 32))
+               then
+                  Rose.Boot.Console.Put (" (level-triggered)");
+               end if;
                Rose.Boot.Console.New_Line;
 
                Rose.Kernel.Interrupts.Set_Handler
@@ -82,11 +89,64 @@ package body Rose.Kernel.Capabilities.Interrupt is
 
             end;
 
-            Params.Control.Flags :=
-              (Rose.Invocation.Reply  => True, others => False);
-            Rose.Kernel.Processes.Set_Current_State
-              (Rose.Kernel.Processes.Current_Process_Id,
-               Rose.Kernel.Processes.Ready);
+            --  A caller that receives caps gets the cap that
+            --  acknowledges the interrupt (#295). ps2 and ata receive
+            --  none, and see no change.
+
+            declare
+               use type Rose.Capabilities.Capability;
+               Pid     : constant Rose.Kernel.Processes.Process_Id :=
+                           Rose.Kernel.Processes.Current_Process_Id;
+               Ack_Cap : Rose.Capabilities.Capability :=
+                           Rose.Capabilities.Null_Capability;
+            begin
+               if Params.Control.Flags (Rose.Invocation.Recv_Caps) then
+                  Ack_Cap := Rose.Kernel.Processes.Create_Cap (Pid);
+                  if Ack_Cap /= Rose.Capabilities.Null_Capability then
+                     Rose.Kernel.Processes.Set_Cap
+                       (Pid    => Pid,
+                        Cap    => Ack_Cap,
+                        Layout =>
+                          (Header  =>
+                             (Cap_Type =>
+                                  Rose.Capabilities.Layout.Interrupt_Cap,
+                              Endpoint => Acknowledge_Endpoint,
+                              others   => <>),
+                           Payload => Rose.Objects."mod" (Cap.Payload, 64)));
+                  end if;
+               end if;
+
+               if Ack_Cap = Rose.Capabilities.Null_Capability then
+                  Params.Control.Flags :=
+                    (Rose.Invocation.Reply  => True, others => False);
+               else
+                  Params.Control.Flags :=
+                    (Rose.Invocation.Reply     => True,
+                     Rose.Invocation.Send_Caps => True,
+                     others                    => False);
+                  Params.Control.Last_Sent_Cap := 0;
+                  Params.Caps (0) := Ack_Cap;
+               end if;
+
+               Rose.Kernel.Processes.Set_Current_State
+                 (Pid, Rose.Kernel.Processes.Ready);
+            end;
+
+         when Acknowledge_Endpoint =>
+            declare
+               Vector : constant Rose.Arch.Interrupts.Interrupt_Vector :=
+                          Rose.Arch.Interrupts.Interrupt_Vector
+                            (Rose.Objects."mod" (Cap.Payload, 64));
+            begin
+               if Vector in 32 .. 47 then
+                  Rose.Arch.Interrupt_Table.Enable_Interrupt (Vector);
+               end if;
+               Params.Control.Flags :=
+                 (Rose.Invocation.Reply => True, others => False);
+               Rose.Kernel.Processes.Set_Current_State
+                 (Rose.Kernel.Processes.Current_Process_Id,
+                  Rose.Kernel.Processes.Ready);
+            end;
 
          when Derive_Endpoint =>
             declare

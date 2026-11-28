@@ -52,6 +52,12 @@ clock              drivers  launch  provides_clock
 
 caps               drivers  launch  provides_cap_sets requires_console
 
+# QEMU's virtio network card (#295). It writes to the console only on a
+# test install, or when the card won't start. Without a card, it serves
+# nothing.
+
+virtio_net         drivers  launch  requires_console
+
 # Saved, not launched: each file and directory is its own process,
 # launched when it is created (ADR 0003).
 

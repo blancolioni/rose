@@ -122,6 +122,12 @@ Only init has the capabilities for the last three, which give a capability that 
 An interrupt capability reserves an interrupt vector for a process to handle.
 Init holds one for the whole range of device vectors, whose `Derive` endpoint replies with a capability for one vector, so that a driver can reserve only its own.
 
+A PCI device's interrupt line is level-triggered: the device holds it until its driver has dealt with the device (#295).
+The kernel sends the end of interrupt to the PIC as soon as it has sent the interrupt to the driver, so the line would raise the interrupt again before the driver could run.
+So the kernel masks a level-triggered line when it sends its interrupt, and the driver unmasks it with an _acknowledge_ capability once it has dealt with the device.
+Reserving a vector replies with that capability if the caller receives capabilities, as `virtio_net` does; `ps2` and `ata`, whose lines are edge-triggered, receive none.
+The kernel reads which lines are level-triggered from the chipset's edge/level control registers (`4D0` and `4D1`), which the firmware sets for the lines that it gives to PCI devices.
+
 === Process Capabilities
 
 A process capability is used to communicate with a running process.

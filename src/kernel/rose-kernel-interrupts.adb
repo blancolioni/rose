@@ -1,6 +1,8 @@
 with Rose.Capabilities.Layout;
 with Rose.Invocation;
 
+with Rose.Arch.PIC;
+
 with Rose.Boot.Console;
 with Rose.Kernel.Processes;
 
@@ -35,6 +37,9 @@ package body Rose.Kernel.Interrupts is
             when Capability_Handler =>
                Handler_Object : Rose.Objects.Object_Id;
                Handler_Cap    : Rose.Capabilities.Capability;
+               Level          : Boolean;
+               --  The line is level-triggered, so it is masked until the
+               --  handler acknowledges the interrupt (#295).
          end case;
       end record;
 
@@ -93,6 +98,16 @@ package body Rose.Kernel.Interrupts is
                It.Ex.all;
                New_State := Finished;
             when Capability_Handler =>
+
+               --  A level-triggered line stays asserted until the driver
+               --  has dealt with its device, which it can't do before the
+               --  EOI that follows. So the line is masked, and the driver
+               --  unmasks it with its acknowledge cap (#295).
+
+               if It.Level then
+                  Rose.Arch.PIC.Disable_IRQ
+                    (Rose.Words.Word_8 (Natural (Interrupt) - 32));
+               end if;
                Send_Interrupt_Cap
                  (It.Handler_Object, It.Handler_Cap, Argument);
                --  The handler process is now ready; reschedule so that
@@ -272,7 +287,10 @@ package body Rose.Kernel.Interrupts is
    begin
       Interrupt_Handler_Count := Interrupt_Handler_Count + 1;
       Interrupt_Handler_Table (Interrupt_Handler_Count) :=
-        (Capability_Handler, null, Object, Cap);
+        (Capability_Handler, null, Object, Cap,
+         Interrupt in 32 .. 47
+         and then Rose.Arch.PIC.Is_Level_Triggered
+           (Rose.Words.Word_8 (Natural (Interrupt) - 32)));
       Set_Handler
         (Interrupt, Interrupt_Handler_Table (Interrupt_Handler_Count)'Access);
    end Set_Handler;
