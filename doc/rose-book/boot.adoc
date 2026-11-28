@@ -54,12 +54,13 @@ The kernel then switches its log output to the serial port and starts the clock.
 * replacing a running process: hold-calls, release-calls, swap-processes and process-state (ADR 0032, #862), which init gives to `mem`;
 * restored-endpoint, which makes an endpoint cap to a restored process, so that the update boot can call the restored `exec` and command registry (#829); only `restore-install` gets it;
 * restarting the machine, trace events, and writing the system image;
-* five _root capabilities_, for I/O ports, interrupts, device pages, device ranges and boot tags.
+* six _root capabilities_, for I/O ports, interrupts, device pages, device ranges, DMA ranges and boot tags.
 
 A root capability makes capabilities for hardware.
 Given a range of ports, an interrupt vector, a physical page, a range of physical pages or a multiboot2 tag type, it replies with a capability for just that, with less authority than its own; none of the capabilities it makes can make others.
-The device-page and device-range roots refuse a page that is RAM.
+The device-page, device-range and DMA-range roots refuse a page that is RAM.
 A device page is mapped at its own address, and a device range at an address its holder chooses in the device window, `E000_0000` to `EF00_0000`.
+A DMA range is a run of pages in the first megabyte, mapped at their own addresses, so that its holder knows their physical addresses and can give them to a device (see <<dma-pages>>).
 A boot tag capability reads that tag from what the boot loader reported, such as the framebuffer's address and geometry.
 
 == `init`
@@ -165,8 +166,28 @@ Each program on the install media comes with a list of the capabilities it asks 
 `init` grants each request that its policy allows, and leaves out the rest:
 
 * any program may have `create-endpoint`, and `create-signal`, which makes signal capabilities for its own signal bits (see <<signals>>);
-* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `framebuffer` (the boot loader's linear framebuffer, if it gave one), `boot-tag 8` (the framebuffer's geometry), and `bank PAGES REGIONS` (a bank of its own under the root bank, with those limits, which must not be zero; see ADR 0014);
+* only drivers, the programs in the install media's `drivers` directory, may have the others: deleting and rescinding caps, interrupts, ports and device pages, `device-pages FIRST COUNT` (one capability for a DMA range; see <<dma-pages>>), `framebuffer` (the boot loader's linear framebuffer, if it gave one), `boot-tag 8` (the framebuffer's geometry), and `bank PAGES REGIONS` (a bank of its own under the root bank, with those limits, which must not be zero; see ADR 0014);
 * hardware that another program already has is refused (see <<_init>>).
+
+[#dma-pages]
+=== DMA pages
+
+A device that reads and writes memory by itself, such as a network card, has to be told the physical addresses of its buffers.
+The process that owns it gets them from low memory, which `init` reserves for devices at every boot (`1000` to `9F000`), so `mem` never has them and no checkpoint saves them.
+
+* **The process asks for a run of pages** with `device-pages FIRST COUNT` in its list of capabilities, giving page numbers in decimal.
+For example, `device-pages 16 16` asks for the 64 KiB at `10000`.
+`init` records the pages as the program's, as it does a device page, and gives it one capability for the whole run.
+* **Invoking the capability maps the pages at their own addresses,** writable and not executable, so an address in them is also the address to give the device.
+* **The program's image must not be at those addresses.**
+A program is linked at address 0 unless its linker script says otherwise, so a program with DMA pages starts its image at `100000`, the first megabyte's end, and asserts it, as `vga-console` does for its text page.
+* **The mappings and the contents don't survive a restore.**
+The process maps the pages again in `Restored`, and sets its device up again, which it has to do anyway: the device has been reset.
+* **The pages are never persistent.**
+A device writes them without going through the page tables, so `mem` could neither protect nor copy them during a checkpoint (ADR 0030).
+
+The pool is less than 640 KiB, and which program has which pages is written in each program's list.
+A general allocator, for RAM above the first megabyte, is #1201.
 
 [#handing-over-the-console]
 === Handing over the console

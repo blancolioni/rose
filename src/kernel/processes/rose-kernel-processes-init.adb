@@ -127,6 +127,8 @@ package body Rose.Kernel.Processes.Init is
              Kernel (Kernel_Caps.Boot_Tags_Endpoint),
            Init_Caps.Device_Ranges_Cap      =>
              Layout (Physical_Memory_Cap, Memory.Device_Range),
+           Init_Caps.Device_Identity_Ranges_Cap =>
+             Layout (Physical_Memory_Cap, Memory.Device_Identity_Range),
            Init_Caps.Derive_Cap             =>
              Layout (Meta_Cap, Meta.Derive_Cap),
            Init_Caps.Restore_Derivations_Cap =>

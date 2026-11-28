@@ -107,12 +107,20 @@ package Rose.Init_Capabilities is
    --  it gives the kernel frames for copies, saves pages through the
    --  kernel, and ends the copying when it has saved them.
 
-   Last_Cap               : constant := 40;
+   Device_Identity_Ranges_Cap : constant := 41;
+   --  Data: the first physical page and the number of pages, all in the
+   --  first megabyte.  Replies with a cap that maps the range at its own
+   --  addresses, if no page in it is RAM: DMA pages for the process that
+   --  owns a device, which tells the device their physical addresses
+   --  (#291).
+
+   Last_Cap               : constant := 41;
 
    Derive_Ports_Endpoint     : constant := 5;
    Derive_Interrupt_Endpoint : constant := 2;
    Device_Page_Endpoint      : constant := 4;
    Device_Range_Endpoint     : constant := 5;
+   Device_Identity_Range_Endpoint : constant := 6;
 
    Port_Out_Endpoint       : constant := 1;
    Port_In_Endpoint        : constant := 2;
