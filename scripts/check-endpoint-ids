@@ -22,6 +22,17 @@
 # as sets, so the file stays sorted by name; the interface level is the
 # number of lines (scripts/make-interface-level).
 #
+# Records are checked the same way (ADR 0048, section 4, #1209).
+# interfaces/record-fields.txt lists every field of every record (idle
+# --list-fields): the record, the field's position, name and type, and its
+# default. It must match the interfaces, and --update writes it with the
+# ids. Within a series a record only gains fields, at its end, each with a
+# default: every line of the list at the tag must still be there,
+# unchanged, which refuses removing, reordering or renaming a field and
+# changing its type or default, and a field added since the tag to a
+# record that existed at the tag must have a default. A tag without the
+# list skips the series check of fields.
+#
 # Before that tag exists (up to the frozen release itself, before it is
 # tagged), the series check is skipped. After it, a missing
 # tag is an error, since it most likely means a clone without tags.
@@ -32,6 +43,7 @@
 
 IDLE=${IDLE:-idle}
 LIST=interfaces/endpoint-ids.txt
+FIELDS=interfaces/record-fields.txt
 VERSION=src/base/rose-version.ads
 
 version_part() {
@@ -52,7 +64,10 @@ TAG=${ENDPOINT_IDS_TAG:-v$FROZEN}
 current=$(mktemp) || exit 2
 tagged=$(mktemp) || exit 2
 gone=$(mktemp) || exit 2
-trap 'rm -f "$current" "$tagged" "$gone"' EXIT
+current_fields=$(mktemp) || exit 2
+tagged_fields=$(mktemp) || exit 2
+added=$(mktemp) || exit 2
+trap 'rm -f "$current" "$tagged" "$gone" "$current_fields" "$tagged_fields" "$added"' EXIT
 
 # Check that every line of the list at $TAG is in $current.
 
@@ -89,6 +104,46 @@ check_series() {
         return 1
     fi
     echo "check-endpoint-ids: every endpoint id of $TAG is still there"
+    check_fields
+}
+
+# Check that every field of the list at $TAG is in $current_fields, and that
+# the fields added since to the records at $TAG have defaults.
+
+check_fields() {
+    if ! git cat-file -e "$TAG:$FIELDS" 2> /dev/null; then
+        echo "check-endpoint-ids: no $FIELDS at $TAG, so the record" \
+             "fields of the series are not checked"
+        return 0
+    fi
+    git show "$TAG:$FIELDS" > "$tagged_fields" || exit 2
+
+    if LC_ALL=C grep -Fxv -f "$current_fields" "$tagged_fields" > "$gone"; then
+        echo "check-endpoint-ids: these record fields of $TAG have changed" \
+             "or gone:" >&2
+        cat "$gone" >&2
+        echo "  Within a release series a record only gains fields, at its" >&2
+        echo "  end (ADR 0048, section 4): processes from $TAG encode and" >&2
+        echo "  decode these. Keep each field, its position, its type and" >&2
+        echo "  its default." >&2
+        return 1
+    fi
+
+    LC_ALL=C grep -Fxv -f "$tagged_fields" "$current_fields" \
+        | awk 'NR == FNR { old[$1] = 1; next }
+               ($1 in old) && !/ := / { print }' "$tagged_fields" - \
+        > "$gone"
+    if [ -s "$gone" ]; then
+        echo "check-endpoint-ids: these fields were added to records of" \
+             "$TAG without a default:" >&2
+        cat "$gone" >&2
+        echo "  A process from $TAG sends these records without them, and" >&2
+        echo "  the decoder gives a missing field its default (ADR 0048," >&2
+        echo "  section 4). Give each one a default." >&2
+        return 1
+    fi
+    echo "check-endpoint-ids: every record field of $TAG is still there," \
+         "and the added ones have defaults"
 }
 
 # shellcheck disable=SC2046
@@ -99,9 +154,18 @@ then
     exit 2
 fi
 
+# shellcheck disable=SC2046
+if ! LC_ALL=C $IDLE --list-fields -I interfaces \
+       $(LC_ALL=C ls interfaces/*.idl) > "$current_fields"
+then
+    echo "check-endpoint-ids: idle --list-fields failed" >&2
+    exit 2
+fi
+
 if [ "$1" = "--update" ]; then
     cp "$current" "$LIST"
-    echo "check-endpoint-ids: wrote $LIST"
+    cp "$current_fields" "$FIELDS"
+    echo "check-endpoint-ids: wrote $LIST and $FIELDS"
     check_series || exit 1
     exit 0
 fi
@@ -113,6 +177,15 @@ if ! git diff --no-index -- "$LIST" "$current"; then
     echo "  A changed id breaks the restore of a checkpoint taken before" >&2
     echo "  it. If the change is meant, run scripts/check-endpoint-ids" >&2
     echo "  --update, and say so in the PR." >&2
+    exit 1
+fi
+
+if ! git diff --no-index -- "$FIELDS" "$current_fields"; then
+    echo "check-endpoint-ids: the record fields differ from $FIELDS." >&2
+    echo "  A process encodes and decodes the records it was built with." >&2
+    echo "  Within a series a record only gains fields, at its end, each" >&2
+    echo "  with a default (ADR 0048, section 4). If the change is meant," >&2
+    echo "  run scripts/check-endpoint-ids --update, and say so in the PR." >&2
     exit 1
 fi
 

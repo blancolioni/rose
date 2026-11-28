@@ -58,6 +58,8 @@ check-targets:
 # restore of a checkpoint taken before it. scripts/check-endpoint-ids
 # --update writes the list after a deliberate change. Within a release
 # series, every id of the series' first tag must still be there (#827).
+# It checks interfaces/record-fields.txt the same way: within a series a
+# record only gains fields, each with a default (ADR 0048, #1209).
 check-endpoint-ids:
 	sh ./scripts/check-endpoint-ids
 
