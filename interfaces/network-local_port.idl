@@ -1,0 +1,9 @@
+--  The right to listen on one local port (ADR 0007, section 3). Ports for
+--  outgoing connections are chosen by net, and are not a grant.
+
+interface Network.Local_Port is
+
+   function Listen return interface Network.Listener;
+   --  Fails if something is already listening on the port.
+
+end Network.Local_Port;

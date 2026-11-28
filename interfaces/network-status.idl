@@ -1,0 +1,18 @@
+--  How the network is configured, read-only (ADR 0007, section 4):
+--  addresses as strings. Every string is empty, and the counts are 0,
+--  until net has an address, from DHCP or set by hand.
+
+interface Network.Status is
+
+   function Local_Address return String;
+
+   function Prefix_Length return Natural;
+
+   function Gateway return String;
+
+   function Name_Server_Count return Natural;
+
+   function Name_Server (Index : Positive) return String;
+   --  Fails if Index is more than Name_Server_Count.
+
+end Network.Status;

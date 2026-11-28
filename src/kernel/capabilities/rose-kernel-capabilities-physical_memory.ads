@@ -20,6 +20,14 @@ package Rose.Kernel.Capabilities.Physical_Memory is
    --  with a cap that maps them together in the device window (#582),
    --  unless a page is RAM.
 
+   Device_Identity_Range : constant Rose.Objects.Endpoint_Index :=
+                             Rose.Init_Capabilities
+                               .Device_Identity_Range_Endpoint;
+   --  Only init's Device_Identity_Ranges_Cap has this endpoint.  As
+   --  Device_Range, but every page must be below
+   --  Pages.Identity_Range_Bound, and the cap maps the range at its own
+   --  addresses (#291).
+
    procedure Handle
      (Cap    : Rose.Capabilities.Layout.Capability_Layout;
       Params : Rose.Invocation.Invocation_Access);

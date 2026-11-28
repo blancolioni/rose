@@ -1,0 +1,41 @@
+--  An Ethernet card, as the network stack sees it (ADR 0007, #294). A
+--  process for each card serves it, and net is its only client. Calls go
+--  towards the card: the card's process never calls net, and tells it
+--  that frames have arrived by raising a signal (ADR 0007, section 2).
+
+interface Devices.Network_Device is
+
+   Max_Frame_Size : constant := 1514;
+   --  The longest frame, in bytes: an Ethernet frame without its frame
+   --  check sequence, which the card adds and checks.
+
+   function MAC_Address return Word_64;
+   --  The card's six-byte address as a 48-bit number: the first byte on
+   --  the wire in bits 47 .. 40 and the last in bits 7 .. 0. Bits 63 ..
+   --  48 are zero.
+
+   function Link_Up return Boolean;
+   --  Whether the card has a link.
+
+   procedure Notify (Signal : Capability);
+   --  Signal is a signal cap (ADR 0006), which the card's process
+   --  invokes, never waiting, when a frame arrives or the link goes up
+   --  or down. The holder then calls Receive_Frame until it returns
+   --  nothing, and Link_Up. A later Notify replaces the signal cap.
+
+   procedure Send_Frame (Frame : Stream_Element_Array);
+   --  Queue one frame to send, from its destination address to the end
+   --  of its payload. Fails if the frame is longer than Max_Frame_Size,
+   --  or if the card has no room to queue it; the stack treats both as
+   --  a frame lost on the wire.
+
+   procedure Receive_Frame
+     (Frame : out Stream_Element_Array;
+      Last  : out Stream_Element_Offset);
+   --  Take the oldest frame that has arrived, without its frame check
+   --  sequence. Never waits: Last < Frame'First if no frame is waiting.
+   --  Frame should have room for Max_Frame_Size bytes. When the card's
+   --  queue of received frames is full, it drops each new frame that
+   --  arrives, as the card itself does when it has no free buffers.
+
+end Devices.Network_Device;

@@ -1,0 +1,15 @@
+--  A TCP connection, as a stream in both directions (ADR 0007, section
+--  3), so a command that takes a stream can be given one. Release closes
+--  it in both directions (ADR 0010); releasing it again does nothing.
+--
+--  A Read waits until data arrives. net holds the request meanwhile, so
+--  the wait stops only the caller. A Read that returns nothing is the end
+--  of the stream (ADR 0011): the far end has closed its side.
+--
+--  After a restore the connection is closed, as if the far end had reset
+--  it (section 6): every call but Release fails, and so does a Read that
+--  was waiting.
+
+interface Network.Connection : Streams.Stream, Common.Resource is
+
+end Network.Connection;
