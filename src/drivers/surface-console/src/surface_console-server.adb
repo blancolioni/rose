@@ -12,6 +12,7 @@ with Rose.Interfaces.Processes.Restorable.Server;
 with Rose.Interfaces.Screens.Terminal.Server;
 
 with Text_Console;
+with Text_Console.Serial;
 
 with Surface_Console.Line_Discipline;
 with Surface_Console.Screen;
@@ -28,8 +29,10 @@ package body Surface_Console.Server is
    Events_Signal : constant := 8;
    --  The console's own signal bit for the surface's events.
 
-   Key_Event   : constant := 1;
-   Event_Bytes : constant := 16;
+   Key_Event     : constant := 1;
+   Pointer_Event : constant := 2;
+   Wheel_Event   : constant := 5;
+   Event_Bytes   : constant := 16;
 
    type Console is limited new
      Rose.Interfaces.Screens.Terminal.Server.Terminal_Interface
@@ -224,6 +227,15 @@ package body Surface_Console.Server is
       function Get_Word (Offset : Stream_Element_Offset) return Word;
       --  The word at Offset in Buffer, in the machine's byte order
 
+      function Image (Value : Word) return String;
+      --  Value in decimal, with no space before it
+
+      function Signed_Image (Value : Word) return String
+      is (if Value >= 2 ** 31
+          then "-" & Image (Word'Last - Value + 1)
+          else Image (Value));
+      --  Value, an Integer_32 word, in decimal
+
       --------------
       -- Get_Word --
       --------------
@@ -236,6 +248,24 @@ package body Surface_Console.Server is
          end loop;
          return Result;
       end Get_Word;
+
+      -----------
+      -- Image --
+      -----------
+
+      function Image (Value : Word) return String is
+         Digits_Of : String (1 .. 10);
+         First     : Positive := Digits_Of'Last + 1;
+         Rest      : Word := Value;
+      begin
+         loop
+            First := First - 1;
+            Digits_Of (First) := Character'Val (48 + Natural (Rest mod 10));
+            Rest := Rest / 10;
+            exit when Rest = 0;
+         end loop;
+         return Digits_Of (First .. Digits_Of'Last);
+      end Image;
 
    begin
       loop
@@ -250,6 +280,19 @@ package body Surface_Console.Server is
                   Surface_Console.Line_Discipline.On_Key
                     (Get_Word (Start + 4) mod 2 ** 24,
                      Get_Word (Start + 8) mod 8);
+
+               --  The console has no use for the pointer (ADR 0022), and
+               --  only traces it, with pointer-trace on the kernel's
+               --  command line (#588).
+
+               elsif Get_Word (Start) = Pointer_Event then
+                  Text_Console.Serial.Trace
+                    ("pointer: " & Image (Get_Word (Start + 4))
+                     & " " & Image (Get_Word (Start + 8))
+                     & " " & Image (Get_Word (Start + 12)));
+               elsif Get_Word (Start) = Wheel_Event then
+                  Text_Console.Serial.Trace
+                    ("wheel: " & Signed_Image (Get_Word (Start + 4)));
                end if;
                Start := Start + Event_Bytes;
             end loop;
@@ -329,9 +372,12 @@ package body Surface_Console.Server is
    begin
       --  The screen driver redraws the screen, so only the input is
       --  left: what was typed before the checkpoint isn't for the
-      --  program that reads next (#523).
+      --  program that reads next (#523). Each boot has its own kernel
+      --  command line, which says whether to copy and trace.
 
       Surface_Console.Line_Discipline.Discard_Input;
+      Text_Console.Serial.Start
+        (Command_Line_Cap, Serial_Data_Cap, Serial_Status_Cap);
    end Restored;
 
    ------------

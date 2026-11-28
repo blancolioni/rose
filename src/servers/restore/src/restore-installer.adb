@@ -72,6 +72,9 @@ package body Restore.Installer is
                               Rose.Capabilities.Null_Capability;
    Screen_Surface_Cap     : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
+   Input_Controller_Cap   : Rose.Capabilities.Capability :=
+                              Rose.Capabilities.Null_Capability;
+   --  The ps2 driver's Input_Controller, for Requires_Input_Controller.
    Input_Stream_Cap       : Rose.Capabilities.Capability :=
                               Rose.Capabilities.Null_Capability;
    Terminal_Cap           : Rose.Capabilities.Capability :=
@@ -328,6 +331,8 @@ package body Restore.Installer is
                Matches := Word = "requires_console";
             when Test_Only =>
                Matches := Word = "test_only";
+            when Requires_Input_Controller =>
+               Matches := Word = "requires_input_controller";
          end case;
 
          if Matches then
@@ -867,6 +872,8 @@ package body Restore.Installer is
 
          if Flags (Requires_Keyboard_Interface) then
             Rose.System_Calls.Send_Cap (Params, Keyboard_Interface_Cap);
+         elsif Flags (Requires_Input_Controller) then
+            Rose.System_Calls.Send_Cap (Params, Input_Controller_Cap);
          elsif Flags (Requires_Screen) then
             Rose.System_Calls.Send_Cap (Params, Screen_Surface_Cap);
          elsif Flags (Requires_Console) then
@@ -914,11 +921,12 @@ package body Restore.Installer is
                            --  whose ancestors are the keyboard and the
                            --  mouse (#588).
 
+                           Input_Controller_Cap :=
+                             Get_Public_Interface_From_Process
+                               (Rose.Invocation.Sent_Cap (Reply, 0));
                            Keyboard_Interface_Cap :=
                              Get_Ancestor_Interface
-                               (Get_Public_Interface_From_Process
-                                  (Rose.Invocation.Sent_Cap (Reply, 0)),
-                                Event_Source_Ancestor);
+                               (Input_Controller_Cap, Event_Source_Ancestor);
                         end if;
 
                         if Flags (Provides_Clock) then
