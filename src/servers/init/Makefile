@@ -60,6 +60,9 @@ COMMON_OBJECTS= \
 	$(BUILDDIR)/rose-interfaces-screens-terminal.o \
 	$(BUILDDIR)/rose-interfaces-screens-terminal-client.o \
 	$(BUILDDIR)/rose-interfaces-streams-reader-client.o \
+	$(BUILDDIR)/rose-interfaces-devices.o \
+	$(BUILDDIR)/rose-interfaces-devices-pci_bus-client.o \
+	$(BUILDDIR)/rose-interfaces-devices-pci_device-client.o \
 	$(BUILDDIR)/rose-interfaces-users-user.o \
 	$(BUILDDIR)/rose-interfaces-users-user-client.o \
 	$(BUILDDIR)/rose-interfaces-files-writable_directory-client.o \

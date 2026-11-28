@@ -6,6 +6,8 @@
 with Rose.Capabilities;
 with Rose.Words;
 
+with Rose.Interfaces.Devices.Pci_Device.Client;
+
 package Init.Grants is
 
    type Owner_Id is new Natural;
@@ -33,6 +35,42 @@ package Init.Grants is
      (Owner  : Owner_Id;
       Vector : Rose.Words.Word)
       return Rose.Capabilities.Capability;
+
+   --  PCI devices (#292): a driver asks for a device by its vendor and
+   --  device ids, and then for its ports and its interrupt.
+
+   function PCI_Device
+     (Owner  : Owner_Id;
+      Bus    : Rose.Capabilities.Capability;
+      Vendor : Rose.Words.Word;
+      Device : Rose.Words.Word;
+      Index  : Rose.Words.Word;
+      Client : out Rose.Interfaces.Devices.Pci_Device.Client
+                     .Pci_Device_Client)
+      return Rose.Capabilities.Capability;
+   --  The Index'th device with these ids, counting from 0, from Bus, the
+   --  pci server's PCI_Bus: its interface cap, which can write the
+   --  device's command register, and in Client a client of it for init.
+   --  The null cap if pci has no such device, or another owner has it.
+
+   function PCI_Ports
+     (Owner    : Owner_Id;
+      Device   : Rose.Interfaces.Devices.Pci_Device.Client
+                   .Pci_Device_Client;
+      BAR      : Rose.Words.Word;
+      Endpoint : Rose.Words.Word;
+      Size     : Rose.Words.Word)
+      return Rose.Capabilities.Capability;
+   --  A range port cap, Endpoint and Size as for Ports, for the I/O ports
+   --  of Device's base address register BAR, or the null cap if BAR isn't
+   --  an I/O BAR, or Ports refuses.
+
+   function PCI_Interrupt
+     (Owner  : Owner_Id;
+      Device : Rose.Interfaces.Devices.Pci_Device.Client.Pci_Device_Client)
+      return Rose.Capabilities.Capability;
+   --  A cap for Device's interrupt, as Interrupt gives, or the null cap if
+   --  it has none.
    --  A cap that installs a handler for Vector, or the null cap if
    --  another owner has it, or the kernel refuses.
 
