@@ -19,7 +19,8 @@ IDL=caps-cap storage-block_array files-file_system files-directory common-tree f
     processes-server processes-process_control time-timeout \
     time-timer caps-constructor caps-bank_constructor \
     caps-cap_set caps-releasable_cap_set screens-terminal \
-    devices-event_source devices-event_listener commands-lookup \
+    devices-event_source devices-event_listener devices-pci_bus \
+    devices-pci_device commands-lookup \
     commands-map processes-heap caps-receiver common-named \
     processes-kernel_process checkpoints-kernel_log \
     checkpoints-log_reader checkpoints-page_log commands-command_endpoint \

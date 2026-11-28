@@ -297,6 +297,10 @@ check_install () {
     grep -q "dma test: mapped pages hold what was written: ok" "$CONSOLE" \
         || { echo "FAIL: init's DMA test did not check its pages"; exit 1; }
 
+    # Init's PCI test (#292) must have found the IDE controller's BARs.
+    grep -q "pci test: BAR 4 is 16 I/O ports: ok" "$CONSOLE" \
+        || { echo "FAIL: init's PCI test did not decode a BAR"; exit 1; }
+
     # The kernel writes each swap of the swap test (ADR 0032, #862) to its
     # own log.
     grep -a "takes over from" "$WORK/serial" \

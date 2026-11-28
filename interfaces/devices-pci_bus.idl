@@ -1,0 +1,16 @@
+--  The PCI bus, as the pci boot server sees it (#292). It scans the bus
+--  at every boot. Init holds this interface, and gives drivers the
+--  devices that their cap requests name (pci-device).
+
+interface Devices.PCI_Bus is
+
+   function Find_Device
+     (Vendor : Word_32;
+      Device : Word_32;
+      Index  : Natural)
+      return interface Devices.PCI_Device;
+   --  The device with these vendor and device ids, counting from 0 in the
+   --  order of their bus, slot and function. Fails if there are no more
+   --  than Index such devices.
+
+end Devices.PCI_Bus;

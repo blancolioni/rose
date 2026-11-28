@@ -1,0 +1,38 @@
+--  One PCI function (#292). The cap's identifier is the function's bus,
+--  slot and function, so a cap names the same device after a restore,
+--  whatever order the bus is scanned in.
+
+interface Devices.PCI_Device is
+
+   function Vendor_Id return Word_32;
+
+   function Device_Id return Word_32;
+
+   function Read_Config (Register : Natural) return Word_32;
+   --  The 32-bit configuration register Register, 0 to 63: register 0
+   --  holds the vendor and device ids, register 4 is BAR 0. Fails if
+   --  Register is more than 63.
+
+   procedure Set_Command (Bits : Word_32);
+   --  Write the command register: I/O space (bit 0), memory space (bit
+   --  1), bus master (bit 2) and interrupt disable (bit 10). Fails if any
+   --  other bit is set. Bus master lets the device read and write memory
+   --  by itself, anywhere, so only the device's driver should have this
+   --  cap.
+
+   procedure Get_BAR
+     (Index : Natural;
+      Is_IO : out Boolean;
+      Base  : out Word_32;
+      Size  : out Word_32);
+   --  Base address register Index, 0 to 5, as pci decoded it at boot: I/O
+   --  ports or memory, the first port or address, and the size in ports
+   --  or bytes. Size is 0 for a BAR that isn't used, and for memory that
+   --  isn't below 4 GB. Fails if Index is more than 5, or names the upper
+   --  half of a 64-bit BAR.
+
+   function Interrupt_Line return Natural;
+   --  The legacy interrupt line that the firmware routed the device's
+   --  interrupt to, 0 to 15, or 255 if it has none.
+
+end Devices.PCI_Device;
