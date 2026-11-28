@@ -26,10 +26,10 @@ exec               drivers  launch
 
 ps2                drivers  launch  provides_keyboard_interface
 
-# With a framebuffer, the screen driver holds it, and the keys go to the
-# screen (ADR 0022, #582, #653).
+# With a framebuffer, the screen driver holds it, and the keys and the
+# mouse go to the screen (ADR 0022, #582, #653, #588).
 
-screen             drivers  launch  requires_framebuffer requires_keyboard_interface provides_screen
+screen             drivers  launch  requires_framebuffer requires_input_controller provides_screen
 
 # The persistent console is the terminal (#454): it draws what it is
 # written, and its line discipline reads the keyboard. It comes straight

@@ -19,7 +19,11 @@
 #      the screen driver and the surface's events to the console, and the
 #      text comes back drawn on the surface; then runs keytest, which has
 #      to draw in the corners of the framebuffer's larger screen and move
-#      its mark with the arrow keys (#734);
+#      its mark with the arrow keys (#734); then moves the mouse, clicks
+#      and turns the wheel, through QEMU's monitor, and checks the
+#      pointer's events, which the console writes to COM2 with
+#      pointer-trace on the kernel's command line: so the mouse works
+#      after a restore, which sets it up again (#588);
 #   3. waits for a checkpoint, stops the machine, and runs check-log.py on
 #      the disk.
 #
@@ -41,6 +45,53 @@ screen () {
     # The text on the framebuffer, in place of the VGA text page that
     # qemu-test-lib.sh reads.
     python3 "$HERE/fb-text.py" "$MONITOR"
+}
+
+boot_with () {
+    # boot_with ARGUMENT: boot the first entry of the disk's GRUB menu with
+    # ARGUMENT added to the kernel's command line. Home is pressed for
+    # twelve seconds, as choose_entry does; then e edits the entry. GRUB
+    # shows the entry with a setparams line and a blank line first, so
+    # Down twice goes to the multiboot2 command, End goes to the end of
+    # it, and Ctrl-X boots.
+    i=0
+    while [ $i -lt 24 ]; do
+        monitor "sendkey home"
+        sleep 0.5
+        i=$((i + 1))
+    done
+    monitor "sendkey e"
+    sleep 2
+    monitor "sendkey down"
+    monitor "sendkey down"
+    monitor "sendkey end"
+    type_text " $1"
+    sleep 1
+    monitor "sendkey ctrl-x"
+}
+
+pointer () {
+    # pointer EXPECTED WHAT COMMAND...: run COMMAND, and wait for the line
+    # EXPECTED in the console's trace
+    expected=$1
+    what=$2
+    shift 2
+    mark=$(console_mark)
+    "$@"
+    wait_for_console "^$expected\$" 30 "$mark" \
+        || fail "$what: expected '$expected'"
+    echo "$what: $expected"
+}
+
+move_far () {
+    # move_far DX DY: move the mouse twelve times by DX and DY. QEMU sends
+    # a large movement in parts, and keeps the rest until the mouse's next
+    # event, so a far move is made of small ones that it sends whole.
+    i=0
+    while [ $i -lt 12 ]; do
+        monitor "mouse_move $1 $2"
+        i=$((i + 1))
+    done
 }
 
 passed () {
@@ -90,6 +141,7 @@ stop_qemu
 
 echo "Booting from the disk, which restores the install"
 start_qemu
+boot_with pointer-trace
 log_in
 
 # With a framebuffer, the boot console writes to the serial port, so the
@@ -116,6 +168,27 @@ passed "$result" || fail "not every self test passed"
 
 echo "Running keytest on the framebuffer's screen"
 check_keytest
+
+# The mouse, through QEMU's monitor (#588). QEMU sends the PS/2 mouse a
+# relative movement, with Y positive down; a wheel turn away from the
+# user is dz 1. The screen is 1024 by 768, and the pointer stays on it.
+echo "Moving the mouse"
+pointer "pointer: 0 0 0" "the top left" move_far -100 -100
+pointer "pointer: 10 20 0" "a move" monitor "mouse_move 10 20"
+pointer "pointer: 10 20 1" "the left button down" monitor "mouse_button 1"
+pointer "pointer: 10 20 0" "the left button up" monitor "mouse_button 0"
+pointer "pointer: 10 20 2" "the right button down" monitor "mouse_button 2"
+pointer "pointer: 10 20 0" "the right button up" monitor "mouse_button 0"
+pointer "pointer: 1023 767 0" "the bottom right" move_far 100 100
+pointer "wheel: -1" "the wheel away" monitor "mouse_move 0 0 1"
+pointer "wheel: 1" "the wheel towards" monitor "mouse_move 0 0 -1"
+
+echo "Typing while the mouse moves"
+type_text "echo ty"
+monitor "mouse_move -5 -5"
+type_text "ped
+"
+wait_for "^typed" 20 || fail "the keys were lost while the mouse moved"
 
 echo "Waiting for a checkpoint, then stopping the machine"
 sleep 45

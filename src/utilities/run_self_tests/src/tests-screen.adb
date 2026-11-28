@@ -61,9 +61,19 @@ package body Tests.Screen is
             X, Y    : Interfaces.Integer_32;
             Buttons : Word;
          begin
+            --  The surface is the whole screen, so the pointer is over
+            --  it, and on it (#588). Its buttons may be down.
+
             Surface.Get_Pointer (Over, X, Y, Buttons);
-            if Over or else X /= 0 or else Y /= 0 or else Buttons /= 0 then
-               return Fail ("there is a pointer");
+            if not Over then
+               return Fail ("the pointer isn't over the screen");
+            elsif X < 0 or else Y < 0
+              or else X >= Interfaces.Integer_32 (Width)
+              or else Y >= Interfaces.Integer_32 (Height)
+            then
+               return Fail ("the pointer is off the screen");
+            elsif Buttons >= 32 then
+               return Fail ("the pointer has more than five buttons");
             end if;
          end;
 

@@ -8,7 +8,9 @@ package Screen.Events is
    --  surface.idl). An event is four 32-bit words, in the machine's byte
    --  order: its kind, then three words whose meaning depends on it.
 
-   Key_Event : constant := 1;
+   Key_Event     : constant := 1;
+   Pointer_Event : constant := 2;
+   Wheel_Event   : constant := 5;
 
    Event_Bytes : constant := 16;
 
@@ -17,6 +19,13 @@ package Screen.Events is
       First, Second     : Rose.Words.Word_32 := 0;
       Third             : Rose.Words.Word_32 := 0);
    --  Queue an event. If the queue is full, the oldest event is dropped.
+
+   procedure Add_Pointer
+     (X, Y    : Rose.Words.Word_32;
+      Buttons : Rose.Words.Word_32);
+   --  Queue a pointer event; or, if the newest event queued is a pointer
+   --  event with the same buttons, overwrite it, so that movement alone
+   --  can't fill the queue (#588).
 
    function Is_Empty return Boolean;
 

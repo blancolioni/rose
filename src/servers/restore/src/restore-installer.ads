@@ -18,7 +18,8 @@ package Restore.Installer is
       Requires_Screen,
       Provides_Cap_Sets,
       Requires_Console,
-      Test_Only);
+      Test_Only,
+      Requires_Input_Controller);
    --  Provides_Console: the program is the persistent console, a
    --  Terminal, whose Writer init gives everything installed after
    --  it as standard output (#454). With Provides_Input_Stream as well,
@@ -44,8 +45,14 @@ package Restore.Installer is
    --  console; it has neither of the other two.
    --  Test_Only: the program is only for the tests, and is installed, or
    --  updated, only by a test install, with self-tests on the kernel's
-   --  command line (#1009). It is the last flag, so init's bits don't
+   --  command line (#1009). It comes after init's bits, so they don't
    --  move.
+   --  Requires_Input_Controller: the program is given the ps2 driver's
+   --  Input_Controller after its own caps, the keyboard and the mouse in
+   --  one cap, as the screen driver is (#588). Provides_Keyboard_Interface
+   --  is the program that publishes it; the others that read the
+   --  keyboard are given its Event_Source ancestor. A program has at most
+   --  one of the Requires_ flags that give a cap.
    --  In the install list, /rose/install/list (#1100), a flag is named
    --  by its name in lower case, apart from Is_Driver, which the
    --  category sets. scripts/check-install-list reads the names from

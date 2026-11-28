@@ -9,6 +9,7 @@ package body Text_Console.Serial is
    use System.Storage_Elements;
 
    Enabled     : Boolean := False;
+   Tracing     : Boolean := False;
    Data_Cap    : Rose.Capabilities.Capability :=
      Rose.Capabilities.Null_Capability;
    Status_Cap  : Rose.Capabilities.Capability :=
@@ -158,7 +159,19 @@ package body Text_Console.Serial is
       Data_Cap := Data;
       Status_Cap := Status;
       Enabled := Has_Argument (Command_Line, "serial-console");
+      Tracing := Has_Argument (Command_Line, "pointer-trace");
    end Start;
+
+   -----------
+   -- Trace --
+   -----------
+
+   procedure Trace (Text : String) is
+   begin
+      if Tracing then
+         Write (Text & Character'Val (10));
+      end if;
+   end Trace;
 
    -----------
    -- Write --

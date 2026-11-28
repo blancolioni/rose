@@ -31,6 +31,30 @@ package body Screen.Events is
       Count := Count + 1;
    end Add;
 
+   -----------------
+   -- Add_Pointer --
+   -----------------
+
+   procedure Add_Pointer
+     (X, Y    : Rose.Words.Word_32;
+      Buttons : Rose.Words.Word_32)
+   is
+   begin
+      if Count > 0 then
+         declare
+            Newest : Event renames
+                       Queue ((Head + Count - 1) mod Max_Events);
+         begin
+            if Newest (1) = Pointer_Event and then Newest (4) = Buttons then
+               Newest := (Pointer_Event, X, Y, Buttons);
+               return;
+            end if;
+         end;
+      end if;
+
+      Add (Pointer_Event, X, Y, Buttons);
+   end Add_Pointer;
+
    --------------
    -- Is_Empty --
    --------------
